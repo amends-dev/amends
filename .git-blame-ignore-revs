@@ -1,0 +1,5 @@
+# Commits git blame skips: run `git config blame.ignoreRevsFile .git-blame-ignore-revs` to use it
+# locally; GitHub reads it by itself.
+
+# Format as Effect's code is formatted
+299bb200650c625917b66dc70422283808bab3f8

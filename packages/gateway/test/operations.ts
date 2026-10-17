@@ -1,16 +1,17 @@
-import { Identity } from "@amends-dev/core/identity";
-import { Assignment, AssignmentService } from "@amends-dev/core/authorization";
+import { type Assignment, AssignmentService } from "@amends-dev/core/authorization"
+import type { Identity } from "@amends-dev/core/identity"
 import {
-  Invitation,
+  type Invitation,
   InvitationService,
   Member,
   MemberService,
-  Ownership,
+  type Ownership,
   OwnershipService,
-  Workspace,
-} from "@amends-dev/core/workspace";
-import { Gateway } from "@amends-dev/gateway";
-import { Effect } from "effect";
+  type WorkspaceId,
+  type MemberId
+} from "@amends-dev/core/workspace"
+import { Gateway } from "@amends-dev/gateway"
+import { Effect } from "effect"
 
 /**
  * Test driver over the gateway: each function enters a workspace and runs one
@@ -18,98 +19,89 @@ import { Effect } from "effect";
  * handler does, without going through HTTP. A person joins named as their human
  * ID unless a test names them.
  */
-export const createWorkspace = (
-  creator: Identity.HumanId,
-  memberName: Member.Name = Member.Name.make(creator),
-) =>
-  Effect.flatMap(Gateway.Gateway, (gateway) =>
-    gateway.createWorkspace(creator, { name: "Test workspace", memberName }),
-  );
+export const createWorkspace = (creator: Identity.HumanId, memberName: Member.Name = Member.Name.make(creator)) =>
+  Effect.flatMap(Gateway.Gateway, (gateway) => gateway.createWorkspace(creator, { name: "Test workspace", memberName }))
 export const renameMember = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  name: Member.Name,
+  name: Member.Name
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(MemberService.MemberService, (memberService) => memberService.rename(name)),
-      ),
-    ),
-  );
+        Effect.flatMap(MemberService.MemberService, (memberService) => memberService.rename(name))
+      )
+    )
+  )
 
 export const getMember = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  memberId: Member.Id,
+  memberId: MemberId.MemberId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(MemberService.MemberService, (memberService) => memberService.get(memberId)),
-      ),
-    ),
-  );
+        Effect.flatMap(MemberService.MemberService, (memberService) => memberService.get(memberId))
+      )
+    )
+  )
 
 export const removeMember = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  memberId: Member.Id,
+  memberId: MemberId.MemberId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(MemberService.MemberService, (memberService) =>
-          memberService.remove(memberId),
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(MemberService.MemberService, (memberService) => memberService.remove(memberId))
+      )
+    )
+  )
 
 export const invite = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  request: Invitation.IssueInput,
+  request: Invitation.IssueInput
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-          invitationService.issue(request),
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(InvitationService.InvitationService, (invitationService) => invitationService.issue(request))
+      )
+    )
+  )
 
 export const acceptInvitation = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   recipient: Identity.HumanId,
-  invitationId: Invitation.Id,
-  name: Member.Name = Member.Name.make(recipient),
+  invitationId: Invitation.InvitationId,
+  name: Member.Name = Member.Name.make(recipient)
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.inWorkspace(
         workspaceId,
         Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-          invitationService.accept(invitationId, recipient, name),
-        ),
-      ),
-    ),
-  );
+          invitationService.accept(invitationId, recipient, name)
+        )
+      )
+    )
+  )
 
 export const revokeInvitation = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  invitationId: Invitation.Id,
+  invitationId: Invitation.InvitationId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
@@ -117,108 +109,94 @@ export const revokeInvitation = (
         workspaceId,
         identity,
         Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-          invitationService.revoke(invitationId),
-        ),
-      ),
-    ),
-  );
+          invitationService.revoke(invitationId)
+        )
+      )
+    )
+  )
 
-export const ownership = (workspaceId: Workspace.Id, identity: Identity.MemberReference) =>
+export const ownership = (workspaceId: WorkspaceId.WorkspaceId, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(
-          OwnershipService.OwnershipService,
-          (ownershipService) => ownershipService.get,
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) => ownershipService.get)
+      )
+    )
+  )
 export const transferOwnership = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  input: Ownership.TransferInput,
+  input: Ownership.TransferInput
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) =>
-          ownershipService.transfer(input),
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) => ownershipService.transfer(input))
+      )
+    )
+  )
 
-export const permissions = (workspaceId: Workspace.Id, identity: Identity.MemberReference) =>
+export const permissions = (workspaceId: WorkspaceId.WorkspaceId, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(
-          AssignmentService.AssignmentService,
-          (assignmentService) => assignmentService.permissions,
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) => assignmentService.permissions)
+      )
+    )
+  )
 export const access = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  memberId: Member.Id,
+  memberId: MemberId.MemberId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-          assignmentService.list(memberId),
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) => assignmentService.list(memberId))
+      )
+    )
+  )
 export const assign = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  input: Assignment.AssignInput,
+  input: Assignment.AssignInput
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-          assignmentService.assign(input),
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) => assignmentService.assign(input))
+      )
+    )
+  )
 export const change = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  input: Assignment.ChangeInput,
+  input: Assignment.ChangeInput
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
         workspaceId,
         identity,
-        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-          assignmentService.change(input),
-        ),
-      ),
-    ),
-  );
+        Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) => assignmentService.change(input))
+      )
+    )
+  )
 export const revokeAssignment = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  memberId: Member.Id,
-  assignmentId: Assignment.Id,
+  memberId: MemberId.MemberId,
+  assignmentId: Assignment.AssignmentId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
@@ -226,8 +204,8 @@ export const revokeAssignment = (
         workspaceId,
         identity,
         Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-          assignmentService.revoke(memberId, assignmentId),
-        ),
-      ),
-    ),
-  );
+          assignmentService.revoke(memberId, assignmentId)
+        )
+      )
+    )
+  )

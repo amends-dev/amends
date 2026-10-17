@@ -1,22 +1,22 @@
-import { Show, createEffect, createSignal, onCleanup, splitProps, type JSX } from "solid-js";
-import { classes } from "../../internal/props.ts";
-import * as s from "./modal.css.ts";
+import { Show, createEffect, createSignal, onCleanup, splitProps, type JSX } from "solid-js"
+import { classes } from "../../internal/props.ts"
+import * as s from "./modal.css.ts"
 
 export type RootProps = {
-  open: boolean;
+  open: boolean
   /** Called on Escape, a click outside, or a close button; the caller closes it. */
-  onClose: () => void;
-  "aria-label": string;
+  onClose: () => void
+  "aria-label": string
   /**
    * "compact" is 560px wide and as tall as its content, for short forms; "form" is 640px wide and
    * as tall as its content, for a form of a few sections; "wide" is 720 × 864, for long forms with
    * side-by-side fields; "palette" is 640 × 480 near the top, for a search that keeps its place as
    * results narrow. Default "regular".
    */
-  size?: "regular" | "compact" | "form" | "wide" | "palette";
+  size?: "regular" | "compact" | "form" | "wide" | "palette"
   /** A Pane with variant="modal". */
-  children: JSX.Element;
-};
+  children: JSX.Element
+}
 
 /**
  * A modal dialog holding a Pane: header, tabs or subtitle, a scrolling body, and Actions. It
@@ -24,21 +24,21 @@ export type RootProps = {
  * it fills the screen.
  */
 export function Root(props: RootProps) {
-  const [dialog, setDialog] = createSignal<HTMLDialogElement>();
+  const [dialog, setDialog] = createSignal<HTMLDialogElement>()
   createEffect(() => {
-    const element = dialog();
-    if (!element) return;
-    if (props.open && !element.open) element.showModal();
-    else if (!props.open && element.open) element.close();
-  });
-  let mounted = true;
+    const element = dialog()
+    if (!element) return
+    if (props.open && !element.open) element.showModal()
+    else if (!props.open && element.open) element.close()
+  })
+  let mounted = true
   // A click closes only when the press began on the backdrop too, not a drag from inside.
-  let pressedBackdrop = false;
+  let pressedBackdrop = false
   // Closing, rather than only removing, returns focus to where it was when the dialog opened.
   onCleanup(() => {
-    mounted = false;
-    if (dialog()?.open) dialog()?.close();
-  });
+    mounted = false
+    if (dialog()?.open) dialog()?.close()
+  })
   return (
     <dialog
       ref={setDialog}
@@ -46,38 +46,38 @@ export function Root(props: RootProps) {
       data-size={props.size ?? "regular"}
       aria-label={props["aria-label"]}
       onCancel={(event) => {
-        event.preventDefault();
-        props.onClose();
+        event.preventDefault()
+        props.onClose()
       }}
       onClose={() => {
         // The browser can close the dialog itself, such as on a second Escape while the caller
         // keeps it open. Ask the caller, and show it again if it stays open.
-        if (!mounted || !props.open) return;
-        props.onClose();
+        if (!mounted || !props.open) return
+        props.onClose()
         queueMicrotask(() => {
-          const element = dialog();
-          if (mounted && props.open && element && !element.open) element.showModal();
-        });
+          const element = dialog()
+          if (mounted && props.open && element && !element.open) element.showModal()
+        })
       }}
       onPointerDown={(event) => {
-        pressedBackdrop = event.target === event.currentTarget;
+        pressedBackdrop = event.target === event.currentTarget
       }}
       onClick={(event) => {
         // A click on the backdrop lands on the dialog itself.
-        const backdrop = pressedBackdrop && event.target === event.currentTarget;
-        pressedBackdrop = false;
-        if (backdrop) props.onClose();
+        const backdrop = pressedBackdrop && event.target === event.currentTarget
+        pressedBackdrop = false
+        if (backdrop) props.onClose()
       }}
     >
       <Show when={props.open}>{props.children}</Show>
     </dialog>
-  );
+  )
 }
 
-export type ActionsProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type ActionsProps = JSX.HTMLAttributes<HTMLDivElement>
 
 /** The modal's buttons, primary last. */
 export function Actions(props: ActionsProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.actions, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <div {...native} class={classes(s.actions, local.class)} />
 }

@@ -1,15 +1,15 @@
-import { splitProps, type JSX } from "solid-js";
-import { IconMarkSearch } from "@amends-dev/icons";
-import { useField } from "../field/index.ts";
-import { classes } from "../../internal/props.ts";
-import * as s from "./input.css.ts";
+import { IconMarkSearch } from "@amends-dev/icons"
+import { splitProps, type JSX } from "solid-js"
+import { classes } from "../../internal/props.ts"
+import { useField } from "../field/index.ts"
+import * as s from "./input.css.ts"
 
-export type InputProps = JSX.InputHTMLAttributes<HTMLInputElement>;
+export type InputProps = JSX.InputHTMLAttributes<HTMLInputElement>
 
 /** A bordered text field. Inside a Field it takes the label, help, and error associations. */
 export function Input(props: InputProps) {
-  const field = useField();
-  const [local, native] = splitProps(props, ["class", "type"]);
+  const field = useField()
+  const [local, native] = splitProps(props, ["class", "type"])
   return (
     <input
       id={field?.id}
@@ -19,18 +19,18 @@ export function Input(props: InputProps) {
       type={local.type ?? "text"}
       class={classes(s.input, local.class)}
     />
-  );
+  )
 }
 
-export type TextAreaProps = JSX.TextareaHTMLAttributes<HTMLTextAreaElement>;
+export type TextAreaProps = JSX.TextareaHTMLAttributes<HTMLTextAreaElement>
 
 /**
  * A bordered field for several lines, such as an agent's instructions, sized by `rows`. Inside a
  * Field it takes the label, help, and error associations.
  */
 export function TextArea(props: TextAreaProps) {
-  const field = useField();
-  const [local, native] = splitProps(props, ["class"]);
+  const field = useField()
+  const [local, native] = splitProps(props, ["class"])
   return (
     <textarea
       id={field?.id}
@@ -39,17 +39,17 @@ export function TextArea(props: TextAreaProps) {
       {...native}
       class={classes(s.input, s.textarea, local.class)}
     />
-  );
+  )
 }
 
 export type SearchFieldProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "type"> & {
   /** Also the accessible name, such as "Search tasks…". */
-  placeholder: string;
-};
+  placeholder: string
+}
 
 /** A quiet filled search field for filtering a list. */
 export function SearchField(props: SearchFieldProps) {
-  const [local, native] = splitProps(props, ["class", "placeholder"]);
+  const [local, native] = splitProps(props, ["class", "placeholder"])
   return (
     <div class={classes(s.search, local.class)}>
       <IconMarkSearch class={s.searchIcon} />
@@ -61,5 +61,5 @@ export function SearchField(props: SearchFieldProps) {
         class={s.searchInput}
       />
     </div>
-  );
+  )
 }

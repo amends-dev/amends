@@ -39,6 +39,9 @@ would be published. It needs an npm login with publish rights on the `@amends-de
 - Every export carries `@since` with the version that introduced it, which starts at the first
   published version, and `@category`, for the [documentation](#the-documentation) generated from
   them.
+- An export's doc opens with a sentence that says what it is. What a reader needs beyond it goes
+  under `**Details**`, and a module's main export shows its use under `**Example** (what it
+shows)`, as Effect's documentation does.
 - Each package has a `LICENSE`, a `README.md` that opens with install and usage, and a
   `tsconfig.build.json` extending the base configuration with emit turned on.
 

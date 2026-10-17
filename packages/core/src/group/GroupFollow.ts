@@ -7,11 +7,12 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as GroupId from "./GroupId.ts";
-import * as GroupMembership from "./GroupMembership.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+import * as Schema from "effect/Schema"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as GroupId from "./GroupId.ts"
+import * as GroupMembership from "./GroupMembership.ts"
 
 /**
  * Identifies one period of following; following again after unfollowing uses a fresh ID.
@@ -19,13 +20,13 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"));
+export const GroupFollowId = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type GroupFollowId = typeof GroupFollowId.Type
 
 /**
  * Whether the follow is current or has ended.
@@ -33,13 +34,13 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "ended"]);
+export const Status = Schema.Literals(["active", "ended"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * A member following a team group, so that threads started there afterwards admit them. It
@@ -50,16 +51,16 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const GroupFollow = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  memberId: MemberId.Id,
+  id: GroupFollowId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId,
   /** The admission the follow is held through; it ends when the admission does. */
-  groupMembershipId: GroupMembership.Id,
+  groupMembershipId: GroupMembership.GroupMembershipId,
   followedAt: Schema.DateTimeUtcFromString,
   status: Status,
-  endedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-});
+  endedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
+})
 
 /**
  * @category schemas
@@ -74,9 +75,9 @@ export interface GroupFollow extends Schema.Schema.Type<typeof GroupFollow> {}
  * @since 0.1.0
  */
 export const Input = Schema.Struct({
-  groupId: GroupId.Id,
-  memberId: MemberId.Id,
-});
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId
+})
 
 /**
  * @category options
@@ -92,11 +93,11 @@ export interface Input extends Schema.Schema.Type<typeof Input> {}
  * @since 0.1.0
  */
 export const Ending = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  followId: Id,
-  memberId: MemberId.Id,
-});
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  followId: GroupFollowId,
+  memberId: MemberId.MemberId
+})
 
 /**
  * @category schemas

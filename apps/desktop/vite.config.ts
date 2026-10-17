@@ -1,7 +1,7 @@
-import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import solid from "vite-plugin-solid";
+import { fileURLToPath } from "node:url"
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin"
+import solid from "vite-plugin-solid"
+import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   plugins: [solid(), vanillaExtractPlugin()],
@@ -11,7 +11,7 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 1420,
     strictPort: true,
-    watch: { ignored: ["**/src-tauri/**"] },
+    watch: { ignored: ["**/src-tauri/**"] }
   },
   // The oldest WebKit the bundle runs on: CSS color-mix() needs Safari 16.2. esbuild lowers syntax
   // to this target but adds no API polyfills, so it must match what the code actually uses.
@@ -20,6 +20,6 @@ export default defineConfig({
     name: "@amends-dev/desktop",
     environment: "happy-dom",
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
-    include: ["test/**/*.test.{ts,tsx}"],
-  },
-});
+    include: ["test/**/*.test.{ts,tsx}"]
+  }
+})

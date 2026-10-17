@@ -13,5 +13,5 @@ export {
   type NavigationLink,
   type NavigationSection,
   type NavigationThread,
-  type WorkspaceNavigationProps,
-} from "./workspace-navigation.tsx";
+  type WorkspaceNavigationProps
+} from "./workspace-navigation.tsx"

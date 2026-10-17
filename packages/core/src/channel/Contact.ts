@@ -7,27 +7,13 @@
  *
  * @since 0.1.0
  */
-import { ChannelTransport } from "@amends-dev/channel";
-import { Schema } from "effect";
-import * as Identity from "../identity/Identity.ts";
-import * as Text from "../text/Text.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as ChannelId from "./ChannelId.ts";
 
-/**
- * Names a contact; `Identity.ContactId`, derived from the channel and the external user, so that
- * the same person on the same channel is one contact however often they write.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = Identity.ContactId;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = Identity.ContactId;
+import { ChannelTransport } from "@amends-dev/channel"
+import * as Schema from "effect/Schema"
+import * as Identity from "../identity/Identity.ts"
+import * as Text from "../text/Text.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ChannelId from "./ChannelId.ts"
 
 /**
  * What a contact is called, as the external system calls them: 1 to 200 characters, without
@@ -36,23 +22,19 @@ export type Id = Identity.ContactId;
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.Trimmed.check(
-  Schema.isMinLength(1),
-  Schema.isMaxLength(200),
-  Text.isStorable,
-);
+export const Name = Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(200), Text.isStorable)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * The name a contact takes from what the external system calls the sender: what remains of it
  * within a name, or "Someone" when nothing does.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const nameOf = (sender: string): Name => {
@@ -61,9 +43,9 @@ export const nameOf = (sender: string): Name => {
     .replace(/\p{Cs}/gu, "")
     .trim()
     .slice(0, 200)
-    .trim();
-  return Name.make(kept === "" ? "Someone" : kept);
-};
+    .trim()
+  return Name.make(kept === "" ? "Someone" : kept)
+}
 
 /**
  * A contact as first heard from, and as since renamed.
@@ -72,14 +54,14 @@ export const nameOf = (sender: string): Name => {
  * @since 0.1.0
  */
 export const Contact = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  channelId: ChannelId.Id,
+  id: Identity.ContactId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
   /** The external system's id for the person. */
   externalId: ChannelTransport.ExternalId,
   name: Name,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -90,11 +72,10 @@ export interface Contact extends Schema.Schema.Type<typeof Contact> {}
 /**
  * The record with some fields changed.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
-export const change = (record: Contact, changes: Partial<Contact>): Contact =>
-  Object.assign({}, record, changes);
+export const change = (record: Contact, changes: Partial<Contact>): Contact => Object.assign({}, record, changes)
 
 /**
  * What renaming records: the name the external system now gives the person.
@@ -102,7 +83,11 @@ export const change = (record: Contact, changes: Partial<Contact>): Contact =>
  * @category schemas
  * @since 0.1.0
  */
-export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, contactId: Id, name: Name });
+export const Renamed = Schema.Struct({
+  workspaceId: WorkspaceId.WorkspaceId,
+  contactId: Identity.ContactId,
+  name: Name
+})
 
 /**
  * @category schemas

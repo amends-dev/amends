@@ -8,11 +8,17 @@
  *
  * @since 0.1.0
  */
-import { Context, Crypto, DateTime, Effect, Option, Schema } from "effect";
-import * as Actor from "../identity/Actor.ts";
-import * as Performer from "../identity/Performer.ts";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Event from "./Event.ts";
+
+import * as Context from "effect/Context"
+import * as Crypto from "effect/Crypto"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Actor from "../identity/Actor.ts"
+import * as Performer from "../identity/Performer.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Event from "./Event.ts"
 
 /**
  * Trusted attribution for the current operation, as `Event.Provenance`. Supply it around an
@@ -24,7 +30,7 @@ import * as Event from "./Event.ts";
  * @since 0.1.0
  */
 export class Publication extends Context.Service<Publication, Event.Provenance>()(
-  "@amends-dev/core/journal/Publication",
+  "@amends-dev/core/journal/Publication"
 ) {}
 
 /**
@@ -36,22 +42,22 @@ export class Publication extends Context.Service<Publication, Event.Provenance>(
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Publication.make")(function* (
-  workspaceId: WorkspaceId.Id,
+export const make = Effect.fnUntraced(function* (
+  workspaceId: WorkspaceId.WorkspaceId,
   performedBy: Performer.Reference,
-  occurredAt?: DateTime.Utc,
+  occurredAt?: DateTime.Utc
 ) {
-  const crypto = yield* Crypto.Crypto;
+  const crypto = yield* Crypto.Crypto
   return Event.snapshotProvenance(
     yield* Schema.decodeEffect(Schema.toType(Event.Provenance))({
       workspaceId,
       performedBy,
       causedBy: null,
       correlationId: Event.CorrelationId.make(yield* crypto.randomUUIDv4),
-      occurredAt: occurredAt ?? (yield* DateTime.now),
-    }),
-  );
-});
+      occurredAt: occurredAt ?? (yield* DateTime.now)
+    })
+  )
+})
 
 /**
  * Root attribution for the current `Actor.Actor`, as the member performing the operation. Resolve
@@ -60,16 +66,14 @@ export const make = Effect.fn("Publication.make")(function* (
  * @category constructors
  * @since 0.1.0
  */
-export const makeForActor = Effect.fn("Publication.makeForActor")(function* (
-  occurredAt?: DateTime.Utc,
-) {
-  const actor = yield* Actor.Actor;
+export const makeForActor = Effect.fnUntraced(function* (occurredAt?: DateTime.Utc) {
+  const actor = yield* Actor.Actor
   return yield* make(
     actor.workspaceId,
     Performer.Reference.cases.Member.make({ memberId: actor.memberId, identity: actor.identity }),
-    occurredAt,
-  );
-});
+    occurredAt
+  )
+})
 
 /**
  * Continue a causal workflow from `event`: its workspace and correlation, with `event` as the
@@ -79,10 +83,10 @@ export const makeForActor = Effect.fn("Publication.makeForActor")(function* (
  * @category constructors
  * @since 0.1.0
  */
-export const makeCausedBy = Effect.fn("Publication.makeCausedBy")(function* (
+export const makeCausedBy = Effect.fnUntraced(function* (
   event: Event.Event,
   performedBy: Performer.Reference = event.provenance.performedBy,
-  occurredAt?: DateTime.Utc,
+  occurredAt?: DateTime.Utc
 ) {
   return Event.snapshotProvenance(
     yield* Schema.decodeEffect(Schema.toType(Event.Provenance))({
@@ -90,73 +94,71 @@ export const makeCausedBy = Effect.fn("Publication.makeCausedBy")(function* (
       performedBy,
       causedBy: Event.makeReference(event),
       correlationId: event.provenance.correlationId,
-      occurredAt: occurredAt ?? (yield* DateTime.now),
-    }),
-  );
-});
+      occurredAt: occurredAt ?? (yield* DateTime.now)
+    })
+  )
+})
 
 /**
  * Runs `program` with the current attribution, or, when there is none, with root attribution for
  * the current actor from `makeForActor`; nested operations reuse the current context.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
-export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(
-  program: Effect.Effect<A, E, R>,
-) {
-  const current = yield* Effect.serviceOption(Publication);
-  const provenance = Option.isSome(current) ? current.value : yield* makeForActor();
-  return yield* Effect.provideService(program, Publication, provenance);
-});
+export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+  const current = yield* Effect.serviceOption(Publication)
+  const provenance = Option.isSome(current) ? current.value : yield* makeForActor()
+  return yield* Effect.provideService(program, Publication, provenance)
+})
 
 /**
  * Override only this effect's immediate cause and correlation, retaining its current performer and
  * workspace: `event` becomes the cause, its correlation is carried on, and the occurrence time is
  * `occurredAt` or now.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withCause = (event: Event.Event, occurredAt?: DateTime.Utc) =>
   Effect.fn("Publication.withCause")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Publication;
+    const current = yield* Publication
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))({
       workspaceId: current.workspaceId,
       performedBy: current.performedBy,
       causedBy: Event.makeReference(event),
       correlationId: event.provenance.correlationId,
-      occurredAt: occurredAt ?? (yield* DateTime.now),
-    });
-    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance));
-  });
+      occurredAt: occurredAt ?? (yield* DateTime.now)
+    })
+    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance))
+  })
 
 /**
  * Override the performer for one trusted operation without changing its causal history.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withPerformer = (performedBy: Performer.Reference) =>
   Effect.fn("Publication.withPerformer")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Publication;
+    const current = yield* Publication
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))(
-      Object.assign({}, current, { performedBy }),
-    );
-    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance));
-  });
+      Object.assign({}, current, { performedBy })
+    )
+    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance))
+  })
 
 /**
  * Use the domain action's timestamp for one publication or a block of related publications.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withOccurredAt = (occurredAt: DateTime.Utc) =>
   Effect.fn("Publication.withOccurredAt")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Publication;
+    const current = yield* Publication
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))(
-      Object.assign({}, current, { occurredAt }),
-    );
-    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance));
-  });
+      Object.assign({}, current, { occurredAt })
+    )
+    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance))
+  })

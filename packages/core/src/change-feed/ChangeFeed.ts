@@ -6,13 +6,14 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Commit from "../journal/Commit.ts";
-import * as Entry from "../journal/Entry.ts";
-import * as JournalEvent from "../journal/Event.ts";
-import * as Notification from "../notification/Notification.ts";
-import * as Signal from "../signal/Signal.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+import * as Schema from "effect/Schema"
+import * as Commit from "../journal/Commit.ts"
+import * as Entry from "../journal/Entry.ts"
+import * as JournalEvent from "../journal/Event.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as Signal from "../signal/Signal.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * An opaque resume point: the feed resumes after the commit that carried it. Clients store and
@@ -23,29 +24,29 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts";
  */
 export const Cursor = Schema.String.check(
   Schema.isPattern(/^(?:0|[1-9][0-9]*)$/),
-  Schema.makeFilter((value) => Number.isSafeInteger(Number(value)) || "Cursor is out of range"),
-).pipe(Schema.brand("ChangeFeedCursor"));
+  Schema.makeFilter((value) => Number.isSafeInteger(Number(value)) || "Cursor is out of range")
+).pipe(Schema.brand("ChangeFeedCursor"))
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Cursor = typeof Cursor.Type;
+export type Cursor = typeof Cursor.Type
 
 /**
  * The cursor that resumes after a journal position.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
-export const cursorOf = (position: Entry.Position): Cursor => Cursor.make(String(position));
+export const cursorOf = (position: Entry.Position): Cursor => Cursor.make(String(position))
 
 /**
  * The journal position a cursor resumes after.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
-export const positionOf = (cursor: Cursor): Entry.Position => Entry.Position.make(Number(cursor));
+export const positionOf = (cursor: Cursor): Entry.Position => Entry.Position.make(Number(cursor))
 
 /**
  * One event a reader receives: a delivered fact with its payload as the fact's public view,
@@ -55,13 +56,13 @@ export const positionOf = (cursor: Cursor): Entry.Position => Entry.Position.mak
  * @since 0.1.0
  */
 export const Event = Schema.Struct({
-  id: Entry.Id,
+  id: Entry.EntryId,
   name: Schema.NonEmptyString,
   version: Schema.Finite,
   recordedAt: Schema.DateTimeUtcFromString,
   provenance: JournalEvent.Provenance,
-  payload: Schema.Json,
-}).annotate({ identifier: "ChangeFeedEvent" });
+  payload: Schema.Json
+}).annotate({ identifier: "ChangeFeedEvent" })
 /**
  * @category schemas
  * @since 0.1.0
@@ -82,27 +83,27 @@ export interface Event extends Schema.Schema.Type<typeof Event> {}
  */
 export const Message = Schema.TaggedUnion({
   Ready: {
-    workspaceId: WorkspaceId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     cursor: Schema.NullOr(Cursor),
-    reset: Schema.Boolean,
+    reset: Schema.Boolean
   },
   Committed: {
-    workspaceId: WorkspaceId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     cursor: Cursor,
-    commitId: Commit.Id,
+    commitId: Commit.CommitId,
     events: Schema.Array(Event),
-    notifications: Schema.Array(Notification.Notification),
+    notifications: Schema.Array(Notification.Notification)
   },
   Signal: {
-    workspaceId: WorkspaceId.Id,
-    signal: Signal.Signal,
-  },
-}).annotate({ identifier: "ChangeFeedMessage" });
+    workspaceId: WorkspaceId.WorkspaceId,
+    signal: Signal.Signal
+  }
+}).annotate({ identifier: "ChangeFeedMessage" })
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Message = typeof Message.Type;
+export type Message = typeof Message.Type
 
 /**
  * What a reader asks when it opens the feed.
@@ -112,8 +113,8 @@ export type Message = typeof Message.Type;
  */
 export const WatchOptions = Schema.Struct({
   /** Resume after this cursor; omitted, the subscription starts with a reset. */
-  after: Schema.optionalKey(Cursor),
-});
+  after: Schema.optionalKey(Cursor)
+})
 /**
  * @category options
  * @since 0.1.0

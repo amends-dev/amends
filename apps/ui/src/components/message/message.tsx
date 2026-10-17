@@ -1,42 +1,42 @@
-import { For, Show, createEffect, createSignal, splitProps, type JSX } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { Avatar, AvatarStack, type AvatarStackPerson } from "../avatar/index.ts";
-import { IconButton, type IconButtonProps } from "../icon-button/index.ts";
-import { Profiles } from "../profile-card/index.ts";
-import { TaskStatus, type TaskState } from "../task-status/index.ts";
-import { TurnActivity, type TurnState } from "../turn-status/index.ts";
-import type { AvatarToneName } from "../../foundations/color/tokens.ts";
-import { classes, type IconComponent } from "../../internal/props.ts";
-import { clockTime, fullTime, shortClockTime } from "../../internal/when.ts";
-import * as s from "./message.css.ts";
-import { stitch } from "../../internal/stitch.ts";
+import { For, Show, createEffect, createSignal, splitProps, type JSX } from "solid-js"
+import { Dynamic } from "solid-js/web"
+import type { AvatarToneName } from "../../foundations/color/tokens.ts"
+import { classes, type IconComponent } from "../../internal/props.ts"
+import { stitch } from "../../internal/stitch.ts"
+import { clockTime, fullTime, shortClockTime } from "../../internal/when.ts"
+import { Avatar, AvatarStack, type AvatarStackPerson } from "../avatar/index.ts"
+import { IconButton, type IconButtonProps } from "../icon-button/index.ts"
+import { Profiles } from "../profile-card/index.ts"
+import { TaskStatus, type TaskState } from "../task-status/index.ts"
+import { TurnActivity, type TurnState } from "../turn-status/index.ts"
+import * as s from "./message.css.ts"
 
 export interface Author {
   /** Who they are, so their messages in a row can stack; without it, messages never stack. */
-  readonly id?: string;
-  readonly name: string;
-  readonly initials?: string;
-  readonly tone?: AvatarToneName;
+  readonly id?: string
+  readonly name: string
+  readonly initials?: string
+  readonly tone?: AvatarToneName
   /** Agents' names are shown in the agent color. */
-  readonly agent?: boolean;
+  readonly agent?: boolean
 }
 
 export type RootProps = JSX.HTMLAttributes<HTMLElement> & {
-  author: Author;
+  author: Author
   /** When it was sent, as shown, such as "10:02 AM" or "Yesterday". */
-  time?: string;
+  time?: string
   /** When it was sent; shown as the time of day unless `time` says otherwise. */
-  at?: Date;
+  at?: Date
   /** Its thread is open beside the timeline. */
-  active?: boolean;
+  active?: boolean
   /** The message the reader came to see, such as one that notified them: set apart and scrolled to. */
-  focused?: boolean;
+  focused?: boolean
   /**
    * It follows its author's message just before, so it stacks under it: no avatar or name, and
    * its time beside it while hovered or focused. Assistive technology still hears both.
    */
-  continued?: boolean;
-};
+  continued?: boolean
+}
 
 /**
  * One message: the author's avatar beside a column of the byline, text, and any extras, or, when
@@ -51,13 +51,13 @@ export function Root(props: RootProps) {
     "focused",
     "continued",
     "children",
-    "class",
-  ]);
-  const [element, setElement] = createSignal<HTMLElement>();
+    "class"
+  ])
+  const [element, setElement] = createSignal<HTMLElement>()
   createEffect(() => {
-    if (local.focused) element()?.scrollIntoView?.({ block: "center" });
-  });
-  const shown = () => local.time ?? (local.at ? clockTime(local.at) : undefined);
+    if (local.focused) element()?.scrollIntoView?.({ block: "center" })
+  })
+  const shown = () => local.time ?? (local.at ? clockTime(local.at) : undefined)
   return (
     <article
       {...native}
@@ -116,22 +116,14 @@ export function Root(props: RootProps) {
             }
           >
             {(id) => (
-              <Profiles.Trigger
-                memberId={id()}
-                class={s.author}
-                data-agent={local.author.agent ? "" : undefined}
-              >
+              <Profiles.Trigger memberId={id()} class={s.author} data-agent={local.author.agent ? "" : undefined}>
                 {local.author.name}
               </Profiles.Trigger>
             )}
           </Show>
           <Show when={shown()}>
             {(time) => (
-              <time
-                class={s.time}
-                dateTime={local.at?.toISOString()}
-                title={local.at ? fullTime(local.at) : undefined}
-              >
+              <time class={s.time} dateTime={local.at?.toISOString()} title={local.at ? fullTime(local.at) : undefined}>
                 {time()}
               </time>
             )}
@@ -140,37 +132,35 @@ export function Root(props: RootProps) {
         {local.children}
       </div>
     </article>
-  );
+  )
 }
 
-export type TextProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type TextProps = JSX.HTMLAttributes<HTMLDivElement>
 
 /** The message's words, in its reading type: plain text, or RichText for its formatting. */
 export function Text(props: TextProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.text, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <div {...native} class={classes(s.text, local.class)} />
 }
 
 export type ActivityProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
-  icon?: IconComponent;
+  icon?: IconComponent
   /** What an agent did, such as "Checked codebase". */
-  children: string;
-};
+  children: string
+}
 
 /** A step an agent took, shown above its text. */
 export function Activity(props: ActivityProps) {
-  const [local, native] = splitProps(props, ["icon", "children", "class"]);
+  const [local, native] = splitProps(props, ["icon", "children", "class"])
   return (
     <div {...native} class={classes(s.activity, local.class)}>
-      <Show when={local.icon}>
-        {(icon) => <Dynamic component={icon()} class={s.activityIcon} />}
-      </Show>
+      <Show when={local.icon}>{(icon) => <Dynamic component={icon()} class={s.activityIcon} />}</Show>
       {local.children}
     </div>
-  );
+  )
 }
 
-export type ActionsProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "role">;
+export type ActionsProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "role">
 
 /**
  * What the reader can do with the message, such as reply in its thread, as Action buttons floating
@@ -178,7 +168,7 @@ export type ActionsProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "role">;
  * message, and touch screens, with no pointer to hover, do not show it.
  */
 export function Actions(props: ActionsProps) {
-  const [local, native] = splitProps(props, ["class", "aria-label"]);
+  const [local, native] = splitProps(props, ["class", "aria-label"])
   return (
     <div
       {...native}
@@ -186,34 +176,34 @@ export function Actions(props: ActionsProps) {
       aria-label={local["aria-label"] ?? "Message actions"}
       class={classes(s.actions, local.class)}
     />
-  );
+  )
 }
 
-export type ActionProps = Omit<IconButtonProps, "size">;
+export type ActionProps = Omit<IconButtonProps, "size">
 
 /** One of the message's Actions: an icon, named by its label and tooltip. */
 export function Action(props: ActionProps) {
-  return <IconButton {...props} />;
+  return <IconButton {...props} />
 }
 
-export type ReactionsProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type ReactionsProps = JSX.HTMLAttributes<HTMLDivElement>
 
 /** A row of Reaction chips. */
 export function Reactions(props: ReactionsProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.extras, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <div {...native} class={classes(s.extras, local.class)} />
 }
 
 export type ReactionProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
-  emoji: string;
-  count: number;
+  emoji: string
+  count: number
   /** The reader reacted with this emoji. */
-  reacted?: boolean;
-};
+  reacted?: boolean
+}
 
 /** An emoji and how many people reacted with it; pressing it adds or removes yours. */
 export function Reaction(props: ReactionProps) {
-  const [local, native] = splitProps(props, ["emoji", "count", "reacted", "class"]);
+  const [local, native] = splitProps(props, ["emoji", "count", "reacted", "class"])
   return (
     <button
       {...native}
@@ -229,35 +219,35 @@ export function Reaction(props: ReactionProps) {
         {local.count}
       </span>
     </button>
-  );
+  )
 }
 
 export type TaskReferenceProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
-  href: string;
+  href: string
   /** The task's key, such as "AND-214". */
-  taskKey: string;
-  state: TaskState;
+  taskKey: string
+  state: TaskState
   /** The task's title. */
-  children: string;
-};
+  children: string
+}
 
 /** A task the message created or mentions. */
 export function TaskReference(props: TaskReferenceProps) {
-  const [local, native] = splitProps(props, ["taskKey", "state", "children", "class"]);
+  const [local, native] = splitProps(props, ["taskKey", "state", "children", "class"])
   return (
     <a {...native} class={classes(s.task, local.class)}>
       <TaskStatus state={local.state} size="0.9375rem" />
       <span class={s.taskKey}>{local.taskKey}</span>
       <span class={s.taskTitle}>{local.children}</span>
     </a>
-  );
+  )
 }
 
 /** An agent at work in a thread, shown as "Yumi working" and marked with its turn's state. */
 export interface ThreadActivity {
   /** The agent, by name. */
-  readonly agent: string;
-  readonly state: TurnState;
+  readonly agent: string
+  readonly state: TurnState
 }
 
 const activityWords: Readonly<Record<TurnState, string>> = {
@@ -266,32 +256,25 @@ const activityWords: Readonly<Record<TurnState, string>> = {
   stopping: "stopping",
   done: "done",
   failed: "failed",
-  stopped: "stopped",
-};
+  stopped: "stopped"
+}
 
 export type RepliesProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
-  count: number;
+  count: number
   /** The people who replied, most recent last. */
-  people?: readonly AvatarStackPerson[];
+  people?: ReadonlyArray<AvatarStackPerson>
   /** The thread has replies the reader has not seen. */
-  unread?: boolean;
+  unread?: boolean
   /** A quiet line after the count, such as who is typing. */
-  note?: string;
+  note?: string
   /** Agents at work in the thread. */
-  activity?: readonly ThreadActivity[];
-};
+  activity?: ReadonlyArray<ThreadActivity>
+}
 
 /** Opens the message's thread. */
 export function Replies(props: RepliesProps) {
-  const [local, native] = splitProps(props, [
-    "count",
-    "people",
-    "unread",
-    "note",
-    "activity",
-    "class",
-  ]);
-  const label = () => `${local.count} ${local.count === 1 ? "reply" : "replies"}`;
+  const [local, native] = splitProps(props, ["count", "people", "unread", "note", "activity", "class"])
+  const label = () => `${local.count} ${local.count === 1 ? "reply" : "replies"}`
   return (
     <button {...native} type="button" class={classes(s.replies, local.class)}>
       <svg class={s.repliesConnector} viewBox="0 0 18 23" fill="none" aria-hidden="true">
@@ -314,24 +297,22 @@ export function Replies(props: RepliesProps) {
       </span>
       <For each={local.activity ?? []}>
         {(activity) => (
-          <TurnActivity state={activity.state}>
-            {`${activity.agent} ${activityWords[activity.state]}`}
-          </TurnActivity>
+          <TurnActivity state={activity.state}>{`${activity.agent} ${activityWords[activity.state]}`}</TurnActivity>
         )}
       </For>
       <Show when={local.note}>
         <span class={s.repliesNote}>{local.note}</span>
       </Show>
     </button>
-  );
+  )
 }
 
 export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   /** A quiet line after the action, such as who is typing; it keeps the action in view. */
-  note?: string;
+  note?: string
   /** Agents at work in the thread; they keep the action in view too. */
-  activity?: readonly ThreadActivity[];
-};
+  activity?: ReadonlyArray<ThreadActivity>
+}
 
 /**
  * Opens the thread of a message with no replies yet. Where there is a pointer, the message's Actions
@@ -339,7 +320,7 @@ export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "chil
  * saying so alone. Touch screens, with no Actions, always show it as "Reply in thread".
  */
 export function Reply(props: ReplyProps) {
-  const [local, native] = splitProps(props, ["note", "activity", "class"]);
+  const [local, native] = splitProps(props, ["note", "activity", "class"])
   return (
     <button
       {...native}
@@ -350,14 +331,12 @@ export function Reply(props: ReplyProps) {
       <span class={s.replyLabel}>Reply in thread</span>
       <For each={local.activity ?? []}>
         {(activity) => (
-          <TurnActivity state={activity.state}>
-            {`${activity.agent} ${activityWords[activity.state]}`}
-          </TurnActivity>
+          <TurnActivity state={activity.state}>{`${activity.agent} ${activityWords[activity.state]}`}</TurnActivity>
         )}
       </For>
       <Show when={local.note}>
         <span class={s.repliesNote}>{local.note}</span>
       </Show>
     </button>
-  );
+  )
 }

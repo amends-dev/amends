@@ -1,1 +1,1 @@
-export { Select, type SelectOption, type SelectProps } from "./select.tsx";
+export { Select, type SelectOption, type SelectProps } from "./select.tsx"

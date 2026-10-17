@@ -8,41 +8,45 @@
  *
  * @since 0.1.0
  */
-import * as Threads from "./Threads.ts";
-import * as ThreadParticipations from "./ThreadParticipations.ts";
-import * as ThreadMessages from "./ThreadMessages.ts";
-import * as ThreadActivities from "./ThreadActivities.ts";
-import * as Tasks from "./Tasks.ts";
-import * as Channels from "./Channels.ts";
-import * as ChannelBindings from "./ChannelBindings.ts";
-import * as Contacts from "./Contacts.ts";
-import * as Deliveries from "./Deliveries.ts";
-import type { Workspace } from "@amends-dev/core/workspace";
-import { WorkspaceStorage } from "@amends-dev/gateway";
-import { Effect, Layer, Option } from "effect";
-import type { Redacted } from "effect";
-import * as Agents from "./Agents.ts";
-import * as TurnRecords from "./TurnRecords.ts";
-import * as Assignments from "./Assignments.ts";
-import * as Groups from "./Groups.ts";
-import * as GroupMemberships from "./GroupMemberships.ts";
-import * as GroupFollows from "./GroupFollows.ts";
-import * as ReadStates from "./ReadStates.ts";
-import * as PostgresSignalHub from "./PostgresSignalHub.ts";
-import * as Binding from "./Binding.ts";
-import * as Checkpoints from "./Checkpoints.ts";
-import * as ConnectionCredentials from "./ConnectionCredentials.ts";
-import * as SessionLogs from "./SessionLogs.ts";
-import * as SessionStates from "./SessionStates.ts";
-import * as Connections from "./Connections.ts";
-import * as CredentialKey from "./CredentialKey.ts";
-import * as PostgresDatabase from "./PostgresDatabase.ts";
-import * as Invitations from "./Invitations.ts";
-import * as Journal from "./Journal.ts";
-import * as Members from "./Members.ts";
-import * as Notifications from "./Notifications.ts";
-import * as Roles from "./Roles.ts";
-import * as Workspaces from "./Workspaces.ts";
+
+import type { WorkspaceId } from "@amends-dev/core/workspace"
+import { WorkspaceStorage } from "@amends-dev/gateway"
+import * as Crypto from "effect/Crypto"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import type * as Redacted from "effect/Redacted"
+import * as Agents from "./internal/agents.ts"
+import * as Assignments from "./internal/assignments.ts"
+import * as Binding from "./internal/binding.ts"
+import * as ChannelBindings from "./internal/channelBindings.ts"
+import * as Channels from "./internal/channels.ts"
+import * as Checkpoints from "./internal/checkpoints.ts"
+import * as ConnectionCredentials from "./internal/connectionCredentials.ts"
+import * as Connections from "./internal/connections.ts"
+import * as Contacts from "./internal/contacts.ts"
+import * as CredentialKey from "./internal/credentialKey.ts"
+import * as Deliveries from "./internal/deliveries.ts"
+import * as GroupFollows from "./internal/groupFollows.ts"
+import * as GroupMemberships from "./internal/groupMemberships.ts"
+import * as Groups from "./internal/groups.ts"
+import * as Invitations from "./internal/invitations.ts"
+import * as Journal from "./internal/journal.ts"
+import * as Members from "./internal/members.ts"
+import * as Notifications from "./internal/notifications.ts"
+import * as ReadStates from "./internal/readStates.ts"
+import * as Roles from "./internal/roles.ts"
+import * as SessionLogs from "./internal/sessionLogs.ts"
+import * as SessionStates from "./internal/sessionStates.ts"
+import * as Tasks from "./internal/tasks.ts"
+import * as ThreadActivities from "./internal/threadActivities.ts"
+import * as ThreadMessages from "./internal/threadMessages.ts"
+import * as ThreadParticipations from "./internal/threadParticipations.ts"
+import * as Threads from "./internal/threads.ts"
+import * as TurnRecords from "./internal/turnRecords.ts"
+import * as Workspaces from "./internal/workspaces.ts"
+import * as PostgresDatabase from "./PostgresDatabase.ts"
+import * as PostgresSignalHub from "./PostgresSignalHub.ts"
 
 /**
  * The binding's limits, and the host's credential key.
@@ -55,7 +59,7 @@ export interface Options extends Binding.Options {
    * The key that seals connections' credentials at rest: 32 bytes, encoded as base64. Without
    * one, the host stores no credentials, and setting one reports that it cannot.
    */
-  readonly credentialKey?: Redacted.Redacted<string> | undefined;
+  readonly credentialKey?: Redacted.Redacted<string> | undefined
 }
 
 /**
@@ -90,8 +94,8 @@ const layerStores = Layer.mergeAll(
   SessionLogs.layer,
   Agents.layer,
   TurnRecords.layer,
-  PostgresSignalHub.layer,
-);
+  PostgresSignalHub.layer
+)
 
 /**
  * Provide the stores bound to one workspace, and its signal hub, over the caller's database, with
@@ -101,15 +105,10 @@ const layerStores = Layer.mergeAll(
  * @since 0.1.0
  */
 export const layerWorkspace = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   options: Options = {},
-  credentialKey: Option.Option<CredentialKey.Cipher> = Option.none(),
-) =>
-  layerStores.pipe(
-    Layer.provide(
-      Layer.mergeAll(Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)),
-    ),
-  );
+  credentialKey: Option.Option<CredentialKey.Cipher> = Option.none()
+) => layerStores.pipe(Layer.provide([Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)]))
 
 /**
  * One pool, with inexpensive workspace-bound views over it. The stores hold no
@@ -118,30 +117,32 @@ export const layerWorkspace = (
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresWorkspaceStorage.make")(function* (options: Options = {}) {
+export const make = Effect.fnUntraced(function* (options: Options = {}) {
   // Invalid options stop the host starting, rather than its first workspace.
-  yield* Binding.settings(options);
+  yield* Binding.settings(options)
   const credentialKey =
     options.credentialKey === undefined
       ? Option.none()
-      : Option.some(yield* Effect.orDie(CredentialKey.make(options.credentialKey)));
-  const postgresDatabase = yield* PostgresDatabase.PostgresDatabase;
+      : Option.some(yield* Effect.orDie(CredentialKey.make(options.credentialKey)))
+  const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
+  const crypto = yield* Crypto.Crypto
   const forWorkspace: WorkspaceStorage.WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn(
-    "PostgresWorkspaceStorage.forWorkspace",
+    "PostgresWorkspaceStorage.forWorkspace"
   )(
-    function* (workspaceId: Workspace.Id) {
-      return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)));
+    function* (workspaceId: WorkspaceId.WorkspaceId) {
+      return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)))
     },
     Effect.provideService(PostgresDatabase.PostgresDatabase, postgresDatabase),
-  );
-  return WorkspaceStorage.WorkspaceStorage.of({ forWorkspace });
-});
+    Effect.provideService(Crypto.Crypto, crypto)
+  )
+  return WorkspaceStorage.WorkspaceStorage.of({ forWorkspace })
+})
 
 /**
- * Expose the workspace views to the gateway as its workspace storage contract.
+ * Expose the workspace views to the gateway as its workspace storage contract, over the caller's
+ * database, with the `Crypto.Crypto` that names commits and journal entries.
  *
  * @category layers
  * @since 0.1.0
  */
-export const layer = (options: Options = {}) =>
-  Layer.effect(WorkspaceStorage.WorkspaceStorage, make(options));
+export const layer = (options: Options = {}) => Layer.effect(WorkspaceStorage.WorkspaceStorage, make(options))

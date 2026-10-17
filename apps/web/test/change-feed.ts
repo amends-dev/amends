@@ -1,20 +1,20 @@
 /** Controllable server-sent event streams for the workspace change feed in route tests. */
 export interface FeedStream {
-  readonly request: Request;
-  readonly send: (message: unknown) => void;
-  readonly unavailable: () => void;
+  readonly request: Request
+  readonly send: (message: unknown) => void
+  readonly unavailable: () => void
 }
-const at = "2026-09-25T12:00:00.000Z";
+const at = "2026-09-25T12:00:00.000Z"
 export const ready = (workspaceId: string, cursor = "1", reset = false) => ({
   _tag: "Ready",
   workspaceId,
   cursor,
-  reset,
-});
+  reset
+})
 export const committed = (
   workspaceId: string,
   cursor: string,
-  events: ReadonlyArray<{ readonly name: string; readonly payload: unknown }>,
+  events: ReadonlyArray<{ readonly name: string; readonly payload: unknown }>
 ) => ({
   _tag: "Committed",
   workspaceId,
@@ -29,40 +29,36 @@ export const committed = (
       performedBy: { _tag: "System", id: "test" },
       causedBy: null,
       correlationId: "correlation",
-      occurredAt: at,
+      occurredAt: at
     },
-    ...event,
+    ...event
   })),
-  notifications: [],
-});
+  notifications: []
+})
 
 /** The reader's sessions hear that they saw these notifications, as the server tells them. */
-export const notificationsSeen = (
-  workspaceId: string,
-  memberId: string,
-  notificationIds: ReadonlyArray<string>,
-) => ({
+export const notificationsSeen = (workspaceId: string, memberId: string, notificationIds: ReadonlyArray<string>) => ({
   _tag: "Signal",
   workspaceId,
-  signal: { _tag: "NotificationsSeen", workspaceId, memberId, notificationIds },
-});
+  signal: { _tag: "NotificationsSeen", workspaceId, memberId, notificationIds }
+})
 
 /**
  * The workspace sidebar's reads: the reader's groups, the members naming them, what the reader
  * may do there, and how many notifications are pending for them.
  */
-const sidebarRead = /^\/(groups|members|permissions|notifications\/count|active-turns)$/;
+const sidebarRead = /^\/(groups|members|permissions|notifications\/count|active-turns)$/
 /**
  * What the sidebar's reads answer: nothing, unless a test grants permissions, lists groups, or
  * has notifications pending.
  */
 export interface Sidebar {
-  readonly permissions?: ReadonlyArray<string>;
+  readonly permissions?: ReadonlyArray<string>
   /** The groups list, or a function reading its current state. */
-  readonly groups?: ReadonlyArray<unknown> | (() => ReadonlyArray<unknown>);
+  readonly groups?: ReadonlyArray<unknown> | (() => ReadonlyArray<unknown>)
   /** The workspace's members, naming groups and listing teammates. */
-  readonly members?: ReadonlyArray<unknown>;
-  readonly pending?: number;
+  readonly members?: ReadonlyArray<unknown>
+  readonly pending?: number
 }
 /**
  * Route change-feed requests to streams the test controls, answer the workspace sidebar's reads
@@ -72,13 +68,13 @@ export interface Sidebar {
 export function withChangeFeed(
   fetch: typeof globalThis.fetch,
   open: (request: Request) => Response | undefined = () => undefined,
-  sidebar: Sidebar = {},
+  sidebar: Sidebar = {}
 ) {
-  const streams: Array<FeedStream> = [];
-  const encoder = new TextEncoder();
+  const streams: Array<FeedStream> = []
+  const encoder = new TextEncoder()
   const route: typeof globalThis.fetch = (input, init) => {
-    const request = new Request(input, init);
-    const path = new URL(request.url).pathname;
+    const request = new Request(input, init)
+    const path = new URL(request.url).pathname
     if (request.method === "GET" && sidebarRead.test(path))
       return Promise.resolve(
         new Response(
@@ -93,38 +89,38 @@ export function withChangeFeed(
                   ? { pending: sidebar.pending ?? 0 }
                   : path.endsWith("/members")
                     ? (sidebar.members ?? [])
-                    : [],
+                    : []
           ),
           {
-            headers: { "content-type": "application/json" },
-          },
-        ),
-      );
-    if (!path.endsWith("/changes")) return fetch(input, init);
-    const answered = open(request);
-    if (answered) return Promise.resolve(answered);
-    let controller!: ReadableStreamDefaultController<Uint8Array>;
+            headers: { "content-type": "application/json" }
+          }
+        )
+      )
+    if (!path.endsWith("/changes")) return fetch(input, init)
+    const answered = open(request)
+    if (answered) return Promise.resolve(answered)
+    let controller!: ReadableStreamDefaultController<Uint8Array>
     const body = new ReadableStream<Uint8Array>({
       start: (value) => {
-        controller = value;
-      },
-    });
+        controller = value
+      }
+    })
     const write = (event: string, data: unknown) => {
       try {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
       } catch {
         /* The client already closed this stream. */
       }
-    };
+    }
     request.signal.addEventListener("abort", () => {
       try {
-        controller.error(request.signal.reason);
+        controller.error(request.signal.reason)
       } catch {
         /* Already ended. */
       }
-    });
-    const workspaceId = request.headers.get("amends-workspace") ?? "";
-    write("message", ready(workspaceId));
+    })
+    const workspaceId = request.headers.get("amends-workspace") ?? ""
+    write("message", ready(workspaceId))
     streams.push({
       request,
       send: (message) => write("message", message),
@@ -132,19 +128,17 @@ export function withChangeFeed(
         write("effect/http-api/stream/failure", [
           {
             _tag: "Fail",
-            error: { _tag: "CoreError.Unavailable", reason: { _tag: "ChangeFeedInterrupted" } },
-          },
-        ]);
+            error: { _tag: "CoreError.Unavailable", reason: { _tag: "ChangeFeedInterrupted" } }
+          }
+        ])
         try {
-          controller.close();
+          controller.close()
         } catch {
           /* Already ended. */
         }
-      },
-    });
-    return Promise.resolve(
-      new Response(body, { headers: { "content-type": "text/event-stream" } }),
-    );
-  };
-  return { fetch: route, streams };
+      }
+    })
+    return Promise.resolve(new Response(body, { headers: { "content-type": "text/event-stream" } }))
+  }
+  return { fetch: route, streams }
 }

@@ -1,1 +1,1 @@
-export { RichText, type RichTextMention, type RichTextProps } from "./rich-text.tsx";
+export { RichText, type RichTextMention, type RichTextProps } from "./rich-text.tsx"

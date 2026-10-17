@@ -6,12 +6,13 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Member from "../workspace/Member.ts";
-import * as Workspace from "../workspace/Workspace.ts";
-import * as Grant from "./Grant.ts";
-import * as Role from "./Role.ts";
-import * as Scope from "./Scope.ts";
+
+import * as Schema from "effect/Schema"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Grant from "./Grant.ts"
+import * as Role from "./Role.ts"
+import * as Scope from "./Scope.ts"
 
 /**
  * Identifies one assignment; assigning access again after revocation uses a fresh ID.
@@ -19,13 +20,13 @@ import * as Scope from "./Scope.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceAssignmentId"));
+export const AssignmentId = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceAssignmentId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type AssignmentId = typeof AssignmentId.Type
 
 /**
  * Whether the assignment still gives access: active, or revoked for good.
@@ -33,13 +34,13 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "revoked"]);
+export const Status = Schema.Literals(["active", "revoked"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * Where an assignment's access comes from: a role, whose current permissions apply at the assigned
@@ -49,37 +50,37 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const Source = Schema.TaggedUnion({
-  Role: { roleId: Role.Id, scope: Scope.Scope },
-  Direct: { grant: Grant.Grant },
-});
+  Role: { roleId: Role.RoleId, scope: Scope.Scope },
+  Direct: { grant: Grant.Grant }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Source = typeof Source.Type;
+export type Source = typeof Source.Type
 
 /**
  * The check records and creation facts share: an assignment's scope belongs to its workspace.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const SourceInWorkspace = Schema.makeFilter(
-  ({ workspaceId, source }: { readonly workspaceId: Workspace.Id; readonly source: Source }) => {
+  ({ workspaceId, source }: { readonly workspaceId: WorkspaceId.WorkspaceId; readonly source: Source }) => {
     const scope = Source.match(source, {
       Role: ({ scope }) => scope,
-      Direct: ({ grant }) => grant.scope,
-    });
+      Direct: ({ grant }) => grant.scope
+    })
     const scopeWorkspaceId = Scope.Scope.match(scope, {
       Workspace: ({ workspaceId }) => workspaceId,
-      Target: ({ target }) => target.workspaceId,
-    });
+      Target: ({ target }) => target.workspaceId
+    })
     return scopeWorkspaceId === workspaceId
       ? undefined
-      : { path: ["source"], issue: "Assignment scope must belong to its workspace" };
-  },
-);
+      : { path: ["source"], issue: "Assignment scope must belong to its workspace" }
+  }
+)
 
 /**
  * Access assigned to one workspace membership. Revoked records retain their source. This schema
@@ -90,12 +91,12 @@ export const SourceInWorkspace = Schema.makeFilter(
  * @since 0.1.0
  */
 export const Assignment = Schema.Struct({
-  id: Id,
-  workspaceId: Workspace.Id,
-  memberId: Member.Id,
+  id: AssignmentId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
   source: Source,
-  status: Status,
-}).check(SourceInWorkspace);
+  status: Status
+}).check(SourceInWorkspace)
 
 /**
  * @category schemas
@@ -110,7 +111,7 @@ export interface Assignment extends Schema.Schema.Type<typeof Assignment> {}
  * @category options
  * @since 0.1.0
  */
-export const AssignInput = Schema.Struct({ memberId: Member.Id, roleId: Role.Id });
+export const AssignInput = Schema.Struct({ memberId: MemberId.MemberId, roleId: Role.RoleId })
 
 /**
  * @category options
@@ -128,8 +129,8 @@ export interface AssignInput extends Schema.Schema.Type<typeof AssignInput> {}
 export const ChangeInput = Schema.Struct({
   ...AssignInput.fields,
   /** The member's current workspace role assignments as the caller saw them, in any order. */
-  expectedAssignmentIds: Schema.UniqueArray(Id),
-});
+  expectedAssignmentIds: Schema.UniqueArray(AssignmentId)
+})
 
 /**
  * @category options
@@ -143,7 +144,7 @@ export interface ChangeInput extends Schema.Schema.Type<typeof ChangeInput> {}
  * @category schemas
  * @since 0.1.0
  */
-export const RoleChoice = Schema.Struct({ role: Role.Role, assignable: Schema.Boolean });
+export const RoleChoice = Schema.Struct({ role: Role.Role, assignable: Schema.Boolean })
 
 /**
  * @category schemas
@@ -162,8 +163,8 @@ export const Access = Schema.Struct({
   assignments: Schema.Array(Assignment),
   roles: Schema.Array(RoleChoice),
   /** Whether the actor may assign, change, or revoke this member's roles. */
-  canManage: Schema.Boolean,
-});
+  canManage: Schema.Boolean
+})
 
 /**
  * @category schemas

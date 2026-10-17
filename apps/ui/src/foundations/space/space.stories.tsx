@@ -1,23 +1,21 @@
-import { For } from "solid-js";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { space, type Space } from "./tokens.ts";
-import * as s from "../foundations.stories.css.ts";
+import { For } from "solid-js"
+import type { Meta, StoryObj } from "storybook-solidjs-vite"
+import * as s from "../foundations.stories.css.ts"
+import { space, type Space } from "./tokens.ts"
 
 // Object keys list integers before fractions; show the scale in order.
-const steps = (Object.keys(space).map(Number) as Space[]).sort((a, b) => a - b);
+const steps = (Object.keys(space).map(Number) as Array<Space>).sort((a, b) => a - b)
 
-const meta = { title: "Foundations/Space" } satisfies Meta;
-export default meta;
-type Story = StoryObj<typeof meta>;
+const meta = { title: "Foundations/Space" } satisfies Meta
+export default meta
+type Story = StoryObj<typeof meta>
 
 export const Scale = {
   render: () => (
     <div class={s.page}>
       <section class={s.section}>
         <h2 class={s.heading}>Spacing</h2>
-        <p class={s.note}>
-          A 4px grid with half steps for compact rows. Corners are square everywhere in the app.
-        </p>
+        <p class={s.note}>A 4px grid with half steps for compact rows. Corners are square everywhere in the app.</p>
         <div class={s.panel}>
           <For each={steps}>
             {(step) => (
@@ -35,5 +33,5 @@ export const Scale = {
         </div>
       </section>
     </div>
-  ),
-} satisfies Story;
+  )
+} satisfies Story

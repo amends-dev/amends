@@ -7,32 +7,32 @@
  *
  * @since 0.1.0
  */
-import * as ApiErrors from "./ApiErrors.ts";
-import type { Identity } from "@amends-dev/core/identity";
-import type { Workspace } from "@amends-dev/core/workspace";
-import {
-  Cause,
-  Context,
-  Deferred,
-  Effect,
-  Layer,
-  Option,
-  Stream,
-  type Scope,
-  Predicate,
-} from "effect";
 
-import { HttpBody, HttpEffect, HttpServerResponse } from "effect/http";
-import * as Draining from "./Draining.ts";
+import type { Identity } from "@amends-dev/core/identity"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
+import * as Cause from "effect/Cause"
+import * as Context from "effect/Context"
+import * as Deferred from "effect/Deferred"
+import * as Effect from "effect/Effect"
+import * as HttpBody from "effect/http/HttpBody"
+import * as HttpEffect from "effect/http/HttpEffect"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
+import type * as Scope from "effect/Scope"
+import * as Stream from "effect/Stream"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Draining from "./Draining.ts"
 
 const heartbeat = Stream.tick("5 seconds").pipe(
   Stream.map(() => ": keepalive\n\n"),
-  Stream.encodeText,
-);
+  Stream.encodeText
+)
 
 /** Transport comments keep idle connections open without becoming domain messages. */
 const prepareResponse: HttpEffect.PreResponseHandler = (_request, response) => {
-  if (!Predicate.isTagged(response.body, "Stream")) return Effect.succeed(response);
+  if (!Predicate.isTagged(response.body, "Stream")) return Effect.succeed(response)
   return Effect.succeed(
     response.pipe(
       HttpServerResponse.setHeader("cache-control", "no-store"),
@@ -40,22 +40,22 @@ const prepareResponse: HttpEffect.PreResponseHandler = (_request, response) => {
       HttpServerResponse.setBody(
         HttpBody.stream(
           response.body.stream.pipe(Stream.merge(heartbeat, { haltStrategy: "left" })),
-          response.body.contentType,
-        ),
-      ),
-    ),
-  );
-};
+          response.body.contentType
+        )
+      )
+    )
+  )
+}
 
 /**
  * Send a handler's server-sent event response with a comment heartbeat every five seconds,
  * `cache-control: no-store`, and proxy buffering off. A response that is not a stream passes
  * unchanged.
  *
- * @category utils
+ * @category middleware
  * @since 0.1.0
  */
-export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse);
+export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)
 
 /**
  * How many live-update streams this process serves at once for one workspace, and for one member
@@ -66,11 +66,11 @@ export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)
  * @since 0.1.0
  */
 export const Limits = Context.Reference<{
-  readonly perWorkspace: number;
-  readonly perMember: number;
+  readonly perWorkspace: number
+  readonly perMember: number
 }>("@amends-dev/http/Streams/Limits", {
-  defaultValue: () => ({ perWorkspace: 1000, perMember: 20 }),
-});
+  defaultValue: () => ({ perWorkspace: 1000, perMember: 20 })
+})
 
 /**
  * The process's open live-update streams: the place each holds within `Limits`, and how each is
@@ -84,9 +84,9 @@ export class Streams extends Context.Service<
   {
     /** Hold a place for a stream within the limits, for as long as the scope lasts. */
     readonly hold: (
-      workspaceId: Workspace.Id,
-      principal: Identity.MemberReference,
-    ) => Effect.Effect<void, ApiErrors.TooManyStreams, Scope.Scope>;
+      workspaceId: WorkspaceId.WorkspaceId,
+      principal: Identity.MemberReference
+    ) => Effect.Effect<void, ApiErrors.TooManyStreams, Scope.Scope>
     /**
      * End a stream as the server starts shutting down, failing it with `unavailable` so its client
      * reconnects, while a stream that ends on its own, as a turn's log does, just ends; and contain
@@ -94,10 +94,7 @@ export class Streams extends Context.Service<
      * defects included, so an unexpected one is logged here and reaches the client as `unavailable`
      * alone.
      */
-    readonly serve: <A, E, R>(
-      stream: Stream.Stream<A, E, R>,
-      unavailable: () => E,
-    ) => Stream.Stream<A, E, R>;
+    readonly serve: <A, E, R>(stream: Stream.Stream<A, E, R>, unavailable: () => E) => Stream.Stream<A, E, R>
   }
 >()("@amends-dev/http/Streams") {}
 
@@ -109,42 +106,40 @@ export class Streams extends Context.Service<
  * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
-  const limits = yield* Limits;
-  const draining = yield* Effect.serviceOption(Draining.Draining);
-  const workspaces = new Map<string, number>();
-  const members = new Map<string, number>();
+  const limits = yield* Limits
+  const draining = yield* Effect.serviceOption(Draining.Draining)
+  const workspaces = new Map<string, number>()
+  const members = new Map<string, number>()
   const adjust = (counts: Map<string, number>, key: string, by: number) => {
-    const next = (counts.get(key) ?? 0) + by;
-    if (next === 0) counts.delete(key);
-    else counts.set(key, next);
-  };
+    const next = (counts.get(key) ?? 0) + by
+    if (next === 0) counts.delete(key)
+    else counts.set(key, next)
+  }
   const hold: Streams["Service"]["hold"] = (workspaceId, principal) => {
-    const member = JSON.stringify([workspaceId, principal._tag, principal.id]);
+    const member = JSON.stringify([workspaceId, principal._tag, principal.id])
     return Effect.acquireRelease(
       Effect.suspend(() => {
         if ((workspaces.get(workspaceId) ?? 0) >= limits.perWorkspace)
-          return Effect.fail(new ApiErrors.TooManyStreams({ limit: "workspace" }));
+          return Effect.fail(new ApiErrors.TooManyStreams({ limit: "workspace" }))
         if ((members.get(member) ?? 0) >= limits.perMember)
-          return Effect.fail(new ApiErrors.TooManyStreams({ limit: "member" }));
-        adjust(workspaces, workspaceId, 1);
-        adjust(members, member, 1);
-        return Effect.void;
+          return Effect.fail(new ApiErrors.TooManyStreams({ limit: "member" }))
+        adjust(workspaces, workspaceId, 1)
+        adjust(members, member, 1)
+        return Effect.void
       }),
       () =>
         Effect.sync(() => {
-          adjust(workspaces, workspaceId, -1);
-          adjust(members, member, -1);
-        }),
-    );
-  };
+          adjust(workspaces, workspaceId, -1)
+          adjust(members, member, -1)
+        })
+    )
+  }
   const serve: Streams["Service"]["serve"] = (stream, unavailable) => {
     const contained = stream.pipe(
       Stream.catchCauseIf(Cause.hasDies, (cause) =>
-        Stream.unwrap(
-          Effect.as(Effect.logError("Live stream failed", cause), Stream.fail(unavailable())),
-        ),
-      ),
-    );
+        Stream.unwrap(Effect.as(Effect.logError("Live stream failed", cause), Stream.fail(unavailable())))
+      )
+    )
     return Option.match(draining, {
       onNone: () => contained,
       onSome: (signal) =>
@@ -153,16 +148,14 @@ export const make = Effect.gen(function* () {
           // Only a stream the shutdown cut short tells its client to reconnect.
           Stream.concat(
             Stream.unwrap(
-              Effect.map(Deferred.isDone(signal), (drained) =>
-                drained ? Stream.fail(unavailable()) : Stream.empty,
-              ),
-            ),
-          ),
-        ),
-    });
-  };
-  return Streams.of({ hold, serve });
-});
+              Effect.map(Deferred.isDone(signal), (drained) => (drained ? Stream.fail(unavailable()) : Stream.empty))
+            )
+          )
+        )
+    })
+  }
+  return Streams.of({ hold, serve })
+})
 
 /**
  * One count of open streams for the process. Handler layers each provide this same layer, so
@@ -171,4 +164,4 @@ export const make = Effect.gen(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Streams, make);
+export const layer = Layer.effect(Streams, make)

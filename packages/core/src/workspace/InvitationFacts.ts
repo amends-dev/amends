@@ -5,12 +5,13 @@
  *
  * @since 0.1.0
  */
-import * as Subject from "../journal/Subject.ts";
-import { Schema } from "effect";
-import * as Audience from "../journal/Audience.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Invitation from "./Invitation.ts";
-import * as Workspace from "./Workspace.ts";
+
+import * as Schema from "effect/Schema"
+import * as Audience from "../journal/Audience.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Invitation from "./Invitation.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * An invitation was issued, as its issuance says. Every member may learn of it.
@@ -23,8 +24,8 @@ export const Issued = Fact.make("workspace.invitation.issued", {
   subject: (payload) => Subject.make("invitation", payload.id),
   version: 1,
   payload: Invitation.Issuance,
-  occurrence: (payload) => [payload.id],
-});
+  occurrence: (payload) => [payload.id]
+})
 
 /**
  * The invitation was accepted: its recipient became the member it names, when it says. The same
@@ -38,12 +39,12 @@ export const Accepted = Fact.make("workspace.invitation.accepted", {
   subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
-    workspaceId: Workspace.Id,
-    invitationId: Invitation.Id,
-    ...Invitation.State.cases.Accepted.fields,
+    workspaceId: WorkspaceId.WorkspaceId,
+    invitationId: Invitation.InvitationId,
+    ...Invitation.State.cases.Accepted.fields
   }),
-  occurrence: (payload) => [payload.invitationId],
-});
+  occurrence: (payload) => [payload.invitationId]
+})
 
 /**
  * The invitation was revoked, by which member and when: by `InvitationService.revoke`, or by the
@@ -57,9 +58,9 @@ export const Revoked = Fact.make("workspace.invitation.revoked", {
   subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
-    workspaceId: Workspace.Id,
-    invitationId: Invitation.Id,
-    ...Invitation.State.cases.Revoked.fields,
+    workspaceId: WorkspaceId.WorkspaceId,
+    invitationId: Invitation.InvitationId,
+    ...Invitation.State.cases.Revoked.fields
   }),
-  occurrence: (payload) => [payload.invitationId],
-});
+  occurrence: (payload) => [payload.invitationId]
+})

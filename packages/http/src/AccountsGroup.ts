@@ -8,12 +8,14 @@
  *
  * @since 0.1.0
  */
-import * as Accounts from "@amends-dev/gateway/Accounts";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
+
+import * as Accounts from "@amends-dev/gateway/Accounts"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
 
 /**
  * The accounts behind a workspace's people: its human members and the recipients of its
@@ -26,9 +28,9 @@ export class AccountsGroup extends HttpApiGroup.make("accounts")
   .add(
     HttpApiEndpoint.get("list", "/", {
       success: Schema.Array(Accounts.Account),
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation]
+    })
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication)
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication)
   .prefix("/accounts") {}

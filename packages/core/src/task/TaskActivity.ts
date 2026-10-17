@@ -5,11 +5,12 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
-import * as ThreadMessage from "../thread/ThreadMessage.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as Task from "./Task.ts";
+
+import * as Schema from "effect/Schema"
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
+import * as ThreadMessage from "../thread/ThreadMessage.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as Task from "./Task.ts"
 
 /**
  * The thread became a task, with these initial values. It is about its thread, which has one task,
@@ -23,17 +24,17 @@ export const Created = ThreadActivityKind.make("task.created", {
   details: Schema.Struct({
     status: Task.Status,
     priority: Task.Priority,
-    assignee: Schema.NullOr(MemberId.Id),
-    createdBy: ThreadMessage.Author,
+    assignee: Schema.NullOr(MemberId.MemberId),
+    createdBy: ThreadMessage.Author
   }),
-  newActivity: false,
-});
+  newActivity: false
+})
 
 /**
  * @category kinds
  * @since 0.1.0
  */
-export type Created = ThreadActivityKind.Activity<typeof Created>;
+export type Created = ThreadActivityKind.Activity<typeof Created>
 
 /**
  * The task changed in one way; the details are the change, with the value it replaced. A task
@@ -46,11 +47,11 @@ export const Updated = ThreadActivityKind.make("task.updated", {
   version: 1,
   details: Task.Change,
   occurrence: () => null,
-  newActivity: false,
-});
+  newActivity: false
+})
 
 /**
  * @category kinds
  * @since 0.1.0
  */
-export type Updated = ThreadActivityKind.Activity<typeof Updated>;
+export type Updated = ThreadActivityKind.Activity<typeof Updated>

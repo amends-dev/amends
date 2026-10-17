@@ -11,14 +11,14 @@
 /**
  * @since 0.1.0
  */
-export * as Actor from "./Actor.ts";
+export * as Actor from "./Actor.ts"
 
 /**
  * @since 0.1.0
  */
-export * as Identity from "./Identity.ts";
+export * as Identity from "./Identity.ts"
 
 /**
  * @since 0.1.0
  */
-export * as Performer from "./Performer.ts";
+export * as Performer from "./Performer.ts"

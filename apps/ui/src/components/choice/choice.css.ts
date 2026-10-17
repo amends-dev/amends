@@ -1,7 +1,7 @@
-import { globalStyle, style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { globalStyle, style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 export const group = style({
   display: "flex",
@@ -10,8 +10,8 @@ export const group = style({
   minWidth: 0,
   margin: 0,
   padding: 0,
-  border: "none",
-});
+  border: "none"
+})
 
 export const options = style({
   display: "flex",
@@ -20,11 +20,11 @@ export const options = style({
   "@media": {
     [media.mobile]: {
       selectors: {
-        "&:not([data-variant=card])": { display: "grid", gridTemplateColumns: "1fr 1fr" },
-      },
-    },
-  },
-});
+        "&:not([data-variant=card])": { display: "grid", gridTemplateColumns: "1fr 1fr" }
+      }
+    }
+  }
+})
 
 // A boxed option: the chosen one is filled, outlined, and checked.
 export const option = style({
@@ -47,16 +47,16 @@ export const option = style({
     "&:has(input:checked)": {
       backgroundColor: vars.color.surface.subtle,
       borderColor: vars.color.border.selected,
-      color: vars.color.text.primary,
+      color: vars.color.text.primary
     },
     "&:has(input:focus-visible)": {
       outline: `2px solid ${vars.color.text.primary}`,
-      outlineOffset: "2px",
+      outlineOffset: "2px"
     },
-    "&:has(input:disabled)": { color: vars.color.text.disabled, cursor: "default" },
+    "&:has(input:disabled)": { color: vars.color.text.disabled, cursor: "default" }
   },
-  "@media": { [media.touch]: { minHeight: "2.75rem" }, [media.mobile]: { width: "auto" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" }, [media.mobile]: { width: "auto" } }
+})
 
 // A card: a radio, then the label over its description, 84px tall across the whole width.
 globalStyle(`${option}[data-variant=card]`, {
@@ -67,12 +67,12 @@ globalStyle(`${option}[data-variant=card]`, {
   width: "100%",
   minHeight: "5.25rem",
   padding: "0.875rem 1rem",
-  fontWeight: fontWeight.regular,
-});
+  fontWeight: fontWeight.regular
+})
 
 globalStyle(`${option}[data-variant=card]:has(input:checked)`, {
-  backgroundColor: vars.color.surface.active,
-});
+  backgroundColor: vars.color.surface.active
+})
 
 export const radio = style({
   position: "relative",
@@ -90,24 +90,24 @@ export const radio = style({
       position: "absolute",
       inset: "3px",
       borderRadius: "50%",
-      backgroundColor: vars.color.text.primary,
-    },
-  },
-});
+      backgroundColor: vars.color.text.primary
+    }
+  }
+})
 
-export const cardText = style({ display: "flex", flexDirection: "column", gap: "0.4375rem" });
+export const cardText = style({ display: "flex", flexDirection: "column", gap: "0.4375rem" })
 
 export const cardLabel = style({
   ...typeScale.item,
   color: vars.color.text.primary,
-  fontWeight: fontWeight.medium,
-});
+  fontWeight: fontWeight.medium
+})
 
 export const description = style({
   ...typeScale.control,
   color: vars.color.text.secondary,
-  fontWeight: fontWeight.regular,
-});
+  fontWeight: fontWeight.regular
+})
 
 // The native radio stays in place for forms and keyboards but is not drawn.
 export const input = style({
@@ -115,15 +115,15 @@ export const input = style({
   inset: 0,
   margin: 0,
   opacity: 0,
-  cursor: "inherit",
-});
+  cursor: "inherit"
+})
 
-export const label = style({ flex: 1 });
+export const label = style({ flex: 1 })
 
 export const check = style({
   flex: "none",
   width: "0.875rem",
   height: "0.875rem",
   visibility: "hidden",
-  selectors: { [`${option}:has(input:checked) &`]: { visibility: "visible" } },
-});
+  selectors: { [`${option}:has(input:checked) &`]: { visibility: "visible" } }
+})

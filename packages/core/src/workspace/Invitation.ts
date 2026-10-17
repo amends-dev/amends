@@ -7,11 +7,13 @@
  *
  * @since 0.1.0
  */
-import { DateTime, Schema } from "effect";
-import * as Role from "../authorization/Role.ts";
-import * as Identity from "../identity/Identity.ts";
-import * as Member from "./Member.ts";
-import * as Workspace from "./Workspace.ts";
+
+import * as DateTime from "effect/DateTime"
+import * as Schema from "effect/Schema"
+import * as Role from "../authorization/Role.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as MemberId from "./MemberId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * Names an invitation. A keyed issuance derives it from the issuer and key, so a retry names the
@@ -20,13 +22,13 @@ import * as Workspace from "./Workspace.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceInvitationId"));
+export const InvitationId = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceInvitationId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type InvitationId = typeof InvitationId.Type
 
 /**
  * What an issuer gives: whom to invite, the role they will hold, and when the invitation expires.
@@ -38,10 +40,10 @@ export const IssueInput = Schema.Struct({
   /** The person invited; the host resolves an address to it, creating the account if needed. */
   recipientId: Identity.HumanId,
   /** The built-in role acceptance assigns at workspace scope; Owner cannot be invited. */
-  roleId: Role.Id,
+  roleId: Role.RoleId,
   /** After this, acceptance fails as expired; it is compared to the clock, never updated. */
-  expiresAt: Schema.DateTimeUtcFromString,
-}).annotate({ identifier: "WorkspaceInvitationIssueInput" });
+  expiresAt: Schema.DateTimeUtcFromString
+}).annotate({ identifier: "WorkspaceInvitationIssueInput" })
 
 /**
  * @category options
@@ -59,19 +61,18 @@ export interface IssueInput extends Schema.Schema.Type<typeof IssueInput> {}
  */
 export const Issuance = Schema.Struct({
   ...IssueInput.fields,
-  id: Id,
-  workspaceId: Workspace.Id,
-  inviterMemberId: Member.Id,
-  issuedAt: Schema.DateTimeUtcFromString,
+  id: InvitationId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  inviterMemberId: MemberId.MemberId,
+  issuedAt: Schema.DateTimeUtcFromString
 })
   .check(
     Schema.makeFilter((value) => {
-      if (!DateTime.isGreaterThan(value.expiresAt, value.issuedAt))
-        return "Expiry must follow issuance";
-      return undefined;
-    }),
+      if (!DateTime.isGreaterThan(value.expiresAt, value.issuedAt)) return "Expiry must follow issuance"
+      return undefined
+    })
   )
-  .annotate({ identifier: "WorkspaceInvitationIssuance" });
+  .annotate({ identifier: "WorkspaceInvitationIssuance" })
 
 /**
  * @category schemas
@@ -88,15 +89,15 @@ export interface Issuance extends Schema.Schema.Type<typeof Issuance> {}
  */
 export const State = Schema.TaggedUnion({
   Pending: {},
-  Accepted: { memberId: Member.Id, acceptedAt: Schema.DateTimeUtcFromString },
-  Revoked: { revokedBy: Member.Id, revokedAt: Schema.DateTimeUtcFromString },
-});
+  Accepted: { memberId: MemberId.MemberId, acceptedAt: Schema.DateTimeUtcFromString },
+  Revoked: { revokedBy: MemberId.MemberId, revokedAt: Schema.DateTimeUtcFromString }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type State = typeof State.Type;
+export type State = typeof State.Type
 
 /**
  * An invitation as `InvitationStore` keeps it: its issuance and its state. Expiry is evaluated
@@ -107,8 +108,8 @@ export type State = typeof State.Type;
  * @since 0.1.0
  */
 export const Invitation = Schema.Struct({ details: Issuance, state: State }).annotate({
-  identifier: "WorkspaceInvitation",
-});
+  identifier: "WorkspaceInvitation"
+})
 
 /**
  * @category schemas

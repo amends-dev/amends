@@ -8,19 +8,20 @@
  *
  * @since 0.1.0
  */
-import { accounts } from "./internal/accounts.ts";
-import { changeFeed } from "./internal/change-feed.ts";
-import { contracts } from "./internal/contracts.ts";
-import { factMetadata } from "./internal/fact-metadata.ts";
-import type { Fixture } from "./Fixture.ts";
-import { idempotency } from "./internal/idempotency.ts";
-import { journal } from "./internal/journal.ts";
-import { reads } from "./internal/reads.ts";
-import { sessionLogs } from "./internal/session-logs.ts";
-import { signInStorage } from "./internal/sign-in-storage.ts";
-import { signals } from "./internal/signals.ts";
-import { standaloneAppends } from "./internal/standalone-appends.ts";
-import { transactions } from "./internal/transactions.ts";
+
+import type * as Fixture from "./Fixture.ts"
+import { accounts } from "./internal/accounts.ts"
+import { changeFeed } from "./internal/changeFeed.ts"
+import { contracts } from "./internal/contracts.ts"
+import { factMetadata } from "./internal/factMetadata.ts"
+import { idempotency } from "./internal/idempotency.ts"
+import { journal } from "./internal/journal.ts"
+import { reads } from "./internal/reads.ts"
+import { sessionLogs } from "./internal/sessionLogs.ts"
+import { signals } from "./internal/signals.ts"
+import { signInStorage } from "./internal/signInStorage.ts"
+import { standaloneAppends } from "./internal/standalone-appends.ts"
+import { transactions } from "./internal/transactions.ts"
 
 export type {
   /**
@@ -50,8 +51,8 @@ export type {
    * @category testing
    * @since 0.1.0
    */
-  Storage,
-} from "./Fixture.ts";
+  Storage
+} from "./Fixture.ts"
 
 /**
  * What the suites share, for an adapter's own tests: identities, bound stores by name, and a core
@@ -60,7 +61,7 @@ export type {
  * @category testing
  * @since 0.1.0
  */
-export * as Support from "./Support.ts";
+export * as Support from "./Support.ts"
 
 /**
  * Runs every suite against the storage `fixture` opens, in the test file that calls it.
@@ -68,17 +69,17 @@ export * as Support from "./Support.ts";
  * @category testing
  * @since 0.1.0
  */
-export const run = (fixture: Fixture) => {
-  journal(fixture);
-  transactions(fixture);
-  changeFeed(fixture);
-  signals(fixture);
-  sessionLogs(fixture);
-  standaloneAppends(fixture);
-  idempotency(fixture);
-  factMetadata(fixture);
-  reads(fixture);
-  contracts(fixture);
-  accounts(fixture);
-  signInStorage(fixture);
-};
+export const run = (fixture: Fixture.Fixture) => {
+  journal(fixture)
+  transactions(fixture)
+  changeFeed(fixture)
+  signals(fixture)
+  sessionLogs(fixture)
+  standaloneAppends(fixture)
+  idempotency(fixture)
+  factMetadata(fixture)
+  reads(fixture)
+  contracts(fixture)
+  accounts(fixture)
+  signInStorage(fixture)
+}

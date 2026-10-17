@@ -1,58 +1,52 @@
-import { Show, createSignal, createUniqueId, onCleanup } from "solid-js";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Count } from "../../components/count/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { Select } from "../../components/select/index.ts";
-import { Modal } from "../../patterns/modal/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import {
-  SettingsAlert,
-  displayName,
-  type SettingsAction,
-  type SettingsError,
-  type SettingsPerson,
-} from "./wording.tsx";
-import * as s from "./settings.css.ts";
+import { Show, createSignal, createUniqueId, onCleanup } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Count } from "../../components/count/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { Select } from "../../components/select/index.ts"
+import { Modal } from "../../patterns/modal/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import * as s from "./settings.css.ts"
+import { SettingsAlert, displayName, type SettingsAction, type SettingsError, type SettingsPerson } from "./wording.tsx"
 
 /** A failure to show, and the change or read it came from. */
 export interface SettingsFailure {
-  readonly action: SettingsAction | "refresh";
-  readonly error: SettingsError;
+  readonly action: SettingsAction | "refresh"
+  readonly error: SettingsError
 }
 
 export interface WorkspaceSettingsProps {
-  readonly workspaceId: string;
+  readonly workspaceId: string
   /** The name being edited. */
-  readonly name: string;
-  readonly onNameChange: (name: string) => void;
+  readonly name: string
+  readonly onNameChange: (name: string) => void
   /** The reader may rename the workspace. */
-  readonly renamable: boolean;
+  readonly renamable: boolean
   /** The name differs from the saved one. */
-  readonly changed: boolean;
-  readonly saving?: boolean;
-  readonly onSave: () => void;
-  readonly owner?: SettingsPerson;
+  readonly changed: boolean
+  readonly saving?: boolean
+  readonly onSave: () => void
+  readonly owner?: SettingsPerson
   /** Opens TransferOwnership; shown to a reader who may transfer. */
-  readonly onTransfer?: () => void;
+  readonly onTransfer?: () => void
   /** Nobody can become the owner yet. */
-  readonly noCandidates?: boolean;
-  readonly creator?: SettingsPerson;
+  readonly noCandidates?: boolean
+  readonly creator?: SettingsPerson
   /** A failed rename, or a read that failed. */
-  readonly failure?: SettingsFailure;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly failure?: SettingsFailure
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /** "6f942c11…5b62": the start and end of a long id. */
-const shortId = (id: string) => (id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
+const shortId = (id: string) => (id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id)
 
 export function SectionHeading(props: {
-  readonly children: string;
-  readonly count?: number;
-  readonly action?: { readonly label: string; readonly onClick: () => void };
+  readonly children: string
+  readonly count?: number
+  readonly action?: { readonly label: string; readonly onClick: () => void }
 }) {
   return (
     <div class={s.heading}>
@@ -69,7 +63,7 @@ export function SectionHeading(props: {
         )}
       </Show>
     </div>
-  );
+  )
 }
 
 /**
@@ -77,17 +71,17 @@ export function SectionHeading(props: {
  * in SettingsPane.
  */
 export function WorkspaceSettings(props: WorkspaceSettingsProps) {
-  const formId = `workspace-name-${createUniqueId()}`;
-  const [copied, setCopied] = createSignal(false);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  onCleanup(() => clearTimeout(timer));
+  const formId = `workspace-name-${createUniqueId()}`
+  const [copied, setCopied] = createSignal(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(timer))
   const copy = () => {
     void navigator.clipboard?.writeText(props.workspaceId).then(() => {
-      setCopied(true);
-      clearTimeout(timer);
-      timer = setTimeout(() => setCopied(false), 2000);
-    });
-  };
+      setCopied(true)
+      clearTimeout(timer)
+      timer = setTimeout(() => setCopied(false), 2000)
+    })
+  }
   return (
     <Pane.Body>
       <Pane.Column>
@@ -95,8 +89,8 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
           id={formId}
           class={s.form}
           onSubmit={(event) => {
-            event.preventDefault();
-            if (props.changed && !props.saving) props.onSave();
+            event.preventDefault()
+            if (props.changed && !props.saving) props.onSave()
           }}
         >
           <Field.Root
@@ -127,12 +121,7 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
             )}
           </Show>
           <Show when={props.renamable}>
-            <Button
-              type="submit"
-              variant="primary"
-              class={s.start}
-              disabled={!props.changed || props.saving}
-            >
+            <Button type="submit" variant="primary" class={s.start} disabled={!props.changed || props.saving}>
               Save changes
             </Button>
           </Show>
@@ -175,13 +164,7 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
             <section class={s.section} aria-label="Ownership">
               <SectionHeading>Ownership</SectionHeading>
               <div class={s.person}>
-                <Avatar
-                  name={owner().name}
-                  initials={owner().initials}
-                  tone={owner().tone}
-                  size={40}
-                  decorative
-                />
+                <Avatar name={owner().name} initials={owner().initials} tone={owner().tone} size={40} decorative />
                 <div class={s.personText}>
                   <span class={s.personName}>{displayName(owner())}</span>
                   <span class={s.personDetail}>Workspace owner</span>
@@ -198,11 +181,7 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
                     <Show when={props.noCandidates}>
                       <p class={s.note}>Invite another person before transferring ownership.</p>
                     </Show>
-                    <Button
-                      class={s.phoneWide}
-                      disabled={props.noCandidates}
-                      onClick={() => transfer()()}
-                    >
+                    <Button class={s.phoneWide} disabled={props.noCandidates} onClick={() => transfer()()}>
                       Transfer ownership
                     </Button>
                   </>
@@ -213,31 +192,31 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
         </Show>
       </Pane.Column>
     </Pane.Body>
-  );
+  )
 }
 
 export interface TransferOwnershipProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly workspaceName: string;
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly workspaceName: string
   /** Who may become the owner. */
-  readonly candidates: readonly SettingsPerson[];
-  readonly chosen?: string;
-  readonly onChoose: (memberId: string) => void;
-  readonly onConfirm: () => void;
-  readonly pending?: boolean;
-  readonly error?: SettingsError;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly candidates: ReadonlyArray<SettingsPerson>
+  readonly chosen?: string
+  readonly onChoose: (memberId: string) => void
+  readonly onConfirm: () => void
+  readonly pending?: boolean
+  readonly error?: SettingsError
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /** Choosing the new owner and confirming the transfer. */
 export function TransferOwnership(props: TransferOwnershipProps) {
-  const formId = `transfer-ownership-${createUniqueId()}`;
+  const formId = `transfer-ownership-${createUniqueId()}`
   const close = () => {
-    if (!props.pending) props.onClose();
-  };
-  const chosen = () => props.candidates.find((person) => person.id === props.chosen);
+    if (!props.pending) props.onClose()
+  }
+  const chosen = () => props.candidates.find((person) => person.id === props.chosen)
   return (
     <Modal.Root open={props.open} onClose={close} aria-label="Transfer ownership" size="compact">
       <Pane.Root variant="modal">
@@ -253,8 +232,8 @@ export function TransferOwnership(props: TransferOwnershipProps) {
             id={formId}
             class={s.form}
             onSubmit={(event) => {
-              event.preventDefault();
-              if (props.chosen && !props.pending) props.onConfirm();
+              event.preventDefault()
+              if (props.chosen && !props.pending) props.onConfirm()
             }}
           >
             <Field.Root
@@ -264,7 +243,7 @@ export function TransferOwnership(props: TransferOwnershipProps) {
               <Select
                 options={props.candidates.map((person) => ({
                   value: person.id,
-                  label: person.name,
+                  label: person.name
                 }))}
                 value={props.chosen}
                 onChange={props.onChoose}
@@ -288,16 +267,11 @@ export function TransferOwnership(props: TransferOwnershipProps) {
           <Button onClick={close} disabled={props.pending}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            form={formId}
-            variant="primary"
-            disabled={!props.chosen || props.pending}
-          >
+          <Button type="submit" form={formId} variant="primary" disabled={!props.chosen || props.pending}>
             Transfer ownership
           </Button>
         </Modal.Actions>
       </Pane.Root>
     </Modal.Root>
-  );
+  )
 }

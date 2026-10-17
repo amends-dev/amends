@@ -1,4 +1,4 @@
-import { colorModes, dark, light, type ColorMode, type ColorTokens } from "./tokens.ts";
+import { colorModes, dark, light, type ColorMode, type ColorTokens } from "./tokens.ts"
 
 /** Optional color studies; Neutral retains the original Lunacy colors. */
 export const colorPalettes = {
@@ -18,7 +18,7 @@ export const colorPalettes = {
         selected: "#E9DCCD",
         railSelected: "#DDCEBD",
         subtle: "#EFE8DD",
-        mention: "#EADCCB",
+        mention: "#EADCCB"
       },
       text: {
         primary: "#302A25",
@@ -26,7 +26,7 @@ export const colorPalettes = {
         muted: "#62574E",
         disabled: "#9B9187",
         agent: "#7850A0",
-        onPrimary: "#FFFCF7",
+        onPrimary: "#FFFCF7"
       },
       border: {
         ...light.border,
@@ -34,11 +34,11 @@ export const colorPalettes = {
         default: "#C9BDAD",
         strong: "#9C5139",
         selected: "#AC7760",
-        stitch: "#B7A791",
+        stitch: "#B7A791"
       },
       action: { primary: "#93482F", secondary: "#FFFCF7", indicator: "#93482F" },
       scrim: "#302A2533",
-      scrimStrong: "#302A2566",
+      scrimStrong: "#302A2566"
     },
     dark: {
       ...dark,
@@ -54,7 +54,7 @@ export const colorPalettes = {
         selected: "#44342A",
         railSelected: "#44342A",
         subtle: "#332B25",
-        mention: "#46362B",
+        mention: "#46362B"
       },
       text: {
         primary: "#F2E9DD",
@@ -62,7 +62,7 @@ export const colorPalettes = {
         muted: "#B5A796",
         disabled: "#80766A",
         agent: "#D4B2EA",
-        onPrimary: "#291A13",
+        onPrimary: "#291A13"
       },
       border: {
         ...dark.border,
@@ -70,10 +70,10 @@ export const colorPalettes = {
         default: "#665344",
         strong: "#D5A589",
         selected: "#AA8062",
-        stitch: "#78634E",
+        stitch: "#78634E"
       },
-      action: { primary: "#E5AC89", secondary: "#332B25", indicator: "#E5AC89" },
-    },
+      action: { primary: "#E5AC89", secondary: "#332B25", indicator: "#E5AC89" }
+    }
   },
   sage: {
     light: {
@@ -90,7 +90,7 @@ export const colorPalettes = {
         selected: "#D9E6D9",
         railSelected: "#CDDDCE",
         subtle: "#E5EDE3",
-        mention: "#D8E7D8",
+        mention: "#D8E7D8"
       },
       text: {
         primary: "#25362D",
@@ -98,7 +98,7 @@ export const colorPalettes = {
         muted: "#526254",
         disabled: "#8E9C90",
         agent: "#715291",
-        onPrimary: "#FCFEFA",
+        onPrimary: "#FCFEFA"
       },
       border: {
         ...light.border,
@@ -106,11 +106,11 @@ export const colorPalettes = {
         default: "#B1C6B5",
         strong: "#3E7355",
         selected: "#729D7C",
-        stitch: "#9AAE97",
+        stitch: "#9AAE97"
       },
       action: { primary: "#326647", secondary: "#FCFEFA", indicator: "#326647" },
       scrim: "#25362D33",
-      scrimStrong: "#25362D66",
+      scrimStrong: "#25362D66"
     },
     dark: {
       ...dark,
@@ -126,7 +126,7 @@ export const colorPalettes = {
         selected: "#314B3A",
         railSelected: "#314B3A",
         subtle: "#283B30",
-        mention: "#324C3C",
+        mention: "#324C3C"
       },
       text: {
         primary: "#E6F0E4",
@@ -134,7 +134,7 @@ export const colorPalettes = {
         muted: "#A5BCA9",
         disabled: "#728879",
         agent: "#D0B8E9",
-        onPrimary: "#16291D",
+        onPrimary: "#16291D"
       },
       border: {
         ...dark.border,
@@ -142,10 +142,10 @@ export const colorPalettes = {
         default: "#4F705A",
         strong: "#A6C6A5",
         selected: "#769D7C",
-        stitch: "#607D5F",
+        stitch: "#607D5F"
       },
-      action: { primary: "#ACCCA1", secondary: "#283B30", indicator: "#ACCCA1" },
-    },
+      action: { primary: "#ACCCA1", secondary: "#283B30", indicator: "#ACCCA1" }
+    }
   },
   slate: {
     light: {
@@ -162,7 +162,7 @@ export const colorPalettes = {
         selected: "#DBE6F6",
         railSelected: "#CCDCF2",
         subtle: "#E9EFF8",
-        mention: "#DCE7F8",
+        mention: "#DCE7F8"
       },
       text: {
         primary: "#233249",
@@ -170,7 +170,7 @@ export const colorPalettes = {
         muted: "#51617A",
         disabled: "#8F9DB1",
         agent: "#7352AE",
-        onPrimary: "#FFFFFF",
+        onPrimary: "#FFFFFF"
       },
       border: {
         ...light.border,
@@ -178,11 +178,11 @@ export const colorPalettes = {
         default: "#B5C6DF",
         strong: "#4B70A7",
         selected: "#7C9BC9",
-        stitch: "#9BAFCB",
+        stitch: "#9BAFCB"
       },
       action: { primary: "#365F9C", secondary: "#FFFFFF", indicator: "#365F9C" },
       scrim: "#23324933",
-      scrimStrong: "#23324966",
+      scrimStrong: "#23324966"
     },
     dark: {
       ...dark,
@@ -198,7 +198,7 @@ export const colorPalettes = {
         selected: "#2D4565",
         railSelected: "#2D4565",
         subtle: "#24364E",
-        mention: "#304767",
+        mention: "#304767"
       },
       text: {
         primary: "#E8EFF9",
@@ -206,7 +206,7 @@ export const colorPalettes = {
         muted: "#ACBED8",
         disabled: "#7286A3",
         agent: "#CFB7FA",
-        onPrimary: "#14243D",
+        onPrimary: "#14243D"
       },
       border: {
         ...dark.border,
@@ -214,22 +214,22 @@ export const colorPalettes = {
         default: "#4B6486",
         strong: "#9ABBEF",
         selected: "#779ACA",
-        stitch: "#607CA1",
+        stitch: "#607CA1"
       },
-      action: { primary: "#A1C2F3", secondary: "#24364E", indicator: "#A1C2F3" },
-    },
-  },
-} satisfies Record<string, Record<ColorMode, ColorTokens>>;
+      action: { primary: "#A1C2F3", secondary: "#24364E", indicator: "#A1C2F3" }
+    }
+  }
+} satisfies Record<string, Record<ColorMode, ColorTokens>>
 
-export type ColorPalette = keyof typeof colorPalettes;
+export type ColorPalette = keyof typeof colorPalettes
 
 export const paletteOptions = [
   { value: "neutral", label: "Neutral", description: "Original gray" },
   { value: "linen", label: "Linen", description: "Warm paper & terracotta" },
   { value: "sage", label: "Sage", description: "Soft green & forest" },
-  { value: "slate", label: "Slate", description: "Cool blue & ink" },
+  { value: "slate", label: "Slate", description: "Cool blue & ink" }
 ] as const satisfies ReadonlyArray<{
-  value: ColorPalette;
-  label: string;
-  description: string;
-}>;
+  value: ColorPalette
+  label: string
+  description: string
+}>

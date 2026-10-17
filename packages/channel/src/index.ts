@@ -13,4 +13,4 @@
 /**
  * @since 0.1.0
  */
-export * as ChannelTransport from "./ChannelTransport.ts";
+export * as ChannelTransport from "./ChannelTransport.ts"

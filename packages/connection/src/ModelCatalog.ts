@@ -12,9 +12,13 @@
  *
  * @since 0.1.0
  */
-import { ModelEndpoint } from "@amends-dev/harness";
-import { Context, Effect, Layer, Schema } from "effect";
-import { snapshot } from "./internal/snapshot.ts";
+
+import { ModelEndpoint } from "@amends-dev/harness"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import { snapshot } from "./internal/snapshot.ts"
 
 /**
  * A kind of content a model takes or gives.
@@ -22,13 +26,13 @@ import { snapshot } from "./internal/snapshot.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"]);
+export const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Modality = typeof Modality.Type;
+export type Modality = typeof Modality.Type
 
 /**
  * How a request controls a model's reasoning. A model that reasons and has none of these controls
@@ -46,9 +50,9 @@ export const Reasoning = Schema.Struct({
 
   /** The tokens a request can let the model reason with, at least `min` and at most `max`. */
   budget: Schema.optionalKey(
-    Schema.Struct({ min: Schema.optionalKey(Schema.Int), max: Schema.optionalKey(Schema.Int) }),
-  ),
-});
+    Schema.Struct({ min: Schema.optionalKey(Schema.Int), max: Schema.optionalKey(Schema.Int) })
+  )
+})
 
 /**
  * @category schemas
@@ -75,8 +79,8 @@ export const Cost = Schema.Struct({
   cacheWrite: Schema.optionalKey(Schema.Finite),
 
   /** Tokens the model reasons with, when they cost other than output tokens. */
-  reasoning: Schema.optionalKey(Schema.Finite),
-});
+  reasoning: Schema.optionalKey(Schema.Finite)
+})
 
 /**
  * @category schemas
@@ -119,13 +123,13 @@ export const Model = Schema.Struct({
   limits: Schema.Struct({
     context: Schema.Int,
     input: Schema.optionalKey(Schema.Int),
-    output: Schema.Int,
+    output: Schema.Int
   }),
 
   /** What the model takes and gives. */
   modalities: Schema.Struct({
     input: Schema.Array(Modality),
-    output: Schema.Array(Modality),
+    output: Schema.Array(Modality)
   }),
 
   /** The model can call tools, which an agent needs in order to work. */
@@ -135,8 +139,8 @@ export const Model = Schema.Struct({
   reasoning: Schema.optionalKey(Reasoning),
 
   /** Absent when the provider publishes no price, as for a model it serves only by subscription. */
-  cost: Schema.optionalKey(Cost),
-});
+  cost: Schema.optionalKey(Cost)
+})
 
 /**
  * @category schemas
@@ -167,8 +171,8 @@ export const Provider = Schema.Struct({
   settings: Schema.Array(Schema.String),
 
   /** The provider's models, in order of id. */
-  models: Schema.Array(Model),
-});
+  models: Schema.Array(Model)
+})
 
 /**
  * @category schemas
@@ -183,7 +187,7 @@ export interface Provider extends Schema.Schema.Type<typeof Provider> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Catalog = Schema.Struct({ providers: Schema.Array(Provider) });
+export const Catalog = Schema.Struct({ providers: Schema.Array(Provider) })
 
 /**
  * @category schemas
@@ -202,13 +206,13 @@ export class ModelCatalog extends Context.Service<
   ModelCatalog,
   {
     /** Every provider, in order of id. */
-    readonly providers: Effect.Effect<ReadonlyArray<Provider>>;
+    readonly providers: Effect.Effect<ReadonlyArray<Provider>>
 
     /** The provider `providerId`, or nothing when the catalog has no such provider. */
-    readonly findProvider: (providerId: string) => Effect.Effect<Provider | undefined>;
+    readonly findProvider: (providerId: string) => Effect.Effect<Provider | undefined>
 
     /** The model `modelId` of the provider `providerId`, or nothing when the catalog has neither. */
-    readonly findModel: (providerId: string, modelId: string) => Effect.Effect<Model | undefined>;
+    readonly findModel: (providerId: string, modelId: string) => Effect.Effect<Model | undefined>
   }
 >()("@amends-dev/connection/ModelCatalog") {}
 
@@ -219,19 +223,16 @@ export class ModelCatalog extends Context.Service<
  * @since 0.1.0
  */
 export const make = (catalog: Catalog): ModelCatalog["Service"] => {
-  const providers = new Map(catalog.providers.map((provider) => [provider.id, provider]));
+  const providers = new Map(catalog.providers.map((provider) => [provider.id, provider]))
   const models = new Map(
-    catalog.providers.map((provider) => [
-      provider.id,
-      new Map(provider.models.map((model) => [model.id, model])),
-    ]),
-  );
+    catalog.providers.map((provider) => [provider.id, new Map(provider.models.map((model) => [model.id, model]))])
+  )
   return ModelCatalog.of({
     providers: Effect.succeed(catalog.providers),
     findProvider: (providerId) => Effect.succeed(providers.get(providerId)),
-    findModel: (providerId, modelId) => Effect.succeed(models.get(providerId)?.get(modelId)),
-  });
-};
+    findModel: (providerId, modelId) => Effect.succeed(models.get(providerId)?.get(modelId))
+  })
+}
 
 /**
  * The catalog this package ships, as models.dev had it when `snapshot.ts` was last written.
@@ -241,8 +242,5 @@ export const make = (catalog: Catalog): ModelCatalog["Service"] => {
  */
 export const layer: Layer.Layer<ModelCatalog> = Layer.effect(
   ModelCatalog,
-  Schema.decodeEffect(Schema.fromJsonString(Catalog))(snapshot).pipe(
-    Effect.map(make),
-    Effect.orDie,
-  ),
-);
+  Schema.decodeEffect(Schema.fromJsonString(Catalog))(snapshot).pipe(Effect.map(make), Effect.orDie)
+)

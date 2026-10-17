@@ -9,61 +9,53 @@
  *
  * @since 0.1.0
  */
-import { createHmac } from "node:crypto";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import {
-  Integrations,
-  ModelCatalog,
-  ModelIntegrations,
-  ToolIntegrations,
-} from "@amends-dev/connection";
-import { DeliveryJob, JobPruning, TurnJob } from "@amends-dev/cluster";
-import {
-  type Accounts,
-  Gateway,
-  type SignInStorage,
-  type WorkspaceDirectory,
-} from "@amends-dev/gateway";
-import { Models } from "@amends-dev/harness-amends";
-import {
-  PostgresClusterStorage,
-  PostgresDatabase,
-  PostgresStorage,
-} from "@amends-dev/storage-postgresql";
-import { BunClusterSocket, BunCrypto, BunServices, BunSocket } from "@effect/platform-bun";
-import { Duration, Effect, Layer, Option, Redacted } from "effect";
-import {
-  type MessageStorage,
-  RunnerAddress,
-  type Runners,
-  type Sharding,
-  SingleRunner,
-} from "effect/cluster";
-import { FetchHttpClient } from "effect/http";
-import type { SqlClient } from "effect/sql";
-import * as HarnessIntegrations from "./HarnessIntegrations.ts";
-import * as LocalConfig from "./LocalConfig.ts";
-import * as SandboxIntegrations from "./SandboxIntegrations.ts";
+
+import { createHmac } from "node:crypto"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { DeliveryJob, JobPruning, TurnJob } from "@amends-dev/cluster"
+import { Integrations, ModelCatalog, ModelIntegrations, ToolIntegrations } from "@amends-dev/connection"
+import { type Accounts, Gateway, type SignInStorage, type WorkspaceDirectory } from "@amends-dev/gateway"
+import { Models } from "@amends-dev/harness-amends"
+import { PostgresClusterStorage, PostgresDatabase, PostgresStorage } from "@amends-dev/storage-postgresql"
+import * as BunClusterSocket from "@effect/platform-bun/BunClusterSocket"
+import * as BunCrypto from "@effect/platform-bun/BunCrypto"
+import * as BunServices from "@effect/platform-bun/BunServices"
+import * as BunSocket from "@effect/platform-bun/BunSocket"
+import type * as MessageStorage from "effect/cluster/MessageStorage"
+import * as RunnerAddress from "effect/cluster/RunnerAddress"
+import type * as Runners from "effect/cluster/Runners"
+import type * as Sharding from "effect/cluster/Sharding"
+import * as SingleRunner from "effect/cluster/SingleRunner"
+import type * as Config from "effect/Config"
+import * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Redacted from "effect/Redacted"
+import type * as SocketServer from "effect/socket/SocketServer"
+import type * as SqlClient from "effect/sql/SqlClient"
+import * as HarnessIntegrations from "./HarnessIntegrations.ts"
+import * as LocalConfig from "./LocalConfig.ts"
+import * as SandboxIntegrations from "./SandboxIntegrations.ts"
 
 /**
  * What `layer` provides for one host's lifetime: the gateway, the workspace directory, the
- * accounts, and sign-in's storage, which `LocalServer.layer` serves the HTTP API over.
+ * accounts, and sign-in's storage, which `LocalServer.layer` serves the HTTP API over. `E` is what
+ * the host fails to start with.
  *
  * @category models
  * @since 0.1.0
  */
-export type HostLayer = Layer.Layer<
-  | Gateway.Gateway
-  | WorkspaceDirectory.WorkspaceDirectory
-  | Accounts.Accounts
-  | SignInStorage.SignInStorage,
-  unknown
->;
+export type HostLayer<E> = Layer.Layer<
+  Gateway.Gateway | WorkspaceDirectory.WorkspaceDirectory | Accounts.Accounts | SignInStorage.SignInStorage,
+  E
+>
 
 /**
  * What `layer` and `layerDatabase` take besides the database URL, each with its default.
- * `LocalConfig.load` reads them from the environment.
+ * `LocalConfig.options` reads them from the environment.
  *
  * @category options
  * @since 0.1.0
@@ -74,38 +66,38 @@ export interface Options {
    * its commits make for the processes that do, and takes no runner address; the runner settings
    * below apply only to a process that runs jobs.
    */
-  readonly runJobs?: boolean | undefined;
+  readonly runJobs?: boolean | undefined
   /** The most connections to open to the database, twenty by default. */
-  readonly poolSize?: number | undefined;
+  readonly poolSize?: number | undefined
   /**
    * This process's address among the processes running jobs over the database,
    * `localhost:34431` by default. The host refuses to start while another process holds it.
    */
-  readonly runnerAddress?: { readonly host: string; readonly port: number } | undefined;
+  readonly runnerAddress?: { readonly host: string; readonly port: number } | undefined
   /**
    * How those processes reach each other: through the database alone, by default, or also over
    * sockets at their runner addresses, which delivers a request to another process at once rather
    * than at its next read. Cluster's socket messages are not authenticated, so the addresses must
    * be reachable only on a private network.
    */
-  readonly runnerTransport?: "storage" | "socket" | undefined;
+  readonly runnerTransport?: "storage" | "socket" | undefined
   /**
    * How long a process that stops answering keeps its workspaces before another takes them,
    * 35 seconds by default. Every process over one database uses the same.
    */
-  readonly runnerTakeover?: Duration.Input | undefined;
+  readonly runnerTakeover?: Duration.Input | undefined
   /** How often a runner reads for due job requests, every two seconds by default. */
-  readonly pollInterval?: Duration.Input | undefined;
+  readonly pollInterval?: Duration.Input | undefined
   /**
    * The key that seals connections' credentials at rest, 32 bytes as base64. Without one, the
    * host stores no credentials.
    */
-  readonly credentialKey?: Redacted.Redacted<string> | undefined;
+  readonly credentialKey?: Redacted.Redacted<string> | undefined
   /**
    * The directory this machine's sandboxes live in, a directory for each connection to it;
    * `amends-sandboxes` in the system's temporary directory by default.
    */
-  readonly sandboxDirectory?: string | undefined;
+  readonly sandboxDirectory?: string | undefined
 }
 
 /**
@@ -117,14 +109,13 @@ export interface Options {
  * @category constructors
  * @since 0.1.0
  */
-export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
+export const makeIntegrations = Effect.fnUntraced(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
     // A host reaches a bridge another host launched.
-    const bridgeSecret = LocalConfig.deriveSecret(credentialKey, "amends/opencode-bridge");
+    const bridgeSecret = LocalConfig.deriveSecret(credentialKey, "amends/opencode-bridge")
     const opencodeOptions: HarnessIntegrations.OpencodeOptions = {
-      token: (sandboxId) =>
-        Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),
-    };
+      token: (sandboxId) => Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url"))
+    }
     return [
       ...(yield* ModelIntegrations.catalogProviders),
       yield* ModelIntegrations.openAiCompatible,
@@ -134,18 +125,16 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
       yield* SandboxIntegrations.daytona,
       yield* HarnessIntegrations.amends(),
       yield* HarnessIntegrations.opencode(opencodeOptions),
-      yield* HarnessIntegrations.opencode2(opencodeOptions),
-    ];
+      yield* HarnessIntegrations.opencode2(opencodeOptions)
+    ]
   },
-  Effect.provide(
-    Layer.mergeAll(
-      BunServices.layer,
-      BunSocket.layerWebSocketConstructor,
-      ModelCatalog.layer,
-      Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer)),
-    ),
-  ),
-);
+  Effect.provide([
+    BunServices.layer,
+    BunSocket.layerWebSocketConstructor,
+    ModelCatalog.layer,
+    Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer))
+  ])
+)
 
 /**
  * The database, and the cluster that runs jobs over the same pool: one SQL client, so a job a
@@ -160,47 +149,37 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
  */
 export const layerDatabase = (url: Redacted.Redacted<string>, options: Options = {}) =>
   layerCluster(options).pipe(
-    Layer.provideMerge(PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 20 })),
-  );
+    Layer.provideMerge(PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 20 }))
+  )
 
 /**
  * The cluster over the database's client, started one process at a time: a runner at this
  * process's address, or a client.
  */
-const layerCluster = (
-  options: Options,
-): Layer.Layer<
-  Sharding.Sharding | Runners.Runners | MessageStorage.MessageStorage,
-  unknown,
-  SqlClient.SqlClient | PostgresDatabase.PostgresDatabase
-> => {
+const layerCluster = (options: Options) => {
   if (options.runJobs === false)
     return PostgresClusterStorage.layerOneAtATime(
-      SingleRunner.layer({ shardingConfig: { runnerAddress: Option.none() } }).pipe(
-        Layer.provide(BunCrypto.layer),
-      ),
-    );
-  const host = options.runnerAddress?.host ?? "localhost";
-  const port = options.runnerAddress?.port ?? 34431;
+      SingleRunner.layer({ shardingConfig: { runnerAddress: Option.none() } }).pipe(Layer.provide(BunCrypto.layer))
+    )
+  const host = options.runnerAddress?.host ?? "localhost"
+  const port = options.runnerAddress?.port ?? 34431
   const shardingConfig = {
     runnerAddress: Option.some(RunnerAddress.make(host, port)),
     entityMessagePollInterval: Duration.fromInputUnsafe(options.pollInterval ?? "2 seconds"),
-    shardLockExpiration: Duration.fromInputUnsafe(options.runnerTakeover ?? "35 seconds"),
-  };
+    shardLockExpiration: Duration.fromInputUnsafe(options.runnerTakeover ?? "35 seconds")
+  }
   const cluster: Layer.Layer<
     Sharding.Sharding | Runners.Runners | MessageStorage.MessageStorage,
-    unknown,
+    Config.ConfigError | SocketServer.SocketServerError,
     SqlClient.SqlClient
   > =
     options.runnerTransport === "socket"
       ? BunClusterSocket.layer({ storage: "sql", shardingConfig })
-      : SingleRunner.layer({ shardingConfig }).pipe(Layer.provide(BunCrypto.layer));
+      : SingleRunner.layer({ shardingConfig }).pipe(Layer.provide(BunCrypto.layer))
   return PostgresClusterStorage.layerOneAtATime(
-    cluster.pipe(
-      Layer.provide(Layer.effectDiscard(PostgresClusterStorage.claimAddress(`${host}:${port}`))),
-    ),
-  );
-};
+    cluster.pipe(Layer.provide(Layer.effectDiscard(PostgresClusterStorage.claimAddress(`${host}:${port}`))))
+  )
+}
 
 /**
  * The gateway, the workspace directory, the accounts, and sign-in's storage over one PostgreSQL
@@ -213,32 +192,26 @@ const layerCluster = (
  * @category layers
  * @since 0.1.0
  */
-export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer => {
-  const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes");
-  const jobs = Effect.map(
-    makeIntegrations(sandboxDirectory, options.credentialKey),
-    (integrations) => {
-      const requests = Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests).pipe(
-        Layer.provide(PostgresClusterStorage.layerWakeup),
-      );
-      const gateway = Gateway.layer({ integrations }).pipe(
-        Layer.provideMerge(PostgresStorage.layer({ credentialKey: options.credentialKey })),
-        Layer.provide(requests),
-      );
-      if (options.runJobs === false) return gateway;
-      const installed = Layer.effect(Integrations.Integrations, Integrations.make(integrations));
-      return Layer.mergeAll(
-        Layer.merge(TurnJob.layerWorker, DeliveryJob.layerWorker).pipe(Layer.provide(installed)),
-        JobPruning.layer({
-          prune: PostgresClusterStorage.prune,
-          entityTypes: [TurnJob.entity.type, DeliveryJob.entity.type],
-        }),
-        PostgresClusterStorage.layerWakeupListener,
-      ).pipe(Layer.provideMerge(gateway));
-    },
-  );
-  return Layer.unwrap(jobs).pipe(
-    Layer.provide(BunCrypto.layer),
-    Layer.provide(layerDatabase(url, options)),
-  );
-};
+export const layer = (url: Redacted.Redacted<string>, options: Options = {}) => {
+  const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes")
+  const jobs = Effect.map(makeIntegrations(sandboxDirectory, options.credentialKey), (integrations) => {
+    const requests = Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests).pipe(
+      Layer.provide(PostgresClusterStorage.layerWakeup)
+    )
+    const gateway = Gateway.layer({ integrations }).pipe(
+      Layer.provideMerge(PostgresStorage.layer({ credentialKey: options.credentialKey })),
+      Layer.provide(requests)
+    )
+    if (options.runJobs === false) return gateway
+    const installed = Layer.effect(Integrations.Integrations, Integrations.make(integrations))
+    return Layer.mergeAll(
+      Layer.merge(TurnJob.layerWorker, DeliveryJob.layerWorker).pipe(Layer.provide(installed)),
+      JobPruning.layer({
+        prune: PostgresClusterStorage.prune,
+        entityTypes: [TurnJob.entity.type, DeliveryJob.entity.type]
+      }),
+      PostgresClusterStorage.layerWakeupListener
+    ).pipe(Layer.provideMerge(gateway))
+  })
+  return Layer.unwrap(jobs).pipe(Layer.provide(BunCrypto.layer), Layer.provide(layerDatabase(url, options)))
+}

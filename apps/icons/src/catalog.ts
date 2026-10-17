@@ -7,427 +7,427 @@ export const iconCatalog = [
     title: "Warning",
     keywords: ["warning", "caution", "alert", "danger"],
     categories: ["status"],
-    exportName: "IconAlertTriangle",
+    exportName: "IconAlertTriangle"
   },
   {
     name: "bell",
     title: "Notifications",
     keywords: ["alert", "notify", "ring", "reminder"],
     categories: ["controls"],
-    exportName: "IconBell",
+    exportName: "IconBell"
   },
   {
     name: "bell-filled",
     title: "Following",
     keywords: ["alert", "notify", "ring", "following", "subscribed", "on"],
     categories: ["controls"],
-    exportName: "IconBellFilled",
+    exportName: "IconBellFilled"
   },
   {
     name: "bold",
     title: "Bold",
     keywords: ["bold", "strong", "weight", "format"],
     categories: ["content", "controls"],
-    exportName: "IconBold",
+    exportName: "IconBold"
   },
   {
     name: "check",
     title: "Check",
     keywords: ["tick", "done", "confirm", "selected"],
     categories: ["actions"],
-    exportName: "IconCheck",
+    exportName: "IconCheck"
   },
   {
     name: "chevron-down",
     title: "Chevron down",
     keywords: ["expand", "open", "select", "caret"],
     categories: ["navigation"],
-    exportName: "IconChevronDown",
+    exportName: "IconChevronDown"
   },
   {
     name: "circle-check",
     title: "Success",
     keywords: ["success", "done", "complete", "verified"],
     categories: ["status"],
-    exportName: "IconCircleCheck",
+    exportName: "IconCircleCheck"
   },
   {
     name: "circle-frame",
     title: "Circle",
     keywords: ["ring", "frame", "base"],
     categories: ["shapes"],
-    exportName: "IconCircleFrame",
+    exportName: "IconCircleFrame"
   },
   {
     name: "clock",
     title: "Time",
     keywords: ["time", "duration", "recent", "history", "wait", "latency"],
     categories: ["status", "content"],
-    exportName: "IconClock",
+    exportName: "IconClock"
   },
   {
     name: "code",
     title: "Code",
     keywords: ["code", "inline", "monospace", "format"],
     categories: ["content", "controls"],
-    exportName: "IconCode",
+    exportName: "IconCode"
   },
   {
     name: "code-block",
     title: "Code block",
     keywords: ["code", "block", "snippet", "monospace", "format"],
     categories: ["content", "controls"],
-    exportName: "IconCodeBlock",
+    exportName: "IconCodeBlock"
   },
   {
     name: "folder",
     title: "Folder",
     keywords: ["directory", "collection", "empty", "files"],
     categories: ["content"],
-    exportName: "IconFolder",
+    exportName: "IconFolder"
   },
   {
     name: "home",
     title: "Home",
     keywords: ["house", "overview", "start", "dashboard"],
     categories: ["navigation"],
-    exportName: "IconHome",
+    exportName: "IconHome"
   },
   {
     name: "italic",
     title: "Italic",
     keywords: ["italic", "emphasis", "slant", "format"],
     categories: ["content", "controls"],
-    exportName: "IconItalic",
+    exportName: "IconItalic"
   },
   {
     name: "link",
     title: "Link",
     keywords: ["link", "url", "address", "chain"],
     categories: ["content", "controls"],
-    exportName: "IconLink",
+    exportName: "IconLink"
   },
   {
     name: "list",
     title: "List",
     keywords: ["list", "browse", "all", "items", "rows"],
     categories: ["navigation", "content"],
-    exportName: "IconList",
+    exportName: "IconList"
   },
   {
     name: "list-ordered",
     title: "Numbered list",
     keywords: ["numbered", "ordered", "list", "steps", "format"],
     categories: ["content", "controls"],
-    exportName: "IconListOrdered",
+    exportName: "IconListOrdered"
   },
   {
     name: "mark-agents",
     title: "Agents mark",
     keywords: ["mark", "agents", "principal", "concentric"],
     categories: ["navigation", "agent"],
-    exportName: "IconMarkAgents",
+    exportName: "IconMarkAgents"
   },
   {
     name: "mark-attach",
     title: "Attach mark",
     keywords: ["mark", "attach", "add", "file"],
     categories: ["actions", "content"],
-    exportName: "IconMarkAttach",
+    exportName: "IconMarkAttach"
   },
   {
     name: "mark-back",
     title: "Back mark",
     keywords: ["mark", "back", "left", "previous"],
     categories: ["actions", "navigation"],
-    exportName: "IconMarkBack",
+    exportName: "IconMarkBack"
   },
   {
     name: "mark-channel",
     title: "Channel mark",
     keywords: ["mark", "channel", "group", "hash"],
     categories: ["navigation"],
-    exportName: "IconMarkChannel",
+    exportName: "IconMarkChannel"
   },
   {
     name: "mark-close",
     title: "Close mark",
     keywords: ["mark", "close", "dismiss", "cancel"],
     categories: ["actions"],
-    exportName: "IconMarkClose",
+    exportName: "IconMarkClose"
   },
   {
     name: "mark-command",
     title: "Command mark",
     keywords: ["mark", "command", "slash", "shortcut"],
     categories: ["actions", "controls"],
-    exportName: "IconMarkCommand",
+    exportName: "IconMarkCommand"
   },
   {
     name: "mark-connections",
     title: "Connections mark",
     keywords: ["mark", "connections", "linked", "rings"],
     categories: ["navigation", "content"],
-    exportName: "IconMarkConnections",
+    exportName: "IconMarkConnections"
   },
   {
     name: "mark-done",
     title: "Done mark",
     keywords: ["mark", "done", "check", "complete"],
     categories: ["actions", "status"],
-    exportName: "IconMarkDone",
+    exportName: "IconMarkDone"
   },
   {
     name: "mark-environments",
     title: "Environments mark",
     keywords: ["mark", "environments", "sandbox", "square"],
     categories: ["navigation", "content"],
-    exportName: "IconMarkEnvironments",
+    exportName: "IconMarkEnvironments"
   },
   {
     name: "mark-forward",
     title: "Forward mark",
     keywords: ["mark", "forward", "right", "next", "open"],
     categories: ["actions", "navigation"],
-    exportName: "IconMarkForward",
+    exportName: "IconMarkForward"
   },
   {
     name: "mark-home",
     title: "Home mark",
     keywords: ["mark", "home", "overview", "house"],
     categories: ["navigation"],
-    exportName: "IconMarkHome",
+    exportName: "IconMarkHome"
   },
   {
     name: "mark-mail",
     title: "Mail mark",
     keywords: ["mark", "mail", "inbox", "envelope"],
     categories: ["navigation", "content"],
-    exportName: "IconMarkMail",
+    exportName: "IconMarkMail"
   },
   {
     name: "mark-marketplace",
     title: "Marketplace mark",
     keywords: ["mark", "marketplace", "add", "square"],
     categories: ["navigation"],
-    exportName: "IconMarkMarketplace",
+    exportName: "IconMarkMarketplace"
   },
   {
     name: "mark-mention",
     title: "Mention mark",
     keywords: ["mark", "mention", "at", "address"],
     categories: ["actions", "content"],
-    exportName: "IconMarkMention",
+    exportName: "IconMarkMention"
   },
   {
     name: "mark-menu",
     title: "Menu mark",
     keywords: ["mark", "menu", "down", "caret", "picker"],
     categories: ["navigation", "controls"],
-    exportName: "IconMarkMenu",
+    exportName: "IconMarkMenu"
   },
   {
     name: "mark-more",
     title: "More mark",
     keywords: ["mark", "more", "ellipsis", "overflow"],
     categories: ["actions", "controls"],
-    exportName: "IconMarkMore",
+    exportName: "IconMarkMore"
   },
   {
     name: "mark-new",
     title: "New mark",
     keywords: ["mark", "new", "add", "plus"],
     categories: ["actions"],
-    exportName: "IconMarkNew",
+    exportName: "IconMarkNew"
   },
   {
     name: "mark-open",
     title: "Open mark",
     keywords: ["mark", "open", "right", "forward"],
     categories: ["actions", "navigation"],
-    exportName: "IconMarkOpen",
+    exportName: "IconMarkOpen"
   },
   {
     name: "mark-reply",
     title: "Reply mark",
     keywords: ["mark", "reply", "return", "respond"],
     categories: ["actions", "content"],
-    exportName: "IconMarkReply",
+    exportName: "IconMarkReply"
   },
   {
     name: "mark-resources",
     title: "Resources mark",
     keywords: ["mark", "resources", "documents", "stack"],
     categories: ["navigation", "content"],
-    exportName: "IconMarkResources",
+    exportName: "IconMarkResources"
   },
   {
     name: "mark-retry",
     title: "Retry mark",
     keywords: ["mark", "retry", "refresh", "repeat"],
     categories: ["actions", "status"],
-    exportName: "IconMarkRetry",
+    exportName: "IconMarkRetry"
   },
   {
     name: "mark-search",
     title: "Search mark",
     keywords: ["mark", "search", "find", "magnifier"],
     categories: ["navigation", "controls"],
-    exportName: "IconMarkSearch",
+    exportName: "IconMarkSearch"
   },
   {
     name: "mark-send",
     title: "Send mark",
     keywords: ["mark", "send", "up", "submit"],
     categories: ["actions"],
-    exportName: "IconMarkSend",
+    exportName: "IconMarkSend"
   },
   {
     name: "mark-settings",
     title: "Settings mark",
     keywords: ["mark", "settings", "gear", "configure"],
     categories: ["navigation", "controls"],
-    exportName: "IconMarkSettings",
+    exportName: "IconMarkSettings"
   },
   {
     name: "mark-tasks",
     title: "Tasks mark",
     keywords: ["mark", "tasks", "grid", "work"],
     categories: ["navigation", "content"],
-    exportName: "IconMarkTasks",
+    exportName: "IconMarkTasks"
   },
   {
     name: "mark-tools",
     title: "Tools mark",
     keywords: ["mark", "tools", "hammer", "build"],
     categories: ["navigation", "controls"],
-    exportName: "IconMarkTools",
+    exportName: "IconMarkTools"
   },
   {
     name: "mark-triage",
     title: "Triage mark",
     keywords: ["mark", "triage", "routing", "triangle"],
     categories: ["navigation"],
-    exportName: "IconMarkTriage",
+    exportName: "IconMarkTriage"
   },
   {
     name: "menu",
     title: "Menu",
     keywords: ["hamburger", "navigation", "lines"],
     categories: ["navigation"],
-    exportName: "IconMenu",
+    exportName: "IconMenu"
   },
   {
     name: "message",
     title: "Message",
     keywords: ["chat", "comment", "conversation", "reply", "turn", "bubble"],
     categories: ["content", "agent"],
-    exportName: "IconMessage",
+    exportName: "IconMessage"
   },
   {
     name: "minus",
     title: "Minus",
     keywords: ["remove", "subtract", "collapse"],
     categories: ["actions"],
-    exportName: "IconMinus",
+    exportName: "IconMinus"
   },
   {
     name: "play",
     title: "Play",
     keywords: ["run", "start", "resume", "continue", "media"],
     categories: ["actions", "controls"],
-    exportName: "IconPlay",
+    exportName: "IconPlay"
   },
   {
     name: "plus",
     title: "Plus",
     keywords: ["add", "new", "create"],
     categories: ["actions"],
-    exportName: "IconPlus",
+    exportName: "IconPlus"
   },
   {
     name: "quote",
     title: "Quote",
     keywords: ["quote", "blockquote", "cite", "format"],
     categories: ["content", "controls"],
-    exportName: "IconQuote",
+    exportName: "IconQuote"
   },
   {
     name: "search",
     title: "Search",
     keywords: ["find", "magnifier", "lookup"],
     categories: ["navigation"],
-    exportName: "IconSearch",
+    exportName: "IconSearch"
   },
   {
     name: "settings",
     title: "Settings",
     keywords: ["gear", "cog", "preferences", "configure"],
     categories: ["controls"],
-    exportName: "IconSettings",
+    exportName: "IconSettings"
   },
   {
     name: "sidebar",
     title: "Sidebar",
     keywords: ["layout", "panel", "rail", "navigation", "drawer", "sidebar", "left", "orientation"],
     categories: ["content", "navigation"],
-    exportName: "IconSidebar",
+    exportName: "IconSidebar"
   },
   {
     name: "sidebar-left-close",
     title: "Close left sidebar",
     keywords: ["sidebar", "panel", "left", "close", "collapse", "drawer"],
     categories: ["navigation", "controls"],
-    exportName: "IconSidebarLeftClose",
+    exportName: "IconSidebarLeftClose"
   },
   {
     name: "sidebar-left-open",
     title: "Open left sidebar",
     keywords: ["sidebar", "panel", "left", "open", "expand", "drawer"],
     categories: ["navigation", "controls"],
-    exportName: "IconSidebarLeftOpen",
+    exportName: "IconSidebarLeftOpen"
   },
   {
     name: "strikethrough",
     title: "Strikethrough",
     keywords: ["strikethrough", "strike", "delete", "format"],
     categories: ["content", "controls"],
-    exportName: "IconStrikethrough",
+    exportName: "IconStrikethrough"
   },
   {
     name: "trash",
     title: "Delete",
     keywords: ["remove", "bin", "discard", "destroy"],
     categories: ["actions"],
-    exportName: "IconTrash",
+    exportName: "IconTrash"
   },
   {
     name: "type",
     title: "Formatting",
     keywords: ["type", "text", "formatting", "style", "toolbar"],
     categories: ["content", "controls"],
-    exportName: "IconType",
+    exportName: "IconType"
   },
   {
     name: "user",
     title: "User",
     keywords: ["person", "account", "profile", "avatar"],
     categories: ["controls"],
-    exportName: "IconUser",
+    exportName: "IconUser"
   },
   {
     name: "users",
     title: "Users",
     keywords: ["people", "team", "group", "members"],
     categories: ["controls"],
-    exportName: "IconUsers",
+    exportName: "IconUsers"
   },
   {
     name: "x",
     title: "Close",
     keywords: ["close", "dismiss", "remove", "cancel", "cross"],
     categories: ["actions"],
-    exportName: "IconX",
-  },
-] as const;
-export type IconName = (typeof iconCatalog)[number]["name"];
+    exportName: "IconX"
+  }
+] as const
+export type IconName = (typeof iconCatalog)[number]["name"]

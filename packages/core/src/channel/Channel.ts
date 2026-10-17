@@ -8,27 +8,14 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Connection from "../connection/Connection.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as Text from "../text/Text.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as ChannelId from "./ChannelId.ts";
 
-/**
- * Names a channel; `ChannelId.Id`, where models that only refer to channels import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ChannelId.Id;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ChannelId.Id;
+import { Connection as ConnectionContract } from "@amends-dev/connection"
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as Text from "../text/Text.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ChannelId from "./ChannelId.ts"
 
 /**
  * A channel's name as recorded; names chosen now are `NewName`.
@@ -36,13 +23,13 @@ export type Id = ChannelId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
+export const Name = Schema.Trimmed.check(Schema.isMinLength(1))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * A name chosen for a channel: 1 to 80 characters, without hidden ones.
@@ -50,7 +37,7 @@ export type Name = typeof Name.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
+export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName)
 
 /**
  * A removed channel's record stays, so that retrying the request that created it finds it, and
@@ -59,13 +46,13 @@ export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isNa
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "removed"]);
+export const Status = Schema.Literals(["active", "removed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * A channel as created and since redirected or removed.
@@ -74,19 +61,19 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const Channel = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: ChannelId.ChannelId,
+  workspaceId: WorkspaceId.WorkspaceId,
   /** The connection whose transport receives the channel's events and posts its replies. */
-  connectionId: Connection.Id,
+  connectionId: ConnectionContract.ConnectionId,
   /** The destination: the group a new conversation becomes a thread in. */
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   name: Name,
   /** Whether a new conversation opens as a task in triage, or as a conversation alone. */
   opensTasks: Schema.Boolean,
   status: Status,
-  createdBy: MemberId.Id,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdBy: MemberId.MemberId,
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -97,11 +84,10 @@ export interface Channel extends Schema.Schema.Type<typeof Channel> {}
 /**
  * The record with some fields changed.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
-export const change = (record: Channel, changes: Partial<Channel>): Channel =>
-  Object.assign({}, record, changes);
+export const change = (record: Channel, changes: Partial<Channel>): Channel => Object.assign({}, record, changes)
 
 /**
  * A new channel: its connection, its destination, what to call it, and whether it opens tasks.
@@ -110,11 +96,11 @@ export const change = (record: Channel, changes: Partial<Channel>): Channel =>
  * @since 0.1.0
  */
 export const CreateInput = Schema.Struct({
-  connectionId: Connection.Id,
-  groupId: GroupId.Id,
+  connectionId: ConnectionContract.ConnectionId,
+  groupId: GroupId.GroupId,
   name: NewName,
-  opensTasks: Schema.Boolean,
-});
+  opensTasks: Schema.Boolean
+})
 
 /**
  * @category options
@@ -128,7 +114,7 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const RedirectInput = Schema.Struct({ channelId: Id, groupId: GroupId.Id });
+export const RedirectInput = Schema.Struct({ channelId: ChannelId.ChannelId, groupId: GroupId.GroupId })
 
 /**
  * @category options
@@ -143,10 +129,10 @@ export interface RedirectInput extends Schema.Schema.Type<typeof RedirectInput> 
  * @since 0.1.0
  */
 export const Redirected = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  channelId: Id,
-  groupId: GroupId.Id,
-});
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
+  groupId: GroupId.GroupId
+})
 
 /**
  * @category schemas
@@ -160,7 +146,7 @@ export interface Redirected extends Schema.Schema.Type<typeof Redirected> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, channelId: Id });
+export const Reference = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId })
 
 /**
  * @category schemas

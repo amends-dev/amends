@@ -1,17 +1,17 @@
 // How screens word times, days, and who is typing.
-const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const full = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" });
-const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
-const thisYear = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long" });
+const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" })
+const full = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" })
+const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" })
+const thisYear = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long" })
 const otherYear = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
   month: "long",
-  year: "numeric",
-});
-const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  year: "numeric"
+})
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
 /** Such as "10:02 AM". */
-export const clockTime = (at: Date) => clock.format(at);
+export const clockTime = (at: Date) => clock.format(at)
 /** Such as "10:02": the time of day without AM or PM, where there is little room. */
 export const shortClockTime = (at: Date) =>
   clock
@@ -19,52 +19,52 @@ export const shortClockTime = (at: Date) =>
     .filter((part) => part.type !== "dayPeriod")
     .map((part) => part.value)
     .join("")
-    .trim();
+    .trim()
 /** Such as "Sunday, September 27, 2026 at 10:02 AM", for a tooltip. */
-export const fullTime = (at: Date) => full.format(at);
+export const fullTime = (at: Date) => full.format(at)
 /** The local calendar day, to group entries under day seams. */
-export const dayOf = (at: Date) => startOfDay(at).getTime();
+export const dayOf = (at: Date) => startOfDay(at).getTime()
 /** Today, yesterday, a weekday within the week, then the date. */
 export function dayLabel(day: number, now = new Date()) {
-  const days = Math.round((startOfDay(now).getTime() - day) / 86_400_000);
-  const date = new Date(day);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days > 1 && days < 7) return weekday.format(date);
-  return (date.getFullYear() === now.getFullYear() ? thisYear : otherYear).format(date);
+  const days = Math.round((startOfDay(now).getTime() - day) / 86_400_000)
+  const date = new Date(day)
+  if (days === 0) return "Today"
+  if (days === 1) return "Yesterday"
+  if (days > 1 && days < 7) return weekday.format(date)
+  return (date.getFullYear() === now.getFullYear() ? thisYear : otherYear).format(date)
 }
 /** The time today, otherwise the day. */
 export const whenLabel = (at: Date, now = new Date()) =>
-  dayOf(at) === dayOf(now) ? clockTime(at) : dayLabel(dayOf(at), now);
+  dayOf(at) === dayOf(now) ? clockTime(at) : dayLabel(dayOf(at), now)
 /** One or two names, or several people. Empty when nobody is typing. */
-export function typingText(names: readonly string[]) {
-  if (names.length === 0) return "";
-  if (names.length === 1) return `${names[0]} is typing…`;
-  if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
-  return "Several people are typing…";
+export function typingText(names: ReadonlyArray<string>) {
+  if (names.length === 0) return ""
+  if (names.length === 1) return `${names[0]} is typing…`
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`
+  return "Several people are typing…"
 }
-const shortDate = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+const shortDate = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" })
 /** How long ago, as a list shows it: "Just now", "12m ago", "3h ago", then the day. */
 export function agoLabel(at: Date, now = new Date()) {
-  const minutes = Math.floor((now.getTime() - at.getTime()) / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (dayOf(at) === dayOf(now)) return `${Math.floor(minutes / 60)}h ago`;
-  const days = Math.round((dayOf(now) - dayOf(at)) / 86_400_000);
-  if (days === 1) return "Yesterday";
-  if (days < 7) return weekday.format(at);
-  return shortDate.format(at);
+  const minutes = Math.floor((now.getTime() - at.getTime()) / 60_000)
+  if (minutes < 1) return "Just now"
+  if (minutes < 60) return `${minutes}m ago`
+  if (dayOf(at) === dayOf(now)) return `${Math.floor(minutes / 60)}h ago`
+  const days = Math.round((dayOf(now) - dayOf(at)) / 86_400_000)
+  if (days === 1) return "Yesterday"
+  if (days < 7) return weekday.format(at)
+  return shortDate.format(at)
 }
 const shortDateYear = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
   month: "short",
-  year: "numeric",
-});
+  year: "numeric"
+})
 /** Such as "Sep 20", with the year when it is not this one. */
 export const dateLabel = (at: Date, now = new Date()) =>
-  (at.getFullYear() === now.getFullYear() ? shortDate : shortDateYear).format(at);
+  (at.getFullYear() === now.getFullYear() ? shortDate : shortDateYear).format(at)
 /** Such as "Sep 28, 2026", always with the year, for when something was created. */
-export const calendarDate = (at: Date) => shortDateYear.format(at);
+export const calendarDate = (at: Date) => shortDateYear.format(at)
 /** Whole days until a moment, rounded up, and at least one: a fresh week reads as 7. */
 export const daysUntil = (at: Date, now = new Date()) =>
-  Math.max(1, Math.ceil((at.getTime() - now.getTime()) / 86_400_000));
+  Math.max(1, Math.ceil((at.getTime() - now.getTime()) / 86_400_000))

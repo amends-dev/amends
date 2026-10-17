@@ -40,41 +40,39 @@ connects to a bridge any of them launched. The caller creates each sandbox with 
 `template`, which installs opencode and the bridge, and `Harness.make` runs the agent in it.
 
 ```ts
-import { OpencodeAgent } from "@amends-dev/harness-opencode";
-import { Agent, Harness } from "@amends-dev/harness";
-import { SandboxProvider } from "@amends-dev/sandbox";
-import { BunServices, BunSocket } from "@effect/platform-bun";
-import { Config, Effect, Layer, Redacted } from "effect";
-import { createHmac } from "node:crypto";
+import { OpencodeAgent } from "@amends-dev/harness-opencode"
+import { Agent, Harness } from "@amends-dev/harness"
+import { SandboxProvider } from "@amends-dev/sandbox"
+import { BunServices, BunSocket } from "@effect/platform-bun"
+import { Config, Effect, Layer, Redacted } from "effect"
+import { createHmac } from "node:crypto"
 
-declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider>; // a sandbox provider
+declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider> // a sandbox provider
 
 const program = Effect.gen(function* () {
   // Every host derives a sandbox's bridge token from its id with a secret the hosts share.
-  const secret = yield* Config.Redacted("BRIDGE_SECRET");
+  const secret = yield* Config.Redacted("BRIDGE_SECRET")
   const agent = yield* OpencodeAgent.make({
     model: {
       provider: "anthropic",
       model: "claude-sonnet-5-5",
       protocol: "anthropic-messages",
       url: "https://api.anthropic.com/v1",
-      apiKey: yield* Config.Redacted("ANTHROPIC_API_KEY"),
+      apiKey: yield* Config.Redacted("ANTHROPIC_API_KEY")
     },
     token: (sandboxId) =>
-      Redacted.make(
-        createHmac("sha256", Redacted.value(secret)).update(sandboxId).digest("base64url"),
-      ),
-  });
-  const harness = Harness.make(agent);
-  const sandboxProvider = yield* SandboxProvider.SandboxProvider;
-  const sandbox = yield* sandboxProvider.createScoped({ template: harness.agent.template });
-  const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") });
-  const answer = yield* session.generate({ prompt: "Summarize README.md" });
-  return answer.text;
+      Redacted.make(createHmac("sha256", Redacted.value(secret)).update(sandboxId).digest("base64url"))
+  })
+  const harness = Harness.make(agent)
+  const sandboxProvider = yield* SandboxProvider.SandboxProvider
+  const sandbox = yield* sandboxProvider.createScoped({ template: harness.agent.template })
+  const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") })
+  const answer = yield* session.generate({ prompt: "Summarize README.md" })
+  return answer.text
 }).pipe(
   Effect.scoped,
-  Effect.provide(Layer.mergeAll(sandboxes, BunServices.layer, BunSocket.layerWebSocketConstructor)),
-);
+  Effect.provide(Layer.mergeAll(sandboxes, BunServices.layer, BunSocket.layerWebSocketConstructor))
+)
 ```
 
 `config` is opencode's configuration, as its `opencode.json` takes it, whose providers the models'

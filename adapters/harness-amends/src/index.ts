@@ -10,14 +10,14 @@
 /**
  * @since 0.1.0
  */
-export * as AmendsAgent from "./AmendsAgent.ts";
+export * as AmendsAgent from "./AmendsAgent.ts"
 
 /**
  * @since 0.1.0
  */
-export * as Models from "./Models.ts";
+export * as Models from "./Models.ts"
 
 /**
  * @since 0.1.0
  */
-export * as Tools from "./Tools.ts";
+export * as Tools from "./Tools.ts"

@@ -19,8 +19,8 @@ each call to core, so a job holds a workspace only while a call runs. The
 | `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                                                                                |
 | `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                                                                            |
 
-`TurnRunner` keeps two steps of a run under `internal/`: `session-log-writer.ts`, what a run
-writes to its participation's session log; and `turn-agent.ts`, starting the session of the agent a
+`TurnRunner` keeps two steps of a run under `internal/`: `sessionLogWriter.ts`, what a run
+writes to its participation's session log; and `turnAgent.ts`, starting the session of the agent a
 turn runs from what core gives and the host's integrations.
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and connection
@@ -94,7 +94,7 @@ which answers `Idle` for one no longer requested or failed as it stood, and othe
 the text and its author's name, the conversation as the transport needs it, and the channel's
 connection with its key; build the transport from the connection's integration and `post`; and
 `recordSent` with the id the system gave the message, or `recordFailed` when the system refused it.
-A system that cannot be reached (`TransportError` with `isRetryable`) fails the run with the
+A system that cannot be reached (a failure whose `isRetryable` holds) fails the run with the
 delivery it was on, for the job to try again, and `giveUp` fails that delivery once the job stops
 trying. The runner counts the tries it made of each delivery, which the delivery records.
 

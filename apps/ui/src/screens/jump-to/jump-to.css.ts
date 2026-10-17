@@ -1,10 +1,10 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // The search, then the results scrolling under it, then how to use it.
-export const jump = style({ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 });
+export const jump = style({ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 })
 
 export const search = style({
   display: "flex",
@@ -13,15 +13,15 @@ export const search = style({
   flex: "none",
   padding: "0.75rem 0.75rem 0.75rem 1.25rem",
   boxShadow: `inset 0 -1px 0 ${vars.color.border.divider}`,
-  "@media": { [media.mobile]: { paddingInlineStart: "1rem" } },
-});
+  "@media": { [media.mobile]: { paddingInlineStart: "1rem" } }
+})
 
 export const searchIcon = style({
   flex: "none",
   width: "1.125rem",
   height: "1.125rem",
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
 export const input = style({
   ...typeScale.title,
@@ -35,17 +35,17 @@ export const input = style({
   color: vars.color.text.primary,
   fontFamily: "inherit",
   selectors: { "&::placeholder": { color: vars.color.text.muted, opacity: 1 } },
-  "@media": { [media.mobile]: typeScale.titleTouch },
-});
+  "@media": { [media.mobile]: typeScale.titleTouch }
+})
 
-export const close = style({ flex: "none" });
+export const close = style({ flex: "none" })
 
 export const results = style({
   flex: 1,
   minHeight: 0,
   overflowY: "auto",
-  padding: "0.5rem",
-});
+  padding: "0.5rem"
+})
 
 export const sectionTitle = style({
   ...typeScale.meta,
@@ -53,8 +53,8 @@ export const sectionTitle = style({
   padding: "0.75rem 0.75rem 0.375rem",
   color: vars.color.text.muted,
   fontWeight: fontWeight.medium,
-  textTransform: "uppercase",
-});
+  textTransform: "uppercase"
+})
 
 export const item = style({
   ...typeScale.item,
@@ -66,36 +66,36 @@ export const item = style({
   color: vars.color.text.primary,
   cursor: "pointer",
   selectors: { "&[aria-selected=true]": { backgroundColor: vars.color.surface.selected } },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
 export const itemIcon = style({
   flex: "none",
   width: "1.125rem",
   height: "1.125rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 export const itemLabel = style({
   minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
 export const itemDetail = style({
   ...typeScale.control,
   flex: "none",
   marginInlineStart: "auto",
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
 export const empty = style({
   ...typeScale.control,
   margin: 0,
   padding: "1.5rem 0.75rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 // Keys to use it by, where there is a keyboard to press them.
 export const hints = style({
@@ -107,8 +107,8 @@ export const hints = style({
   padding: "0.625rem 1.25rem",
   boxShadow: `inset 0 1px 0 ${vars.color.border.divider}`,
   color: vars.color.text.muted,
-  "@media": { [media.touch]: { display: "none" } },
-});
+  "@media": { [media.touch]: { display: "none" } }
+})
 
 export const key = style({
   display: "inline-block",
@@ -117,5 +117,5 @@ export const key = style({
   paddingInline: "0.25rem",
   border: `1px solid ${vars.color.border.default}`,
   fontFamily: "inherit",
-  textAlign: "center",
-});
+  textAlign: "center"
+})

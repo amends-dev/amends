@@ -6,27 +6,13 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Audience from "../journal/Audience.ts";
-import * as Identity from "../identity/Identity.ts";
-import * as WorkspaceId from "./WorkspaceId.ts";
-import * as MemberId from "./MemberId.ts";
-import * as Text from "../text/Text.ts";
 
-/**
- * Identifies one admission to a workspace; `MemberId.Id`, where models that only refer to members
- * import it from. Rejoining creates a new membership.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = MemberId.Id;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = MemberId.Id;
+import * as Schema from "effect/Schema"
+import * as Identity from "../identity/Identity.ts"
+import * as Audience from "../journal/Audience.ts"
+import * as Text from "../text/Text.ts"
+import * as MemberId from "./MemberId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * Whether the membership gives access now: `active`, or `removed`, which is terminal and keeps the
@@ -35,13 +21,13 @@ export type Id = MemberId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "removed"]);
+export const Status = Schema.Literals(["active", "removed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * What people in a workspace call a member, as recorded: without surrounding space, 1 to 80
@@ -51,14 +37,14 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(80)).annotate({
-  identifier: "MemberName",
-});
+  identifier: "MemberName"
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * A name a member chooses now: a `Name` without hidden characters.
@@ -66,7 +52,7 @@ export type Name = typeof Name.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const NewName = Name.check(Text.isName);
+export const NewName = Name.check(Text.isName)
 
 /**
  * A membership as `MemberStore` keeps it: whom it admits, what the workspace calls them, and its
@@ -77,12 +63,12 @@ export const NewName = Name.check(Text.isName);
  * @since 0.1.0
  */
 export const Member = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: MemberId.MemberId,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   name: Name,
-  status: Status,
-}).annotate({ identifier: "WorkspaceMember" });
+  status: Status
+}).annotate({ identifier: "WorkspaceMember" })
 
 /**
  * @category schemas
@@ -94,7 +80,7 @@ export interface Member extends Schema.Schema.Type<typeof Member> {}
  * The audience scope of one membership alone: a fact or signal addressed to it, such as a member's
  * own follows and admissions, reaches that member and nobody else.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
-export const audienceOf = (memberId: Id): Audience.Scope => Audience.make("member", memberId);
+export const audienceOf = (memberId: MemberId.MemberId): Audience.Scope => Audience.make("member", memberId)

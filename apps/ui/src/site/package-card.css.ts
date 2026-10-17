@@ -1,6 +1,6 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../foundations/theme/vars.css.ts";
-import { fontWeight, monoFamily, typeScale } from "../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { vars } from "../foundations/theme/vars.css.ts"
+import { fontWeight, monoFamily, typeScale } from "../foundations/typography/tokens.ts"
 
 export const card = style({
   display: "grid",
@@ -8,8 +8,8 @@ export const card = style({
   height: "100%",
   boxSizing: "border-box",
   border: `1px solid ${vars.color.border.default}`,
-  backgroundColor: vars.color.surface.panel,
-});
+  backgroundColor: vars.color.surface.panel
+})
 
 export const name = style({
   ...typeScale.control,
@@ -18,8 +18,8 @@ export const name = style({
   fontFamily: monoFamily,
   fontWeight: fontWeight.regular,
   color: vars.color.text.primary,
-  overflowWrap: "anywhere",
-});
+  overflowWrap: "anywhere"
+})
 
 export const meta = style({
   ...typeScale.hint,
@@ -29,17 +29,17 @@ export const meta = style({
   gap: "1rem",
   margin: 0,
   padding: "0.5rem 1.5rem 0",
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
-export const version = style({ fontFamily: monoFamily, fontWeight: fontWeight.regular });
+export const version = style({ fontFamily: monoFamily, fontWeight: fontWeight.regular })
 
 export const description = style({
   ...typeScale.item,
   margin: 0,
   padding: "1rem 1.5rem 1.5rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 export const links = style({
   display: "flex",
@@ -47,8 +47,8 @@ export const links = style({
   margin: 0,
   padding: "1rem 1.5rem",
   borderTop: `1px solid ${vars.color.border.divider}`,
-  listStyle: "none",
-});
+  listStyle: "none"
+})
 
 export const link = style({
   ...typeScale.control,
@@ -57,6 +57,6 @@ export const link = style({
   textDecoration: "none",
   selectors: {
     "&:hover": { textDecoration: "underline", textUnderlineOffset: "0.2em" },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "3px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "3px" }
+  }
+})

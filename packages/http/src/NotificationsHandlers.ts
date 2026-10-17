@@ -6,10 +6,11 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { NotificationService } from "@amends-dev/core/notification";
-import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+
+import { NotificationService } from "@amends-dev/core/notification"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
 
 /**
  * Register the inbox, its pending count, and marking notifications seen, resolving the
@@ -21,22 +22,20 @@ import { HttpApiBuilder } from "effect/http-api";
 export const layer = HttpApiBuilder.group(Api.Api, "notifications", (handlers) =>
   handlers.handleAll({
     inbox: ({ query }) =>
-      NotificationService.NotificationService.use((notificationService) =>
-        notificationService.inbox(query),
-      ),
+      NotificationService.NotificationService.use((notificationService) => notificationService.inbox(query)),
     count: () =>
       NotificationService.NotificationService.use((notificationService) =>
-        Effect.map(notificationService.countPending, (pending) => ({ pending })),
+        Effect.map(notificationService.countPending, (pending) => ({ pending }))
       ),
     markSeenThrough: ({ payload }) =>
       NotificationService.NotificationService.use((notificationService) =>
         Effect.map(notificationService.markSeenThrough(payload.through), (marked) => ({
-          marked,
-        })),
+          marked
+        }))
       ),
     markSeen: ({ params }) =>
       NotificationService.NotificationService.use((notificationService) =>
-        notificationService.markSeen(params.notificationId),
-      ),
-  }),
-);
+        notificationService.markSeen(params.notificationId)
+      )
+  })
+)

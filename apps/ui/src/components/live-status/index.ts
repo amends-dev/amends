@@ -1,1 +1,1 @@
-export { LiveStatus, type LiveStatusProps } from "./live-status.tsx";
+export { LiveStatus, type LiveStatusProps } from "./live-status.tsx"

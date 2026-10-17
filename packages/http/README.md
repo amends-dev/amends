@@ -393,7 +393,7 @@ services, then mounts the routes with `HttpRouter.serve` or `HttpRouter.toWebHan
 - `Routes.layer` registers every group, with the OpenAPI document at `/openapi.json`.
 - `Routes.layerDocs` serves interactive documentation at `/docs`.
 - `Routes.layerHandlers` is the group layers and the middleware's server side alone, for tests.
-- `BearerAuthentication.make()` builds the contract's `Authentication` from
+- `BearerAuthentication.make` builds the contract's `Authentication` from
   `SessionTokens.SessionTokens`, and `BearerAuthentication.layer` provides it. Each request resolves
   its own bearer token and supplies its own `Principal` and `Credential`.
 

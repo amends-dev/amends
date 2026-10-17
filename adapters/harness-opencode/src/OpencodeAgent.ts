@@ -19,19 +19,22 @@
  *
  * @since 0.1.0
  */
-import { type Agent, BridgeClient, HarnessError } from "@amends-dev/harness";
-import type { Sandbox } from "@amends-dev/sandbox";
-import { type Crypto, Effect, type Redacted, Schema } from "effect";
-import type { Socket } from "effect/socket";
-import type { Options as DriverOptions } from "./internal/bridge/Driver.ts";
-import { modelsOf } from "./internal/models.ts";
-import { hostToolName } from "./internal/bridge/v1/Session.ts";
-import { makeInstallation } from "./internal/template.ts";
+
+import type { Agent } from "@amends-dev/harness"
+import type { Sandbox } from "@amends-dev/sandbox"
+import type * as Redacted from "effect/Redacted"
+import type * as Schema from "effect/Schema"
+import * as internal from "./internal/agent.ts"
+import { hostToolName } from "./internal/bridge/v1/session.ts"
 
 /**
  * What the agent is made with: the endpoints its turns run on, as `Agent.Options` give them, and
- * what only opencode takes. All of it, the keys included, names the bridge, so an agent made with
- * other options gets a bridge and a server of its own in a sandbox, and never runs on another's.
+ * what only opencode takes.
+ *
+ * **Details**
+ *
+ * All of it, the keys included, names the bridge, so an agent made with other options gets a bridge
+ * and a server of its own in a sandbox, and never runs on another's.
  *
  * @category options
  * @since 0.1.0
@@ -41,7 +44,7 @@ export interface Options extends Agent.Options {
    * The token the bridge in the sandbox `id` takes, derived from the id with a secret every host
    * shares, such as an HMAC of it, so that every host connects to a bridge any of them launched.
    */
-  readonly token: (id: Sandbox.SandboxId) => Redacted.Redacted<string>;
+  readonly token: (id: Sandbox.SandboxId) => Redacted.Redacted<string>
 
   /**
    * opencode's configuration, as opencode 1 writes its `opencode.json`, which names providers
@@ -49,90 +52,72 @@ export interface Options extends Agent.Options {
    * bridge starts opencode's server; a server already running in the sandbox keeps the one it
    * started with.
    */
-  readonly config?: { readonly [key: string]: Schema.Json };
+  readonly config?: { readonly [key: string]: Schema.Json }
 
   /** Environment variables opencode's server runs with. */
-  readonly env?: Readonly<Record<string, string>>;
+  readonly env?: Readonly<Record<string, string>>
 }
 
 /**
  * The agent, which bundles the bridge program for its template when it is made, with `Bun.build`,
- * so the host runs on Bun. The names of the host's tools fit in 59 characters, as
- * `maxToolNameLength` says, since opencode puts `host_` before them. Each session reaches opencode
- * through the bridge in its sandbox, with the `Crypto` and the `WebSocketConstructor` the agent is
- * made with; the constructor must send headers, as Bun's and Node's do. Endpoints that opencode
- * cannot serve together fail with `UnsupportedError`.
+ * so the host runs on Bun.
+ *
+ * **Details**
+ *
+ * The names of the host's tools fit in 59 characters, as `maxToolNameLength` says, since opencode
+ * puts `host_` before them. Each session reaches opencode through the bridge in its sandbox, with
+ * the `Crypto` and the `WebSocketConstructor` the agent is made with; the constructor must send
+ * headers, as Bun's and Node's do. Endpoints that opencode cannot serve together fail with
+ * `UnsupportedError`.
  *
  * **Example** (A turn of opencode in a new sandbox)
  *
  * ```ts
- * import { OpencodeAgent } from "@amends-dev/harness-opencode";
- * import { Agent, Harness } from "@amends-dev/harness";
- * import { SandboxProvider } from "@amends-dev/sandbox";
- * import { BunServices, BunSocket } from "@effect/platform-bun";
- * import { Config, Effect, Layer, Redacted } from "effect";
- * import { createHmac } from "node:crypto";
+ * import { createHmac } from "node:crypto"
+ * import { Agent, Harness } from "@amends-dev/harness"
+ * import { OpencodeAgent } from "@amends-dev/harness-opencode"
+ * import { SandboxProvider } from "@amends-dev/sandbox"
+ * import { BunServices, BunSocket } from "@effect/platform-bun"
+ * import { Config, Effect, Layer, Redacted } from "effect"
  *
- * declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider>; // a sandbox provider
+ * declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider> // a sandbox provider
  *
  * const program = Effect.gen(function* () {
  *   // Every host derives a sandbox's bridge token from its id with a secret the hosts share.
- *   const secret = yield* Config.Redacted("BRIDGE_SECRET");
+ *   const secret = yield* Config.Redacted("BRIDGE_SECRET")
  *   const agent = yield* OpencodeAgent.make({
  *     model: {
  *       provider: "anthropic",
  *       model: "claude-sonnet-5-5",
  *       protocol: "anthropic-messages",
  *       url: "https://api.anthropic.com/v1",
- *       apiKey: yield* Config.Redacted("ANTHROPIC_API_KEY"),
+ *       apiKey: yield* Config.Redacted("ANTHROPIC_API_KEY")
  *     },
  *     token: (sandboxId) =>
- *       Redacted.make(
- *         createHmac("sha256", Redacted.value(secret)).update(sandboxId).digest("base64url"),
- *       ),
- *   });
- *   const harness = Harness.make(agent);
- *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
- *   const sandbox = yield* sandboxProvider.createScoped({ template: harness.agent.template });
- *   const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") });
- *   const answer = yield* session.generate({ prompt: "Summarize README.md" });
- *   return answer.text;
+ *       Redacted.make(createHmac("sha256", Redacted.value(secret)).update(sandboxId).digest("base64url"))
+ *   })
+ *   const harness = Harness.make(agent)
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider
+ *   const sandbox = yield* sandboxProvider.createScoped({ template: harness.agent.template })
+ *   const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") })
+ *   const answer = yield* session.generate({ prompt: "Summarize README.md" })
+ *   return answer.text
  * }).pipe(
  *   Effect.scoped,
- *   Effect.provide(
- *     Layer.mergeAll(sandboxes, BunServices.layer, BunSocket.layerWebSocketConstructor),
- *   ),
- * );
+ *   Effect.provide(Layer.mergeAll(sandboxes, BunServices.layer, BunSocket.layerWebSocketConstructor))
+ * )
  * ```
  *
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
-  const models = yield* Effect.fromResult(modelsOf(1, options)).pipe(
-    Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode", reason })),
-  );
-  const installation = yield* makeInstallation(1);
-  const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
-  const bridge: BridgeClient.Options = {
-    id: "opencode",
-    ...installation,
-    token: options.token,
-    agentOptions: {
-      model: models.model,
-      models: models.models,
-      config: { ...options.config, ...models.config },
-      env: { ...options.env, ...models.env },
-    } satisfies DriverOptions,
-  };
-  const agent: Agent.Agent = {
-    id: "opencode",
-    requiresSandbox: true,
-    template: installation.template,
-    // opencode names a host's tool after the MCP server that offers it, `host_<tool>`.
-    maxToolNameLength: 64 - hostToolName("").length,
-    createSession: (sessionOptions) =>
-      Effect.provide(BridgeClient.createSession(bridge, sessionOptions), services),
-  };
-  return agent;
-});
+export const make = (options: Options) =>
+  internal.make(
+    {
+      id: "opencode",
+      version: 1,
+      // opencode names a host's tool after the MCP server that offers it, `host_<tool>`.
+      maxToolNameLength: 64 - hostToolName("").length
+    },
+    options
+  )

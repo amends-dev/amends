@@ -1,8 +1,8 @@
-import { Show } from "solid-js";
-import { Combobox } from "../../components/combobox/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { TextArea } from "../../components/input/index.ts";
-import { Select } from "../../components/select/index.ts";
+import { Show } from "solid-js"
+import { Combobox } from "../../components/combobox/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { TextArea } from "../../components/input/index.ts"
+import { Select } from "../../components/select/index.ts"
 import {
   effortLabels,
   efforts,
@@ -10,11 +10,11 @@ import {
   type Effort,
   type HarnessOption,
   type ModelChoices,
-  type SetupField,
-} from "./wording.tsx";
+  type SetupField
+} from "./wording.tsx"
 
 /** The harness choice that lets amends choose one as the agent works. */
-export const autoHarness = "auto";
+export const autoHarness = "auto"
 
 /** A connection as a choice: its integration under its name, and why it can't be chosen. */
 const connectionChoice = (option: ConnectionOption, description = option.integrationName) => ({
@@ -26,39 +26,39 @@ const connectionChoice = (option: ConnectionOption, description = option.integra
     : {
         detail: option.unavailable,
         status: { mark: "blocked", label: "Unavailable" } as const,
-        disabled: true,
-      }),
-});
+        disabled: true
+      })
+})
 
 export interface SetupFieldsProps {
-  readonly instructions: string;
-  readonly onInstructionsChange: (instructions: string) => void;
+  readonly instructions: string
+  readonly onInstructionsChange: (instructions: string) => void
   /** `auto`, or the id of a connection that gives harnesses. */
-  readonly harness: string | undefined;
-  readonly onHarnessChange: (harness: string) => void;
-  readonly harnesses: readonly HarnessOption[];
-  readonly modelConnections: readonly ConnectionOption[];
-  readonly modelConnectionId: string | undefined;
-  readonly onModelConnectionChange: (connectionId: string) => void;
+  readonly harness: string | undefined
+  readonly onHarnessChange: (harness: string) => void
+  readonly harnesses: ReadonlyArray<HarnessOption>
+  readonly modelConnections: ReadonlyArray<ConnectionOption>
+  readonly modelConnectionId: string | undefined
+  readonly onModelConnectionChange: (connectionId: string) => void
   /** The models the chosen connection offers. */
-  readonly models?: ModelChoices;
+  readonly models?: ModelChoices
   /** The model's id, as its provider gives it. */
-  readonly model: string;
-  readonly onModelChange: (model: string) => void;
+  readonly model: string
+  readonly onModelChange: (model: string) => void
   /** Undefined for the model's default. */
-  readonly effort: Effort | undefined;
-  readonly onEffortChange: (effort: Effort | undefined) => void;
-  readonly sandboxes: readonly ConnectionOption[];
+  readonly effort: Effort | undefined
+  readonly onEffortChange: (effort: Effort | undefined) => void
+  readonly sandboxes: ReadonlyArray<ConnectionOption>
   /** Undefined for no sandbox. */
-  readonly sandboxId: string | undefined;
-  readonly onSandboxChange: (sandboxId: string | undefined) => void;
+  readonly sandboxId: string | undefined
+  readonly onSandboxChange: (sandboxId: string | undefined) => void
   /** What the host refused, beside each part's field. */
-  readonly problems?: Partial<Record<SetupField, string>>;
-  readonly disabled?: boolean;
+  readonly problems?: Partial<Record<SetupField, string>>
+  readonly disabled?: boolean
 }
 
-const noSandbox = "none";
-const defaultEffort = "default";
+const noSandbox = "none"
+const defaultEffort = "default"
 
 /**
  * How an agent is set up, as adding and configuring ask for it: its instructions, the harness it
@@ -67,38 +67,38 @@ const defaultEffort = "default";
  * reasons, and the sandbox it works in, if any.
  */
 export function SetupFields(props: SetupFieldsProps) {
-  const harness = () => props.harnesses.find((option) => option.id === props.harness);
-  const loaded = () => (props.models?.status === "loaded" ? props.models : undefined);
-  const listedModel = () => loaded()?.listed.find((model) => model.id === props.model.trim());
+  const harness = () => props.harnesses.find((option) => option.id === props.harness)
+  const loaded = () => (props.models?.status === "loaded" ? props.models : undefined)
+  const listedModel = () => loaded()?.listed.find((model) => model.id === props.model.trim())
   /** The efforts the chosen model takes: its own when listed, any when it isn't. */
-  const offeredEfforts = (): readonly Effort[] => listedModel()?.efforts ?? efforts;
+  const offeredEfforts = (): ReadonlyArray<Effort> => listedModel()?.efforts ?? efforts
   const modelProblem = () => {
-    const models = loaded();
-    if (props.problems?.model) return props.problems.model;
-    if (models === undefined || models.unlisted || props.model.trim() === "") return undefined;
-    return listedModel() ? undefined : "This connection offers only the models it lists.";
-  };
+    const models = loaded()
+    if (props.problems?.model) return props.problems.model
+    if (models === undefined || models.unlisted || props.model.trim() === "") return undefined
+    return listedModel() ? undefined : "This connection offers only the models it lists."
+  }
   const sandboxProblem = () =>
     props.problems?.sandbox ??
     (harness()?.requiresSandbox && props.sandboxId === undefined
       ? `${harness()?.name} works only in a sandbox. Choose one.`
-      : undefined);
+      : undefined)
   const modelHint = () => {
-    if (props.modelConnectionId === undefined) return "Choose a model connection first.";
+    if (props.modelConnectionId === undefined) return "Choose a model connection first."
     switch (props.models?.status) {
       case "loading":
-        return "Loading this connection’s models…";
+        return "Loading this connection’s models…"
       case "failed":
-        return "Its models couldn’t be loaded. You can still enter a model’s ID.";
+        return "Its models couldn’t be loaded. You can still enter a model’s ID."
       case "loaded":
-        if (!props.models.unlisted) return "Choose one of the models it lists.";
+        if (!props.models.unlisted) return "Choose one of the models it lists."
         return props.models.listed.length > 0
           ? "Choose one it lists, or enter any model’s ID."
-          : "Enter the ID of any model it serves.";
+          : "Enter the ID of any model it serves."
       default:
-        return undefined;
+        return undefined
     }
-  };
+  }
   return (
     <>
       <Field.Root hint="What the agent works by: its role, how it answers, and what to avoid.">
@@ -125,16 +125,16 @@ export function SetupFields(props: SetupFieldsProps) {
             {
               value: autoHarness,
               label: "Auto",
-              description: "amends chooses a harness as the agent works",
+              description: "amends chooses a harness as the agent works"
             },
             ...props.harnesses.map((option) =>
               connectionChoice(
                 option,
                 `${option.integrationName} · ${
                   option.requiresSandbox ? "Works only in a sandbox" : "Works on this host"
-                }`,
-              ),
-            ),
+                }`
+              )
+            )
           ]}
           value={props.harness}
           onChange={props.onHarnessChange}
@@ -168,7 +168,7 @@ export function SetupFields(props: SetupFieldsProps) {
           onChange={props.onModelChange}
           suggestions={(loaded()?.listed ?? []).map((model) => ({
             value: model.id,
-            label: model.name,
+            label: model.name
           }))}
           heading="Models"
           placeholder="Model ID"
@@ -184,15 +184,11 @@ export function SetupFields(props: SetupFieldsProps) {
               { value: defaultEffort, label: "Model default" },
               ...[
                 ...offeredEfforts(),
-                ...(props.effort !== undefined && !offeredEfforts().includes(props.effort)
-                  ? [props.effort]
-                  : []),
-              ].map((effort) => ({ value: effort, label: effortLabels[effort] })),
+                ...(props.effort !== undefined && !offeredEfforts().includes(props.effort) ? [props.effort] : [])
+              ].map((effort) => ({ value: effort, label: effortLabels[effort] }))
             ]}
             value={props.effort ?? defaultEffort}
-            onChange={(value) =>
-              props.onEffortChange(value === defaultEffort ? undefined : (value as Effort))
-            }
+            onChange={(value) => props.onEffortChange(value === defaultEffort ? undefined : (value as Effort))}
             disabled={props.disabled}
           />
         </Field.Root>
@@ -202,7 +198,7 @@ export function SetupFields(props: SetupFieldsProps) {
         <Select
           options={[
             { value: noSandbox, label: "No sandbox", description: "Answers from its model alone" },
-            ...props.sandboxes.map((option) => connectionChoice(option)),
+            ...props.sandboxes.map((option) => connectionChoice(option))
           ]}
           value={props.sandboxId ?? noSandbox}
           onChange={(value) => props.onSandboxChange(value === noSandbox ? undefined : value)}
@@ -211,5 +207,5 @@ export function SetupFields(props: SetupFieldsProps) {
         />
       </Field.Root>
     </>
-  );
+  )
 }

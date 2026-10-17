@@ -24,34 +24,34 @@ own `FileSystem` and `ChildProcessSpawner`, and resumes them later by id, as it 
 provider.
 
 ```ts
-import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
-import { Sandbox, SandboxProvider } from "@amends-dev/sandbox";
-import { BunServices } from "@effect/platform-bun";
-import { Effect, FileSystem, Layer, Path } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local"
+import { Sandbox, SandboxProvider } from "@amends-dev/sandbox"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, FileSystem, Layer, Path } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 
 const sandboxes = LocalSandboxProvider.layer({ directory: "/var/lib/amends/sandboxes" }).pipe(
-  Layer.provide(BunServices.layer),
-);
+  Layer.provide(BunServices.layer)
+)
 
 const program = Effect.gen(function* () {
-  const sandboxProvider = yield* SandboxProvider.SandboxProvider;
-  const sandbox = yield* sandboxProvider.create();
+  const sandboxProvider = yield* SandboxProvider.SandboxProvider
+  const sandbox = yield* sandboxProvider.create()
 
   // Commands start in the working directory; file paths are this machine's.
   const greeting = yield* Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]));
-    return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"));
-  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]))
+    return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"))
+  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)))
 
   // The directory stays: the provider resumes the sandbox by its id, in this process or another.
-  yield* sandbox.stop;
-  const resumed = yield* sandboxProvider.resume(sandbox.id);
-  return { greeting, workingDirectory: resumed.workingDirectory };
-}).pipe(Effect.provide(sandboxes));
+  yield* sandbox.stop
+  const resumed = yield* sandboxProvider.resume(sandbox.id)
+  return { greeting, workingDirectory: resumed.workingDirectory }
+}).pipe(Effect.provide(sandboxes))
 ```
 
 `LocalSandboxProvider.make` makes the provider for code that composes it itself, such as a test

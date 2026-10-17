@@ -55,8 +55,8 @@ transaction services stay exposed so execution-log writes can join journal commi
 ```ts
 const JournalLive = Journal.layer({
   logId: Entry.LogId.make("domain"),
-  projections: [AgentsProjection],
-}).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostServices));
+  projections: [AgentsProjection]
+}).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostServices))
 ```
 
 Domains obtain the configured implementation with `yield* Journal.Journal`.
@@ -151,12 +151,12 @@ export const Removed = Fact.make("workspace.member.removed", {
   version: 1,
   payload: Schema.Struct({ workspaceId: Workspace.Id, memberId: Member.Id }),
   subject: (payload) => Subject.make("member", payload.memberId),
-  occurrence: (payload) => [payload.memberId],
-});
+  occurrence: (payload) => [payload.memberId]
+})
 
 const remove = Effect.gen(function* () {
-  return yield* journal.publish(Removed, { workspaceId, memberId });
-});
+  return yield* journal.publish(Removed, { workspaceId, memberId })
+})
 ```
 
 `occurrence` is a pure, deterministic function of the validated decoded payload.
@@ -187,10 +187,10 @@ key fails with `StoreError` (`Rejected`); callers cannot override the declared i
 Use an explicit key for request-level retries of a repeatable fact:
 
 ```ts
-const options = { idempotencyKey: Occurrence.Key.make(operationId) };
+const options = { idempotencyKey: Occurrence.Key.make(operationId) }
 const rename = Effect.gen(function* () {
-  return yield* journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options);
-});
+  return yield* journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options)
+})
 ```
 
 `Log.append` and `Log.appendAll` continue to accept explicit keys because execution
@@ -317,12 +317,10 @@ For a workflow whose facts are `MemberFacts.Removed` and `InvitationFacts.Revoke
 const remove = journal.commit(
   Effect.gen(function* () {
     // The application validates inputs and authorizes this operation first.
-    const removed = yield* journal.publish(MemberFacts.Removed, removal);
-    yield* journal
-      .publish(InvitationFacts.Revoked, revocation)
-      .pipe(Publication.withCause(removed));
-  }).pipe(Publication.withActor),
-);
+    const removed = yield* journal.publish(MemberFacts.Removed, removal)
+    yield* journal.publish(InvitationFacts.Revoked, revocation).pipe(Publication.withCause(removed))
+  }).pipe(Publication.withActor)
+)
 ```
 
 Here `removal` and `revocation` are validated fact payloads supplied by the workflow.
@@ -393,11 +391,11 @@ staged. Work outside storage can still run concurrently inside a commit's progra
 const incorporate = Effect.gen(function* () {
   yield* journal.commit(
     Effect.gen(function* () {
-      yield* turnLog.append(confirmation);
-      yield* journal.publish(InputIncorporated, { turnId, throughSequence });
-    }).pipe(Publication.withActor),
-  );
-});
+      yield* turnLog.append(confirmation)
+      yield* journal.publish(InputIncorporated, { turnId, throughSequence })
+    }).pipe(Publication.withActor)
+  )
+})
 ```
 
 The domain supplies the fact and execution-entry schemas in this example. The two
@@ -462,10 +460,10 @@ const readCreatedRoles = Effect.gen(function* () {
   const entries = yield* journal.read({
     name: RoleFacts.Created.name,
     version: RoleFacts.Created.version,
-    limit: 100,
-  });
-  return yield* Effect.forEach(entries, (entry) => Event.decode(RoleFacts.Created, entry));
-});
+    limit: 100
+  })
+  return yield* Effect.forEach(entries, (entry) => Event.decode(RoleFacts.Created, entry))
+})
 ```
 
 Here `limit` counts matching entries. Resume with the last returned entry's
@@ -507,9 +505,9 @@ domain events. For a consumer-owned `handleBatch` effect:
 
 ```ts
 const followJournal = Effect.gen(function* () {
-  const journal = yield* Journal.Journal;
-  yield* journal.log.tail({ limit: 32 }).pipe(Stream.runForEach(handleBatch));
-});
+  const journal = yield* Journal.Journal
+  yield* journal.log.tail({ limit: 32 }).pipe(Stream.runForEach(handleBatch))
+})
 ```
 
 A tail emits complete committed batches in position order, with independent
@@ -570,9 +568,9 @@ registered projection that is not live. For example, using the host layer above:
 
 ```ts
 const initialize = Effect.gen(function* () {
-  const journal = yield* Journal.Journal;
-  yield* journal.replay;
-}).pipe(Effect.provide(JournalLive));
+  const journal = yield* Journal.Journal
+  yield* journal.replay
+}).pipe(Effect.provide(JournalLive))
 ```
 
 Hosts that write one workspace must therefore register the same projections. During a

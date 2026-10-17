@@ -6,9 +6,10 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Workspace from "../workspace/Workspace.ts";
-import * as Permission from "./Permission.ts";
+
+import * as Schema from "effect/Schema"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Permission from "./Permission.ts"
 
 /**
  * Stable identity retained when the role's display name or permissions change.
@@ -16,13 +17,13 @@ import * as Permission from "./Permission.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceRoleId"));
+export const RoleId = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceRoleId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type RoleId = typeof RoleId.Type
 
 /**
  * A workspace-owned permission bundle; its assignments supply recipients and scopes. No member
@@ -33,12 +34,12 @@ export type Id = typeof Id.Type;
  * @since 0.1.0
  */
 export const Role = Schema.Struct({
-  id: Id,
-  workspaceId: Workspace.Id,
+  id: RoleId,
+  workspaceId: WorkspaceId.WorkspaceId,
   name: Schema.NonEmptyString,
   /** Empty roles confer no permissions; each permission name appears at most once. */
-  permissions: Schema.UniqueArray(Permission.Name),
-});
+  permissions: Schema.UniqueArray(Permission.Name)
+})
 
 /**
  * @category schemas

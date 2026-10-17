@@ -1,1 +1,1 @@
-export { NewMessage, type NewMessageProps } from "./new-message.tsx";
+export { NewMessage, type NewMessageProps } from "./new-message.tsx"

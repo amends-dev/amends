@@ -129,16 +129,16 @@ and sessions are tables beside the workspaces' state, and a change to an address
 address's lock across every host.
 
 ```ts
-import { MemoryDatabase } from "@amends-dev/core/journal";
-import { Accounts, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway";
-import { Layer } from "effect";
+import { MemoryDatabase } from "@amends-dev/core/journal"
+import { Accounts, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway"
+import { Layer } from "effect"
 
 const storage = Layer.mergeAll(
   WorkspaceStorage.layerMemory,
   WorkspaceDirectory.layerMemory,
   Accounts.layerMemory,
-  SignInStorage.layerMemory,
-).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provide(MemoryDatabase.layer));
+  SignInStorage.layerMemory
+).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provide(MemoryDatabase.layer))
 ```
 
 ## Conformance

@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Rename the workspace. Only the Owner role holds it.
@@ -15,5 +16,5 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Rename = Permission.make("workspace.rename", {
   targetKind: "Workspace",
-  builtinTier: "owner",
-});
+  builtinTier: "owner"
+})

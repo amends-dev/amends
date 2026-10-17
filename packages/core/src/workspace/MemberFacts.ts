@@ -5,13 +5,15 @@
  *
  * @since 0.1.0
  */
-import * as Subject from "../journal/Subject.ts";
-import { Schema } from "effect";
-import * as Identity from "../identity/Identity.ts";
-import * as Audience from "../journal/Audience.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Member from "./Member.ts";
-import * as Workspace from "./Workspace.ts";
+
+import * as Schema from "effect/Schema"
+import * as Identity from "../identity/Identity.ts"
+import * as Audience from "../journal/Audience.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Member from "./Member.ts"
+import * as MemberId from "./MemberId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * A member joined: an active membership with a fresh member ID, for the identity and under the name
@@ -25,14 +27,14 @@ export const Added = Fact.make("workspace.member.added", {
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
-    memberId: Member.Id,
-    workspaceId: Workspace.Id,
+    memberId: MemberId.MemberId,
+    workspaceId: WorkspaceId.WorkspaceId,
     identity: Identity.MemberReference,
     /** What the member is called on joining; later facts may rename them. */
-    name: Member.Name,
+    name: Member.Name
   }),
-  occurrence: (payload) => [payload.memberId],
-});
+  occurrence: (payload) => [payload.memberId]
+})
 
 /**
  * A member chose what people in the workspace call them; each change is its own fact.
@@ -45,11 +47,11 @@ export const Renamed = Fact.make("workspace.member.renamed", {
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
-    memberId: Member.Id,
-    workspaceId: Workspace.Id,
-    name: Member.Name,
-  }),
-});
+    memberId: MemberId.MemberId,
+    workspaceId: WorkspaceId.WorkspaceId,
+    name: Member.Name
+  })
+})
 
 /**
  * A member was removed. Removal is terminal for this membership, whose record stays; rejoining is
@@ -64,8 +66,8 @@ export const Removed = Fact.make("workspace.member.removed", {
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
-    memberId: Member.Id,
-    workspaceId: Workspace.Id,
+    memberId: MemberId.MemberId,
+    workspaceId: WorkspaceId.WorkspaceId
   }),
-  occurrence: (payload) => [payload.memberId],
-});
+  occurrence: (payload) => [payload.memberId]
+})

@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Create a channel: give a connection's channel transport a destination group in the workspace.
@@ -14,8 +15,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Create = Permission.make("channel.create", {
   targetKind: "Workspace",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})
 
 /**
  * See a channel: its connection, destination, name, and whether it opens tasks.
@@ -25,8 +26,8 @@ export const Create = Permission.make("channel.create", {
  */
 export const Read = Permission.make("channel.read", {
   targetKind: "Channel",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Redirect a channel to another group, and remove it.
@@ -36,5 +37,5 @@ export const Read = Permission.make("channel.read", {
  */
 export const Manage = Permission.make("channel.manage", {
   targetKind: "Channel",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})

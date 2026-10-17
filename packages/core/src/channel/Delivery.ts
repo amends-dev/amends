@@ -8,28 +8,15 @@
  *
  * @since 0.1.0
  */
-import { ChannelTransport } from "@amends-dev/channel";
-import { Schema } from "effect";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as ChannelId from "./ChannelId.ts";
-import * as DeliveryId from "./DeliveryId.ts";
 
-/**
- * Names a delivery; `DeliveryId.Id`, where models that only refer to deliveries import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = DeliveryId.Id;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = DeliveryId.Id;
+import { ChannelTransport } from "@amends-dev/channel"
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ChannelId from "./ChannelId.ts"
+import * as DeliveryId from "./DeliveryId.ts"
 
 /**
  * Where a delivery stands: `requested` until the job has posted the message or given up, then
@@ -38,13 +25,13 @@ export type Id = DeliveryId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["requested", "sent", "failed"]);
+export const Status = Schema.Literals(["requested", "sent", "failed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * A delivery as requested, and as since sent or failed.
@@ -53,15 +40,15 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const Delivery = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  channelId: ChannelId.Id,
-  threadId: ThreadId.Id,
+  id: DeliveryId.DeliveryId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
+  threadId: ThreadId.ThreadId,
   /** The thread's group, copied so that the facts' audience follows from their payloads. */
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   /** The external conversation the message goes to, as the thread's binding names it. */
   conversationId: ChannelTransport.ExternalId,
-  messageId: ThreadMessageId.Id,
+  messageId: ThreadMessageId.ThreadMessageId,
   /** The message's position in the thread; a thread's deliveries are sent in this order. */
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
   status: Status,
@@ -72,8 +59,8 @@ export const Delivery = Schema.Struct({
   /** Why it failed. */
   failure: Schema.NullOr(Schema.String),
   requestedAt: Schema.DateTimeUtcFromString,
-  finishedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-});
+  finishedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
+})
 
 /**
  * @category schemas
@@ -84,28 +71,27 @@ export interface Delivery extends Schema.Schema.Type<typeof Delivery> {}
 /**
  * The record with some fields changed.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
-export const change = (record: Delivery, changes: Partial<Delivery>): Delivery =>
-  Object.assign({}, record, changes);
+export const change = (record: Delivery, changes: Partial<Delivery>): Delivery => Object.assign({}, record, changes)
 
 /**
  * A new delivery, requested and not yet tried.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const requested = (
-  delivery: Omit<Delivery, "status" | "externalMessageId" | "attempts" | "failure" | "finishedAt">,
+  delivery: Omit<Delivery, "status" | "externalMessageId" | "attempts" | "failure" | "finishedAt">
 ): Delivery => ({
   ...delivery,
   status: "requested",
   externalMessageId: null,
   attempts: 0,
   failure: null,
-  finishedAt: null,
-});
+  finishedAt: null
+})
 
 /**
  * What a successful send records: the id the external system gave the message, after how many
@@ -115,14 +101,14 @@ export const requested = (
  * @since 0.1.0
  */
 export const Sent = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  deliveryId: Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  deliveryId: DeliveryId.DeliveryId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   externalMessageId: ChannelTransport.ExternalId,
   attempts: Schema.Int.check(Schema.isGreaterThan(0)),
-  sentAt: Schema.DateTimeUtcFromString,
-});
+  sentAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -137,14 +123,14 @@ export interface Sent extends Schema.Schema.Type<typeof Sent> {}
  * @since 0.1.0
  */
 export const Failed = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  deliveryId: Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  deliveryId: DeliveryId.DeliveryId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   reason: Schema.NonEmptyString,
   attempts: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  failedAt: Schema.DateTimeUtcFromString,
-});
+  failedAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas

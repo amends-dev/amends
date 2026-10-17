@@ -5,11 +5,12 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Member from "../workspace/Member.ts";
-import * as GroupFollow from "./GroupFollow.ts";
+
+import * as Schema from "effect/Schema"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Member from "../workspace/Member.ts"
+import * as GroupFollow from "./GroupFollow.ts"
 
 /**
  * A member started following a group, as the follow says. Following is personal: only the
@@ -26,9 +27,9 @@ export const Started = Fact.make("group.follow.started", {
   payload: Schema.Struct({
     ...GroupFollow.GroupFollow.fields,
     status: Schema.Literal("active"),
-    endedAt: Schema.Null,
-  }),
-});
+    endedAt: Schema.Null
+  })
+})
 
 /**
  * Ends one follow by its ID. Leaving the group ends its follow without this fact.
@@ -41,5 +42,5 @@ export const Ended = Fact.make("group.follow.ended", {
   version: 1,
   subject: (payload) => Subject.make("group-follow", payload.followId),
   occurrence: (payload) => [payload.followId],
-  payload: GroupFollow.Ending,
-});
+  payload: GroupFollow.Ending
+})

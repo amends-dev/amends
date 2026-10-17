@@ -6,9 +6,12 @@
  *
  * @since 0.1.0
  */
-import { Identity } from "@amends-dev/core/identity";
-import { Context, Schema } from "effect";
-import type { Effect, Redacted } from "effect";
+
+import type { Identity } from "@amends-dev/core/identity"
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
+import type * as Redacted from "effect/Redacted"
+import * as Schema from "effect/Schema"
 
 /**
  * A token that authenticates nobody: not one the host issued, or one it no longer honors.
@@ -17,7 +20,7 @@ import type { Effect, Redacted } from "effect";
  * @since 0.1.0
  */
 export class Rejected extends Schema.TaggedError<Rejected>()("SessionTokens.Rejected", {
-  reason: Schema.Literals(["malformed", "unknown", "expired"]),
+  reason: Schema.Literals(["malformed", "unknown", "expired"])
 }) {}
 
 /**
@@ -35,13 +38,11 @@ export class SessionTokens extends Context.Service<
      * Protocol packages call this from their own authentication mechanism, so a
      * host verifies tokens once for every protocol. Storage failures are defects.
      */
-    readonly resolve: (
-      token: Redacted.Redacted<string>,
-    ) => Effect.Effect<Identity.MemberReference, Rejected>;
+    readonly resolve: (token: Redacted.Redacted<string>) => Effect.Effect<Identity.MemberReference, Rejected>
     /**
      * Stop honoring a token, as signing out does. A token the host does not honor already is left
      * as it is.
      */
-    readonly revoke: (token: Redacted.Redacted<string>) => Effect.Effect<void>;
+    readonly revoke: (token: Redacted.Redacted<string>) => Effect.Effect<void>
   }
 >()("@amends-dev/gateway/SessionTokens") {}

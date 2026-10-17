@@ -1,168 +1,163 @@
-import { Subject } from "@amends-dev/core/journal";
-import * as Publication from "../../src/journal/Publication.ts";
-import { testProvenance } from "../publication.ts";
-import { expect, it } from "@effect/vitest";
-import { Cause, Deferred, Effect, Exit, Fiber, Option, Result, Schema, Stream } from "effect";
-import * as Checkpoint from "../../src/journal/Checkpoint.ts";
-import * as Fact from "../../src/journal/Fact.ts";
-import * as Event from "../../src/journal/Event.ts";
-import * as Journal from "../../src/journal/Journal.ts";
-import * as Entry from "../../src/journal/Entry.ts";
-import * as Log from "../../src/journal/Log.ts";
-import * as Projection from "../../src/journal/Projection.ts";
-import * as Store from "../../src/journal/Store.ts";
-import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
-import * as Transaction from "../../src/journal/Transaction.ts";
-import { Counter, make, type Fixture } from "../memory.ts";
+import { Subject } from "@amends-dev/core/journal"
+import { expect, it } from "@effect/vitest"
+import { Cause, Deferred, Effect, Exit, Fiber, Option, Result, Schema, Stream } from "effect"
+import * as Checkpoint from "../../src/journal/Checkpoint.ts"
+import * as Entry from "../../src/journal/Entry.ts"
+import * as Event from "../../src/journal/Event.ts"
+import * as Fact from "../../src/journal/Fact.ts"
+import * as Journal from "../../src/journal/Journal.ts"
+import * as Log from "../../src/journal/Log.ts"
+import * as Projection from "../../src/journal/Projection.ts"
+import * as Publication from "../../src/journal/Publication.ts"
+import * as Store from "../../src/journal/Store.ts"
+import * as Transaction from "../../src/journal/Transaction.ts"
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
+import { Counter, make, type Fixture } from "../memory.ts"
+import { testProvenance } from "../publication.ts"
 
-const testSubject = () => Subject.make("test", "entity");
-const workspaceId = WorkspaceId.Id.make("workspace-one");
+const testSubject = () => Subject.make("test", "entity")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
   version: 1,
-  payload: Schema.Struct({ amount: Schema.FiniteFromString }),
-});
-const Harness = Schema.TaggedUnion({ Text: { text: Schema.String }, Finished: {} });
+  payload: Schema.Struct({ amount: Schema.FiniteFromString })
+})
+const Harness = Schema.TaggedUnion({ Text: { text: Schema.String }, Finished: {} })
 const projection = Projection.make("counter", { version: 1 }).on(
   Changed,
   Effect.fn("Test.project")(function* (event) {
-    const counter = yield* Counter;
-    yield* counter.add(event.payload.amount);
-  }),
-);
+    const counter = yield* Counter
+    yield* counter.add(event.payload.amount)
+  })
+)
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
     A,
     E,
     Publication.Publication | Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint
-  >,
+  >
 ) =>
   program.pipe(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
     Effect.provideService(Counter, fixture.counter),
-    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
-  );
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints)
+  )
 const setup = Effect.gen(function* () {
-  const log = yield* Log.Log;
+  const log = yield* Log.Log
   const journal = yield* Journal.make({
     logId: Entry.LogId.make("domain"),
-    projections: [projection],
-  });
-  const turn = log.open({ id: Entry.LogId.make("turn/one"), schema: Harness });
-  return { logs: log, journal, turn };
-});
-it.effect(
-  "facts and turn output use independent logs; output alone needs no workspace commit",
-  () =>
-    Effect.gen(function* () {
-      const fixture = yield* make();
-      yield* run(
-        fixture,
-        Effect.gen(function* () {
-          const { journal, turn } = yield* setup;
-          const event = yield* journal.publish(Changed, { amount: 2 });
-          yield* turn.append({ _tag: "Text", text: "working" });
-          yield* turn.append({ _tag: "Finished" });
-          const domain = yield* journal.log.read({ limit: 10 });
-          const output = yield* Stream.runCollect(turn.stream({ limit: 1 }));
-          expect(domain).toHaveLength(1);
-          expect(output.map((batch) => batch.position)).toEqual([
-            Entry.Position.make(0),
-            Entry.Position.make(1),
-          ]);
-          expect(
-            output.flatMap((batch) => batch.entries.map((entry) => entry.payload._tag)),
-          ).toEqual(["Text", "Finished"]);
-          expect(event.logId).toBe(journal.log.id);
-          expect(event.payload.amount).toBe(2);
-          expect(yield* (yield* Counter).get).toBe(2);
-          // Only the fact took the workspace's write order; each output was a commit of its own.
-          expect(yield* fixture.attempts).toBe(1);
-          expect(yield* fixture.standalone).toBe(2);
-          expect(new Set(output.map((batch) => batch.commit.id)).size).toBe(2);
-          const raw = domain[0]?.entries[0];
-          if (raw === undefined) throw new Error("Missing fact");
-          expect((yield* Event.decode(Changed, raw)).payload.amount).toBe(2);
-        }),
-      );
-    }),
-);
+    projections: [projection]
+  })
+  const turn = log.open({ id: Entry.LogId.make("turn/one"), schema: Harness })
+  return { logs: log, journal, turn }
+})
+it.effect("facts and turn output use independent logs; output alone needs no workspace commit", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make()
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const { journal, turn } = yield* setup
+        const event = yield* journal.publish(Changed, { amount: 2 })
+        yield* turn.append({ _tag: "Text", text: "working" })
+        yield* turn.append({ _tag: "Finished" })
+        const domain = yield* journal.log.read({ limit: 10 })
+        const output = yield* Stream.runCollect(turn.stream({ limit: 1 }))
+        expect(domain).toHaveLength(1)
+        expect(output.map((batch) => batch.position)).toEqual([Entry.Position.make(0), Entry.Position.make(1)])
+        expect(output.flatMap((batch) => batch.entries.map((entry) => entry.payload._tag))).toEqual([
+          "Text",
+          "Finished"
+        ])
+        expect(event.logId).toBe(journal.log.id)
+        expect(event.payload.amount).toBe(2)
+        expect(yield* (yield* Counter).get).toBe(2)
+        // Only the fact took the workspace's write order; each output was a commit of its own.
+        expect(yield* fixture.attempts).toBe(1)
+        expect(yield* fixture.standalone).toBe(2)
+        expect(new Set(output.map((batch) => batch.commit.id)).size).toBe(2)
+        const raw = domain[0]?.entries[0]
+        if (raw === undefined) throw new Error("Missing fact")
+        expect((yield* Event.decode(Changed, raw)).payload.amount).toBe(2)
+      })
+    )
+  })
+)
 
 it.effect("one explicit commit spans logs, nested commits, and projections", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
+        const { journal, turn } = yield* setup
         const entries = yield* journal.commit(
           Effect.gen(function* () {
-            const first = yield* journal.publish(Changed, { amount: 1 });
-            const output = yield* turn.append({ _tag: "Text", text: "inside" });
-            const second = yield* journal.commit(journal.publish(Changed, { amount: 2 }));
-            expect(yield* (yield* Counter).get).toBe(3);
-            return [first, output, second];
-          }),
-        );
-        expect(new Set(entries.map((entry) => entry.commitId)).size).toBe(1);
-        const domain = yield* journal.log.read({ limit: 10 });
-        const output = yield* turn.read({ limit: 10 });
-        expect(domain).toHaveLength(1);
-        expect(domain[0]?.entries.map((entry) => entry.index)).toEqual([0, 1]);
-        expect(output[0]?.entries.map((entry) => entry.index)).toEqual([0]);
-        expect(domain[0]?.commit.entryCount).toBe(3);
-        expect(output[0]?.commit.entryCount).toBe(3);
-        expect(yield* fixture.attempts).toBe(1);
-        expect(yield* fixture.standalone).toBe(0);
-      }),
-    );
-  }),
-);
+            const first = yield* journal.publish(Changed, { amount: 1 })
+            const output = yield* turn.append({ _tag: "Text", text: "inside" })
+            const second = yield* journal.commit(journal.publish(Changed, { amount: 2 }))
+            expect(yield* (yield* Counter).get).toBe(3)
+            return [first, output, second]
+          })
+        )
+        expect(new Set(entries.map((entry) => entry.commitId)).size).toBe(1)
+        const domain = yield* journal.log.read({ limit: 10 })
+        const output = yield* turn.read({ limit: 10 })
+        expect(domain).toHaveLength(1)
+        expect(domain[0]?.entries.map((entry) => entry.index)).toEqual([0, 1])
+        expect(output[0]?.entries.map((entry) => entry.index)).toEqual([0])
+        expect(domain[0]?.commit.entryCount).toBe(3)
+        expect(output[0]?.commit.entryCount).toBe(3)
+        expect(yield* fixture.attempts).toBe(1)
+        expect(yield* fixture.standalone).toBe(0)
+      })
+    )
+  })
+)
 
 it.effect("a caught projection failure still rolls back all logs and projection state", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { logs, turn } = yield* setup;
-        const failing = projection.on(Changed, () => Effect.fail("Rejected"));
+        const { logs, turn } = yield* setup
+        const failing = projection.on(Changed, () => Effect.fail("Rejected"))
         const journal = yield* Journal.make({
           logId: Entry.LogId.make("domain"),
-          projections: [failing],
-        });
+          projections: [failing]
+        })
         const failure = yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
-              yield* turn.append({ _tag: "Text", text: "will roll back" });
-              yield* journal.publish(Changed, { amount: 7 }).pipe(Effect.catch(() => Effect.void));
-            }),
-          ),
-        );
-        expect(failure._tag).toBe("Transaction.Aborted");
-        expect((yield* fixture.snapshot).logs.size).toBe(0);
-        expect(yield* (yield* Counter).get).toBe(0);
-        yield* logs.commit(Effect.void);
-      }),
-    );
-  }),
-);
+              yield* turn.append({ _tag: "Text", text: "will roll back" })
+              yield* journal.publish(Changed, { amount: 7 }).pipe(Effect.catch(() => Effect.void))
+            })
+          )
+        )
+        expect(failure._tag).toBe("Transaction.Aborted")
+        expect((yield* fixture.snapshot).logs.size).toBe(0)
+        expect(yield* (yield* Counter).get).toBe(0)
+        yield* logs.commit(Effect.void)
+      })
+    )
+  })
+)
 
 it.effect("storage work started concurrently in one commit is a defect, and writes nothing", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
-        const transaction = yield* Transaction.Transaction;
+        const { journal, turn } = yield* setup
+        const transaction = yield* Transaction.Transaction
         const concurrent = (exit: Exit.Exit<unknown, unknown>) =>
-          Exit.isFailure(exit) &&
-          Result.getOrUndefined(Cause.findDefect(exit.cause)) instanceof Transaction.Concurrent;
-        const publish = (amount: number) => journal.publish(Changed, { amount });
+          Exit.isFailure(exit) && Schema.is(Transaction.Concurrent)(Result.getOrUndefined(Cause.findDefect(exit.cause)))
+        const publish = (amount: number) => journal.publish(Changed, { amount })
         const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Publication.Publication>> = [
           // Publications side by side.
           Effect.forEach([1, 2, 3, 4], publish, { concurrency: "unbounded" }),
@@ -170,228 +165,210 @@ it.effect("storage work started concurrently in one commit is a defect, and writ
           Effect.all([publish(1), journal.log.read({ limit: 1 })], { concurrency: "unbounded" }),
           // A step forked inside another, which waiting would deadlock on its parent's step.
           transaction.operation(
-            Effect.flatMap(Effect.forkChild(turn.append({ _tag: "Finished" })), (fiber) =>
-              Fiber.join(fiber),
-            ),
-          ),
-        ];
-        for (const attempt of attempts)
-          expect(concurrent(yield* Effect.exit(journal.commit(attempt)))).toBe(true);
-        expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
-        expect(yield* turn.read({ limit: 10 })).toEqual([]);
-        expect(yield* (yield* Counter).get).toBe(0);
-      }),
-    );
-  }),
-);
+            Effect.flatMap(Effect.forkChild(turn.append({ _tag: "Finished" })), (fiber) => Fiber.join(fiber))
+          )
+        ]
+        for (const attempt of attempts) expect(concurrent(yield* Effect.exit(journal.commit(attempt)))).toBe(true)
+        expect(yield* journal.log.read({ limit: 10 })).toEqual([])
+        expect(yield* turn.read({ limit: 10 })).toEqual([])
+        expect(yield* (yield* Counter).get).toBe(0)
+      })
+    )
+  })
+)
 
 it.effect("publications one after another in one commit share its batch in order", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal } = yield* setup;
-        yield* journal.commit(
-          Effect.forEach([1, 2, 3, 4], (amount) => journal.publish(Changed, { amount })),
-        );
-        const batches = yield* journal.log.read({ limit: 10 });
-        expect(batches).toHaveLength(1);
-        expect(batches[0]?.entries.map((entry) => entry.index)).toEqual([0, 1, 2, 3]);
-        expect(yield* (yield* Counter).get).toBe(10);
-      }),
-    );
-  }),
-);
+        const { journal } = yield* setup
+        yield* journal.commit(Effect.forEach([1, 2, 3, 4], (amount) => journal.publish(Changed, { amount })))
+        const batches = yield* journal.log.read({ limit: 10 })
+        expect(batches).toHaveLength(1)
+        expect(batches[0]?.entries.map((entry) => entry.index)).toEqual([0, 1, 2, 3])
+        expect(yield* (yield* Counter).get).toBe(10)
+      })
+    )
+  })
+)
 
 it.effect("interruption rolls back staged entries and projection changes", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
-        const ready = yield* Deferred.make<void>();
+        const { journal, turn } = yield* setup
+        const ready = yield* Deferred.make<void>()
         const fiber = yield* journal
           .commit(
             Effect.gen(function* () {
-              yield* turn.append({ _tag: "Text", text: "pending" });
-              yield* journal.publish(Changed, { amount: 5 });
-              yield* Deferred.succeed(ready, undefined);
-              return yield* Effect.never;
-            }),
+              yield* turn.append({ _tag: "Text", text: "pending" })
+              yield* journal.publish(Changed, { amount: 5 })
+              yield* Deferred.succeed(ready, undefined)
+              return yield* Effect.never
+            })
           )
-          .pipe(Effect.forkChild);
-        yield* Deferred.await(ready);
-        yield* Fiber.interrupt(fiber);
-        expect((yield* fixture.snapshot).logs.size).toBe(0);
-        expect(yield* (yield* Counter).get).toBe(0);
-      }),
-    );
-  }),
-);
+          .pipe(Effect.forkChild)
+        yield* Deferred.await(ready)
+        yield* Fiber.interrupt(fiber)
+        expect((yield* fixture.snapshot).logs.size).toBe(0)
+        expect(yield* (yield* Counter).get).toBe(0)
+      })
+    )
+  })
+)
 
 it.effect("projections cannot recursively append execution or fact entries", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { turn } = yield* setup;
+        const { turn } = yield* setup
         const invalid = Projection.make("invalid", { version: 1 }).on(Changed, () =>
-          turn.append({ _tag: "Finished" }).pipe(Effect.asVoid),
-        );
+          turn.append({ _tag: "Finished" }).pipe(Effect.asVoid)
+        )
         const journal = yield* Journal.make({
           logId: Entry.LogId.make("domain"),
-          projections: [invalid],
-        });
-        const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
+          projections: [invalid]
+        })
+        const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }))
         expect(failure).toMatchObject({
           _tag: "Projection.Failure",
           phase: "apply",
-          cause: { _tag: "Transaction.WriteForbidden" },
-        });
-        expect((yield* fixture.snapshot).logs.size).toBe(0);
-      }),
-    );
-  }),
-);
+          cause: { _tag: "Transaction.WriteForbidden" }
+        })
+        expect((yield* fixture.snapshot).logs.size).toBe(0)
+      })
+    )
+  })
+)
 
 it.effect("uncertain commit outcomes preserve identity and are not automatically retried", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal } = yield* setup;
-        yield* fixture.loseNextAcknowledgment;
-        const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
-        if (!Schema.is(Store.CommitUncertain)(failure))
-          throw new Error("Expected uncertain outcome");
-        expect(Option.isSome(yield* journal.log.get(failure.commitId))).toBe(true);
-        expect(yield* (yield* Counter).get).toBe(1);
-        expect(yield* fixture.attempts).toBe(1);
-      }),
-    );
-  }),
-);
+        const { journal } = yield* setup
+        yield* fixture.loseNextAcknowledgment
+        const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }))
+        if (!Schema.is(Store.CommitUncertain)(failure)) throw new Error("Expected uncertain outcome")
+        expect(Option.isSome(yield* journal.log.get(failure.commitId))).toBe(true)
+        expect(yield* (yield* Counter).get).toBe(1)
+        expect(yield* fixture.attempts).toBe(1)
+      })
+    )
+  })
+)
 
 it.effect("escaped transaction contexts cannot append after completion", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
-        const captured = yield* journal.commit(Effect.context<never>());
-        const failure = yield* Effect.flip(
-          turn.append({ _tag: "Finished" }).pipe(Effect.provideContext(captured)),
-        );
-        expect(failure._tag).toBe("Transaction.Closed");
-        expect(yield* fixture.attempts).toBe(1);
-        expect((yield* fixture.snapshot).logs.size).toBe(0);
-      }),
-    );
-  }),
-);
+        const { journal, turn } = yield* setup
+        const captured = yield* journal.commit(Effect.context<never>())
+        const failure = yield* Effect.flip(turn.append({ _tag: "Finished" }).pipe(Effect.provideContext(captured)))
+        expect(failure._tag).toBe("Transaction.Closed")
+        expect(yield* fixture.attempts).toBe(1)
+        expect((yield* fixture.snapshot).logs.size).toBe(0)
+      })
+    )
+  })
+)
 
 it.effect("expected positions and replay cursors are scoped to their log", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
-        const first = yield* turn.append(
-          { _tag: "Text", text: "first" },
-          { expectedAfter: Option.none() },
-        );
-        yield* journal.publish(Changed, { amount: 1 });
-        yield* turn.append({ _tag: "Finished" }, { expectedAfter: Option.some(first.position) });
-        const conflict = yield* Effect.flip(
-          turn.append({ _tag: "Finished" }, { expectedAfter: Option.none() }),
-        );
-        expect(conflict).toMatchObject({ _tag: "StoreError", reason: { _tag: "Contended" } });
-        const resumed = yield* Stream.runCollect(turn.stream({ after: first.position, limit: 1 }));
-        expect(resumed).toHaveLength(1);
-        expect(resumed[0]?.entries[0]?.payload._tag).toBe("Finished");
-      }),
-    );
-  }),
-);
+        const { journal, turn } = yield* setup
+        const first = yield* turn.append({ _tag: "Text", text: "first" }, { expectedAfter: Option.none() })
+        yield* journal.publish(Changed, { amount: 1 })
+        yield* turn.append({ _tag: "Finished" }, { expectedAfter: Option.some(first.position) })
+        const conflict = yield* Effect.flip(turn.append({ _tag: "Finished" }, { expectedAfter: Option.none() }))
+        expect(conflict).toMatchObject({ _tag: "StoreError", reason: { _tag: "Contended" } })
+        const resumed = yield* Stream.runCollect(turn.stream({ after: first.position, limit: 1 }))
+        expect(resumed).toHaveLength(1)
+        expect(resumed[0]?.entries[0]?.payload._tag).toBe("Finished")
+      })
+    )
+  })
+)
 
 it.effect("readers reject batches from another log", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
-        yield* journal.publish(Changed, { amount: 1 });
-        yield* turn.append({ _tag: "Finished" });
-      }),
-    );
+        const { journal, turn } = yield* setup
+        yield* journal.publish(Changed, { amount: 1 })
+        yield* turn.append({ _tag: "Finished" })
+      })
+    )
     const corrupt = {
       ...fixture,
       store: Store.Store.of({
         ...fixture.store,
-        read: (_id, options) => fixture.store.read(Entry.LogId.make("domain"), options),
-      }),
-    };
+        read: (_id, options) => fixture.store.read(Entry.LogId.make("domain"), options)
+      })
+    }
     yield* run(
       corrupt,
       Effect.gen(function* () {
-        const { turn } = yield* setup;
-        const failure = yield* Effect.flip(turn.read({ limit: 10 }));
-        expect(failure._tag).toBe("SchemaError");
-      }),
-    );
-  }),
-);
+        const { turn } = yield* setup
+        const failure = yield* Effect.flip(turn.read({ limit: 10 }))
+        expect(failure._tag).toBe("SchemaError")
+      })
+    )
+  })
+)
 
 it.effect("replay continues through short pages and respects consumer demand", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make()
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const { turn } = yield* setup;
-        yield* turn.append({ _tag: "Text", text: "one" });
-        yield* turn.append({ _tag: "Text", text: "two" });
-        yield* turn.append({ _tag: "Finished" });
-      }),
-    );
-    let reads = 0;
+        const { turn } = yield* setup
+        yield* turn.append({ _tag: "Text", text: "one" })
+        yield* turn.append({ _tag: "Text", text: "two" })
+        yield* turn.append({ _tag: "Finished" })
+      })
+    )
+    let reads = 0
     const shortPages = {
       ...fixture,
       store: Store.Store.of({
         ...fixture.store,
         read: (id, options) =>
-          fixture.store
-            .read(
-              id,
-              options.after === undefined ? { limit: 1 } : { after: options.after, limit: 1 },
+          fixture.store.read(id, options.after === undefined ? { limit: 1 } : { after: options.after, limit: 1 }).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                reads++
+              })
             )
-            .pipe(
-              Effect.tap(() =>
-                Effect.sync(() => {
-                  reads++;
-                }),
-              ),
-            ),
-      }),
-    };
+          )
+      })
+    }
     yield* run(
       shortPages,
       Effect.gen(function* () {
-        const { turn } = yield* setup;
-        const all = yield* Stream.runCollect(turn.stream({ limit: 3 }));
-        expect(all).toHaveLength(3);
-        expect(reads).toBe(4);
-        reads = 0;
-        yield* turn.stream({ limit: 3 }).pipe(Stream.take(1), Stream.runDrain);
-        expect(reads).toBe(1);
-      }),
-    );
-  }),
-);
+        const { turn } = yield* setup
+        const all = yield* Stream.runCollect(turn.stream({ limit: 3 }))
+        expect(all).toHaveLength(3)
+        expect(reads).toBe(4)
+        reads = 0
+        yield* turn.stream({ limit: 3 }).pipe(Stream.take(1), Stream.runDrain)
+        expect(reads).toBe(1)
+      })
+    )
+  })
+)

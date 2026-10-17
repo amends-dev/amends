@@ -3,5 +3,5 @@ export {
   type InboxItem,
   type InboxPaneProps,
   type InboxTab,
-  type NotificationReason,
-} from "./inbox-pane.tsx";
+  type NotificationReason
+} from "./inbox-pane.tsx"

@@ -6,13 +6,14 @@
  *
  * @since 0.1.0
  */
-import * as Audience from "../journal/Audience.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Connection from "./Connection.ts";
+
+import * as Audience from "../journal/Audience.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Connection from "./Connection.ts"
 
 /** Connections are workspace configuration: every member may learn of changes to them. */
-const workspace = () => [Audience.workspace];
+const workspace = () => [Audience.workspace]
 
 /**
  * A connection was created, as its record says, without its key, which the same commit stored
@@ -26,8 +27,8 @@ export const Created = Fact.make("connection.created", {
   version: 1,
   subject: (payload) => Subject.make("connection", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Connection.Connection,
-});
+  payload: Connection.Connection
+})
 
 /**
  * A connection's name changed.
@@ -39,8 +40,8 @@ export const Renamed = Fact.make("connection.renamed", {
   audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
-  payload: Connection.Renamed,
-});
+  payload: Connection.Renamed
+})
 
 /**
  * A connection's settings were replaced as a whole.
@@ -52,8 +53,8 @@ export const Configured = Fact.make("connection.configured", {
   audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
-  payload: Connection.Configured,
-});
+  payload: Connection.Configured
+})
 
 /**
  * Its key replaced with another, which the commit stored apart from the journal. The fact names no
@@ -66,8 +67,8 @@ export const KeyReplaced = Fact.make("connection.key-replaced", {
   audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
-  payload: Connection.Reference,
-});
+  payload: Connection.Reference
+})
 
 /**
  * A connection was removed from use, and its key deleted; its record remains, as `removed`.
@@ -80,5 +81,5 @@ export const Removed = Fact.make("connection.removed", {
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   occurrence: (payload) => [payload.connectionId],
-  payload: Connection.Reference,
-});
+  payload: Connection.Reference
+})

@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names a message. A publication names its message itself, so a keyed reply names the same message
@@ -13,10 +14,10 @@ import { Schema } from "effect";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadMessageId"));
+export const ThreadMessageId = Schema.NonEmptyString.pipe(Schema.brand("ThreadMessageId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type ThreadMessageId = typeof ThreadMessageId.Type

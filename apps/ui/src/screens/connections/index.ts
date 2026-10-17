@@ -6,16 +6,16 @@ export {
   type ChooseIntegrationProps,
   type ConfigureConnectionProps,
   type ConfirmRemoveConnectionProps,
-  type ReplaceKeyProps,
-} from "./add-connection.tsx";
-export { ConnectionPane, type ConnectionPaneProps } from "./connection-pane.tsx";
+  type ReplaceKeyProps
+} from "./add-connection.tsx"
+export { ConnectionPane, type ConnectionPaneProps } from "./connection-pane.tsx"
 export {
   ConnectionList,
   ConnectionsPane,
   type ConnectionListProps,
   type ConnectionsPaneProps,
-  type ConnectionsTab,
-} from "./connections-pane.tsx";
+  type ConnectionsTab
+} from "./connections-pane.tsx"
 export {
   capabilityLabels,
   capabilityNouns,
@@ -30,5 +30,5 @@ export {
   type ConnectionsError,
   type ConnectionsFailure,
   type IntegrationCapability,
-  type IntegrationOption,
-} from "./wording.tsx";
+  type IntegrationOption
+} from "./wording.tsx"

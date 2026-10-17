@@ -5,22 +5,22 @@
  *
  * @since 0.1.0
  */
-import { Effect, Option } from "effect";
-import * as Projection from "../journal/Projection.ts";
-import * as Delivery from "./Delivery.ts";
-import * as DeliveryFacts from "./DeliveryFacts.ts";
-import * as DeliveryStore from "./DeliveryStore.ts";
+
+import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import * as Projection from "../journal/Projection.ts"
+import * as Delivery from "./Delivery.ts"
+import * as DeliveryFacts from "./DeliveryFacts.ts"
+import type * as DeliveryId from "./DeliveryId.ts"
+import * as DeliveryStore from "./DeliveryStore.ts"
 
 /** Change the stored delivery a fact names, as `changes` says. */
-const update = Effect.fnUntraced(function* (
-  deliveryId: Delivery.Id,
-  changes: Partial<Delivery.Delivery>,
-) {
-  const deliveryStore = yield* DeliveryStore.DeliveryStore;
-  const found = yield* deliveryStore.get(deliveryId);
-  if (Option.isNone(found)) return yield* Effect.die("A changed delivery is missing");
-  yield* deliveryStore.update(Delivery.change(found.value, changes));
-});
+const update = Effect.fnUntraced(function* (deliveryId: DeliveryId.DeliveryId, changes: Partial<Delivery.Delivery>) {
+  const deliveryStore = yield* DeliveryStore.DeliveryStore
+  const found = yield* deliveryStore.get(deliveryId)
+  if (Option.isNone(found)) return yield* Effect.die("A changed delivery is missing")
+  yield* deliveryStore.update(Delivery.change(found.value, changes))
+})
 
 /**
  * Inserts each delivery and applies each end.
@@ -32,10 +32,10 @@ export const definition = Projection.make("channel-delivery", { version: 1 })
   .on(
     DeliveryFacts.Created,
     Effect.fn("DeliveryProjection.created")(function* ({ payload }) {
-      const deliveryStore = yield* DeliveryStore.DeliveryStore;
-      const { notificationIds: _, ...record } = payload;
-      yield* deliveryStore.insert(record);
-    }),
+      const deliveryStore = yield* DeliveryStore.DeliveryStore
+      const { notificationIds: _, ...record } = payload
+      yield* deliveryStore.insert(record)
+    })
   )
   .on(
     DeliveryFacts.Sent,
@@ -44,9 +44,9 @@ export const definition = Projection.make("channel-delivery", { version: 1 })
         status: "sent",
         externalMessageId: payload.externalMessageId,
         attempts: payload.attempts,
-        finishedAt: payload.sentAt,
-      });
-    }),
+        finishedAt: payload.sentAt
+      })
+    })
   )
   .on(
     DeliveryFacts.Failed,
@@ -55,7 +55,7 @@ export const definition = Projection.make("channel-delivery", { version: 1 })
         status: "failed",
         failure: payload.reason,
         attempts: payload.attempts,
-        finishedAt: payload.failedAt,
-      });
-    }),
-  );
+        finishedAt: payload.failedAt
+      })
+    })
+  )

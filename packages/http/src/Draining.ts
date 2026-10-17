@@ -6,7 +6,11 @@
  *
  * @since 0.1.0
  */
-import { Context, Deferred, Effect, Layer } from "effect";
+
+import * as Context from "effect/Context"
+import * as Deferred from "effect/Deferred"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 
 /**
  * The signal that the server has begun to shut down: a `Deferred` that completes as draining
@@ -16,9 +20,7 @@ import { Context, Deferred, Effect, Layer } from "effect";
  * @category services
  * @since 0.1.0
  */
-export class Draining extends Context.Service<Draining, Deferred.Deferred<void>>()(
-  "@amends-dev/http/Draining",
-) {}
+export class Draining extends Context.Service<Draining, Deferred.Deferred<void>>()("@amends-dev/http/Draining") {}
 
 /**
  * Provides `Draining`, not yet complete. A host provides this one instance both to its routes and
@@ -27,7 +29,7 @@ export class Draining extends Context.Service<Draining, Deferred.Deferred<void>>
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Draining, Deferred.make<void>());
+export const layer = Layer.effect(Draining, Deferred.make<void>())
 
 /**
  * Begin draining when this layer is released. A host builds it after its HTTP server, so it is
@@ -37,7 +39,5 @@ export const layer = Layer.effect(Draining, Deferred.make<void>());
  * @since 0.1.0
  */
 export const layerOnRelease = Layer.effectDiscard(
-  Effect.flatMap(Draining, (draining) =>
-    Effect.addFinalizer(() => Deferred.succeed(draining, undefined)),
-  ),
-);
+  Effect.flatMap(Draining, (draining) => Effect.addFinalizer(() => Deferred.succeed(draining, undefined)))
+)

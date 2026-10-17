@@ -3,9 +3,5 @@
   "title": "Mention mark",
   "categories": ["actions", "content"],
   "keywords": ["mark", "mention", "at", "address"],
-  "shapes": [
-    { "arc": [12, 12, 8, 45, 360] },
-    { "circle": [12, 12, 3] },
-    { "line": [15, 12, 20, 12] }
-  ]
+  "shapes": [{ "arc": [12, 12, 8, 45, 360] }, { "circle": [12, 12, 3] }, { "line": [15, 12, 20, 12] }]
 }

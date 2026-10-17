@@ -1,4 +1,4 @@
-import { paths, useAgents, useWorkspace } from "@amends-dev/client";
+import { paths, useAgents, useWorkspace } from "@amends-dev/client"
 import {
   AddAgent,
   AgentList,
@@ -7,21 +7,21 @@ import {
   ConfirmRemoveAgent,
   agentsToast,
   type AgentsAction,
-  type AgentsTab,
-} from "@amends-dev/ui/screens/agents";
-import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
-import { useWorkspaceActions } from "../workspace-actions.ts";
+  type AgentsTab
+} from "@amends-dev/ui/screens/agents"
+import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js"
+import { useWorkspaceActions } from "../workspace-actions.ts"
 
-const href = (path: string) => `#${path}`;
+const href = (path: string) => `#${path}`
 
 export function AgentsPage() {
-  const params = useParams<{ workspaceId: string }>();
+  const params = useParams<{ workspaceId: string }>()
   return (
     <Show when={params.workspaceId} keyed>
       {(workspaceId) => <Agents workspaceId={workspaceId} />}
     </Show>
-  );
+  )
 }
 
 /**
@@ -29,78 +29,74 @@ export function AgentsPage() {
  * page by its path. `?add=agent` opens Add agent over either; creating opens the agent's page.
  */
 function Agents(props: { readonly workspaceId: string }) {
-  const { workspaceId } = props;
-  const params = useParams<{ agentId?: string }>();
-  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string }>();
-  const navigate = useNavigate();
-  const workspace = useWorkspace(() => workspaceId);
-  const actions = useWorkspaceActions();
-  const [removing, setRemoving] = createSignal(false);
-  const [query, setQuery] = createSignal("");
-  const base = paths.workspacePage(workspaceId, "agents");
+  const { workspaceId } = props
+  const params = useParams<{ agentId?: string }>()
+  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string }>()
+  const navigate = useNavigate()
+  const workspace = useWorkspace(() => workspaceId)
+  const actions = useWorkspaceActions()
+  const [removing, setRemoving] = createSignal(false)
+  const [query, setQuery] = createSignal("")
+  const base = paths.workspacePage(workspaceId, "agents")
   const view = useAgents(workspaceId, {
     done: (done) => {
       if (done.action === "create") {
-        setSearch({ add: undefined });
-        if (done.created) navigate(paths.agent(workspaceId, done.created));
+        setSearch({ add: undefined })
+        if (done.created) navigate(paths.agent(workspaceId, done.created))
       }
       if (done.action === "remove") {
-        setRemoving(false);
-        navigate(base);
+        setRemoving(false)
+        navigate(base)
       }
-      actions.toast(agentsToast(done.action, done.subject));
-    },
-  });
-  const adding = () => search.add !== undefined && view.canCreate();
+      actions.toast(agentsToast(done.action, done.subject))
+    }
+  })
+  const adding = () => search.add !== undefined && view.canCreate()
   // `?add=` opens Add agent over the page; leaving it, such as with Back, sets the draft aside.
   createEffect(
     on(adding, (add) => {
-      view.dismiss();
-      if (add) view.create.begin();
-      else view.create.cancel();
-    }),
-  );
+      view.dismiss()
+      if (add) view.create.begin()
+      else view.create.cancel()
+    })
+  )
   // An agent's unsaved name and setup are set aside as its page closes.
   createEffect(
     on(
       () => params.agentId,
       (_, previous) => {
-        if (previous !== undefined) view.reset(previous);
+        if (previous !== undefined) view.reset(previous)
       },
-      { defer: true },
-    ),
-  );
-  const tab = (): AgentsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
-  const ofTab = createMemo(() =>
-    view.agents().filter((agent) => tab() === "all" || agent.issues.length > 0),
-  );
+      { defer: true }
+    )
+  )
+  const tab = (): AgentsTab => (search.tab === "needs-setup" ? "needs-setup" : "all")
+  const ofTab = createMemo(() => view.agents().filter((agent) => tab() === "all" || agent.issues.length > 0))
   const shown = createMemo(() => {
-    const words = query().trim().toLocaleLowerCase();
-    return ofTab().filter(
-      (agent) => words === "" || agent.name.toLocaleLowerCase().includes(words),
-    );
-  });
-  const add = () => setSearch({ add: "agent" });
+    const words = query().trim().toLocaleLowerCase()
+    return ofTab().filter((agent) => words === "" || agent.name.toLocaleLowerCase().includes(words))
+  })
+  const add = () => setSearch({ add: "agent" })
   const failureOf = (action: AgentsAction) => {
-    const failure = view.failure();
-    return failure?.action === action ? failure : undefined;
-  };
-  const refreshing = () => view.pending() === "refresh";
-  const name = () => workspace()?.workspace.name ?? "";
-  const selected = () => (params.agentId === undefined ? undefined : view.agent(params.agentId));
+    const failure = view.failure()
+    return failure?.action === action ? failure : undefined
+  }
+  const refreshing = () => view.pending() === "refresh"
+  const name = () => workspace()?.workspace.name ?? ""
+  const selected = () => (params.agentId === undefined ? undefined : view.agent(params.agentId))
   /** The selected agent's turns in progress, each opening its log beside its thread. */
   const turnsOfSelected = () => {
-    const agent = selected();
+    const agent = selected()
     return agent === undefined
       ? []
       : view.turnsOf(agent.memberId).map((turn) => ({
           id: turn.id,
           state: turn.state,
           place: turn.place,
-          href: href(paths.turnLog(workspaceId, turn.groupId, turn.threadId, turn.id)),
-        }));
-  };
-  const tabHref = (next: AgentsTab) => href(next === "all" ? base : `${base}?tab=${next}`);
+          href: href(paths.turnLog(workspaceId, turn.groupId, turn.threadId, turn.id))
+        }))
+  }
+  const tabHref = (next: AgentsTab) => href(next === "all" ? base : `${base}?tab=${next}`)
   return (
     <>
       <Show
@@ -112,15 +108,15 @@ function Agents(props: { readonly workspaceId: string }) {
             tab={tab()}
             tabHref={tabHref}
             onTabChange={(next) => {
-              setQuery("");
-              setSearch({ tab: next === "all" ? undefined : next });
+              setQuery("")
+              setSearch({ tab: next === "all" ? undefined : next })
             }}
             counts={
               view.status()
                 ? undefined
                 : {
                     all: view.agents().length,
-                    "needs-setup": view.agents().filter((agent) => agent.issues.length > 0).length,
+                    "needs-setup": view.agents().filter((agent) => agent.issues.length > 0).length
                   }
             }
             onAdd={view.canCreate() ? add : undefined}
@@ -135,9 +131,7 @@ function Agents(props: { readonly workspaceId: string }) {
               total={view.agents().length}
               agentHref={(id) => href(paths.agent(workspaceId, id))}
               onAdd={view.canCreate() ? add : undefined}
-              failure={
-                view.failure()?.action === "refresh" && !adding() ? view.failure() : undefined
-              }
+              failure={view.failure()?.action === "refresh" && !adding() ? view.failure() : undefined}
               onRefresh={view.refresh}
               refreshing={refreshing()}
             />
@@ -162,8 +156,8 @@ function Agents(props: { readonly workspaceId: string }) {
             onRemove={
               selected()?.configurable
                 ? () => {
-                    view.dismiss();
-                    setRemoving(true);
+                    view.dismiss()
+                    setRemoving(true)
                   }
                 : undefined
             }
@@ -177,7 +171,7 @@ function Agents(props: { readonly workspaceId: string }) {
       <AddAgent
         open={adding()}
         onClose={() => {
-          if (view.pending() === undefined) setSearch({ add: undefined });
+          if (view.pending() === undefined) setSearch({ add: undefined })
         }}
         workspaceName={name()}
         name={view.create.name()}
@@ -198,9 +192,9 @@ function Agents(props: { readonly workspaceId: string }) {
           <ConfirmRemoveAgent
             open={removing()}
             onClose={() => {
-              if (view.pending() !== undefined) return;
-              view.dismiss();
-              setRemoving(false);
+              if (view.pending() !== undefined) return
+              view.dismiss()
+              setRemoving(false)
             }}
             name={agent().name}
             onConfirm={() => view.remove(agent().id)}
@@ -212,5 +206,5 @@ function Agents(props: { readonly workspaceId: string }) {
         )}
       </Show>
     </>
-  );
+  )
 }

@@ -1,21 +1,21 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media, shell } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
-import { knockoutVar } from "../../components/status-mark/status-mark.css.ts";
+import { style } from "@vanilla-extract/css"
+import { knockoutVar } from "../../components/status-mark/status-mark.css.ts"
+import { media, shell } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
-const logoKnockout = "--amends-logo-knockout";
+const logoKnockout = "--amends-logo-knockout"
 
 const ellipsis = {
   minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-} as const;
+  whiteSpace: "nowrap"
+} as const
 
 const focusInset = {
-  "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
-} as const;
+  "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" }
+} as const
 
 // The 2px bar beside the current row.
 const indicator = {
@@ -26,8 +26,8 @@ const indicator = {
   width: "2px",
   height: "1.25rem",
   transform: "translateY(-50%)",
-  backgroundColor: vars.color.action.indicator,
-} as const;
+  backgroundColor: vars.color.action.indicator
+} as const
 
 export const sidebar = style({
   display: "flex",
@@ -36,8 +36,8 @@ export const sidebar = style({
   width: shell.sidebar,
   minHeight: 0,
   overflow: "hidden",
-  backgroundColor: vars.color.surface.panel,
-});
+  backgroundColor: vars.color.surface.panel
+})
 
 // 96px on desktop, the same height as the pane headers beside it.
 export const header = style({
@@ -50,9 +50,9 @@ export const header = style({
   padding: "1.0625rem 1.125rem 0.4375rem",
   borderBlockEnd: `1px solid ${vars.color.border.divider}`,
   "@media": {
-    [media.touch]: { gap: "0.25rem", minHeight: 0, padding: "0 0.5rem 0", border: "none" },
-  },
-});
+    [media.touch]: { gap: "0.25rem", minHeight: 0, padding: "0 0.5rem 0", border: "none" }
+  }
+})
 
 export const workspace = style({
   ...typeScale.body,
@@ -71,14 +71,14 @@ export const workspace = style({
   textAlign: "start",
   cursor: "pointer",
   selectors: {
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
   "@media": {
-    [media.touch]: { ...typeScale.item, height: "3.5rem", paddingInline: "0.5rem" },
-  },
-});
+    [media.touch]: { ...typeScale.item, height: "3.5rem", paddingInline: "0.5rem" }
+  }
+})
 
-export const workspaceName = style(ellipsis);
+export const workspaceName = style(ellipsis)
 
 export const chevron = style({
   flex: "none",
@@ -86,8 +86,8 @@ export const chevron = style({
   height: "0.875rem",
   marginInlineStart: "auto",
   color: vars.color.text.secondary,
-  selectors: { [`${workspace}:hover &`]: { color: vars.color.text.primary } },
-});
+  selectors: { [`${workspace}:hover &`]: { color: vars.color.text.primary } }
+})
 
 export const search = style({
   ...typeScale.control,
@@ -106,7 +106,7 @@ export const search = style({
   cursor: "pointer",
   selectors: {
     "&:hover": { color: vars.color.text.secondary },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
   "@media": {
     [media.touch]: {
@@ -116,26 +116,26 @@ export const search = style({
       width: "auto",
       paddingInline: "0.75rem",
       backgroundColor: vars.color.surface.subtle,
-      color: vars.color.text.secondary,
-    },
-  },
-});
+      color: vars.color.text.secondary
+    }
+  }
+})
 
 export const searchIcon = style({
   flex: "none",
   width: "0.875rem",
   height: "0.875rem",
-  "@media": { [media.touch]: { width: "1rem", height: "1rem" } },
-});
+  "@media": { [media.touch]: { width: "1rem", height: "1rem" } }
+})
 
-export const searchLabel = style({ ...ellipsis, flex: 1 });
+export const searchLabel = style({ ...ellipsis, flex: 1 })
 
 export const shortcut = style({
   ...typeScale.meta,
   flex: "none",
   fontFamily: "inherit",
-  "@media": { [media.touch]: { display: "none" } },
-});
+  "@media": { [media.touch]: { display: "none" } }
+})
 
 export const body = style({
   flex: 1,
@@ -143,8 +143,8 @@ export const body = style({
   overflowY: "auto",
   overscrollBehavior: "contain",
   padding: "0.9375rem 0.75rem 1rem",
-  "@media": { [media.touch]: { padding: "1rem 0.5rem" } },
-});
+  "@media": { [media.touch]: { padding: "1rem 0.5rem" } }
+})
 
 export const list = style({
   display: "flex",
@@ -152,8 +152,8 @@ export const list = style({
   gap: "0.25rem",
   margin: 0,
   padding: 0,
-  listStyle: "none",
-});
+  listStyle: "none"
+})
 
 export const item = style({
   ...typeScale.item,
@@ -172,7 +172,7 @@ export const item = style({
     ...focusInset,
     "&:hover": {
       backgroundColor: vars.color.surface.hover,
-      vars: { [knockoutVar]: vars.color.surface.hover, [logoKnockout]: vars.color.surface.hover },
+      vars: { [knockoutVar]: vars.color.surface.hover, [logoKnockout]: vars.color.surface.hover }
     },
     "&[aria-current]": {
       backgroundColor: vars.color.surface.selected,
@@ -180,13 +180,13 @@ export const item = style({
       fontWeight: fontWeight.medium,
       vars: {
         [knockoutVar]: vars.color.surface.selected,
-        [logoKnockout]: vars.color.surface.selected,
-      },
+        [logoKnockout]: vars.color.surface.selected
+      }
     },
-    "&[aria-current]::before": indicator,
+    "&[aria-current]::before": indicator
   },
-  "@media": { [media.touch]: { ...typeScale.body, height: "2.75rem" } },
-});
+  "@media": { [media.touch]: { ...typeScale.body, height: "2.75rem" } }
+})
 
 // Item icons stay secondary even on the current row.
 export const itemIcon = style({
@@ -194,21 +194,21 @@ export const itemIcon = style({
   width: "1.0625rem",
   height: "1.0625rem",
   color: vars.color.text.secondary,
-  "@media": { [media.touch]: { width: "1.125rem", height: "1.125rem" } },
-});
+  "@media": { [media.touch]: { width: "1.125rem", height: "1.125rem" } }
+})
 
 export const itemAvatar = style({
-  "@media": { [media.touch]: { width: "1.75rem", height: "1.75rem", fontSize: "0.63rem" } },
-});
+  "@media": { [media.touch]: { width: "1.75rem", height: "1.75rem", fontSize: "0.63rem" } }
+})
 
 export const itemLabel = style({
   ...ellipsis,
   flex: 1,
   // Unseen activity reads in the primary weight.
   selectors: {
-    [`${item}[data-unread] &`]: { color: vars.color.text.primary, fontWeight: fontWeight.medium },
-  },
-});
+    [`${item}[data-unread] &`]: { color: vars.color.text.primary, fontWeight: fontWeight.medium }
+  }
+})
 
 export const unread = style({
   flex: "none",
@@ -216,8 +216,8 @@ export const unread = style({
   height: "0.4375rem",
   marginInlineEnd: "0.25rem",
   borderRadius: "50%",
-  backgroundColor: vars.color.action.indicator,
-});
+  backgroundColor: vars.color.action.indicator
+})
 
 export const section = style({
   display: "flex",
@@ -226,8 +226,8 @@ export const section = style({
   marginBlockStart: "1.375rem",
   // A destination's first section starts where Home's first items do.
   selectors: { "&:first-child": { marginBlockStart: 0 } },
-  "@media": { [media.touch]: { gap: "0.25rem", marginBlockStart: "0.5rem" } },
-});
+  "@media": { [media.touch]: { gap: "0.25rem", marginBlockStart: "0.5rem" } }
+})
 
 // Lined up with an item's label, in the quieter hint type.
 export const empty = style({
@@ -239,8 +239,8 @@ export const empty = style({
   margin: 0,
   paddingInline: "0.75rem",
   color: vars.color.text.muted,
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
 export const sectionHeader = style({
   position: "relative",
@@ -251,10 +251,10 @@ export const sectionHeader = style({
   paddingInlineStart: "0.5rem",
   selectors: {
     "&[data-current]": { backgroundColor: vars.color.surface.selected },
-    "&[data-current]::before": indicator,
+    "&[data-current]::before": indicator
   },
-  "@media": { [media.touch]: { height: "2.75rem", paddingInlineStart: "0.75rem" } },
-});
+  "@media": { [media.touch]: { height: "2.75rem", paddingInlineStart: "0.75rem" } }
+})
 
 export const sectionTitle = style({
   ...typeScale.meta,
@@ -268,18 +268,18 @@ export const sectionTitle = style({
     ...focusInset,
     [`${sectionHeader}[data-current] &`]: { color: vars.color.text.primary },
     // A linked title makes the whole row clickable; the actions sit above that area.
-    "a&::after": { content: '""', position: "absolute", inset: 0 },
+    "a&::after": { content: '""', position: "absolute", inset: 0 }
   },
-  "@media": { [media.touch]: { color: vars.color.text.secondary } },
-});
+  "@media": { [media.touch]: { color: vars.color.text.secondary } }
+})
 
 export const sectionActions = style({
   position: "relative",
   display: "flex",
   alignItems: "center",
   gap: "0.25rem",
-  "@media": { [media.touch]: { gap: 0 } },
-});
+  "@media": { [media.touch]: { gap: 0 } }
+})
 
 // A thread or task under its group, joined by a stitched elbow.
 export const subItem = style({
@@ -299,12 +299,12 @@ export const subItem = style({
     "&:hover": { backgroundColor: vars.color.surface.hover },
     "&[aria-current]": {
       backgroundColor: vars.color.surface.selected,
-      color: vars.color.text.primary,
+      color: vars.color.text.primary
     },
-    "&[aria-current]::before": indicator,
+    "&[aria-current]::before": indicator
   },
-  "@media": { [media.touch]: { ...typeScale.control, height: "2.75rem" } },
-});
+  "@media": { [media.touch]: { ...typeScale.control, height: "2.75rem" } }
+})
 
 // Runs from just under the group's row to the middle of this one; the drawing is anchored at
 // its bottom, so taller touch rows only lengthen the vertical run.
@@ -315,19 +315,19 @@ export const connector = style({
   width: "1.125rem",
   height: "calc(50% + 0.28125rem)",
   color: vars.color.border.stitch,
-  pointerEvents: "none",
-});
+  pointerEvents: "none"
+})
 
 export const subItemIcon = style({
   flex: "none",
   width: "0.875rem",
   height: "0.875rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 // Where agents are at work: the logo alone, quiet beside the label and apart from unread counts.
 export const itemActivity = style({
   display: "inline-flex",
   flex: "none",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})

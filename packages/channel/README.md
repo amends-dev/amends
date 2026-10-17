@@ -37,11 +37,12 @@ there later, kept as JSON and given back to `post` as it was: a Slack channel an
 an email's message id to reply to. A `Sender` is the person's `id` in the system and what they are
 called. Every id is an `ExternalId`, a non-empty string the system owns.
 
-Every operation fails with `TransportError`, whose `reason` says what to do: `rejected`, the
-request is not the system's or cannot be read, and the system should be answered so; `refused`, the
-system refused the operation for good, such as a message in an archived conversation; and
-`unavailable`, the system could not be reached now, which `isRetryable` says, so the caller may try
-again. `cause` carries what the system said.
+Every operation fails with `TransportError`, whose `reason` says what to do: `RejectedError`, the
+request is not the system's or cannot be read, and the system should be answered so; `RefusedError`,
+the system refused the operation for good, such as a message in an archived conversation; and
+`UnavailableError`, the system could not be reached now, which `isRetryable` says, so the caller may
+try again. Each reason's `description` says what happened, and `cause` carries what the system said.
+A caller recovers from one reason with `Effect.catchReason("TransportError", "RejectedError", ...)`.
 
 ## Writing a transport
 
@@ -49,29 +50,29 @@ A transport is a plain object, usually made once per connection to the system wi
 connection's settings and secret. Slack, for example:
 
 ```ts
-import { ChannelTransport } from "@amends-dev/channel";
-import { Effect, Schema } from "effect";
+import { ChannelTransport } from "@amends-dev/channel"
+import { Effect, Schema } from "effect"
 
 export const slack = (options: {
-  readonly botToken: string;
-  readonly signingSecret: string;
-  readonly botUserId: string;
+  readonly botToken: string
+  readonly signingSecret: string
+  readonly botUserId: string
 }): ChannelTransport.ChannelTransport => ({
   self: ChannelTransport.ExternalId.make(options.botUserId),
   receive: (inbound) =>
     Effect.gen(function* () {
-      yield* verifySignature(inbound, options.signingSecret); // TransportError "rejected"
-      const payload = yield* decodeEventsApi(inbound.body);
-      if (payload.type === "url_verification") return { events: [], answer: payload.challenge };
-      return { events: yield* eventsOf(payload) };
+      yield* verifySignature(inbound, options.signingSecret) // TransportError with a RejectedError
+      const payload = yield* decodeEventsApi(inbound.body)
+      if (payload.type === "url_verification") return { events: [], answer: payload.challenge }
+      return { events: yield* eventsOf(payload) }
     }),
   post: (conversation, outgoing) =>
     chatPostMessage(options.botToken, {
       channel: conversation.details.channel,
       thread_ts: conversation.details.thread_ts,
-      text: `${outgoing.author}: ${outgoing.text}`,
-    }).pipe(Effect.map((posted) => ({ messageId: posted.ts }))),
-});
+      text: `${outgoing.author}: ${outgoing.text}`
+    }).pipe(Effect.map((posted) => ({ messageId: posted.ts })))
+})
 ```
 
 A `MessageReceived` event's conversation is the Slack channel and thread it arrived in, with the

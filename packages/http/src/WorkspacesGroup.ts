@@ -10,11 +10,14 @@
  *
  * @since 0.1.0
  */
-import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
-import { Authentication } from "./Authentication.ts";
-import * as ApiErrors from "./ApiErrors.ts";
+
+import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
 
 /**
  * Workspace creation, and joining one by accepting its invitation. Creation entitlement checks
@@ -29,17 +32,17 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       headers: ApiErrors.requestKey,
       payload: Workspace.CreateInput,
       success: Workspace.Workspace.pipe(HttpApiSchema.status(201)).annotate({
-        identifier: "CreatedWorkspace",
+        identifier: "CreatedWorkspace"
       }),
-      error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.Invalid],
+      error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.Invalid]
     }),
     HttpApiEndpoint.post("acceptInvitation", "/:workspaceId/invitations/:invitationId/accept", {
-      params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
+      params: { workspaceId: WorkspaceId.WorkspaceId, invitationId: Invitation.InvitationId },
       // What the recipient wants people in the workspace to call them.
       payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Member,
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation]
+    })
   )
-  .middleware(Authentication)
+  .middleware(Authentication.Authentication)
   .prefix("/workspaces") {}

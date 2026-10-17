@@ -1,0 +1,97 @@
+/**
+ * Sealing connections' credentials with the host's credential key: AES-256-GCM with a random
+ * nonce per secret, and the row's identity as additional data, so a sealed value opens only as the
+ * credential it was stored as. `PostgresWorkspaceStorage.make` imports the key from the host's
+ * `credentialKey` option once, failing the host's start on a malformed one, and provides it to
+ * every workspace's `ConnectionCredentials` store as `CredentialKey`.
+ */
+
+import * as Context from "effect/Context"
+import * as Data from "effect/Data"
+import * as Effect from "effect/Effect"
+import * as Base64 from "effect/encoding/Base64"
+import * as Layer from "effect/Layer"
+import type * as Option from "effect/Option"
+import * as Redacted from "effect/Redacted"
+
+/**
+ * The key is malformed, or a secret failed to seal or open.
+ */
+export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
+  readonly message: string
+  readonly cause?: unknown
+}> {}
+
+/**
+ * The imported key, which seals a secret and opens it again. A sealed value is text: a version
+ * tag, the nonce, and the ciphertext.
+ */
+export interface Cipher {
+  /** Seal `secret`, bound to `binding`: only the same binding opens it. */
+  readonly seal: (secret: string, binding: string) => Effect.Effect<string, Failure>
+  /** Open what `seal` returned for the same binding; anything else fails. */
+  readonly open: (sealed: string, binding: string) => Effect.Effect<string, Failure>
+}
+
+/**
+ * The host's credential key, when it configured one; none means the host stores no credentials.
+ */
+export class CredentialKey extends Context.Service<CredentialKey, Option.Option<Cipher>>()(
+  "@amends-dev/storage-postgresql/internal/credentialKey"
+) {}
+
+const version = "v1"
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
+const asFailure = (cause: unknown) =>
+  new Failure({ message: cause instanceof Error ? cause.message : String(cause), cause })
+/** The bytes `base64` encodes, failing with `message` for anything else. */
+const bytesOf = (base64: string, message: string) =>
+  Effect.mapError(Effect.fromResult(Base64.decode(base64)), () => new Failure({ message }))
+
+/**
+ * Import a base64-encoded 32-byte key, failing for anything else.
+ */
+export const make = Effect.fnUntraced(function* (key: Redacted.Redacted<string>) {
+  const raw = yield* bytesOf(Redacted.value(key), "The credential key must be base64")
+  if (raw.length !== 32)
+    return yield* new Failure({ message: "The credential key must be 32 bytes, encoded as base64" })
+  const cryptoKey = yield* Effect.tryPromise({
+    try: () => crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]),
+    catch: asFailure
+  })
+  const seal = (secret: string, binding: string) =>
+    Effect.tryPromise({
+      try: async () => {
+        const nonce = crypto.getRandomValues(new Uint8Array(12))
+        const sealed = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv: nonce, additionalData: encoder.encode(binding) },
+          cryptoKey,
+          encoder.encode(secret)
+        )
+        return `${version}:${Base64.encode(nonce)}:${Base64.encode(new Uint8Array(sealed))}`
+      },
+      catch: asFailure
+    })
+  const open = Effect.fnUntraced(function* (sealed: string, binding: string) {
+    const unrecognized = "Unrecognized sealed credential"
+    const [tag, nonce, data] = sealed.split(":")
+    if (tag !== version || nonce === undefined || data === undefined)
+      return yield* new Failure({ message: unrecognized })
+    const iv = yield* bytesOf(nonce, unrecognized)
+    const ciphertext = yield* bytesOf(data, unrecognized)
+    const opened = yield* Effect.tryPromise({
+      try: () =>
+        crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(binding) }, cryptoKey, ciphertext),
+      catch: asFailure
+    })
+    return decoder.decode(opened)
+  })
+  const cipher: Cipher = { seal, open }
+  return cipher
+})
+
+/**
+ * Provides `CredentialKey` with the key the host imported, or none.
+ */
+export const layer = (key: Option.Option<Cipher>) => Layer.succeed(CredentialKey, key)

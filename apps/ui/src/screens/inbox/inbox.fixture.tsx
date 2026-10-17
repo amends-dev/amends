@@ -1,22 +1,22 @@
 // Workshop harness: the Inbox with the Lunacy sample notifications, selection, and the thread
 // beside it, following the mocks' behavior notes. Not exported.
-import { Show, createMemo, createSignal } from "solid-js";
-import { Shell } from "../../patterns/shell/index.ts";
-import { ThreadPane } from "../group/index.ts";
-import { navigation, people, threadEntries } from "../sample.ts";
-import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
-import { InboxPane, type InboxItem, type InboxTab } from "./index.ts";
+import { Show, createMemo, createSignal } from "solid-js"
+import { Shell } from "../../patterns/shell/index.ts"
+import { ThreadPane } from "../group/index.ts"
+import { navigation, people, threadEntries } from "../sample.ts"
+import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts"
+import { InboxPane, type InboxItem, type InboxTab } from "./index.ts"
 
-const now = new Date();
-const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+const now = new Date()
+const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000)
 const yesterday = (hour: number) => {
-  const date = new Date(now);
-  date.setDate(date.getDate() - 1);
-  date.setHours(hour, 0, 0, 0);
-  return date;
-};
+  const date = new Date(now)
+  date.setDate(date.getDate() - 1)
+  date.setHours(hour, 0, 0, 0)
+  return date
+}
 
-export const sampleInbox: readonly InboxItem[] = [
+export const sampleInbox: ReadonlyArray<InboxItem> = [
   {
     id: "sara",
     at: minutesAgo(2),
@@ -26,7 +26,7 @@ export const sampleInbox: readonly InboxItem[] = [
     place: { name: "general", direct: false },
     text: "[@Jamie](member:jamie) can you check the composer fix before we ship?",
     mentions: [{ id: "jamie", name: "Jamie" }],
-    href: "#sara",
+    href: "#sara"
   },
   {
     id: "alex",
@@ -36,7 +36,7 @@ export const sampleInbox: readonly InboxItem[] = [
     author: people.alex,
     place: { name: "engineering", direct: false },
     text: "The retry now keeps the original request, so a send cut off by closing the thread is not posted twice. **Ready for another look:**\n\n- retries reuse the key\n- drafts keep it across remounts",
-    href: "#alex",
+    href: "#alex"
   },
   {
     id: "graeme",
@@ -46,7 +46,7 @@ export const sampleInbox: readonly InboxItem[] = [
     author: people.graeme,
     place: { name: "design", direct: false },
     text: "Sharing the revised navigation icons for review.",
-    href: "#graeme",
+    href: "#graeme"
   },
   {
     id: "oliver",
@@ -56,7 +56,7 @@ export const sampleInbox: readonly InboxItem[] = [
     author: people.oliver,
     place: { name: "product", direct: false },
     text: "The empty state copy is updated. I’ve attached the latest version.",
-    href: "#oliver",
+    href: "#oliver"
   },
   {
     id: "caleb",
@@ -67,38 +67,36 @@ export const sampleInbox: readonly InboxItem[] = [
     place: { name: "Caleb", direct: true },
     text: "[@Jamie](member:jamie) let’s grab coffee after the rollout.",
     mentions: [{ id: "jamie", name: "Jamie" }],
-    href: "#caleb",
+    href: "#caleb"
   },
-  { id: "gone", at: yesterday(11), unread: false },
-];
+  { id: "gone", at: yesterday(11), unread: false }
+]
 
 export interface InboxWorkspaceProps {
-  readonly tab?: InboxTab;
-  readonly items?: readonly InboxItem[];
-  readonly selected?: string;
-  readonly status?: "loading" | "failed";
+  readonly tab?: InboxTab
+  readonly items?: ReadonlyArray<InboxItem>
+  readonly selected?: string
+  readonly status?: "loading" | "failed"
 }
 
 /** The inbox's own rules, over local state: opening marks seen; Unread keeps the open row. */
 export function InboxWorkspace(props: InboxWorkspaceProps) {
   // A notification open from the start was seen as it opened.
   const [items, setItems] = createSignal(
-    (props.items ?? sampleInbox).map((item) =>
-      item.id === props.selected ? { ...item, unread: false } : item,
-    ),
-  );
-  const [tab, setTab] = createSignal<InboxTab>(props.tab ?? "unread");
-  const [selected, setSelected] = createSignal(props.selected);
-  const unread = () => items().filter((item) => item.unread).length;
+    (props.items ?? sampleInbox).map((item) => (item.id === props.selected ? { ...item, unread: false } : item))
+  )
+  const [tab, setTab] = createSignal<InboxTab>(props.tab ?? "unread")
+  const [selected, setSelected] = createSignal(props.selected)
+  const unread = () => items().filter((item) => item.unread).length
   const shown = createMemo(() =>
-    tab() === "all" ? items() : items().filter((item) => item.unread || item.id === selected()),
-  );
+    tab() === "all" ? items() : items().filter((item) => item.unread || item.id === selected())
+  )
   const open = (id: string) => {
-    setSelected(id);
-    setItems(items().map((item) => (item.id === id ? { ...item, unread: false } : item)));
-  };
-  const current = () => items().find((item) => item.id === selected());
-  const nav = navigation({ groups: [{ id: "general", name: "general" }] });
+    setSelected(id)
+    setItems(items().map((item) => (item.id === id ? { ...item, unread: false } : item)))
+  }
+  const current = () => items().find((item) => item.id === selected())
+  const nav = navigation({ groups: [{ id: "general", name: "general" }] })
   return (
     <Shell.Root>
       <WorkspaceNavigation {...nav}>
@@ -115,7 +113,7 @@ export function InboxWorkspace(props: InboxWorkspaceProps) {
           selectedId={selected()}
           onOpen={(id) => {
             // The link would navigate; the workshop opens in place.
-            queueMicrotask(() => open(id));
+            queueMicrotask(() => open(id))
           }}
           onMarkAllSeen={() => setItems(items().map((item) => ({ ...item, unread: false })))}
           status={props.status}
@@ -141,5 +139,5 @@ export function InboxWorkspace(props: InboxWorkspaceProps) {
         )}
       </Show>
     </Shell.Root>
-  );
+  )
 }

@@ -1,6 +1,6 @@
 /** The packages page: every published package, how they fit, and how to start with them. */
-import { For } from "solid-js";
-import { ButtonLink } from "@amends-dev/ui/components/button";
+
+import { ButtonLink } from "@amends-dev/ui/components/button"
 import {
   CodeWindow,
   Command,
@@ -9,36 +9,36 @@ import {
   PackageCard,
   PackageDiagram,
   Section,
-  Steps,
-} from "@amends-dev/ui/site";
-import { adapters, adaptersOf, contracts, links, type PublishedPackage } from "./catalog.ts";
-import { quickStart } from "./examples.ts";
-import { Footer, Header } from "./site.tsx";
+  Steps
+} from "@amends-dev/ui/site"
+import { For } from "solid-js"
+import { adapters, adaptersOf, contracts, links, type PublishedPackage } from "./catalog.ts"
+import { quickStart } from "./examples.ts"
+import { Footer, Header } from "./site.tsx"
 
 const writeYourOwn = [
   {
     title: "An agent",
     text: "Implement the harness contract, and every host runs your agent's turns in the same stream.",
     link: "Writing an adapter →",
-    href: "/docs/packages/harness/#writing-an-adapter",
+    href: "/docs/packages/harness/#writing-an-adapter"
   },
   {
     title: "A sandbox provider",
     text: "Implement the sandbox contract, then run its conformance suites against your provider.",
     link: "Writing a provider →",
-    href: "/docs/packages/sandbox/#writing-a-provider",
+    href: "/docs/packages/sandbox/#writing-a-provider"
   },
   {
     title: "A channel",
     text: "Implement the channel transport contract to bring one system's conversations in.",
     link: "Writing a transport →",
-    href: "/docs/packages/channel/#writing-a-transport",
-  },
-];
+    href: "/docs/packages/channel/#writing-a-transport"
+  }
+]
 
 function Card(props: { pkg: PublishedPackage }) {
-  const kind = () =>
-    props.pkg.implements === undefined ? "Contract" : `Implements ${props.pkg.implements}`;
+  const kind = () => (props.pkg.implements === undefined ? "Contract" : `Implements ${props.pkg.implements}`)
   return (
     <li>
       <PackageCard.Root name={props.pkg.name} kind={kind()} version={props.pkg.version}>
@@ -51,16 +51,16 @@ function Card(props: { pkg: PublishedPackage }) {
         </PackageCard.Links>
       </PackageCard.Root>
     </li>
-  );
+  )
 }
 
 export function Packages() {
   const diagram = contracts
     .map((contract) => ({
       name: contract.name,
-      adapters: adaptersOf(contract).map((adapter) => adapter.short),
+      adapters: adaptersOf(contract).map((adapter) => adapter.short)
     }))
-    .filter((contract) => contract.adapters.length > 0);
+    .filter((contract) => contract.adapters.length > 0)
   return (
     <>
       <Header current="packages" />
@@ -70,8 +70,8 @@ export function Packages() {
             <Hero.Badge>Packages</Hero.Badge>
             <Hero.Title size="page">The parts amends runs agents with</Hero.Title>
             <Hero.Lead>
-              Run any agent in any sandbox from your own Effect program. Contracts say what every
-              implementation agrees on, and each adapter implements one over one system.
+              Run any agent in any sandbox from your own Effect program. Contracts say what every implementation agrees
+              on, and each adapter implements one over one system.
             </Hero.Lead>
             <Command command="bun add @amends-dev/harness @amends-dev/sandbox" />
             <Hero.Actions>
@@ -89,8 +89,8 @@ export function Packages() {
           <Section.Header>
             <Section.Title size="heading">Contracts</Section.Title>
             <Section.Intro>
-              What every implementation agrees on. Depend on a contract, and choose the adapter
-              behind it when the program runs.
+              What every implementation agrees on. Depend on a contract, and choose the adapter behind it when the
+              program runs.
             </Section.Intro>
           </Section.Header>
           <Section.Grid columns={3}>
@@ -116,8 +116,7 @@ export function Packages() {
               </Section.Header>
               <Steps.Root>
                 <Steps.Step title="Make an agent">
-                  From an adapter: amends's own agent over an Effect AI model, or opencode in a
-                  sandbox.
+                  From an adapter: amends's own agent over an Effect AI model, or opencode in a sandbox.
                 </Steps.Step>
                 <Steps.Step title="Run it with a harness">
                   Every agent gets the same sessions and turns, streamed in one format.
@@ -137,8 +136,8 @@ export function Packages() {
           <Section.Header>
             <Section.Title size="heading">Write your own</Section.Title>
             <Section.Intro>
-              An integration connects amends to another system. Each kind has a contract, and each
-              implementation is a package of its own.
+              An integration connects amends to another system. Each kind has a contract, and each implementation is a
+              package of its own.
             </Section.Intro>
           </Section.Header>
           <Section.Grid columns={3}>
@@ -158,5 +157,5 @@ export function Packages() {
       </main>
       <Footer />
     </>
-  );
+  )
 }

@@ -1,22 +1,22 @@
-import { createSignal } from "solid-js";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { expect, userEvent, within } from "storybook/test";
-import { IconMarkNew } from "@amends-dev/icons";
-import { Button } from "./button/index.ts";
-import { Choice } from "./choice/index.ts";
-import { Combobox } from "./combobox/index.ts";
-import { Field } from "./field/index.ts";
-import { FormFields, type FormField, type FormIssue } from "./form-fields/index.ts";
-import { Input, SearchField } from "./input/index.ts";
-import { Menu } from "./menu/index.ts";
-import { MemberPicker } from "./member-picker/index.ts";
-import { Notice } from "./notice/index.ts";
-import { Select } from "./select/index.ts";
-import * as s from "./components.stories.css.ts";
+import { IconMarkNew } from "@amends-dev/icons"
+import { createSignal } from "solid-js"
+import type { Meta, StoryObj } from "storybook-solidjs-vite"
+import { expect, userEvent, within } from "storybook/test"
+import { Button } from "./button/index.ts"
+import { Choice } from "./choice/index.ts"
+import { Combobox } from "./combobox/index.ts"
+import * as s from "./components.stories.css.ts"
+import { Field } from "./field/index.ts"
+import { FormFields, type FormField, type FormIssue } from "./form-fields/index.ts"
+import { Input, SearchField } from "./input/index.ts"
+import { MemberPicker } from "./member-picker/index.ts"
+import { Menu } from "./menu/index.ts"
+import { Notice } from "./notice/index.ts"
+import { Select } from "./select/index.ts"
 
-const meta = { title: "Components/Forms" } satisfies Meta;
-export default meta;
-type Story = StoryObj;
+const meta = { title: "Components/Forms" } satisfies Meta
+export default meta
+type Story = StoryObj
 
 export const Buttons = {
   render: () => (
@@ -24,8 +24,8 @@ export const Buttons = {
       <section class={s.section}>
         <h2 class={s.heading}>Button</h2>
         <p class={s.note}>
-          Primary for the one main action, secondary for the rest, and quiet for row actions.
-          Disabled buttons fill with the subtle shade. Below 64rem they are 44px tall.
+          Primary for the one main action, secondary for the rest, and quiet for row actions. Disabled buttons fill with
+          the subtle shade. Below 64rem they are 44px tall.
         </p>
         <div class={s.panel}>
           <Button variant="primary">Save changes</Button>
@@ -40,14 +40,14 @@ export const Buttons = {
         </div>
       </section>
     </div>
-  ),
-} satisfies Story;
+  )
+} satisfies Story
 
 function FieldsExample() {
-  const [name, setName] = createSignal("general");
-  const [visibility, setVisibility] = createSignal("private");
-  const [status, setStatus] = createSignal("all");
-  const [selected, setSelected] = createSignal<string[]>([]);
+  const [name, setName] = createSignal("general")
+  const [visibility, setVisibility] = createSignal("private")
+  const [status, setStatus] = createSignal("all")
+  const [selected, setSelected] = createSignal<Array<string>>([])
   return (
     <div class={s.stack}>
       <Field.Root
@@ -89,14 +89,14 @@ function FieldsExample() {
           candidates={[
             { id: "casey", name: "Casey Park", tone: "sage", kind: "Person" },
             { id: "morgan", name: "Morgan Lee", tone: "slate", kind: "Person" },
-            { id: "yumi", name: "Yumi", tone: "lilac", kind: "Agent" },
+            { id: "yumi", name: "Yumi", tone: "lilac", kind: "Agent" }
           ]}
           selected={selected()}
           onSelectedChange={setSelected}
         />
       </Field.Root>
     </div>
-  );
+  )
 }
 
 export const Fields = {
@@ -109,29 +109,29 @@ export const Fields = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const name = canvas.getByRole("textbox", { name: "Group name" });
-    await expect(name).toHaveAccessibleDescription("Everyone in this group sees this name.");
-    await userEvent.clear(name);
-    await expect(name).toHaveAttribute("aria-invalid", "true");
-    await userEvent.click(canvas.getByRole("radio", { name: "Public" }));
-    await expect(canvas.getByText(/can find this group and join it/)).toBeVisible();
-    const picker = canvas.getByRole("combobox", { name: "Add members" });
-    await userEvent.type(picker, "yu{Enter}");
-    await expect(canvas.getByRole("button", { name: "Remove Yumi" })).toBeVisible();
-    await userEvent.type(picker, "{Backspace}");
-    await expect(canvas.queryByRole("button", { name: "Remove Yumi" })).toBeNull();
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    const name = canvas.getByRole("textbox", { name: "Group name" })
+    await expect(name).toHaveAccessibleDescription("Everyone in this group sees this name.")
+    await userEvent.clear(name)
+    await expect(name).toHaveAttribute("aria-invalid", "true")
+    await userEvent.click(canvas.getByRole("radio", { name: "Public" }))
+    await expect(canvas.getByText(/can find this group and join it/)).toBeVisible()
+    const picker = canvas.getByRole("combobox", { name: "Add members" })
+    await userEvent.type(picker, "yu{Enter}")
+    await expect(canvas.getByRole("button", { name: "Remove Yumi" })).toBeVisible()
+    await userEvent.type(picker, "{Backspace}")
+    await expect(canvas.queryByRole("button", { name: "Remove Yumi" })).toBeNull()
+  }
+} satisfies Story
 
-const settingsFields: readonly FormField[] = [
+const settingsFields: ReadonlyArray<FormField> = [
   {
     key: "url",
     label: "Server URL",
     description: "Where the MCP server answers over Streamable HTTP.",
     required: true,
     kind: "text",
-    format: "uri",
+    format: "uri"
   },
   {
     key: "keyHeader",
@@ -139,7 +139,7 @@ const settingsFields: readonly FormField[] = [
     description: "The header the API key goes in. Without one, it goes in Authorization.",
     required: false,
     kind: "text",
-    maxLength: 64,
+    maxLength: 64
   },
   {
     key: "contextWindow",
@@ -147,7 +147,7 @@ const settingsFields: readonly FormField[] = [
     required: false,
     kind: "number",
     integer: true,
-    minimum: 1,
+    minimum: 1
   },
   {
     key: "region",
@@ -156,30 +156,28 @@ const settingsFields: readonly FormField[] = [
     kind: "choice",
     options: [
       { value: "us", label: "United States" },
-      { value: "eu", label: "Europe" },
-    ],
+      { value: "eu", label: "Europe" }
+    ]
   },
-  { key: "streaming", label: "Stream responses", required: true, kind: "boolean" },
-];
+  { key: "streaming", label: "Stream responses", required: true, kind: "boolean" }
+]
 
 /** What the story's fields refuse, as the app's client would tell it. */
 const settingsIssue = (field: FormField, value: string): FormIssue | undefined => {
-  if (value.trim() === "") return undefined;
-  if (field.kind === "text" && field.format === "uri" && !URL.canParse(value)) return "format";
-  if (field.kind === "text" && field.maxLength !== undefined && value.length > field.maxLength)
-    return "length";
-  if (field.kind === "number" && field.integer && !/^-?\d+$/.test(value)) return "format";
-  if (field.kind === "number" && field.minimum !== undefined && Number(value) < field.minimum)
-    return "range";
-  return undefined;
-};
+  if (value.trim() === "") return undefined
+  if (field.kind === "text" && field.format === "uri" && !URL.canParse(value)) return "format"
+  if (field.kind === "text" && field.maxLength !== undefined && value.length > field.maxLength) return "length"
+  if (field.kind === "number" && field.integer && !/^-?\d+$/.test(value)) return "format"
+  if (field.kind === "number" && field.minimum !== undefined && Number(value) < field.minimum) return "range"
+  return undefined
+}
 
 function SettingsExample() {
   const [values, setValues] = createSignal<Readonly<Record<string, string>>>({
     url: "https://tools.example.com/mcp",
-    streaming: "true",
-  });
-  const field = (key: string) => settingsFields.find((candidate) => candidate.key === key);
+    streaming: "true"
+  })
+  const field = (key: string) => settingsFields.find((candidate) => candidate.key === key)
   return (
     <div class={s.stack}>
       <FormFields
@@ -187,12 +185,12 @@ function SettingsExample() {
         value={(key) => values()[key] ?? ""}
         onChange={(key, value) => setValues({ ...values(), [key]: value })}
         issue={(key) => {
-          const described = field(key);
-          return described && settingsIssue(described, values()[key] ?? "");
+          const described = field(key)
+          return described && settingsIssue(described, values()[key] ?? "")
         }}
       />
     </div>
-  );
+  )
 }
 
 /**
@@ -209,25 +207,21 @@ export const SettingsFields = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const url = canvas.getByRole("textbox", { name: "Server URL" });
-    await expect(url).toHaveAccessibleDescription(
-      "Where the MCP server answers over Streamable HTTP.",
-    );
-    await userEvent.clear(url);
-    await userEvent.type(url, "tools.example.com");
-    await expect(url).toHaveAttribute("aria-invalid", "true");
-    await expect(
-      canvas.getByText("Enter a full address, such as https://example.com."),
-    ).toBeVisible();
-    const window = canvas.getByRole("spinbutton", { name: "Context window · Optional" });
-    await userEvent.type(window, "0");
-    await expect(canvas.getByText("Enter a whole number of at least 1.")).toBeVisible();
-    await userEvent.click(canvas.getByRole("radio", { name: "No" }));
-    await expect(canvas.getByRole("radio", { name: "No" })).toBeChecked();
-    await expect(canvas.getByText("Not set")).toBeVisible();
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    const url = canvas.getByRole("textbox", { name: "Server URL" })
+    await expect(url).toHaveAccessibleDescription("Where the MCP server answers over Streamable HTTP.")
+    await userEvent.clear(url)
+    await userEvent.type(url, "tools.example.com")
+    await expect(url).toHaveAttribute("aria-invalid", "true")
+    await expect(canvas.getByText("Enter a full address, such as https://example.com.")).toBeVisible()
+    const window = canvas.getByRole("spinbutton", { name: "Context window · Optional" })
+    await userEvent.type(window, "0")
+    await expect(canvas.getByText("Enter a whole number of at least 1.")).toBeVisible()
+    await userEvent.click(canvas.getByRole("radio", { name: "No" }))
+    await expect(canvas.getByRole("radio", { name: "No" })).toBeChecked()
+    await expect(canvas.getByText("Not set")).toBeVisible()
+  }
+} satisfies Story
 
 /**
  * Notices from the Lunacy "Status v01" board: caution for what needs setup, danger for what cannot
@@ -235,7 +229,7 @@ export const SettingsFields = {
  */
 export const Notices = {
   render: () => {
-    const [opened, setOpened] = createSignal(0);
+    const [opened, setOpened] = createSignal(0)
     return (
       <div class={s.page}>
         <section class={s.section}>
@@ -251,20 +245,20 @@ export const Notices = {
           <p class={s.note}>Opened {opened()} times</p>
         </section>
       </div>
-    );
+    )
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByRole("alert")).toHaveTextContent("API key wasn’t saved");
-    await userEvent.click(canvas.getByRole("button", { name: "Open connection" }));
-    await expect(canvas.getByText("Opened 1 times")).toBeVisible();
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("alert")).toHaveTextContent("API key wasn’t saved")
+    await userEvent.click(canvas.getByRole("button", { name: "Open connection" }))
+    await expect(canvas.getByText("Opened 1 times")).toBeVisible()
+  }
+} satisfies Story
 
 function CardChoiceExample() {
-  const [where, setWhere] = createSignal("none");
-  const [account, setAccount] = createSignal<string | undefined>("team");
-  const [created, setCreated] = createSignal(0);
+  const [where, setWhere] = createSignal("none")
+  const [account, setAccount] = createSignal<string | undefined>("team")
+  const [created, setCreated] = createSignal(0)
   return (
     <div class={s.stack}>
       <Choice.Group label="Sandbox" value={where()} onChange={setWhere} variant="card">
@@ -287,8 +281,8 @@ function CardChoiceExample() {
               value: "backup",
               label: "Daytona · Backup",
               description: "Needs API key · Can finish setup later",
-              status: { mark: "attention", label: "Needs setup" },
-            },
+              status: { mark: "attention", label: "Needs setup" }
+            }
           ]}
           value={account()}
           onChange={setAccount}
@@ -296,7 +290,7 @@ function CardChoiceExample() {
         />
       </Field.Root>
     </div>
-  );
+  )
 }
 
 /**
@@ -313,22 +307,20 @@ export const CardsAndDetailedSelect = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("radio", { name: /Daytona/ }));
-    await expect(canvas.getByRole("radio", { name: /Daytona/ })).toBeChecked();
-    await userEvent.click(canvas.getByRole("button", { name: /Daytona account/ }));
-    const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("option", { name: /Daytona · Backup/ })).toHaveTextContent(
-      "Needs API key",
-    );
-    await userEvent.click(body.getByRole("button", { name: "Create Daytona connection" }));
-    await expect(canvas.getByText("Created 1 from the list")).toBeVisible();
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole("radio", { name: /Daytona/ }))
+    await expect(canvas.getByRole("radio", { name: /Daytona/ })).toBeChecked()
+    await userEvent.click(canvas.getByRole("button", { name: /Daytona account/ }))
+    const body = within(canvasElement.ownerDocument.body)
+    await expect(await body.findByRole("option", { name: /Daytona · Backup/ })).toHaveTextContent("Needs API key")
+    await userEvent.click(body.getByRole("button", { name: "Create Daytona connection" }))
+    await expect(canvas.getByText("Created 1 from the list")).toBeVisible()
+  }
+} satisfies Story
 
 function ModelFieldsExample() {
-  const [model, setModel] = createSignal("claude-sonnet-5");
-  const [environment, setEnvironment] = createSignal("remote");
+  const [model, setModel] = createSignal("claude-sonnet-5")
+  const [environment, setEnvironment] = createSignal("remote")
   return (
     <div class={s.stack}>
       <Field.Root hint="Choose a suggestion or enter a model ID.">
@@ -340,12 +332,12 @@ function ModelFieldsExample() {
           footer="Or enter another model ID."
           custom={{
             label: (text) => `Use “${text}”`,
-            description: "Use this model ID as entered.",
+            description: "Use this model ID as entered."
           }}
           suggestions={[
             { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
             { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
-            { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+            { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" }
           ]}
         />
       </Field.Root>
@@ -359,35 +351,35 @@ function ModelFieldsExample() {
               value: "in-process",
               label: "In-process",
               description: "Amends · No sandbox",
-              status: { mark: "available", label: "Works" },
+              status: { mark: "available", label: "Works" }
             },
             {
               value: "remote",
               label: "Remote development",
               description: "Amends · Daytona",
-              status: { mark: "available", label: "Works" },
+              status: { mark: "available", label: "Works" }
             },
             {
               value: "review",
               label: "Review sandbox",
               description: "Amends · Daytona",
               detail: "Daytona account needs its API key.",
-              status: { mark: "attention", label: "Needs setup" },
+              status: { mark: "attention", label: "Needs setup" }
             },
             {
               value: "boxed",
               label: "Boxed",
               description: "The harness doesn’t support this connection’s model provider.",
               status: { mark: "blocked", label: "Can’t run this model" },
-              disabled: true,
-            },
+              disabled: true
+            }
           ]}
           value={environment()}
           onChange={setEnvironment}
         />
       </Field.Root>
     </div>
-  );
+  )
 }
 
 /**
@@ -405,25 +397,22 @@ export const SuggestionsAndStatuses = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const body = within(canvasElement.ownerDocument.body);
-    const model = canvas.getByRole("combobox", { name: "Model" });
-    await userEvent.click(canvas.getByRole("button", { name: "Show suggestions" }));
-    await expect(await body.findByRole("option", { name: /Claude Opus 5.5/ })).toBeVisible();
-    await userEvent.click(body.getByRole("option", { name: /Claude Opus 5.5/ }));
-    await expect(model).toHaveValue("claude-opus-5-5");
-    await userEvent.clear(model);
-    await userEvent.type(model, "my-model-alias");
-    await expect(await body.findByRole("option", { name: /Use “my-model-alias”/ })).toBeVisible();
-    await userEvent.keyboard("{Enter}");
-    await expect(canvas.getByText("Model: my-model-alias")).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: /Environment/ }));
-    const review = await body.findByRole("option", { name: /Review sandbox/ });
-    await expect(within(review).getByRole("img", { name: "Needs setup" })).toBeVisible();
-    await expect(review).toHaveTextContent("Daytona account needs its API key.");
-    await expect(body.getByRole("option", { name: /Boxed/ })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    const body = within(canvasElement.ownerDocument.body)
+    const model = canvas.getByRole("combobox", { name: "Model" })
+    await userEvent.click(canvas.getByRole("button", { name: "Show suggestions" }))
+    await expect(await body.findByRole("option", { name: /Claude Opus 5.5/ })).toBeVisible()
+    await userEvent.click(body.getByRole("option", { name: /Claude Opus 5.5/ }))
+    await expect(model).toHaveValue("claude-opus-5-5")
+    await userEvent.clear(model)
+    await userEvent.type(model, "my-model-alias")
+    await expect(await body.findByRole("option", { name: /Use “my-model-alias”/ })).toBeVisible()
+    await userEvent.keyboard("{Enter}")
+    await expect(canvas.getByText("Model: my-model-alias")).toBeVisible()
+    await userEvent.click(canvas.getByRole("button", { name: /Environment/ }))
+    const review = await body.findByRole("option", { name: /Review sandbox/ })
+    await expect(within(review).getByRole("img", { name: "Needs setup" })).toBeVisible()
+    await expect(review).toHaveTextContent("Daytona account needs its API key.")
+    await expect(body.getByRole("option", { name: /Boxed/ })).toHaveAttribute("aria-disabled", "true")
+  }
+} satisfies Story

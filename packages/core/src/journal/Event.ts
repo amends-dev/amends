@@ -7,15 +7,17 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
-import * as Performer from "../identity/Performer.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Codec from "./Codec.ts";
-import * as Commit from "./Commit.ts";
-import * as Entry from "./Entry.ts";
-import * as Fact from "./Fact.ts";
-import type * as Log from "./Log.ts";
-import * as Subject from "./Subject.ts";
+
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import * as Performer from "../identity/Performer.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Codec from "./Codec.ts"
+import * as Commit from "./Commit.ts"
+import * as Entry from "./Entry.ts"
+import * as Fact from "./Fact.ts"
+import type * as Log from "./Log.ts"
+import * as Subject from "./Subject.ts"
 
 /**
  * Enough information to locate a particular event in a workspace journal: its workspace, log,
@@ -25,11 +27,11 @@ import * as Subject from "./Subject.ts";
  * @since 0.1.0
  */
 export const Reference = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   logId: Entry.LogId,
-  commitId: Commit.Id,
-  id: Entry.Id,
-});
+  commitId: Commit.CommitId,
+  id: Entry.EntryId
+})
 
 /**
  * @category schemas
@@ -44,15 +46,13 @@ export interface Reference extends Schema.Schema.Type<typeof Reference> {}
  * @category schemas
  * @since 0.1.0
  */
-export const CorrelationId = Schema.NonEmptyString.check(Schema.isTrimmed()).pipe(
-  Schema.brand("EventCorrelationId"),
-);
+export const CorrelationId = Schema.NonEmptyString.check(Schema.isTrimmed()).pipe(Schema.brand("EventCorrelationId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type CorrelationId = typeof CorrelationId.Type;
+export type CorrelationId = typeof CorrelationId.Type
 
 /**
  * Immutable context of the domain action; log metadata describes its recording. Every fact event
@@ -64,21 +64,21 @@ export type CorrelationId = typeof CorrelationId.Type;
  * @since 0.1.0
  */
 export const Provenance = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   /** The member, non-member identity, or named system process responsible for the action. */
   performedBy: Performer.Reference,
   /** Null identifies a root action with no upstream event. */
   causedBy: Schema.NullOr(Reference),
   correlationId: CorrelationId,
   /** When the domain action happened, independently of its entry's `recordedAt`. */
-  occurredAt: Schema.DateTimeUtcFromString,
+  occurredAt: Schema.DateTimeUtcFromString
 }).check(
   Schema.makeFilter((value) =>
     value.causedBy === null || value.causedBy.workspaceId === value.workspaceId
       ? undefined
-      : "The cause must belong to the same workspace",
-  ),
-);
+      : "The cause must belong to the same workspace"
+  )
+)
 /**
  * @category schemas
  * @since 0.1.0
@@ -96,8 +96,8 @@ export const Header = Schema.Struct({
   subject: Subject.Subject,
   name: Schema.String,
   version: Schema.Finite,
-  provenance: Provenance,
-});
+  provenance: Provenance
+})
 
 /**
  * @category schemas
@@ -112,7 +112,7 @@ export interface Header extends Schema.Schema.Type<typeof Header> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Envelope = Schema.Struct({ ...Header.fields, payload: Schema.Uint8Array });
+export const Envelope = Schema.Struct({ ...Header.fields, payload: Schema.Uint8Array })
 
 /**
  * @category schemas
@@ -125,19 +125,19 @@ export interface Envelope extends Schema.Schema.Type<typeof Envelope> {}
  * payload bytes as they are, preserving the envelope's typed metadata without encoding a second
  * binary wrapper. Each direction copies the bytes.
  *
- * @category utils
+ * @category serialization
  * @since 0.1.0
  */
 export const storageCodec: Codec.EntryCodec<typeof Envelope> = {
   encode: Effect.fn("Event.encodeEntry")(function* (input) {
-    const { payload, ...fact } = yield* Schema.decodeEffect(Schema.toType(Envelope))(input);
-    return { fact, payload: payload.slice() };
+    const { payload, ...fact } = yield* Schema.decodeEffect(Schema.toType(Envelope))(input)
+    return { fact, payload: payload.slice() }
   }),
   decode: Effect.fn("Event.decodeEntry")(function* (entry) {
-    const fact = yield* Schema.decodeUnknownEffect(Schema.toType(Header))(entry.fact);
-    return { ...fact, payload: entry.payload.slice() };
-  }),
-};
+    const fact = yield* Schema.decodeUnknownEffect(Schema.toType(Header))(entry.fact)
+    return { ...fact, payload: entry.payload.slice() }
+  })
+}
 
 /**
  * A fact event does not match the definition it is read or published with: it records another
@@ -149,7 +149,7 @@ export const storageCodec: Codec.EntryCodec<typeof Envelope> = {
  */
 export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Event.FactMismatch", {
   name: Schema.String,
-  version: Schema.Finite,
+  version: Schema.Finite
 }) {}
 
 /**
@@ -162,8 +162,8 @@ export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Event.Fact
 export const Metadata = Schema.Struct({
   ...Entry.Metadata.fields,
   subject: Subject.Subject,
-  provenance: Provenance,
-});
+  provenance: Provenance
+})
 
 /**
  * @category schemas
@@ -182,8 +182,8 @@ export const Event = Schema.Struct({
   ...Metadata.fields,
   name: Schema.String,
   version: Schema.Finite,
-  payload: Schema.Unknown,
-});
+  payload: Schema.Unknown
+})
 
 /**
  * @category schemas
@@ -200,7 +200,7 @@ export interface Event extends Schema.Schema.Type<typeof Event> {}
  */
 export type Type<F extends Fact.Definition> = ReturnType<
   typeof makeSchema<F["name"], F["version"], F["payload"]>
->["Type"];
+>["Type"]
 
 /**
  * The durable reference that locates `event`, for a later event's `causedBy`.
@@ -212,18 +212,18 @@ export const makeReference = (event: Event): Reference => ({
   workspaceId: event.provenance.workspaceId,
   logId: event.logId,
   commitId: event.commitId,
-  id: event.id,
-});
+  id: event.id
+})
 
 /**
  * Own and freeze attribution before sharing it with projections and subscribers: a frozen copy of
  * `value`, its performer's identity and its cause included.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const snapshotProvenance = (value: Provenance): Provenance => {
-  const performedBy = value.performedBy;
+  const performedBy = value.performedBy
   return Object.freeze({
     workspaceId: value.workspaceId,
     correlationId: value.correlationId,
@@ -233,11 +233,11 @@ export const snapshotProvenance = (value: Provenance): Provenance => {
       Member: (performer): Performer.Reference =>
         Object.freeze({ ...performer, identity: Object.freeze({ ...performer.identity }) }),
       Identity: (performer): Performer.Reference =>
-        Object.freeze({ ...performer, identity: Object.freeze({ ...performer.identity }) }),
+        Object.freeze({ ...performer, identity: Object.freeze({ ...performer.identity }) })
     }),
-    causedBy: value.causedBy === null ? null : Object.freeze({ ...value.causedBy }),
-  });
-};
+    causedBy: value.causedBy === null ? null : Object.freeze({ ...value.causedBy })
+  })
+}
 
 /**
  * The schema of one fact's decoded events: event metadata with the fact's literal name and
@@ -249,40 +249,39 @@ export const snapshotProvenance = (value: Provenance): Provenance => {
 export const makeSchema = <
   const Name extends string,
   const Version extends number,
-  PayloadSchema extends Schema.Constraint,
+  PayloadSchema extends Schema.Constraint
 >(
-  fact: Fact.Definition<Name, Version, PayloadSchema>,
+  fact: Fact.Definition<Name, Version, PayloadSchema>
 ) =>
   Schema.Struct({
     ...Metadata.fields,
     name: Schema.Literal(fact.name),
     version: Schema.Literal(fact.version),
-    payload: fact.payload,
-  });
+    payload: fact.payload
+  })
 
 /**
  * Decodes a journal entry as an event of `fact`, its matching versioned definition. Fails with
  * `FactMismatch` when the entry records another name or version, or a subject other than the one
  * `fact` derives from the decoded payload. The event's provenance is frozen.
  *
- * @category utils
+ * @category decoding
  * @since 0.1.0
  */
 export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Definition>(
   fact: F,
-  entry: Log.Entry<Envelope>,
+  entry: Log.Entry<Envelope>
 ) {
   if (entry.payload.name !== fact.name || entry.payload.version !== fact.version) {
-    return yield* new FactMismatch({ name: fact.name, version: fact.version });
+    return yield* new FactMismatch({ name: fact.name, version: fact.version })
   }
-  const payload = yield* Codec.make(fact).decode(entry.payload.payload);
-  const subject = yield* Fact.makeSubject(fact, payload);
-  if (entry.payload.subject !== subject)
-    return yield* new FactMismatch({ name: fact.name, version: fact.version });
-  const provenance = snapshotProvenance(entry.payload.provenance);
+  const payload = yield* Codec.make(fact).decode(entry.payload.payload)
+  const subject = yield* Fact.makeSubject(fact, payload)
+  if (entry.payload.subject !== subject) return yield* new FactMismatch({ name: fact.name, version: fact.version })
+  const provenance = snapshotProvenance(entry.payload.provenance)
   const event = yield* Schema.decodeUnknownEffect(
-    Schema.toType(makeSchema<F["name"], F["version"], F["payload"]>(fact)),
-  )({ ...entry, subject, provenance, name: fact.name, version: fact.version, payload });
+    Schema.toType(makeSchema<F["name"], F["version"], F["payload"]>(fact))
+  )({ ...entry, subject, provenance, name: fact.name, version: fact.version, payload })
   // Retain the concrete metadata shape even for a generic fact payload schema.
   return Object.assign(event, {
     ...entry,
@@ -290,6 +289,6 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
     provenance,
     name: fact.name,
     version: fact.version,
-    payload,
-  });
-});
+    payload
+  })
+})

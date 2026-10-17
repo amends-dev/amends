@@ -32,7 +32,7 @@ implementations of the same contracts.
 
 Modules that only compose expose layers alone. The local host's `LocalHost.layer` composes the
 gateway, the storage adapter, the integrations, and the jobs, and `LocalServer.layer` adds the
-authentication the configuration chooses and the HTTP server. `LocalConfig.load()` reads and validates the configuration
+authentication the configuration chooses and the HTTP server. `LocalConfig.options` reads and validates the configuration
 before anything is acquired, and `src/index.ts` alone launches the server, so importing any other
 module reads no setting and starts nothing.
 

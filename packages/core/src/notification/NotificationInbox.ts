@@ -5,10 +5,11 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as ThreadTimeline from "../thread/ThreadTimeline.ts";
-import * as Notification from "./Notification.ts";
-import * as NotificationStore from "./NotificationStore.ts";
+
+import * as Schema from "effect/Schema"
+import * as ThreadTimeline from "../thread/ThreadTimeline.ts"
+import * as Notification from "./Notification.ts"
+import * as NotificationStore from "./NotificationStore.ts"
 
 /**
  * One page of a reader's inbox, newest first: all of it, or what still waits for them.
@@ -18,8 +19,8 @@ import * as NotificationStore from "./NotificationStore.ts";
  */
 export const Options = Schema.Struct({
   ...NotificationStore.LatestOptions.fields,
-  pendingOnly: Schema.optionalKey(Schema.Boolean),
-});
+  pendingOnly: Schema.optionalKey(Schema.Boolean)
+})
 
 /**
  * @category options
@@ -37,8 +38,8 @@ export interface Options extends Schema.Schema.Type<typeof Options> {}
  */
 export const Item = Schema.Struct({
   notification: Notification.Notification,
-  source: Schema.optionalKey(ThreadTimeline.Item),
-});
+  source: Schema.optionalKey(ThreadTimeline.Item)
+})
 
 /**
  * @category schemas

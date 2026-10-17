@@ -4,43 +4,45 @@
  * appends, a lost commit acknowledgment, and a counter that projections write inside the
  * transaction.
  */
-import { Context, Effect, Layer, Ref } from "effect";
-import { AssignmentStore, RoleStore } from "../src/authorization/index.ts";
-import type { Commit } from "../src/journal/index.ts";
-import { Checkpoint, MemoryDatabase, Store } from "../src/journal/index.ts";
-import { MemberStore, Workspace } from "../src/workspace/index.ts";
-import * as StoreError from "../src/journal/StoreError.ts";
+
+import { WorkspaceId } from "@amends-dev/core/workspace"
+import { Context, Effect, Layer, Ref } from "effect"
+import { AssignmentStore, RoleStore } from "../src/authorization/index.ts"
+import type { Commit } from "../src/journal/index.ts"
+import { Checkpoint, MemoryDatabase, Store } from "../src/journal/index.ts"
+import type * as StoreError from "../src/journal/StoreError.ts"
+import { MemberStore } from "../src/workspace/index.ts"
 
 /** A projection target: a number the transaction stages, like any projected record. */
 export class Counter extends Context.Service<
   Counter,
   {
-    readonly add: (amount: number) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
-    readonly get: Effect.Effect<number>;
+    readonly add: (amount: number) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
+    readonly get: Effect.Effect<number>
   }
 >()("JournalTest/Counter") {}
 
 /** New memory storage with one host over it, and the stores bound to `workspaceId`. */
 export const make = Effect.fn("JournalTest.memory")(function* (
-  workspaceId: Workspace.Id = Workspace.Id.make("workspace-one"),
+  workspaceId: WorkspaceId.WorkspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 ) {
-  const database = yield* MemoryDatabase.make();
-  const connection = yield* MemoryDatabase.makeConnection().pipe(
-    Effect.provideService(MemoryDatabase.MemoryDatabase, database),
-  );
+  const database = yield* MemoryDatabase.make
+  const connection = yield* MemoryDatabase.makeConnection.pipe(
+    Effect.provideService(MemoryDatabase.MemoryDatabase, database)
+  )
   /** The stores bound to one workspace over this host's connection. */
-  const bind = Effect.fn("JournalTest.bind")(function* (id: Workspace.Id) {
+  const bind = Effect.fn("JournalTest.bind")(function* (id: WorkspaceId.WorkspaceId) {
     const context = yield* Layer.build(
       Layer.mergeAll(
         Checkpoint.layerMemory,
         MemberStore.layerMemory,
         RoleStore.layerMemory,
-        AssignmentStore.layerMemory,
+        AssignmentStore.layerMemory
       ).pipe(
         Layer.provideMerge(Store.layerMemory(id)),
-        Layer.provide(Layer.succeed(MemoryDatabase.Connection, connection)),
-      ),
-    );
+        Layer.provide(Layer.succeed(MemoryDatabase.Connection, connection))
+      )
+    )
     return {
       context,
       binding: Context.get(context, Store.MemoryBinding),
@@ -48,28 +50,26 @@ export const make = Effect.fn("JournalTest.memory")(function* (
       checkpoints: Context.get(context, Checkpoint.Checkpoint),
       members: Context.get(context, MemberStore.MemberStore),
       roles: Context.get(context, RoleStore.RoleStore),
-      assignments: Context.get(context, AssignmentStore.AssignmentStore),
-    };
-  });
-  const bound = yield* bind(workspaceId);
-  const { binding } = bound;
-  const inner = bound.store;
-  const attempts = yield* Ref.make(0);
-  const standalone = yield* Ref.make(0);
-  const uncertain = yield* Ref.make(false);
+      assignments: Context.get(context, AssignmentStore.AssignmentStore)
+    }
+  })
+  const bound = yield* bind(workspaceId)
+  const { binding } = bound
+  const inner = bound.store
+  const attempts = yield* Ref.make(0)
+  const standalone = yield* Ref.make(0)
+  const uncertain = yield* Ref.make(false)
 
   const counter = Counter.of({
     add: Effect.fn("JournalTest.counter.add")(function* (amount) {
-      yield* Store.Transaction;
-      const rows = (yield* binding.write).records.of("counter");
-      const next = Number(rows.get("value") ?? 0) + amount;
-      yield* Effect.yieldNow;
-      rows.set("value", String(next));
+      yield* Store.Transaction
+      const rows = (yield* binding.write).records.of("counter")
+      const next = Number(rows.get("value") ?? 0) + amount
+      yield* Effect.yieldNow
+      rows.set("value", String(next))
     }),
-    get: Effect.map(Effect.orDie(binding.read), (space) =>
-      Number(space.records.of("counter").get("value") ?? 0),
-    ),
-  });
+    get: Effect.map(Effect.orDie(binding.read), (space) => Number(space.records.of("counter").get("value") ?? 0))
+  })
 
   /**
    * The store, counting what it is asked, and reporting the next commit as uncertain when asked:
@@ -79,37 +79,37 @@ export const make = Effect.fn("JournalTest.memory")(function* (
     ...inner,
     transaction: <A, E, R>(program: Effect.Effect<A, E, R>) =>
       Effect.gen(function* () {
-        yield* Ref.update(attempts, (count) => count + 1);
-        const committed: Array<Effect.Effect<void>> = [];
-        let commitId: Commit.Id | undefined;
+        yield* Ref.update(attempts, (count) => count + 1)
+        const committed: Array<Effect.Effect<void>> = []
+        let commitId: Commit.CommitId | undefined
         const result = yield* inner.transaction(
           Effect.flatMap(Store.Transaction, (native) => {
-            commitId = native.id;
+            commitId = native.id
             return program.pipe(
               Effect.provideService(Store.Transaction, {
                 ...native,
                 afterCommit: (effect) =>
                   Effect.andThen(
                     native.afterCommit(Effect.void),
-                    Effect.sync(() => void committed.push(effect)),
-                  ),
-              }),
-            );
-          }),
-        );
+                    Effect.sync(() => void committed.push(effect))
+                  )
+              })
+            )
+          })
+        )
         if (yield* Ref.getAndSet(uncertain, false)) {
-          if (commitId === undefined) return yield* Effect.die("The transaction never began");
-          return yield* new Store.CommitUncertain({ commitId, cause: "lost acknowledgment" });
+          if (commitId === undefined) return yield* Effect.die("The transaction never began")
+          return yield* new Store.CommitUncertain({ commitId, cause: "lost acknowledgment" })
         }
-        yield* Store.runAfterCommit(committed);
-        return result;
+        yield* Store.runAfterCommit(committed)
+        return result
       }),
     append: (request) =>
       Effect.andThen(
         Ref.update(standalone, (count) => count + 1),
-        inner.append(request),
-      ),
-  });
+        inner.append(request)
+      )
+  })
 
   return {
     store,
@@ -126,17 +126,17 @@ export const make = Effect.fn("JournalTest.memory")(function* (
     standalone: Ref.get(standalone),
     /** The workspace's committed logs and checkpoints. */
     snapshot: Effect.sync(() => {
-      const space = MemoryDatabase.committed(database, workspaceId);
+      const space = MemoryDatabase.committed(database, workspaceId)
       return {
         logs: space.logs,
         checkpoints: space.records.of("checkpoints"),
         members: space.records.of("members"),
         roles: space.records.of("roles"),
-        assignments: space.records.of("assignments"),
-      };
+        assignments: space.records.of("assignments")
+      }
     }),
-    loseNextAcknowledgment: Ref.set(uncertain, true),
-  };
-});
+    loseNextAcknowledgment: Ref.set(uncertain, true)
+  }
+})
 
-export type Fixture = Effect.Success<ReturnType<typeof make>>;
+export type Fixture = Effect.Success<ReturnType<typeof make>>

@@ -12,17 +12,17 @@ every storage adapter runs. It is internal to this repository and not published 
 ```ts
 Gateway.layer().pipe(
   Layer.provideMerge(PostgresStorage.layer()),
-  Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) })),
-);
+  Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) }))
+)
 ```
 
 `PostgresStorage.layer(options)` provides the storage contract, with its signal hubs, the directory, the
-accounts, and the sign-in storage, leaving the database, and the cryptography that issues human IDs, to the host. Its
+accounts, and the sign-in storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
 `maxConnections` (ten by default), and applies the schema before returning.
-`PostgresDatabase.make()` instead takes a `SqlClient.SqlClient` from the context and applies the
+`PostgresDatabase.make` instead takes a `SqlClient.SqlClient` from the context and applies the
 schema through it, inside a transaction holding an advisory lock, so processes starting together on
 an empty database take turns. Keep the client's scope open while using the result; bindings,
 queries, and journal transactions all share it.
@@ -268,20 +268,20 @@ transaction-pooling proxy, leaves the request to the runner's next read.
 
 ## Layout
 
-One module per store, each exporting `make` and a `layer` for the core store it implements, such as
-`Members.ts`, `Threads.ts`, `TurnRecords.ts`, `SessionLogs.ts`, and `Deliveries.ts`. They share
-`Binding.ts`, one workspace's view of the database: its identity, the transaction boundary, and the
-guard each statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a binding
+The package exports the `Postgres*` modules; the rest is under `src/internal/`. There, one module
+per store exports `make` and a `layer` for the core store it implements, such as `members.ts`,
+`threads.ts`, `turnRecords.ts`, `sessionLogs.ts`, and `deliveries.ts`. They share `binding.ts`, one
+workspace's view of the database: its identity, the transaction boundary, and the guard each
+statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a binding
 for one workspace (`layerWorkspace`), its private `layerStores` registers each store, and
 `PostgresStorage.ts` is the adapter: every gateway contract it implements, in one layer.
 `PostgresDatabase.ts` prepares the SQL client, `PostgresDirectory.ts` reads across workspaces,
 `internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener
 that `PostgresSignalHub.ts` binds to each workspace, `PostgresTurns.ts` and `PostgresReads.ts` are
-the writer queue and read cap above, `CredentialKey.ts` seals credentials, `PostgresAccounts.ts`
+the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`
 and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
 `PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the
-wakeup for the job requests commits store. Bindings and raw tables stay
-internal.
+wakeup for the job requests commits store.
 Follow the [adapter conventions](../README.md).
 
 ## Development

@@ -1,49 +1,40 @@
-import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  createUniqueId,
-  onCleanup,
-  type JSX,
-} from "solid-js";
-import { IconCheck, IconChevronDown } from "@amends-dev/icons";
-import { useField } from "../field/index.ts";
-import * as s from "./combobox.css.ts";
+import { IconCheck, IconChevronDown } from "@amends-dev/icons"
+import { For, Show, createEffect, createMemo, createSignal, createUniqueId, onCleanup, type JSX } from "solid-js"
+import { useField } from "../field/index.ts"
+import * as s from "./combobox.css.ts"
 
 export interface ComboboxSuggestion {
   /** What choosing it enters, such as a model ID. */
-  readonly value: string;
+  readonly value: string
   /** Its name, over the value. */
-  readonly label: string;
+  readonly label: string
 }
 
 export interface ComboboxProps {
   /** The text entered; any text is a value, and a suggestion enters its own. */
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly suggestions: readonly ComboboxSuggestion[];
+  readonly value: string
+  readonly onChange: (value: string) => void
+  readonly suggestions: ReadonlyArray<ComboboxSuggestion>
   /** Names the suggestions above them, such as "Suggested models". */
-  readonly heading?: string;
+  readonly heading?: string
   /** Under the suggestions, such as how to enter another value. */
-  readonly footer?: string;
+  readonly footer?: string
   /** The option that keeps text matching no suggestion, as `Use “text”` by default. */
-  readonly custom?: { readonly label: (text: string) => string; readonly description: string };
-  readonly placeholder?: string;
-  readonly disabled?: boolean;
+  readonly custom?: { readonly label: (text: string) => string; readonly description: string }
+  readonly placeholder?: string
+  readonly disabled?: boolean
   /** The accessible name outside a Field. */
-  readonly "aria-label"?: string;
+  readonly "aria-label"?: string
   /** Values are typed exactly, such as model IDs: the field and each suggestion's value are set in the monospace. */
-  readonly monospace?: boolean;
+  readonly monospace?: boolean
 }
 
 type Entry =
   | { readonly kind: "suggestion"; readonly suggestion: ComboboxSuggestion }
   | {
-      readonly kind: "custom";
-      readonly text: string;
-    };
+      readonly kind: "custom"
+      readonly text: string
+    }
 
 /**
  * Free text with suggestions, shaped like a Select: typing narrows the suggestions, choosing one
@@ -51,90 +42,87 @@ type Entry =
  * label, help, and error associations.
  */
 export function Combobox(props: ComboboxProps): JSX.Element {
-  const field = useField();
-  const id = createUniqueId();
-  const listId = `combobox-${id}-list`;
-  const optionId = (index: number) => `combobox-${id}-option-${index}`;
-  const [expanded, setExpanded] = createSignal(false);
+  const field = useField()
+  const id = createUniqueId()
+  const listId = `combobox-${id}-list`
+  const optionId = (index: number) => `combobox-${id}-option-${index}`
+  const [expanded, setExpanded] = createSignal(false)
   // Narrowing follows typing; opening the list shows every suggestion again.
-  const [narrowing, setNarrowing] = createSignal(false);
-  const [active, setActive] = createSignal(0);
-  const [input, setInput] = createSignal<HTMLInputElement>();
-  const [control, setControl] = createSignal<HTMLDivElement>();
-  const [position, setPosition] = createSignal<JSX.CSSProperties>();
-  const text = () => props.value.trim();
-  const entries = createMemo((): readonly Entry[] => {
-    const typed = text().toLowerCase();
+  const [narrowing, setNarrowing] = createSignal(false)
+  const [active, setActive] = createSignal(0)
+  const [input, setInput] = createSignal<HTMLInputElement>()
+  const [control, setControl] = createSignal<HTMLDivElement>()
+  const [position, setPosition] = createSignal<JSX.CSSProperties>()
+  const text = () => props.value.trim()
+  const entries = createMemo((): ReadonlyArray<Entry> => {
+    const typed = text().toLowerCase()
     const matching = props.suggestions.filter(
       (suggestion) =>
         !narrowing() ||
         typed === "" ||
         suggestion.value.toLowerCase().includes(typed) ||
-        suggestion.label.toLowerCase().includes(typed),
-    );
-    const known = props.suggestions.some((suggestion) => suggestion.value === text());
+        suggestion.label.toLowerCase().includes(typed)
+    )
+    const known = props.suggestions.some((suggestion) => suggestion.value === text())
     return [
       ...(text() !== "" && !known ? [{ kind: "custom", text: text() } as const] : []),
-      ...matching.map((suggestion) => ({ kind: "suggestion", suggestion }) as const),
-    ];
-  });
-  const activeIndex = () =>
-    expanded() && entries().length > 0 ? Math.min(active(), entries().length - 1) : undefined;
+      ...matching.map((suggestion) => ({ kind: "suggestion", suggestion }) as const)
+    ]
+  })
+  const activeIndex = () => (expanded() && entries().length > 0 ? Math.min(active(), entries().length - 1) : undefined)
   // Placed under the field, within the surrounding dialog, opening upward when more fits above.
   const place = () => {
-    const box = control();
-    if (!box) return;
-    const rect = box.getBoundingClientRect();
-    const height = window.innerHeight;
-    const frame = box.closest("dialog")?.getBoundingClientRect();
-    const below = (frame?.bottom ?? height) - rect.bottom - 12;
-    const above = rect.top - (frame?.top ?? 0) - 12;
-    const up = below < 240 && above > below;
+    const box = control()
+    if (!box) return
+    const rect = box.getBoundingClientRect()
+    const height = window.innerHeight
+    const frame = box.closest("dialog")?.getBoundingClientRect()
+    const below = (frame?.bottom ?? height) - rect.bottom - 12
+    const above = rect.top - (frame?.top ?? 0) - 12
+    const up = below < 240 && above > below
     setPosition({
       position: "fixed",
       left: `${rect.left}px`,
       width: `${rect.width}px`,
-      ...(up
-        ? { top: "auto", bottom: `${height - rect.top + 4}px` }
-        : { top: `${rect.bottom + 4}px`, bottom: "auto" }),
-      "max-height": `${Math.max(160, Math.min(320, up ? above : below))}px`,
-    });
-  };
+      ...(up ? { top: "auto", bottom: `${height - rect.top + 4}px` } : { top: `${rect.bottom + 4}px`, bottom: "auto" }),
+      "max-height": `${Math.max(160, Math.min(320, up ? above : below))}px`
+    })
+  }
   createEffect(() => {
-    if (!expanded()) return;
-    const update = () => place();
-    window.addEventListener("resize", update);
-    document.addEventListener("scroll", update, true);
+    if (!expanded()) return
+    const update = () => place()
+    window.addEventListener("resize", update)
+    document.addEventListener("scroll", update, true)
     onCleanup(() => {
-      window.removeEventListener("resize", update);
-      document.removeEventListener("scroll", update, true);
-    });
-  });
+      window.removeEventListener("resize", update)
+      document.removeEventListener("scroll", update, true)
+    })
+  })
   const open = (narrow: boolean) => {
-    if (props.disabled) return;
-    if (!expanded()) place();
-    setNarrowing(narrow);
-    setExpanded(true);
-  };
+    if (props.disabled) return
+    if (!expanded()) place()
+    setNarrowing(narrow)
+    setExpanded(true)
+  }
   const close = () => {
-    setExpanded(false);
-    setActive(0);
-  };
+    setExpanded(false)
+    setActive(0)
+  }
   const choose = (entry: Entry) => {
-    if (entry.kind === "suggestion") props.onChange(entry.suggestion.value);
-    close();
-    input()?.focus();
-  };
+    if (entry.kind === "suggestion") props.onChange(entry.suggestion.value)
+    close()
+    input()?.focus()
+  }
   const move = (step: number) => {
-    open(narrowing());
-    const count = entries().length;
-    if (count > 0) setActive((index) => (Math.min(index, count - 1) + step + count) % count);
-  };
+    open(narrowing())
+    const count = entries().length
+    if (count > 0) setActive((index) => (Math.min(index, count - 1) + step + count) % count)
+  }
   return (
     <div
       class={s.combobox}
       onFocusOut={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) close();
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) close()
       }}
     >
       <div
@@ -144,7 +132,7 @@ export function Combobox(props: ComboboxProps): JSX.Element {
         data-invalid={field?.invalid() ? "" : undefined}
         data-disabled={props.disabled ? "" : undefined}
         onClick={(event) => {
-          if (event.target === event.currentTarget) input()?.focus();
+          if (event.target === event.currentTarget) input()?.focus()
         }}
       >
         <input
@@ -167,29 +155,29 @@ export function Combobox(props: ComboboxProps): JSX.Element {
           autocomplete="off"
           spellcheck={false}
           onInput={(event) => {
-            props.onChange(event.currentTarget.value);
-            setActive(0);
-            open(true);
+            props.onChange(event.currentTarget.value)
+            setActive(0)
+            open(true)
           }}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown") {
-              event.preventDefault();
-              move(1);
+              event.preventDefault()
+              move(1)
             } else if (event.key === "ArrowUp") {
-              event.preventDefault();
-              move(-1);
+              event.preventDefault()
+              move(-1)
             } else if (event.key === "Enter" && expanded()) {
-              const index = activeIndex();
-              const entry = index === undefined ? undefined : entries()[index];
+              const index = activeIndex()
+              const entry = index === undefined ? undefined : entries()[index]
               if (entry) {
-                event.preventDefault();
-                choose(entry);
+                event.preventDefault()
+                choose(entry)
               }
             } else if (event.key === "Escape" && expanded()) {
               // Close the list, not the dialog around it.
-              event.preventDefault();
-              event.stopPropagation();
-              close();
+              event.preventDefault()
+              event.stopPropagation()
+              close()
             }
           }}
         />
@@ -200,9 +188,9 @@ export function Combobox(props: ComboboxProps): JSX.Element {
           disabled={props.disabled}
           aria-label={expanded() ? "Hide suggestions" : "Show suggestions"}
           onClick={() => {
-            if (expanded()) close();
-            else open(false);
-            input()?.focus();
+            if (expanded()) close()
+            else open(false)
+            input()?.focus()
           }}
         >
           <IconChevronDown class={s.toggleIcon} weight={1.5} />
@@ -215,22 +203,13 @@ export function Combobox(props: ComboboxProps): JSX.Element {
               {props.heading}
             </p>
           </Show>
-          <ul
-            id={listId}
-            role="listbox"
-            aria-label={props.heading ?? "Suggestions"}
-            class={s.listbox}
-          >
+          <ul id={listId} role="listbox" aria-label={props.heading ?? "Suggestions"} class={s.listbox}>
             <For each={entries()}>
               {(entry, index) => (
                 <li
                   id={optionId(index())}
                   role="option"
-                  aria-selected={
-                    entry.kind === "suggestion" && entry.suggestion.value === text()
-                      ? "true"
-                      : "false"
-                  }
+                  aria-selected={entry.kind === "suggestion" && entry.suggestion.value === text() ? "true" : "false"}
                   class={s.option}
                   data-active={activeIndex() === index() ? "" : undefined}
                   onMouseDown={(event) => event.preventDefault()}
@@ -241,9 +220,7 @@ export function Combobox(props: ComboboxProps): JSX.Element {
                     <span class={s.optionLabel}>
                       {entry.kind === "suggestion"
                         ? entry.suggestion.label
-                        : (props.custom?.label ?? ((typed: string) => `Use “${typed}”`))(
-                            entry.text,
-                          )}
+                        : (props.custom?.label ?? ((typed: string) => `Use “${typed}”`))(entry.text)}
                     </span>
                     <span
                       class={s.optionDescription}
@@ -267,5 +244,5 @@ export function Combobox(props: ComboboxProps): JSX.Element {
         </div>
       </Show>
     </div>
-  );
+  )
 }

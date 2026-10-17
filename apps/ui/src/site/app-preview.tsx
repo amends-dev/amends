@@ -1,4 +1,3 @@
-import { For, splitProps, type JSX } from "solid-js";
 import {
   IconMarkAgents,
   IconMarkChannel,
@@ -8,28 +7,29 @@ import {
   IconMarkMail,
   IconMarkSettings,
   IconMarkTasks,
-  IconMarkTriage,
-} from "@amends-dev/icons";
-import { Avatar } from "../components/avatar/index.ts";
-import { Count } from "../components/count/index.ts";
-import { Divider } from "../components/divider/index.ts";
-import { Logo } from "../components/logo/index.ts";
-import { Message, type MessageAuthor } from "../components/message/index.ts";
-import { classes } from "../internal/props.ts";
-import * as s from "./app-preview.css.ts";
+  IconMarkTriage
+} from "@amends-dev/icons"
+import { For, splitProps, type JSX } from "solid-js"
+import { Avatar } from "../components/avatar/index.ts"
+import { Count } from "../components/count/index.ts"
+import { Divider } from "../components/divider/index.ts"
+import { Logo } from "../components/logo/index.ts"
+import { Message, type MessageAuthor } from "../components/message/index.ts"
+import { classes } from "../internal/props.ts"
+import * as s from "./app-preview.css.ts"
 
 const people = {
   aj: { name: "AJ", tone: "ink" },
   sara: { name: "Sara", tone: "sand" },
   oliver: { name: "Oliver", tone: "neutral" },
   graeme: { name: "Graeme", tone: "slate" },
-  yumi: { name: "Yumi", tone: "lilac", agent: true },
-} as const satisfies Record<string, MessageAuthor>;
+  yumi: { name: "Yumi", tone: "lilac", agent: true }
+} as const satisfies Record<string, MessageAuthor>
 
 export type AppPreviewProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
   /** What the picture shows, for assistive technology. */
-  label: string;
-};
+  label: string
+}
 
 /**
  * The app in a window, drawn with its own components: a group's threads beside an open thread in
@@ -37,7 +37,7 @@ export type AppPreviewProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children
  * Phones show the thread alone, tablets the group beside it, and desktops the navigation too.
  */
 export function AppPreview(props: AppPreviewProps) {
-  const [local, native] = splitProps(props, ["label", "class"]);
+  const [local, native] = splitProps(props, ["label", "class"])
   return (
     <div {...native} role="img" aria-label={local.label} class={classes(s.window, local.class)}>
       <div class={s.titleBar} aria-hidden="true">
@@ -53,7 +53,7 @@ export function AppPreview(props: AppPreviewProps) {
         <Thread />
       </div>
     </div>
-  );
+  )
 }
 
 function Rail() {
@@ -64,7 +64,7 @@ function Rail() {
         {(Icon) => <Icon class={s.railIcon} />}
       </For>
     </div>
-  );
+  )
 }
 
 function Navigation() {
@@ -114,7 +114,7 @@ function Navigation() {
         <span class={s.itemLabel}>Yumi</span>
       </span>
     </div>
-  );
+  )
 }
 
 function Group() {
@@ -151,7 +151,7 @@ function Group() {
       </div>
       <div class={s.composer}>Message #general</div>
     </div>
-  );
+  )
 }
 
 function Thread() {
@@ -175,16 +175,14 @@ function Thread() {
           </Message.Text>
         </Message.Root>
         <Message.Root author={people.yumi} time="10:04 AM">
-          <Message.Activity icon={IconMarkDone}>
-            Read the thread and the rollout doc
-          </Message.Activity>
+          <Message.Activity icon={IconMarkDone}>Read the thread and the rollout doc</Message.Activity>
           <Message.Text>
-            Deploy the API first and check compatibility, then release the clients on Thursday. Keep
-            the rollback ready if error rates rise.
+            Deploy the API first and check compatibility, then release the clients on Thursday. Keep the rollback ready
+            if error rates rise.
           </Message.Text>
         </Message.Root>
       </div>
       <div class={s.composer}>Reply in thread</div>
     </div>
-  );
+  )
 }

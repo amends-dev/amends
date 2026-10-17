@@ -9,7 +9,7 @@
  *
  * Below 64rem controls use 44px touch targets.
  */
-export const breakpoint = { tablet: "48rem", desktop: "64rem", split: "80rem" } as const;
+export const breakpoint = { tablet: "48rem", desktop: "64rem", split: "80rem" } as const
 
 export const media = {
   mobile: "screen and (max-width: 47.999rem)",
@@ -19,12 +19,12 @@ export const media = {
   desktop: "screen and (min-width: 64rem)",
   /** Below the split width, the side panel floats over the content. */
   overlay: "screen and (max-width: 79.999rem)",
-  split: "screen and (min-width: 80rem)",
-} as const;
+  split: "screen and (min-width: 80rem)"
+} as const
 
 export const shell = {
   rail: "52px",
   sidebar: "264px",
   gap: "8px",
-  aside: "440px",
-} as const;
+  aside: "440px"
+} as const

@@ -6,31 +6,36 @@
  *
  * @since 0.1.0
  */
-import * as Identity from "../identity/Identity.ts";
-import * as Assignment from "../authorization/Assignment.ts";
-import * as Scope from "../authorization/Scope.ts";
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 
-import * as AssignmentStore from "../authorization/AssignmentStore.ts";
-import * as Authorization from "../authorization/Authorization.ts";
-import * as Delegation from "../authorization/Delegation.ts";
-import * as AssignmentCommand from "../authorization/AssignmentCommand.ts";
-import * as Requirement from "../authorization/Requirement.ts";
-import * as BuiltinRoles from "../authorization/BuiltinRoles.ts";
-
-import * as Actor from "../identity/Actor.ts";
-import * as Journal from "../journal/Journal.ts";
-import * as Publication from "../journal/Publication.ts";
-import * as Store from "../journal/Store.ts";
-import * as WorkspaceFacts from "./WorkspaceFacts.ts";
-import * as Member from "./Member.ts";
-import * as MemberStore from "./MemberStore.ts";
-import * as WorkspaceStore from "./WorkspaceStore.ts";
-import * as Workspace from "./Workspace.ts";
-import * as Ownership from "./Ownership.ts";
-import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import * as CoreError from "../error/CoreError.ts";
-import * as Operation from "../operation/Operation.ts";
+import * as Context from "effect/Context"
+import * as Crypto from "effect/Crypto"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Assignment from "../authorization/Assignment.ts"
+import * as AssignmentCommand from "../authorization/AssignmentCommand.ts"
+import * as AssignmentStore from "../authorization/AssignmentStore.ts"
+import * as Authorization from "../authorization/Authorization.ts"
+import * as BuiltinRoles from "../authorization/BuiltinRoles.ts"
+import * as Delegation from "../authorization/Delegation.ts"
+import * as Requirement from "../authorization/Requirement.ts"
+import * as Scope from "../authorization/Scope.ts"
+import * as Target from "../authorization/Target.ts"
+import * as CoreError from "../error/CoreError.ts"
+import * as Actor from "../identity/Actor.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as Journal from "../journal/Journal.ts"
+import * as Publication from "../journal/Publication.ts"
+import * as Store from "../journal/Store.ts"
+import * as Operation from "../operation/Operation.ts"
+import type * as MemberId from "./MemberId.ts"
+import * as MemberStore from "./MemberStore.ts"
+import * as Ownership from "./Ownership.ts"
+import * as OwnershipPermissions from "./OwnershipPermissions.ts"
+import type * as Workspace from "./Workspace.ts"
+import * as WorkspaceFacts from "./WorkspaceFacts.ts"
+import * as WorkspaceStore from "./WorkspaceStore.ts"
 
 /**
  * What the ownership operations can fail with.
@@ -45,7 +50,7 @@ export type Error =
   | CoreError.Conflict
   | CoreError.Invalid
   | CoreError.Unavailable
-  | CoreError.Uncertain;
+  | CoreError.Uncertain
 
 /**
  * The ownership operations, one of `Core.Operations`.
@@ -61,7 +66,7 @@ export class OwnershipService extends Context.Service<
      * owner, a person holding `workspace.transfer-ownership`, can transfer, and only they receive
      * the candidates: the other active human members.
      */
-    readonly get: Effect.Effect<Ownership.View, Error, Actor.Actor>;
+    readonly get: Effect.Effect<Ownership.View, Error, Actor.Actor>
     /**
      * Make another active human member the owner, under `workspace.transfer-ownership`, as the
      * current owner (otherwise `CoreError.Denied`, `OwnerRequired`), and against the Owner
@@ -70,9 +75,7 @@ export class OwnershipService extends Context.Service<
      * Administrator, and moves `ownerMemberId`; direct grants, scoped assignments, the name, and
      * `createdBy` stay. Returns the workspace as it now stands.
      */
-    readonly transfer: (
-      input: Ownership.TransferInput,
-    ) => Effect.Effect<Workspace.Workspace, Error, Actor.Actor>;
+    readonly transfer: (input: Ownership.TransferInput) => Effect.Effect<Workspace.Workspace, Error, Actor.Actor>
   }
 >()("@amends-dev/core/workspace/OwnershipService") {}
 
@@ -82,7 +85,7 @@ export class OwnershipService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   OwnershipService["Service"],
   never,
   | WorkspaceStore.WorkspaceStore
@@ -94,130 +97,124 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   | Journal.Journal
   | Crypto.Crypto
   | Store.Store
-> {
-  const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
-  const memberStore = yield* MemberStore.MemberStore;
-  const assignmentStore = yield* AssignmentStore.AssignmentStore;
-  const authorization = yield* Authorization.Authorization;
-  const delegation = yield* Delegation.Delegation;
-  const assignmentCommand = yield* AssignmentCommand.AssignmentCommand;
-  const journal = yield* Journal.Journal;
-  const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Store;
-  const requirement = Requirement.make(OwnershipPermissions.Transfer, {
-    _tag: "Workspace",
-    workspaceId,
-  });
-  const requireMember = Effect.fn("OwnershipService.requireMember")(function* (
-    memberId: Member.Id,
-  ) {
-    const found = yield* memberStore.get(memberId);
-    if (Option.isNone(found))
-      return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
-    return found.value;
-  });
+> = Effect.gen(function* () {
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore
+  const memberStore = yield* MemberStore.MemberStore
+  const assignmentStore = yield* AssignmentStore.AssignmentStore
+  const authorization = yield* Authorization.Authorization
+  const delegation = yield* Delegation.Delegation
+  const assignmentCommand = yield* AssignmentCommand.AssignmentCommand
+  const journal = yield* Journal.Journal
+  const crypto = yield* Crypto.Crypto
+  const { workspaceId } = yield* Store.Store
+  const requirement = Requirement.make(
+    OwnershipPermissions.Transfer,
+    Target.Reference.cases.Workspace.make({ workspaceId })
+  )
+  const requireMember = Effect.fn("OwnershipService.requireMember")(function* (memberId: MemberId.MemberId) {
+    const found = yield* memberStore.get(memberId)
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id: memberId })
+    return found.value
+  })
   const readCurrentOwnership = Effect.gen(function* () {
-    const found = yield* workspaceStore.get;
-    if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
-    const owner = yield* memberStore.get(found.value.ownerMemberId);
-    const [assignment] = yield* assignmentStore.listActiveByRole(BuiltinRoles.OwnerId);
+    const found = yield* workspaceStore.get
+    if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing")
+    const owner = yield* memberStore.get(found.value.ownerMemberId)
+    const [assignment] = yield* assignmentStore.listActiveByRole(BuiltinRoles.OwnerId)
     if (Option.isNone(owner) || assignment === undefined)
-      return yield* Effect.die("A workspace's owner or its Owner assignment is missing");
-    return { workspace: found.value, owner: owner.value, assignment };
-  });
+      return yield* Effect.die("A workspace's owner or its Owner assignment is missing")
+    return { workspace: found.value, owner: owner.value, assignment }
+  })
   const get = Effect.gen(function* () {
-    yield* authorization.require([]);
-    const state = yield* readCurrentOwnership;
-    const actor = yield* Actor.Actor;
+    yield* authorization.require([])
+    const state = yield* readCurrentOwnership
+    const actor = yield* Actor.Actor
     const canTransfer =
       actor.memberId === state.owner.id &&
       Identity.MemberReference.isAnyOf(["Human"])(actor.identity) &&
       (yield* authorization.require([requirement]).pipe(
         Effect.as(true),
-        Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false)),
-      ));
+        Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false))
+      ))
     const candidates = canTransfer
       ? (yield* memberStore.list).filter(
           (member) =>
             member.status === "active" &&
             Identity.MemberReference.isAnyOf(["Human"])(member.identity) &&
-            member.id !== state.owner.id,
+            member.id !== state.owner.id
         )
-      : [];
+      : []
     return Ownership.View.make({
       workspace: state.workspace,
       owner: state.owner,
       ownerAssignmentId: state.assignment.id,
       canTransfer,
-      candidates,
-    });
-  }).pipe(Effect.withSpan("OwnershipService.get"), Operation.report);
-  const builtins = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
+      candidates
+    })
+  }).pipe(Effect.withSpan("OwnershipService.get"), Operation.report)
+  const builtins = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId]
   const transfer = Effect.fn("OwnershipService.transfer")(
     function* (input: Ownership.TransferInput) {
-      yield* authorization.require([requirement]);
-      const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
-      const state = yield* readCurrentOwnership;
-      const actor = yield* Actor.Actor;
-      if (
-        actor.memberId !== state.owner.id ||
-        !Identity.MemberReference.isAnyOf(["Human"])(actor.identity)
-      )
+      yield* authorization.require([requirement])
+      const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input)
+      const state = yield* readCurrentOwnership
+      const actor = yield* Actor.Actor
+      if (actor.memberId !== state.owner.id || !Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new CoreError.Denied({
-          reason: new CoreError.OwnerRequired({ reason: "ownership-transfer" }),
-        });
+          reason: new CoreError.OwnerRequired({ reason: "ownership-transfer" })
+        })
       if (request.expectedOwnerAssignmentId !== state.assignment.id)
-        return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId });
+        return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId })
       if (request.memberId === state.owner.id)
         return yield* new CoreError.Conflict({
           reason: new CoreError.InvalidRecipient({
             memberId: request.memberId,
-            reason: "same-owner",
-          }),
-        });
-      const recipient = yield* requireMember(request.memberId);
+            reason: "same-owner"
+          })
+        })
+      const recipient = yield* requireMember(request.memberId)
       if (recipient.status !== "active")
         return yield* new CoreError.Conflict({
-          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "removed" }),
-        });
+          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "removed" })
+        })
       if (!Identity.MemberReference.isAnyOf(["Human"])(recipient.identity))
         return yield* new CoreError.Conflict({
-          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "agent" }),
-        });
-      const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
-      yield* delegation.loadRole(BuiltinRoles.AdministratorId);
+          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "agent" })
+        })
+      const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId)
+      yield* delegation.loadRole(BuiltinRoles.AdministratorId)
       if (!ownerRole.permissions.includes(OwnershipPermissions.Transfer.name))
-        return yield* Effect.die("The Owner role must keep the ownership-transfer permission");
+        return yield* Effect.die("The Owner role must keep the ownership-transfer permission")
       // Replace built-in workspace roles only. Direct grants and scoped assignments retain their identity.
-      const previousAssignments = yield* delegation.assignmentsFor(state.owner.id);
-      const recipientAssignments = yield* delegation.assignmentsFor(recipient.id);
+      const previousAssignments = yield* delegation.assignmentsFor(state.owner.id)
+      const recipientAssignments = yield* delegation.assignmentsFor(recipient.id)
       for (const records of [previousAssignments, recipientAssignments]) {
         for (const assignment of records) {
-          const source = assignment.source;
+          const source = assignment.source
           if (
             Assignment.Source.isAnyOf(["Role"])(source) &&
             Scope.Scope.isAnyOf(["Workspace"])(source.scope) &&
             builtins.includes(source.roleId)
           )
-            yield* assignmentCommand.revokeAssignment(assignment);
+            yield* assignmentCommand.revokeAssignment(assignment)
         }
       }
-      yield* assignmentCommand.assignRole(state.owner.id, BuiltinRoles.AdministratorId);
-      yield* assignmentCommand.assignRole(recipient.id, BuiltinRoles.OwnerId);
+      yield* assignmentCommand.assignRole(state.owner.id, BuiltinRoles.AdministratorId)
+      yield* assignmentCommand.assignRole(recipient.id, BuiltinRoles.OwnerId)
       yield* journal.publish(WorkspaceFacts.OwnershipTransferred, {
         workspaceId,
         previousOwnerMemberId: state.owner.id,
-        ownerMemberId: recipient.id,
-      });
-      return (yield* readCurrentOwnership).workspace;
+        ownerMemberId: recipient.id
+      })
+      return (yield* readCurrentOwnership).workspace
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
-    Operation.report,
-  );
-  return OwnershipService.of({ get, transfer });
-});
+    Operation.report
+  )
+  return OwnershipService.of({ get, transfer })
+})
 
 /**
  * Provide the ownership operations over the workspace, member, and assignment stores, the
@@ -226,4 +223,4 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(OwnershipService, make());
+export const layer = Layer.effect(OwnershipService, make)

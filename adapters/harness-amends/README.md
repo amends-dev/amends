@@ -25,10 +25,10 @@ a language model of each endpoint with `Models.LanguageModels`, which `Models.la
 the `HttpClient` the requests go out through.
 
 ```ts
-import { AmendsAgent, Models } from "@amends-dev/harness-amends";
-import { Agent, Harness } from "@amends-dev/harness";
-import { Config, Effect, Layer } from "effect";
-import { FetchHttpClient } from "effect/http";
+import { AmendsAgent, Models } from "@amends-dev/harness-amends"
+import { Agent, Harness } from "@amends-dev/harness"
+import { Config, Effect, Layer } from "effect"
+import { FetchHttpClient } from "effect/http"
 
 const program = Effect.gen(function* () {
   const agent = yield* AmendsAgent.make({
@@ -38,14 +38,14 @@ const program = Effect.gen(function* () {
       protocol: "anthropic-messages",
       url: "https://api.anthropic.com/v1",
       apiKey: yield* Config.Redacted("ANTHROPIC_API_KEY"),
-      contextWindow: 200_000,
-    },
-  });
-  const harness = Harness.make(agent);
-  const session = yield* harness.createSession({ id: Agent.SessionId.make("hello") });
-  const answer = yield* session.generate({ prompt: "Say hello in one word." });
-  return answer.text;
-}).pipe(Effect.provide(Models.layer.pipe(Layer.provide(FetchHttpClient.layer))));
+      contextWindow: 200_000
+    }
+  })
+  const harness = Harness.make(agent)
+  const session = yield* harness.createSession({ id: Agent.SessionId.make("hello") })
+  const answer = yield* session.generate({ prompt: "Say hello in one word." })
+  return answer.text
+}).pipe(Effect.provide(Models.layer.pipe(Layer.provide(FetchHttpClient.layer))))
 ```
 
 The agent needs no sandbox and installs nothing in one. Given a sandbox, as `createSession`'s

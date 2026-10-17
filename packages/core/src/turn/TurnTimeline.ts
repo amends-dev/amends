@@ -6,12 +6,14 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
-import type * as Thread from "../thread/Thread.ts";
-import type * as ThreadActivity from "../thread/ThreadActivity.ts";
-import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
-import * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts";
-import * as TurnActivity from "./TurnActivity.ts";
+
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import type * as Thread from "../thread/Thread.ts"
+import type * as ThreadActivity from "../thread/ThreadActivity.ts"
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
+import type * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts"
+import * as TurnActivity from "./TurnActivity.ts"
 
 /**
  * A turn accepted here, or a retry asked again: where its row shows.
@@ -19,7 +21,7 @@ import * as TurnActivity from "./TurnActivity.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const CreatedItem = Schema.Struct({ activity: TurnActivity.Created.Activity });
+export const CreatedItem = Schema.Struct({ activity: TurnActivity.Created.Activity })
 
 /**
  * @category schemas
@@ -33,7 +35,7 @@ export interface CreatedItem extends Schema.Schema.Type<typeof CreatedItem> {}
  * @category schemas
  * @since 0.1.0
  */
-export const StartedItem = Schema.Struct({ activity: TurnActivity.Started.Activity });
+export const StartedItem = Schema.Struct({ activity: TurnActivity.Started.Activity })
 
 /**
  * @category schemas
@@ -47,7 +49,7 @@ export interface StartedItem extends Schema.Schema.Type<typeof StartedItem> {}
  * @category schemas
  * @since 0.1.0
  */
-export const StoppingItem = Schema.Struct({ activity: TurnActivity.Stopping.Activity });
+export const StoppingItem = Schema.Struct({ activity: TurnActivity.Stopping.Activity })
 
 /**
  * @category schemas
@@ -61,7 +63,7 @@ export interface StoppingItem extends Schema.Schema.Type<typeof StoppingItem> {}
  * @category schemas
  * @since 0.1.0
  */
-export const EndedItem = Schema.Struct({ activity: TurnActivity.Ended.Activity });
+export const EndedItem = Schema.Struct({ activity: TurnActivity.Ended.Activity })
 
 /**
  * @category schemas
@@ -69,16 +71,16 @@ export const EndedItem = Schema.Struct({ activity: TurnActivity.Ended.Activity }
  */
 export interface EndedItem extends Schema.Schema.Type<typeof EndedItem> {}
 
-type Created = CreatedItem;
-type Started = StartedItem;
-type Stopping = StoppingItem;
-type Ended = EndedItem;
+type Created = CreatedItem
+type Started = StartedItem
+type Stopping = StoppingItem
+type Ended = EndedItem
 declare module "../thread/ThreadActivityKind.ts" {
   interface Items {
-    "turn.created": Created;
-    "turn.started": Started;
-    "turn.stopping": Stopping;
-    "turn.ended": Ended;
+    "turn.created": Created
+    "turn.started": Started
+    "turn.stopping": Stopping
+    "turn.ended": Ended
   }
 }
 
@@ -93,7 +95,7 @@ export const resolver = Effect.succeed({
   kinds: [TurnActivity.Created, TurnActivity.Started, TurnActivity.Stopping, TurnActivity.Ended],
   resolve: Effect.fn("TurnTimeline.resolve")(function* (
     _thread: Thread.Thread,
-    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>
   ) {
     return yield* Effect.orDie(
       Effect.forEach(listed, (activity) =>
@@ -102,16 +104,16 @@ export const resolver = Effect.succeed({
           ThreadActivityKind.Mismatch | Schema.SchemaError
         > {
           if (ThreadActivityKind.is(TurnActivity.Created)(activity))
-            return { activity: yield* ThreadActivityKind.decode(TurnActivity.Created, activity) };
+            return { activity: yield* ThreadActivityKind.decode(TurnActivity.Created, activity) }
           if (ThreadActivityKind.is(TurnActivity.Started)(activity))
-            return { activity: yield* ThreadActivityKind.decode(TurnActivity.Started, activity) };
+            return { activity: yield* ThreadActivityKind.decode(TurnActivity.Started, activity) }
           if (ThreadActivityKind.is(TurnActivity.Stopping)(activity))
             return {
-              activity: yield* ThreadActivityKind.decode(TurnActivity.Stopping, activity),
-            };
-          return { activity: yield* ThreadActivityKind.decode(TurnActivity.Ended, activity) };
-        }),
-      ),
-    );
-  }),
-} satisfies ThreadActivityResolvers.Resolver);
+              activity: yield* ThreadActivityKind.decode(TurnActivity.Stopping, activity)
+            }
+          return { activity: yield* ThreadActivityKind.decode(TurnActivity.Ended, activity) }
+        })
+      )
+    )
+  })
+} satisfies ThreadActivityResolvers.Resolver)

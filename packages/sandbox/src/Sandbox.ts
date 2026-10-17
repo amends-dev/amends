@@ -12,16 +12,16 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
-import { ChildProcessSpawner } from "effect/process";
-import type {
-  Endpoint,
-  EndpointProtocol,
-  NetworkPolicy,
-  Port,
-  RequestTransformation,
-} from "./Network.ts";
-import type { SandboxError } from "./SandboxError.ts";
+
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
+import type * as Network from "./Network.ts"
+import type * as SandboxError from "./SandboxError.ts"
 
 /**
  * Checks a name of letters, digits, `-`, and `_`, starting with a letter or digit and at most 63
@@ -32,7 +32,7 @@ import type { SandboxError } from "./SandboxError.ts";
  * @category validation
  * @since 0.1.0
  */
-export const isName = Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/);
+export const isName = Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/)
 
 /**
  * Names a sandbox, as `isName` checks. A provider resumes a sandbox by it.
@@ -40,13 +40,13 @@ export const isName = Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/);
  * @category schemas
  * @since 0.1.0
  */
-export const SandboxId = Schema.String.check(isName).pipe(Schema.brand("SandboxId"));
+export const SandboxId = Schema.String.check(isName).pipe(Schema.brand("SandboxId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type SandboxId = typeof SandboxId.Type;
+export type SandboxId = typeof SandboxId.Type
 
 /**
  * The Effect services a sandbox provides to code that runs inside it: its files, its processes,
@@ -55,10 +55,7 @@ export type SandboxId = typeof SandboxId.Type;
  * @category utility types
  * @since 0.1.0
  */
-export type SandboxServices =
-  | FileSystem.FileSystem
-  | Path.Path
-  | ChildProcessSpawner.ChildProcessSpawner;
+export type SandboxServices = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
 /**
  * One sandbox, as its provider's `create` or `resume` returns it. Every value for the same
@@ -67,21 +64,21 @@ export type SandboxServices =
  * **Example** (Running a command and reading a file inside a sandbox)
  *
  * ```ts
- * import { Sandbox } from "@amends-dev/sandbox";
- * import { Effect, FileSystem, Path } from "effect";
- * import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ * import { Sandbox } from "@amends-dev/sandbox"
+ * import { Effect, FileSystem, Path } from "effect"
+ * import { ChildProcess, ChildProcessSpawner } from "effect/process"
  *
- * declare const sandbox: Sandbox.Sandbox["Service"];
+ * declare const sandbox: Sandbox.Sandbox["Service"]
  *
  * // Commands start in the working directory; file paths are absolute.
  * const greeting = Effect.gen(function* () {
- *   const fs = yield* FileSystem.FileSystem;
- *   const path = yield* Path.Path;
- *   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+ *   const fs = yield* FileSystem.FileSystem
+ *   const path = yield* Path.Path
+ *   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
  *
- *   yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]));
- *   return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"));
- * }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+ *   yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]))
+ *   return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"))
+ * }).pipe(Effect.provide(Sandbox.layerServices(sandbox)))
  * ```
  *
  * @category services
@@ -91,59 +88,59 @@ export class Sandbox extends Context.Service<
   Sandbox,
   {
     /** Names the sandbox; its provider resumes it by this id. */
-    readonly id: SandboxId;
+    readonly id: SandboxId
 
     /**
      * The absolute directory that commands start in when they set no `cwd`, and that a relative
      * `cwd` is resolved against.
      */
-    readonly workingDirectory: string;
+    readonly workingDirectory: string
 
     /**
      * The sandbox's files. Paths must be absolute, such as ones joined onto `workingDirectory`:
      * what a relative path refers to differs between providers.
      */
-    readonly fileSystem: FileSystem.FileSystem;
+    readonly fileSystem: FileSystem.FileSystem
 
     /**
      * The sandbox's processes. A command starts in `workingDirectory` unless it sets a `cwd`, and
      * gets the environment it is given, or the sandbox's with it when it extends the environment.
      */
-    readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
+    readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
 
     /**
      * Exposes `ports`, besides those exposed at creation or since, so that `endpoint` reaches them
      * for the rest of the sandbox's life. Exposing a port again succeeds. Fails with
      * `UnsupportedError` when the provider cannot expose a port once the sandbox exists.
      */
-    readonly exposePorts: (ports: ReadonlyArray<Port>) => Effect.Effect<void, SandboxError>;
+    readonly exposePorts: (ports: ReadonlyArray<Network.Port>) => Effect.Effect<void, SandboxError.SandboxError>
 
     /**
      * How to reach `port` from outside the sandbox; fails with `NotFoundError` for a port the
      * sandbox does not expose.
      */
     readonly endpoint: (
-      port: Port,
-      protocol: EndpointProtocol,
-    ) => Effect.Effect<Endpoint, SandboxError>;
+      port: Network.Port,
+      protocol: Network.EndpointProtocol
+    ) => Effect.Effect<Network.Endpoint, SandboxError.SandboxError>
 
     /**
      * Stops the sandbox, ending every process in it, so that it can be resumed later. Stopping a
      * stopped sandbox succeeds.
      */
-    readonly stop: Effect.Effect<void, SandboxError>;
+    readonly stop: Effect.Effect<void, SandboxError.SandboxError>
 
     /**
      * Stops the sandbox and deletes it; it cannot be resumed afterwards. Destroying a destroyed
      * sandbox succeeds.
      */
-    readonly destroy: Effect.Effect<void, SandboxError>;
+    readonly destroy: Effect.Effect<void, SandboxError.SandboxError>
 
     /**
      * Replaces the outbound network policy; fails with `UnsupportedError` when the provider cannot
      * enforce one.
      */
-    readonly setNetworkPolicy: (policy: NetworkPolicy) => Effect.Effect<void, SandboxError>;
+    readonly setNetworkPolicy: (policy: Network.NetworkPolicy) => Effect.Effect<void, SandboxError.SandboxError>
 
     /**
      * Replaces the request transformations with `transformations`, for the rest of the sandbox's
@@ -152,8 +149,8 @@ export class Sandbox extends Context.Service<
      * sandbox.
      */
     readonly setRequestTransformations: (
-      transformations: ReadonlyArray<RequestTransformation>,
-    ) => Effect.Effect<void, SandboxError>;
+      transformations: ReadonlyArray<Network.RequestTransformation>
+    ) => Effect.Effect<void, SandboxError.SandboxError>
   }
 >()("@amends-dev/sandbox/Sandbox") {}
 
@@ -169,5 +166,5 @@ export const layerServices = (sandbox: Sandbox["Service"]): Layer.Layer<SandboxS
   Layer.mergeAll(
     Layer.succeed(FileSystem.FileSystem, sandbox.fileSystem),
     Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, sandbox.childProcessSpawner),
-    Path.layer,
-  );
+    Path.layer
+  )

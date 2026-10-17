@@ -13,39 +13,39 @@
 /**
  * @since 0.1.0
  */
-export * as Agent from "./Agent.ts";
+export * as Agent from "./Agent.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentFacts from "./AgentFacts.ts";
+export * as AgentFacts from "./AgentFacts.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentPermissions from "./AgentPermissions.ts";
+export * as AgentPermissions from "./AgentPermissions.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentProjection from "./AgentProjection.ts";
+export * as AgentProjection from "./AgentProjection.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentQuery from "./AgentQuery.ts";
+export * as AgentQuery from "./AgentQuery.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentReadiness from "./AgentReadiness.ts";
+export * as AgentReadiness from "./AgentReadiness.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentService from "./AgentService.ts";
+export * as AgentService from "./AgentService.ts"
 
 /**
  * @since 0.1.0
  */
-export * as AgentStore from "./AgentStore.ts";
+export * as AgentStore from "./AgentStore.ts"

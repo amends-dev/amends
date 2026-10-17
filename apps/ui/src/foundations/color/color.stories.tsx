@@ -1,41 +1,38 @@
-import { For } from "solid-js";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { avatarTones, light } from "./tokens.ts";
-import { colorPalettes, type ColorPalette } from "./palettes.ts";
-import { vars } from "../theme/vars.css.ts";
-import * as s from "../foundations.stories.css.ts";
+import { For } from "solid-js"
+import type { Meta, StoryObj } from "storybook-solidjs-vite"
+import * as s from "../foundations.stories.css.ts"
+import { vars } from "../theme/vars.css.ts"
+import { colorPalettes, type ColorPalette } from "./palettes.ts"
+import { avatarTones, light } from "./tokens.ts"
 
-type Group = "surface" | "text" | "border" | "action";
+type Group = "surface" | "text" | "border" | "action"
 const groups: ReadonlyArray<{ group: Group; title: string; note: string }> = [
   {
     group: "surface",
     title: "Surfaces",
-    note: "Canvas frames the app; panels, modals, and popovers sit on it in that order.",
+    note: "Canvas frames the app; panels, modals, and popovers sit on it in that order."
   },
   {
     group: "text",
     title: "Text",
-    note: "Primary for reading, secondary for navigation and support, muted for metadata.",
+    note: "Primary for reading, secondary for navigation and support, muted for metadata."
   },
   {
     group: "border",
     title: "Borders",
-    note: "Dividers split regions; default outlines controls; the stitch is decoration.",
+    note: "Dividers split regions; default outlines controls; the stitch is decoration."
   },
   {
     group: "action",
     title: "Actions",
-    note: "The primary action and the current-item indicator carry the palette’s accent.",
-  },
-];
+    note: "The primary action and the current-item indicator carry the palette’s accent."
+  }
+]
 
 function Swatch(props: { group: Group; role: string; palette: ColorPalette }) {
-  const color = () =>
-    (vars.color[props.group] as Record<string, string>)[props.role] ?? "transparent";
+  const color = () => (vars.color[props.group] as Record<string, string>)[props.role] ?? "transparent"
   const values = () =>
-    Object.values(colorPalettes[props.palette]).map(
-      (mode) => (mode[props.group] as Record<string, string>)[props.role],
-    );
+    Object.values(colorPalettes[props.palette]).map((mode) => (mode[props.group] as Record<string, string>)[props.role])
   return (
     <li class={s.swatch}>
       {props.group === "text" ? (
@@ -44,7 +41,7 @@ function Swatch(props: { group: Group; role: string; palette: ColorPalette }) {
           style={{
             color: color(),
             // Text on the primary action is only meaningful on that fill.
-            "background-color": props.role === "onPrimary" ? vars.color.action.primary : undefined,
+            "background-color": props.role === "onPrimary" ? vars.color.action.primary : undefined
           }}
           aria-hidden="true"
         >
@@ -60,20 +57,20 @@ function Swatch(props: { group: Group; role: string; palette: ColorPalette }) {
         <span class={s.value}>{values().join(" / ")}</span>
       </span>
     </li>
-  );
+  )
 }
 
-const statusTones = ["success", "caution", "danger"] as const;
-const statusRoles = ["mark", "text", "surface", "border"] as const;
+const statusTones = ["success", "caution", "danger"] as const
+const statusRoles = ["mark", "text", "surface", "border"] as const
 
-const meta = { title: "Foundations/Color" } satisfies Meta;
-export default meta;
-type Story = StoryObj;
+const meta = { title: "Foundations/Color" } satisfies Meta
+export default meta
+type Story = StoryObj
 
 export const Roles = {
   render: (_args, context) => {
-    const palette = (): ColorPalette => context.globals["palette"] ?? "neutral";
-    const colors = () => colorPalettes[palette()];
+    const palette = (): ColorPalette => context.globals["palette"] ?? "neutral"
+    const colors = () => colorPalettes[palette()]
     return (
       <div class={s.page}>
         <For each={groups}>
@@ -92,8 +89,8 @@ export const Roles = {
         <section class={s.section}>
           <h2 class={s.heading}>Status</h2>
           <p class={s.note}>
-            Status marks identify state. Text, surfaces, and borders make a notice in the tone.
-            Offline has no tone: its mark is a ring in text.muted.
+            Status marks identify state. Text, surfaces, and borders make a notice in the tone. Offline has no tone: its
+            mark is a ring in text.muted.
           </p>
           <ul class={s.grid}>
             <For each={statusTones}>
@@ -129,9 +126,7 @@ export const Roles = {
         </section>
         <section class={s.section}>
           <h2 class={s.heading}>Avatar tones</h2>
-          <p class={s.note}>
-            Square initials; a person keeps one tone. Ink marks the current reader.
-          </p>
+          <p class={s.note}>Square initials; a person keeps one tone. Ink marks the current reader.</p>
           <ul class={s.grid}>
             <For each={avatarTones}>
               {(tone) => (
@@ -141,7 +136,7 @@ export const Roles = {
                     style={{
                       "background-color": vars.color.avatar[tone].background,
                       color: vars.color.avatar[tone].foreground,
-                      border: "none",
+                      border: "none"
                     }}
                     aria-hidden="true"
                   >
@@ -150,8 +145,7 @@ export const Roles = {
                   <span>
                     <span class={s.name}>avatar.{tone}</span>
                     <span class={s.value}>
-                      {colors().light.avatar[tone].background} /{" "}
-                      {colors().dark.avatar[tone].background}
+                      {colors().light.avatar[tone].background} / {colors().dark.avatar[tone].background}
                     </span>
                   </span>
                 </li>
@@ -160,6 +154,6 @@ export const Roles = {
           </ul>
         </section>
       </div>
-    );
-  },
-} satisfies Story;
+    )
+  }
+} satisfies Story

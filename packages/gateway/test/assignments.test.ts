@@ -1,260 +1,218 @@
-import { AssignmentService, BuiltinRoles, Role } from "@amends-dev/core/authorization";
-
-import { Actor, Identity } from "@amends-dev/core/identity";
-
-import { Entry } from "@amends-dev/core/journal";
-
-import type { Gateway } from "@amends-dev/gateway";
-import { describe, expect, it } from "@effect/vitest";
-
-import { Effect, Option, Result } from "effect";
-
-import { withStorage } from "./fixture.ts";
-import * as Operations from "./operations.ts";
-
-import * as Support from "./support.ts";
-import { alice, bob, boundTo, charlie, failingLate, future, request } from "./support.ts";
-import { StoreError } from "@amends-dev/core/journal";
+import { AssignmentService, BuiltinRoles, Role } from "@amends-dev/core/authorization"
+import { Actor, Identity } from "@amends-dev/core/identity"
+import { Entry, StoreError } from "@amends-dev/core/journal"
+import type { Gateway } from "@amends-dev/gateway"
+import { describe, expect, it } from "@effect/vitest"
+import { Effect, Option, Result } from "effect"
+import { withStorage } from "./fixture.ts"
+import * as Operations from "./operations.ts"
+import * as Support from "./support.ts"
+import { alice, bob, boundTo, charlie, failingLate, future, request } from "./support.ts"
 
 /** Assigning, changing, and revoking access, and delegation limits. */
 
-const { core, runGateway } = Support;
+const { core, runGateway } = Support
 describe("assignments", () => {
   const setup = Effect.gen(function* () {
-    const workspace = yield* Operations.createWorkspace(alice.id);
-    const invitation = yield* Operations.invite(workspace.id, alice, request(yield* future));
-    const viewer = yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
+    const workspace = yield* Operations.createWorkspace(alice.id)
+    const invitation = yield* Operations.invite(workspace.id, alice, request(yield* future))
+    const viewer = yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id)
     const adminInvite = yield* Operations.invite(
       workspace.id,
       alice,
-      request(yield* future, charlie.id, BuiltinRoles.AdministratorId),
-    );
-    const admin = yield* Operations.acceptInvitation(
-      workspace.id,
-      charlie.id,
-      adminInvite.details.id,
-    );
-    return { workspace, viewer, admin, bound: yield* boundTo(workspace.id) };
-  });
+      request(yield* future, charlie.id, BuiltinRoles.AdministratorId)
+    )
+    const admin = yield* Operations.acceptInvitation(workspace.id, charlie.id, adminInvite.details.id)
+    return { workspace, viewer, admin, bound: yield* boundTo(workspace.id) }
+  })
   it.effect("assignments cannot be addressed through another workspace or recipient", () =>
     withStorage((storage) =>
       runGateway(
         storage,
         Effect.gen(function* () {
-          const { workspace, viewer, admin, bound } = yield* setup;
-          const other = yield* Operations.createWorkspace(alice.id);
-          const otherBound = yield* boundTo(other.id);
-          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
+          const { workspace, viewer, admin, bound } = yield* setup
+          const other = yield* Operations.createWorkspace(alice.id)
+          const otherBound = yield* boundTo(other.id)
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })
           const otherBefore = yield* otherBound.store.read(Entry.LogId.make("journal"), {
-            limit: 20,
-          });
-          const first = (yield* bound.assignments.listActiveByMember(viewer.id))[0];
-          if (first === undefined) throw new Error("Missing Viewer assignment");
+            limit: 20
+          })
+          const first = (yield* bound.assignments.listActiveByMember(viewer.id))[0]
+          if (first === undefined) throw new Error("Missing Viewer assignment")
           expect(
             yield* Effect.flip(
               Operations.assign(other.id, alice, {
                 memberId: viewer.id,
-                roleId: BuiltinRoles.MemberId,
-              }),
-            ),
-          ).toMatchObject({ _tag: "CoreError.NotFound" });
+                roleId: BuiltinRoles.MemberId
+              })
+            )
+          ).toMatchObject({ _tag: "CoreError.NotFound" })
           expect(yield* Effect.flip(Operations.access(other.id, bob, viewer.id))).toMatchObject({
             _tag: "CoreError.Denied",
-            reason: { _tag: "NotMember" },
-          });
+            reason: { _tag: "NotMember" }
+          })
           expect(
-            yield* Effect.flip(
-              Operations.revokeAssignment(workspace.id, alice, admin.id, first.id),
-            ),
-          ).toMatchObject({ _tag: "CoreError.NotFound" });
-          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
-            before,
-          );
-          expect(yield* otherBound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
-            otherBefore,
-          );
-        }),
-      ),
-    ),
-  );
+            yield* Effect.flip(Operations.revokeAssignment(workspace.id, alice, admin.id, first.id))
+          ).toMatchObject({ _tag: "CoreError.NotFound" })
+          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before)
+          expect(yield* otherBound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(otherBefore)
+        })
+      )
+    )
+  )
 
   it.effect("each member reads what their own grants let them do across the workspace", () =>
     withStorage((storage) =>
       runGateway(
         storage,
         Effect.gen(function* () {
-          const { workspace, viewer } = yield* setup;
+          const { workspace, viewer } = yield* setup
           // Everyone creates groups; owners and administrators also manage invitations.
-          const owner = yield* Operations.permissions(workspace.id, alice);
-          const administrator = yield* Operations.permissions(workspace.id, charlie);
-          const reader = yield* Operations.permissions(workspace.id, bob);
+          const owner = yield* Operations.permissions(workspace.id, alice)
+          const administrator = yield* Operations.permissions(workspace.id, charlie)
+          const reader = yield* Operations.permissions(workspace.id, bob)
           for (const granted of [owner, administrator])
-            expect(granted).toEqual(expect.arrayContaining(["group.create", "invitation.manage"]));
-          expect(reader).toContain("group.create");
-          expect(reader).not.toContain("invitation.manage");
-          expect(owner).toContain("workspace.transfer-ownership");
-          expect(administrator).not.toContain("workspace.transfer-ownership");
+            expect(granted).toEqual(expect.arrayContaining(["group.create", "invitation.manage"]))
+          expect(reader).toContain("group.create")
+          expect(reader).not.toContain("invitation.manage")
+          expect(owner).toContain("workspace.transfer-ownership")
+          expect(administrator).not.toContain("workspace.transfer-ownership")
           // Only workspace-wide permissions are listed, never those of a group or thread.
-          expect(owner).not.toContain("thread.read");
+          expect(owner).not.toContain("thread.read")
           // A new role changes the answer at once.
           yield* Operations.assign(workspace.id, alice, {
             memberId: viewer.id,
-            roleId: BuiltinRoles.AdministratorId,
-          });
-          expect(yield* Operations.permissions(workspace.id, bob)).toContain("invitation.manage");
+            roleId: BuiltinRoles.AdministratorId
+          })
+          expect(yield* Operations.permissions(workspace.id, bob)).toContain("invitation.manage")
           expect(
             yield* Effect.flip(
               Operations.permissions(workspace.id, {
                 _tag: "Human",
-                id: Identity.HumanId.make("stranger"),
-              }),
-            ),
-          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
-        }),
-      ),
-    ),
-  );
+                id: Identity.HumanId.make("stranger")
+              })
+            )
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } })
+        })
+      )
+    )
+  )
 
-  it.effect(
-    "assignments are additive, duplicate assignment is idempotent, and role replacement is atomic",
-    () =>
-      withStorage((storage) =>
-        runGateway(
-          storage,
-          Effect.gen(function* () {
-            const { workspace, viewer, bound } = yield* setup;
-            const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
-            const duplicate = yield* Operations.assign(workspace.id, alice, {
-              memberId: viewer.id,
-              roleId: BuiltinRoles.MemberId,
-            });
-            expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
-              before,
-            );
-            const admin = yield* Operations.assign(workspace.id, alice, {
-              memberId: viewer.id,
-              roleId: BuiltinRoles.AdministratorId,
-            });
-            expect(
-              (yield* Operations.access(workspace.id, alice, viewer.id)).assignments,
-            ).toHaveLength(2);
-            yield* Operations.revokeAssignment(workspace.id, alice, viewer.id, duplicate.id);
-            const access = yield* Operations.access(workspace.id, bob, workspace.ownerMemberId);
-            expect(
-              access.roles.filter(({ assignable }) => assignable).map(({ role }) => role.id),
-            ).toEqual([BuiltinRoles.MemberId]);
-            const changed = yield* Operations.change(workspace.id, alice, {
-              memberId: viewer.id,
-              roleId: BuiltinRoles.MemberId,
-              expectedAssignmentIds: [admin.id],
-            });
-            expect(changed.id).not.toBe(admin.id);
-            expect(yield* bound.assignments.get(admin.id)).toMatchObject({
-              _tag: "Some",
-              value: { status: "revoked" },
-            });
-            expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual([changed]);
-            const batches = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
-            expect(batches.at(-1)?.entries).toHaveLength(2);
-            expect(
-              yield* Effect.flip(
-                Operations.assign(workspace.id, bob, {
-                  memberId: viewer.id,
-                  roleId: BuiltinRoles.AdministratorId,
-                }),
-              ),
-            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
-          }),
-        ),
-      ),
-  );
-
-  it.effect(
-    "delegation protects owners and administrators across assignment and member-removal endpoints",
-    () =>
-      withStorage((storage) =>
-        runGateway(
-          storage,
-          Effect.gen(function* () {
-            const { workspace, viewer, admin, bound } = yield* setup;
-            const peerId = Identity.HumanId.make("peer");
-            const peerInvite = yield* Operations.invite(
-              workspace.id,
-              alice,
-              request(yield* future, peerId, BuiltinRoles.AdministratorId),
-            );
-            const peer = yield* Operations.acceptInvitation(
-              workspace.id,
-              peerId,
-              peerInvite.details.id,
-            );
-            const ownerAccess = yield* Operations.access(
-              workspace.id,
-              alice,
-              workspace.ownerMemberId,
-            );
-            const adminAccess = yield* Operations.access(workspace.id, alice, peer.id);
-            const viewerAccess = yield* Operations.access(workspace.id, charlie, viewer.id);
-            expect(viewerAccess.canManage).toBe(true);
-            expect((yield* Operations.access(workspace.id, charlie, admin.id)).canManage).toBe(
-              false,
-            );
-            expect(ownerAccess.canManage).toBe(false);
-            const ownerAssignment = ownerAccess.assignments[0];
-            const adminAssignment = adminAccess.assignments[0];
-            if (!ownerAssignment || !adminAssignment) throw new Error("Missing initial assignment");
-            const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Gateway.Gateway>> = [
-              Operations.assign(workspace.id, charlie, {
+  it.effect("assignments are additive, duplicate assignment is idempotent, and role replacement is atomic", () =>
+    withStorage((storage) =>
+      runGateway(
+        storage,
+        Effect.gen(function* () {
+          const { workspace, viewer, bound } = yield* setup
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })
+          const duplicate = yield* Operations.assign(workspace.id, alice, {
+            memberId: viewer.id,
+            roleId: BuiltinRoles.MemberId
+          })
+          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before)
+          const admin = yield* Operations.assign(workspace.id, alice, {
+            memberId: viewer.id,
+            roleId: BuiltinRoles.AdministratorId
+          })
+          expect((yield* Operations.access(workspace.id, alice, viewer.id)).assignments).toHaveLength(2)
+          yield* Operations.revokeAssignment(workspace.id, alice, viewer.id, duplicate.id)
+          const access = yield* Operations.access(workspace.id, bob, workspace.ownerMemberId)
+          expect(access.roles.filter(({ assignable }) => assignable).map(({ role }) => role.id)).toEqual([
+            BuiltinRoles.MemberId
+          ])
+          const changed = yield* Operations.change(workspace.id, alice, {
+            memberId: viewer.id,
+            roleId: BuiltinRoles.MemberId,
+            expectedAssignmentIds: [admin.id]
+          })
+          expect(changed.id).not.toBe(admin.id)
+          expect(yield* bound.assignments.get(admin.id)).toMatchObject({
+            _tag: "Some",
+            value: { status: "revoked" }
+          })
+          expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual([changed])
+          const batches = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })
+          expect(batches.at(-1)?.entries).toHaveLength(2)
+          expect(
+            yield* Effect.flip(
+              Operations.assign(workspace.id, bob, {
                 memberId: viewer.id,
-                roleId: BuiltinRoles.AdministratorId,
-              }),
+                roleId: BuiltinRoles.AdministratorId
+              })
+            )
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } })
+        })
+      )
+    )
+  )
+
+  it.effect("delegation protects owners and administrators across assignment and member-removal endpoints", () =>
+    withStorage((storage) =>
+      runGateway(
+        storage,
+        Effect.gen(function* () {
+          const { workspace, viewer, admin, bound } = yield* setup
+          const peerId = Identity.HumanId.make("peer")
+          const peerInvite = yield* Operations.invite(
+            workspace.id,
+            alice,
+            request(yield* future, peerId, BuiltinRoles.AdministratorId)
+          )
+          const peer = yield* Operations.acceptInvitation(workspace.id, peerId, peerInvite.details.id)
+          const ownerAccess = yield* Operations.access(workspace.id, alice, workspace.ownerMemberId)
+          const adminAccess = yield* Operations.access(workspace.id, alice, peer.id)
+          const viewerAccess = yield* Operations.access(workspace.id, charlie, viewer.id)
+          expect(viewerAccess.canManage).toBe(true)
+          expect((yield* Operations.access(workspace.id, charlie, admin.id)).canManage).toBe(false)
+          expect(ownerAccess.canManage).toBe(false)
+          const ownerAssignment = ownerAccess.assignments[0]
+          const adminAssignment = adminAccess.assignments[0]
+          if (!ownerAssignment || !adminAssignment) throw new Error("Missing initial assignment")
+          const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Gateway.Gateway>> = [
+            Operations.assign(workspace.id, charlie, {
+              memberId: viewer.id,
+              roleId: BuiltinRoles.AdministratorId
+            }),
+            Operations.assign(workspace.id, alice, {
+              memberId: viewer.id,
+              roleId: BuiltinRoles.OwnerId
+            }),
+            Operations.assign(workspace.id, charlie, {
+              memberId: peer.id,
+              roleId: BuiltinRoles.MemberId
+            }),
+            Operations.revokeAssignment(workspace.id, charlie, peer.id, adminAssignment.id),
+            Operations.revokeAssignment(workspace.id, alice, workspace.ownerMemberId, ownerAssignment.id),
+            Operations.change(workspace.id, alice, {
+              memberId: workspace.ownerMemberId,
+              roleId: BuiltinRoles.MemberId,
+              expectedAssignmentIds: [ownerAssignment.id]
+            }),
+            Operations.removeMember(workspace.id, charlie, peer.id),
+            Operations.removeMember(workspace.id, charlie, workspace.ownerMemberId),
+            Operations.assign(workspace.id, alice, {
+              memberId: viewer.id,
+              roleId: Role.RoleId.make("invented")
+            })
+          ]
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 })
+          for (const attempt of attempts) {
+            yield* Effect.flip(attempt)
+            expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 })).toEqual(before)
+          }
+          yield* Operations.removeMember(workspace.id, charlie, viewer.id)
+          expect(
+            yield* Effect.flip(
               Operations.assign(workspace.id, alice, {
                 memberId: viewer.id,
-                roleId: BuiltinRoles.OwnerId,
-              }),
-              Operations.assign(workspace.id, charlie, {
-                memberId: peer.id,
-                roleId: BuiltinRoles.MemberId,
-              }),
-              Operations.revokeAssignment(workspace.id, charlie, peer.id, adminAssignment.id),
-              Operations.revokeAssignment(
-                workspace.id,
-                alice,
-                workspace.ownerMemberId,
-                ownerAssignment.id,
-              ),
-              Operations.change(workspace.id, alice, {
-                memberId: workspace.ownerMemberId,
-                roleId: BuiltinRoles.MemberId,
-                expectedAssignmentIds: [ownerAssignment.id],
-              }),
-              Operations.removeMember(workspace.id, charlie, peer.id),
-              Operations.removeMember(workspace.id, charlie, workspace.ownerMemberId),
-              Operations.assign(workspace.id, alice, {
-                memberId: viewer.id,
-                roleId: Role.Id.make("invented"),
-              }),
-            ];
-            const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 });
-            for (const attempt of attempts) {
-              yield* Effect.flip(attempt);
-              expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 })).toEqual(
-                before,
-              );
-            }
-            yield* Operations.removeMember(workspace.id, charlie, viewer.id);
-            expect(
-              yield* Effect.flip(
-                Operations.assign(workspace.id, alice, {
-                  memberId: viewer.id,
-                  roleId: BuiltinRoles.MemberId,
-                }),
-              ),
-            ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "InactiveMember" } });
-          }),
-        ),
-      ),
-  );
+                roleId: BuiltinRoles.MemberId
+              })
+            )
+          ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "InactiveMember" } })
+        })
+      )
+    )
+  )
 
   it.effect(
     "competing role changes reject stale assignments rather than overwrite the winner, and a new host reads the outcome",
@@ -265,123 +223,109 @@ describe("assignments", () => {
             runGateway(
               storage,
               Effect.gen(function* () {
-                const { workspace, viewer, bound } = yield* setup;
-                const access = yield* Operations.access(workspace.id, alice, viewer.id);
+                const { workspace, viewer, bound } = yield* setup
+                const access = yield* Operations.access(workspace.id, alice, viewer.id)
                 const input = {
                   memberId: viewer.id,
                   roleId: BuiltinRoles.AdministratorId,
-                  expectedAssignmentIds: access.assignments.map(({ id }) => id),
-                };
+                  expectedAssignmentIds: access.assignments.map(({ id }) => id)
+                }
                 const results = yield* Effect.forEach(
                   [1, 2],
                   () => Operations.change(workspace.id, alice, input).pipe(Effect.result),
-                  { concurrency: "unbounded" },
-                );
-                expect(results.filter(Result.isSuccess)).toHaveLength(1);
-                const rejected = results.find((result) => Result.isFailure(result));
+                  { concurrency: "unbounded" }
+                )
+                expect(results.filter(Result.isSuccess)).toHaveLength(1)
+                const rejected = results.find((result) => Result.isFailure(result))
                 // A writer that waited sees the winner's change; one that gave up reports contention.
                 expect(["CoreError.Changed", "CoreError.Unavailable"]).toContain(
-                  rejected !== undefined && Result.isFailure(rejected)
-                    ? rejected.failure._tag
-                    : undefined,
-                );
-                expect(yield* bound.assignments.listActiveByMember(viewer.id)).toHaveLength(1);
-                return { workspace, viewer, replaced: access.assignments };
-              }),
-            ),
-          );
+                  rejected !== undefined && Result.isFailure(rejected) ? rejected.failure._tag : undefined
+                )
+                expect(yield* bound.assignments.listActiveByMember(viewer.id)).toHaveLength(1)
+                return { workspace, viewer, replaced: access.assignments }
+              })
+            )
+          )
           yield* runGateway(
             storage,
             Effect.gen(function* () {
-              const access = yield* Operations.access(saved.workspace.id, bob, saved.viewer.id);
+              const access = yield* Operations.access(saved.workspace.id, bob, saved.viewer.id)
               expect(access.assignments.map(({ source }) => source)).toEqual([
                 {
                   _tag: "Role",
                   roleId: BuiltinRoles.AdministratorId,
-                  scope: { _tag: "Workspace", workspaceId: saved.workspace.id },
-                },
-              ]);
-              const bound = yield* boundTo(saved.workspace.id);
+                  scope: { _tag: "Workspace", workspaceId: saved.workspace.id }
+                }
+              ])
+              const bound = yield* boundTo(saved.workspace.id)
               for (const previous of saved.replaced)
                 expect(yield* bound.assignments.get(previous.id)).toEqual(
-                  Option.some(Object.assign({}, previous, { status: "revoked" })),
-                );
-            }),
-          );
-        }),
-      ),
-  );
+                  Option.some(Object.assign({}, previous, { status: "revoked" }))
+                )
+            })
+          )
+        })
+      )
+  )
 
   it.effect("a late role-change failure restores the previous assignments and journal", () =>
     withStorage((storage) =>
       runGateway(
         storage,
         Effect.gen(function* () {
-          const { workspace, viewer, bound } = yield* setup;
-          const active = yield* bound.assignments.listActiveByMember(viewer.id);
-          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
-          const failure = StoreError.failed("Store", "commit")("injected late failure");
-          const broken = failingLate(bound, failure);
-          const rejected = yield* Effect.flatMap(
-            AssignmentService.AssignmentService,
-            (assignmentService) =>
-              assignmentService.change({
-                memberId: viewer.id,
-                roleId: BuiltinRoles.AdministratorId,
-                expectedAssignmentIds: active.map(({ id }) => id),
-              }),
+          const { workspace, viewer, bound } = yield* setup
+          const active = yield* bound.assignments.listActiveByMember(viewer.id)
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })
+          const failure = StoreError.failed("Store", "commit")("injected late failure")
+          const broken = failingLate(bound, failure)
+          const rejected = yield* Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
+            assignmentService.change({
+              memberId: viewer.id,
+              roleId: BuiltinRoles.AdministratorId,
+              expectedAssignmentIds: active.map(({ id }) => id)
+            })
           ).pipe(
             Effect.provide(core(broken)),
             Effect.provideService(Actor.Actor, {
               workspaceId: workspace.id,
               memberId: workspace.ownerMemberId,
-              identity: alice,
+              identity: alice
             }),
-            Effect.catchDefect(Effect.succeed),
-          );
-          expect(rejected).toBe(failure);
-          expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual(active);
-          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
-            before,
-          );
-        }),
-      ),
-    ),
-  );
+            Effect.catchDefect(Effect.succeed)
+          )
+          expect(rejected).toBe(failure)
+          expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual(active)
+          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before)
+        })
+      )
+    )
+  )
 
   it.effect("pending invitations recheck the administrator's authority after demotion", () =>
     withStorage((storage) =>
       runGateway(
         storage,
         Effect.gen(function* () {
-          const { workspace, admin, bound } = yield* setup;
-          const recipientId = alice.id + ".new";
-          const recipient = Identity.HumanId.make(recipientId);
-          const invitation = yield* Operations.invite(
-            workspace.id,
-            charlie,
-            request(yield* future, recipient),
-          );
-          const assignments = yield* bound.assignments.listActiveByMember(admin.id);
+          const { workspace, admin, bound } = yield* setup
+          const recipientId = alice.id + ".new"
+          const recipient = Identity.HumanId.make(recipientId)
+          const invitation = yield* Operations.invite(workspace.id, charlie, request(yield* future, recipient))
+          const assignments = yield* bound.assignments.listActiveByMember(admin.id)
           yield* Operations.change(workspace.id, alice, {
             memberId: admin.id,
             roleId: BuiltinRoles.MemberId,
-            expectedAssignmentIds: assignments.map(({ id }) => id),
-          });
+            expectedAssignmentIds: assignments.map(({ id }) => id)
+          })
           expect(
-            yield* Effect.flip(
-              Operations.acceptInvitation(workspace.id, recipient, invitation.details.id),
-            ),
-          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
-          expect(yield* bound.members.findActive({ _tag: "Human", id: recipient })).toEqual(
-            Option.none(),
-          );
+            yield* Effect.flip(Operations.acceptInvitation(workspace.id, recipient, invitation.details.id))
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } })
+          expect(yield* bound.members.findActive({ _tag: "Human", id: recipient })).toEqual(Option.none())
           expect(yield* bound.invitations.get(invitation.details.id)).toMatchObject({
             _tag: "Some",
-            value: { state: { _tag: "Pending" } },
-          });
-        }),
-      ),
-    ),
-  );
-});
+            value: { state: { _tag: "Pending" } }
+          })
+        })
+      )
+    )
+  )
+})

@@ -1,21 +1,21 @@
-import { For, Match, Switch, splitProps, type JSX } from "solid-js";
-import { IconCheck } from "@amends-dev/icons";
-import { Avatar } from "../components/avatar/index.ts";
-import { Badge } from "../components/badge/index.ts";
-import { Message } from "../components/message/index.ts";
-import { StatusMark } from "../components/status-mark/index.ts";
-import { TaskStatus, type TaskState } from "../components/task-status/index.ts";
-import { TurnActivity } from "../components/turn-status/index.ts";
-import type { AvatarToneName } from "../foundations/color/tokens.ts";
-import { classes } from "../internal/props.ts";
-import * as s from "./feature-art.css.ts";
+import { IconCheck } from "@amends-dev/icons"
+import { For, Match, Switch, splitProps, type JSX } from "solid-js"
+import { Avatar } from "../components/avatar/index.ts"
+import { Badge } from "../components/badge/index.ts"
+import { Message } from "../components/message/index.ts"
+import { StatusMark } from "../components/status-mark/index.ts"
+import { TaskStatus, type TaskState } from "../components/task-status/index.ts"
+import { TurnActivity } from "../components/turn-status/index.ts"
+import type { AvatarToneName } from "../foundations/color/tokens.ts"
+import { classes } from "../internal/props.ts"
+import * as s from "./feature-art.css.ts"
 
 /** Which part of the app a `FeatureArt` shows. */
-export type FeatureArtKind = "threads" | "tasks" | "agents" | "connections";
+export type FeatureArtKind = "threads" | "tasks" | "agents" | "connections"
 
 export type FeatureArtProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
-  kind: FeatureArtKind;
-};
+  kind: FeatureArtKind
+}
 
 /**
  * A corner of the app, drawn with its own components and sample people: a thread with its replies
@@ -23,7 +23,7 @@ export type FeatureArtProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children
  * Decorative: the card beside it says what it shows.
  */
 export function FeatureArt(props: FeatureArtProps) {
-  const [local, native] = splitProps(props, ["kind", "class"]);
+  const [local, native] = splitProps(props, ["kind", "class"])
   return (
     <div {...native} class={classes(s.art, local.class)}>
       <Switch>
@@ -41,7 +41,7 @@ export function FeatureArt(props: FeatureArtProps) {
         </Match>
       </Switch>
     </div>
-  );
+  )
 }
 
 function ThreadsArt() {
@@ -53,7 +53,7 @@ function ThreadsArt() {
           count={3}
           people={[
             { name: "Sara", tone: "sand" },
-            { name: "Yumi", tone: "lilac" },
+            { name: "Yumi", tone: "lilac" }
           ]}
         />
       </Message.Root>
@@ -70,20 +70,20 @@ function ThreadsArt() {
         </li>
       </ul>
     </>
-  );
+  )
 }
 
 const tasks: ReadonlyArray<{
-  readonly state: TaskState;
-  readonly title: string;
-  readonly assignee: string;
-  readonly tone: AvatarToneName;
+  readonly state: TaskState
+  readonly title: string
+  readonly assignee: string
+  readonly tone: AvatarToneName
 }> = [
   { state: "progress", title: "Ship the rollout plan", assignee: "Yumi", tone: "lilac" },
   { state: "open", title: "Review the API changes", assignee: "Sara", tone: "sand" },
   { state: "triage", title: "Flaky upload test", assignee: "Graeme", tone: "slate" },
-  { state: "done", title: "Draft the release notes", assignee: "AJ", tone: "ink" },
-];
+  { state: "done", title: "Draft the release notes", assignee: "AJ", tone: "ink" }
+]
 
 function TasksArt() {
   return (
@@ -101,10 +101,10 @@ function TasksArt() {
         </For>
       </ul>
     </>
-  );
+  )
 }
 
-const steps = ["Read the thread", "Searched the repository", "Ran the release checklist"];
+const steps = ["Read the thread", "Searched the repository", "Ran the release checklist"]
 
 function AgentsArt() {
   return (
@@ -128,7 +128,7 @@ function AgentsArt() {
         </li>
       </ul>
     </>
-  );
+  )
 }
 
 const connections = [
@@ -136,8 +136,8 @@ const connections = [
   { name: "OpenAI", kind: "Models" },
   { name: "Daytona", kind: "Sandboxes" },
   { name: "opencode", kind: "Agent" },
-  { name: "MCP server", kind: "Tools" },
-] as const;
+  { name: "MCP server", kind: "Tools" }
+] as const
 
 function ConnectionsArt() {
   return (
@@ -153,5 +153,5 @@ function ConnectionsArt() {
         )}
       </For>
     </ul>
-  );
+  )
 }

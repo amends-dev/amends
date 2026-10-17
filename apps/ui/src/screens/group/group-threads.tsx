@@ -1,68 +1,64 @@
-import { Match, Show, Switch, createEffect, createSignal, on } from "solid-js";
-import { IconMarkAttach } from "@amends-dev/icons";
-import { Button } from "../../components/button/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { EmptyState } from "../../components/empty-state/index.ts";
-import {
-  Composer,
-  type ComposerCommand,
-  type MentionCandidate,
-} from "../../components/composer/index.ts";
-import { IconButton } from "../../components/icon-button/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Timeline, type TimelineEntry } from "../timeline/index.ts";
-import * as s from "./group.css.ts";
+import { IconMarkAttach } from "@amends-dev/icons"
+import { Match, Show, Switch, createEffect, createSignal, on } from "solid-js"
+import { Button } from "../../components/button/index.ts"
+import { Composer, type ComposerCommand, type MentionCandidate } from "../../components/composer/index.ts"
+import { EmptyState } from "../../components/empty-state/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { IconButton } from "../../components/icon-button/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Timeline, type TimelineEntry } from "../timeline/index.ts"
+import * as s from "./group.css.ts"
 
 /** Why a message was not sent; the draft stays for another try. */
-export type SendError = "changed" | "denied" | "gone" | "invalid" | "failed";
+export type SendError = "changed" | "denied" | "gone" | "invalid" | "failed"
 
 const sendErrors: { readonly [Error in SendError]: string } = {
   changed: "This conversation changed while you were sending. Try again.",
   denied: "You can’t post here.",
   gone: "This conversation is no longer available to you.",
   invalid: "Write something to send.",
-  failed: "We couldn’t send this. Try again when the host is reachable.",
-};
+  failed: "We couldn’t send this. Try again when the host is reachable."
+}
 
 /**
  * Why a conversation shows no messages: still loading, closed to the reader (such as after
  * leaving its group), or failed to load and worth retrying.
  */
-export type ConversationStatus = "loading" | "unavailable" | "failed";
+export type ConversationStatus = "loading" | "unavailable" | "failed"
 
 export interface ConversationProps {
-  readonly entries: readonly TimelineEntry[];
-  readonly taskHref?: (key: string) => string;
-  readonly onReact?: (messageId: string, emoji: string) => void;
+  readonly entries: ReadonlyArray<TimelineEntry>
+  readonly taskHref?: (key: string) => string
+  readonly onReact?: (messageId: string, emoji: string) => void
   /** The composer's placeholder and name, such as "Message #general". */
-  readonly placeholder: string;
+  readonly placeholder: string
   /** The draft, as markdown whose mentions link to members. */
-  readonly draft: string;
-  readonly onDraftChange: (draft: string) => void;
-  readonly onSend: (text: string) => void;
-  readonly sending?: boolean;
-  readonly sendError?: SendError;
-  readonly onAttach?: () => void;
+  readonly draft: string
+  readonly onDraftChange: (draft: string) => void
+  readonly onSend: (text: string) => void
+  readonly sending?: boolean
+  readonly sendError?: SendError
+  readonly onAttach?: () => void
   /** People the draft can mention after "@", which also shows the Mention action. */
-  readonly mentionCandidates?: readonly MentionCandidate[];
+  readonly mentionCandidates?: ReadonlyArray<MentionCandidate>
   /** What typing "/" as the whole draft offers to do, such as following or renaming. */
-  readonly commands?: readonly ComposerCommand[];
+  readonly commands?: ReadonlyArray<ComposerCommand>
   /** Runs a command by name, in place of sending the "/name" typed. */
-  readonly onCommand?: (name: string) => void;
+  readonly onCommand?: (name: string) => void
   /** In place of the timeline, while it loads or when it cannot. */
-  readonly status?: ConversationStatus;
-  readonly onRetry?: () => void;
+  readonly status?: ConversationStatus
+  readonly onRetry?: () => void
   /** Older entries remain; the top of the timeline offers to load them. */
   readonly earlier?: {
-    readonly loading?: boolean;
+    readonly loading?: boolean
     /** The last older page failed; loading again tries it once more. */
-    readonly failed?: boolean;
-    readonly onLoad: () => void;
-  };
+    readonly failed?: boolean
+    readonly onLoad: () => void
+  }
   /** Put a day seam before each new day. */
-  readonly days?: boolean;
+  readonly days?: boolean
   /** The message the reader came to see: set apart and scrolled to. */
-  readonly focusId?: string;
+  readonly focusId?: string
 }
 
 /**
@@ -70,23 +66,23 @@ export interface ConversationProps {
  * leaves them where they are. `atBottom` says whether they are there, and `toBottom` returns them.
  */
 export function useStickToBottom(size: () => number) {
-  const [body, setBody] = createSignal<HTMLDivElement>();
-  const [atBottom, setAtBottom] = createSignal(true);
+  const [body, setBody] = createSignal<HTMLDivElement>()
+  const [atBottom, setAtBottom] = createSignal(true)
   const onScroll = () => {
-    const element = body();
-    if (element) setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 80);
-  };
+    const element = body()
+    if (element) setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 80)
+  }
   const toBottom = () => {
-    const element = body();
-    if (element) element.scrollTop = element.scrollHeight;
-    setAtBottom(true);
-  };
+    const element = body()
+    if (element) element.scrollTop = element.scrollHeight
+    setAtBottom(true)
+  }
   createEffect(
     on([body, size], ([element]) => {
-      if (element && atBottom()) element.scrollTop = element.scrollHeight;
-    }),
-  );
-  return { ref: setBody, onScroll, atBottom, toBottom };
+      if (element && atBottom()) element.scrollTop = element.scrollHeight
+    })
+  )
+  return { ref: setBody, onScroll, atBottom, toBottom }
 }
 
 /** The composer under a timeline, with formatting, attach and mention actions, and Send. */
@@ -107,28 +103,24 @@ export function ConversationComposer(props: ConversationProps) {
         <Composer.Toolbar>
           <Composer.FormattingToggle />
           <Show when={props.onAttach}>
-            {(attach) => (
-              <IconButton icon={IconMarkAttach} label="Attach" onClick={() => attach()()} />
-            )}
+            {(attach) => <IconButton icon={IconMarkAttach} label="Attach" onClick={() => attach()()} />}
           </Show>
           <Show when={props.mentionCandidates}>
             <Composer.Mention />
           </Show>
           <Composer.Send />
         </Composer.Toolbar>
-        <Show when={props.sendError}>
-          {(error) => <Composer.Alert>{sendErrors[error()]}</Composer.Alert>}
-        </Show>
+        <Show when={props.sendError}>{(error) => <Composer.Alert>{sendErrors[error()]}</Composer.Alert>}</Show>
       </Composer.Root>
     </Pane.Footer>
-  );
+  )
 }
 
 /** A conversation's loading or unavailable state, in place of its timeline. */
 export function ConversationState(props: {
-  readonly status: ConversationStatus;
-  readonly subject: "group" | "thread";
-  readonly onRetry?: () => void;
+  readonly status: ConversationStatus
+  readonly subject: "group" | "thread"
+  readonly onRetry?: () => void
 }) {
   return (
     <Switch>
@@ -140,42 +132,36 @@ export function ConversationState(props: {
       <Match when={props.status === "unavailable"}>
         <EmptyState
           art="held-back"
-          title={
-            props.subject === "group" ? "This group isn’t available" : "This thread isn’t available"
-          }
+          title={props.subject === "group" ? "This group isn’t available" : "This thread isn’t available"}
           lines={[
             props.subject === "group"
               ? "You may no longer be a member of it."
-              : "It may be in a group you no longer belong to.",
+              : "It may be in a group you no longer belong to."
           ]}
         />
       </Match>
       <Match when={props.status === "failed"}>
         <EmptyState
           art="came-apart"
-          title={
-            props.subject === "group" ? "Can’t load this conversation" : "Can’t load this thread"
-          }
+          title={props.subject === "group" ? "Can’t load this conversation" : "Can’t load this thread"}
           lines={["Try again once the host is reachable."]}
         >
-          <Show when={props.onRetry}>
-            {(retry) => <Button onClick={() => retry()()}>Try again</Button>}
-          </Show>
+          <Show when={props.onRetry}>{(retry) => <Button onClick={() => retry()()}>Try again</Button>}</Show>
         </EmptyState>
       </Match>
     </Switch>
-  );
+  )
 }
 
 /** Loads older entries, above the timeline. */
 export function Earlier(props: {
-  readonly loading?: boolean;
-  readonly failed?: boolean;
-  readonly onLoad: () => void;
+  readonly loading?: boolean
+  readonly failed?: boolean
+  readonly onLoad: () => void
   /** Such as "Show earlier messages". */
-  readonly label: string;
+  readonly label: string
   /** Such as "earlier messages", for the failure. */
-  readonly what: string;
+  readonly what: string
 }) {
   return (
     <div class={s.earlier}>
@@ -186,33 +172,33 @@ export function Earlier(props: {
         {props.loading ? "Loading…" : props.failed ? "Try again" : props.label}
       </Button>
     </div>
-  );
+  )
 }
 
 export interface GroupThreadsProps extends ConversationProps {
   /** The message whose thread is open beside the timeline. */
-  readonly openThreadId?: string;
-  readonly onOpenThread: (messageId: string) => void;
+  readonly openThreadId?: string
+  readonly onOpenThread: (messageId: string) => void
   /** Shown while the group has no messages yet. */
   readonly welcome?: {
-    readonly groupName: string;
-    readonly memberNames: readonly string[];
+    readonly groupName: string
+    readonly memberNames: ReadonlyArray<string>
     /** A direct conversation, named by the people in it. */
-    readonly direct?: boolean;
-  };
+    readonly direct?: boolean
+  }
   /** Previewing a public group: a prompt to join replaces the composer. */
   readonly preview?: {
-    readonly groupName: string;
-    readonly onJoin: () => void;
-    readonly joining?: boolean;
-  };
+    readonly groupName: string
+    readonly onJoin: () => void
+    readonly joining?: boolean
+  }
 }
 
-const list = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+const list = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 
 /** A group's Threads tab: the timeline and the composer. Place it inside GroupPane. */
 export function GroupThreads(props: GroupThreadsProps) {
-  const scroll = useStickToBottom(() => props.entries.length);
+  const scroll = useStickToBottom(() => props.entries.length)
   return (
     <>
       <Pane.Body ref={scroll.ref} onScroll={scroll.onScroll}>
@@ -243,9 +229,7 @@ export function GroupThreads(props: GroupThreadsProps) {
           }
         >
           <Match when={props.status}>
-            {(status) => (
-              <ConversationState status={status()} subject="group" onRetry={props.onRetry} />
-            )}
+            {(status) => <ConversationState status={status()} subject="group" onRetry={props.onRetry} />}
           </Match>
           <Match when={props.entries.length === 0 && props.welcome}>
             {(welcome) => (
@@ -260,9 +244,9 @@ export function GroupThreads(props: GroupThreadsProps) {
                   ...(welcome().direct
                     ? []
                     : [
-                        `${list.format(welcome().memberNames)} ${welcome().memberNames.length === 1 ? "is a member" : "are members"}.`,
+                        `${list.format(welcome().memberNames)} ${welcome().memberNames.length === 1 ? "is a member" : "are members"}.`
                       ]),
-                  "Send the first message to start the conversation.",
+                  "Send the first message to start the conversation."
                 ]}
               />
             )}
@@ -282,9 +266,7 @@ export function GroupThreads(props: GroupThreadsProps) {
             <div class={s.prompt}>
               <div class={s.promptText}>
                 <p class={s.promptTitle}>You’re previewing #{preview().groupName}</p>
-                <p class={s.promptNote}>
-                  Read messages, tasks, and files. Join the group to participate.
-                </p>
+                <p class={s.promptNote}>Read messages, tasks, and files. Join the group to participate.</p>
               </div>
               <Button disabled={preview().joining} onClick={() => preview().onJoin()}>
                 Join group
@@ -294,5 +276,5 @@ export function GroupThreads(props: GroupThreadsProps) {
         )}
       </Show>
     </>
-  );
+  )
 }

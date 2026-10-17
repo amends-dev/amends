@@ -10,16 +10,20 @@
  *
  * @since 0.1.0
  */
-import { DeliveryJobs } from "@amends-dev/core/channel";
-import { Store } from "@amends-dev/core/journal";
-import { ThreadId } from "@amends-dev/core/thread";
-import { Workspace } from "@amends-dev/core/workspace";
-import { Effect, Layer, PrimaryKey, Schema } from "effect";
-import { ClusterSchema, Entity } from "effect/cluster";
-import { Rpc } from "effect/rpc";
-import * as DeliveryRunner from "./DeliveryRunner.ts";
-import * as JobRequests from "./JobRequests.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { DeliveryJobs } from "@amends-dev/core/channel"
+import { Store, StoreError } from "@amends-dev/core/journal"
+import { ThreadId } from "@amends-dev/core/thread"
+import { WorkspaceId } from "@amends-dev/core/workspace"
+import * as ClusterSchema from "effect/cluster/ClusterSchema"
+import * as Entity from "effect/cluster/Entity"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as PrimaryKey from "effect/PrimaryKey"
+import * as Rpc from "effect/rpc/Rpc"
+import * as Schema from "effect/Schema"
+import * as DeliveryRunner from "./DeliveryRunner.ts"
+import * as JobRequests from "./JobRequests.ts"
 
 /**
  * A request to deliver what the thread's contacts were told, keyed by the commit that stored it;
@@ -30,10 +34,10 @@ import { StoreError } from "@amends-dev/core/journal";
  */
 export class Deliver extends Schema.Class<Deliver>("amends/DeliveryJob/Deliver")({
   ...DeliveryJobs.Job.fields,
-  key: Schema.String,
+  key: Schema.String
 }) {
   [PrimaryKey.symbol]() {
-    return this.key;
+    return this.key
   }
 }
 
@@ -45,26 +49,28 @@ export class Deliver extends Schema.Class<Deliver>("amends/DeliveryJob/Deliver")
  * @since 0.1.0
  */
 export const entity = Entity.make("amends/DeliveryJob", [
-  Rpc.make("Deliver", { payload: Deliver }).annotate(ClusterSchema.Persisted, true),
-]);
+  Rpc.make("Deliver", { payload: Deliver }).annotate(ClusterSchema.Persisted, true)
+])
 
 /**
  * The ID of `job`'s entity: its workspace and thread as a JSON array, which the worker reads back
  * into the job.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
-export const entityId = (job: DeliveryJobs.Job) => JSON.stringify([job.workspaceId, job.threadId]);
+export const entityId = (job: DeliveryJobs.Job) => encodeEntityId([job.workspaceId, job.threadId])
 
-const decodeEntityId = Schema.decodeUnknownSync(
-  Schema.fromJsonString(Schema.Tuple([Workspace.Id, ThreadId.Id])),
-);
+/** An entity's ID, written and read back by the one codec. */
+const EntityId = Schema.fromJsonString(Schema.Tuple([WorkspaceId.WorkspaceId, ThreadId.ThreadId]))
+const encodeEntityId = Schema.encodeSync(EntityId)
+const decodeEntityId = Schema.decodeUnknownSync(EntityId)
+
 /** The job an entity is. */
 const jobOf = (entityId: string): DeliveryJobs.Job => {
-  const [workspaceId, threadId] = decodeEntityId(entityId);
-  return { workspaceId, threadId };
-};
+  const [workspaceId, threadId] = decodeEntityId(entityId)
+  return { workspaceId, threadId }
+}
 
 /**
  * Provides core's `DeliveryJobs.DeliveryJobs`, whose requests Cluster stores, each keyed by the
@@ -78,24 +84,24 @@ const jobOf = (entityId: string): DeliveryJobs.Job => {
 export const layerRequests = Layer.effect(
   DeliveryJobs.DeliveryJobs,
   Effect.gen(function* () {
-    const wakeup = yield* JobRequests.Wakeup;
-    const deliveryJobClient = yield* entity.client;
+    const wakeup = yield* JobRequests.Wakeup
+    const deliveryJobClient = yield* entity.client
     return DeliveryJobs.DeliveryJobs.of({
       requestDeliver: Effect.fnUntraced(function* ({ workspaceId, threadId }) {
-        const storeTransaction = yield* Store.Transaction;
+        const storeTransaction = yield* Store.Transaction
         const deliver = new Deliver({
           workspaceId,
           threadId,
-          key: `deliver:${storeTransaction.id}`,
-        });
+          key: `deliver:${storeTransaction.id}`
+        })
         yield* deliveryJobClient(entityId(deliver))
           .Deliver(deliver, { discard: true })
-          .pipe(Effect.mapError(StoreError.failed("Store", "request delivery job")));
-        yield* wakeup.afterCommit;
-      }),
-    });
-  }),
-);
+          .pipe(Effect.mapError(StoreError.failed("Store", "request delivery job")))
+        yield* wakeup.afterCommit
+      })
+    })
+  })
+)
 
 /**
  * Handle each request when it arrives, through the job's delivery runner, one at a time. A request
@@ -108,39 +114,36 @@ export const layerRequests = Layer.effect(
  */
 export const layerWorker = entity.toLayer(
   Effect.gen(function* () {
-    const job = jobOf((yield* Entity.CurrentAddress).entityId);
-    const { workspaceId, threadId } = job;
-    const deliveryRunner = yield* DeliveryRunner.make(job);
+    const job = jobOf((yield* Entity.CurrentAddress).entityId)
+    const { workspaceId, threadId } = job
+    const deliveryRunner = yield* DeliveryRunner.make(job)
     /** What a log says of `request`: its job and key. */
-    const named = (request: Deliver) => ({ workspaceId, threadId, request: request.key });
+    const named = (request: Deliver) => ({ workspaceId, threadId, request: request.key })
     const deliver = Effect.fnUntraced(function* (request: Deliver) {
       yield* JobRequests.retrying(
         "Delivery job",
         named(request),
         deliveryRunner.deliver,
-        JobRequests.maxFailures - 1,
+        JobRequests.maxFailures - 1
       ).pipe(
         Effect.catch(
           Effect.fnUntraced(function* (error) {
-            const deliveryId =
-              error instanceof DeliveryRunner.RunFailed ? error.deliveryId : undefined;
+            const deliveryId = error instanceof DeliveryRunner.RunFailed ? error.deliveryId : undefined
             if (deliveryId === undefined || JobRequests.isWorkspaceNotFound(error))
-              return yield* JobRequests.drop("Delivery job", named(request), error);
+              return yield* JobRequests.drop("Delivery job", named(request), error)
             yield* JobRequests.retrying(
               "Delivery job",
               named(request),
-              deliveryRunner.giveUp(deliveryId, "Its delivery job could not reach the channel."),
-            ).pipe(
-              Effect.catch((error) => JobRequests.drop("Delivery job", named(request), error)),
-            );
-          }),
-        ),
-      );
-    });
-    return entity.of({ Deliver: ({ payload }) => deliver(payload) });
+              deliveryRunner.giveUp(deliveryId, "Its delivery job could not reach the channel.")
+            ).pipe(Effect.catch((error) => JobRequests.drop("Delivery job", named(request), error)))
+          })
+        )
+      )
+    })
+    return entity.of({ Deliver: ({ payload }) => deliver(payload) })
   }),
-  { concurrency: 1, maxIdleTime: "1 minute" },
-);
+  { concurrency: 1, maxIdleTime: "1 minute" }
+)
 
 /**
  * Both `layerRequests` and `layerWorker`, over the host's Cluster: the requests commits store, and
@@ -149,4 +152,4 @@ export const layerWorker = entity.toLayer(
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.merge(layerWorker, layerRequests);
+export const layer = Layer.merge(layerWorker, layerRequests)

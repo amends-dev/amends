@@ -9,4 +9,4 @@
 /**
  * @since 0.1.0
  */
-export * as Operation from "./Operation.ts";
+export * as Operation from "./Operation.ts"

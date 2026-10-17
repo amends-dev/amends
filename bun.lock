@@ -113,6 +113,7 @@
       "name": "@amends-dev/client",
       "version": "0.0.0",
       "dependencies": {
+        "@amends-dev/connection": "workspace:*",
         "@amends-dev/core": "workspace:*",
         "@amends-dev/gateway": "workspace:*",
         "@amends-dev/http": "workspace:*",

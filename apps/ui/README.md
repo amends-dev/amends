@@ -30,8 +30,8 @@ An app imports UI by subpath, such as `@amends-dev/ui/patterns/shell` or
 wraps the app in [`Theme`](#foundations):
 
 ```ts
-import "@amends-dev/ui/foundations/typography/fonts";
-import "@amends-dev/ui/styles";
+import "@amends-dev/ui/foundations/typography/fonts"
+import "@amends-dev/ui/styles"
 ```
 
 Apps add no styles of their own. A visual gap is filled here, one piece at a time, and verified in

@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
+
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * How far a human member has read a thread, by timeline sequence. Private to that member.
@@ -19,11 +20,11 @@ import * as MemberId from "../workspace/MemberId.ts";
  * @since 0.1.0
  */
 export const ThreadPosition = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
-  threadId: ThreadId.Id,
-  readThrough: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
+  threadId: ThreadId.ThreadId,
+  readThrough: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category schemas
@@ -38,11 +39,11 @@ export interface ThreadPosition extends Schema.Schema.Type<typeof ThreadPosition
  * @since 0.1.0
  */
 export const GroupRead = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
-  groupId: GroupId.Id,
-  readAt: Schema.DateTimeUtcFromString,
-});
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
+  groupId: GroupId.GroupId,
+  readAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -58,9 +59,9 @@ export interface GroupRead extends Schema.Schema.Type<typeof GroupRead> {}
  * @since 0.1.0
  */
 export const MarkThreadReadInput = Schema.Struct({
-  threadId: ThreadId.Id,
-  throughSequence: ThreadPosition.fields.readThrough,
-});
+  threadId: ThreadId.ThreadId,
+  throughSequence: ThreadPosition.fields.readThrough
+})
 
 /**
  * @category options
@@ -74,7 +75,7 @@ export interface MarkThreadReadInput extends Schema.Schema.Type<typeof MarkThrea
  * @category options
  * @since 0.1.0
  */
-export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.Id });
+export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.GroupId })
 
 /**
  * @category options

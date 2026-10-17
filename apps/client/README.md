@@ -63,13 +63,13 @@ the workspace's client for the mounted owner, one at a time, and returns `{ pend
 bottom:
 
 ```ts
-const request = useWorkspaceMutation(workspaceId, renameSelf(workspaceId));
+const request = useWorkspaceMutation(workspaceId, renameSelf(workspaceId))
 async function save() {
-  setError(undefined);
-  const exit = await request.run(name());
-  if (exit === undefined) return;
-  if (Exit.isSuccess(exit)) saved();
-  else setError(workspaceFailure(exit.cause));
+  setError(undefined)
+  const exit = await request.run(name())
+  if (exit === undefined) return
+  if (Exit.isSuccess(exit)) saved()
+  else setError(workspaceFailure(exit.cause))
 }
 ```
 

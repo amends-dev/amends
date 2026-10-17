@@ -7,14 +7,18 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Schema } from "effect";
-import * as Agent from "../agent/Agent.ts";
-import type { Option } from "effect";
-import * as Store from "../journal/Store.ts";
-import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
-import * as StoreInput from "../journal/StoreInput.ts";
-import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import type * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Agent from "../agent/Agent.ts"
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as StoreInput from "../journal/StoreInput.ts"
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
 
 /**
  * What an agent's harness session resumes from, beside its conversation, which the session log
@@ -26,8 +30,8 @@ import * as StoreError from "../journal/StoreError.ts";
  */
 export const Resume = Schema.Struct({
   agent: Schema.String,
-  agentState: Schema.optionalKey(Schema.Json),
-});
+  agentState: Schema.optionalKey(Schema.Json)
+})
 
 /**
  * @category schemas
@@ -46,8 +50,8 @@ export interface Resume extends Schema.Schema.Type<typeof Resume> {}
 export const Saved = Schema.Struct({
   ...Resume.fields,
   promptedThroughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  selection: Agent.Selection,
-});
+  selection: Agent.Selection
+})
 
 /**
  * @category schemas
@@ -73,13 +77,13 @@ export class SessionStateStore extends Context.Service<
   {
     /** The participation's session as its last turn left it, or none before its first ended. */
     readonly get: (
-      participationId: ThreadParticipationId.Id,
-    ) => Effect.Effect<Option.Option<Saved>, StoreError.StoreError>;
+      participationId: ThreadParticipationId.ThreadParticipationId
+    ) => Effect.Effect<Option.Option<Saved>, StoreError.StoreError>
     /** Store the participation's session, in place of any it had. */
     readonly set: (
-      participationId: ThreadParticipationId.Id,
-      saved: Saved,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+      participationId: ThreadParticipationId.ThreadParticipationId,
+      saved: Saved
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/turn/SessionStateStore") {}
 
@@ -90,44 +94,44 @@ export class SessionStateStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (driver: SessionStateStore["Service"]): SessionStateStore["Service"] => {
-  const read = StoreInput.read("SessionStateStore");
+  const read = StoreInput.read("SessionStateStore")
   return {
     get: (participationId) =>
-      Effect.flatMap(read("get", ThreadParticipationId.Id, participationId), driver.get),
+      Effect.flatMap(read("get", ThreadParticipationId.ThreadParticipationId, participationId), driver.get),
     set: Effect.fn("SessionStateStore.set")(function* (participationId, saved) {
       return yield* driver.set(
-        yield* read("set", ThreadParticipationId.Id, participationId),
-        yield* read("set", Saved, saved),
-      );
-    }),
-  };
-};
+        yield* read("set", ThreadParticipationId.ThreadParticipationId, participationId),
+        yield* read("set", Saved, saved)
+      )
+    })
+  }
+}
 
 /** A participation's session as JSON. */
-const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(Saved)));
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(Saved)))
 
 /**
  * Each participation's harness session in the workspace's memory, written in its transactions.
  */
 const makeMemory = Effect.fn("SessionStateStore.makeMemory")(function* () {
-  const { read, write } = yield* Store.MemoryBinding;
+  const { read, write } = yield* Store.MemoryBinding
   const driver: SessionStateStore["Service"] = {
     get: Effect.fn("SessionStateStore.memory.get")(
       function* (participationId) {
-        return yield* rows.get((yield* read).sessionStates, participationId);
+        return yield* rows.get((yield* read).sessionStates, participationId)
       },
-      Effect.mapError(StoreError.failed("SessionStateStore", "get")),
+      Effect.mapError(StoreError.failed("SessionStateStore", "get"))
     ),
     set: Effect.fn("SessionStateStore.memory.set")(
       function* (participationId, saved) {
-        const row = yield* rows.encode(saved);
-        (yield* write).sessionStates.set(participationId, row);
+        const row = yield* rows.encode(saved)
+        ;(yield* write).sessionStates.set(participationId, row)
       },
-      Effect.mapError(StoreError.failed("SessionStateStore", "set")),
-    ),
-  };
-  return make(driver);
-});
+      Effect.mapError(StoreError.failed("SessionStateStore", "set"))
+    )
+  }
+  return make(driver)
+})
 
 /**
  * Provide `SessionStateStore` in process memory, over the workspace's `Store.MemoryBinding`: what
@@ -138,4 +142,4 @@ const makeMemory = Effect.fn("SessionStateStore.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(SessionStateStore, makeMemory());
+export const layerMemory = Layer.effect(SessionStateStore, makeMemory())

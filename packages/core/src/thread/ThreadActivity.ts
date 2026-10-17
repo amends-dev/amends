@@ -6,12 +6,13 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Subject from "../journal/Subject.ts";
-import * as ThreadId from "./ThreadId.ts";
-import * as ThreadParticipationId from "./ThreadParticipationId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Notification from "../notification/Notification.ts";
+
+import * as Schema from "effect/Schema"
+import * as Subject from "../journal/Subject.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ThreadId from "./ThreadId.ts"
+import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 
 /**
  * Names an activity.
@@ -19,13 +20,13 @@ import * as Notification from "../notification/Notification.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadActivityId"));
+export const ThreadActivityId = Schema.NonEmptyString.pipe(Schema.brand("ThreadActivityId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type ThreadActivityId = typeof ThreadActivityId.Type
 
 /**
  * An activity kind's name: dotted, chosen by the domain that owns the kind, such as
@@ -35,15 +36,15 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Kind = Schema.String.check(
-  Schema.isPattern(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/),
-).pipe(Schema.brand("ThreadActivityKind"));
+export const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/)).pipe(
+  Schema.brand("ThreadActivityKind")
+)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Kind = typeof Kind.Type;
+export type Kind = typeof Kind.Type
 
 /**
  * What every activity has whatever its kind: its identity, its thread, its position there, and
@@ -53,12 +54,12 @@ export type Kind = typeof Kind.Type;
  * @since 0.1.0
  */
 export const Common = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
+  id: ThreadActivityId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
-  occurredAt: Schema.DateTimeUtcFromString,
-});
+  occurredAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * An activity as recorded and stored, with its details in their kind's encoded form.
@@ -78,8 +79,8 @@ export const ThreadActivity = Schema.Struct({
   /** Whether it counts as the thread's and its group's latest activity for readers. */
   newActivity: Schema.Boolean,
   /** The change the activity reports, in its kind's encoded form. */
-  details: Schema.Json,
-});
+  details: Schema.Json
+})
 
 /**
  * @category schemas
@@ -95,14 +96,14 @@ export interface ThreadActivity extends Schema.Schema.Type<typeof ThreadActivity
  * @since 0.1.0
  */
 export const Recipient = Schema.Struct({
-  participationId: ThreadParticipationId.Id,
+  participationId: ThreadParticipationId.ThreadParticipationId,
   recipient: Notification.Recipient,
   /**
    * Whether the activity asks this recipient for work: an agent to take it into a turn. People
    * are told, never asked, and an agent's own messages ask no work of other agents.
    */
-  requestsWork: Schema.Boolean,
-});
+  requestsWork: Schema.Boolean
+})
 
 /**
  * @category schemas

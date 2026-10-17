@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * A TCP port a sandbox exposes, from 1 to 65535.
@@ -13,15 +14,13 @@ import { Schema } from "effect";
  * @category schemas
  * @since 0.1.0
  */
-export const Port = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })).pipe(
-  Schema.brand("Port"),
-);
+export const Port = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })).pipe(Schema.brand("Port"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Port = typeof Port.Type;
+export type Port = typeof Port.Type
 
 /**
  * The kind of connection an endpoint is for; its URL uses the secure scheme when the provider
@@ -30,17 +29,20 @@ export type Port = typeof Port.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const EndpointProtocol = Schema.Literals(["http", "ws"]);
+export const EndpointProtocol = Schema.Literals(["http", "ws"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type EndpointProtocol = typeof EndpointProtocol.Type;
+export type EndpointProtocol = typeof EndpointProtocol.Type
 
 /**
- * How to reach a sandbox port from outside: the URL, and any headers the provider requires. A
- * request to the URL with those headers reaches the server with the request's other headers
+ * How to reach a sandbox port from outside: the URL, and any headers the provider requires.
+ *
+ * **Details**
+ *
+ * A request to the URL with those headers reaches the server with the request's other headers
  * intact, `Authorization` included.
  *
  * @category schemas
@@ -48,8 +50,8 @@ export type EndpointProtocol = typeof EndpointProtocol.Type;
  */
 export const Endpoint = Schema.Struct({
   url: Schema.String,
-  headers: Schema.Record(Schema.String, Schema.Redacted(Schema.String)),
-});
+  headers: Schema.Record(Schema.String, Schema.Redacted(Schema.String))
+})
 
 /**
  * @category schemas
@@ -58,20 +60,23 @@ export const Endpoint = Schema.Struct({
 export interface Endpoint extends Schema.Schema.Type<typeof Endpoint> {}
 
 /**
- * Which outbound destinations the sandbox may reach. `AllowList` allows the listed hosts and
- * CIDR ranges, and `deniedCidrs` overrides both, for example to block a cloud metadata address
- * inside an allowed range.
+ * Which outbound destinations the sandbox may reach.
+ *
+ * **Details**
+ *
+ * `AllowList` allows the listed hosts and CIDR ranges, and `deniedCidrs` overrides both, for
+ * example to block a cloud metadata address inside an allowed range.
  *
  * **Example** (Allowing one registry and a private network, except its metadata address)
  *
  * ```ts
- * import { Network } from "@amends-dev/sandbox";
+ * import { Network } from "@amends-dev/sandbox"
  *
  * const policy = Network.NetworkPolicy.cases.AllowList.make({
  *   allowedHosts: ["registry.npmjs.org"],
  *   allowedCidrs: ["10.0.0.0/8"],
- *   deniedCidrs: ["169.254.169.254/32"],
- * });
+ *   deniedCidrs: ["169.254.169.254/32"]
+ * })
  * ```
  *
  * @category schemas
@@ -83,34 +88,38 @@ export const NetworkPolicy = Schema.TaggedUnion({
   AllowList: {
     allowedHosts: Schema.Array(Schema.String),
     allowedCidrs: Schema.Array(Schema.String),
-    deniedCidrs: Schema.Array(Schema.String),
-  },
-});
+    deniedCidrs: Schema.Array(Schema.String)
+  }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type NetworkPolicy = typeof NetworkPolicy.Type;
+export type NetworkPolicy = typeof NetworkPolicy.Type
 
 /**
  * Sets `setHeaders` on outbound HTTPS requests to `host` whose path starts with `pathPrefix` and
- * that carry every header in `matchHeaders` with exactly that value. The sandbox holds only a
- * placeholder credential, matched here, and the real value is set outside it.
+ * that carry every header in `matchHeaders` with exactly that value.
+ *
+ * **Details**
+ *
+ * The sandbox holds only a placeholder credential, matched here, and the real value is set outside
+ * it.
  *
  * **Example** (Giving a sandbox an API key it never sees)
  *
  * ```ts
- * import { Network } from "@amends-dev/sandbox";
- * import type { Redacted } from "effect";
+ * import { Network } from "@amends-dev/sandbox"
+ * import type { Redacted } from "effect"
  *
- * declare const apiKey: Redacted.Redacted<string>;
+ * declare const apiKey: Redacted.Redacted<string>
  *
  * const anthropicKey: Network.RequestTransformation = {
  *   host: "api.anthropic.com",
  *   matchHeaders: { "x-api-key": "placeholder" },
- *   setHeaders: { "x-api-key": apiKey },
- * };
+ *   setHeaders: { "x-api-key": apiKey }
+ * }
  * ```
  *
  * @category schemas
@@ -120,8 +129,8 @@ export const RequestTransformation = Schema.Struct({
   host: Schema.String,
   pathPrefix: Schema.optionalKey(Schema.String),
   matchHeaders: Schema.Record(Schema.String, Schema.String),
-  setHeaders: Schema.Record(Schema.String, Schema.Redacted(Schema.String)),
-});
+  setHeaders: Schema.Record(Schema.String, Schema.Redacted(Schema.String))
+})
 
 /**
  * @category schemas

@@ -7,104 +7,95 @@
  * setup. A status mark is the only saturated color; status text and surfaces stay muted.
  */
 export interface AvatarTone {
-  readonly background: string;
-  readonly foreground: string;
+  readonly background: string
+  readonly foreground: string
 }
 
-export const avatarTones = [
-  "neutral",
-  "sand",
-  "lilac",
-  "clay",
-  "olive",
-  "slate",
-  "sage",
-  "ink",
-] as const;
-export type AvatarToneName = (typeof avatarTones)[number];
+export const avatarTones = ["neutral", "sand", "lilac", "clay", "olive", "slate", "sage", "ink"] as const
+export type AvatarToneName = (typeof avatarTones)[number]
 
 /** One status tone: the mark's fill, and the text, fill, and outline of a notice in that tone. */
 export interface StatusTone {
   /** A status mark, such as the patch on an avatar's corner. */
-  readonly mark: string;
-  readonly text: string;
-  readonly surface: string;
-  readonly border: string;
+  readonly mark: string
+  readonly text: string
+  readonly surface: string
+  readonly border: string
 }
 
 export interface ColorTokens {
   readonly surface: {
     /** The outer frame: title bar, rail, and the gutter around panels. */
-    readonly canvas: string;
+    readonly canvas: string
     /** Sidebar, main content, side panel, and centered screens. */
-    readonly panel: string;
+    readonly panel: string
     /** Modal dialogs. */
-    readonly raised: string;
+    readonly raised: string
     /** Menus, dropdowns, and toasts, which sit above a modal. */
-    readonly popover: string;
+    readonly popover: string
     /** Inputs and the composer. */
-    readonly field: string;
+    readonly field: string
     /** The quiet "Find anything" field. */
-    readonly search: string;
+    readonly search: string
     /** A row under the pointer. */
-    readonly hover: string;
+    readonly hover: string
     /** The message whose thread is open. */
-    readonly active: string;
+    readonly active: string
     /** The current sidebar row. */
-    readonly selected: string;
+    readonly selected: string
     /** The current rail destination, on canvas. */
-    readonly railSelected: string;
+    readonly railSelected: string
     /** Badges, counts, reactions, a chosen option, and disabled actions. */
-    readonly subtle: string;
+    readonly subtle: string
     /** An inline mention and the workspace mark. */
-    readonly mention: string;
-  };
+    readonly mention: string
+  }
   readonly text: {
-    readonly primary: string;
+    readonly primary: string
     /** Navigation items, supporting copy, and secondary actions. */
-    readonly secondary: string;
+    readonly secondary: string
     /** Timestamps, section labels, placeholders, and toolbar icons. */
-    readonly muted: string;
-    readonly disabled: string;
+    readonly muted: string
+    readonly disabled: string
     /** An agent's name. */
-    readonly agent: string;
+    readonly agent: string
     /** Text and icons on the primary action. */
-    readonly onPrimary: string;
-  };
+    readonly onPrimary: string
+  }
   readonly border: {
     /** 1px lines between panel regions. */
-    readonly divider: string;
+    readonly divider: string
     /** Outlines of buttons, inputs, the composer, and modals. */
-    readonly default: string;
+    readonly default: string
     /** An open or focused picker field. */
-    readonly strong: string;
+    readonly strong: string
     /** The outline of a chosen option. */
-    readonly selected: string;
+    readonly selected: string
     /** The outline of invalid field input. */
-    readonly danger: string;
+    readonly danger: string
     /** The dashed running stitch; decorative only. */
-    readonly stitch: string;
-  };
+    readonly stitch: string
+  }
   readonly action: {
-    readonly primary: string;
-    readonly secondary: string;
+    readonly primary: string
+    readonly secondary: string
     /** The 2px bar beside the current item and under the current tab. */
-    readonly indicator: string;
-  };
+    readonly indicator: string
+  }
   /**
    * Success for online, ready, and saved; caution for what needs setup or attention; danger for
    * what cannot run or failed. Offline has no tone: its mark is a ring in `text.muted`.
    */
   readonly status: {
-    readonly success: StatusTone;
-    readonly caution: StatusTone;
-    readonly danger: StatusTone;
-  };
+    readonly success: StatusTone
+    readonly caution: StatusTone
+    readonly danger: StatusTone
+  }
   /** The dimming layer behind a modal or a floating side panel. */
-  readonly scrim: string;
+  readonly scrim: string
   /** The heavier dimming behind the navigation drawer on phones. */
-  readonly scrimStrong: string;
-  readonly avatar: Readonly<Record<AvatarToneName, AvatarTone>>;
+  readonly scrimStrong: string
+  readonly avatar: Readonly<Record<AvatarToneName, AvatarTone>>
 }
 
 export const light = {
@@ -120,7 +111,7 @@ export const light = {
     selected: "#F0F0F2",
     railSelected: "#E9E9EC",
     subtle: "#F3F3F5",
-    mention: "#ECEEF1",
+    mention: "#ECEEF1"
   },
   text: {
     primary: "#242528",
@@ -128,7 +119,7 @@ export const light = {
     muted: "#9C9EA4",
     disabled: "#9C9EA4",
     agent: "#8755DD",
-    onPrimary: "#FFFFFF",
+    onPrimary: "#FFFFFF"
   },
   border: {
     divider: "#EDEEF0",
@@ -136,13 +127,13 @@ export const light = {
     strong: "#73757B",
     selected: "#9C9EA4",
     danger: "#B32F28",
-    stitch: "#BCB7AC",
+    stitch: "#BCB7AC"
   },
   action: { primary: "#242528", secondary: "#FFFFFF", indicator: "#242528" },
   status: {
     success: { mark: "#2E9E68", text: "#2A7550", surface: "#EFF6F1", border: "#D2E7D9" },
     caution: { mark: "#D49A3A", text: "#8A7251", surface: "#F7F4EE", border: "#E8E1D5" },
-    danger: { mark: "#CF4336", text: "#89221C", surface: "#FBEFEE", border: "#F1D3D0" },
+    danger: { mark: "#CF4336", text: "#89221C", surface: "#FBEFEE", border: "#F1D3D0" }
   },
   scrim: "#24252833",
   scrimStrong: "#24252866",
@@ -154,9 +145,9 @@ export const light = {
     olive: { background: "#E6E9E1", foreground: "#61714E" },
     slate: { background: "#E2E8EC", foreground: "#5C7485" },
     sage: { background: "#E0E5DE", foreground: "#56654F" },
-    ink: { background: "#28292D", foreground: "#FFFFFF" },
-  },
-} satisfies ColorTokens;
+    ink: { background: "#28292D", foreground: "#FFFFFF" }
+  }
+} satisfies ColorTokens
 
 export const dark = {
   surface: {
@@ -171,7 +162,7 @@ export const dark = {
     selected: "#30343B",
     railSelected: "#30353D",
     subtle: "#262A30",
-    mention: "#353A44",
+    mention: "#353A44"
   },
   text: {
     primary: "#ECEEF2",
@@ -179,7 +170,7 @@ export const dark = {
     muted: "#959CA8",
     disabled: "#777E8A",
     agent: "#C2A1FA",
-    onPrimary: "#191B20",
+    onPrimary: "#191B20"
   },
   border: {
     divider: "#343942",
@@ -188,14 +179,14 @@ export const dark = {
     selected: "#727D8F",
     // The mocks have no dark error state yet; this is a proposal.
     danger: "#E58A80",
-    stitch: "#626B79",
+    stitch: "#626B79"
   },
   action: { primary: "#ECEEF2", secondary: "#25292F", indicator: "#ECEEF2" },
   // Lunacy "Status v01 / 01 / Status colors"; dark caution follows the sand avatar tone.
   status: {
     success: { mark: "#4CC38A", text: "#8FD6AE", surface: "#1D2A23", border: "#2D4638" },
     caution: { mark: "#E2B25E", text: "#D5B68C", surface: "#2B2720", border: "#4D4336" },
-    danger: { mark: "#F07065", text: "#F0A8A0", surface: "#2E1E1D", border: "#553330" },
+    danger: { mark: "#F07065", text: "#F0A8A0", surface: "#2E1E1D", border: "#553330" }
   },
   scrim: "#00000080",
   // The mocks show the drawer in light mode only; this dark value is a proposal.
@@ -208,9 +199,9 @@ export const dark = {
     olive: { background: "#303A2C", foreground: "#B3C59D" },
     slate: { background: "#2C3741", foreground: "#AFC5D8" },
     sage: { background: "#2E392F", foreground: "#AEC0A5" },
-    ink: { background: "#383C45", foreground: "#ECEEF2" },
-  },
-} satisfies ColorTokens;
+    ink: { background: "#383C45", foreground: "#ECEEF2" }
+  }
+} satisfies ColorTokens
 
-export const colorModes = { light, dark } as const;
-export type ColorMode = keyof typeof colorModes;
+export const colorModes = { light, dark } as const
+export type ColorMode = keyof typeof colorModes

@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Adding an agent to the workspace. It adds its membership, so the actor must also be able to
@@ -17,8 +18,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Create = Permission.make("agent.create", {
   targetKind: "Workspace",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})
 
 /**
  * Seeing how an agent is set up: its instructions, harness, model, and sandbox. Lists skip the
@@ -29,8 +30,8 @@ export const Create = Permission.make("agent.create", {
  */
 export const Read = Permission.make("agent.read", {
   targetKind: "Member",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Renaming an agent and changing how it is set up.
@@ -40,8 +41,8 @@ export const Read = Permission.make("agent.read", {
  */
 export const Configure = Permission.make("agent.configure", {
   targetKind: "Member",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})
 
 /**
  * Asking an agent for work: mentioning it, starting a conversation with it, making it follow a
@@ -50,4 +51,4 @@ export const Configure = Permission.make("agent.configure", {
  * @category permissions
  * @since 0.1.0
  */
-export const Use = Permission.make("agent.use", { targetKind: "Member", builtinTier: "member" });
+export const Use = Permission.make("agent.use", { targetKind: "Member", builtinTier: "member" })

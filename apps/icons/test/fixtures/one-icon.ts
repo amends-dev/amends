@@ -1,1 +1,1 @@
-export { IconCheck } from "@amends-dev/icons";
+export { IconCheck } from "@amends-dev/icons"

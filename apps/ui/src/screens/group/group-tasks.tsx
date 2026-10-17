@@ -1,61 +1,61 @@
-import { For, Show } from "solid-js";
-import { IconMarkNew, IconUsers } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { SearchField } from "../../components/input/index.ts";
-import { Menu } from "../../components/menu/index.ts";
-import { TaskStatus, taskStateLabel, type TaskState } from "../../components/task-status/index.ts";
-import type { AvatarToneName } from "../../foundations/color/tokens.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import * as s from "./tasks.css.ts";
+import { IconMarkNew, IconUsers } from "@amends-dev/icons"
+import { For, Show } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { SearchField } from "../../components/input/index.ts"
+import { Menu } from "../../components/menu/index.ts"
+import { TaskStatus, taskStateLabel, type TaskState } from "../../components/task-status/index.ts"
+import type { AvatarToneName } from "../../foundations/color/tokens.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { Pane } from "../../patterns/pane/index.ts"
+import * as s from "./tasks.css.ts"
 
 export interface TaskPerson {
-  readonly id: string;
-  readonly name: string;
-  readonly initials?: string;
-  readonly tone?: AvatarToneName;
+  readonly id: string
+  readonly name: string
+  readonly initials?: string
+  readonly tone?: AvatarToneName
 }
 
 export interface TaskRow {
-  readonly key: string;
-  readonly title: string;
-  readonly state: TaskState;
-  readonly assignee?: TaskPerson;
+  readonly key: string
+  readonly title: string
+  readonly state: TaskState
+  readonly assignee?: TaskPerson
   /** The latest activity, as shown, such as "2m ago". */
-  readonly activity: string;
+  readonly activity: string
 }
 
-export type TaskStateFilter = "all" | TaskState;
-export type TaskSort = "activity" | "newest" | "oldest";
+export type TaskStateFilter = "all" | TaskState
+export type TaskSort = "activity" | "newest" | "oldest"
 
-const states: readonly TaskState[] = ["triage", "open", "progress", "done"];
+const states: ReadonlyArray<TaskState> = ["triage", "open", "progress", "done"]
 const sorts: ReadonlyArray<{ value: TaskSort; label: string }> = [
   { value: "activity", label: "Latest activity" },
   { value: "newest", label: "Newest" },
-  { value: "oldest", label: "Oldest" },
-];
+  { value: "oldest", label: "Oldest" }
+]
 
 export interface GroupTasksProps {
   /** Tasks after filtering and sorting. */
-  readonly tasks: readonly TaskRow[];
+  readonly tasks: ReadonlyArray<TaskRow>
   /** The task open in the side panel. */
-  readonly openTaskKey?: string;
-  readonly taskHref: (key: string) => string;
+  readonly openTaskKey?: string
+  readonly taskHref: (key: string) => string
   /** Opens a task in place of following its link, such as into the side panel. */
-  readonly onOpenTask?: (key: string) => void;
-  readonly query: string;
-  readonly onQueryChange: (query: string) => void;
-  readonly state: TaskStateFilter;
-  readonly onStateChange: (state: TaskStateFilter) => void;
+  readonly onOpenTask?: (key: string) => void
+  readonly query: string
+  readonly onQueryChange: (query: string) => void
+  readonly state: TaskStateFilter
+  readonly onStateChange: (state: TaskStateFilter) => void
   /** "all", "unassigned", or a person's id. */
-  readonly assignee: string;
-  readonly people: readonly TaskPerson[];
-  readonly onAssigneeChange: (assignee: string) => void;
-  readonly sort: TaskSort;
-  readonly onSortChange: (sort: TaskSort) => void;
-  readonly onNewTask: () => void;
+  readonly assignee: string
+  readonly people: ReadonlyArray<TaskPerson>
+  readonly onAssigneeChange: (assignee: string) => void
+  readonly sort: TaskSort
+  readonly onSortChange: (sort: TaskSort) => void
+  readonly onNewTask: () => void
 }
 
 /** A group's Tasks tab: search, filters, and sorting above the task list. Place it in GroupPane. */
@@ -65,7 +65,7 @@ export function GroupTasks(props: GroupTasksProps) {
       ? "Assignee"
       : props.assignee === "unassigned"
         ? "Unassigned"
-        : (props.people.find((person) => person.id === props.assignee)?.name ?? "Assignee");
+        : (props.people.find((person) => person.id === props.assignee)?.name ?? "Assignee")
   return (
     <>
       <Pane.Toolbar>
@@ -75,14 +75,9 @@ export function GroupTasks(props: GroupTasksProps) {
           onInput={(event) => props.onQueryChange(event.currentTarget.value)}
         />
         <Menu.Root>
-          <Menu.Trigger>
-            {props.state === "all" ? "Status" : taskStateLabel(props.state)}
-          </Menu.Trigger>
+          <Menu.Trigger>{props.state === "all" ? "Status" : taskStateLabel(props.state)}</Menu.Trigger>
           <Menu.Content aria-label="Filter by status">
-            <Menu.RadioGroup
-              value={props.state}
-              onChange={(value) => props.onStateChange(value as TaskStateFilter)}
-            >
+            <Menu.RadioGroup value={props.state} onChange={(value) => props.onStateChange(value as TaskStateFilter)}>
               <Menu.RadioItem value="all">Any status</Menu.RadioItem>
               <For each={states}>
                 {(state) => (
@@ -104,13 +99,7 @@ export function GroupTasks(props: GroupTasksProps) {
               <For each={props.people}>
                 {(person) => (
                   <Menu.RadioItem value={person.id} textValue={person.name}>
-                    <Avatar
-                      name={person.name}
-                      initials={person.initials}
-                      tone={person.tone}
-                      size={22}
-                      decorative
-                    />
+                    <Avatar name={person.name} initials={person.initials} tone={person.tone} size={22} decorative />
                     {person.name}
                   </Menu.RadioItem>
                 )}
@@ -120,17 +109,10 @@ export function GroupTasks(props: GroupTasksProps) {
         </Menu.Root>
         <Pane.ToolbarEnd>
           <Menu.Root>
-            <Menu.Trigger aria-label="Sort">
-              {sorts.find((sort) => sort.value === props.sort)?.label}
-            </Menu.Trigger>
+            <Menu.Trigger aria-label="Sort">{sorts.find((sort) => sort.value === props.sort)?.label}</Menu.Trigger>
             <Menu.Content aria-label="Sort tasks">
-              <Menu.RadioGroup
-                value={props.sort}
-                onChange={(value) => props.onSortChange(value as TaskSort)}
-              >
-                <For each={sorts}>
-                  {(sort) => <Menu.RadioItem value={sort.value}>{sort.label}</Menu.RadioItem>}
-                </For>
+              <Menu.RadioGroup value={props.sort} onChange={(value) => props.onSortChange(value as TaskSort)}>
+                <For each={sorts}>{(sort) => <Menu.RadioItem value={sort.value}>{sort.label}</Menu.RadioItem>}</For>
               </Menu.RadioGroup>
             </Menu.Content>
           </Menu.Root>
@@ -147,10 +129,7 @@ export function GroupTasks(props: GroupTasksProps) {
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
-        <Show
-          when={props.tasks.length > 0}
-          fallback={<p class={s.empty}>No tasks match these filters.</p>}
-        >
+        <Show when={props.tasks.length > 0} fallback={<p class={s.empty}>No tasks match these filters.</p>}>
           <ul class={s.list} aria-label="Tasks">
             <Keyed each={props.tasks} by={(task) => task.key}>
               {(task) => (
@@ -160,9 +139,9 @@ export function GroupTasks(props: GroupTasksProps) {
                     class={s.row}
                     aria-current={props.openTaskKey === task().key ? "true" : undefined}
                     onClick={(event) => {
-                      if (!props.onOpenTask) return;
-                      event.preventDefault();
-                      props.onOpenTask(task().key);
+                      if (!props.onOpenTask) return
+                      event.preventDefault()
+                      props.onOpenTask(task().key)
                     }}
                   >
                     <TaskStatus state={task().state} size="1rem" />
@@ -184,12 +163,7 @@ export function GroupTasks(props: GroupTasksProps) {
                     >
                       {(person) => (
                         <span class={s.assignee}>
-                          <Avatar
-                            name={person().name}
-                            initials={person().initials}
-                            tone={person().tone}
-                            size={24}
-                          />
+                          <Avatar name={person().name} initials={person().initials} tone={person().tone} size={24} />
                           <span class={s.assigneeName}>{person().name}</span>
                         </span>
                       )}
@@ -203,5 +177,5 @@ export function GroupTasks(props: GroupTasksProps) {
         </Show>
       </Pane.Body>
     </>
-  );
+  )
 }

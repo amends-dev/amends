@@ -18,26 +18,30 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Option } from "effect";
-import type { DateTime } from "effect";
-import * as Journal from "../journal/Journal.ts";
-import * as Publication from "../journal/Publication.ts";
-import * as Store from "../journal/Store.ts";
-import type * as Thread from "../thread/Thread.ts";
-import type * as ThreadActivity from "../thread/ThreadActivity.ts";
-import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
-import * as ThreadCommand from "../thread/ThreadCommand.ts";
-import type * as ThreadMessage from "../thread/ThreadMessage.ts";
-import type * as ThreadParticipation from "../thread/ThreadParticipation.ts";
-import * as ThreadQuery from "../thread/ThreadQuery.ts";
-import * as ThreadStore from "../thread/ThreadStore.ts";
-import * as TurnCommand from "../turn/TurnCommand.ts";
-import * as TurnStore from "../turn/TurnStore.ts";
-import type * as Member from "../workspace/Member.ts";
-import * as Task from "./Task.ts";
-import * as TaskActivity from "./TaskActivity.ts";
-import * as TaskFacts from "./TaskFacts.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import type * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Journal from "../journal/Journal.ts"
+import * as Publication from "../journal/Publication.ts"
+import * as Store from "../journal/Store.ts"
+import type * as StoreError from "../journal/StoreError.ts"
+import type * as Thread from "../thread/Thread.ts"
+import type * as ThreadActivity from "../thread/ThreadActivity.ts"
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
+import * as ThreadCommand from "../thread/ThreadCommand.ts"
+import type * as ThreadMessage from "../thread/ThreadMessage.ts"
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
+import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as ThreadStore from "../thread/ThreadStore.ts"
+import * as TurnCommand from "../turn/TurnCommand.ts"
+import * as TurnStore from "../turn/TurnStore.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
+import * as Task from "./Task.ts"
+import * as TaskActivity from "./TaskActivity.ts"
+import * as TaskFacts from "./TaskFacts.ts"
 
 /**
  * What the writes can fail with.
@@ -45,7 +49,7 @@ import * as StoreError from "../journal/StoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type Error = ThreadCommand.Error | TurnCommand.EndError | StoreError.StoreError;
+export type Error = ThreadCommand.Error | TurnCommand.EndError | StoreError.StoreError
 
 /**
  * What creates a task: its thread, how it starts, who created it, and when. `by` is who made the
@@ -55,10 +59,10 @@ export type Error = ThreadCommand.Error | TurnCommand.EndError | StoreError.Stor
  * @since 0.1.0
  */
 export interface CreateInput extends Pick<Task.Task, "status" | "priority" | "assignee"> {
-  readonly thread: Thread.Thread;
-  readonly createdBy: ThreadMessage.Author;
-  readonly by: ThreadParticipation.Reference | undefined;
-  readonly occurredAt: DateTime.Utc;
+  readonly thread: Thread.Thread
+  readonly createdBy: ThreadMessage.Author
+  readonly by: ThreadParticipation.Reference | undefined
+  readonly occurredAt: DateTime.Utc
 }
 
 /**
@@ -68,8 +72,8 @@ export interface CreateInput extends Pick<Task.Task, "status" | "priority" | "as
  * @since 0.1.0
  */
 export interface Created {
-  readonly task: Task.Task;
-  readonly activity: TaskActivity.Created;
+  readonly task: Task.Task
+  readonly activity: TaskActivity.Created
 }
 
 /**
@@ -79,10 +83,10 @@ export interface Created {
  * @since 0.1.0
  */
 export interface UpdateInput {
-  readonly task: Task.Task;
-  readonly change: Task.Change;
-  readonly by: ThreadParticipation.Reference | undefined;
-  readonly occurredAt: DateTime.Utc;
+  readonly task: Task.Task
+  readonly change: Task.Change
+  readonly by: ThreadParticipation.Reference | undefined
+  readonly occurredAt: DateTime.Utc
 }
 
 /**
@@ -92,8 +96,8 @@ export interface UpdateInput {
  * @since 0.1.0
  */
 export interface Updated {
-  readonly task: Task.Task;
-  readonly activity: TaskActivity.Updated;
+  readonly task: Task.Task
+  readonly activity: TaskActivity.Updated
 }
 
 /**
@@ -113,32 +117,24 @@ export class TaskCommand extends Context.Service<
      * Make the thread a task, at its next position, in the caller's commit. The caller authorizes
      * the creation and gives a thread without a task.
      */
-    readonly create: (
-      input: CreateInput,
-    ) => Effect.Effect<Created, Error, Store.Transaction | Publication.Publication>;
+    readonly create: (input: CreateInput) => Effect.Effect<Created, Error, Store.Transaction | Publication.Publication>
     /**
      * Change a task in one way, at its thread's next position, in the caller's commit. An agent
      * taken off the task, by reassignment or by a status that asks no work, has its turn there
      * stopped. The caller authorizes the change and checks it replaces the task's value as it is.
      */
-    readonly update: (
-      input: UpdateInput,
-    ) => Effect.Effect<Updated, Error, Store.Transaction | Publication.Publication>;
+    readonly update: (input: UpdateInput) => Effect.Effect<Updated, Error, Store.Transaction | Publication.Publication>
   }
 >()("@amends-dev/core/task/TaskCommand") {}
 
-const member = (memberId: Member.Id): ThreadParticipation.Reference => ({
-  _tag: "Member",
-  memberId,
-});
+const member = (memberId: MemberId.MemberId): ThreadParticipation.Reference =>
+  ThreadParticipation.Reference.cases.Member.make({ memberId })
 
 /** Who takes part through a task in this state: triage while it is in triage, and its assignee. */
-const participantsOf = (
-  task: Pick<Task.Task, "status" | "assignee">,
-): ReadonlyArray<ThreadParticipation.Reference> => [
-  ...(task.status === "triage" ? [{ _tag: "Triage" } as const] : []),
-  ...(task.assignee === null ? [] : [member(task.assignee)]),
-];
+const participantsOf = (task: Pick<Task.Task, "status" | "assignee">): ReadonlyArray<ThreadParticipation.Reference> => [
+  ...(task.status === "triage" ? [ThreadParticipation.Reference.cases.Triage.make({})] : []),
+  ...(task.assignee === null ? [] : [member(task.assignee)])
+]
 
 /**
  * Whom a change brings into the thread: the new assignee, triage as the task enters triage, and
@@ -149,30 +145,28 @@ const admittedBy = (change: Task.Change, next: Task.Task) =>
     Assignee: ({ to }) => (to === null ? [] : [member(to)]),
     Status: ({ to }) =>
       to === "triage"
-        ? [{ _tag: "Triage" } as const]
+        ? [ThreadParticipation.Reference.cases.Triage.make({})]
         : Task.working(to) && next.assignee !== null
           ? [member(next.assignee)]
           : [],
-    Priority: () => [],
-  });
+    Priority: () => []
+  })
 
 /** Whom a change asks for work: the assignee while the task is being worked; a priority informs alone. */
-const askedBy = (change: Task.Change, next: Task.Task): Member.Id | null =>
-  Task.Change.isAnyOf(["Priority"])(change) ? null : Task.asked(next);
+const askedBy = (change: Task.Change, next: Task.Task): MemberId.MemberId | null =>
+  Task.Change.isAnyOf(["Priority"])(change) ? null : Task.asked(next)
 
 /** Whether a change reaches every participant, rather than those it admits alone. */
 const reachesEveryone = (change: Task.Change) =>
-  !Task.Change.isAnyOf(["Assignee"])(change) &&
-  !(Task.Change.isAnyOf(["Status"])(change) && change.to === "triage");
+  !Task.Change.isAnyOf(["Assignee"])(change) && !(Task.Change.isAnyOf(["Status"])(change) && change.to === "triage")
 
 /** The agent a change takes off the task: the former assignee, or the assignee as work stops. */
-const leftBy = (task: Task.Task, change: Task.Change): Member.Id | null =>
+const leftBy = (task: Task.Task, change: Task.Change): MemberId.MemberId | null =>
   Task.Change.match(change, {
     Assignee: ({ from }) => from,
-    Status: ({ to }) =>
-      to === "held" || to === "done" || to === "dismissed" ? task.assignee : null,
-    Priority: () => null,
-  });
+    Status: ({ to }) => (to === "held" || to === "done" || to === "dismissed" ? task.assignee : null),
+    Priority: () => null
+  })
 
 /**
  * Capture the shared thread writes and reads, the journal, and the turn command.
@@ -180,25 +174,25 @@ const leftBy = (task: Task.Task, change: Task.Change): Member.Id | null =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("TaskCommand.make")(function* () {
-  const journal = yield* Journal.Journal;
-  const threadCommand = yield* ThreadCommand.ThreadCommand;
-  const threadQuery = yield* ThreadQuery.ThreadQuery;
-  const threadStore = yield* ThreadStore.ThreadStore;
-  const turnCommand = yield* TurnCommand.TurnCommand;
-  const turnStore = yield* TurnStore.TurnStore;
-  const { workspaceId } = yield* Store.Store;
+export const make = Effect.gen(function* () {
+  const journal = yield* Journal.Journal
+  const threadCommand = yield* ThreadCommand.ThreadCommand
+  const threadQuery = yield* ThreadQuery.ThreadQuery
+  const threadStore = yield* ThreadStore.ThreadStore
+  const turnCommand = yield* TurnCommand.TurnCommand
+  const turnStore = yield* TurnStore.TurnStore
+  const { workspaceId } = yield* Store.Store
 
   /** The thread a task belongs to, which a task cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (task: Task.Task) {
-    const found = yield* threadStore.get(task.threadId);
-    if (Option.isNone(found)) return yield* Effect.die("A task's thread is missing");
-    return found.value;
-  });
+    const found = yield* threadStore.get(task.threadId)
+    if (Option.isNone(found)) return yield* Effect.die("A task's thread is missing")
+    return found.value
+  })
 
   const create = Effect.fn("TaskCommand.create")(function* (input: CreateInput) {
-    yield* Store.Transaction;
-    const { thread } = input;
+    yield* Store.Transaction
+    const { thread } = input
     const task: Task.Task = {
       threadId: thread.id,
       workspaceId,
@@ -207,8 +201,8 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
       priority: input.priority,
       assignee: input.assignee,
       createdBy: input.createdBy,
-      createdAt: input.occurredAt,
-    };
+      createdAt: input.occurredAt
+    }
     const created = yield* threadCommand.publishActivity({
       thread,
       occurredAt: input.occurredAt,
@@ -217,7 +211,7 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
         Effect.gen(function* () {
           const fact = yield* journal
             .publish(TaskFacts.Created, task)
-            .pipe(Publication.withOccurredAt(input.occurredAt));
+            .pipe(Publication.withOccurredAt(input.occurredAt))
           return {
             value: task,
             kind: TaskActivity.Created,
@@ -225,33 +219,33 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
               status: task.status,
               priority: task.priority,
               assignee: task.assignee,
-              createdBy: task.createdBy,
+              createdBy: task.createdBy
             },
             recipients: Task.recipients(admitted.participants, input.by, Task.asked(task)),
-            cause: fact,
-          };
-        }),
-    });
+            cause: fact
+          }
+        })
+    })
     const activity = yield* Effect.orDie(
-      ThreadActivityKind.decode(TaskActivity.Created, created.event.payload.activity),
-    );
-    return { task, activity } satisfies Created;
-  });
+      ThreadActivityKind.decode(TaskActivity.Created, created.event.payload.activity)
+    )
+    return { task, activity } satisfies Created
+  })
 
   /** Ask the agent's active turn in the thread, if it has one, to stop. */
-  const stopTurnOf = Effect.fnUntraced(function* (memberId: Member.Id, thread: Thread.Thread) {
-    const active = yield* turnStore.findActive(memberId, thread.id);
+  const stopTurnOf = Effect.fnUntraced(function* (memberId: MemberId.MemberId, thread: Thread.Thread) {
+    const active = yield* turnStore.findActive(memberId, thread.id)
     if (Option.isSome(active) && active.value.status !== "cancelling")
-      yield* turnCommand.requestStop(active.value, "task-changed");
-  });
+      yield* turnCommand.requestStop(active.value, "task-changed")
+  })
 
   const update = Effect.fn("TaskCommand.update")(function* (input: UpdateInput) {
-    yield* Store.Transaction;
-    const { task, change } = input;
+    yield* Store.Transaction
+    const { task, change } = input
     if (Task.valueOf(task, change) !== change.from)
-      return yield* Effect.die("A change must replace the task's value as it is");
-    const thread = yield* threadOf(task);
-    const next = Task.apply(task, change);
+      return yield* Effect.die("A change must replace the task's value as it is")
+    const thread = yield* threadOf(task)
+    const next = Task.apply(task, change)
     const updated = yield* threadCommand.publishActivity({
       thread,
       occurredAt: input.occurredAt,
@@ -264,35 +258,33 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
               threadId: thread.id,
               groupId: thread.groupId,
               change,
-              changedAt: input.occurredAt,
+              changedAt: input.occurredAt
             })
-            .pipe(Publication.withOccurredAt(input.occurredAt));
+            .pipe(Publication.withOccurredAt(input.occurredAt))
           const told: ReadonlyArray<ThreadActivity.Recipient> = Task.recipients(
-            reachesEveryone(change)
-              ? yield* threadQuery.currentParticipants(thread)
-              : admitted.participants,
+            reachesEveryone(change) ? yield* threadQuery.currentParticipants(thread) : admitted.participants,
             input.by,
-            askedBy(change, next),
-          );
+            askedBy(change, next)
+          )
           return {
             value: next,
             kind: TaskActivity.Updated,
             details: change,
             recipients: told,
-            cause: fact,
-          };
-        }),
-    });
-    const left = leftBy(task, change);
-    if (left !== null) yield* stopTurnOf(left, thread);
+            cause: fact
+          }
+        })
+    })
+    const left = leftBy(task, change)
+    if (left !== null) yield* stopTurnOf(left, thread)
     const activity = yield* Effect.orDie(
-      ThreadActivityKind.decode(TaskActivity.Updated, updated.event.payload.activity),
-    );
-    return { task: next, activity } satisfies Updated;
-  });
+      ThreadActivityKind.decode(TaskActivity.Updated, updated.event.payload.activity)
+    )
+    return { task: next, activity } satisfies Updated
+  })
 
-  return TaskCommand.of({ create, update });
-});
+  return TaskCommand.of({ create, update })
+})
 
 /**
  * Provide the shared task writes over the thread writes and reads, the turn command, and the
@@ -301,4 +293,4 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TaskCommand, make());
+export const layer = Layer.effect(TaskCommand, make)

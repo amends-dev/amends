@@ -1,18 +1,18 @@
-import { For, splitProps, type JSX } from "solid-js";
-import { Theme } from "../foundations/theme/index.ts";
-import { classes } from "../internal/props.ts";
-import * as s from "./code-window.css.ts";
+import { For, splitProps, type JSX } from "solid-js"
+import { Theme } from "../foundations/theme/index.ts"
+import { classes } from "../internal/props.ts"
+import * as s from "./code-window.css.ts"
 
 export type CodeWindowProps = Omit<JSX.HTMLAttributes<HTMLElement>, "children" | "title"> & {
   /** The file or tool it shows, such as "review.ts" or "Terminal". */
-  title: string;
+  title: string
   /** Shown as written, in the code face. */
-  code: string;
-};
+  code: string
+}
 
 /** Code or a terminal session in a window, dark in both modes. */
 export function CodeWindow(props: CodeWindowProps) {
-  const [local, native] = splitProps(props, ["title", "code", "class"]);
+  const [local, native] = splitProps(props, ["title", "code", "class"])
   return (
     <Theme mode="dark" class={classes(s.window, local.class)}>
       <figure {...native} class={s.figure}>
@@ -27,5 +27,5 @@ export function CodeWindow(props: CodeWindowProps) {
         </pre>
       </figure>
     </Theme>
-  );
+  )
 }

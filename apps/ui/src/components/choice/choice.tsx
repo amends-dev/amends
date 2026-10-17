@@ -1,32 +1,32 @@
-import { Show, createContext, createUniqueId, splitProps, useContext, type JSX } from "solid-js";
-import { IconCheck } from "@amends-dev/icons";
-import * as fieldStyles from "../field/field.css.ts";
-import { classes } from "../../internal/props.ts";
-import * as s from "./choice.css.ts";
+import { IconCheck } from "@amends-dev/icons"
+import { Show, createContext, createUniqueId, splitProps, useContext, type JSX } from "solid-js"
+import { classes } from "../../internal/props.ts"
+import * as fieldStyles from "../field/field.css.ts"
+import * as s from "./choice.css.ts"
 
 interface State {
-  readonly variant: () => "chip" | "card";
-  readonly name: string;
-  readonly value: () => string;
-  readonly select: (value: string) => void;
-  readonly disabled: () => boolean;
+  readonly variant: () => "chip" | "card"
+  readonly name: string
+  readonly value: () => string
+  readonly select: (value: string) => void
+  readonly disabled: () => boolean
 }
-const Context = createContext<State>();
+const Context = createContext<State>()
 
 export type GroupProps = Omit<JSX.FieldsetHTMLAttributes<HTMLFieldSetElement>, "onChange"> & {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
+  label: string
+  value: string
+  onChange: (value: string) => void
   /** Help under the options, such as what the chosen one means. */
-  hint?: string;
+  hint?: string
   /** Default a unique name. */
-  name?: string;
+  name?: string
   /**
    * "chip" sets short options in a row, such as Public and Private. "card" stacks full-width
    * options with a radio and a description, such as where something runs. Default "chip".
    */
-  variant?: "chip" | "card";
-};
+  variant?: "chip" | "card"
+}
 
 /** One choice among a few boxed options, such as a group's visibility. */
 export function Group(props: GroupProps) {
@@ -39,16 +39,16 @@ export function Group(props: GroupProps) {
     "variant",
     "disabled",
     "class",
-    "children",
-  ]);
-  const id = createUniqueId();
+    "children"
+  ])
+  const id = createUniqueId()
   const state: State = {
     variant: () => local.variant ?? "chip",
     name: local.name ?? `choice-${id}`,
     value: () => local.value,
     select: (value) => local.onChange(value),
-    disabled: () => local.disabled ?? false,
-  };
+    disabled: () => local.disabled ?? false
+  }
   return (
     <Context.Provider value={state}>
       <fieldset
@@ -68,19 +68,19 @@ export function Group(props: GroupProps) {
         </Show>
       </fieldset>
     </Context.Provider>
-  );
+  )
 }
 
 export type OptionProps = {
-  value: string;
-  children: string;
+  value: string
+  children: string
   /** What choosing it means, under its label in a card. */
-  description?: string;
-};
+  description?: string
+}
 
 export function Option(props: OptionProps) {
-  const state = useContext(Context);
-  if (!state) throw new Error("Choice.Option must be inside Choice.Group");
+  const state = useContext(Context)
+  if (!state) throw new Error("Choice.Option must be inside Choice.Group")
   return (
     <label class={s.option} data-variant={state.variant()}>
       <input
@@ -109,5 +109,5 @@ export function Option(props: OptionProps) {
         </span>
       </Show>
     </label>
-  );
+  )
 }

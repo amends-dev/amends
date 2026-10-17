@@ -4,5 +4,5 @@ export {
   formIssueText,
   type FormField,
   type FormFieldsProps,
-  type FormIssue,
-} from "./form-fields.tsx";
+  type FormIssue
+} from "./form-fields.tsx"

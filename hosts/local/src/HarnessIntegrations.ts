@@ -8,15 +8,17 @@
  *
  * @since 0.1.0
  */
-import { Connection, Integration } from "@amends-dev/connection";
-import { type Agent, Harness } from "@amends-dev/harness";
-import { AmendsAgent, Models } from "@amends-dev/harness-amends";
-import { Opencode2Agent, OpencodeAgent } from "@amends-dev/harness-opencode";
-import { type Crypto, Effect } from "effect";
-import type { Socket } from "effect/socket";
+
+import { Connection, Integration } from "@amends-dev/connection"
+import { type Agent, Harness } from "@amends-dev/harness"
+import { AmendsAgent, Models } from "@amends-dev/harness-amends"
+import { Opencode2Agent, OpencodeAgent } from "@amends-dev/harness-opencode"
+import type * as Crypto from "effect/Crypto"
+import * as Effect from "effect/Effect"
+import type * as Socket from "effect/socket/Socket"
 
 /** The health of a connection to an agent, which reaches nothing. */
-const healthy = () => Effect.succeed<Connection.Health>({ status: "healthy" });
+const healthy = () => Effect.succeed<Connection.Health>({ status: "healthy" })
 
 /**
  * The integration of amends's agent, for the host to install with what the agent takes besides
@@ -27,9 +29,9 @@ const healthy = () => Effect.succeed<Connection.Health>({ status: "healthy" });
  * @since 0.1.0
  */
 export const amends = Effect.fn("HarnessIntegrations.amends")(function* (
-  options: Omit<AmendsAgent.Options, keyof Agent.Options> = {},
+  options: Omit<AmendsAgent.Options, keyof Agent.Options> = {}
 ) {
-  const languageModels = yield* Models.LanguageModels;
+  const languageModels = yield* Models.LanguageModels
   return Integration.make({
     id: "amends",
     name: "amends",
@@ -39,12 +41,12 @@ export const amends = Effect.fn("HarnessIntegrations.amends")(function* (
       harness: (_access, agentOptions) =>
         AmendsAgent.make({ ...options, ...agentOptions }).pipe(
           Effect.map(Harness.make),
-          Effect.provideService(Models.LanguageModels, languageModels),
-        ),
+          Effect.provideService(Models.LanguageModels, languageModels)
+        )
     },
-    check: healthy,
-  });
-});
+    check: healthy
+  })
+})
 
 /**
  * What the host installs opencode's agents with besides their models.
@@ -52,7 +54,7 @@ export const amends = Effect.fn("HarnessIntegrations.amends")(function* (
  * @category options
  * @since 0.1.0
  */
-export type OpencodeOptions = Omit<OpencodeAgent.Options, keyof Agent.Options>;
+export type OpencodeOptions = Omit<OpencodeAgent.Options, keyof Agent.Options>
 
 /**
  * The integration of opencode 1, opencode's stable release, for the host to install with what the
@@ -69,8 +71,8 @@ export const opencode = (options: OpencodeOptions) =>
     id: "opencode-agent",
     name: "opencode",
     docs: "https://opencode.ai/docs",
-    make: OpencodeAgent.make,
-  });
+    make: OpencodeAgent.make
+  })
 
 /**
  * The integration of opencode 2, as `opencode` gives that of opencode 1, with the id
@@ -85,20 +87,20 @@ export const opencode2 = (options: OpencodeOptions) =>
     id: "opencode2-agent",
     name: "opencode 2",
     docs: "https://opencode.ai/v2/docs",
-    make: Opencode2Agent.make,
-  });
+    make: Opencode2Agent.make
+  })
 
 /** The integration of one of opencode's agents, which `make` makes with `options`. */
 const makeOpencodeIntegration = Effect.fn("HarnessIntegrations.makeOpencodeIntegration")(function* (
   options: OpencodeOptions,
   agent: {
-    readonly id: string;
-    readonly name: string;
-    readonly docs: string;
-    readonly make: typeof OpencodeAgent.make;
-  },
+    readonly id: string
+    readonly name: string
+    readonly docs: string
+    readonly make: typeof OpencodeAgent.make
+  }
 ) {
-  const context = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
+  const context = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>()
   return Integration.make({
     id: agent.id,
     name: agent.name,
@@ -109,12 +111,10 @@ const makeOpencodeIntegration = Effect.fn("HarnessIntegrations.makeOpencodeInteg
       harness: (_access, agentOptions) =>
         agent.make({ ...options, ...agentOptions }).pipe(
           Effect.map(Harness.make),
-          Effect.mapError(
-            (error) => new Connection.UnsupportedError({ description: error.reason.message }),
-          ),
-          Effect.provideContext(context),
-        ),
+          Effect.mapError((error) => new Connection.UnsupportedError({ description: error.reason.message })),
+          Effect.provideContext(context)
+        )
     },
-    check: healthy,
-  });
-});
+    check: healthy
+  })
+})

@@ -6,17 +6,19 @@
  *
  * @since 0.1.0
  */
-import { Notification, NotificationInbox, NotificationStore } from "@amends-dev/core/notification";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
 
-const record = Notification.Notification.annotate({ identifier: "Notification" });
+import { Notification, NotificationInbox, NotificationStore } from "@amends-dev/core/notification"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const params = { notificationId: Notification.Id };
-const cursor = Schema.fromJsonString(NotificationStore.Cursor);
+const record = Notification.Notification.annotate({ identifier: "Notification" })
+
+const params = { notificationId: Notification.NotificationId }
+const cursor = Schema.fromJsonString(NotificationStore.Cursor)
 
 /**
  * The authenticated member's inbox within one workspace: reading it newest first, with each
@@ -33,28 +35,28 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       query: {
         limit: NotificationStore.LatestOptions.fields.limit.check(Schema.isLessThanOrEqualTo(50)),
         before: Schema.optionalKey(cursor).annotate({
-          description: "Exclusive boundary as JSON containing recordedAt (UTC ISO string) and id.",
+          description: "Exclusive boundary as JSON containing recordedAt (UTC ISO string) and id."
         }),
-        pendingOnly: Schema.optionalKey(Schema.Boolean),
+        pendingOnly: Schema.optionalKey(Schema.Boolean)
       },
       success: Schema.Array(NotificationInbox.Item.annotate({ identifier: "InboxItem" })),
-      error: ApiErrors.workspace,
+      error: ApiErrors.workspace
     }),
     HttpApiEndpoint.get("count", "/count", {
       success: Schema.Struct({ pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
-      error: ApiErrors.workspace,
+      error: ApiErrors.workspace
     }),
     HttpApiEndpoint.post("markSeenThrough", "/seen", {
       payload: Schema.Struct({ through: NotificationStore.Cursor }),
       success: Schema.Struct({ marked: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
-      error: [...ApiErrors.workspace],
+      error: [...ApiErrors.workspace]
     }),
     HttpApiEndpoint.post("markSeen", "/:notificationId/seen", {
       params,
       success: record,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
-    }),
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict]
+    })
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication)
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication)
   .prefix("/notifications") {}

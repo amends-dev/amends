@@ -1,6 +1,6 @@
 /**
- * The local host's entry point, which `bun run start` runs: it loads the configuration with
- * `LocalConfig.load` and builds `LocalHost.layer` for the role `AMENDS_ROLE` names. A process that
+ * The local host's entry point, which `bun run start` runs: it reads the configuration,
+ * `LocalConfig.options`, and builds `LocalHost.layer` for the role `AMENDS_ROLE` names. A process that
  * serves the API adds the authentication `AMENDS_SIGN_IN` names and serves them with
  * `LocalServer.layer`; one that only runs jobs runs the host alone. Either way it runs until the
  * process stops, through `BunRuntime.runMain`. It reads settings from the environment keeping empty
@@ -9,13 +9,16 @@
  *
  * @since 0.1.0
  */
-import { BunRuntime } from "@effect/platform-bun";
-import { ConfigProvider, Effect, Layer } from "effect";
-import * as DevelopmentAuthentication from "./DevelopmentAuthentication.ts";
-import * as EmailAuthentication from "./EmailAuthentication.ts";
-import * as LocalConfig from "./LocalConfig.ts";
-import * as LocalHost from "./LocalHost.ts";
-import * as LocalServer from "./LocalServer.ts";
+
+import * as BunRuntime from "@effect/platform-bun/BunRuntime"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as DevelopmentAuthentication from "./DevelopmentAuthentication.ts"
+import * as EmailAuthentication from "./EmailAuthentication.ts"
+import * as LocalConfig from "./LocalConfig.ts"
+import * as LocalHost from "./LocalHost.ts"
+import * as LocalServer from "./LocalServer.ts"
 
 /**
  * Serve the application on the loopback interface over the AMENDS_DATABASE_URL database, signing
@@ -32,8 +35,8 @@ const program = Effect.gen(function* () {
     runnerTakeover,
     credentialKey,
     sandboxDirectory,
-    signIn,
-  } = yield* LocalConfig.load();
+    signIn
+  } = yield* LocalConfig.options
   const host = LocalHost.layer(databaseUrl, {
     runJobs: role !== "api",
     poolSize,
@@ -41,28 +44,19 @@ const program = Effect.gen(function* () {
     runnerTransport,
     runnerTakeover,
     credentialKey,
-    sandboxDirectory,
-  });
+    sandboxDirectory
+  })
   if (role === "jobs")
     return yield* Layer.launch(
-      host.pipe(
-        Layer.tap(() =>
-          Effect.logInfo(`Running jobs at ${runnerAddress.host}:${runnerAddress.port}`),
-        ),
-      ),
-    );
+      host.pipe(Layer.tap(() => Effect.logInfo(`Running jobs at ${runnerAddress.host}:${runnerAddress.port}`)))
+    )
   const authentication =
-    signIn === "development"
-      ? DevelopmentAuthentication.layer()
-      : EmailAuthentication.layer(credentialKey);
-  return yield* Layer.launch(LocalServer.layer(host, authentication, port));
-});
+    signIn === "development" ? DevelopmentAuthentication.layer() : EmailAuthentication.layer(credentialKey)
+  return yield* Layer.launch(LocalServer.layer(host, authentication, port))
+})
 
 BunRuntime.runMain(
   program.pipe(
-    Effect.provideService(
-      ConfigProvider.ConfigProvider,
-      ConfigProvider.fromEnv({ preserveEmptyStrings: true }),
-    ),
-  ),
-);
+    Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromEnv({ preserveEmptyStrings: true }))
+  )
+)

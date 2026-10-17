@@ -1,4 +1,4 @@
-import { paths, useConnections, useWorkspace } from "@amends-dev/client";
+import { paths, useConnections, useWorkspace } from "@amends-dev/client"
 import {
   ChooseIntegration,
   ConfigureConnection,
@@ -10,35 +10,29 @@ import {
   connectionsToast,
   type ConnectionsAction,
   type ConnectionsTab,
-  type IntegrationCapability,
-} from "@amends-dev/ui/screens/connections";
-import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
-import { useWorkspaceActions } from "../workspace-actions.ts";
+  type IntegrationCapability
+} from "@amends-dev/ui/screens/connections"
+import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js"
+import { useWorkspaceActions } from "../workspace-actions.ts"
 
-const href = (path: string) => `#${path}`;
+const href = (path: string) => `#${path}`
 
 export function ConnectionsPage() {
-  const params = useParams<{ workspaceId: string }>();
+  const params = useParams<{ workspaceId: string }>()
   return (
     <Show when={params.workspaceId} keyed>
       {(workspaceId) => <Connections workspaceId={workspaceId} />}
     </Show>
-  );
+  )
 }
 
-type Dialog = "choose" | "configure" | "replace-key" | "remove";
+type Dialog = "choose" | "configure" | "replace-key" | "remove"
 
-const capabilities: readonly IntegrationCapability[] = [
-  "models",
-  "tools",
-  "sandboxes",
-  "harnesses",
-  "channels",
-];
+const capabilities: ReadonlyArray<IntegrationCapability> = ["models", "tools", "sandboxes", "harnesses", "channels"]
 /** What `?tab=` and `?add=` name: one capability, or none for all of them. */
 const capabilityOf = (value: string | undefined): IntegrationCapability | undefined =>
-  capabilities.find((capability) => capability === value);
+  capabilities.find((capability) => capability === value)
 
 /**
  * A workspace's connections: the list, all of them or one capability's by `?tab=`, or one
@@ -47,89 +41,83 @@ const capabilityOf = (value: string | undefined): IntegrationCapability | undefi
  * it is checked.
  */
 function Connections(props: { readonly workspaceId: string }) {
-  const { workspaceId } = props;
-  const params = useParams<{ connectionId?: string }>();
-  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string }>();
-  const navigate = useNavigate();
-  const workspace = useWorkspace(() => workspaceId);
-  const actions = useWorkspaceActions();
-  const [dialog, setDialog] = createSignal<Dialog>();
-  const [query, setQuery] = createSignal("");
-  const base = paths.workspacePage(workspaceId, "connections");
+  const { workspaceId } = props
+  const params = useParams<{ connectionId?: string }>()
+  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string }>()
+  const navigate = useNavigate()
+  const workspace = useWorkspace(() => workspaceId)
+  const actions = useWorkspaceActions()
+  const [dialog, setDialog] = createSignal<Dialog>()
+  const [query, setQuery] = createSignal("")
+  const base = paths.workspacePage(workspaceId, "connections")
   const view = useConnections(workspaceId, {
     done: (done) => {
-      if (done.action === "create" && done.created)
-        navigate(paths.connection(workspaceId, done.created));
-      if (done.action === "remove") navigate(base);
-      actions.toast(connectionsToast(done.action, done.subject));
-      setDialog(undefined);
-    },
-  });
+      if (done.action === "create" && done.created) navigate(paths.connection(workspaceId, done.created))
+      if (done.action === "remove") navigate(base)
+      actions.toast(connectionsToast(done.action, done.subject))
+      setDialog(undefined)
+    }
+  })
   const open = (next: Dialog) => {
-    view.dismiss();
-    setDialog(next);
-  };
-  const adding = () => dialog() === "choose" || dialog() === "configure";
+    view.dismiss()
+    setDialog(next)
+  }
+  const adding = () => dialog() === "choose" || dialog() === "configure"
   const close = () => {
-    view.dismiss();
-    if (adding()) return setSearch({ add: undefined });
-    setDialog(undefined);
-  };
+    view.dismiss()
+    if (adding()) return setSearch({ add: undefined })
+    setDialog(undefined)
+  }
   // `?add=` opens Add connection over the page; leaving it, such as with Back, sets the draft aside.
   createEffect(
     on(
       () => search.add !== undefined && view.canCreate(),
       (add) => {
-        if (add) open("choose");
+        if (add) open("choose")
         else if (adding()) {
-          view.create.cancel();
-          setDialog(undefined);
+          view.create.cancel()
+          setDialog(undefined)
         }
-      },
-    ),
-  );
-  const tab = (): ConnectionsTab => capabilityOf(search.tab) ?? "all";
-  const add = () => setSearch({ add: capabilityOf(search.tab) ?? "connection" });
-  const inTab = (provides: readonly IntegrationCapability[] | undefined, next: ConnectionsTab) =>
-    next === "all" || (provides?.includes(next) ?? false);
+      }
+    )
+  )
+  const tab = (): ConnectionsTab => capabilityOf(search.tab) ?? "all"
+  const add = () => setSearch({ add: capabilityOf(search.tab) ?? "connection" })
+  const inTab = (provides: ReadonlyArray<IntegrationCapability> | undefined, next: ConnectionsTab) =>
+    next === "all" || (provides?.includes(next) ?? false)
   const ofTab = createMemo(() =>
-    view.connections().filter((connection) => inTab(connection.integration?.provides, tab())),
-  );
+    view.connections().filter((connection) => inTab(connection.integration?.provides, tab()))
+  )
   const shown = createMemo(() => {
-    const words = query().trim().toLocaleLowerCase();
+    const words = query().trim().toLocaleLowerCase()
     return ofTab().filter(
       (connection) =>
         words === "" ||
         connection.name.toLocaleLowerCase().includes(words) ||
-        (connection.integration?.name ?? connection.integrationId)
-          .toLocaleLowerCase()
-          .includes(words),
-    );
-  });
+        (connection.integration?.name ?? connection.integrationId).toLocaleLowerCase().includes(words)
+    )
+  })
   const count = (next: ConnectionsTab) =>
-    view.connections().filter((connection) => inTab(connection.integration?.provides, next)).length;
+    view.connections().filter((connection) => inTab(connection.integration?.provides, next)).length
   /** The integrations Add connection offers: all, or those giving the capability asked for. */
   const integrations = () => {
-    const wanted = capabilityOf(search.add);
-    return view
-      .integrations()
-      .filter((integration) => wanted === undefined || integration.provides.includes(wanted));
-  };
+    const wanted = capabilityOf(search.add)
+    return view.integrations().filter((integration) => wanted === undefined || integration.provides.includes(wanted))
+  }
   const failureOf = (action: ConnectionsAction) => {
-    const failure = view.failure();
-    return failure?.action === action ? failure : undefined;
-  };
-  const pending = (action: ConnectionsAction) => view.pending() === action;
-  const refreshing = () => view.pending() === "refresh";
+    const failure = view.failure()
+    return failure?.action === action ? failure : undefined
+  }
+  const pending = (action: ConnectionsAction) => view.pending() === action
+  const refreshing = () => view.pending() === "refresh"
   /** What runs, as one connection's page shows it: a check of another connection is not its own. */
   const pendingOn = (connectionId: string) => {
-    const running = view.pending();
-    return running === "check" && !view.check.running(connectionId) ? undefined : running;
-  };
-  const name = () => workspace()?.workspace.name ?? "";
-  const selected = () =>
-    params.connectionId === undefined ? undefined : view.connection(params.connectionId);
-  const tabHref = (next: ConnectionsTab) => href(next === "all" ? base : `${base}?tab=${next}`);
+    const running = view.pending()
+    return running === "check" && !view.check.running(connectionId) ? undefined : running
+  }
+  const name = () => workspace()?.workspace.name ?? ""
+  const selected = () => (params.connectionId === undefined ? undefined : view.connection(params.connectionId))
+  const tabHref = (next: ConnectionsTab) => href(next === "all" ? base : `${base}?tab=${next}`)
   return (
     <>
       <Show
@@ -141,8 +129,8 @@ function Connections(props: { readonly workspaceId: string }) {
             tab={tab()}
             tabHref={tabHref}
             onTabChange={(next) => {
-              setQuery("");
-              setSearch({ tab: next === "all" ? undefined : next });
+              setQuery("")
+              setSearch({ tab: next === "all" ? undefined : next })
             }}
             counts={
               view.status()
@@ -153,7 +141,7 @@ function Connections(props: { readonly workspaceId: string }) {
                     tools: count("tools"),
                     sandboxes: count("sandboxes"),
                     harnesses: count("harnesses"),
-                    channels: count("channels"),
+                    channels: count("channels")
                   }
             }
             onAdd={view.canCreate() ? add : undefined}
@@ -168,9 +156,7 @@ function Connections(props: { readonly workspaceId: string }) {
               total={view.connections().length}
               connectionHref={(id) => href(paths.connection(workspaceId, id))}
               onAdd={view.canCreate() ? add : undefined}
-              failure={
-                view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined
-              }
+              failure={view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined}
               onRefresh={view.refresh}
               refreshing={refreshing()}
             />
@@ -210,8 +196,8 @@ function Connections(props: { readonly workspaceId: string }) {
         capability={capabilityOf(search.add)}
         integrations={integrations()}
         onChoose={(integrationId) => {
-          view.create.begin(integrationId);
-          setDialog("configure");
+          view.create.begin(integrationId)
+          setDialog("configure")
         }}
       />
       <Show when={view.create.integration()}>
@@ -220,8 +206,8 @@ function Connections(props: { readonly workspaceId: string }) {
             open={dialog() === "configure"}
             onClose={close}
             onBack={() => {
-              view.dismiss();
-              setDialog("choose");
+              view.dismiss()
+              setDialog("choose")
             }}
             integration={integration()}
             name={view.create.name()}
@@ -272,5 +258,5 @@ function Connections(props: { readonly workspaceId: string }) {
         )}
       </Show>
     </>
-  );
+  )
 }

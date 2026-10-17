@@ -8,17 +8,20 @@
  *
  * @since 0.1.0
  */
-import { Turn } from "@amends-dev/core/turn";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
-import { limit } from "./internal/paging.ts";
-import { CoreError } from "@amends-dev/core/error";
 
-const turn = { turnId: Turn.Id };
-const view = Turn.View.annotate({ identifier: "Turn" });
+import { CoreError } from "@amends-dev/core/error"
+import { Turn, TurnId } from "@amends-dev/core/turn"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import { limit } from "./internal/paging.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
+
+const turn = { turnId: TurnId.TurnId }
+const view = Turn.View.annotate({ identifier: "Turn" })
 
 /**
  * Agents' turns: each agent's work on what was asked of it in a thread, which a reader of the
@@ -35,28 +38,28 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
     HttpApiEndpoint.get("listActive", "/active-turns", {
       query: { limit },
       success: Schema.Array(view),
-      error: ApiErrors.workspace,
+      error: ApiErrors.workspace
     }),
     HttpApiEndpoint.get("get", "/turns/:turnId", {
       params: turn,
       success: view,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound]
     }),
     HttpApiEndpoint.get("watchLog", "/turns/:turnId/log/events", {
       params: turn,
       success: HttpApiSchema.StreamSse({ data: Turn.LogMessage, error: CoreError.Unavailable }),
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.TooManyStreams],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.TooManyStreams]
     }),
     HttpApiEndpoint.post("cancel", "/turns/:turnId/cancel", {
       params: turn,
       success: view,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict]
     }),
     HttpApiEndpoint.post("retry", "/turns/:turnId/retry", {
       params: turn,
       success: Turn.View.pipe(HttpApiSchema.status(201)).annotate({ identifier: "RetriedTurn" }),
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
-    }),
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict]
+    })
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication) {}
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication) {}

@@ -2,15 +2,20 @@
  * What the local host reads at start: every `AMENDS_*` setting, from the environment, validated
  * before any resource is acquired, so a missing or invalid setting fails startup before a
  * connection opens. The database URL and the credential key stay redacted, in errors too. The entry
- * point passes what `load` returns to `LocalHost.layer`, `LocalServer.layer`, and the
+ * point passes the `options` it reads to `LocalHost.layer`, `LocalServer.layer`, and the
  * authentication `AMENDS_SIGN_IN` names. `deriveSecret` makes each purpose's secret from the
  * credential key.
  *
  * @since 0.1.0
  */
-import { createHmac, randomBytes } from "node:crypto";
-import { Config, Duration, Effect, Option, Redacted, Result, Schema } from "effect";
-import { Base64 } from "effect/encoding";
+
+import { createHmac, randomBytes } from "node:crypto"
+import * as Config from "effect/Config"
+import * as Duration from "effect/Duration"
+import * as Base64 from "effect/encoding/Base64"
+import * as Redacted from "effect/Redacted"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
 
 /**
  * The host's settings, read from their `AMENDS_*` environment variables with defaults applied.
@@ -24,94 +29,92 @@ export interface Options {
    * storing the job requests its commits make for other processes to run, or run jobs alone
    * (`jobs`).
    */
-  readonly role: "all" | "api" | "jobs";
+  readonly role: "all" | "api" | "jobs"
   /** The port the server listens on, on the loopback interface; `0` selects a free one. */
-  readonly port: number;
+  readonly port: number
   /** The PostgreSQL database the host stores every workspace in. */
-  readonly databaseUrl: Redacted.Redacted<string>;
+  readonly databaseUrl: Redacted.Redacted<string>
   /** The most connections the host opens to it; one listens for notifications while needed. */
-  readonly poolSize: number;
+  readonly poolSize: number
   /** This process's address among those running jobs over the database. */
-  readonly runnerAddress: { readonly host: string; readonly port: number };
+  readonly runnerAddress: { readonly host: string; readonly port: number }
   /**
    * How processes running jobs reach each other: through the database alone, or also
    * directly over sockets at their runner addresses.
    */
-  readonly runnerTransport: "storage" | "socket";
+  readonly runnerTransport: "storage" | "socket"
   /** How long a process that stops answering keeps its workspaces before another takes them. */
-  readonly runnerTakeover: Duration.Duration;
+  readonly runnerTakeover: Duration.Duration
   /** The key that seals connections' credentials at rest; without one, none can be stored. */
-  readonly credentialKey: Redacted.Redacted<string> | undefined;
+  readonly credentialKey: Redacted.Redacted<string> | undefined
   /** The directory local sandboxes live in; the host's default when not set. */
-  readonly sandboxDirectory: string | undefined;
+  readonly sandboxDirectory: string | undefined
   /**
    * How people sign in: with codes emailed to them, or, for tests and scripts, with development
    * sign-in, whose bearer tokens are human IDs that the host trusts.
    */
-  readonly signIn: "email" | "development";
+  readonly signIn: "email" | "development"
 }
 
 const role = Config.schema(Schema.Literals(["all", "api", "jobs"]), "AMENDS_ROLE").pipe(
-  Config.withDefault("all" as const),
-);
-const port = Config.schema(
-  Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65535 })),
-  "AMENDS_PORT",
-).pipe(Config.withDefault(8787));
+  Config.withDefault("all" as const)
+)
+const port = Config.schema(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65535 })), "AMENDS_PORT").pipe(
+  Config.withDefault(8787)
+)
 const databaseUrl = Config.schema(
   Schema.Redacted(
     Schema.String.check(
       Schema.makeFilter((value) => {
-        const url = URL.parse(value);
+        const url = URL.parse(value)
         return (
           (url !== null && (url.protocol === "postgres:" || url.protocol === "postgresql:")) ||
           "Expected a postgres:// or postgresql:// database URL"
-        );
-      }),
-    ),
+        )
+      })
+    )
   ),
-  "AMENDS_DATABASE_URL",
-);
+  "AMENDS_DATABASE_URL"
+)
 const runnerAddress = Config.schema(
   Schema.String.check(
     Schema.makeFilter((value) => {
-      const match = /^([A-Za-z0-9.-]+):([0-9]{1,5})$/.exec(value);
+      const match = /^([A-Za-z0-9.-]+):([0-9]{1,5})$/.exec(value)
       return (
         (match !== null && Number(match[2]) >= 1 && Number(match[2]) <= 65535) ||
         "Expected host:port, with a port from 1 through 65535"
-      );
-    }),
+      )
+    })
   ),
-  "AMENDS_RUNNER_ADDRESS",
+  "AMENDS_RUNNER_ADDRESS"
 ).pipe(
   Config.withDefault("localhost:34431"),
   Config.map((value) => {
-    const separator = value.lastIndexOf(":");
-    return { host: value.slice(0, separator), port: Number(value.slice(separator + 1)) };
-  }),
-);
-const runnerTransport = Config.schema(
-  Schema.Literals(["storage", "socket"]),
-  "AMENDS_RUNNER_TRANSPORT",
-).pipe(Config.withDefault("storage" as const));
+    const separator = value.lastIndexOf(":")
+    return { host: value.slice(0, separator), port: Number(value.slice(separator + 1)) }
+  })
+)
+const runnerTransport = Config.schema(Schema.Literals(["storage", "socket"]), "AMENDS_RUNNER_TRANSPORT").pipe(
+  Config.withDefault("storage" as const)
+)
 const runnerTakeover = Config.schema(
   Schema.DurationFromString.check(
     Schema.makeFilter(
       (duration) =>
         (Duration.isGreaterThanOrEqualTo(duration, Duration.seconds(6)) &&
           Duration.isLessThanOrEqualTo(duration, Duration.minutes(10))) ||
-        "Expected a duration from 6 seconds through 10 minutes",
-    ),
+        "Expected a duration from 6 seconds through 10 minutes"
+    )
   ),
-  "AMENDS_RUNNER_TAKEOVER",
-).pipe(Config.withDefault(Duration.seconds(35)));
+  "AMENDS_RUNNER_TAKEOVER"
+).pipe(Config.withDefault(Duration.seconds(35)))
 // A process that runs jobs keeps a connection for each of the runner-address claim, the cluster's
 // shard locks, and the notice listener; five leaves two for requests, so one long commit does not
 // stall every read.
 const poolSize = Config.schema(
   Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 1000 })),
-  "AMENDS_DATABASE_POOL_SIZE",
-).pipe(Config.withDefault(20));
+  "AMENDS_DATABASE_POOL_SIZE"
+).pipe(Config.withDefault(20))
 
 const credentialKey = Config.schema(
   Schema.Redacted(
@@ -120,61 +123,53 @@ const credentialKey = Config.schema(
         (value) =>
           Result.match(Base64.decode(value), {
             onFailure: () => false,
-            onSuccess: (bytes) => bytes.length === 32,
-          }) || "Expected 32 bytes encoded as base64, such as from `openssl rand -base64 32`",
-      ),
-    ),
+            onSuccess: (bytes) => bytes.length === 32
+          }) || "Expected 32 bytes encoded as base64, such as from `openssl rand -base64 32`"
+      )
+    )
   ),
-  "AMENDS_CREDENTIAL_KEY",
-).pipe(Config.option);
+  "AMENDS_CREDENTIAL_KEY"
+).pipe(Config.withDefault(undefined))
 
 const sandboxDirectory = Config.schema(Schema.NonEmptyString, "AMENDS_SANDBOX_DIRECTORY").pipe(
-  Config.option,
-);
+  Config.withDefault(undefined)
+)
 
 const signIn = Config.schema(Schema.Literals(["email", "development"]), "AMENDS_SIGN_IN").pipe(
-  Config.withDefault("email" as const),
-);
+  Config.withDefault("email" as const)
+)
 
 /**
- * Read and validate startup options without opening a database or server, failing with a
- * `Config.ConfigError` that names the setting missing or invalid.
+ * The startup options, read and validated without opening a database or server: reading them fails
+ * with a `Config.ConfigError` that names the setting missing or invalid.
  *
- * @category constructors
+ * @category configuration
  * @since 0.1.0
  */
-export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<
-  Options,
-  Config.ConfigError
-> {
-  return {
-    role: yield* role,
-    port: yield* port,
-    databaseUrl: yield* databaseUrl,
-    poolSize: yield* poolSize,
-    runnerAddress: yield* runnerAddress,
-    runnerTransport: yield* runnerTransport,
-    runnerTakeover: yield* runnerTakeover,
-    credentialKey: Option.getOrUndefined(yield* credentialKey),
-    sandboxDirectory: Option.getOrUndefined(yield* sandboxDirectory),
-    signIn: yield* signIn,
-  };
-});
+export const options: Config.Config<Options> = Config.all({
+  role,
+  port,
+  databaseUrl,
+  poolSize,
+  runnerAddress,
+  runnerTransport,
+  runnerTakeover,
+  credentialKey,
+  sandboxDirectory,
+  signIn
+})
 
 /**
  * A secret for one purpose, such as opencode's bridge tokens: one made from the credential key,
  * which every host over the database shares, so that hosts agree on it; or, without a credential
  * key, this process's own.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
-export const deriveSecret = (
-  credentialKey: Redacted.Redacted<string> | undefined,
-  purpose: string,
-) =>
+export const deriveSecret = (credentialKey: Redacted.Redacted<string> | undefined, purpose: string) =>
   credentialKey === undefined
     ? randomBytes(32)
     : createHmac("sha256", Buffer.from(Redacted.value(credentialKey), "base64"))
         .update(purpose)
-        .digest();
+        .digest()

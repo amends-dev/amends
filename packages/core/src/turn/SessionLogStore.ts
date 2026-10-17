@@ -7,13 +7,20 @@
  *
  * @since 0.1.0
  */
-import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effect";
-import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
-import * as SessionLog from "./SessionLog.ts";
-import * as StoreInput from "../journal/StoreInput.ts";
-import * as Store from "../journal/Store.ts";
-import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import * as Array from "effect/Array"
+import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import * as Deferred from "effect/Deferred"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as StoreInput from "../journal/StoreInput.ts"
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
+import * as SessionLog from "./SessionLog.ts"
 
 /**
  * The log holds an entry past where its writer read it to: someone else wrote there meanwhile.
@@ -23,7 +30,7 @@ import * as StoreError from "../journal/StoreError.ts";
  */
 export class Overtaken extends Schema.TaggedError<Overtaken>()("SessionLogStore.Overtaken", {
   participationId: Schema.String,
-  after: Schema.Int,
+  after: Schema.Int
 }) {}
 
 /**
@@ -34,8 +41,8 @@ export class Overtaken extends Schema.TaggedError<Overtaken>()("SessionLogStore.
  */
 export const ReadOptions = Schema.Struct({
   after: Schema.Natural,
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -58,8 +65,8 @@ export class SessionLogStore extends Context.Service<
   {
     /** The position of the log's latest entry, or 0 while it has none. */
     readonly head: (
-      participationId: ThreadParticipationId.Id,
-    ) => Effect.Effect<number, StoreError.StoreError>;
+      participationId: ThreadParticipationId.ThreadParticipationId
+    ) => Effect.Effect<number, StoreError.StoreError>
     /**
      * Append `entries` in order after the entry at `after`, the log's latest as the writer read it,
      * or 0 for an empty log. A log that holds an entry past `after` takes none of them and fails
@@ -67,23 +74,20 @@ export class SessionLogStore extends Context.Service<
      * it.
      */
     readonly append: (
-      participationId: ThreadParticipationId.Id,
+      participationId: ThreadParticipationId.ThreadParticipationId,
       entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>,
-      after: number,
-    ) => Effect.Effect<
-      Array.NonEmptyReadonlyArray<SessionLog.Recorded>,
-      StoreError.StoreError | Overtaken
-    >;
+      after: number
+    ) => Effect.Effect<Array.NonEmptyReadonlyArray<SessionLog.Recorded>, StoreError.StoreError | Overtaken>
     /** The log's entries past `after`, oldest first, at most `limit` of them. */
     readonly read: (
-      participationId: ThreadParticipationId.Id,
-      options: ReadOptions,
-    ) => Effect.Effect<ReadonlyArray<SessionLog.Recorded>, StoreError.StoreError>;
+      participationId: ThreadParticipationId.ThreadParticipationId,
+      options: ReadOptions
+    ) => Effect.Effect<ReadonlyArray<SessionLog.Recorded>, StoreError.StoreError>
     /** Completes once the log holds an entry past `after`. */
     readonly waitForAppend: (
-      participationId: ThreadParticipationId.Id,
-      after: number,
-    ) => Effect.Effect<void, StoreError.StoreError>;
+      participationId: ThreadParticipationId.ThreadParticipationId,
+      after: number
+    ) => Effect.Effect<void, StoreError.StoreError>
   }
 >()("@amends-dev/core/turn/SessionLogStore") {}
 
@@ -94,85 +98,81 @@ export class SessionLogStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (driver: SessionLogStore["Service"]): SessionLogStore["Service"] => {
-  const read = StoreInput.read("SessionLogStore");
+  const read = StoreInput.read("SessionLogStore")
   return {
     head: (participationId) =>
-      Effect.flatMap(read("head", ThreadParticipationId.Id, participationId), driver.head),
+      Effect.flatMap(read("head", ThreadParticipationId.ThreadParticipationId, participationId), driver.head),
     append: Effect.fn("SessionLogStore.append")(function* (participationId, entries, after) {
       return yield* driver.append(
-        yield* read("append", ThreadParticipationId.Id, participationId),
+        yield* read("append", ThreadParticipationId.ThreadParticipationId, participationId),
         yield* read("append", Schema.NonEmptyArray(SessionLog.Entry), entries),
-        yield* read("append", Schema.Natural, after),
-      );
+        yield* read("append", Schema.Natural, after)
+      )
     }),
     read: Effect.fn("SessionLogStore.read")(function* (participationId, options) {
       return yield* driver.read(
-        yield* read("read", ThreadParticipationId.Id, participationId),
-        yield* read("read", ReadOptions, options),
-      );
+        yield* read("read", ThreadParticipationId.ThreadParticipationId, participationId),
+        yield* read("read", ReadOptions, options)
+      )
     }),
     waitForAppend: Effect.fn("SessionLogStore.waitForAppend")(function* (participationId, after) {
       return yield* driver.waitForAppend(
-        yield* read("waitForAppend", ThreadParticipationId.Id, participationId),
-        yield* read("waitForAppend", Schema.Natural, after),
-      );
-    }),
-  };
-};
+        yield* read("waitForAppend", ThreadParticipationId.ThreadParticipationId, participationId),
+        yield* read("waitForAppend", Schema.Natural, after)
+      )
+    })
+  }
+}
 
 /** An entry as JSON, where and when its log recorded it. */
-const rows = MemoryDatabase.makeRows(
-  Schema.fromJsonString(Schema.toCodecJson(SessionLog.Recorded)),
-);
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(SessionLog.Recorded)))
 
 /**
  * Each participation's session log in memory, beside the workspace's transactional state: an
  * append takes part in no transaction and is kept at once.
  */
 const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
-  const { workspaceId, connection } = yield* Store.MemoryBinding;
-  const { database } = connection;
-  const logKeyOf = (participationId: string) => MemoryDatabase.keyOf(workspaceId, participationId);
-  const logOf = (participationId: string) =>
-    database.sessionLogs.get(logKeyOf(participationId)) ?? [];
+  const { workspaceId, connection } = yield* Store.MemoryBinding
+  const { database } = connection
+  const logKeyOf = (participationId: string) => MemoryDatabase.keyOf(workspaceId, participationId)
+  const logOf = (participationId: string) => database.sessionLogs.get(logKeyOf(participationId)) ?? []
   const driver: SessionLogStore["Service"] = {
     head: (participationId) => Effect.sync(() => logOf(participationId).length),
     append: Effect.fn("SessionLogStore.memory.append")(function* (participationId, entries, after) {
-      const log = logOf(participationId);
-      if (log.length !== after) return yield* new Overtaken({ participationId, after });
-      const recordedAt = yield* DateTime.now;
+      const log = logOf(participationId)
+      if (log.length !== after) return yield* new Overtaken({ participationId, after })
+      const recordedAt = yield* DateTime.now
       const recorded = Array.map(entries, (entry, index) => ({
         position: after + index + 1,
         recordedAt,
-        entry,
-      }));
+        entry
+      }))
+      // Overtaken passes as it is; only the encoding fails as the store.
       const encoded = yield* Effect.forEach(recorded, (entry) => rows.encode(entry)).pipe(
-        Effect.mapError(StoreError.failed("SessionLogStore", "append")),
-      );
-      database.sessionLogs.set(logKeyOf(participationId), [...log, ...encoded]);
-      MemoryDatabase.wakeAppendReaders(database);
-      return recorded;
+        Effect.mapError(StoreError.failed("SessionLogStore", "append"))
+      )
+      database.sessionLogs.set(logKeyOf(participationId), [...log, ...encoded])
+      MemoryDatabase.wakeAppendReaders(database)
+      return recorded
     }),
     read: Effect.fn("SessionLogStore.memory.read")(
       function* (participationId, { after, limit }) {
-        const page = logOf(participationId).slice(Math.max(after, 0), Math.max(after, 0) + limit);
-        return yield* Effect.forEach(page, (row) => rows.decode(row));
+        const page = logOf(participationId).slice(Math.max(after, 0), Math.max(after, 0) + limit)
+        return yield* Effect.forEach(page, (row) => rows.decode(row))
       },
-      Effect.mapError(StoreError.failed("SessionLogStore", "read")),
+      Effect.mapError(StoreError.failed("SessionLogStore", "read"))
     ),
-    waitForAppend: Effect.fn("SessionLogStore.memory.waitForAppend")(
-      function* (participationId, after) {
-        while (true) {
-          // Take the signal before checking the log, so no append falls between the two.
-          const appended = database.appended;
-          if (logOf(participationId).length > after) return;
-          yield* Deferred.await(appended);
-        }
-      },
-    ),
-  };
-  return make(driver);
-});
+    waitForAppend: Effect.fn("SessionLogStore.memory.waitForAppend")(function* (participationId, after) {
+      while (true) {
+        // Take the signal before checking the log, so no append falls between the two.
+        const appended = database.appended
+        if (logOf(participationId).length > after) return
+        yield* Deferred.await(appended)
+      }
+    })
+  }
+  return make(driver)
+})
 
 /**
  * Provide `SessionLogStore` in process memory, over the workspace's `Store.MemoryBinding`: each
@@ -184,4 +184,4 @@ const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(SessionLogStore, makeMemory());
+export const layerMemory = Layer.effect(SessionLogStore, makeMemory())

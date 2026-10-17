@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names a workspace. The host allocates it when it creates the workspace and binds storage to it;
@@ -14,10 +15,10 @@ import { Schema } from "effect";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceId"));
+export const WorkspaceId = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type WorkspaceId = typeof WorkspaceId.Type

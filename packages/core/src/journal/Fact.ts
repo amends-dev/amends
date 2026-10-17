@@ -7,10 +7,12 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
-import * as Audience from "./Audience.ts";
-import * as Occurrence from "./Occurrence.ts";
-import * as Subject from "./Subject.ts";
+
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import * as Audience from "./Audience.ts"
+import * as Occurrence from "./Occurrence.ts"
+import * as Subject from "./Subject.ts"
 
 /**
  * A domain fact's contract, before the journal adds publication metadata. Definitions registered
@@ -23,23 +25,23 @@ import * as Subject from "./Subject.ts";
 export interface Definition<
   Name extends string = string,
   Version extends number = number,
-  PayloadSchema extends Schema.Constraint = Schema.Constraint,
+  PayloadSchema extends Schema.Constraint = Schema.Constraint
 > {
   /** The fact's name, such as `thread.created`, which its occurrence keys include. */
-  readonly name: Name;
+  readonly name: Name
   /** The version of its payload schema; projections register each version they handle. */
-  readonly version: Version;
+  readonly version: Version
   /** What the fact records, encoded to bytes by `Codec.make`. */
-  readonly payload: PayloadSchema;
+  readonly payload: PayloadSchema
   /** Pure, deterministic entity identity, derived from the validated payload. */
-  subject(payload: PayloadSchema["Type"]): Subject.Subject;
+  subject(payload: PayloadSchema["Type"]): Subject.Subject
   /** Pure, deterministic identity of this occurrence; null leaves this payload repeatable. */
-  occurrence?(payload: PayloadSchema["Type"]): ReadonlyArray<string> | null;
+  occurrence?(payload: PayloadSchema["Type"]): ReadonlyArray<string> | null
   /**
    * Pure, deterministic delivery scopes of this payload: who may learn of the fact beyond the
    * projections that apply it. Omitted, the fact stays internal.
    */
-  audience?(payload: PayloadSchema["Type"]): ReadonlyArray<Audience.Scope>;
+  audience?(payload: PayloadSchema["Type"]): ReadonlyArray<Audience.Scope>
 }
 
 /**
@@ -48,7 +50,7 @@ export interface Definition<
  * @category models
  * @since 0.1.0
  */
-export type Payload<F extends Definition> = F["payload"]["Type"];
+export type Payload<F extends Definition> = F["payload"]["Type"]
 
 /**
  * Declares a fact: its name, and in `options` its version, payload schema, subject rule, and
@@ -58,19 +60,15 @@ export type Payload<F extends Definition> = F["payload"]["Type"];
  * @category constructors
  * @since 0.1.0
  */
-export const make = <
-  const Name extends string,
-  const Version extends number,
-  PayloadSchema extends Schema.Constraint,
->(
+export const make = <const Name extends string, const Version extends number, PayloadSchema extends Schema.Constraint>(
   name: Name,
   options: {
-    readonly version: Version;
-    readonly payload: PayloadSchema;
-    readonly subject: (payload: NoInfer<PayloadSchema["Type"]>) => Subject.Subject;
-    readonly occurrence?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<string> | null;
-    readonly audience?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<Audience.Scope>;
-  },
+    readonly version: Version
+    readonly payload: PayloadSchema
+    readonly subject: (payload: NoInfer<PayloadSchema["Type"]>) => Subject.Subject
+    readonly occurrence?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<string> | null
+    readonly audience?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<Audience.Scope>
+  }
 ): Readonly<Definition<Name, Version, PayloadSchema>> =>
   Object.freeze({
     name,
@@ -78,8 +76,8 @@ export const make = <
     payload: options.payload,
     subject: options.subject,
     ...(options.occurrence === undefined ? {} : { occurrence: options.occurrence }),
-    ...(options.audience === undefined ? {} : { audience: options.audience }),
-  });
+    ...(options.audience === undefined ? {} : { audience: options.audience })
+  })
 
 /**
  * The idempotency key of publishing `payload` as `fact`, or null when the fact declares no
@@ -90,14 +88,15 @@ export const make = <
  * @category constructors
  * @since 0.1.0
  */
-export const makeOccurrenceKey = Effect.fn("Fact.makeOccurrenceKey")(function* <
-  F extends Definition,
->(fact: F, payload: Payload<NoInfer<F>>) {
-  if (fact.occurrence === undefined) return null;
-  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
-  const parts = fact.occurrence(validated);
-  return parts === null ? null : yield* Occurrence.makeKey(fact.name, parts);
-});
+export const makeOccurrenceKey = Effect.fnUntraced(function* <F extends Definition>(
+  fact: F,
+  payload: Payload<NoInfer<F>>
+) {
+  if (fact.occurrence === undefined) return null
+  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload)
+  const parts = fact.occurrence(validated)
+  return parts === null ? null : yield* Occurrence.makeKey(fact.name, parts)
+})
 
 /**
  * The subject `fact` declares for `payload`, after checking the payload against the fact's schema
@@ -106,13 +105,10 @@ export const makeOccurrenceKey = Effect.fn("Fact.makeOccurrenceKey")(function* <
  * @category constructors
  * @since 0.1.0
  */
-export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends Definition>(
-  fact: F,
-  payload: Payload<NoInfer<F>>,
-) {
-  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
-  return yield* Schema.decodeEffect(Subject.Subject)(fact.subject(validated));
-});
+export const makeSubject = Effect.fnUntraced(function* <F extends Definition>(fact: F, payload: Payload<NoInfer<F>>) {
+  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload)
+  return yield* Schema.decodeEffect(Subject.Subject)(fact.subject(validated))
+})
 
 /**
  * The audience `fact` declares for `payload`, after checking the payload against the fact's schema
@@ -122,11 +118,8 @@ export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends De
  * @category constructors
  * @since 0.1.0
  */
-export const makeAudience = Effect.fn("Fact.makeAudience")(function* <F extends Definition>(
-  fact: F,
-  payload: Payload<NoInfer<F>>,
-) {
-  if (fact.audience === undefined) return Audience.internal;
-  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
-  return yield* Schema.decodeEffect(Audience.Audience)(fact.audience(validated));
-});
+export const makeAudience = Effect.fnUntraced(function* <F extends Definition>(fact: F, payload: Payload<NoInfer<F>>) {
+  if (fact.audience === undefined) return Audience.internal
+  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload)
+  return yield* Schema.decodeEffect(Audience.Audience)(fact.audience(validated))
+})

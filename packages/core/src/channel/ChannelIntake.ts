@@ -10,34 +10,44 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends-dev/channel";
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import * as Identity from "../identity/Identity.ts";
-import * as Performer from "../identity/Performer.ts";
-import * as Journal from "../journal/Journal.ts";
-import * as Publication from "../journal/Publication.ts";
-import * as Store from "../journal/Store.ts";
-import * as Request from "../request/Request.ts";
-import * as Task from "../task/Task.ts";
-import * as TaskCommand from "../task/TaskCommand.ts";
-import * as Thread from "../thread/Thread.ts";
-import * as ThreadCommand from "../thread/ThreadCommand.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadMessage from "../thread/ThreadMessage.ts";
-import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts";
-import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
-import * as ThreadQuery from "../thread/ThreadQuery.ts";
-import * as ThreadStore from "../thread/ThreadStore.ts";
-import type * as Channel from "./Channel.ts";
-import type * as ChannelBinding from "./ChannelBinding.ts";
-import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import * as ChannelFacts from "./ChannelFacts.ts";
-import * as ChannelQuery from "./ChannelQuery.ts";
-import * as Contact from "./Contact.ts";
-import * as ContactStore from "./ContactStore.ts";
-import * as DeliveryStore from "./DeliveryStore.ts";
-import * as CoreError from "../error/CoreError.ts";
-import * as Operation from "../operation/Operation.ts";
+
+import type { ChannelTransport } from "@amends-dev/channel"
+import * as Context from "effect/Context"
+import * as Crypto from "effect/Crypto"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Match from "effect/Match"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as CoreError from "../error/CoreError.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as Performer from "../identity/Performer.ts"
+import * as Journal from "../journal/Journal.ts"
+import * as Publication from "../journal/Publication.ts"
+import * as Store from "../journal/Store.ts"
+import * as Operation from "../operation/Operation.ts"
+import * as Request from "../request/Request.ts"
+import * as Task from "../task/Task.ts"
+import * as TaskCommand from "../task/TaskCommand.ts"
+import * as Thread from "../thread/Thread.ts"
+import * as ThreadCommand from "../thread/ThreadCommand.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadMessage from "../thread/ThreadMessage.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
+import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts"
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
+import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as ThreadStore from "../thread/ThreadStore.ts"
+import type * as Channel from "./Channel.ts"
+import type * as ChannelBinding from "./ChannelBinding.ts"
+import * as ChannelBindingStore from "./ChannelBindingStore.ts"
+import * as ChannelFacts from "./ChannelFacts.ts"
+import type * as ChannelId from "./ChannelId.ts"
+import * as ChannelQuery from "./ChannelQuery.ts"
+import * as Contact from "./Contact.ts"
+import * as ContactStore from "./ContactStore.ts"
+import * as DeliveryStore from "./DeliveryStore.ts"
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or
@@ -49,18 +59,18 @@ import * as Operation from "../operation/Operation.ts";
  * @since 0.1.0
  */
 export const Intake = Schema.TaggedUnion({
-  Opened: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Replied: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Edited: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Deleted: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Ignored: { reason: Schema.Literals(["echo", "duplicate", "empty", "unknown", "unchanged"]) },
-});
+  Opened: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Replied: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Edited: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Deleted: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Ignored: { reason: Schema.Literals(["echo", "duplicate", "empty", "unknown", "unchanged"]) }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Intake = typeof Intake.Type;
+export type Intake = typeof Intake.Type
 
 /**
  * What receiving an inbound request made: what to answer the system with, when it expects an
@@ -71,8 +81,8 @@ export type Intake = typeof Intake.Type;
  */
 export const Received = Schema.Struct({
   answer: Schema.NullOr(Schema.String),
-  intakes: Schema.Array(Intake),
-});
+  intakes: Schema.Array(Intake)
+})
 
 /**
  * @category schemas
@@ -86,11 +96,7 @@ export interface Received extends Schema.Schema.Type<typeof Received> {}
  * @category errors
  * @since 0.1.0
  */
-export type IntakeError =
-  | CoreError.NotFound
-  | CoreError.Invalid
-  | CoreError.Unavailable
-  | CoreError.Uncertain;
+export type IntakeError = CoreError.NotFound | CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain
 
 /**
  * What receiving an inbound request can fail with.
@@ -98,16 +104,10 @@ export type IntakeError =
  * @category errors
  * @since 0.1.0
  */
-export type ReceiveError =
-  | CoreError.NotFound
-  | CoreError.Invalid
-  | CoreError.Unavailable
-  | CoreError.Uncertain;
+export type ReceiveError = CoreError.NotFound | CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain
 
 /**
  * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
- *
- * Intake, as a host calls it.
  *
  * @category services
  * @since 0.1.0
@@ -123,21 +123,21 @@ export class ChannelIntake extends Context.Service<
      * a channel missing or removed is `CoreError.NotFound`.
      */
     readonly receive: (
-      channelId: Channel.Id,
-      inbound: ChannelTransport.Inbound,
-    ) => Effect.Effect<Received, ReceiveError>;
+      channelId: ChannelId.ChannelId,
+      inbound: ChannelTransport.Inbound
+    ) => Effect.Effect<Received, ReceiveError>
     /** Take in one event the channel's system sent, in a commit of its own. */
     readonly intake: (
-      channelId: Channel.Id,
-      event: ChannelTransport.Event,
-    ) => Effect.Effect<Intake, IntakeError>;
+      channelId: ChannelId.ChannelId,
+      event: ChannelTransport.Event
+    ) => Effect.Effect<Intake, IntakeError>
   }
 >()("@amends-dev/core/channel/ChannelIntake") {}
 
 /** Why intake took nothing in. */
-type IgnoredReason = Extract<Intake, { readonly _tag: "Ignored" }>["reason"];
+type IgnoredReason = Extract<Intake, { readonly _tag: "Ignored" }>["reason"]
 
-const ignored = (reason: IgnoredReason) => Intake.cases.Ignored.make({ reason });
+const ignored = (reason: IgnoredReason) => Intake.cases.Ignored.make({ reason })
 
 /**
  * Capture the stores, the shared reads and writes, and the journal.
@@ -145,52 +145,52 @@ const ignored = (reason: IgnoredReason) => Intake.cases.Ignored.make({ reason })
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ChannelIntake.make")(function* () {
-  const channelQuery = yield* ChannelQuery.ChannelQuery;
-  const channelBindingStore = yield* ChannelBindingStore.ChannelBindingStore;
-  const contactStore = yield* ContactStore.ContactStore;
-  const deliveryStore = yield* DeliveryStore.DeliveryStore;
-  const threadStore = yield* ThreadStore.ThreadStore;
-  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
-  const threadQuery = yield* ThreadQuery.ThreadQuery;
-  const threadCommand = yield* ThreadCommand.ThreadCommand;
-  const taskCommand = yield* TaskCommand.TaskCommand;
-  const journal = yield* Journal.Journal;
-  const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Store;
+export const make = Effect.gen(function* () {
+  const channelQuery = yield* ChannelQuery.ChannelQuery
+  const channelBindingStore = yield* ChannelBindingStore.ChannelBindingStore
+  const contactStore = yield* ContactStore.ContactStore
+  const deliveryStore = yield* DeliveryStore.DeliveryStore
+  const threadStore = yield* ThreadStore.ThreadStore
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
+  const threadQuery = yield* ThreadQuery.ThreadQuery
+  const threadCommand = yield* ThreadCommand.ThreadCommand
+  const taskCommand = yield* TaskCommand.TaskCommand
+  const journal = yield* Journal.Journal
+  const crypto = yield* Crypto.Crypto
+  const { workspaceId } = yield* Store.Store
 
   /** Run `step` in its own commit, attributed to the contact `contactId`. */
-  const asContact = <A, E, R>(contactId: Contact.Id, step: Effect.Effect<A, E, R>) =>
+  const asContact = <A, E, R>(contactId: Identity.ContactId, step: Effect.Effect<A, E, R>) =>
     Effect.flatMap(
       Publication.make(
         workspaceId,
-        Performer.Reference.cases.Identity.make({ identity: { _tag: "Contact", id: contactId } }),
+        Performer.Reference.cases.Identity.make({ identity: Identity.Reference.cases.Contact.make({ id: contactId }) })
       ),
-      (provenance) => step.pipe(Effect.provideService(Publication.Publication, provenance)),
-    ).pipe(journal.commit);
+      (provenance) => step.pipe(Effect.provideService(Publication.Publication, provenance))
+    ).pipe(journal.commit)
 
   /** The thread a binding names, which a binding cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (binding: ChannelBinding.ChannelBinding) {
-    const found = yield* threadStore.get(binding.threadId);
-    if (Option.isNone(found)) return yield* Effect.die("A bound thread is missing");
-    return found.value;
-  });
+    const found = yield* threadStore.get(binding.threadId)
+    if (Option.isNone(found)) return yield* Effect.die("A bound thread is missing")
+    return found.value
+  })
 
   /** A participant who could not be admitted: intake admits only those it just read as able. */
   const admitted = <A, E, R>(effect: Effect.Effect<A, E | CoreError.Conflict, R>) =>
     Effect.catchTag(effect, "CoreError.Conflict", () =>
-      Effect.die("Intake could not admit a participant it read as able to take part"),
-    );
+      Effect.die("Intake could not admit a participant it read as able to take part")
+    )
 
   /** The contact the sender is on the channel, created when first heard from, renamed when called otherwise. */
   const resolveContact = Effect.fnUntraced(function* (
     channel: Channel.Channel,
-    contactId: Contact.Id,
+    contactId: Identity.ContactId,
     sender: ChannelTransport.Sender,
-    occurredAt: DateTime.Utc,
+    occurredAt: DateTime.Utc
   ) {
-    const name = Contact.nameOf(sender.name);
-    const found = yield* contactStore.get(contactId);
+    const name = Contact.nameOf(sender.name)
+    const found = yield* contactStore.get(contactId)
     if (Option.isNone(found)) {
       const record: Contact.Contact = {
         id: contactId,
@@ -198,15 +198,15 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         channelId: channel.id,
         externalId: sender.id,
         name,
-        createdAt: occurredAt,
-      };
-      yield* journal.publish(ChannelFacts.ContactCreated, record);
-      return record;
+        createdAt: occurredAt
+      }
+      yield* journal.publish(ChannelFacts.ContactCreated, record)
+      return record
     }
-    if (found.value.name === name) return found.value;
-    yield* journal.publish(ChannelFacts.ContactRenamed, { workspaceId, contactId, name });
-    return Contact.change(found.value, { name });
-  });
+    if (found.value.name === name) return found.value
+    yield* journal.publish(ChannelFacts.ContactRenamed, { workspaceId, contactId, name })
+    return Contact.change(found.value, { name })
+  })
 
   /** Open a thread for a conversation the channel has not heard before, bound to it. */
   const open = Effect.fnUntraced(function* (
@@ -214,26 +214,24 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     contact: Contact.Contact,
     event: Extract<ChannelTransport.Event, { readonly _tag: "MessageReceived" }>,
     text: ThreadMessage.Text,
-    messageId: ThreadMessage.Id,
-    occurredAt: DateTime.Utc,
+    messageId: ThreadMessageId.ThreadMessageId,
+    occurredAt: DateTime.Utc
   ) {
-    const threadId = Thread.Id.make(
-      yield* Request.derivedId(["channel.thread", workspaceId, channel.id, event.conversation.id]),
-    );
+    const threadId = ThreadId.ThreadId.make(
+      yield* Request.derivedId(["channel.thread", workspaceId, channel.id, event.conversation.id])
+    )
     const title =
-      event.title === undefined
-        ? null
-        : Option.getOrNull(Schema.decodeOption(Thread.Title)(event.title.trim()));
-    const author: ThreadMessage.Author = { _tag: "Contact", contactId: contact.id };
+      event.title === undefined ? null : Option.getOrNull(Schema.decodeOption(Thread.Title)(event.title.trim()))
+    const author: ThreadMessage.Author = ThreadMessage.Author.cases.Contact.make({ contactId: contact.id })
     // The group's human followers join; its agents come through triage, assignment, or a mention.
     const followers = (yield* threadQuery.followers(channel.groupId)).filter(({ member }) =>
-      Identity.MemberReference.isAnyOf(["Human"])(member.identity),
-    );
+      Identity.MemberReference.isAnyOf(["Human"])(member.identity)
+    )
     const participants: Array<ThreadParticipation.Reference> = [
-      { _tag: "Contact", contactId: contact.id },
-      ...followers.map(({ member }) => ({ _tag: "Member" as const, memberId: member.id })),
-      ...(channel.opensTasks ? [{ _tag: "Triage" as const }] : []),
-    ];
+      ThreadParticipation.Reference.cases.Contact.make({ contactId: contact.id }),
+      ...followers.map(({ member }) => ThreadParticipation.Reference.cases.Member.make({ memberId: member.id })),
+      ...(channel.opensTasks ? [ThreadParticipation.Reference.cases.Triage.make({})] : [])
+    ]
     const created = yield* admitted(
       threadCommand.create({
         threadId,
@@ -246,11 +244,11 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
           author,
           text,
           mentions: [],
-          via: { _tag: "Channel", channelId: channel.id, externalMessageId: event.messageId },
+          via: ThreadMessage.Via.cases.Channel.make({ channelId: channel.id, externalMessageId: event.messageId })
         },
-        occurredAt,
-      }),
-    );
+        occurredAt
+      })
+    )
     yield* journal
       .publish(ChannelFacts.Bound, {
         threadId,
@@ -258,21 +256,21 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         channelId: channel.id,
         groupId: channel.groupId,
         conversation: event.conversation,
-        boundAt: occurredAt,
+        boundAt: occurredAt
       })
-      .pipe(Publication.withOccurredAt(occurredAt));
+      .pipe(Publication.withOccurredAt(occurredAt))
     if (channel.opensTasks)
       yield* admitted(
         taskCommand.create({
           thread: created.thread,
           ...Task.initial({}),
           createdBy: author,
-          by: { _tag: "Contact", contactId: contact.id },
-          occurredAt,
-        }),
-      );
-    return Intake.cases.Opened.make({ threadId, messageId });
-  });
+          by: ThreadParticipation.Reference.cases.Contact.make({ contactId: contact.id }),
+          occurredAt
+        })
+      )
+    return Intake.cases.Opened.make({ threadId, messageId })
+  })
 
   /** Publish the contact's message in the thread its conversation is bound to. */
   const reply = Effect.fnUntraced(function* (
@@ -281,188 +279,162 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     binding: ChannelBinding.ChannelBinding,
     event: Extract<ChannelTransport.Event, { readonly _tag: "MessageReceived" }>,
     text: ThreadMessage.Text,
-    messageId: ThreadMessage.Id,
-    occurredAt: DateTime.Utc,
+    messageId: ThreadMessageId.ThreadMessageId,
+    occurredAt: DateTime.Utc
   ) {
-    if (Option.isSome(yield* threadMessageStore.get(messageId))) return ignored("duplicate");
-    const thread = yield* threadOf(binding);
+    if (Option.isSome(yield* threadMessageStore.get(messageId))) return ignored("duplicate")
+    const thread = yield* threadOf(binding)
     // The contact is readmitted if their participation ended; everyone taking part is told.
-    const contactReference: ThreadParticipation.Reference = {
-      _tag: "Contact",
-      contactId: contact.id,
-    };
-    const current = yield* threadQuery.currentParticipants(thread);
+    const contactReference: ThreadParticipation.Reference = ThreadParticipation.Reference.cases.Contact.make({
+      contactId: contact.id
+    })
+    const current = yield* threadQuery.currentParticipants(thread)
     const byKey = new Map(
       [contactReference, ...current.map((p) => ThreadParticipation.referenceOf(p.participant))].map(
-        (reference) => [ThreadParticipation.keyOf(reference), reference] as const,
-      ),
-    );
+        (reference) => [ThreadParticipation.keyOf(reference), reference] as const
+      )
+    )
     yield* admitted(
       threadCommand.publishMessage({
         messageId,
         threadId: thread.id,
-        author: { _tag: "Contact", contactId: contact.id },
+        author: ThreadMessage.Author.cases.Contact.make({ contactId: contact.id }),
         text,
         mentions: [],
         participants: [...byKey.values()],
         occurredAt,
-        via: { _tag: "Channel", channelId: channel.id, externalMessageId: event.messageId },
-      }),
-    );
-    return Intake.cases.Replied.make({ threadId: thread.id, messageId });
-  });
+        via: ThreadMessage.Via.cases.Channel.make({ channelId: channel.id, externalMessageId: event.messageId })
+      })
+    )
+    return Intake.cases.Replied.make({ threadId: thread.id, messageId })
+  })
 
   /** The contact's own message with text, as intake took it in; anything else is unknown. */
   const ownMessage = Effect.fnUntraced(function* (
     contact: Contact.Contact,
-    messageId: ThreadMessage.Id,
+    messageId: ThreadMessageId.ThreadMessageId
   ) {
-    const found = yield* threadMessageStore.get(messageId);
-    if (Option.isNone(found)) return undefined;
-    const message = found.value;
-    const own =
-      ThreadMessage.Author.isAnyOf(["Contact"])(message.author) &&
-      message.author.contactId === contact.id;
+    const found = yield* threadMessageStore.get(messageId)
+    if (Option.isNone(found)) return undefined
+    const message = found.value
+    const own = ThreadMessage.Author.isAnyOf(["Contact"])(message.author) && message.author.contactId === contact.id
     return own && ThreadMessage.Content.isAnyOf(["Text"])(message.content)
       ? { message, content: message.content }
-      : undefined;
-  });
+      : undefined
+  })
 
   const edit = Effect.fnUntraced(function* (
     contact: Contact.Contact,
     text: ThreadMessage.Text,
-    messageId: ThreadMessage.Id,
-    occurredAt: DateTime.Utc,
+    messageId: ThreadMessageId.ThreadMessageId,
+    occurredAt: DateTime.Utc
   ) {
-    const own = yield* ownMessage(contact, messageId);
-    if (own === undefined) return ignored("unknown");
-    if (own.content.text === text) return ignored("unchanged");
+    const own = yield* ownMessage(contact, messageId)
+    if (own === undefined) return ignored("unknown")
+    if (own.content.text === text) return ignored("unchanged")
     yield* admitted(
       threadCommand.editMessage({
         message: own.message,
         text,
         mentions: own.content.mentions,
-        occurredAt,
-      }),
-    );
-    return Intake.cases.Edited.make({ threadId: own.message.threadId, messageId });
-  });
+        occurredAt
+      })
+    )
+    return Intake.cases.Edited.make({ threadId: own.message.threadId, messageId })
+  })
 
   const remove = Effect.fnUntraced(function* (
     contact: Contact.Contact,
-    messageId: ThreadMessage.Id,
-    occurredAt: DateTime.Utc,
+    messageId: ThreadMessageId.ThreadMessageId,
+    occurredAt: DateTime.Utc
   ) {
-    const own = yield* ownMessage(contact, messageId);
-    if (own === undefined) return ignored("unknown");
-    yield* admitted(threadCommand.deleteMessage({ message: own.message, occurredAt }));
-    return Intake.cases.Deleted.make({ threadId: own.message.threadId, messageId });
-  });
+    const own = yield* ownMessage(contact, messageId)
+    if (own === undefined) return ignored("unknown")
+    yield* admitted(threadCommand.deleteMessage({ message: own.message, occurredAt }))
+    return Intake.cases.Deleted.make({ threadId: own.message.threadId, messageId })
+  })
 
   /** The text of a message as a thread holds it, or none for a message with no text to keep. */
-  const textOf = (text: string) => Schema.decodeOption(ThreadMessage.Text)(text);
+  const textOf = (text: string) => Schema.decodeOption(ThreadMessage.Text)(text)
 
   /**
    * Take one event in, in a commit of its own as the contact who sent it, once it is known not to
    * be an echo of a post of our own: by the sender, or by the message the transport posted.
    */
   const intakeEvent = Effect.fn("ChannelIntake.intakeEvent")(
-    function* (
-      channel: Channel.Channel,
-      self: ChannelTransport.ExternalId | undefined,
-      event: ChannelTransport.Event,
-    ) {
-      if (self !== undefined && event.sender.id === self) return ignored("echo");
-      const posted = yield* deliveryStore.findByExternalMessage(
-        channel.id,
-        event.conversation.id,
-        event.messageId,
-      );
-      if (Option.isSome(posted)) return ignored("echo");
-      const contactId = Contact.Id.make(
-        yield* Request.derivedId(["channel.contact", workspaceId, channel.id, event.sender.id]),
-      );
-      const messageId = ThreadMessage.Id.make(
-        yield* Request.derivedId(["channel.message", workspaceId, channel.id, event.messageId]),
-      );
+    function* (channel: Channel.Channel, self: ChannelTransport.ExternalId | undefined, event: ChannelTransport.Event) {
+      if (self !== undefined && event.sender.id === self) return ignored("echo")
+      const posted = yield* deliveryStore.findByExternalMessage(channel.id, event.conversation.id, event.messageId)
+      if (Option.isSome(posted)) return ignored("echo")
+      const contactId = Identity.ContactId.make(
+        yield* Request.derivedId(["channel.contact", workspaceId, channel.id, event.sender.id])
+      )
+      const messageId = ThreadMessageId.ThreadMessageId.make(
+        yield* Request.derivedId(["channel.message", workspaceId, channel.id, event.messageId])
+      )
       return yield* asContact(
         contactId,
         Effect.gen(function* () {
-          const occurredAt = yield* DateTime.now;
-          const contact = yield* resolveContact(channel, contactId, event.sender, occurredAt);
-          switch (event._tag) {
-            case "MessageReceived": {
-              const text = textOf(event.text);
-              if (Option.isNone(text)) return ignored("empty");
-              const binding = yield* channelBindingStore.findByConversation(
-                channel.id,
-                event.conversation.id,
-              );
-              return Option.isNone(binding)
-                ? yield* open(channel, contact, event, text.value, messageId, occurredAt)
-                : yield* reply(
-                    channel,
-                    contact,
-                    binding.value,
-                    event,
-                    text.value,
-                    messageId,
-                    occurredAt,
-                  );
-            }
-            case "MessageEdited": {
-              const text = textOf(event.text);
-              if (Option.isNone(text)) return ignored("empty");
-              return yield* edit(contact, text.value, messageId, occurredAt);
-            }
-            case "MessageDeleted":
-              return yield* remove(contact, messageId, occurredAt);
-          }
-        }),
-      );
+          const occurredAt = yield* DateTime.now
+          const contact = yield* resolveContact(channel, contactId, event.sender, occurredAt)
+          return yield* Match.valueTags(event, {
+            MessageReceived: (received) =>
+              Effect.gen(function* () {
+                const text = textOf(received.text)
+                if (Option.isNone(text)) return ignored("empty")
+                const binding = yield* channelBindingStore.findByConversation(channel.id, received.conversation.id)
+                return Option.isNone(binding)
+                  ? yield* open(channel, contact, received, text.value, messageId, occurredAt)
+                  : yield* reply(channel, contact, binding.value, received, text.value, messageId, occurredAt)
+              }),
+            MessageEdited: (edited) => {
+              const text = textOf(edited.text)
+              return Option.isNone(text)
+                ? Effect.succeed(ignored("empty"))
+                : edit(contact, text.value, messageId, occurredAt)
+            },
+            MessageDeleted: () => remove(contact, messageId, occurredAt)
+          })
+        })
+      )
     },
-    Effect.provideService(Crypto.Crypto, crypto),
-  );
+    Effect.provideService(Crypto.Crypto, crypto)
+  )
 
   /** The channel's transport, or why its system cannot be reached. */
-  const transportOf = (channel: Channel.Channel) => channelQuery.transport(channel);
+  const transportOf = (channel: Channel.Channel) => channelQuery.transport(channel)
 
-  const receive: ChannelIntake["Service"]["receive"] = Effect.fn("ChannelIntake.receive")(
-    function* (channelId, inbound) {
-      const channel = yield* channelQuery.requireActive(channelId);
-      const transport = yield* transportOf(channel);
-      const received = yield* transport.receive(inbound).pipe(
-        Effect.catchTag("TransportError", (error) =>
-          Effect.fail(
-            error.reason === "rejected"
-              ? new CoreError.Invalid({
-                  reason: new CoreError.Unverified({ description: error.description }),
-                })
-              : new CoreError.Unavailable({
-                  reason: new CoreError.ChannelUnreachable({ description: error.description }),
-                }),
-          ),
-        ),
-      );
-      const intakes: Array<Intake> = [];
-      for (const event of received.events)
-        intakes.push(yield* intakeEvent(channel, transport.self, event));
-      return { answer: received.answer ?? null, intakes } satisfies Received;
-    },
-    Operation.report,
-  );
-
-  const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(function* (
+  const receive: ChannelIntake["Service"]["receive"] = Effect.fn("ChannelIntake.receive")(function* (
     channelId,
-    event,
+    inbound
   ) {
-    const channel = yield* channelQuery.requireActive(channelId);
-    const transport = yield* transportOf(channel);
-    return yield* intakeEvent(channel, transport.self, event);
-  }, Operation.report);
+    const channel = yield* channelQuery.requireActive(channelId)
+    const transport = yield* transportOf(channel)
+    const received = yield* transport.receive(inbound).pipe(
+      Effect.catchReason(
+        "TransportError",
+        "RejectedError",
+        (reason) =>
+          Effect.fail(new CoreError.Invalid({ reason: new CoreError.Unverified({ description: reason.message }) })),
+        (reason) =>
+          Effect.fail(
+            new CoreError.Unavailable({ reason: new CoreError.ChannelUnreachable({ description: reason.message }) })
+          )
+      )
+    )
+    const intakes: Array<Intake> = []
+    for (const event of received.events) intakes.push(yield* intakeEvent(channel, transport.self, event))
+    return { answer: received.answer ?? null, intakes } satisfies Received
+  }, Operation.report)
 
-  return ChannelIntake.of({ receive, intake });
-});
+  const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(function* (channelId, event) {
+    const channel = yield* channelQuery.requireActive(channelId)
+    const transport = yield* transportOf(channel)
+    return yield* intakeEvent(channel, transport.self, event)
+  }, Operation.report)
+
+  return ChannelIntake.of({ receive, intake })
+})
 
 /**
  * Provide intake over the stores, the shared reads and writes, and the journal. Internal: callers
@@ -471,4 +443,4 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChannelIntake, make());
+export const layer = Layer.effect(ChannelIntake, make)

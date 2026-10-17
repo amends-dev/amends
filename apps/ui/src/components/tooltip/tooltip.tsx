@@ -1,20 +1,20 @@
-import * as Primitive from "@kobalte/core/tooltip";
-import { Show, createSignal, type JSX } from "solid-js";
-import { classes } from "../../internal/props.ts";
-import { overlayMount } from "../../internal/overlay.ts";
-import * as s from "./tooltip.css.ts";
+import * as Primitive from "@kobalte/core/tooltip"
+import { Show, createSignal, type JSX } from "solid-js"
+import { overlayMount } from "../../internal/overlay.ts"
+import { classes } from "../../internal/props.ts"
+import * as s from "./tooltip.css.ts"
 
 export type TooltipProps = {
   /** The words, such as "Needs setup". */
-  title: string;
+  title: string
   /** Why, in a sentence. */
-  detail?: string;
+  detail?: string
   /** Colors the title as a status. */
-  tone?: "success" | "caution" | "danger";
+  tone?: "success" | "caution" | "danger"
   /** What the pointer rests on, such as a status mark. */
-  children: JSX.Element;
-  class?: string;
-};
+  children: JSX.Element
+  class?: string
+}
 
 /**
  * A short label on hover, for a mark whose meaning has no room beside it. The trigger is a span,
@@ -22,7 +22,7 @@ export type TooltipProps = {
  * such as the mark's label or visually hidden text, since hover alone does not.
  */
 export function Tooltip(props: TooltipProps) {
-  const [trigger, setTrigger] = createSignal<HTMLElement>();
+  const [trigger, setTrigger] = createSignal<HTMLElement>()
   return (
     <Primitive.Root openDelay={300} closeDelay={0} placement="top" gutter={6}>
       <Primitive.Trigger as="span" ref={setTrigger} class={classes(s.trigger, props.class)}>
@@ -37,5 +37,5 @@ export function Tooltip(props: TooltipProps) {
         </Primitive.Content>
       </Primitive.Portal>
     </Primitive.Root>
-  );
+  )
 }

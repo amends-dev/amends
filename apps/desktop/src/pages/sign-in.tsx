@@ -1,14 +1,14 @@
-import { paths, useSignIn, SignInState } from "@amends-dev/client";
-import { SignInCode, SignInEmail } from "@amends-dev/ui/screens/sign-in";
-import { Match, Switch } from "solid-js";
+import { paths, useSignIn, SignInState } from "@amends-dev/client"
+import { SignInCode, SignInEmail } from "@amends-dev/ui/screens/sign-in"
+import { Match, Switch } from "solid-js"
 
 /** The email and code steps; the route resumes the intended page once a session exists. */
 export function SignInPage() {
-  const flow = useSignIn();
+  const flow = useSignIn()
   const step = <Tag extends "Email" | "Code">(tag: Tag) => {
-    const state = flow.state();
-    return SignInState.$is(tag)(state) ? state : undefined;
-  };
+    const state = flow.state()
+    return SignInState.$is(tag)(state) ? state : undefined
+  }
   return (
     <Switch>
       <Match when={step("Email")}>
@@ -41,5 +41,5 @@ export function SignInPage() {
         )}
       </Match>
     </Switch>
-  );
+  )
 }

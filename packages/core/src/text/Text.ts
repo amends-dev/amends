@@ -4,40 +4,39 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Text storage keeps as given: no NUL, which PostgreSQL text cannot hold, and no unpaired
  * surrogate half, which UTF-8 cannot encode and would be replaced.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const isStorable = Schema.makeFilter(
   (text: string) =>
-    (!text.includes("\u0000") && !/\p{Cs}/u.test(text)) ||
-    "Expected text without NUL characters or unpaired surrogates",
-);
+    (!text.includes("\u0000") && !/\p{Cs}/u.test(text)) || "Expected text without NUL characters or unpaired surrogates"
+)
 
 // Controls, unpaired surrogates, direction embeddings, overrides, and isolates, and invisible
 // spaces: each can make one name read as another. Joiners stay, since emoji and scripts need them.
-const hidden = /[\p{Cc}\p{Cs}​‪-‮⁦-⁩﻿]/u;
+const hidden = /[\p{Cc}\p{Cs}​‪-‮⁦-⁩﻿]/u
 
 /**
  * A name people read and choose between: without control, direction, or invisible characters.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const isName = Schema.makeFilter(
-  (text: string) =>
-    !hidden.test(text) || "Expected a name without control, direction, or invisible characters",
-);
+  (text: string) => !hidden.test(text) || "Expected a name without control, direction, or invisible characters"
+)
 
 /**
  * The most characters a name may have, as people choose one.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
-export const nameLength = 80;
+export const nameLength = 80

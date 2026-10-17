@@ -13,19 +13,19 @@
 /**
  * @since 0.1.0
  */
-export * as ChangeFeed from "./ChangeFeed.ts";
+export * as ChangeFeed from "./ChangeFeed.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ChangeFeedEvents from "./ChangeFeedEvents.ts";
+export * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ChangeFeedService from "./ChangeFeedService.ts";
+export * as ChangeFeedService from "./ChangeFeedService.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ChangeFeedSource from "./ChangeFeedSource.ts";
+export * as ChangeFeedSource from "./ChangeFeedSource.ts"

@@ -1,7 +1,9 @@
 # Project guidance
 
 Use Bun for dependency installation, scripts, and application execution.
-Use TypeScript 7 for type-checking, Oxlint for linting, and Oxfmt for formatting.
+Use TypeScript 7 for type-checking, Oxlint for linting, and Oxfmt for formatting. Oxfmt formats as
+Effect's dprint does: 120 columns, no semicolons, no trailing commas, and imports sorted. A
+module's header is followed by a blank line, which keeps it first when the imports below it sort.
 Run `bun run check` after changes and `bun run test` after changing behavior.
 Tests use `@effect/vitest` through Vitest running on Bun. Use `it.effect` for Effect
 programs, `it.live` only for integrations that need live clocks, and plain `it`
@@ -28,6 +30,19 @@ as parallel jobs; see [continuous integration](docs/testing.md#continuous-integr
 Keep these diagnostics enabled in `tsconfig.base.json`: the pinned Oxlint version is
 newer than the versions supported by the Effect Oxlint patch, so Effect checks
 currently run through TypeScript. Check compatibility before changing this setup.
+`tsconfig.base.json` raises the language service's idiom rules, such as `Effect.void` over
+`Effect.succeed(undefined)` or `Effect.catchTag` over a catch-all that re-fails, to warnings,
+which fail `typecheck`; the few that only fit source, such as `deterministicKeys` for service
+keys, are off in tests and scripts. `anyUnknownInErrorContext` keeps `unknown` and `any` out of
+the packages' error channels; the apps' failures are still classified from `Cause<unknown>`, so it
+is off there too. Source reaches the platform through Effect: `Config` rather than `process.env`,
+the `Crypto` service rather than `crypto.randomUUID`, `Schema.is` rather than `instanceof` on a
+schema class, and no `console` or timers; tests and scripts are exempt, and the apps keep their
+UI's timers and request keys. Converting a known time with `Date`, as Effect's own source does, is
+allowed; reading the clock goes through `Clock` or `DateTime`.
+`.oxlintrc.json` takes the rules of Effect's own Oxlint configuration
+(`repos/effect/packages/tools/oxc/oxlintrc.json`), with its type-aware rules off as Effect
+runs them, and keeps `console` to tests and scripts.
 
 ## Workspace layout
 
@@ -36,9 +51,10 @@ currently run through TypeScript. Check compatibility before changing this setup
   shared packages with `workspace:*`, but never hosts or apps. This applies to all dependency
   sections; development tools live at the root. `core` operates within one workspace with a trusted
   actor; its services are the operations. Each core feature keeps the operations actors call in
-  `service.ts`, the internal writes other operations share in one `command.ts` service, and the
-  internal reads in one `query.ts` service; a command may read through the query, a query never
-  writes, and a step with one caller stays a private function of that caller. `gateway` is how a
+  its service module, such as `ThreadService`, the internal writes other operations share in one
+  command service, `ThreadCommand`, and the internal reads in one query service, `ThreadQuery`; a
+  command may read through the query, a query never writes, and a step with one caller stays a
+  private function of that caller. `gateway` is how a
   host enters core: it bootstraps a workspace and resolves an authenticated identity into the actor,
   and it holds the host contracts for storage, accounts, sign-in, session token resolution, and the
   workspace directory. `http` is the HTTP protocol: the contract clients call, which they import by
@@ -106,6 +122,10 @@ currently run through TypeScript. Check compatibility before changing this setup
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no
 runtime-specific global types; hosts and apps opt into their own environments.
+`tsconfig.base.json` takes Effect's strict flags: `exactOptionalPropertyTypes`, so an optional
+field that may be given `undefined` says so as `readonly x?: X | undefined`; unused locals and
+parameters; and erasable syntax only. The apps turn `exactOptionalPropertyTypes` off until their
+UI props are written for it.
 Root `tsconfig.json` checks repository scripts, shared-package tests, and the Vitest
 configuration; `bun run typecheck` checks these and every workspace. Use declared
 package names for cross-workspace imports, not relative paths into another workspace.
@@ -187,6 +207,24 @@ to verify APIs rather than guessing from prior versions or web snippets.
 - Usage examples: `repos/effect/ai-docs/src`.
 - Bun integration: `repos/effect/packages/platform/bun`.
 - Domain design: `docs/core-model.md`.
+
+Source imports Effect by module, `import * as Effect from "effect/Effect"`, as Effect's packages
+do; tests, scripts, and documentation examples may use the `effect` barrel.
+
+Tell which variant a tagged value is with the helpers its type gives, never by comparing `_tag`:
+`X.isAnyOf(["A"])` for a value of a schema's tagged union, which checks the tag alone, and `X.match`
+for a case per variant, or `Match.valueTags` when the cases return different types; `$is` and
+`$match` for a `Data.TaggedEnum`; and the guards Effect's modules give their own types, such as
+`Option.isSome`, `Exit.isSuccess`, and `ChildProcess.isPipedCommand`. A union's `guards` validate
+the whole value, so keep them for input of unknown shape. Recover from one reason of an error with
+`Effect.catchReason`. An error's reasons are `Schema.TaggedError` classes that say `isRetryable` and
+give a default message, in a union piped through `Schema.toTaggedUnion("_tag")`, as harness's
+`HarnessError` shows. Reading `_tag` as data, such as the kind a row stores, is fine.
+
+Build a variant in source with its constructor, `Union.cases.Member.make({ memberId })`, which
+checks it as decoding would and throws when it does not hold. A value that something else checks
+stays a literal: a row before its decoder, a store driver's record before its encoder, and a
+request's encoded payload. Tests may write the values they expect as literals.
 
 Name a variable that holds a service after the service, so a call says who it calls:
 `const threadStore = yield* ThreadStore.ThreadStore`,

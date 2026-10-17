@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Start a thread in a group.
@@ -16,8 +17,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Start = Permission.make("thread.start", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Read a thread: its record, timeline, and participants. Lists skip the threads it does not cover.
@@ -27,8 +28,8 @@ export const Start = Permission.make("thread.start", {
  */
 export const Read = Permission.make("thread.read", {
   targetKind: "Thread",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Give a thread a title, or change the one it has.
@@ -38,5 +39,5 @@ export const Read = Permission.make("thread.read", {
  */
 export const Rename = Permission.make("thread.rename", {
   targetKind: "Thread",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})

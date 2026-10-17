@@ -1,6 +1,6 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media, shell } from "../../foundations/layout/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media, shell } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
 
 export const rail = style({
   display: "flex",
@@ -10,15 +10,15 @@ export const rail = style({
   boxSizing: "border-box",
   width: shell.rail,
   minHeight: 0,
-  paddingBlock: "0.625rem 0.8125rem",
-});
+  paddingBlock: "0.625rem 0.8125rem"
+})
 
 // Destinations are 40px on desktop and 44px touch targets below it.
 const target = {
   width: "2.5rem",
   height: "2.5rem",
-  "@media": { [media.touch]: { width: "2.75rem", height: "2.75rem" } },
-} as const;
+  "@media": { [media.touch]: { width: "2.75rem", height: "2.75rem" } }
+} as const
 
 export const brand = style({
   ...target,
@@ -27,9 +27,9 @@ export const brand = style({
   flex: "none",
   color: vars.color.text.primary,
   selectors: {
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
+  }
+})
 
 export const seam = style({
   flex: "none",
@@ -37,8 +37,8 @@ export const seam = style({
   height: "1px",
   marginBlock: "0.5625rem 0.75rem",
   backgroundColor: vars.color.border.divider,
-  "@media": { [media.touch]: { marginBlockStart: "0.3125rem" } },
-});
+  "@media": { [media.touch]: { marginBlockStart: "0.3125rem" } }
+})
 
 export const list = style({
   display: "flex",
@@ -47,8 +47,8 @@ export const list = style({
   margin: 0,
   padding: 0,
   listStyle: "none",
-  "@media": { [media.touch]: { gap: "0.625rem" } },
-});
+  "@media": { [media.touch]: { gap: "0.625rem" } }
+})
 
 export const item = style({
   ...target,
@@ -66,7 +66,7 @@ export const item = style({
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
     "&[aria-current]": {
       backgroundColor: vars.color.surface.railSelected,
-      color: vars.color.text.primary,
+      color: vars.color.text.primary
     },
     // The 2px bar that marks the current item across the rail, sidebar, and lists.
     "&[aria-current]::before": {
@@ -77,14 +77,14 @@ export const item = style({
       width: "2px",
       height: "1.25rem",
       transform: "translateY(-50%)",
-      backgroundColor: vars.color.action.indicator,
-    },
-  },
-});
+      backgroundColor: vars.color.action.indicator
+    }
+  }
+})
 
-export const entry = style({ display: "flex" });
+export const entry = style({ display: "flex" })
 
-export const icon = style({ width: "1.125rem", height: "1.125rem" });
+export const icon = style({ width: "1.125rem", height: "1.125rem" })
 
 export const footer = style({
   display: "flex",
@@ -93,8 +93,8 @@ export const footer = style({
   gap: "1rem",
   marginBlockStart: "auto",
   paddingBlockStart: "0.875rem",
-  "@media": { [media.touch]: { gap: "1rem" } },
-});
+  "@media": { [media.touch]: { gap: "1rem" } }
+})
 
 export const account = style({
   ...target,
@@ -105,6 +105,6 @@ export const account = style({
   background: "transparent",
   cursor: "pointer",
   selectors: {
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
+  }
+})

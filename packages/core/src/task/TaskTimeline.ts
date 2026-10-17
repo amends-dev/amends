@@ -4,12 +4,14 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
-import type * as Thread from "../thread/Thread.ts";
-import type * as ThreadActivity from "../thread/ThreadActivity.ts";
-import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
-import type * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts";
-import * as TaskActivity from "./TaskActivity.ts";
+
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import type * as Thread from "../thread/Thread.ts"
+import type * as ThreadActivity from "../thread/ThreadActivity.ts"
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
+import type * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts"
+import * as TaskActivity from "./TaskActivity.ts"
 
 /**
  * The thread becoming a task, with the task's initial values.
@@ -17,7 +19,7 @@ import * as TaskActivity from "./TaskActivity.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const CreatedItem = Schema.Struct({ activity: TaskActivity.Created.Activity });
+export const CreatedItem = Schema.Struct({ activity: TaskActivity.Created.Activity })
 
 /**
  * @category schemas
@@ -31,7 +33,7 @@ export interface CreatedItem extends Schema.Schema.Type<typeof CreatedItem> {}
  * @category schemas
  * @since 0.1.0
  */
-export const UpdatedItem = Schema.Struct({ activity: TaskActivity.Updated.Activity });
+export const UpdatedItem = Schema.Struct({ activity: TaskActivity.Updated.Activity })
 
 /**
  * @category schemas
@@ -39,14 +41,14 @@ export const UpdatedItem = Schema.Struct({ activity: TaskActivity.Updated.Activi
  */
 export interface UpdatedItem extends Schema.Schema.Type<typeof UpdatedItem> {}
 
-type Created = CreatedItem;
+type Created = CreatedItem
 
-type Updated = UpdatedItem;
+type Updated = UpdatedItem
 
 declare module "../thread/ThreadActivityKind.ts" {
   interface Items {
-    "task.created": Created;
-    "task.updated": Updated;
+    "task.created": Created
+    "task.updated": Updated
   }
 }
 
@@ -60,27 +62,20 @@ export const resolver = Effect.succeed({
   kinds: [TaskActivity.Created, TaskActivity.Updated],
   resolve: Effect.fn("TaskTimeline.resolve")(function* (
     _thread: Thread.Thread,
-    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>
   ) {
     return yield* Effect.orDie(
       Effect.forEach(
         listed,
-        (
-          activity,
-        ): Effect.Effect<
-          CreatedItem | UpdatedItem,
-          ThreadActivityKind.Mismatch | Schema.SchemaError
-        > =>
+        (activity): Effect.Effect<CreatedItem | UpdatedItem, ThreadActivityKind.Mismatch | Schema.SchemaError> =>
           ThreadActivityKind.is(TaskActivity.Created)(activity)
-            ? Effect.map(
-                ThreadActivityKind.decode(TaskActivity.Created, activity),
-                (activity): CreatedItem => ({ activity }),
-              )
-            : Effect.map(
-                ThreadActivityKind.decode(TaskActivity.Updated, activity),
-                (activity): UpdatedItem => ({ activity }),
-              ),
-      ),
-    );
-  }),
-} satisfies ThreadActivityResolvers.Resolver);
+            ? Effect.map(ThreadActivityKind.decode(TaskActivity.Created, activity), (activity): CreatedItem => ({
+                activity
+              }))
+            : Effect.map(ThreadActivityKind.decode(TaskActivity.Updated, activity), (activity): UpdatedItem => ({
+                activity
+              }))
+      )
+    )
+  })
+} satisfies ThreadActivityResolvers.Resolver)

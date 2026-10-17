@@ -1,4 +1,4 @@
-import { paths, useWorkspace, useWorkspaceSettings } from "@amends-dev/client";
+import { paths, useWorkspace, useWorkspaceSettings } from "@amends-dev/client"
 import {
   ConfirmRemoveMember,
   ConfirmRevokeInvitation,
@@ -11,92 +11,92 @@ import {
   WorkspaceSettings,
   settingsToast,
   type SettingsAction,
-  type SettingsTab,
-} from "@amends-dev/ui/screens/settings";
-import { Navigate, useParams, useSearchParams } from "@solidjs/router";
-import { Show, createSignal } from "solid-js";
-import { useWorkspaceActions } from "../workspace-actions.ts";
+  type SettingsTab
+} from "@amends-dev/ui/screens/settings"
+import { Navigate, useParams, useSearchParams } from "@solidjs/router"
+import { Show, createSignal } from "solid-js"
+import { useWorkspaceActions } from "../workspace-actions.ts"
 
-const href = (path: string) => `#${path}`;
+const href = (path: string) => `#${path}`
 
 export function SettingsIndex() {
-  const params = useParams<{ workspaceId: string }>();
-  return <Navigate href={paths.settingsSection(params.workspaceId, "workspace")} />;
+  const params = useParams<{ workspaceId: string }>()
+  return <Navigate href={paths.settingsSection(params.workspaceId, "workspace")} />
 }
 export function WorkspaceSettingsPage() {
-  const params = useParams<{ workspaceId: string }>();
+  const params = useParams<{ workspaceId: string }>()
   return (
     <Show when={params.workspaceId} keyed>
       {(workspaceId) => <Settings workspaceId={workspaceId} tab="workspace" />}
     </Show>
-  );
+  )
 }
 export function MembersSettingsPage() {
-  const params = useParams<{ workspaceId: string }>();
+  const params = useParams<{ workspaceId: string }>()
   return (
     <Show when={params.workspaceId} keyed>
       {(workspaceId) => <Settings workspaceId={workspaceId} tab="members" />}
     </Show>
-  );
+  )
 }
 
-type Dialog = "invite" | "history" | "transfer" | "remove" | "revoke";
+type Dialog = "invite" | "history" | "transfer" | "remove" | "revoke"
 
 /** A workspace's settings: one section, with the member open beside Members by `?member=`. */
 function Settings(props: { readonly workspaceId: string; readonly tab: SettingsTab }) {
-  const { workspaceId } = props;
-  const [search, setSearch] = useSearchParams<{ member?: string }>();
-  const workspace = useWorkspace(() => workspaceId);
-  const actions = useWorkspaceActions();
-  const [dialog, setDialog] = createSignal<Dialog>();
+  const { workspaceId } = props
+  const [search, setSearch] = useSearchParams<{ member?: string }>()
+  const workspace = useWorkspace(() => workspaceId)
+  const actions = useWorkspaceActions()
+  const [dialog, setDialog] = createSignal<Dialog>()
   // Revoking from the history returns to it.
-  const [fromHistory, setFromHistory] = createSignal(false);
-  const [revoking, setRevoking] = createSignal<string>();
-  const [created, setCreated] = createSignal<string>();
+  const [fromHistory, setFromHistory] = createSignal(false)
+  const [revoking, setRevoking] = createSignal<string>()
+  const [created, setCreated] = createSignal<string>()
   const view = useWorkspaceSettings(workspaceId, props.tab, {
     done: (done) => {
-      actions.toast(settingsToast(done.action, done.subject));
+      actions.toast(settingsToast(done.action, done.subject))
       // The invitation just created stays marked until the next change.
-      setCreated(done.action === "invite" ? done.created : undefined);
-      if (done.action === "remove") setSearch({ member: undefined });
-      setDialog(done.action === "revoke" && fromHistory() ? "history" : undefined);
-    },
-  });
+      setCreated(done.action === "invite" ? done.created : undefined)
+      if (done.action === "remove") setSearch({ member: undefined })
+      setDialog(done.action === "revoke" && fromHistory() ? "history" : undefined)
+    }
+  })
   const open = (next: Dialog) => {
-    view.dismiss();
-    setDialog(next);
-  };
+    view.dismiss()
+    setDialog(next)
+  }
   const close = () => {
-    view.dismiss();
-    setDialog(fromHistory() && dialog() === "revoke" ? "history" : undefined);
-  };
+    view.dismiss()
+    setDialog(fromHistory() && dialog() === "revoke" ? "history" : undefined)
+  }
   const failureOf = (action: SettingsAction) => {
-    const failure = view.failure();
-    return failure?.action === action ? failure.error : undefined;
-  };
+    const failure = view.failure()
+    return failure?.action === action ? failure.error : undefined
+  }
   const readFailure = () => {
-    const failure = view.failure();
-    return failure?.action === "refresh" ? failure : undefined;
-  };
-  const pending = (action: SettingsAction) => view.pending() === action;
-  const refreshing = () => view.pending() === "refresh";
-  const name = () => workspace()?.workspace.name ?? view.workspace()?.name ?? "";
-  const members = paths.settingsSection(workspaceId, "members");
-  const selected = () => (props.tab === "members" ? search.member : undefined);
+    const failure = view.failure()
+    return failure?.action === "refresh" ? failure : undefined
+  }
+  const pending = (action: SettingsAction) => view.pending() === action
+  const refreshing = () => view.pending() === "refresh"
+  const name = () => workspace()?.workspace.name ?? view.workspace()?.name ?? ""
+  const members = paths.settingsSection(workspaceId, "members")
+  const selected = () => (props.tab === "members" ? search.member : undefined)
   const detail = () => {
-    const id = selected();
-    return id === undefined ? undefined : view.member(id);
-  };
+    const id = selected()
+    return id === undefined ? undefined : view.member(id)
+  }
   const revoke = (id: string) => {
-    setFromHistory(dialog() === "history");
-    setRevoking(id);
-    open("revoke");
-  };
+    setFromHistory(dialog() === "history")
+    setRevoking(id)
+    open("revoke")
+  }
   const invite = () => {
-    view.invite.begin();
-    setFromHistory(false);
-    setDialog("invite");
-  };
+    view.invite.begin()
+    setFromHistory(false)
+    setDialog("invite")
+  }
   return (
     <>
       <SettingsPane
@@ -121,18 +121,14 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsT
               onTransfer={
                 view.permissions().transfer
                   ? () => {
-                      view.transfer.begin();
-                      setDialog("transfer");
+                      view.transfer.begin()
+                      setDialog("transfer")
                     }
                   : undefined
               }
               noCandidates={view.candidates().length === 0}
               creator={view.workspace()?.creator}
-              failure={
-                failureOf("rename")
-                  ? { action: "rename", error: failureOf("rename")! }
-                  : readFailure()
-              }
+              failure={failureOf("rename") ? { action: "rename", error: failureOf("rename")! } : readFailure()}
               onRefresh={view.refresh}
               refreshing={refreshing()}
             />
@@ -153,8 +149,8 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsT
             }
             highlightId={created()}
             onViewHistory={() => {
-              setFromHistory(false);
-              open("history");
+              setFromHistory(false)
+              open("history")
             }}
             onRevoke={revoke}
             failure={readFailure()}
@@ -169,9 +165,9 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsT
             workspaceName={name()}
             member={member()}
             onClose={() => {
-              view.role.reset();
-              view.dismiss();
-              setSearch({ member: undefined });
+              view.role.reset()
+              view.dismiss()
+              setSearch({ member: undefined })
             }}
             roles={view.role.choices(member().id)}
             role={view.role.of(member().id)}
@@ -205,8 +201,8 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsT
         workspaceName={name()}
         name={detail()?.name ?? ""}
         onConfirm={() => {
-          const id = selected();
-          if (id) view.remove(id);
+          const id = selected()
+          if (id) view.remove(id)
         }}
         pending={pending("remove")}
         error={failureOf("remove")}
@@ -239,12 +235,10 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsT
       <ConfirmRevokeInvitation
         open={dialog() === "revoke"}
         onClose={close}
-        recipient={
-          view.invitations().find((invitation) => invitation.id === revoking())?.recipient ?? ""
-        }
+        recipient={view.invitations().find((invitation) => invitation.id === revoking())?.recipient ?? ""}
         onConfirm={() => {
-          const id = revoking();
-          if (id) view.revoke(id);
+          const id = revoking()
+          if (id) view.revoke(id)
         }}
         pending={pending("revoke")}
         error={failureOf("revoke")}
@@ -252,5 +246,5 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsT
         refreshing={refreshing()}
       />
     </>
-  );
+  )
 }

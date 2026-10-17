@@ -5,26 +5,13 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Identity from "../identity/Identity.ts";
-import * as WorkspaceId from "./WorkspaceId.ts";
-import * as MemberId from "./MemberId.ts";
-import * as Member from "./Member.ts";
-import * as Text from "../text/Text.ts";
 
-/**
- * Names a workspace; `WorkspaceId.Id`, where models that only refer to workspaces import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = WorkspaceId.Id;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = WorkspaceId.Id;
+import * as Schema from "effect/Schema"
+import * as Identity from "../identity/Identity.ts"
+import * as Text from "../text/Text.ts"
+import * as Member from "./Member.ts"
+import * as MemberId from "./MemberId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * A workspace's name as recorded: trimmed and not empty. Names chosen now are `NewName`.
@@ -32,13 +19,13 @@ export type Id = WorkspaceId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
+export const Name = Schema.Trimmed.check(Schema.isMinLength(1))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * A name chosen for a workspace: 1 to 80 characters, without hidden ones.
@@ -46,7 +33,7 @@ export type Name = typeof Name.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
+export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName)
 
 /**
  * A new workspace's name, and what its creator is called there: what
@@ -57,10 +44,10 @@ export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isNa
  */
 export const CreateInput = Schema.Struct({
   name: NewName,
-  memberName: Member.NewName,
+  memberName: Member.NewName
 }).annotate({
-  identifier: "WorkspaceCreateInput",
-});
+  identifier: "WorkspaceCreateInput"
+})
 
 /**
  * @category options
@@ -77,11 +64,11 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @since 0.1.0
  */
 export const Workspace = Schema.Struct({
-  id: Id,
+  id: WorkspaceId.WorkspaceId,
   name: Name,
   createdBy: Identity.HumanId,
-  ownerMemberId: MemberId.Id,
-}).annotate({ identifier: "Workspace" });
+  ownerMemberId: MemberId.MemberId
+}).annotate({ identifier: "Workspace" })
 
 /**
  * @category schemas

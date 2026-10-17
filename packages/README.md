@@ -33,20 +33,21 @@ relative path into it.
 
 Every package declares `"sideEffects": false`: importing a module runs nothing beyond its
 declarations, so a bundler drops what a client does not use. A protocol contract reaches core's
-records, inputs, and errors, never its operations, so each core feature keeps the errors a protocol
-exposes in an `errors.ts` of schemas alone. A browser bundle then carries core's schemas without
-their implementation; the web app's bundle test fails when an implementation reaches it.
+records, inputs, and errors, never its operations: the errors a protocol exposes are
+`CoreError`'s kinds, schemas alone in `error/CoreError.ts`. A browser bundle then carries core's
+schemas without their implementation; the web app's bundle test fails when an implementation
+reaches it.
 
 ## Features and module names
 
 A feature owns one concept, its rules, and its lifecycle. It starts as one module, and becomes a
 directory when its models, operations, facts, projections, or contracts need modules of their own.
-A core feature keeps the operations actors call in `service.ts`, the writes other operations
-share in `command.ts`, and its reads in `query.ts`, as far as it has each, as
-[AGENTS.md](../AGENTS.md) describes. An HTTP group's module and its handler share a name, so
+A core feature keeps the operations actors call in its service module, such as `ThreadService.ts`,
+the writes other operations share in `ThreadCommand.ts`, and its reads in `ThreadQuery.ts`, as far
+as it has each, as [AGENTS.md](../AGENTS.md) describes. An HTTP group's module and its handler share a name, so
 `http/src/InvitationsGroup.ts` leads to `http/src/InvitationsHandlers.ts`.
 
-Each namespace module gives its concept one name, such as `ThreadErrors` or `ThreadActivityStore`. A
+Each namespace module gives its concept one name, such as `CoreError` or `ThreadActivityStore`. A
 package's index re-exports that name, and modules inside the package import the owning module
 directly. A name that would be ambiguous in a shared namespace says what it is about, such as
 `ThreadMessageId`. [Core's schema vocabulary](core/README.md#schema-and-type-names) applies

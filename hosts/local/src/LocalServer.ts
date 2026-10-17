@@ -6,13 +6,15 @@
  *
  * @since 0.1.0
  */
-import { Draining, Routes } from "@amends-dev/http";
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
-import type { Accounts, SessionTokens, SignIn, SignInStorage } from "@amends-dev/gateway";
-import type { Crypto } from "effect";
-import { Layer } from "effect";
-import { HttpRouter } from "effect/http";
-import type * as LocalHost from "./LocalHost.ts";
+
+import type { Accounts, SessionTokens, SignIn, SignInStorage } from "@amends-dev/gateway"
+import { Draining, Routes } from "@amends-dev/http"
+import * as BunCrypto from "@effect/platform-bun/BunCrypto"
+import * as BunHttpServer from "@effect/platform-bun/BunHttpServer"
+import type * as Crypto from "effect/Crypto"
+import * as HttpRouter from "effect/http/HttpRouter"
+import * as Layer from "effect/Layer"
+import type * as LocalHost from "./LocalHost.ts"
 
 /**
  * Register the HTTP API, its OpenAPI document, and docs over the required host services, with a
@@ -26,12 +28,7 @@ export const layerRoutes = Layer.mergeAll(
   Routes.layer,
   Routes.layerDocs,
   HttpRouter.cors({
-    allowedOrigins: [
-      "http://127.0.0.1:1420",
-      "tauri://localhost",
-      "http://tauri.localhost",
-      "https://tauri.localhost",
-    ],
+    allowedOrigins: ["http://127.0.0.1:1420", "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"],
     allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Authorization",
@@ -40,19 +37,19 @@ export const layerRoutes = Layer.mergeAll(
       "Amends-Workspace",
       "traceparent",
       "tracestate",
-      "b3",
+      "b3"
     ],
-    credentials: false,
-  }),
-);
+    credentials: false
+  })
+)
 
 /**
  * The largest request body the server reads, in bytes: one mebibyte. Bun answers 413 beyond it.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
-export const maxRequestBodySize = 1024 * 1024;
+export const maxRequestBodySize = 1024 * 1024
 
 /**
  * How the host signs people in and resolves their bearer tokens, over the host's services:
@@ -65,7 +62,7 @@ export type Authentication = Layer.Layer<
   SignIn.SignIn | SessionTokens.SessionTokens,
   never,
   Crypto.Crypto | Accounts.Accounts | SignInStorage.SignInStorage
->;
+>
 
 /**
  * Serve the routes over a host and its authentication on the loopback interface at `port`; the web
@@ -74,17 +71,15 @@ export type Authentication = Layer.Layer<
  * @category layers
  * @since 0.1.0
  */
-export const layer = (host: LocalHost.HostLayer, authentication: Authentication, port: number) =>
+export const layer = <E>(host: LocalHost.HostLayer<E>, authentication: Authentication, port: number) =>
   // Built after the server, the drain is released first as the host stops, ending open change
   // streams so the server's graceful stop waits only for ordinary requests.
   Draining.layerOnRelease.pipe(
     Layer.provide(
       HttpRouter.serve(layerRoutes).pipe(
-        Layer.provide(
-          authentication.pipe(Layer.provide(BunCrypto.layer), Layer.provideMerge(host)),
-        ),
-        Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port, maxRequestBodySize })),
-      ),
+        Layer.provide(authentication.pipe(Layer.provide(BunCrypto.layer), Layer.provideMerge(host))),
+        Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port, maxRequestBodySize }))
+      )
     ),
-    Layer.provide(Draining.layer),
-  );
+    Layer.provide(Draining.layer)
+  )

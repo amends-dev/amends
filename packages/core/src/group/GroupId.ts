@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names a group. The general group's is the fixed `Group.GeneralId`; a keyed team creation
@@ -13,10 +14,10 @@ import { Schema } from "effect";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupId"));
+export const GroupId = Schema.NonEmptyString.pipe(Schema.brand("GroupId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type GroupId = typeof GroupId.Type

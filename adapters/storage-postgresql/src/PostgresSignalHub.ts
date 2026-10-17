@@ -7,9 +7,11 @@
  *
  * @since 0.1.0
  */
-import { SignalHub } from "@amends-dev/core/signal";
-import { Effect, Layer } from "effect";
-import * as Binding from "./Binding.ts";
+
+import { SignalHub } from "@amends-dev/core/signal"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Binding from "./internal/binding.ts"
 
 /**
  * The workspace's signals, between every process over the same database, relayed with `NOTIFY`
@@ -20,13 +22,13 @@ import * as Binding from "./Binding.ts";
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresSignalHub.make")(function* () {
-  const { workspaceId, database } = yield* Binding.Binding;
+export const make = Effect.gen(function* () {
+  const { workspaceId, database } = yield* Binding.Binding
   return SignalHub.SignalHub.of({
     publish: database.notices.publishSignal,
-    subscribe: database.notices.subscribeSignals(workspaceId),
-  });
-});
+    subscribe: database.notices.subscribeSignals(workspaceId)
+  })
+})
 
 /**
  * Provides `SignalHub.SignalHub` over the caller's `Binding.Binding`.
@@ -34,4 +36,4 @@ export const make = Effect.fn("PostgresSignalHub.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(SignalHub.SignalHub, make());
+export const layer = Layer.effect(SignalHub.SignalHub, make)

@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Create a team group in the workspace. Its bundle placement is a default; any role or direct
@@ -17,8 +18,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Create = Permission.make("group.create", {
   targetKind: "Workspace",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Read a group: its record, its row in the reader's list, and its roster. Ordinary group reads
@@ -29,8 +30,8 @@ export const Create = Permission.make("group.create", {
  */
 export const Read = Permission.make("group.read", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Renaming a team group, which its members see as its name; only its members may.
@@ -40,8 +41,8 @@ export const Read = Permission.make("group.read", {
  */
 export const Rename = Permission.make("group.rename", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Following a team group for oneself; making an agent follow needs agent use instead.
@@ -51,8 +52,8 @@ export const Rename = Permission.make("group.rename", {
  */
 export const Follow = Permission.make("group.follow", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Removing people from a public team group, as a member of it; in a private group any member may.
@@ -63,5 +64,5 @@ export const Follow = Permission.make("group.follow", {
  */
 export const Moderate = Permission.make("group.moderate", {
   targetKind: "Group",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})

@@ -7,17 +7,22 @@
  *
  * @since 0.1.0
  */
-import { Context, DateTime, Effect, Layer, Schema } from "effect";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as Notification from "../notification/Notification.ts";
-import * as ReadState from "./ReadState.ts";
-import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Store from "../journal/Store.ts";
-import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as StoreInput from "../journal/StoreInput.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ReadState from "./ReadState.ts"
 
 /**
  * Private per-member read state, kept outside the journal: rebuilding projections neither restores
@@ -39,9 +44,9 @@ export class ReadStateStore extends Context.Service<
   {
     /** One member's read positions for several threads; unread threads are omitted. */
     readonly getThreadPositions: (
-      memberId: MemberId.Id,
-      threadIds: ReadonlyArray<ThreadId.Id>,
-    ) => Effect.Effect<ReadonlyArray<ReadState.ThreadPosition>, StoreError.StoreError>;
+      memberId: MemberId.MemberId,
+      threadIds: ReadonlyArray<ThreadId.ThreadId>
+    ) => Effect.Effect<ReadonlyArray<ReadState.ThreadPosition>, StoreError.StoreError>
     /**
      * Mark a thread read through a position, in one write: the member's read position advances,
      * one at or before the stored one being kept, and their pending notifications from the
@@ -50,17 +55,15 @@ export class ReadStateStore extends Context.Service<
      */
     readonly markThreadRead: (
       position: ReadState.ThreadPosition,
-      seenAt: DateTime.Utc,
-    ) => Effect.Effect<void, StoreError.StoreError>;
+      seenAt: DateTime.Utc
+    ) => Effect.Effect<void, StoreError.StoreError>
     /** One member's read times for several groups; groups never read are omitted. */
     readonly getGroupReads: (
-      memberId: MemberId.Id,
-      groupIds: ReadonlyArray<GroupId.Id>,
-    ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, StoreError.StoreError>;
+      memberId: MemberId.MemberId,
+      groupIds: ReadonlyArray<GroupId.GroupId>
+    ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, StoreError.StoreError>
     /** Advance when a member last read a group; a time at or before the stored one is kept. */
-    readonly advanceGroup: (
-      read: ReadState.GroupRead,
-    ) => Effect.Effect<void, StoreError.StoreError>;
+    readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, StoreError.StoreError>
   }
 >()("@amends-dev/core/read-state/ReadStateStore") {}
 
@@ -72,43 +75,41 @@ export class ReadStateStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
-  driver: ReadStateStore["Service"],
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: ReadStateStore["Service"]
 ): ReadStateStore["Service"] => {
-  const read = StoreInput.read("ReadStateStore");
-  const write = StoreInput.write("ReadStateStore", workspaceId);
+  const read = StoreInput.read("ReadStateStore")
+  const write = StoreInput.write("ReadStateStore", workspaceId)
   return {
-    getThreadPositions: Effect.fn("ReadStateStore.getThreadPositions")(
-      function* (memberId, threadIds) {
-        return yield* driver.getThreadPositions(
-          yield* read("getThreadPositions", MemberId.Id, memberId),
-          yield* read("getThreadPositions", Schema.Array(ThreadId.Id), threadIds),
-        );
-      },
-    ),
+    getThreadPositions: Effect.fn("ReadStateStore.getThreadPositions")(function* (memberId, threadIds) {
+      return yield* driver.getThreadPositions(
+        yield* read("getThreadPositions", MemberId.MemberId, memberId),
+        yield* read("getThreadPositions", Schema.Array(ThreadId.ThreadId), threadIds)
+      )
+    }),
     markThreadRead: Effect.fn("ReadStateStore.markThreadRead")(function* (position, seenAt) {
       return yield* driver.markThreadRead(
         yield* write("markThreadRead", ReadState.ThreadPosition, position),
-        yield* write("markThreadRead", Schema.DateTimeUtc, seenAt),
-      );
+        yield* write("markThreadRead", Schema.DateTimeUtc, seenAt)
+      )
     }),
     getGroupReads: Effect.fn("ReadStateStore.getGroupReads")(function* (memberId, groupIds) {
       return yield* driver.getGroupReads(
-        yield* read("getGroupReads", MemberId.Id, memberId),
-        yield* read("getGroupReads", Schema.Array(GroupId.Id), groupIds),
-      );
+        yield* read("getGroupReads", MemberId.MemberId, memberId),
+        yield* read("getGroupReads", Schema.Array(GroupId.GroupId), groupIds)
+      )
     }),
     advanceGroup: (groupRead) =>
-      Effect.flatMap(write("advanceGroup", ReadState.GroupRead, groupRead), driver.advanceGroup),
-  };
-};
+      Effect.flatMap(write("advanceGroup", ReadState.GroupRead, groupRead), driver.advanceGroup)
+  }
+}
 
 /** Keep the later of the stored and requested value. */
 const advance = (values: Map<string, number>, key: string, value: number) =>
-  values.set(key, Math.max(value, values.get(key) ?? value));
+  values.set(key, Math.max(value, values.get(key) ?? value))
 
 /** Notifications as `NotificationStore` keeps them in memory. */
-const notificationRows = MemoryDatabase.makeRows(Schema.fromJsonString(Notification.Notification));
+const notificationRows = MemoryDatabase.makeRows(Schema.fromJsonString(Notification.Notification))
 
 /** Is this the member's pending notification from the thread's activity up to the position? */
 const isSettledBy = (record: Notification.Notification, position: ReadState.ThreadPosition) =>
@@ -117,26 +118,24 @@ const isSettledBy = (record: Notification.Notification, position: ReadState.Thre
   Notification.State.isAnyOf(["Pending"])(record.state) &&
   record.thread !== undefined &&
   record.thread.threadId === position.threadId &&
-  record.thread.sequence <= position.readThrough;
+  record.thread.sequence <= position.readThrough
 
 /**
  * Private read state as plain values. Writes keep the later value; they join the caller's
  * transaction when there is one and otherwise apply at once.
  */
 const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
-  const { workspaceId, read, join, exclusive } = yield* Store.MemoryBinding;
+  const { workspaceId, read, join, exclusive } = yield* Store.MemoryBinding
   const driver: ReadStateStore["Service"] = {
     getThreadPositions: Effect.fn("ReadStateStore.memory.getThreadPositions")(
       function* (memberId, threadIds) {
-        const positions = (yield* read).threadPositions;
+        const positions = (yield* read).threadPositions
         return [...new Set(threadIds)].flatMap((threadId) => {
-          const readThrough = positions.get(MemoryDatabase.keyOf(memberId, threadId));
-          return readThrough === undefined
-            ? []
-            : [{ workspaceId, memberId, threadId, readThrough }];
-        });
+          const readThrough = positions.get(MemoryDatabase.keyOf(memberId, threadId))
+          return readThrough === undefined ? [] : [{ workspaceId, memberId, threadId, readThrough }]
+        })
       },
-      Effect.mapError(StoreError.failed("ReadStateStore", "getThreadPositions")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getThreadPositions"))
     ),
     markThreadRead: Effect.fn("ReadStateStore.memory.markThreadRead")(
       function* (position, seenAt) {
@@ -144,50 +143,49 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
         // workspace's writer, as marking one seen does, and no commit lands in between.
         yield* exclusive((space) =>
           Effect.gen(function* () {
-            const notifications = space.records.of("notifications");
+            const notifications = space.records.of("notifications")
             for (const record of yield* notificationRows.all(notifications)) {
-              if (!isSettledBy(record, position)) continue;
+              if (!isSettledBy(record, position)) continue
               const seen = Object.assign({}, record, {
-                state: Notification.State.cases.Seen.make({ seenAt }),
-              });
-              notifications.set(record.id, yield* notificationRows.encode(seen));
-              space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt));
+                state: Notification.State.cases.Seen.make({ seenAt })
+              })
+              notifications.set(record.id, yield* notificationRows.encode(seen))
+              space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt))
             }
             advance(
               space.threadPositions,
               MemoryDatabase.keyOf(position.memberId, position.threadId),
-              position.readThrough,
-            );
-          }),
-        );
+              position.readThrough
+            )
+          })
+        )
       },
-      Effect.mapError(StoreError.failed("ReadStateStore", "markThreadRead")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "markThreadRead"))
     ),
     getGroupReads: Effect.fn("ReadStateStore.memory.getGroupReads")(
       function* (memberId, groupIds) {
-        const times = (yield* read).groupTimes;
+        const times = (yield* read).groupTimes
         return [...new Set(groupIds)].flatMap((groupId) => {
-          const at = times.get(MemoryDatabase.keyOf(memberId, groupId));
-          return at === undefined
-            ? []
-            : [{ workspaceId, memberId, groupId, readAt: DateTime.makeUnsafe(at) }];
-        });
+          const at = times.get(MemoryDatabase.keyOf(memberId, groupId))
+          return at === undefined ? [] : [{ workspaceId, memberId, groupId, readAt: DateTime.makeUnsafe(at) }]
+        })
       },
-      Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads"))
     ),
-    advanceGroup: Effect.fn("ReadStateStore.memory.advanceGroup")(function* (groupRead) {
-      const space = yield* join.pipe(
-        Effect.mapError(StoreError.failed("ReadStateStore", "advanceGroup")),
-      );
-      advance(
-        space.groupTimes,
-        MemoryDatabase.keyOf(groupRead.memberId, groupRead.groupId),
-        DateTime.toEpochMillis(groupRead.readAt),
-      );
-    }),
-  };
-  return make(workspaceId, driver);
-});
+    advanceGroup: Effect.fn("ReadStateStore.memory.advanceGroup")(
+      function* (groupRead) {
+        const space = yield* join
+        advance(
+          space.groupTimes,
+          MemoryDatabase.keyOf(groupRead.memberId, groupRead.groupId),
+          DateTime.toEpochMillis(groupRead.readAt)
+        )
+      },
+      Effect.mapError(StoreError.failed("ReadStateStore", "advanceGroup"))
+    )
+  }
+  return make(workspaceId, driver)
+})
 
 /**
  * Provide `ReadStateStore` in process memory, over the workspace's `Store.MemoryBinding`: each
@@ -202,4 +200,4 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(ReadStateStore, makeMemory());
+export const layerMemory = Layer.effect(ReadStateStore, makeMemory())

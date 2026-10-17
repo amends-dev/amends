@@ -7,7 +7,9 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
+
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
 
 /**
  * Stable identity for one append within a workspace and log, which `Store` and `Log` take as an
@@ -16,19 +18,15 @@ import { Effect, Schema } from "effect";
  * @category schemas
  * @since 0.1.0
  */
-export const Key = Schema.NonEmptyString.check(Schema.isTrimmed()).pipe(
-  Schema.brand("LogIdempotencyKey"),
-);
+export const Key = Schema.NonEmptyString.check(Schema.isTrimmed()).pipe(Schema.brand("LogIdempotencyKey"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Key = typeof Key.Type;
+export type Key = typeof Key.Type
 
-const component = Schema.String.check(
-  Schema.isPattern(/\S/, { title: "nonblank occurrence component" }),
-);
+const component = Schema.String.check(Schema.isPattern(/\S/, { title: "nonblank occurrence component" }))
 
 /**
  * The stable parts that name an occurrence, as a fact's `occurrence` rule returns them: at least
@@ -37,13 +35,13 @@ const component = Schema.String.check(
  * @category schemas
  * @since 0.1.0
  */
-export const Parts = Schema.NonEmptyArray(component);
+export const Parts = Schema.NonEmptyArray(component)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Parts = typeof Parts.Type;
+export type Parts = typeof Parts.Type
 
 /**
  * The key of the occurrence that `input`, its parts, names for the fact `name`: `fact:` followed by
@@ -55,11 +53,8 @@ export type Parts = typeof Parts.Type;
  * @category constructors
  * @since 0.1.0
  */
-export const makeKey = Effect.fn("Occurrence.makeKey")(function* (
-  name: string,
-  input: ReadonlyArray<string>,
-) {
-  const factName = yield* Schema.decodeEffect(component)(name);
-  const parts = yield* Schema.decodeUnknownEffect(Parts)(input);
-  return Key.make(`fact:${JSON.stringify([factName, parts])}`);
-});
+export const makeKey = Effect.fnUntraced(function* (name: string, input: ReadonlyArray<string>) {
+  const factName = yield* Schema.decodeEffect(component)(name)
+  const parts = yield* Schema.decodeUnknownEffect(Parts)(input)
+  return Key.make(`fact:${JSON.stringify([factName, parts])}`)
+})

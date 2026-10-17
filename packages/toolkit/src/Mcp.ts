@@ -9,20 +9,18 @@
  *
  * @since 0.1.0
  */
-import { Effect, Ref, Result, Schema } from "effect";
-import { McpSchema } from "effect/ai";
-import type { ToolDefinition } from "./ToolDefinition.ts";
-import type { ToolSource } from "./ToolSource.ts";
-import {
-  CallFailedError,
-  InvalidResponseError,
-  ToolSourceError,
-  UnsupportedError,
-  type ToolSourceErrorReason,
-} from "./ToolSourceError.ts";
-import { findBindings, headersOf, type Binding } from "./internal/mcp-headers.ts";
-import * as Transport from "./internal/mcp-transport.ts";
-import type { Options } from "./internal/mcp-transport.ts";
+
+import * as McpSchema from "effect/ai/McpSchema"
+import * as Effect from "effect/Effect"
+import * as Ref from "effect/Ref"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
+import { findBindings, headersOf, type Binding } from "./internal/mcpHeaders.ts"
+import * as Transport from "./internal/mcpTransport.ts"
+import type { Options } from "./internal/mcpTransport.ts"
+import type * as ToolDefinition from "./ToolDefinition.ts"
+import type * as ToolSource from "./ToolSource.ts"
+import * as ToolSourceError from "./ToolSourceError.ts"
 
 export type {
   /**
@@ -32,8 +30,8 @@ export type {
    * @category options
    * @since 0.1.0
    */
-  Options,
-};
+  Options
+}
 
 const Tool = Schema.Struct({
   name: Schema.NonEmptyString,
@@ -46,28 +44,28 @@ const Tool = Schema.Struct({
       readOnlyHint: Schema.optionalKey(Schema.Boolean),
       destructiveHint: Schema.optionalKey(Schema.Boolean),
       idempotentHint: Schema.optionalKey(Schema.Boolean),
-      openWorldHint: Schema.optionalKey(Schema.Boolean),
-    }),
-  ),
-});
+      openWorldHint: Schema.optionalKey(Schema.Boolean)
+    })
+  )
+})
 
 const ToolList = Schema.Struct({
   tools: Schema.Array(Tool),
-  nextCursor: Schema.optionalKey(Schema.String),
-});
+  nextCursor: Schema.optionalKey(Schema.String)
+})
 
 const ToolResult = Schema.Struct({
   /** `complete`, or `input_required` when the tool asks the caller for something first. */
   resultType: Schema.optionalKey(Schema.String),
   content: Schema.optionalKey(Schema.Array(Schema.Json)),
   structuredContent: Schema.optionalKey(Schema.Json),
-  isError: Schema.optionalKey(Schema.Boolean),
-});
+  isError: Schema.optionalKey(Schema.Boolean)
+})
 
-const TextBlock = Schema.Struct({ type: Schema.Literal("text"), text: Schema.String });
+const TextBlock = Schema.Struct({ type: Schema.Literal("text"), text: Schema.String })
 
 /** The most pages of tools a server may list before the source takes its cursors for a loop. */
-const maxToolPages = 100;
+const maxToolPages = 100
 
 /**
  * Makes a source of the tools of the MCP server at `options.url`. Making it contacts nothing: the
@@ -79,31 +77,35 @@ const maxToolPages = 100;
  * @since 0.1.0
  */
 export const http = Effect.fn("Mcp.http")(function* (options: Options) {
-  const { name } = options;
-  const transport = yield* Transport.streamableHttp(options);
+  const { name } = options
+  const transport = yield* Transport.streamableHttp(options)
 
-  const fail = (reason: ToolSourceErrorReason, cause?: unknown) =>
-    new ToolSourceError({ source: name, reason, cause });
+  const fail = (reason: ToolSourceError.ToolSourceErrorReason, cause?: unknown) =>
+    new ToolSourceError.ToolSourceError({ source: name, reason, cause })
 
   const listPages = (
     cursor: string | undefined,
     listed: ReadonlyArray<typeof Tool.Type>,
-    pagesLeft: number,
-  ): Effect.Effect<ReadonlyArray<typeof Tool.Type>, ToolSourceError> =>
+    pagesLeft: number
+  ): Effect.Effect<ReadonlyArray<typeof Tool.Type>, ToolSourceError.ToolSourceError> =>
     transport.request(ToolList, "tools/list", cursor === undefined ? {} : { cursor }).pipe(
       Effect.flatMap((page) => {
-        const tools = [...listed, ...page.tools];
-        if (page.nextCursor === undefined) return Effect.succeed(tools);
+        const tools = [...listed, ...page.tools]
+        if (page.nextCursor === undefined) return Effect.succeed(tools)
         return pagesLeft > 1
           ? listPages(page.nextCursor, tools, pagesLeft - 1)
           : Effect.fail(
-              fail(new InvalidResponseError({ description: "The tool list does not end" })),
-            );
-      }),
-    );
+              fail(
+                new ToolSourceError.InvalidResponseError({
+                  description: "The tool list does not end"
+                })
+              )
+            )
+      })
+    )
 
   /** The parameters of each tool that is sent as a header too, as of the last time they were listed. */
-  const listedBindings = yield* Ref.make<ReadonlyMap<string, ReadonlyArray<Binding>>>(new Map());
+  const listedBindings = yield* Ref.make<ReadonlyMap<string, ReadonlyArray<Binding>>>(new Map())
 
   /**
    * Asks the server for its tools, and remembers which of their parameters are sent as headers, so
@@ -111,23 +113,20 @@ export const http = Effect.fn("Mcp.http")(function* (options: Options) {
    * out and logged.
    */
   const listTools = Effect.gen(function* () {
-    const tools = yield* listPages(undefined, [], maxToolPages);
-    const { usable, refused } = sortTools(tools, yield* transport.mirrorsParameters);
+    const tools = yield* listPages(undefined, [], maxToolPages)
+    const { usable, refused } = sortTools(tools, yield* transport.mirrorsParameters)
     for (const { tool, reason } of refused) {
-      yield* Effect.logWarning(`Leaving out the tool ${tool.name} of ${name}: ${reason}`);
+      yield* Effect.logWarning(`Leaving out the tool ${tool.name} of ${name}: ${reason}`)
     }
-    yield* Ref.set(
-      listedBindings,
-      new Map(usable.map(({ tool, bindings }) => [tool.name, bindings])),
-    );
-    return usable.map(({ tool }) => definitionOf(tool));
-  });
+    yield* Ref.set(listedBindings, new Map(usable.map(({ tool, bindings }) => [tool.name, bindings])))
+    return usable.map(({ tool }) => definitionOf(tool))
+  })
 
   const headersOfCall = (
     bindings: ReadonlyMap<string, ReadonlyArray<Binding>>,
     tool: string,
-    input: Schema.JsonObject,
-  ) => headersOf(bindings.get(tool) ?? [], input);
+    input: Schema.JsonObject
+  ) => headersOf(bindings.get(tool) ?? [], input)
 
   /**
    * Runs a tool. A server may refuse a call that does not send the parameters its tool marks as
@@ -137,43 +136,35 @@ export const http = Effect.fn("Mcp.http")(function* (options: Options) {
    */
   const callTool = Effect.fnUntraced(function* (tool: string, input: Schema.JsonObject) {
     const send = (headers: Readonly<Record<string, string>>) =>
-      transport.request(
-        ToolResult,
-        "tools/call",
-        { name: tool, arguments: input },
-        { toolName: tool, headers },
-      );
-    const mirrorsParameters = yield* transport.mirrorsParameters;
-    const sent = mirrorsParameters
-      ? headersOfCall(yield* Ref.get(listedBindings), tool, input)
-      : {};
+      transport.request(ToolResult, "tools/call", { name: tool, arguments: input }, { toolName: tool, headers })
+    const mirrorsParameters = yield* transport.mirrorsParameters
+    const sent = mirrorsParameters ? headersOfCall(yield* Ref.get(listedBindings), tool, input) : {}
     return yield* send(sent).pipe(
       Effect.catchIf(Transport.isHeaderMismatch, (mismatch) =>
         Effect.gen(function* () {
           // Only the stateless protocol has headers to send.
-          if (!mirrorsParameters) return yield* mismatch;
-          yield* listTools;
-          const listed = headersOfCall(yield* Ref.get(listedBindings), tool, input);
+          if (!mirrorsParameters) return yield* mismatch
+          yield* listTools
+          const listed = headersOfCall(yield* Ref.get(listedBindings), tool, input)
           // The headers that the listing does not change are the ones the server has refused.
-          return sameHeaders(sent, listed) ? yield* mismatch : yield* send(listed);
-        }),
-      ),
-    );
-  });
+          return sameHeaders(sent, listed) ? yield* mismatch : yield* send(listed)
+        })
+      )
+    )
+  })
 
-  const source: ToolSource = {
+  const source: ToolSource.ToolSource = {
     name,
     discover: listTools,
-    call: (tool, input) =>
-      callTool(tool, input).pipe(Effect.flatMap((result) => resultOf(result, fail))),
-  };
-  return source;
-});
+    call: (tool, input) => callTool(tool, input).pipe(Effect.flatMap((result) => resultOf(result, fail)))
+  }
+  return source
+})
 
 /** The definition of a tool as an MCP server lists it. */
-const definitionOf = (tool: typeof Tool.Type): ToolDefinition => {
-  const hints = tool.annotations;
-  const title = hints?.title ?? tool.title;
+const definitionOf = (tool: typeof Tool.Type): ToolDefinition.ToolDefinition => {
+  const hints = tool.annotations
+  const title = hints?.title ?? tool.title
   return {
     name: tool.name,
     ...(tool.description === undefined ? {} : { description: tool.description }),
@@ -183,10 +174,10 @@ const definitionOf = (tool: typeof Tool.Type): ToolDefinition => {
       ...(hints?.readOnlyHint === undefined ? {} : { readOnly: hints.readOnlyHint }),
       ...(hints?.destructiveHint === undefined ? {} : { destructive: hints.destructiveHint }),
       ...(hints?.idempotentHint === undefined ? {} : { idempotent: hints.idempotentHint }),
-      ...(hints?.openWorldHint === undefined ? {} : { openWorld: hints.openWorldHint }),
-    },
-  };
-};
+      ...(hints?.openWorldHint === undefined ? {} : { openWorld: hints.openWorldHint })
+    }
+  }
+}
 
 /**
  * The tools of a listing that a source may offer, each with the parameters it sends as headers. A
@@ -195,27 +186,24 @@ const definitionOf = (tool: typeof Tool.Type): ToolDefinition => {
  * for the marks.
  */
 const sortTools = (tools: ReadonlyArray<typeof Tool.Type>, sendsParametersAsHeaders: boolean) => {
-  const usable: Array<{ tool: typeof Tool.Type; bindings: ReadonlyArray<Binding> }> = [];
-  const refused: Array<{ tool: typeof Tool.Type; reason: string }> = [];
+  const usable: Array<{ tool: typeof Tool.Type; bindings: ReadonlyArray<Binding> }> = []
+  const refused: Array<{ tool: typeof Tool.Type; reason: string }> = []
   for (const tool of tools) {
     if (!sendsParametersAsHeaders) {
-      usable.push({ tool, bindings: [] });
-      continue;
+      usable.push({ tool, bindings: [] })
+      continue
     }
-    const found = findBindings(tool.inputSchema);
-    if (Result.isSuccess(found)) usable.push({ tool, bindings: found.success });
-    else refused.push({ tool, reason: found.failure });
+    const found = findBindings(tool.inputSchema)
+    if (Result.isSuccess(found)) usable.push({ tool, bindings: found.success })
+    else refused.push({ tool, reason: found.failure })
   }
-  return { usable, refused };
-};
+  return { usable, refused }
+}
 
-const sameHeaders = (
-  first: Readonly<Record<string, string>>,
-  second: Readonly<Record<string, string>>,
-) => {
-  const names = Object.keys(first);
-  return names.length === Object.keys(second).length && names.every((n) => first[n] === second[n]);
-};
+const sameHeaders = (first: Readonly<Record<string, string>>, second: Readonly<Record<string, string>>) => {
+  const names = Object.keys(first)
+  return names.length === Object.keys(second).length && names.every((n) => first[n] === second[n])
+}
 
 /**
  * What a tool answers with: the structured content when it has some, or else the content blocks,
@@ -224,20 +212,22 @@ const sameHeaders = (
  */
 const resultOf = (
   result: typeof ToolResult.Type,
-  fail: (reason: ToolSourceErrorReason) => ToolSourceError,
+  fail: (reason: ToolSourceError.ToolSourceErrorReason) => ToolSourceError.ToolSourceError
 ) => {
   if (result.resultType === "input_required") {
     return Effect.fail(
       fail(
-        new UnsupportedError({ description: "The tool asks for input, which is not supported" }),
-      ),
-    );
+        new ToolSourceError.UnsupportedError({
+          description: "The tool asks for input, which is not supported"
+        })
+      )
+    )
   }
   if (result.isError === true) {
-    const said = (result.content ?? []).filter(Schema.is(TextBlock)).map((block) => block.text);
+    const said = (result.content ?? []).filter(Schema.is(TextBlock)).map((block) => block.text)
     return Effect.fail(
-      fail(new CallFailedError(said.length === 0 ? {} : { description: said.join("\n") })),
-    );
+      fail(new ToolSourceError.CallFailedError(said.length === 0 ? {} : { description: said.join("\n") }))
+    )
   }
-  return Effect.succeed(result.structuredContent ?? result.content ?? []);
-};
+  return Effect.succeed(result.structuredContent ?? result.content ?? [])
+}

@@ -1,6 +1,6 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // Centered in the viewport, 24px above the bottom and any home indicator.
 export const region = style({
@@ -15,8 +15,8 @@ export const region = style({
   margin: 0,
   padding: "0 1rem",
   listStyle: "none",
-  pointerEvents: "none",
-});
+  pointerEvents: "none"
+})
 
 export const toast = style({
   ...typeScale.control,
@@ -32,12 +32,12 @@ export const toast = style({
   boxShadow: vars.shadow.toast,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
-  pointerEvents: "auto",
-});
+  pointerEvents: "auto"
+})
 
-export const icon = style({ flex: "none", width: "1rem", height: "1rem" });
+export const icon = style({ flex: "none", width: "1rem", height: "1rem" })
 
-export const message = style({ minWidth: 0 });
+export const message = style({ minWidth: 0 })
 
 export const action = style({
   ...typeScale.control,
@@ -52,6 +52,6 @@ export const action = style({
   cursor: "pointer",
   selectors: {
     "&:hover": { backgroundColor: vars.color.surface.subtle },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
+  }
+})

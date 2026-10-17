@@ -1,31 +1,25 @@
-import {
-  Api,
-  Authentication,
-  BearerAuthentication,
-  ChangeFeedHandlers,
-  WorkspaceMember,
-} from "../src/index.ts";
-import * as WorkspaceMemberServer from "../src/internal/workspace-member.ts";
-import type * as Core from "@amends-dev/core";
-import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
-import { Actor, Identity } from "@amends-dev/core/identity";
-import { Member, Workspace } from "@amends-dev/core/workspace";
-import { SessionTokens, Gateway } from "@amends-dev/gateway";
-import { expect, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
-import type { Scope } from "effect";
-import { HttpClientRequest, HttpServer } from "effect/http";
-import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
-import { CoreError } from "@amends-dev/core/error";
+import type { Core } from "@amends-dev/core"
+import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
+import { CoreError } from "@amends-dev/core/error"
+import { Actor, Identity } from "@amends-dev/core/identity"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import { SessionTokens, Gateway } from "@amends-dev/gateway"
+import { expect, it } from "@effect/vitest"
+import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect"
+import type { Scope } from "effect"
+import { HttpClientRequest, HttpServer } from "effect/http"
+import { HttpApiMiddleware, HttpApiTest } from "effect/http-api"
+import { Api, Authentication, BearerAuthentication, ChangeFeedHandlers, WorkspaceMember } from "../src/index.ts"
+import * as WorkspaceMemberServer from "../src/internal/workspaceMember.ts"
 
-const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
-const workspaceId = Workspace.Id.make("workspace-one");
+const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const actor = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("member-one"),
-  identity: alice,
-});
-const secret = "connect ECONNREFUSED 10.0.0.5:5432 password=hunter2";
+  memberId: MemberId.MemberId.make("member-one"),
+  identity: alice
+})
+const secret = "connect ECONNREFUSED 10.0.0.5:5432 password=hunter2"
 
 /** A change feed that opens, then fails in a way no client should learn the details of. */
 const failing = Layer.succeed(
@@ -33,80 +27,72 @@ const failing = Layer.succeed(
   ChangeFeedService.ChangeFeedService.of({
     watch: () =>
       Effect.succeed(
-        Stream.make(
-          ChangeFeed.Message.cases.Ready.make({ workspaceId, cursor: null, reset: true }),
-        ).pipe(Stream.concat(Stream.die(new Error(secret)))),
-      ),
-  }),
-);
+        Stream.make(ChangeFeed.Message.cases.Ready.make({ workspaceId, cursor: null, reset: true })).pipe(
+          Stream.concat(Stream.die(new Error(secret)))
+        )
+      )
+  })
+)
 const gateway = Layer.succeed(
   Gateway.Gateway,
   Gateway.Gateway.of({
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
     asMember: <A, E>(
-      _id: Workspace.Id,
+      _id: WorkspaceId.WorkspaceId,
       _identity: Identity.MemberReference,
-      program: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope>,
+      program: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope>
     ) =>
       Effect.provide(Effect.provideService(program, Actor.Actor, actor), failing) as Effect.Effect<
         A,
         E | CoreError.Denied,
         Scope.Scope
-      >,
-  }),
-);
+      >
+  })
+)
 const credentials = Layer.succeed(
   SessionTokens.SessionTokens,
   SessionTokens.SessionTokens.of({
     resolve: () => Effect.succeed(alice),
-    revoke: () => Effect.void,
-  }),
-);
+    revoke: () => Effect.void
+  })
+)
 const client = HttpApiTest.groups(Api.Api, ["changeFeed"]).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      ChangeFeedHandlers.layer.pipe(
-        Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMemberServer.layer)),
-        Layer.provide(Layer.mergeAll(gateway, credentials)),
-      ),
-      HttpServer.layerServices,
-      HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-        next(HttpClientRequest.bearerToken(request, "alice")),
-      ),
-      WorkspaceMember.layerClient(workspaceId),
+  Effect.provide([
+    ChangeFeedHandlers.layer.pipe(
+      Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMemberServer.layer)),
+      Layer.provide([gateway, credentials])
     ),
-  ),
-);
+    HttpServer.layerServices,
+    HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
+      next(HttpClientRequest.bearerToken(request, "alice"))
+    ),
+    WorkspaceMember.layerClient(workspaceId)
+  ])
+)
 
-it.effect(
-  "a change stream that fails unexpectedly is logged, and its client told only to reconnect",
-  () =>
-    Effect.gen(function* () {
-      const logged: Array<Logger.Options<unknown>> = [];
-      const messages: Array<ChangeFeed.Message> = [];
-      const exit = yield* Effect.gen(function* () {
-        const api = yield* client;
-        const stream = yield* api.changeFeed.watch({ query: {} });
-        return yield* Stream.runForEach(stream, (message) =>
-          Effect.sync(() => messages.push(message)),
-        );
-      }).pipe(
-        Effect.scoped,
-        Effect.exit,
-        Effect.provide(Logger.layer([Logger.make((options) => void logged.push(options))])),
-      );
-      expect(messages.map((message) => message._tag)).toEqual(["Ready"]);
-      expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-        Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
-      );
-      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(false);
-      expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).not.toContain("hunter2");
-      // The host keeps the cause for its logs.
-      expect(
-        logged.filter(
-          ({ logLevel, cause }) => logLevel === "Error" && Cause.pretty(cause).includes("hunter2"),
-        ),
-      ).toHaveLength(1);
-    }),
-);
+it.effect("a change stream that fails unexpectedly is logged, and its client told only to reconnect", () =>
+  Effect.gen(function* () {
+    const logged: Array<Logger.Options<unknown>> = []
+    const messages: Array<ChangeFeed.Message> = []
+    const exit = yield* Effect.gen(function* () {
+      const api = yield* client
+      const stream = yield* api.changeFeed.watch({ query: {} })
+      return yield* Stream.runForEach(stream, (message) => Effect.sync(() => messages.push(message)))
+    }).pipe(
+      Effect.scoped,
+      Effect.exit,
+      Effect.provide(Logger.layer([Logger.make((options) => void logged.push(options))]))
+    )
+    expect(messages.map((message) => message._tag)).toEqual(["Ready"])
+    expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
+      Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() }))
+    )
+    expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(false)
+    expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).not.toContain("hunter2")
+    // The host keeps the cause for its logs.
+    expect(
+      logged.filter(({ logLevel, cause }) => logLevel === "Error" && Cause.pretty(cause).includes("hunter2"))
+    ).toHaveLength(1)
+  })
+)

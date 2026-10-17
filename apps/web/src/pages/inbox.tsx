@@ -1,45 +1,38 @@
-import { paths, useInboxView, useWorkspace } from "@amends-dev/client";
-import { InboxPane, type InboxTab } from "@amends-dev/ui/screens/inbox";
-import { useParams, useSearchParams } from "@solidjs/router";
-import { createEffect, createSignal } from "solid-js";
-import { useWorkspaceActions } from "../workspace-actions.ts";
+import { paths, useInboxView, useWorkspace } from "@amends-dev/client"
+import { InboxPane, type InboxTab } from "@amends-dev/ui/screens/inbox"
+import { useParams, useSearchParams } from "@solidjs/router"
+import { createEffect, createSignal } from "solid-js"
+import { useWorkspaceActions } from "../workspace-actions.ts"
 
-const href = (path: string) => path;
+const href = (path: string) => path
 /** The reader's inbox; the workspace layout shows a thread opened from it beside it. */
 export function InboxPage() {
-  const params = useParams<{ workspaceId: string; threadId?: string }>();
-  const [search] = useSearchParams<{ at?: string }>();
-  const workspace = useWorkspace(() => params.workspaceId);
+  const params = useParams<{ workspaceId: string; threadId?: string }>()
+  const [search] = useSearchParams<{ at?: string }>()
+  const workspace = useWorkspace(() => params.workspaceId)
   // Unread first: what the reader has not looked at is why they come here.
-  const [tab, setTab] = createSignal<InboxTab>("unread");
+  const [tab, setTab] = createSignal<InboxTab>("unread")
   // The notification whose thread is open beside the inbox, kept in Unread while it is.
-  const [selected, setSelected] = createSignal<string>();
-  const actions = useWorkspaceActions();
-  const view = useInboxView(
-    params.workspaceId,
-    () => (tab() === "unread" ? "pending" : "all"),
-    selected,
-    {
-      failed: (change) =>
-        actions.toast(
-          change === "seen"
-            ? "Couldn’t mark that notification seen."
-            : "Couldn’t mark everything seen. Try again.",
-        ),
-    },
-  );
+  const [selected, setSelected] = createSignal<string>()
+  const actions = useWorkspaceActions()
+  const view = useInboxView(params.workspaceId, () => (tab() === "unread" ? "pending" : "all"), selected, {
+    failed: (change) =>
+      actions.toast(
+        change === "seen" ? "Couldn’t mark that notification seen." : "Couldn’t mark everything seen. Try again."
+      )
+  })
   // A thread opened by its address, or closed: follow the route.
   createEffect(() => {
-    const threadId = params.threadId;
-    if (threadId === undefined) return setSelected(undefined);
-    const sequence = Number(search.at);
-    const current = view.entries().find((entry) => entry.id === selected());
-    if (current?.thread?.threadId === threadId) return;
+    const threadId = params.threadId
+    if (threadId === undefined) return setSelected(undefined)
+    const sequence = Number(search.at)
+    const current = view.entries().find((entry) => entry.id === selected())
+    if (current?.thread?.threadId === threadId) return
     const match = view
       .entries()
-      .find((entry) => entry.thread?.threadId === threadId && entry.thread.sequence === sequence);
-    if (match) setSelected(match.id);
-  });
+      .find((entry) => entry.thread?.threadId === threadId && entry.thread.sequence === sequence)
+    if (match) setSelected(match.id)
+  })
   return (
     <InboxPane
       workspaceName={workspace()?.workspace.name ?? ""}
@@ -58,35 +51,28 @@ export function InboxPage() {
         mentions: entry.mentions,
         href: entry.thread
           ? href(
-              paths.inboxThread(
-                params.workspaceId,
-                entry.thread.groupId,
-                entry.thread.threadId,
-                entry.thread.sequence,
-              ),
+              paths.inboxThread(params.workspaceId, entry.thread.groupId, entry.thread.threadId, entry.thread.sequence)
             )
-          : undefined,
+          : undefined
       }))}
       selectedId={selected()}
       onOpen={(id) => {
-        setSelected(id);
-        view.open(id);
+        setSelected(id)
+        view.open(id)
       }}
       onMarkAllSeen={view.markAllSeen}
       markingAll={view.markingAll()}
-      status={
-        view.status() === "failed" ? "failed" : view.status() === "loading" ? "loading" : undefined
-      }
+      status={view.status() === "failed" ? "failed" : view.status() === "loading" ? "loading" : undefined}
       onRetry={view.retry}
       earlier={
         view.earlier()
           ? {
               loading: view.loadingEarlier(),
               failed: view.earlierFailed(),
-              onLoad: view.loadEarlier,
+              onLoad: view.loadEarlier
             }
           : undefined
       }
     />
-  );
+  )
 }

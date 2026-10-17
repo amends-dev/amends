@@ -1,45 +1,34 @@
-import { Predicate } from "effect";
-import {
-  paths,
-  useDirectMessage,
-  usePeople,
-  useWorkspace,
-  useWorkspaceGroups,
-} from "@amends-dev/client";
-import { GroupPane, GroupThreads } from "@amends-dev/ui/screens/group";
-import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { createEffect, For } from "solid-js";
+import { paths, useDirectMessage, usePeople, useWorkspace, useWorkspaceGroups } from "@amends-dev/client"
+import { GroupPane, GroupThreads } from "@amends-dev/ui/screens/group"
+import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
+import * as Predicate from "effect/Predicate"
+import { createEffect, For } from "solid-js"
 
-const href = (path: string) => path;
+const href = (path: string) => path
 /**
  * A first message to the people in `?to=`, who have no conversation together yet. Once it starts
  * theirs, or theirs turns out to exist, their group replaces this page in history.
  */
 export function DirectPage() {
-  const [search] = useSearchParams<{ to?: string }>();
+  const [search] = useSearchParams<{ to?: string }>()
   // A different set of people is a different draft.
-  return (
-    <For each={[search.to ?? ""]}>
-      {(to) => <Draft memberIds={to.split(",").filter(Boolean)} />}
-    </For>
-  );
+  return <For each={[search.to ?? ""]}>{(to) => <Draft memberIds={to.split(",").filter(Boolean)} />}</For>
 }
 
 function Draft(props: { readonly memberIds: ReadonlyArray<string> }) {
-  const params = useParams<{ workspaceId: string }>();
-  const navigate = useNavigate();
-  const workspace = useWorkspace(() => params.workspaceId);
-  const people = usePeople(params.workspaceId);
-  const groups = useWorkspaceGroups(params.workspaceId);
-  const open = (groupId: string) =>
-    navigate(paths.group(params.workspaceId, groupId), { replace: true });
-  const composer = useDirectMessage(params.workspaceId, props.memberIds, open);
+  const params = useParams<{ workspaceId: string }>()
+  const navigate = useNavigate()
+  const workspace = useWorkspace(() => params.workspaceId)
+  const people = usePeople(params.workspaceId)
+  const groups = useWorkspaceGroups(params.workspaceId)
+  const open = (groupId: string) => navigate(paths.group(params.workspaceId, groupId), { replace: true })
+  const composer = useDirectMessage(params.workspaceId, props.memberIds, open)
   // Someone may already have started this conversation.
   createEffect(() => {
-    const existing = groups.directWith(props.memberIds);
-    if (existing) open(existing.id);
-  });
-  const names = () => props.memberIds.map(people.name).join(", ");
+    const existing = groups.directWith(props.memberIds)
+    if (existing) open(existing.id)
+  })
+  const names = () => props.memberIds.map(people.name).join(", ")
   return (
     <GroupPane
       name={names()}
@@ -64,9 +53,9 @@ function Draft(props: { readonly memberIds: ReadonlyArray<string> }) {
         mentionCandidates={props.memberIds.map((id) => ({
           id,
           name: people.name(id),
-          agent: Predicate.isTagged(people.member(id)?.identity, "Agent"),
+          agent: Predicate.isTagged(people.member(id)?.identity, "Agent")
         }))}
       />
     </GroupPane>
-  );
+  )
 }

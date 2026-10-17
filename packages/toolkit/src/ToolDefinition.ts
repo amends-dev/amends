@@ -7,8 +7,9 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import { McpSchema } from "effect/ai";
+
+import * as McpSchema from "effect/ai/McpSchema"
+import * as Schema from "effect/Schema"
 
 /**
  * What a source says about a tool besides what it takes, under the names Effect AI gives its tool
@@ -35,8 +36,8 @@ export const Annotations = Schema.Struct({
   idempotent: Schema.optionalKey(Schema.Boolean),
 
   /** The tool reaches beyond the system it belongs to, such as the web, rather than a closed one. */
-  openWorld: Schema.optionalKey(Schema.Boolean),
-});
+  openWorld: Schema.optionalKey(Schema.Boolean)
+})
 
 /**
  * @category schemas
@@ -69,8 +70,8 @@ export const ToolDefinition = Schema.Struct({
   inputSchema: McpSchema.ToolJson,
 
   /** What the source says of the tool besides what it takes, which are hints and not guarantees. */
-  annotations: Annotations,
-});
+  annotations: Annotations
+})
 
 /**
  * @category schemas

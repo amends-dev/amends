@@ -1,9 +1,9 @@
-import { render } from "solid-js/web";
-import "@amends-dev/ui/foundations/typography/fonts";
-import "@amends-dev/ui/styles";
-import { App } from "./app.tsx";
+import { render } from "solid-js/web"
+import "@amends-dev/ui/foundations/typography/fonts"
+import "@amends-dev/ui/styles"
+import { App } from "./app.tsx"
 
-const root = document.getElementById("root");
-if (!root) throw new Error("The application mount element is missing.");
+const root = document.getElementById("root")
+if (!root) throw new Error("The application mount element is missing.")
 
-render(() => <App />, root);
+render(() => <App />, root)

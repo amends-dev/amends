@@ -6,10 +6,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer } from "effect";
-import type { Scope, Stream } from "effect";
-import * as Store from "../journal/Store.ts";
-import type * as Signal from "./Signal.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import type * as Scope from "effect/Scope"
+import type * as Stream from "effect/Stream"
+import * as Store from "../journal/Store.ts"
+import type * as Signal from "./Signal.ts"
 
 /**
  * One workspace's signals, across every process sharing its storage. Storage binds it to the
@@ -25,9 +29,9 @@ export class SignalHub extends Context.Service<
      * Offer a signal to the workspace's current subscribers, best effort: it never fails the caller,
      * and a subscriber too slow to keep up, or disconnected, misses it.
      */
-    readonly publish: (signal: Signal.Signal) => Effect.Effect<void>;
+    readonly publish: (signal: Signal.Signal) => Effect.Effect<void>
     /** The signals published after this registers, until the scope closes. */
-    readonly subscribe: Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>;
+    readonly subscribe: Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>
   }
 >()("@amends-dev/core/signal/SignalHub") {}
 
@@ -36,13 +40,13 @@ export class SignalHub extends Context.Service<
  * own bounded queue; nothing is kept.
  */
 const makeMemory = Effect.fn("SignalHub.makeMemory")(function* () {
-  const { workspaceId, connection } = yield* Store.MemoryBinding;
-  const { signals } = connection.database;
+  const { workspaceId, connection } = yield* Store.MemoryBinding
+  const { signals } = connection.database
   return SignalHub.of({
     publish: signals.publish,
-    subscribe: signals.subscribe(workspaceId),
-  });
-});
+    subscribe: signals.subscribe(workspaceId)
+  })
+})
 
 /**
  * Provide the workspace's signals in process memory, over the workspace's `Store.MemoryBinding`:
@@ -53,4 +57,4 @@ const makeMemory = Effect.fn("SignalHub.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(SignalHub, makeMemory());
+export const layerMemory = Layer.effect(SignalHub, makeMemory())

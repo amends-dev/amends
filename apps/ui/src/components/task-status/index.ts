@@ -1,6 +1,1 @@
-export {
-  TaskStatus,
-  taskStateLabel,
-  type TaskState,
-  type TaskStatusProps,
-} from "./task-status.tsx";
+export { TaskStatus, taskStateLabel, type TaskState, type TaskStatusProps } from "./task-status.tsx"

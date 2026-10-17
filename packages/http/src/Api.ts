@@ -6,46 +6,48 @@
  *
  * @since 0.1.0
  */
-import { HttpApi, OpenApi } from "effect/http-api";
-import { declareWorkspaceHeader } from "./internal/workspace-header.ts";
-import { AccountsGroup } from "./AccountsGroup.ts";
-import { InvitationsGroup } from "./InvitationsGroup.ts";
-import { AssignmentsGroup } from "./AssignmentsGroup.ts";
-import { MeGroup } from "./MeGroup.ts";
-import { MembersGroup } from "./MembersGroup.ts";
-import { NotificationsGroup } from "./NotificationsGroup.ts";
-import { SessionGroup } from "./SessionGroup.ts";
-import { WorkspacesGroup } from "./WorkspacesGroup.ts";
-import { SettingsGroup } from "./SettingsGroup.ts";
-import { ChangeFeedGroup } from "./ChangeFeedGroup.ts";
-import { AgentsGroup } from "./AgentsGroup.ts";
-import { ChannelEventsGroup, ChannelsGroup } from "./ChannelsGroup.ts";
-import { ConnectionsGroup } from "./ConnectionsGroup.ts";
-import { GroupsGroup } from "./GroupsGroup.ts";
-import { TasksGroup } from "./TasksGroup.ts";
-import { ThreadsGroup } from "./ThreadsGroup.ts";
-import { TurnsGroup } from "./TurnsGroup.ts";
+
+import * as HttpApi from "effect/http-api/HttpApi"
+import * as OpenApi from "effect/http-api/OpenApi"
+import * as AccountsGroup from "./AccountsGroup.ts"
+import * as AgentsGroup from "./AgentsGroup.ts"
+import * as AssignmentsGroup from "./AssignmentsGroup.ts"
+import * as ChangeFeedGroup from "./ChangeFeedGroup.ts"
+import * as ChannelsGroup from "./ChannelsGroup.ts"
+import * as ConnectionsGroup from "./ConnectionsGroup.ts"
+import * as GroupsGroup from "./GroupsGroup.ts"
+import { declareWorkspaceHeader } from "./internal/workspaceHeader.ts"
+import * as InvitationsGroup from "./InvitationsGroup.ts"
+import * as MeGroup from "./MeGroup.ts"
+import * as MembersGroup from "./MembersGroup.ts"
+import * as NotificationsGroup from "./NotificationsGroup.ts"
+import * as SessionGroup from "./SessionGroup.ts"
+import * as SettingsGroup from "./SettingsGroup.ts"
+import * as TasksGroup from "./TasksGroup.ts"
+import * as ThreadsGroup from "./ThreadsGroup.ts"
+import * as TurnsGroup from "./TurnsGroup.ts"
+import * as WorkspacesGroup from "./WorkspacesGroup.ts"
 
 /** Every endpoint group. */
 const groups = HttpApi.make("amends")
-  .add(SessionGroup)
-  .add(MeGroup)
-  .add(AccountsGroup)
-  .add(WorkspacesGroup)
-  .add(SettingsGroup)
-  .add(MembersGroup)
-  .add(InvitationsGroup)
-  .add(AssignmentsGroup)
-  .add(GroupsGroup)
-  .add(ThreadsGroup)
-  .add(TasksGroup)
-  .add(NotificationsGroup)
-  .add(ConnectionsGroup)
-  .add(AgentsGroup)
-  .add(TurnsGroup)
-  .add(ChannelsGroup)
-  .add(ChannelEventsGroup)
-  .add(ChangeFeedGroup);
+  .add(SessionGroup.SessionGroup)
+  .add(MeGroup.MeGroup)
+  .add(AccountsGroup.AccountsGroup)
+  .add(WorkspacesGroup.WorkspacesGroup)
+  .add(SettingsGroup.SettingsGroup)
+  .add(MembersGroup.MembersGroup)
+  .add(InvitationsGroup.InvitationsGroup)
+  .add(AssignmentsGroup.AssignmentsGroup)
+  .add(GroupsGroup.GroupsGroup)
+  .add(ThreadsGroup.ThreadsGroup)
+  .add(TasksGroup.TasksGroup)
+  .add(NotificationsGroup.NotificationsGroup)
+  .add(ConnectionsGroup.ConnectionsGroup)
+  .add(AgentsGroup.AgentsGroup)
+  .add(TurnsGroup.TurnsGroup)
+  .add(ChannelsGroup.ChannelsGroup)
+  .add(ChannelsGroup.ChannelEventsGroup)
+  .add(ChangeFeedGroup.ChangeFeedGroup)
 
 /**
  * The public HTTP contract. Servers implement its groups; clients are generated from it. Its
@@ -55,5 +57,5 @@ const groups = HttpApi.make("amends")
  * @since 0.1.0
  */
 export class Api extends groups.annotateMerge(
-  OpenApi.annotations({ title: "Amends API", transform: declareWorkspaceHeader(groups) }),
+  OpenApi.annotations({ title: "Amends API", transform: declareWorkspaceHeader(groups) })
 ) {}

@@ -3,14 +3,15 @@
  * the headings that sell; everything else is the app's Figtree and Geist Mono, at the app's sizes
  * or at the larger reading sizes below. Sizes are rem at a 16px root, as in the app.
  */
-import type { TypeStep } from "../foundations/typography/tokens.ts";
 
-export const displayFamily = '"Instrument Serif", ui-serif, Georgia, "Times New Roman", serif';
+import type { TypeStep } from "../foundations/typography/tokens.ts"
+
+export const displayFamily = '"Instrument Serif", ui-serif, Georgia, "Times New Roman", serif'
 
 const step = (size: number, line: number): TypeStep => ({
   fontSize: `${size / 16}rem`,
-  lineHeight: `${line / 16}rem`,
-});
+  lineHeight: `${line / 16}rem`
+})
 
 export const siteType = {
   /** 84/88: the home page's headline. */
@@ -26,8 +27,8 @@ export const siteType = {
   /** 20/31: the lead under a headline. */
   lead: step(20, 31),
   /** 17/27: a section's introduction. */
-  intro: step(17, 27),
-} as const satisfies Record<string, TypeStep>;
+  intro: step(17, 27)
+} as const satisfies Record<string, TypeStep>
 
 /** Headlines shrink on phones, where the larger sizes would break every word onto its own line. */
 export const siteTypeMobile = {
@@ -35,8 +36,8 @@ export const siteTypeMobile = {
   page: step(44, 50),
   section: step(36, 42),
   heading: step(30, 36),
-  lead: step(18, 28),
-} as const satisfies Partial<Record<keyof typeof siteType, TypeStep>>;
+  lead: step(18, 28)
+} as const satisfies Partial<Record<keyof typeof siteType, TypeStep>>
 
 /** The width the site's content lines up to, and the gutter around it. */
-export const siteLayout = { width: "75rem", gutter: "1rem", gutterWide: "2rem" } as const;
+export const siteLayout = { width: "75rem", gutter: "1rem", gutterWide: "2rem" } as const

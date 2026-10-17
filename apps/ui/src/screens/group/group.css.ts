@@ -1,7 +1,7 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // The member stack opens the member list; it hides on phones, where the header is narrow.
 export const members = style({
@@ -14,20 +14,20 @@ export const members = style({
   cursor: "pointer",
   selectors: {
     "&:hover": { backgroundColor: vars.color.surface.subtle },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
   "@media": {
     [media.touch]: { height: "2.75rem", marginInlineEnd: "0.5rem" },
-    [media.mobile]: { display: "none" },
-  },
-});
+    [media.mobile]: { display: "none" }
+  }
+})
 
 // Phones show search in the group header instead of notifications.
-export const desktopOnly = style({ "@media": { [media.mobile]: { display: "none" } } });
+export const desktopOnly = style({ "@media": { [media.mobile]: { display: "none" } } })
 export const mobileOnly = style({
   display: "none",
-  "@media": { [media.mobile]: { display: "inline-grid" } },
-});
+  "@media": { [media.mobile]: { display: "inline-grid" } }
+})
 
 // The prompt to join a previewed group, in place of the composer.
 export const prompt = style({
@@ -35,36 +35,36 @@ export const prompt = style({
   alignItems: "center",
   justifyContent: "space-between",
   gap: "1.5rem",
-  "@media": { [media.mobile]: { flexDirection: "column", alignItems: "stretch", gap: "0.75rem" } },
-});
+  "@media": { [media.mobile]: { flexDirection: "column", alignItems: "stretch", gap: "0.75rem" } }
+})
 
-export const promptText = style({ display: "flex", flexDirection: "column", gap: "0.25rem" });
+export const promptText = style({ display: "flex", flexDirection: "column", gap: "0.25rem" })
 
 export const promptTitle = style({
   ...typeScale.item,
   margin: 0,
   color: vars.color.text.primary,
-  fontWeight: fontWeight.medium,
-});
+  fontWeight: fontWeight.medium
+})
 
 export const promptNote = style({
   ...typeScale.control,
   margin: 0,
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 export const loading = style({
   ...typeScale.control,
   margin: "auto",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 // "Show earlier threads" above the oldest loaded entry.
 export const earlier = style({
   display: "flex",
   justifyContent: "center",
-  paddingBlockEnd: "1rem",
-});
+  paddingBlockEnd: "1rem"
+})
 
 // A thread's messages and its agents' turns, resting together against the bottom.
 export const threadStack = style({
@@ -73,13 +73,13 @@ export const threadStack = style({
   justifyContent: "flex-end",
   gap: "1.5rem",
   minHeight: "100%",
-  "@media": { [media.mobile]: { gap: "1.375rem" } },
-});
+  "@media": { [media.mobile]: { gap: "1.375rem" } }
+})
 
 // Who is typing, under the thread's timeline; empty and out of the way otherwise.
 export const typing = style({
   ...typeScale.meta,
   margin: 0,
   color: vars.color.text.muted,
-  selectors: { "&:not(:empty)": { paddingBlockStart: "0.75rem" } },
-});
+  selectors: { "&:not(:empty)": { paddingBlockStart: "0.75rem" } }
+})

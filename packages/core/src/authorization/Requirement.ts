@@ -7,9 +7,10 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Permission from "./Permission.ts";
-import * as Target from "./Target.ts";
+
+import * as Schema from "effect/Schema"
+import * as Permission from "./Permission.ts"
+import * as Target from "./Target.ts"
 
 /**
  * A core-declared permission required on a concrete target. An operation's requirements must all
@@ -21,17 +22,17 @@ import * as Target from "./Target.ts";
  */
 export const Requirement = Schema.Struct({
   permission: Permission.Reference,
-  target: Target.Reference,
+  target: Target.Reference
 }).check(
   Schema.makeFilter(({ permission, target }) =>
     Target.Reference.isAnyOf([permission.targetKind])(target)
       ? undefined
       : {
           path: ["target"],
-          issue: `Permission ${permission.name} requires a ${permission.targetKind} target`,
-        },
-  ),
-);
+          issue: `Permission ${permission.name} requires a ${permission.targetKind} target`
+        }
+  )
+)
 /**
  * @category schemas
  * @since 0.1.0
@@ -46,9 +47,9 @@ export interface Requirement extends Schema.Schema.Type<typeof Requirement> {}
  */
 export const make = <K extends Target.Kind>(
   permission: Permission.Definition<K>,
-  target: Target.Of<NoInfer<K>>,
+  target: Target.Of<NoInfer<K>>
 ): Requirement =>
   Requirement.make({
     permission: { name: permission.name, targetKind: permission.targetKind },
-    target,
-  });
+    target
+  })

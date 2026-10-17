@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Identifies one agent's attempt on one thread. A retry derives its ID from the turn it retries,
@@ -14,10 +15,10 @@ import { Schema } from "effect";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("TurnId"));
+export const TurnId = Schema.NonEmptyString.pipe(Schema.brand("TurnId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type TurnId = typeof TurnId.Type

@@ -7,31 +7,33 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Agent from "../agent/Agent.ts";
-import * as Group from "../group/Group.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Notification from "../notification/Notification.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as Turn from "./Turn.ts";
+
+import * as Schema from "effect/Schema"
+import * as Agent from "../agent/Agent.ts"
+import * as Group from "../group/Group.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Turn from "./Turn.ts"
+import * as TurnId from "./TurnId.ts"
 
 /**
  * Every fact names the turn's thread and group, which the group's members may learn of, and its
  * agent's membership, whose work it changes.
  */
 const Where = {
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  threadId: ThreadId.Id,
-  memberId: MemberId.Id,
-};
-const audience = (payload: { readonly groupId: GroupId.Id }) => [Group.audienceOf(payload.groupId)];
-const subject = (payload: { readonly turnId: Turn.Id }) => Subject.make("turn", payload.turnId);
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  threadId: ThreadId.ThreadId,
+  memberId: MemberId.MemberId
+}
+const audience = (payload: { readonly groupId: GroupId.GroupId }) => [Group.audienceOf(payload.groupId)]
+const subject = (payload: { readonly turnId: TurnId.TurnId }) => Subject.make("turn", payload.turnId)
 
 /**
  * An agent accepted work into a new turn, settling the notifications that asked for it. The
@@ -48,9 +50,9 @@ export const Created = Fact.make("turn.created", {
   payload: Schema.Struct({
     ...Turn.Turn.fields,
     /** The notifications the turn accepted, which it settles. */
-    notificationIds: Schema.NonEmptyArray(Notification.Id),
-  }),
-});
+    notificationIds: Schema.NonEmptyArray(Notification.NotificationId)
+  })
+})
 
 /**
  * Someone asked a failed or stopped turn to run again: a new turn for the same agent and input,
@@ -64,8 +66,8 @@ export const Retried = Fact.make("turn.retried", {
   audience,
   subject: (payload) => Subject.make("turn", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Schema.Struct(Turn.Turn.fields),
-});
+  payload: Schema.Struct(Turn.Turn.fields)
+})
 
 /**
  * The turn's job started it, with the harness, model, and sandbox it runs on.
@@ -80,11 +82,11 @@ export const Started = Fact.make("turn.started", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     selection: Agent.Selection,
-    startedAt: Schema.DateTimeUtcFromString,
-  }),
-});
+    startedAt: Schema.DateTimeUtcFromString
+  })
+})
 
 /**
  * Someone asked the turn to stop, or its agent stopped taking part; stopping is confirmed later,
@@ -100,11 +102,11 @@ export const CancelRequested = Fact.make("turn.cancel-requested", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     reason: Turn.CancelReason,
-    requestedAt: Schema.DateTimeUtcFromString,
-  }),
-});
+    requestedAt: Schema.DateTimeUtcFromString
+  })
+})
 
 /**
  * The turn finished its work, with the reply it posted, if it had one.
@@ -119,11 +121,11 @@ export const Completed = Fact.make("turn.completed", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
-    messageIds: Schema.Array(ThreadMessageId.Id),
-    finishedAt: Schema.DateTimeUtcFromString,
-  }),
-});
+    turnId: TurnId.TurnId,
+    messageIds: Schema.Array(ThreadMessageId.ThreadMessageId),
+    finishedAt: Schema.DateTimeUtcFromString
+  })
+})
 
 /**
  * The turn could not continue, for the reason recorded.
@@ -138,11 +140,11 @@ export const Failed = Fact.make("turn.failed", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     reason: Schema.NonEmptyString,
-    finishedAt: Schema.DateTimeUtcFromString,
-  }),
-});
+    finishedAt: Schema.DateTimeUtcFromString
+  })
+})
 
 /**
  * The turn stopped, as it was asked to or because its agent no longer takes part where it worked;
@@ -158,8 +160,8 @@ export const Cancelled = Fact.make("turn.cancelled", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     cancelReason: Turn.CancelReason,
-    finishedAt: Schema.DateTimeUtcFromString,
-  }),
-});
+    finishedAt: Schema.DateTimeUtcFromString
+  })
+})

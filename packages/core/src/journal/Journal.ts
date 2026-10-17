@@ -14,19 +14,24 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Option, Schema } from "effect";
-import * as Checkpoint from "./Checkpoint.ts";
-import * as Codec from "./Codec.ts";
-import type * as Entry from "./Entry.ts";
-import * as Event from "./Event.ts";
-import * as Fact from "./Fact.ts";
-import * as Log from "./Log.ts";
-import * as Projection from "./Projection.ts";
-import * as Publication from "./Publication.ts";
-import type * as Reaction from "./Reaction.ts";
-import * as Store from "./Store.ts";
-import * as Transaction from "./Transaction.ts";
-import * as StoreError from "./StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Checkpoint from "./Checkpoint.ts"
+import * as Codec from "./Codec.ts"
+import type * as Entry from "./Entry.ts"
+import * as Event from "./Event.ts"
+import * as Fact from "./Fact.ts"
+import * as Log from "./Log.ts"
+import * as Projection from "./Projection.ts"
+import * as Publication from "./Publication.ts"
+import type * as Reaction from "./Reaction.ts"
+import * as Store from "./Store.ts"
+import * as StoreError from "./StoreError.ts"
+import * as Transaction from "./Transaction.ts"
 
 /**
  * The journal of one log, through which every domain publishes its facts. Domains obtain it with
@@ -43,20 +48,20 @@ export class Journal extends Context.Service<
      * The journal's log, read-only: its batches, entries, keyed appends, streams, and live tails
      * of fact envelopes. Facts are written only through `publish`.
      */
-    readonly log: Log.Reader<typeof Event.Envelope>;
+    readonly log: Log.Reader<typeof Event.Envelope>
     /**
      * Read matching envelopes by fact name and/or subject, ordered by position and entry index,
      * after the exclusive `after` cursor and up to `limit`. Decode them with `Event.decode`.
      */
     readonly read: (
-      options: Store.ReadFactsOptions,
-    ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
+      options: Store.ReadFactsOptions
+    ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>
     /**
      * Runs `program` as one commit, or as part of the current one: its publications, appends to
      * other logs, and projection writes become visible together or not at all. A write that fails
      * inside it fails the whole commit, with `Transaction.Aborted` when the program caught it.
      */
-    readonly commit: Transaction.Transaction["Service"]["run"];
+    readonly commit: Transaction.Transaction["Service"]["run"]
     /**
      * Make exactly the registered projections live before accepting publications: rebuild any
      * that are not live from the log, and retire live versions this journal does not run, which
@@ -64,7 +69,7 @@ export class Journal extends Context.Service<
      * this reads nothing but the live versions. An empty log has nothing to rebuild, and its
      * first commit makes the projections live, so replaying it writes nothing.
      */
-    readonly replay: Effect.Effect<void, Projection.Error>;
+    readonly replay: Effect.Effect<void, Projection.Error>
     /**
      * Records `payload` as `fact` and returns its event. It stamps trusted operation attribution
      * from `Publication.Publication`, appends the event to the journal's log, and applies the live
@@ -79,13 +84,13 @@ export class Journal extends Context.Service<
     readonly publish: <F extends Fact.Definition>(
       fact: F,
       payload: Fact.Payload<NoInfer<F>>,
-      options?: Store.AppendOptions,
+      options?: Store.AppendOptions
     ) => Effect.Effect<
       Event.Type<F>,
       Projection.Error | Log.WriteError,
       | Publication.Publication
       | Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
-    >;
+    >
   }
 >()("@amends-dev/core/journal/Journal") {}
 
@@ -96,26 +101,18 @@ export class Journal extends Context.Service<
  * @category options
  * @since 0.1.0
  */
-export interface Options<
-  Requirements extends ReadonlyArray<unknown> = readonly [],
-  ReactionRequirements = never,
-> {
+export interface Options<Requirements extends ReadonlyArray<unknown> = readonly [], ReactionRequirements = never> {
   /** The log it records facts in, such as core's `journalLog`. */
-  readonly logId: Entry.LogId;
+  readonly logId: Entry.LogId
   /**
    * The projections every commit applies, in registration order. Each one's requirements are
    * inferred separately, then combined at construction.
    */
   readonly projections: {
-    readonly [Index in keyof Requirements]: Projection.Definition<
-      string,
-      number,
-      unknown,
-      Requirements[Index]
-    >;
-  };
+    readonly [Index in keyof Requirements]: Projection.Definition<string, number, unknown, Requirements[Index]>
+  }
   /** What a commit does when it publishes one of these facts, in registration order. */
-  readonly reactions?: ReadonlyArray<Reaction.Definition<ReactionRequirements>> | undefined;
+  readonly reactions?: ReadonlyArray<Reaction.Definition<ReactionRequirements>> | undefined
 }
 
 /**
@@ -128,142 +125,134 @@ export interface Options<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Journal.make")(function* <
+export const make = Effect.fnUntraced(function* <
   const Requirements extends ReadonlyArray<unknown>,
-  ReactionRequirements = never,
+  ReactionRequirements = never
 >(options: Options<Requirements, ReactionRequirements>) {
-  const log = yield* Log.Log;
-  const transaction = yield* Transaction.Transaction;
-  const checkpoint = yield* Checkpoint.Checkpoint;
+  const log = yield* Log.Log
+  const transaction = yield* Transaction.Transaction
+  const checkpoint = yield* Checkpoint.Checkpoint
   // Captured outside any transaction; the publishing commit supplies its own.
-  const reactionServices = yield* Effect.context<ReactionRequirements>();
-  const reactions = new Map<string, Array<Reaction.Definition<ReactionRequirements>>>();
+  const reactionServices = yield* Effect.context<ReactionRequirements>()
+  const reactions = new Map<string, Array<Reaction.Definition<ReactionRequirements>>>()
   for (const reaction of options.reactions ?? [])
-    reactions.set(reaction.fact, [...(reactions.get(reaction.fact) ?? []), reaction]);
+    reactions.set(reaction.fact, [...(reactions.get(reaction.fact) ?? []), reaction])
   const journalLog = log.open({
     id: options.logId,
     schema: Event.Envelope,
-    storageCodec: Event.storageCodec,
-  });
+    storageCodec: Event.storageCodec
+  })
   const validateProvenance = Schema.decodeUnknownEffect(
     Schema.toType(Event.Provenance).check(
       Schema.makeFilter((value) =>
-        value.workspaceId === transaction.workspaceId
-          ? undefined
-          : "Publication belongs to another workspace",
-      ),
-    ),
-  );
-  const subscriptions = options.projections.flatMap((projection) => projection.subscriptions);
-  const definitions = new Map<string, Map<number, Fact.Definition>>();
+        value.workspaceId === transaction.workspaceId ? undefined : "Publication belongs to another workspace"
+      )
+    )
+  )
+  const subscriptions = options.projections.flatMap((projection) => projection.subscriptions)
+  const definitions = new Map<string, Map<number, Fact.Definition>>()
   for (const { fact } of subscriptions) {
-    let versions = definitions.get(fact.name);
+    let versions = definitions.get(fact.name)
     if (versions === undefined) {
-      versions = new Map();
-      definitions.set(fact.name, versions);
+      versions = new Map()
+      definitions.set(fact.name, versions)
     }
-    const existing = versions.get(fact.version);
+    const existing = versions.get(fact.version)
     if (
       existing !== undefined &&
       (existing.payload !== fact.payload ||
         existing.occurrence !== fact.occurrence ||
         existing.subject !== fact.subject)
     ) {
-      return yield* new Event.FactMismatch({ name: fact.name, version: fact.version });
+      return yield* new Event.FactMismatch({ name: fact.name, version: fact.version })
     }
-    versions.set(fact.version, fact);
+    versions.set(fact.version, fact)
   }
-  const runners: Array<Projection.Runner> = [];
-  const keys = new Map<string, Set<number>>();
+  const runners: Array<Projection.Runner> = []
+  const keys = new Map<string, Set<number>>()
   for (const definition of options.projections) {
     if (keys.get(definition.name)?.has(definition.version)) {
       return yield* new Projection.Duplicate({
-        key: { logId: journalLog.id, name: definition.name, version: definition.version },
-      });
+        key: { logId: journalLog.id, name: definition.name, version: definition.version }
+      })
     }
-    const versions = keys.get(definition.name) ?? new Set<number>();
-    versions.add(definition.version);
-    keys.set(definition.name, versions);
-    runners.push(
-      yield* Projection.makeRunner<unknown, Requirements[number]>({ definition, log: journalLog }),
-    );
+    const versions = keys.get(definition.name) ?? new Set<number>()
+    versions.add(definition.version)
+    keys.set(definition.name, versions)
+    runners.push(yield* Projection.makeRunner<unknown, Requirements[number]>({ definition, log: journalLog }))
   }
   // Each fact goes only to the projections that handle its name, in registration order.
-  const subscribers = new Map<string, ReadonlyArray<Projection.Runner>>();
+  const subscribers = new Map<string, ReadonlyArray<Projection.Runner>>()
   for (const { fact } of subscriptions)
     if (!subscribers.has(fact.name))
       subscribers.set(
         fact.name,
-        runners.filter((runner) => runner.subscribes(fact.name)),
-      );
-  const registeredVersions = runners.map(({ key }) => ({ name: key.name, version: key.version }));
+        runners.filter((runner) => runner.subscribes(fact.name))
+      )
+  const registeredVersions = runners.map(({ key }) => ({ name: key.name, version: key.version }))
   const isRegistered = (live: Checkpoint.LiveVersion) =>
-    runners.some((runner) => Projection.isVersion(runner.key)(live));
+    runners.some((runner) => Projection.isVersion(runner.key)(live))
   const toCheckpointKey = (live: Checkpoint.LiveVersion): Checkpoint.Key => ({
     logId: journalLog.id,
     name: live.name,
-    version: live.version,
-  });
+    version: live.version
+  })
 
   /**
    * A commit applies exactly the live projections, so it may publish only when those are the
    * registered ones. An empty log has nothing to rebuild, so its first commit makes them live.
    * Checked once per native transaction, before its first publication.
    */
-  const checked = new WeakSet<object>();
+  const checked = new WeakSet<object>()
   const requireLive = Effect.fnUntraced(function* () {
-    const storeTransaction = yield* Store.Transaction;
-    if (checked.has(storeTransaction)) return;
-    const live = yield* checkpoint.listLive(journalLog.id);
-    const behind = runners.find((runner) => !live.some(Projection.isVersion(runner.key)));
-    const unknown = live.find((version) => !isRegistered(version));
+    const storeTransaction = yield* Store.Transaction
+    if (checked.has(storeTransaction)) return
+    const live = yield* checkpoint.listLive(journalLog.id)
+    const behind = runners.find((runner) => !live.some(Projection.isVersion(runner.key)))
+    const unknown = live.find((version) => !isRegistered(version))
     if (behind !== undefined || unknown !== undefined) {
       if ((yield* journalLog.read({ limit: 1 })).length > 0) {
-        if (behind !== undefined) return yield* new Projection.Behind({ key: behind.key });
-        if (unknown !== undefined)
-          return yield* new Projection.Unregistered({ key: toCheckpointKey(unknown) });
+        if (behind !== undefined) return yield* new Projection.Behind({ key: behind.key })
+        if (unknown !== undefined) return yield* new Projection.Unregistered({ key: toCheckpointKey(unknown) })
       }
-      yield* checkpoint.setLive(journalLog.id, registeredVersions);
+      yield* checkpoint.setLive(journalLog.id, registeredVersions)
     }
-    checked.add(storeTransaction);
-  });
+    checked.add(storeTransaction)
+  })
 
   const publish = Effect.fn("Journal.publish")(function* <F extends Fact.Definition>(
     fact: F,
     payload: Fact.Payload<NoInfer<F>>,
-    options: Store.AppendOptions = {},
+    options: Store.AppendOptions = {}
   ) {
     return yield* transaction.operation(
       Effect.gen(function* () {
-        yield* requireLive();
-        const provenance = Event.snapshotProvenance(
-          yield* validateProvenance(yield* Publication.Publication),
-        );
-        const request = yield* Schema.decodeEffect(Store.AppendOptions)(options);
-        const registered = definitions.get(fact.name)?.get(fact.version);
+        yield* requireLive()
+        const provenance = Event.snapshotProvenance(yield* validateProvenance(yield* Publication.Publication))
+        const request = yield* Schema.decodeEffect(Store.AppendOptions)(options)
+        const registered = definitions.get(fact.name)?.get(fact.version)
         if (
           registered !== undefined &&
           (registered.payload !== fact.payload ||
             registered.occurrence !== fact.occurrence ||
             registered.subject !== fact.subject)
         ) {
-          return yield* new Event.FactMismatch({ name: fact.name, version: fact.version });
+          return yield* new Event.FactMismatch({ name: fact.name, version: fact.version })
         }
-        const encoded = yield* Codec.make(fact).encode(payload);
-        const subject = yield* Fact.makeSubject(fact, payload);
-        const occurrenceKey = yield* Fact.makeOccurrenceKey(fact, payload);
+        const encoded = yield* Codec.make(fact).encode(payload)
+        const subject = yield* Fact.makeSubject(fact, payload)
+        const occurrenceKey = yield* Fact.makeOccurrenceKey(fact, payload)
         if (occurrenceKey !== null && request.idempotencyKey !== undefined)
           return yield* StoreError.rejected(
             "Store",
             "publish",
-            "A fact's declared occurrence identity cannot be overridden",
-          );
-        const appendOptions =
-          occurrenceKey === null ? request : { ...request, idempotencyKey: occurrenceKey };
+            "A fact's declared occurrence identity cannot be overridden"
+          )
+        const appendOptions = occurrenceKey === null ? request : { ...request, idempotencyKey: occurrenceKey }
         if (appendOptions.idempotencyKey !== undefined) {
-          const found = yield* journalLog.getAppend(appendOptions.idempotencyKey);
+          const found = yield* journalLog.getAppend(appendOptions.idempotencyKey)
           if (Option.isSome(found)) {
-            const entry = found.value[0];
+            const entry = found.value[0]
             if (
               found.value.length !== 1 ||
               entry === undefined ||
@@ -275,32 +264,25 @@ export const make = Effect.fn("Journal.make")(function* <
               return yield* StoreError.rejected(
                 "Store",
                 "publish",
-                "Idempotency key is already associated with different content",
-              );
-            yield* validateProvenance(entry.payload.provenance);
-            return yield* Event.decode(fact, entry);
+                "Idempotency key is already associated with different content"
+              )
+            yield* validateProvenance(entry.payload.provenance)
+            return yield* Event.decode(fact, entry)
           }
         }
         if (provenance.causedBy !== null) {
-          const cause = provenance.causedBy;
+          const cause = provenance.causedBy
           const source = log.open({
             id: cause.logId,
             schema: Event.Envelope,
-            storageCodec: Event.storageCodec,
-          });
+            storageCodec: Event.storageCodec
+          })
           // Look up the one cause entry; loading its batch would rescan an open commit per cause.
-          const found = yield* source.getEntry(cause.id);
-          const parent =
-            Option.isSome(found) && found.value.commitId === cause.commitId
-              ? found.value
-              : undefined;
-          const parentEnvelope = yield* Schema.decodeUnknownEffect(Schema.toType(Event.Envelope))(
-            parent?.payload,
-          );
-          yield* validateProvenance(parentEnvelope.provenance);
-          yield* Schema.decodeEffect(Schema.Literal(parentEnvelope.provenance.correlationId))(
-            provenance.correlationId,
-          );
+          const found = yield* source.getEntry(cause.id)
+          const parent = Option.isSome(found) && found.value.commitId === cause.commitId ? found.value : undefined
+          const parentEnvelope = yield* Schema.decodeUnknownEffect(Schema.toType(Event.Envelope))(parent?.payload)
+          yield* validateProvenance(parentEnvelope.provenance)
+          yield* Schema.decodeEffect(Schema.Literal(parentEnvelope.provenance.correlationId))(provenance.correlationId)
         }
         const entry = yield* journalLog.append(
           {
@@ -308,24 +290,21 @@ export const make = Effect.fn("Journal.make")(function* <
             subject,
             name: fact.name,
             version: fact.version,
-            payload: encoded,
+            payload: encoded
           },
-          appendOptions,
-        );
-        const event = yield* Event.decode(fact, entry);
-        for (const runner of subscribers.get(fact.name) ?? []) yield* runner.apply(entry, event);
-        const storeTransaction = yield* Store.Transaction;
+          appendOptions
+        )
+        const event = yield* Event.decode(fact, entry)
+        for (const runner of subscribers.get(fact.name) ?? []) yield* runner.apply(entry, event)
+        const storeTransaction = yield* Store.Transaction
         for (const reaction of reactions.get(fact.name) ?? [])
           yield* reaction
             .react(event)
-            .pipe(
-              Effect.provide(reactionServices),
-              Effect.provideService(Store.Transaction, storeTransaction),
-            );
-        return event;
-      }),
-    );
-  });
+            .pipe(Effect.provide(reactionServices), Effect.provideService(Store.Transaction, storeTransaction))
+        return event
+      })
+    )
+  })
 
   const reader: Log.Reader<typeof Event.Envelope> = {
     id: journalLog.id,
@@ -336,41 +315,36 @@ export const make = Effect.fn("Journal.make")(function* <
     read: journalLog.read,
     head: journalLog.head,
     stream: journalLog.stream,
-    tail: journalLog.tail,
-  };
+    tail: journalLog.tail
+  }
   const replay = Effect.gen(function* () {
-    const live = yield* checkpoint.listLive(journalLog.id);
-    const pending = runners.filter((runner) => !live.some(Projection.isVersion(runner.key)));
-    if (pending.length === 0 && live.every(isRegistered)) return;
+    const live = yield* checkpoint.listLive(journalLog.id)
+    const pending = runners.filter((runner) => !live.some(Projection.isVersion(runner.key)))
+    if (pending.length === 0 && live.every(isRegistered)) return
     // An empty log waits for its first commit, which makes the registered projections live;
     // booting a workspace that was never created must leave nothing behind.
-    if ((yield* journalLog.read({ limit: 1 })).length === 0) return;
+    if ((yield* journalLog.read({ limit: 1 })).length === 0) return
     // Live versions this journal does not run would stop its commits, so they are retired first.
     // Whoever runs a retired version again rebuilds it from the last commit it applied.
     if (!live.every(isRegistered))
       yield* transaction.run(
         Effect.gen(function* () {
-          const current = yield* checkpoint.listLive(journalLog.id);
+          const current = yield* checkpoint.listLive(journalLog.id)
           if (!current.every(isRegistered))
-            yield* Projection.replaceLive(
-              checkpoint,
-              journalLog,
-              current,
-              current.filter(isRegistered),
-            );
-        }),
-      );
-    for (const runner of pending) yield* runner.replay;
-  }).pipe(Effect.withSpan("Journal.replay"));
+            yield* Projection.replaceLive(checkpoint, journalLog, current, current.filter(isRegistered))
+        })
+      )
+    for (const runner of pending) yield* runner.replay
+  }).pipe(Effect.withSpan("Journal.replay"))
 
   return Journal.of({
     log: reader,
     read: journalLog.readFacts,
     commit: transaction.run,
     replay,
-    publish,
-  });
-});
+    publish
+  })
+})
 
 /**
  * Provide the configured journal over the caller's log, transaction, and projection dependencies,
@@ -379,9 +353,6 @@ export const make = Effect.fn("Journal.make")(function* <
  * @category layers
  * @since 0.1.0
  */
-export const layer = <
-  const Requirements extends ReadonlyArray<unknown>,
-  ReactionRequirements = never,
->(
-  options: Options<Requirements, ReactionRequirements>,
-) => Layer.effect(Journal, make(options));
+export const layer = <const Requirements extends ReadonlyArray<unknown>, ReactionRequirements = never>(
+  options: Options<Requirements, ReactionRequirements>
+) => Layer.effect(Journal, make(options))

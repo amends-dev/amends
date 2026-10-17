@@ -8,10 +8,11 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as GroupId from "./GroupId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+import * as Schema from "effect/Schema"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as GroupId from "./GroupId.ts"
 
 /**
  * Identifies one admission; a later readmission uses a fresh ID.
@@ -19,13 +20,13 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"));
+export const GroupMembershipId = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type GroupMembershipId = typeof GroupMembershipId.Type
 
 /**
  * Whether the admission is current or has ended.
@@ -33,13 +34,13 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "removed"]);
+export const Status = Schema.Literals(["active", "removed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * One member's admission to one group, from when they were admitted until it ended, if it has.
@@ -49,13 +50,13 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const GroupMembership = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  memberId: MemberId.Id,
+  id: GroupMembershipId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId,
   admittedAt: Schema.DateTimeUtcFromString,
-  status: Status,
-});
+  status: Status
+})
 
 /**
  * @category schemas
@@ -70,9 +71,9 @@ export interface GroupMembership extends Schema.Schema.Type<typeof GroupMembersh
  * @since 0.1.0
  */
 export const ListOptions = Schema.Struct({
-  after: Schema.optionalKey(Id),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  after: Schema.optionalKey(GroupMembershipId),
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -87,9 +88,9 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * @since 0.1.0
  */
 export const ByMemberOptions = Schema.Struct({
-  afterGroupId: Schema.optionalKey(GroupId.Id),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  afterGroupId: Schema.optionalKey(GroupId.GroupId),
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -104,9 +105,9 @@ export interface ByMemberOptions extends Schema.Schema.Type<typeof ByMemberOptio
  * @since 0.1.0
  */
 export const AddInput = Schema.Struct({
-  groupId: GroupId.Id,
-  memberId: MemberId.Id,
-});
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId
+})
 
 /**
  * @category options
@@ -121,9 +122,9 @@ export interface AddInput extends Schema.Schema.Type<typeof AddInput> {}
  * @since 0.1.0
  */
 export const RemoveInput = Schema.Struct({
-  groupId: GroupId.Id,
-  membershipId: Id,
-});
+  groupId: GroupId.GroupId,
+  membershipId: GroupMembershipId
+})
 
 /**
  * @category options
@@ -137,7 +138,7 @@ export interface RemoveInput extends Schema.Schema.Type<typeof RemoveInput> {}
  * @category options
  * @since 0.1.0
  */
-export const LeaveInput = RemoveInput;
+export const LeaveInput = RemoveInput
 
 /**
  * @category options
@@ -155,10 +156,10 @@ export interface LeaveInput extends Schema.Schema.Type<typeof LeaveInput> {}
  */
 export const Removal = Schema.Struct({
   ...RemoveInput.fields,
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
-  reason: Schema.Literals(["removed", "left", "workspace-removed"]),
-});
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
+  reason: Schema.Literals(["removed", "left", "workspace-removed"])
+})
 
 /**
  * @category schemas

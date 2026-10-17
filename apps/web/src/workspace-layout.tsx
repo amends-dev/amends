@@ -21,32 +21,8 @@ import {
   useWorkspaceGroups,
   useWorkspacePeople,
   useWorkspacePermission,
-  type WorkspacePage,
-} from "@amends-dev/client";
-import type { MentionCandidate } from "@amends-dev/ui/components/composer";
-import type { PickerPerson } from "@amends-dev/ui/components/member-picker";
-import { LiveStatus } from "@amends-dev/ui/components/live-status";
-import { Profiles } from "@amends-dev/ui/components/profile-card";
-import { Toast } from "@amends-dev/ui/components/toast";
-import { Shell } from "@amends-dev/ui/patterns/shell";
-import { ChangeName } from "@amends-dev/ui/screens/account";
-import { agentStatus } from "@amends-dev/ui/screens/agents";
-import {
-  capabilityLabels,
-  capabilityNouns,
-  connectionStatus,
-  type IntegrationCapability,
-} from "@amends-dev/ui/screens/connections";
-import { NewMessage } from "@amends-dev/ui/screens/direct";
-import { CreateGroup, ThreadPane } from "@amends-dev/ui/screens/group";
-import { JumpTo, type JumpToItem } from "@amends-dev/ui/screens/jump-to";
-import {
-  DestinationSidebar,
-  HomeSidebar,
-  WorkspaceNavigation,
-  type Destination,
-  type NavigationSection,
-} from "@amends-dev/ui/screens/workspace-navigation";
+  type WorkspacePage
+} from "@amends-dev/client"
 import {
   IconMarkAgents,
   IconMarkChannel,
@@ -54,168 +30,170 @@ import {
   IconMarkMail,
   IconMarkSettings,
   IconMessage,
-  IconUsers,
-} from "@amends-dev/icons";
-import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
+  IconUsers
+} from "@amends-dev/icons"
+import type { MentionCandidate } from "@amends-dev/ui/components/composer"
+import { LiveStatus } from "@amends-dev/ui/components/live-status"
+import type { PickerPerson } from "@amends-dev/ui/components/member-picker"
+import { Profiles } from "@amends-dev/ui/components/profile-card"
+import { Toast } from "@amends-dev/ui/components/toast"
+import { Shell } from "@amends-dev/ui/patterns/shell"
+import { ChangeName } from "@amends-dev/ui/screens/account"
+import { agentStatus } from "@amends-dev/ui/screens/agents"
 import {
-  createMemo,
-  createSignal,
-  For,
-  Match,
-  onCleanup,
-  onMount,
-  Show,
-  Switch,
-  type ParentProps,
-} from "solid-js";
-import { TurnLog } from "./turn-log.tsx";
-import { WorkspaceActionsContext, useWorkspaceActions } from "./workspace-actions.ts";
+  capabilityLabels,
+  capabilityNouns,
+  connectionStatus,
+  type IntegrationCapability
+} from "@amends-dev/ui/screens/connections"
+import { NewMessage } from "@amends-dev/ui/screens/direct"
+import { CreateGroup, ThreadPane } from "@amends-dev/ui/screens/group"
+import { JumpTo, type JumpToItem } from "@amends-dev/ui/screens/jump-to"
+import {
+  DestinationSidebar,
+  HomeSidebar,
+  WorkspaceNavigation,
+  type Destination,
+  type NavigationSection
+} from "@amends-dev/ui/screens/workspace-navigation"
+import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router"
+import { createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch, type ParentProps } from "solid-js"
+import { TurnLog } from "./turn-log.tsx"
+import { WorkspaceActionsContext, useWorkspaceActions } from "./workspace-actions.ts"
 
-const href = (path: string) => path;
+const href = (path: string) => path
 /** A workspace member or agent, as the member pickers show them. */
 export const pickerPerson = (candidate: MentionCandidate): PickerPerson => ({
   id: candidate.id,
   name: candidate.name,
-  kind: candidate.agent ? "Agent" : "Person",
-});
+  kind: candidate.agent ? "Agent" : "Person"
+})
 
 /** The workspace frame: navigation, the page, and a thread open beside it. Keyed by workspace. */
 export function WorkspaceLayout(props: ParentProps) {
-  const params = useParams<{ workspaceId: string }>();
+  const params = useParams<{ workspaceId: string }>()
   return (
     <Show when={params.workspaceId} keyed>
       {(workspaceId) => <Frame workspaceId={workspaceId}>{props.children}</Frame>}
     </Show>
-  );
+  )
 }
 
 function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
-  const workspaceId = props.workspaceId;
-  const location = useLocation();
-  const navigate = useNavigate();
-  const session = useSession();
-  const appearance = useAppearance();
-  const membership = useWorkspace(() => workspaceId);
-  const groups = useWorkspaceGroups(workspaceId);
-  const directs = useDirectMessages(workspaceId);
-  const pending = useInboxPending(workspaceId);
-  const activity = useTurnActivity(workspaceId);
-  const creator = useWorkspacePermission(workspaceId, "group.create");
-  const live = useChangeFeedStatus();
-  const conversation = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/*rest");
-  const opened = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/threads/:threadId");
-  const fromInbox = useMatch(
-    () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
-  );
-  const browsing = useMatch(() => "/workspaces/:workspaceId/groups");
-  const [search, setSearch] = useSearchParams<{ at?: string; to?: string; log?: string }>();
-  const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
-  const [dialog, setDialog] = createSignal<"create-group" | "new-message" | "name" | "jump">();
+  const workspaceId = props.workspaceId
+  const location = useLocation()
+  const navigate = useNavigate()
+  const session = useSession()
+  const appearance = useAppearance()
+  const membership = useWorkspace(() => workspaceId)
+  const groups = useWorkspaceGroups(workspaceId)
+  const directs = useDirectMessages(workspaceId)
+  const pending = useInboxPending(workspaceId)
+  const activity = useTurnActivity(workspaceId)
+  const creator = useWorkspacePermission(workspaceId, "group.create")
+  const live = useChangeFeedStatus()
+  const conversation = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/*rest")
+  const opened = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/threads/:threadId")
+  const fromInbox = useMatch(() => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId")
+  const browsing = useMatch(() => "/workspaces/:workspaceId/groups")
+  const [search, setSearch] = useSearchParams<{ at?: string; to?: string; log?: string }>()
+  const drafting = useMatch(() => "/workspaces/:workspaceId/direct")
+  const [dialog, setDialog] = createSignal<"create-group" | "new-message" | "name" | "jump">()
   // ⌘K, or Ctrl+K, jumps anywhere in the workspace, from wherever the reader is.
   onMount(() => {
     const jump = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k" || event.altKey || event.shiftKey) return;
-      if (!(event.metaKey || event.ctrlKey)) return;
-      event.preventDefault();
-      setDialog("jump");
-    };
-    document.addEventListener("keydown", jump);
-    onCleanup(() => document.removeEventListener("keydown", jump));
-  });
-  const [toasts, setToasts] = createSignal<ReadonlyArray<{ id: number; text: string }>>([]);
-  let toastId = 0;
-  const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }]);
+      if (event.key.toLowerCase() !== "k" || event.altKey || event.shiftKey) return
+      if (!(event.metaKey || event.ctrlKey)) return
+      event.preventDefault()
+      setDialog("jump")
+    }
+    document.addEventListener("keydown", jump)
+    onCleanup(() => document.removeEventListener("keydown", jump))
+  })
+  const [toasts, setToasts] = createSignal<ReadonlyArray<{ id: number; text: string }>>([])
+  let toastId = 0
+  const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }])
 
-  const path = (page: WorkspacePage) => paths.workspacePage(workspaceId, page);
+  const path = (page: WorkspacePage) => paths.workspacePage(workspaceId, page)
   const at = (page: WorkspacePage) => {
-    const current = location.pathname.replace(/\/$/, "");
-    return current === path(page) || current.startsWith(`${path(page)}/`);
-  };
+    const current = location.pathname.replace(/\/$/, "")
+    return current === path(page) || current.startsWith(`${path(page)}/`)
+  }
   const destination = (): Destination | undefined =>
-    at("agents")
-      ? "agents"
-      : at("connections")
-        ? "connections"
-        : at("settings")
-          ? undefined
-          : "home";
-  const groupId = () => conversation()?.params.groupId;
+    at("agents") ? "agents" : at("connections") ? "connections" : at("settings") ? undefined : "home"
+  const groupId = () => conversation()?.params.groupId
   // A thread opens beside its group's stream, or beside the inbox it was opened from.
   const panel = createMemo(
     () => {
-      const { groupId, threadId } = (opened() ?? fromInbox())?.params ?? {};
-      return groupId && threadId ? { groupId, threadId } : undefined;
+      const { groupId, threadId } = (opened() ?? fromInbox())?.params ?? {}
+      return groupId && threadId ? { groupId, threadId } : undefined
     },
     undefined,
-    { equals: (left, right) => left?.threadId === right?.threadId },
-  );
+    { equals: (left, right) => left?.threadId === right?.threadId }
+  )
   const closePanel = () => {
-    const group = groupId();
-    navigate(group ? paths.group(workspaceId, group) : path("inbox"));
-  };
-  const ownName = () => membership()?.member.name ?? "";
+    const group = groupId()
+    navigate(group ? paths.group(workspaceId, group) : path("inbox"))
+  }
+  const ownName = () => membership()?.member.name ?? ""
 
-  const people = useWorkspacePeople(workspaceId);
+  const people = useWorkspacePeople(workspaceId)
   const creation = useCreateGroup(workspaceId, (id) => {
-    setDialog(undefined);
-    navigate(paths.group(workspaceId, id));
-    toast("Group created");
-  });
+    setDialog(undefined)
+    navigate(paths.group(workspaceId, id))
+    toast("Group created")
+  })
   const openCreate = () => {
-    creation.reset();
-    setDialog("create-group");
-  };
-  const [recipients, setRecipients] = createSignal<string[]>([]);
-  const existing = () => (recipients().length > 0 ? groups.directWith(recipients()) : undefined);
-  const name = useMemberName(workspaceId, () => setDialog(undefined));
-  const profiles = useMemberProfiles(workspaceId);
-  const agents = useAgentList(workspaceId);
+    creation.reset()
+    setDialog("create-group")
+  }
+  const [recipients, setRecipients] = createSignal<Array<string>>([])
+  const existing = () => (recipients().length > 0 ? groups.directWith(recipients()) : undefined)
+  const name = useMemberName(workspaceId, () => setDialog(undefined))
+  const profiles = useMemberProfiles(workspaceId)
+  const agents = useAgentList(workspaceId)
   /**
    * An agent's state as its status, its readiness or where it is at work, for its profile card and
    * its direct message row.
    */
   const agentStatusOf = (memberId: string) => {
-    const agent = agents.agents().find((candidate) => candidate.memberId === memberId);
-    return agent && agentStatus(agent.issues, agent.activity);
-  };
+    const agent = agents.agents().find((candidate) => candidate.memberId === memberId)
+    return agent && agentStatus(agent.issues, agent.activity)
+  }
   /** A one-to-one conversation's status: the other member's. People have none until presence. */
-  const soleStatus = (memberIds: readonly string[]) => {
-    const [only, ...others] = memberIds;
-    return only !== undefined && others.length === 0 ? agentStatusOf(only) : undefined;
-  };
+  const soleStatus = (memberIds: ReadonlyArray<string>) => {
+    const [only, ...others] = memberIds
+    return only !== undefined && others.length === 0 ? agentStatusOf(only) : undefined
+  }
 
   return (
     <WorkspaceActionsContext.Provider
       value={{
         // Read when used: the permission loads after the layout mounts.
         get createGroup() {
-          return creator() ? openCreate : undefined;
+          return creator() ? openCreate : undefined
         },
-        toast,
+        toast
       }}
     >
       <Profiles.Root
         profile={(memberId) => {
-          const profile = profiles(memberId);
-          const status = agentStatusOf(memberId);
-          return profile && status ? { ...profile, status } : profile;
+          const profile = profiles(memberId)
+          const status = agentStatusOf(memberId)
+          return profile && status ? { ...profile, status } : profile
         }}
         onMessage={(memberId) => {
           // Their conversation with the reader, or a first message to them.
-          const existing = groups.directWith([memberId]);
-          navigate(
-            existing
-              ? paths.group(workspaceId, existing.id)
-              : paths.directDraft(workspaceId, [memberId]),
-          );
+          const existing = groups.directWith([memberId])
+          navigate(existing ? paths.group(workspaceId, existing.id) : paths.directDraft(workspaceId, [memberId]))
         }}
         onOpenAgent={(memberId) => {
-          const agentId = profiles(memberId)?.agentId;
-          if (agentId) navigate(paths.agent(workspaceId, agentId));
+          const agentId = profiles(memberId)?.agentId
+          if (agentId) navigate(paths.agent(workspaceId, agentId))
         }}
         onChangeName={() => {
-          name.reset();
-          setDialog("name");
+          name.reset()
+          setDialog("name")
         }}
       >
         <Shell.Root>
@@ -231,11 +209,11 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                 onPaletteChange: appearance.setPalette,
                 onOpenSettings: () => navigate(path("settings")),
                 onChangeName: () => {
-                  name.reset();
-                  setDialog("name");
+                  name.reset()
+                  setDialog("name")
                 },
-                onSignOut: session.signOut,
-              },
+                onSignOut: session.signOut
+              }
             }}
             homeHref={href(path("home"))}
             destinations={["home", "agents", "connections"]}
@@ -253,7 +231,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                   tasks={{ href: href(path("tasks")), current: at("tasks") }}
                   groupsDirectory={{
                     href: href(paths.groups(workspaceId)),
-                    current: browsing() !== undefined,
+                    current: browsing() !== undefined
                   }}
                   groups={groups.teams().map((group) => ({
                     id: group.id,
@@ -262,7 +240,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                     current: groupId() === group.id,
                     pending: group.pending,
                     unread: group.unread,
-                    activity: activity.inGroup(group.id),
+                    activity: activity.inGroup(group.id)
                   }))}
                   groupsLoading={groups.all() === undefined}
                   directMessages={directs().map((entry) =>
@@ -274,7 +252,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                           current: groupId() === entry.id,
                           pending: entry.pending,
                           unread: entry.unread,
-                          status: soleStatus(entry.memberIds),
+                          status: soleStatus(entry.memberIds)
                         }
                       : {
                           id: entry.id,
@@ -282,14 +260,14 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                           // A first message; the conversation starts when it is sent.
                           href: href(paths.directDraft(workspaceId, entry.memberIds)),
                           current: drafting() !== undefined && search.to === entry.id,
-                          status: soleStatus(entry.memberIds),
-                        },
+                          status: soleStatus(entry.memberIds)
+                        }
                   )}
                   onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
                   onCreateGroup={creator() ? openCreate : undefined}
                   onNewMessage={() => {
-                    setRecipients([]);
-                    setDialog("new-message");
+                    setRecipients([])
+                    setDialog("new-message")
                   }}
                 />
               }
@@ -306,17 +284,17 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                           name: "Workspace",
                           href: href(paths.settingsSection(workspaceId, "workspace")),
                           current: at("settings") && !location.pathname.endsWith("/members"),
-                          icon: IconMarkSettings,
+                          icon: IconMarkSettings
                         },
                         {
                           id: "members",
                           name: "Members",
                           href: href(paths.settingsSection(workspaceId, "members")),
                           current: location.pathname.endsWith("/settings/members"),
-                          icon: IconUsers,
-                        },
-                      ],
-                    },
+                          icon: IconUsers
+                        }
+                      ]
+                    }
                   ]}
                 />
               </Match>
@@ -351,9 +329,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             name={creation.name()}
             onNameChange={creation.setName}
             visibility={creation.visibility() === "Public" ? "public" : "private"}
-            onVisibilityChange={(value) =>
-              creation.setVisibility(value === "public" ? "Public" : "Private")
-            }
+            onVisibilityChange={(value) => creation.setVisibility(value === "public" ? "Public" : "Private")}
             you={{ id: membership()?.member.id ?? "you", name: "You", kind: "Person" }}
             candidates={people().map(pickerPerson)}
             selected={[...creation.members()]}
@@ -370,13 +346,9 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             onSelectedChange={setRecipients}
             existing={existing() !== undefined}
             onConfirm={() => {
-              const group = existing();
-              setDialog(undefined);
-              navigate(
-                group
-                  ? paths.group(workspaceId, group.id)
-                  : paths.directDraft(workspaceId, recipients()),
-              );
+              const group = existing()
+              setDialog(undefined)
+              navigate(group ? paths.group(workspaceId, group.id) : paths.directDraft(workspaceId, recipients()))
             }}
           />
           <ChangeName
@@ -397,9 +369,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
           <Toast.Region>
             <For each={toasts()}>
               {(item) => (
-                <Toast.Item
-                  onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}
-                >
+                <Toast.Item onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}>
                   {item.text}
                 </Toast.Item>
               )}
@@ -408,33 +378,33 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         </Shell.Root>
       </Profiles.Root>
     </WorkspaceActionsContext.Provider>
-  );
+  )
 }
 
 /** A place Jump to offers, and the path it leads to. */
-type Place = JumpToItem & { readonly path: string };
+type Place = JumpToItem & { readonly path: string }
 
 /**
  * Jump to: pages, groups, conversations, people, and the workspace's agents and connections, by
  * name. The lists it offers load while it is open.
  */
 function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: () => void }) {
-  const workspaceId = props.workspaceId;
-  const navigate = useNavigate();
-  const groups = useWorkspaceGroups(workspaceId);
-  const people = useWorkspacePeople(workspaceId);
-  const agents = useAgentList(workspaceId);
-  const connections = useConnectionList(workspaceId);
-  const page = (target: WorkspacePage) => paths.workspacePage(workspaceId, target);
-  const places = createMemo((): readonly Place[] => {
-    const humans = new Set(people().flatMap((person) => (person.agent ? [] : [person.id])));
+  const workspaceId = props.workspaceId
+  const navigate = useNavigate()
+  const groups = useWorkspaceGroups(workspaceId)
+  const people = useWorkspacePeople(workspaceId)
+  const agents = useAgentList(workspaceId)
+  const connections = useConnectionList(workspaceId)
+  const page = (target: WorkspacePage) => paths.workspacePage(workspaceId, target)
+  const places = createMemo((): ReadonlyArray<Place> => {
+    const humans = new Set(people().flatMap((person) => (person.agent ? [] : [person.id])))
     return [
       {
         id: "page:inbox",
         label: "Inbox",
         section: "Go to",
         icon: IconMarkMail,
-        path: page("inbox"),
+        path: page("inbox")
       },
       {
         id: "page:groups",
@@ -442,28 +412,28 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
         section: "Go to",
         detail: "Browse",
         icon: IconMarkChannel,
-        path: paths.groups(workspaceId),
+        path: paths.groups(workspaceId)
       },
       {
         id: "page:agents",
         label: "Agents",
         section: "Go to",
         icon: IconMarkAgents,
-        path: page("agents"),
+        path: page("agents")
       },
       {
         id: "page:connections",
         label: "Connections",
         section: "Go to",
         icon: IconMarkConnections,
-        path: page("connections"),
+        path: page("connections")
       },
       {
         id: "page:settings",
         label: "Settings",
         section: "Go to",
         icon: IconMarkSettings,
-        path: paths.settingsSection(workspaceId, "workspace"),
+        path: paths.settingsSection(workspaceId, "workspace")
       },
       {
         id: "page:members",
@@ -471,14 +441,14 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
         section: "Go to",
         detail: "Settings",
         icon: IconUsers,
-        path: paths.settingsSection(workspaceId, "members"),
+        path: paths.settingsSection(workspaceId, "members")
       },
       ...groups.teams().map((group) => ({
         id: `group:${group.id}`,
         label: group.name,
         section: "Groups",
         icon: IconMarkChannel,
-        path: paths.group(workspaceId, group.id),
+        path: paths.group(workspaceId, group.id)
       })),
       // A conversation with one person is under People; with several, or with an agent, here.
       ...groups
@@ -489,22 +459,20 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
           label: group.name,
           section: "Direct messages",
           icon: IconMessage,
-          path: paths.group(workspaceId, group.id),
+          path: paths.group(workspaceId, group.id)
         })),
       ...people()
         .filter((person) => !person.agent)
         .map((person) => {
-          const existing = groups.directWith([person.id]);
+          const existing = groups.directWith([person.id])
           return {
             id: `person:${person.id}`,
             label: person.name,
             section: "People",
             detail: "Direct message",
             person: { name: person.name },
-            path: existing
-              ? paths.group(workspaceId, existing.id)
-              : paths.directDraft(workspaceId, [person.id]),
-          };
+            path: existing ? paths.group(workspaceId, existing.id) : paths.directDraft(workspaceId, [person.id])
+          }
         }),
       ...agents.agents().map((agent) => ({
         id: `agent:${agent.id}`,
@@ -513,19 +481,19 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
         person: {
           name: agent.name,
           initials: agent.name.trim().charAt(0).toUpperCase(),
-          tone: "lilac" as const,
+          tone: "lilac" as const
         },
-        path: paths.agent(workspaceId, agent.id),
+        path: paths.agent(workspaceId, agent.id)
       })),
       ...connections.connections().map((connection) => ({
         id: `connection:${connection.id}`,
         label: connection.name,
         section: "Connections",
         icon: IconMarkConnections,
-        path: paths.connection(workspaceId, connection.id),
-      })),
-    ];
-  });
+        path: paths.connection(workspaceId, connection.id)
+      }))
+    ]
+  })
   return (
     <JumpTo
       open
@@ -533,12 +501,12 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
       items={places()}
       loading={groups.all() === undefined || agents.loading()}
       onOpen={(id) => {
-        const place = places().find((entry) => entry.id === id);
-        props.onClose();
-        if (place) navigate(place.path);
+        const place = places().find((entry) => entry.id === id)
+        props.onClose()
+        if (place) navigate(place.path)
       }}
     />
-  );
+  )
 }
 
 /**
@@ -546,11 +514,11 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
  * opens Add agent over the current page, by `?add=agent`.
  */
 function AgentsSidebar(props: { readonly workspaceId: string }) {
-  const navigate = useNavigate();
-  const [, setSearch] = useSearchParams<{ add?: string }>();
-  const list = useAgentList(props.workspaceId);
-  const open = useMatch(() => "/workspaces/:workspaceId/agents/:agentId");
-  const base = paths.workspacePage(props.workspaceId, "agents");
+  const navigate = useNavigate()
+  const [, setSearch] = useSearchParams<{ add?: string }>()
+  const list = useAgentList(props.workspaceId)
+  const open = useMatch(() => "/workspaces/:workspaceId/agents/:agentId")
+  const base = paths.workspacePage(props.workspaceId, "agents")
   return (
     <DestinationSidebar
       sections={[
@@ -560,9 +528,7 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
           href: href(base),
           current: open() === undefined,
           browse: { label: "Browse agents", onBrowse: () => navigate(base) },
-          create: list.canCreate()
-            ? { label: "Add agent", onCreate: () => setSearch({ add: "agent" }) }
-            : undefined,
+          create: list.canCreate() ? { label: "Add agent", onCreate: () => setSearch({ add: "agent" }) } : undefined,
           entries: list.agents().map((agent) => ({
             id: agent.id,
             name: agent.name,
@@ -571,16 +537,16 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
             person: {
               name: agent.name,
               initials: agent.name.trim().charAt(0).toUpperCase(),
-              tone: "lilac" as const,
+              tone: "lilac" as const
             },
-            status: agentStatus(agent.issues, agent.activity),
+            status: agentStatus(agent.issues, agent.activity)
           })),
           loading: list.loading(),
-          empty: "No agents yet",
-        },
+          empty: "No agents yet"
+        }
       ]}
     />
-  );
+  )
 }
 
 /**
@@ -591,12 +557,12 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
  * it, by `?add=`.
  */
 function ConnectionsSidebar(props: { readonly workspaceId: string }) {
-  const navigate = useNavigate();
-  const [search, setSearch] = useSearchParams<{ add?: string; tab?: string }>();
-  const list = useConnectionList(props.workspaceId);
-  const open = useMatch(() => "/workspaces/:workspaceId/connections/:connectionId");
-  const browsing = useMatch(() => "/workspaces/:workspaceId/connections");
-  const base = paths.workspacePage(props.workspaceId, "connections");
+  const navigate = useNavigate()
+  const [search, setSearch] = useSearchParams<{ add?: string; tab?: string }>()
+  const list = useConnectionList(props.workspaceId)
+  const open = useMatch(() => "/workspaces/:workspaceId/connections/:connectionId")
+  const browsing = useMatch(() => "/workspaces/:workspaceId/connections")
+  const base = paths.workspacePage(props.workspaceId, "connections")
   const section = (capability: IntegrationCapability): NavigationSection => ({
     id: capability,
     title: capabilityLabels[capability],
@@ -604,12 +570,12 @@ function ConnectionsSidebar(props: { readonly workspaceId: string }) {
     current: browsing() !== undefined && search.tab === capability,
     browse: {
       label: `Browse ${capabilityLabels[capability].toLowerCase()}`,
-      onBrowse: () => navigate(`${base}?tab=${capability}`),
+      onBrowse: () => navigate(`${base}?tab=${capability}`)
     },
     create: list.canCreate()
       ? {
           label: `Add ${capabilityNouns[capability]} connection`,
-          onCreate: () => setSearch({ add: capability }),
+          onCreate: () => setSearch({ add: capability })
         }
       : undefined,
     entries: list
@@ -621,16 +587,14 @@ function ConnectionsSidebar(props: { readonly workspaceId: string }) {
         href: href(paths.connection(props.workspaceId, connection.id)),
         current: open()?.params.connectionId === connection.id,
         icon: IconMarkConnections,
-        status: connectionStatus(connection),
+        status: connectionStatus(connection)
       })),
     loading: list.loading(),
-    empty: "None yet",
-  });
+    empty: "None yet"
+  })
   return (
-    <DestinationSidebar
-      sections={(["models", "tools", "sandboxes", "harnesses", "channels"] as const).map(section)}
-    />
-  );
+    <DestinationSidebar sections={(["models", "tools", "sandboxes", "harnesses", "channels"] as const).map(section)} />
+  )
 }
 
 /**
@@ -638,36 +602,31 @@ function ConnectionsSidebar(props: { readonly workspaceId: string }) {
  * replying; or one of its turns' logs in its place, keeping the reply being written.
  */
 function ThreadPanel(props: {
-  readonly workspaceId: string;
-  readonly groupId: string;
-  readonly threadId: string;
-  readonly focus?: number;
+  readonly workspaceId: string
+  readonly groupId: string
+  readonly threadId: string
+  readonly focus?: number
   /** Opened from the inbox: it says why the notification came, and Back leads to the inbox. */
-  readonly fromInbox?: boolean;
-  readonly onClose: () => void;
+  readonly fromInbox?: boolean
+  readonly onClose: () => void
   /** The turn whose log shows in place of the thread. */
-  readonly log?: string;
-  readonly onOpenLog: (turnId: string) => void;
-  readonly onCloseLog: () => void;
+  readonly log?: string
+  readonly onOpenLog: (turnId: string) => void
+  readonly onCloseLog: () => void
 }) {
-  const groups = useWorkspaceGroups(props.workspaceId);
-  const group = () => groups.group(props.groupId);
-  const record = useThread(props.workspaceId, props.threadId);
-  const thread = useThreadConversation(props.workspaceId, props.threadId, () => props.focus);
-  const reply = useReply(props.workspaceId, props.threadId);
-  const candidates = useMentionCandidates(props.workspaceId, props.groupId);
-  const actions = useWorkspaceActions();
+  const groups = useWorkspaceGroups(props.workspaceId)
+  const group = () => groups.group(props.groupId)
+  const record = useThread(props.workspaceId, props.threadId)
+  const thread = useThreadConversation(props.workspaceId, props.threadId, () => props.focus)
+  const reply = useReply(props.workspaceId, props.threadId)
+  const candidates = useMentionCandidates(props.workspaceId, props.groupId)
+  const actions = useWorkspaceActions()
   const follow = useThreadFollow(props.workspaceId, props.groupId, props.threadId, {
-    changed: (following) =>
-      actions.toast(following ? "Following this thread" : "Unfollowed this thread"),
+    changed: (following) => actions.toast(following ? "Following this thread" : "Unfollowed this thread"),
     failed: (following) =>
-      actions.toast(
-        following
-          ? "Couldn’t follow the thread. Try again."
-          : "Couldn’t unfollow the thread. Try again.",
-      ),
-  });
-  const turns = useThreadTurnControls(props.workspaceId, props.threadId);
+      actions.toast(following ? "Couldn’t follow the thread. Try again." : "Couldn’t unfollow the thread. Try again.")
+  })
+  const turns = useThreadTurnControls(props.workspaceId, props.threadId)
   // An agent's reply names the turn that posted it, whose log its actions open. A turn shows where
   // its agent took on the work until it replies, with where to fix the agent's setup.
   const entries = () =>
@@ -676,8 +635,8 @@ function ThreadPanel(props: {
       .map((entry) =>
         entry.kind === "turn" && entry.agentId !== undefined
           ? { ...entry, agentHref: href(paths.agent(props.workspaceId, entry.agentId)) }
-          : entry,
-      );
+          : entry
+      )
   return (
     <Show
       when={props.log}
@@ -696,7 +655,7 @@ function ThreadPanel(props: {
             onRetry: turns.retry,
             onOpenLog: props.onOpenLog,
             acting: turns.acting(),
-            problem: turns.problem(),
+            problem: turns.problem()
           }}
           days
           repliesDivider
@@ -707,7 +666,7 @@ function ThreadPanel(props: {
               ? {
                   loading: thread.loadingEarlier(),
                   failed: thread.earlierFailed(),
-                  onLoad: thread.loadEarlier,
+                  onLoad: thread.loadEarlier
                 }
               : undefined
           }
@@ -719,7 +678,7 @@ function ThreadPanel(props: {
               : {
                   following: follow.following() ?? false,
                   pending: follow.pending(),
-                  onToggle: follow.toggle,
+                  onToggle: follow.toggle
                 }
           }
           onClose={props.onClose}
@@ -729,12 +688,12 @@ function ThreadPanel(props: {
               ? [
                   follow.following()
                     ? { name: "unfollow", description: "Stop following this thread" }
-                    : { name: "follow", description: "Follow this thread to hear of its replies" },
+                    : { name: "follow", description: "Follow this thread to hear of its replies" }
                 ]
               : []
           }
           onCommand={(command) => {
-            if ((command === "follow") !== follow.following()) follow.toggle();
+            if ((command === "follow") !== follow.following()) follow.toggle()
           }}
           draft={reply.draft()}
           onDraftChange={reply.setDraft}
@@ -755,5 +714,5 @@ function ThreadPanel(props: {
         />
       )}
     </Show>
-  );
+  )
 }

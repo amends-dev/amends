@@ -10,22 +10,27 @@
  *
  * @since 0.1.0
  */
-import { Store } from "@amends-dev/core/journal";
-import { ThreadId } from "@amends-dev/core/thread";
-import { Turn, TurnJobs } from "@amends-dev/core/turn";
-import { Member, Workspace } from "@amends-dev/core/workspace";
-import { Effect, Layer, PrimaryKey, Ref, Schema } from "effect";
-import { ClusterSchema, Entity } from "effect/cluster";
-import { Rpc } from "effect/rpc";
-import * as TurnRunner from "./TurnRunner.ts";
-import * as JobRequests from "./JobRequests.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { Store, StoreError } from "@amends-dev/core/journal"
+import { ThreadId } from "@amends-dev/core/thread"
+import { TurnJobs, TurnId } from "@amends-dev/core/turn"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as ClusterSchema from "effect/cluster/ClusterSchema"
+import * as Entity from "effect/cluster/Entity"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as PrimaryKey from "effect/PrimaryKey"
+import * as Ref from "effect/Ref"
+import * as Rpc from "effect/rpc/Rpc"
+import * as Schema from "effect/Schema"
+import * as JobRequests from "./JobRequests.ts"
+import * as TurnRunner from "./TurnRunner.ts"
 
 /**
  * Which request this is among the job's: Cluster keeps one request per key, so a commit that asks
  * twice stores one.
  */
-const keyed = { key: Schema.String };
+const keyed = { key: Schema.String }
 
 /**
  * A request to run the agent's next turn in the thread, keyed by the commit that stored it.
@@ -35,10 +40,10 @@ const keyed = { key: Schema.String };
  */
 export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
   ...TurnJobs.Job.fields,
-  ...keyed,
+  ...keyed
 }) {
   [PrimaryKey.symbol]() {
-    return this.key;
+    return this.key
   }
 }
 
@@ -52,10 +57,10 @@ export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
 export class Stop extends Schema.Class<Stop>("amends/TurnJob/Stop")({
   ...TurnJobs.Job.fields,
   ...keyed,
-  turnId: Turn.Id,
+  turnId: TurnId.TurnId
 }) {
   [PrimaryKey.symbol]() {
-    return this.key;
+    return this.key
   }
 }
 
@@ -68,27 +73,28 @@ export class Stop extends Schema.Class<Stop>("amends/TurnJob/Stop")({
  */
 export const entity = Entity.make("amends/TurnJob", [
   Rpc.make("Run", { payload: Run }).annotate(ClusterSchema.Persisted, true),
-  Rpc.make("Stop", { payload: Stop }).annotate(ClusterSchema.Persisted, true),
-]);
+  Rpc.make("Stop", { payload: Stop }).annotate(ClusterSchema.Persisted, true)
+])
 
 /**
  * The ID of `job`'s entity: its workspace, membership, and thread as a JSON array, which the
  * worker reads back into the job.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
-export const entityId = (job: TurnJobs.Job) =>
-  JSON.stringify([job.workspaceId, job.memberId, job.threadId]);
+export const entityId = (job: TurnJobs.Job) => encodeEntityId([job.workspaceId, job.memberId, job.threadId])
 
-const decodeEntityId = Schema.decodeUnknownSync(
-  Schema.fromJsonString(Schema.Tuple([Workspace.Id, Member.Id, ThreadId.Id])),
-);
+/** An entity's ID, written and read back by the one codec. */
+const EntityId = Schema.fromJsonString(Schema.Tuple([WorkspaceId.WorkspaceId, MemberId.MemberId, ThreadId.ThreadId]))
+const encodeEntityId = Schema.encodeSync(EntityId)
+const decodeEntityId = Schema.decodeUnknownSync(EntityId)
+
 /** The job an entity is. */
 const jobOf = (entityId: string): TurnJobs.Job => {
-  const [workspaceId, memberId, threadId] = decodeEntityId(entityId);
-  return { workspaceId, memberId, threadId };
-};
+  const [workspaceId, memberId, threadId] = decodeEntityId(entityId)
+  return { workspaceId, memberId, threadId }
+}
 
 /**
  * A request the job handles: a `Run` or a `Stop`.
@@ -96,7 +102,7 @@ const jobOf = (entityId: string): TurnJobs.Job => {
  * @category models
  * @since 0.1.0
  */
-export type Request = Run | Stop;
+export type Request = Run | Stop
 
 /**
  * Provides core's `TurnJobs.TurnJobs`, whose requests Cluster stores, each keyed by the commit that
@@ -111,35 +117,31 @@ export type Request = Run | Stop;
 export const layerRequests = Layer.effect(
   TurnJobs.TurnJobs,
   Effect.gen(function* () {
-    const wakeup = yield* JobRequests.Wakeup;
-    const turnJobClient = yield* entity.client;
-    const failure = StoreError.failed("Store", "request turn job");
+    const wakeup = yield* JobRequests.Wakeup
+    const turnJobClient = yield* entity.client
+    const failure = StoreError.failed("Store", "request turn job")
     return TurnJobs.TurnJobs.of({
       requestRun: Effect.fnUntraced(function* ({ workspaceId, memberId, threadId }) {
-        const storeTransaction = yield* Store.Transaction;
-        const run = new Run({ workspaceId, memberId, threadId, key: `run:${storeTransaction.id}` });
-        yield* turnJobClient(entityId(run))
-          .Run(run, { discard: true })
-          .pipe(Effect.mapError(failure));
-        yield* wakeup.afterCommit;
+        const storeTransaction = yield* Store.Transaction
+        const run = new Run({ workspaceId, memberId, threadId, key: `run:${storeTransaction.id}` })
+        yield* turnJobClient(entityId(run)).Run(run, { discard: true }).pipe(Effect.mapError(failure))
+        yield* wakeup.afterCommit
       }),
       requestStop: Effect.fnUntraced(function* ({ workspaceId, memberId, threadId, turnId }) {
-        const storeTransaction = yield* Store.Transaction;
+        const storeTransaction = yield* Store.Transaction
         const stop = new Stop({
           workspaceId,
           memberId,
           threadId,
           turnId,
-          key: `stop:${turnId}:${storeTransaction.id}`,
-        });
-        yield* turnJobClient(entityId(stop))
-          .Stop(stop, { discard: true })
-          .pipe(Effect.mapError(failure));
-        yield* wakeup.afterCommit;
-      }),
-    });
-  }),
-);
+          key: `stop:${turnId}:${storeTransaction.id}`
+        })
+        yield* turnJobClient(entityId(stop)).Stop(stop, { discard: true }).pipe(Effect.mapError(failure))
+        yield* wakeup.afterCommit
+      })
+    })
+  })
+)
 
 /**
  * Handle each request when it arrives, through the job's turn runner: run the agent's next turn,
@@ -153,22 +155,21 @@ export const layerRequests = Layer.effect(
  */
 export const layerWorker = entity.toLayer(
   Effect.gen(function* () {
-    const job = jobOf((yield* Entity.CurrentAddress).entityId);
-    const { workspaceId, memberId, threadId } = job;
-    const turnRunner = yield* TurnRunner.make(job);
+    const job = jobOf((yield* Entity.CurrentAddress).entityId)
+    const { workspaceId, memberId, threadId } = job
+    const turnRunner = yield* TurnRunner.make(job)
     /** What a log says of `request`: its job and key. */
-    const named = (request: Request) => ({ workspaceId, memberId, threadId, request: request.key });
+    const named = (request: Request) => ({ workspaceId, memberId, threadId, request: request.key })
 
     const retrying = <A, E, R>(request: Request, work: Effect.Effect<A, E, R>, times?: number) =>
-      JobRequests.retrying("Turn job", named(request), work, times);
-    const drop = (request: Request, error: unknown) =>
-      JobRequests.drop("Turn job", named(request), error);
+      JobRequests.retrying("Turn job", named(request), work, times)
+    const drop = (request: Request, error: unknown) => JobRequests.drop("Turn job", named(request), error)
 
     /** Give the turn up, as the request's runs kept failing to run it, trying until it holds. */
-    const giveUp = (request: Run, turnId: Turn.Id) =>
+    const giveUp = (request: Run, turnId: TurnId.TurnId) =>
       retrying(request, turnRunner.giveUp(turnId, "Its turn job kept failing to run it.")).pipe(
-        Effect.catch((error) => drop(request, error)),
-      );
+        Effect.catch((error) => drop(request, error))
+      )
 
     /**
      * Run the agent's next turn, trying again after each failed run until `JobRequests.maxFailures`. Then the
@@ -176,35 +177,34 @@ export const layerWorker = entity.toLayer(
      */
     const runNextTurn = Effect.fnUntraced(function* (request: Run) {
       /** The turn the runs accepted, once one did; a later run may fail before finding it again. */
-      const accepted = yield* Ref.make<Turn.Id | undefined>(undefined);
+      const accepted = yield* Ref.make<TurnId.TurnId | undefined>(undefined)
       const run = turnRunner.runNextTurn.pipe(
-        Effect.tapError((error) => Ref.update(accepted, (turnId) => error.turnId ?? turnId)),
-      );
+        Effect.tapError((error) => Ref.update(accepted, (turnId) => error.turnId ?? turnId))
+      )
       yield* retrying(request, run, JobRequests.maxFailures - 1).pipe(
         Effect.catch(
           Effect.fnUntraced(function* (error) {
-            const turnId = yield* Ref.get(accepted);
-            if (turnId === undefined || JobRequests.isWorkspaceNotFound(error))
-              return yield* drop(request, error);
-            yield* giveUp(request, turnId);
-          }),
-        ),
-      );
-    });
+            const turnId = yield* Ref.get(accepted)
+            if (turnId === undefined || JobRequests.isWorkspaceNotFound(error)) return yield* drop(request, error)
+            yield* giveUp(request, turnId)
+          })
+        )
+      )
+    })
 
     /** Stop the turn, trying again after each failure until `JobRequests.maxFailures`; then it is dropped. */
     const stopTurn = (request: Stop) =>
       retrying(request, turnRunner.stopTurn(request.turnId), JobRequests.maxFailures - 1).pipe(
-        Effect.catch((error) => drop(request, error)),
-      );
+        Effect.catch((error) => drop(request, error))
+      )
 
     return entity.of({
       Run: ({ payload: run }) => runNextTurn(run),
-      Stop: ({ payload: stop }) => stopTurn(stop),
-    });
+      Stop: ({ payload: stop }) => stopTurn(stop)
+    })
   }),
-  { concurrency: "unbounded", maxIdleTime: "1 minute" },
-);
+  { concurrency: "unbounded", maxIdleTime: "1 minute" }
+)
 
 /**
  * Both `layerRequests` and `layerWorker`, over the host's Cluster: the requests commits store, and
@@ -213,4 +213,4 @@ export const layerWorker = entity.toLayer(
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.merge(layerWorker, layerRequests);
+export const layer = Layer.merge(layerWorker, layerRequests)

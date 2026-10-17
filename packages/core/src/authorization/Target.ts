@@ -7,13 +7,15 @@
  *
  * @since 0.1.0
  */
-import { Record, Schema } from "effect";
-import * as ChannelId from "../channel/ChannelId.ts";
-import * as Connection from "../connection/Connection.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as Member from "../workspace/Member.ts";
-import * as Workspace from "../workspace/Workspace.ts";
+
+import { Connection as ConnectionContract } from "@amends-dev/connection"
+import * as Record from "effect/Record"
+import * as Schema from "effect/Schema"
+import * as ChannelId from "../channel/ChannelId.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * A concrete authorization target within a workspace, not a grant's scope.
@@ -22,19 +24,19 @@ import * as Workspace from "../workspace/Workspace.ts";
  * @since 0.1.0
  */
 export const Reference = Schema.TaggedUnion({
-  Workspace: { workspaceId: Workspace.Id },
-  Member: { workspaceId: Workspace.Id, memberId: Member.Id },
-  Thread: { workspaceId: Workspace.Id, threadId: ThreadId.Id },
-  Group: { workspaceId: Workspace.Id, groupId: GroupId.Id },
-  Connection: { workspaceId: Workspace.Id, connectionId: Connection.Id },
-  Channel: { workspaceId: Workspace.Id, channelId: ChannelId.Id },
-});
+  Workspace: { workspaceId: WorkspaceId.WorkspaceId },
+  Member: { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+  Thread: { workspaceId: WorkspaceId.WorkspaceId, threadId: ThreadId.ThreadId },
+  Group: { workspaceId: WorkspaceId.WorkspaceId, groupId: GroupId.GroupId },
+  Connection: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
+  Channel: { workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Reference = typeof Reference.Type;
+export type Reference = typeof Reference.Type
 
 /**
  * The kinds of target, by tag. A permission declares the one its action is done to, and a
@@ -43,13 +45,13 @@ export type Reference = typeof Reference.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Kind = Schema.Literals(Record.keys(Reference.cases));
+export const Kind = Schema.Literals(Record.keys(Reference.cases))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Kind = typeof Kind.Type;
+export type Kind = typeof Kind.Type
 
 /**
  * The reference of one kind, so `Requirement.make` accepts only the target a permission's kind
@@ -58,4 +60,4 @@ export type Kind = typeof Kind.Type;
  * @category models
  * @since 0.1.0
  */
-export type Of<K extends Kind> = Extract<Reference, { readonly _tag: K }>;
+export type Of<K extends Kind> = Extract<Reference, { readonly _tag: K }>

@@ -1,38 +1,38 @@
-import { For, Match, Show, Switch } from "solid-js";
-import { IconClock, IconMarkRetry } from "@amends-dev/icons";
-import { Button, ButtonLink } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { EmptyState } from "../../components/empty-state/index.ts";
-import { Logo } from "../../components/logo/index.ts";
-import { RichText } from "../../components/rich-text/index.ts";
-import { TurnStatus, type TurnState } from "../../components/turn-status/index.ts";
-import { clockTime, fullTime } from "../../internal/when.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { useStickToBottom } from "../group/group-threads.tsx";
-import { turnProblemText, type TurnProblem } from "./turn-row.tsx";
-import * as s from "./turns.css.ts";
+import { IconClock, IconMarkRetry } from "@amends-dev/icons"
+import { For, Match, Show, Switch } from "solid-js"
+import { Button, ButtonLink } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { EmptyState } from "../../components/empty-state/index.ts"
+import { Logo } from "../../components/logo/index.ts"
+import { RichText } from "../../components/rich-text/index.ts"
+import { TurnStatus, type TurnState } from "../../components/turn-status/index.ts"
+import { clockTime, fullTime } from "../../internal/when.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { useStickToBottom } from "../group/group-threads.tsx"
+import { turnProblemText, type TurnProblem } from "./turn-row.tsx"
+import * as s from "./turns.css.ts"
 
 /** A turn as its log shows it. */
 export interface TurnLogTurn {
-  readonly agent: { readonly name: string };
-  readonly state: TurnState;
+  readonly agent: { readonly name: string }
+  readonly state: TurnState
   /** Where it works, such as "Thread in #general". */
-  readonly where: string;
+  readonly where: string
   /** What it started on, each by its connection's name; unset before it starts. */
   readonly setup?: {
-    readonly harness: string;
+    readonly harness: string
     /** The model and its connection, such as "OpenRouter · claude-opus-5-5". */
-    readonly model: string;
+    readonly model: string
     /** Where it works, or none, for an agent that answers from its model alone. */
-    readonly sandbox?: string;
-  };
-  readonly stoppable: boolean;
-  readonly retryable: boolean;
+    readonly sandbox?: string
+  }
+  readonly stoppable: boolean
+  readonly retryable: boolean
   /** Where the agent's setup is fixed, offered with a failure. */
-  readonly agentHref?: string;
+  readonly agentHref?: string
   /** The reply it posted, when it closed with one. */
-  readonly replyId?: string;
+  readonly replyId?: string
 }
 
 /** One entry of a turn's activity, oldest first. */
@@ -40,69 +40,69 @@ export type TurnLogActivity =
   | { readonly kind: "accepted"; readonly at: Date }
   | { readonly kind: "started"; readonly at: Date }
   | {
-      readonly kind: "input";
-      readonly at: Date;
-      readonly messages: number;
-      readonly first: boolean;
+      readonly kind: "input"
+      readonly at: Date
+      readonly messages: number
+      readonly first: boolean
     }
   | {
-      readonly kind: "response";
-      readonly at: Date;
-      readonly id: string;
-      readonly text: string;
+      readonly kind: "response"
+      readonly at: Date
+      readonly id: string
+      readonly text: string
       /** It became the agent's reply in the thread. */
-      readonly posted: boolean;
+      readonly posted: boolean
     }
   | {
-      readonly kind: "interrupted";
-      readonly at: Date;
-      readonly reason: string;
-      readonly retrying: boolean;
+      readonly kind: "interrupted"
+      readonly at: Date
+      readonly reason: string
+      readonly retrying: boolean
     }
   | { readonly kind: "replied"; readonly at: Date }
   | { readonly kind: "finished"; readonly at: Date }
   | { readonly kind: "failed"; readonly at: Date; readonly reason: string }
   | {
-      readonly kind: "stopped";
-      readonly at: Date;
-      readonly by: "request" | "departure" | "task";
-    };
+      readonly kind: "stopped"
+      readonly at: Date
+      readonly by: "request" | "departure" | "task"
+    }
 
 export interface TurnLogPaneProps {
   /** The turn, once loaded. */
-  readonly turn?: TurnLogTurn;
-  readonly activity: readonly TurnLogActivity[];
+  readonly turn?: TurnLogTurn
+  readonly activity: ReadonlyArray<TurnLogActivity>
   /** The response the agent is writing now, before it completes. */
-  readonly draft?: { readonly text: string; readonly broken: boolean };
+  readonly draft?: { readonly text: string; readonly broken: boolean }
   /** The log is loading, is out of reach, or could not be read. */
-  readonly status?: "loading" | "unavailable" | "failed";
-  readonly onRetryLoad?: () => void;
+  readonly status?: "loading" | "unavailable" | "failed"
+  readonly onRetryLoad?: () => void
   /** Live updates are down; what shows is the last known, from `updatedAt`. */
-  readonly reconnecting?: boolean;
-  readonly updatedAt?: Date;
+  readonly reconnecting?: boolean
+  readonly updatedAt?: Date
   /** The stop or retry running now. */
-  readonly acting?: "stop" | "retry";
+  readonly acting?: "stop" | "retry"
   /** A stop or retry that did not go through, and why. */
-  readonly problem?: TurnProblem;
-  readonly onStop: () => void;
-  readonly onRetry: () => void;
+  readonly problem?: TurnProblem
+  readonly onStop: () => void
+  readonly onRetry: () => void
   /** Back to the thread; closing leaves the thread too. Neither stops the turn. */
-  readonly onBack: () => void;
-  readonly onClose: () => void;
+  readonly onBack: () => void
+  readonly onClose: () => void
   /** Opens the turn's reply in its thread. */
-  readonly onOpenReply?: () => void;
+  readonly onOpenReply?: () => void
 }
 
 /** Each entry's title and the line under it. */
 function describe(entry: TurnLogActivity, agent: string): { title: string; text?: string } {
   switch (entry.kind) {
     case "accepted":
-      return { title: "Work accepted", text: `${agent} picked up the request from this thread.` };
+      return { title: "Work accepted", text: `${agent} picked up the request from this thread.` }
     case "started":
       return {
         title: "Turn started",
-        text: "Running on the recorded harness, model, and sandbox.",
-      };
+        text: "Running on the recorded harness, model, and sandbox."
+      }
     case "input":
       return {
         title: "Thread input received",
@@ -110,21 +110,21 @@ function describe(entry: TurnLogActivity, agent: string): { title: string; text?
           ? "The request and prior conversation were added."
           : entry.messages === 1
             ? "Another message from the thread was added."
-            : `${entry.messages} more messages from the thread were added.`,
-      };
+            : `${entry.messages} more messages from the thread were added.`
+      }
     case "response":
-      return { title: entry.posted ? "Reply recorded" : "Response recorded" };
+      return { title: entry.posted ? "Reply recorded" : "Response recorded" }
     case "interrupted":
       return {
         title: "Interrupted",
-        text: entry.retrying ? `${entry.reason} Trying again.` : entry.reason,
-      };
+        text: entry.retrying ? `${entry.reason} Trying again.` : entry.reason
+      }
     case "replied":
-      return { title: "Reply posted", text: "Turn completed. Open the reply in its thread." };
+      return { title: "Reply posted", text: "Turn completed. Open the reply in its thread." }
     case "finished":
-      return { title: "Turn completed", text: "No reply was posted." };
+      return { title: "Turn completed", text: "No reply was posted." }
     case "failed":
-      return { title: "Turn failed", text: entry.reason };
+      return { title: "Turn failed", text: entry.reason }
     case "stopped":
       return {
         title: "Turn stopped",
@@ -133,8 +133,8 @@ function describe(entry: TurnLogActivity, agent: string): { title: string; text?
             ? `${agent} stopped taking part in this thread.`
             : entry.by === "task"
               ? `The task no longer asks ${agent} to work on it. Its output stays in this log.`
-              : "It stopped as asked. Its output stays in this log.",
-      };
+              : "It stopped as asked. Its output stays in this log."
+      }
   }
 }
 
@@ -144,17 +144,17 @@ function describe(entry: TurnLogActivity, agent: string): { title: string; text?
  * the turn is active; leaving the log never stops it.
  */
 export function TurnLogPane(props: TurnLogPaneProps) {
-  const size = () => props.activity.length * 1_000_000 + (props.draft?.text.length ?? 0);
-  const scroll = useStickToBottom(size);
+  const size = () => props.activity.length * 1_000_000 + (props.draft?.text.length ?? 0)
+  const scroll = useStickToBottom(size)
   // Content that arrived while the reader was scrolled up waits below them.
-  let seen = size();
+  let seen = size()
   const fresh = () => {
-    const current = size();
-    if (scroll.atBottom()) seen = current;
-    return current > seen;
-  };
-  const agent = () => props.turn?.agent.name ?? "The agent";
-  const stopping = () => props.turn?.state === "stopping" || props.acting === "stop";
+    const current = size()
+    if (scroll.atBottom()) seen = current
+    return current > seen
+  }
+  const agent = () => props.turn?.agent.name ?? "The agent"
+  const stopping = () => props.turn?.state === "stopping" || props.acting === "stop"
   return (
     <Shell.Aside aria-label="Turn log" onClose={() => props.onClose()}>
       <Pane.Root variant="side">
@@ -198,9 +198,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
             </Match>
             <Match when={props.status === "failed"}>
               <EmptyState art="came-apart" title="Can’t load this turn log">
-                <Show when={props.onRetryLoad}>
-                  {(retry) => <Button onClick={() => retry()()}>Try again</Button>}
-                </Show>
+                <Show when={props.onRetryLoad}>{(retry) => <Button onClick={() => retry()()}>Try again</Button>}</Show>
               </EmptyState>
             </Match>
             <Match when={props.turn}>
@@ -230,11 +228,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                         <>
                           <span class={s.model}>{setup().model}</span>
                           <span>Harness · {setup().harness}</span>
-                          <span>
-                            {setup().sandbox === undefined
-                              ? "No sandbox"
-                              : `Sandbox · ${setup().sandbox}`}
-                          </span>
+                          <span>{setup().sandbox === undefined ? "No sandbox" : `Sandbox · ${setup().sandbox}`}</span>
                         </>
                       )}
                     </Show>
@@ -243,7 +237,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                   <ol class={s.activity}>
                     <For each={props.activity}>
                       {(entry) => {
-                        const described = () => describe(entry, agent());
+                        const described = () => describe(entry, agent())
                         return (
                           <li>
                             <Show
@@ -252,16 +246,10 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                                 <div class={s.item}>
                                   <span class={s.dot} aria-hidden="true" />
                                   <span class={s.itemTitle}>{described().title}</span>
-                                  <time
-                                    class={s.itemTime}
-                                    dateTime={entry.at.toISOString()}
-                                    title={fullTime(entry.at)}
-                                  >
+                                  <time class={s.itemTime} dateTime={entry.at.toISOString()} title={fullTime(entry.at)}>
                                     {clockTime(entry.at)}
                                   </time>
-                                  <Show when={described().text}>
-                                    {(text) => <p class={s.itemText}>{text()}</p>}
-                                  </Show>
+                                  <Show when={described().text}>{(text) => <p class={s.itemText}>{text()}</p>}</Show>
                                 </div>
                               }
                             >
@@ -281,7 +269,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                               )}
                             </Show>
                           </li>
-                        );
+                        )
                       }}
                     </For>
                   </ol>
@@ -299,9 +287,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                       <div class={s.card} aria-live="off">
                         <div class={s.cardHead}>
                           <span class={s.cardTitle}>Reply draft</span>
-                          <span class={s.cardLabel}>
-                            {props.reconnecting ? "Paused" : "Streaming"}
-                          </span>
+                          <span class={s.cardLabel}>{props.reconnecting ? "Paused" : "Streaming"}</span>
                         </div>
                         <RichText
                           class={s.cardText}
@@ -321,9 +307,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                     {(href) => (
                       <div class={s.cautionCard}>
                         <span class={s.cardTitle}>Review the agent’s setup</span>
-                        <p class={s.cardNote}>
-                          Fix what stopped this turn before starting another attempt.
-                        </p>
+                        <p class={s.cardNote}>Fix what stopped this turn before starting another attempt.</p>
                         <div>
                           <ButtonLink href={href()}>Agent settings</ButtonLink>
                         </div>
@@ -358,9 +342,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                     <IconMarkRetry class={s.footerIcon} aria-hidden="true" />
                     <span role="status">
                       Reconnecting…
-                      <Show when={props.updatedAt}>
-                        {(at) => ` · Last update ${clockTime(at())}`}
-                      </Show>
+                      <Show when={props.updatedAt}>{(at) => ` · Last update ${clockTime(at())}`}</Show>
                     </span>
                   </Match>
                   <Match when={fresh()}>
@@ -374,11 +356,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                     </Button>
                     <span>Previous log stays available.</span>
                   </Match>
-                  <Match
-                    when={
-                      turn().state === "done" && turn().replyId !== undefined && props.onOpenReply
-                    }
-                  >
+                  <Match when={turn().state === "done" && turn().replyId !== undefined && props.onOpenReply}>
                     {(open) => (
                       <Button class={s.jump} onClick={() => open()()}>
                         View reply in thread
@@ -399,5 +377,5 @@ export function TurnLogPane(props: TurnLogPaneProps) {
         </Show>
       </Pane.Root>
     </Shell.Aside>
-  );
+  )
 }

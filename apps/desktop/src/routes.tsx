@@ -1,5 +1,3 @@
-import { SettingsIndex, WorkspaceSettingsPage, MembersSettingsPage } from "./pages/settings.tsx";
-import { Navigate, Route, useLocation, useParams, useSearchParams } from "@solidjs/router";
 import {
   DirectoryProvider,
   paths,
@@ -9,38 +7,36 @@ import {
   useSession,
   useWorkspace,
   ChangeFeedProvider,
-  DirectoryState,
-} from "@amends-dev/client";
-import { CheckingSessionScreen, HostUnavailableScreen } from "@amends-dev/ui/screens/standalone";
-import { Match, Show, Switch, type ParentProps } from "solid-js";
-import { useStandaloneAccount } from "./account.ts";
-import { NotFoundPage } from "./pages/not-found.tsx";
-import { SignInPage } from "./pages/sign-in.tsx";
-import { WorkspacePickerPage } from "./pages/workspace-picker.tsx";
-import { WorkspaceUnavailablePage } from "./pages/workspace-unavailable.tsx";
-import { WorkspaceLayout } from "./workspace-layout.tsx";
-import { GroupPage } from "./pages/group.tsx";
-import { InboxPage } from "./pages/inbox.tsx";
-import { GroupsPage } from "./pages/groups.tsx";
-import { DirectPage } from "./pages/direct.tsx";
-import { WorkspaceIndex, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
-import { AgentsPage } from "./pages/agents.tsx";
-import { ConnectionsPage } from "./pages/connections.tsx";
+  DirectoryState
+} from "@amends-dev/client"
+import { CheckingSessionScreen, HostUnavailableScreen } from "@amends-dev/ui/screens/standalone"
+import { Navigate, Route, useLocation, useParams, useSearchParams } from "@solidjs/router"
+import { Match, Show, Switch, type ParentProps } from "solid-js"
+import { useStandaloneAccount } from "./account.ts"
+import { AgentsPage } from "./pages/agents.tsx"
+import { ConnectionsPage } from "./pages/connections.tsx"
+import { DirectPage } from "./pages/direct.tsx"
+import { GroupPage } from "./pages/group.tsx"
+import { GroupsPage } from "./pages/groups.tsx"
+import { InboxPage } from "./pages/inbox.tsx"
+import { NotFoundPage } from "./pages/not-found.tsx"
+import { SettingsIndex, WorkspaceSettingsPage, MembersSettingsPage } from "./pages/settings.tsx"
+import { SignInPage } from "./pages/sign-in.tsx"
+import { WorkspacePickerPage } from "./pages/workspace-picker.tsx"
+import { WorkspaceUnavailablePage } from "./pages/workspace-unavailable.tsx"
+import { WorkspaceIndex, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx"
+import { WorkspaceLayout } from "./workspace-layout.tsx"
 
 function RequireSession(props: ParentProps) {
-  const session = useSession();
-  const location = useLocation();
+  const session = useSession()
+  const location = useLocation()
   return (
     <Show
       when={session.session}
       fallback={
         // Signing out starts the next person afresh; otherwise sign-in returns to this page.
         <Navigate
-          href={
-            session.signedOut
-              ? paths.signIn
-              : signInPath(location.pathname + location.search + location.hash)
-          }
+          href={session.signedOut ? paths.signIn : signInPath(location.pathname + location.search + location.hash)}
         />
       }
     >
@@ -48,11 +44,11 @@ function RequireSession(props: ParentProps) {
         <ValidatedSession>{props.children}</ValidatedSession>
       </DirectoryProvider>
     </Show>
-  );
+  )
 }
 function ValidatedSession(props: ParentProps) {
-  const directory = useDirectory();
-  const account = useStandaloneAccount();
+  const directory = useDirectory()
+  const account = useStandaloneAccount()
   return (
     <Switch>
       <Match when={DirectoryState.$is("Ready")(directory.state())}>{props.children}</Match>
@@ -63,11 +59,11 @@ function ValidatedSession(props: ParentProps) {
         <CheckingSessionScreen homeHref="#/" account={account()} />
       </Match>
     </Switch>
-  );
+  )
 }
 function SignInRoute() {
-  const session = useSession();
-  const [search] = useSearchParams<{ returnTo?: string }>();
+  const session = useSession()
+  const [search] = useSearchParams<{ returnTo?: string }>()
   return (
     <Switch>
       <Match when={!session.session}>
@@ -79,21 +75,18 @@ function SignInRoute() {
         </RequireSession>
       </Match>
     </Switch>
-  );
+  )
 }
 function WorkspaceRoute(props: ParentProps) {
-  const params = useParams<{ workspaceId: string }>();
-  const workspace = useWorkspace(() => params.workspaceId);
+  const params = useParams<{ workspaceId: string }>()
+  const workspace = useWorkspace(() => params.workspaceId)
   return (
-    <Show
-      when={workspace() !== undefined}
-      fallback={<WorkspaceUnavailablePage workspaceId={params.workspaceId} />}
-    >
+    <Show when={workspace() !== undefined} fallback={<WorkspaceUnavailablePage workspaceId={params.workspaceId} />}>
       <ChangeFeedProvider workspaceId={params.workspaceId}>
         <WorkspaceLayout>{props.children}</WorkspaceLayout>
       </ChangeFeedProvider>
     </Show>
-  );
+  )
 }
 export function ApplicationRoutes() {
   return (
@@ -105,22 +98,13 @@ export function ApplicationRoutes() {
         <Route path="/workspaces/:workspaceId" component={WorkspaceRoute}>
           <Route path="/" component={WorkspaceIndex} />
           <Route path="/groups" component={GroupsPage} />
-          <Route
-            path={["/groups/:groupId", "/groups/:groupId/threads/:threadId"]}
-            component={GroupPage}
-          />
-          <Route
-            path={["/inbox", "/inbox/groups/:groupId/threads/:threadId"]}
-            component={InboxPage}
-          />
+          <Route path={["/groups/:groupId", "/groups/:groupId/threads/:threadId"]} component={GroupPage} />
+          <Route path={["/inbox", "/inbox/groups/:groupId/threads/:threadId"]} component={InboxPage} />
           <Route path="/direct" component={DirectPage} />
           <Route path="/triage" component={TriagePage} />
           <Route path="/tasks" component={TasksPage} />
           <Route path={["/agents", "/agents/:agentId"]} component={AgentsPage} />
-          <Route
-            path={["/connections", "/connections/:connectionId"]}
-            component={ConnectionsPage}
-          />
+          <Route path={["/connections", "/connections/:connectionId"]} component={ConnectionsPage} />
           <Route path="/settings">
             <Route path="/" component={SettingsIndex} />
             <Route path="/workspace" component={WorkspaceSettingsPage} />
@@ -131,5 +115,5 @@ export function ApplicationRoutes() {
       </Route>
       <Route path="*unmatched" component={NotFoundPage} />
     </>
-  );
+  )
 }

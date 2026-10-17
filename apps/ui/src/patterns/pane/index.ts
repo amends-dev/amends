@@ -1,4 +1,4 @@
-export * as Pane from "./pane.tsx";
+export * as Pane from "./pane.tsx"
 export type {
   ActionsProps as PaneActionsProps,
   BackProps as PaneBackProps,
@@ -11,5 +11,5 @@ export type {
   SubtitleProps as PaneSubtitleProps,
   TabsProps as PaneTabsProps,
   TitleProps as PaneTitleProps,
-  ToolbarProps as PaneToolbarProps,
-} from "./pane.tsx";
+  ToolbarProps as PaneToolbarProps
+} from "./pane.tsx"

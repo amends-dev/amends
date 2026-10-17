@@ -10,10 +10,14 @@
  *
  * @since 0.1.0
  */
-import { Array as Arr, Effect, Schema, Struct } from "effect";
-import type { ToolDefinition } from "./ToolDefinition.ts";
-import { toolkit as toolkitOfSource, type ToolSource } from "./ToolSource.ts";
-import { NotFoundError, ToolSourceError } from "./ToolSourceError.ts";
+
+import * as Arr from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import * as Struct from "effect/Struct"
+import type * as ToolDefinition from "./ToolDefinition.ts"
+import * as ToolSource from "./ToolSource.ts"
+import * as ToolSourceError from "./ToolSourceError.ts"
 
 /**
  * What the model may do with a tool: call it, call it once the person has approved the call, or not
@@ -22,13 +26,13 @@ import { NotFoundError, ToolSourceError } from "./ToolSourceError.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Decision = Schema.Literals(["allow", "approve", "block"]);
+export const Decision = Schema.Literals(["allow", "approve", "block"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Decision = typeof Decision.Type;
+export type Decision = typeof Decision.Type
 
 /**
  * A source, with the definitions of the tools of it that the workspace has, from which `toolkit`
@@ -38,10 +42,10 @@ export type Decision = typeof Decision.Type;
  * @since 0.1.0
  */
 export interface Member {
-  readonly source: ToolSource;
+  readonly source: ToolSource.ToolSource
 
   /** The definitions of the source's tools that the host holds in its catalog. */
-  readonly definitions: ReadonlyArray<ToolDefinition>;
+  readonly definitions: ReadonlyArray<ToolDefinition.ToolDefinition>
 }
 
 /**
@@ -55,8 +59,8 @@ export const Clash = Schema.Struct({
   name: Schema.String,
 
   /** Each tool by its source's name for it, which is how it is told from the others. */
-  tools: Schema.Array(Schema.Struct({ source: Schema.String, tool: Schema.String })),
-});
+  tools: Schema.Array(Schema.Struct({ source: Schema.String, tool: Schema.String }))
+})
 
 /**
  * @category schemas
@@ -71,24 +75,24 @@ export interface Clash extends Schema.Schema.Type<typeof Clash> {}
  * @category errors
  * @since 0.1.0
  */
-export class NameClash extends Schema.TaggedError<NameClash>(
-  "@amends-dev/toolkit/Assembly/NameClash",
-)("NameClash", { clashes: Schema.NonEmptyArray(Clash) }) {
+export class NameClash extends Schema.TaggedError<NameClash>("@amends-dev/toolkit/Assembly/NameClash")("NameClash", {
+  clashes: Schema.NonEmptyArray(Clash)
+}) {
   override get message(): string {
     return this.clashes
       .map(
         ({ name, tools }) =>
-          `${tools.map(({ source, tool }) => `${source}: ${tool}`).join(" and ")} are all named ${name}`,
+          `${tools.map(({ source, tool }) => `${source}: ${tool}`).join(" and ")} are all named ${name}`
       )
-      .join("; ");
+      .join("; ")
   }
 }
 
 /** The longest name that the model APIs of Anthropic and OpenAI accept for a tool. */
-const modelApiNameLength = 64;
+const modelApiNameLength = 64
 
 /** A name is cut to its fingerprint and an underscore at least, with a few characters before them. */
-const shortestNameLength = 16;
+const shortestNameLength = 16
 
 /**
  * What `toolkit` takes besides its members and the decision for each tool.
@@ -101,7 +105,7 @@ export interface Options {
    * The longest name a tool may have, for an agent that adds to the names it is given and so takes
    * fewer than the model APIs' 64 characters, such as an agent's `maxToolNameLength`. At least 16.
    */
-  readonly maxNameLength?: number;
+  readonly maxNameLength?: number
 }
 
 /**
@@ -117,14 +121,12 @@ export interface Options {
  */
 export const toolkit = Effect.fn("Assembly.toolkit")(function* (
   members: ReadonlyArray<Member>,
-  decide: (source: string, definition: ToolDefinition) => Decision,
-  options?: Options,
+  decide: (source: string, definition: ToolDefinition.ToolDefinition) => Decision,
+  options?: Options
 ) {
-  const maxNameLength = options?.maxNameLength ?? modelApiNameLength;
+  const maxNameLength = options?.maxNameLength ?? modelApiNameLength
   if (!Number.isInteger(maxNameLength) || maxNameLength < shortestNameLength) {
-    return yield* Effect.die(
-      new Error(`maxNameLength must be a whole number of at least ${shortestNameLength}`),
-    );
+    return yield* Effect.die(new Error(`maxNameLength must be a whole number of at least ${shortestNameLength}`))
   }
   const offered = members
     .flatMap(({ source, definitions }) =>
@@ -132,39 +134,42 @@ export const toolkit = Effect.fn("Assembly.toolkit")(function* (
         source,
         definition,
         decision: decide(source.name, definition),
-        name: nameOf(source.name, definition.name, maxNameLength),
-      })),
+        name: nameOf(source.name, definition.name, maxNameLength)
+      }))
     )
-    .filter((tool) => tool.decision !== "block");
+    .filter((tool) => tool.decision !== "block")
 
   const clashes = findClashes(
     offered.map(({ source, definition, name }) => ({
       name,
       source: source.name,
-      tool: definition.name,
-    })),
-  );
-  if (Arr.isReadonlyArrayNonEmpty(clashes)) return yield* new NameClash({ clashes });
+      tool: definition.name
+    }))
+  )
+  if (Arr.isReadonlyArrayNonEmpty(clashes)) return yield* new NameClash({ clashes })
 
-  const ownerOf = new Map(offered.map((tool) => [tool.name, tool]));
-  const definitions = offered.map(({ definition, name }) => Struct.assign(definition, { name }));
-  const approved = new Set(
-    offered.filter((tool) => tool.decision === "approve").map((tool) => tool.name),
-  );
-  const assembled: ToolSource = {
+  const ownerOf = new Map(offered.map((tool) => [tool.name, tool]))
+  const definitions = offered.map(({ definition, name }) => Struct.assign(definition, { name }))
+  const approved = new Set(offered.filter((tool) => tool.decision === "approve").map((tool) => tool.name))
+  const assembled: ToolSource.ToolSource = {
     name: "assembly",
     discover: Effect.succeed(definitions),
     call: (name, input) => {
-      const owner = ownerOf.get(name);
+      const owner = ownerOf.get(name)
       return owner === undefined
-        ? Effect.fail(new ToolSourceError({ source: "assembly", reason: new NotFoundError({}) }))
-        : owner.source.call(owner.definition.name, input);
-    },
-  };
-  return yield* toolkitOfSource(assembled, definitions, {
-    needsApproval: (definition) => approved.has(definition.name),
-  });
-});
+        ? Effect.fail(
+            new ToolSourceError.ToolSourceError({
+              source: "assembly",
+              reason: new ToolSourceError.NotFoundError({})
+            })
+          )
+        : owner.source.call(owner.definition.name, input)
+    }
+  }
+  return yield* ToolSource.toolkit(assembled, definitions, {
+    needsApproval: (definition) => approved.has(definition.name)
+  })
+})
 
 /**
  * The name the model knows a tool by: its source's, then its own, in the characters agents accept. A
@@ -172,31 +177,29 @@ export const toolkit = Effect.fn("Assembly.toolkit")(function* (
  * names differ only after the cut are still told apart, and a name is the same whenever it is made.
  */
 const nameOf = (source: string, tool: string, maxNameLength: number) => {
-  const whole = `${source}__${tool}`;
-  const safe = whole.replace(/[^A-Za-z0-9_-]/g, "_");
-  if (safe.length <= maxNameLength) return safe;
-  const fingerprint = fingerprintOf(whole);
-  return `${safe.slice(0, maxNameLength - fingerprint.length - 1)}_${fingerprint}`;
-};
+  const whole = `${source}__${tool}`
+  const safe = whole.replace(/[^A-Za-z0-9_-]/g, "_")
+  if (safe.length <= maxNameLength) return safe
+  const fingerprint = fingerprintOf(whole)
+  return `${safe.slice(0, maxNameLength - fingerprint.length - 1)}_${fingerprint}`
+}
 
 /** Eight hexadecimal digits that are the same for the same text, and rarely for different texts. */
 const fingerprintOf = (text: string) => {
-  let hash = 0x811c9dc5;
+  let hash = 0x811c9dc5
   for (let index = 0; index < text.length; index++) {
-    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193);
+    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193)
   }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-};
+  return (hash >>> 0).toString(16).padStart(8, "0")
+}
 
 /** The tools that share a name, for each name that more than one tool has, in the order met. */
 const findClashes = (
-  tools: ReadonlyArray<{ readonly name: string; readonly source: string; readonly tool: string }>,
+  tools: ReadonlyArray<{ readonly name: string; readonly source: string; readonly tool: string }>
 ): ReadonlyArray<Clash> => {
-  const byName = new Map<string, Array<{ readonly source: string; readonly tool: string }>>();
+  const byName = new Map<string, Array<{ readonly source: string; readonly tool: string }>>()
   for (const { name, source, tool } of tools) {
-    byName.set(name, [...(byName.get(name) ?? []), { source, tool }]);
+    byName.set(name, [...(byName.get(name) ?? []), { source, tool }])
   }
-  return [...byName]
-    .filter(([, sharing]) => sharing.length > 1)
-    .map(([name, sharing]) => ({ name, tools: sharing }));
-};
+  return [...byName].filter(([, sharing]) => sharing.length > 1).map(([name, sharing]) => ({ name, tools: sharing }))
+}

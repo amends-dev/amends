@@ -7,14 +7,16 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { Actor } from "@amends-dev/core/identity";
-import * as Authentication from "./Authentication.ts";
-import { ChangeFeedService } from "@amends-dev/core/change-feed";
-import { Effect, Layer } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
-import * as Streams from "./Streams.ts";
-import { CoreError } from "@amends-dev/core/error";
+
+import { ChangeFeedService } from "@amends-dev/core/change-feed"
+import { CoreError } from "@amends-dev/core/error"
+import { Actor } from "@amends-dev/core/identity"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Layer from "effect/Layer"
+import * as Api from "./Api.ts"
+import * as Authentication from "./Authentication.ts"
+import * as Streams from "./Streams.ts"
 
 /**
  * Register the change feed handler, which acquires the subscription in the HTTP response scope,
@@ -28,17 +30,16 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "changeFeed",
   Effect.fn(function* (handlers) {
-    const streams = yield* Streams.Streams;
-    const unavailable = () =>
-      new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() });
+    const streams = yield* Streams.Streams
+    const unavailable = () => new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })
     return handlers.handleAll({
       watch: ({ query }) =>
         Effect.gen(function* () {
-          const { workspaceId } = yield* Actor.Actor;
-          yield* streams.hold(workspaceId, yield* Authentication.Principal);
-          const changeFeedService = yield* ChangeFeedService.ChangeFeedService;
-          return streams.serve(yield* changeFeedService.watch(query), unavailable);
-        }).pipe(Streams.withHeartbeats),
-    });
-  }),
-).pipe(Layer.provide(Streams.layer));
+          const { workspaceId } = yield* Actor.Actor
+          yield* streams.hold(workspaceId, yield* Authentication.Principal)
+          const changeFeedService = yield* ChangeFeedService.ChangeFeedService
+          return streams.serve(yield* changeFeedService.watch(query), unavailable)
+        }).pipe(Streams.withHeartbeats)
+    })
+  })
+).pipe(Layer.provide(Streams.layer))

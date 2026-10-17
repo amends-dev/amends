@@ -1,66 +1,66 @@
-import { Show } from "solid-js";
-import { IconBell, IconBellFilled, IconMessage } from "@amends-dev/icons";
-import { IconButton } from "../../components/icon-button/index.ts";
-import { typingText } from "../../internal/when.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { Timeline, type TimelineEntry } from "../timeline/index.ts";
-import type { ThreadTurnControls } from "../turns/turn-row.tsx";
-import type { GroupFollow } from "./group-pane.tsx";
+import { IconBell, IconBellFilled, IconMessage } from "@amends-dev/icons"
+import { Show } from "solid-js"
+import { IconButton } from "../../components/icon-button/index.ts"
+import { typingText } from "../../internal/when.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { Timeline, type TimelineEntry } from "../timeline/index.ts"
+import type { ThreadTurnControls } from "../turns/turn-row.tsx"
+import type { GroupFollow } from "./group-pane.tsx"
 import {
   ConversationComposer,
   ConversationState,
   Earlier,
   useStickToBottom,
-  type ConversationProps,
-} from "./group-threads.tsx";
-import * as s from "./group.css.ts";
+  type ConversationProps
+} from "./group-threads.tsx"
+import * as s from "./group.css.ts"
 
 export interface ThreadPaneProps extends ConversationProps {
-  readonly title: string;
+  readonly title: string
   /** The thread's group, for the subtitle and the phone's Back. */
-  readonly groupName: string;
+  readonly groupName: string
   /** A direct conversation's thread, whose group is named by its people. Default "team". */
-  readonly groupKind?: "team" | "direct";
-  readonly onClose: () => void;
+  readonly groupKind?: "team" | "direct"
+  readonly onClose: () => void
   /** Hide the composer, as while previewing a group the reader has not joined. */
-  readonly readOnly?: boolean;
+  readonly readOnly?: boolean
   /** The bell follows the thread, so its replies reach the reader, or stops. */
-  readonly follow?: GroupFollow;
+  readonly follow?: GroupFollow
   /** The people typing a reply now. */
-  readonly typing?: readonly string[];
+  readonly typing?: ReadonlyArray<string>
   /** Put an "N replies" divider after the first message, as the thread's replies begin. */
-  readonly repliesDivider?: boolean;
+  readonly repliesDivider?: boolean
   /** Opened from a notification: the subtitle says why, such as "Mention · #general". */
-  readonly reason?: "mention" | "reply" | "thread";
+  readonly reason?: "mention" | "reply" | "thread"
   /** What Back returns to on phones. Default the group's name. */
-  readonly backLabel?: string;
+  readonly backLabel?: string
   /**
    * Stopping, retrying, and opening the logs of the agents' turns among the entries, each shown
    * where its agent took on the work.
    */
-  readonly turns?: ThreadTurnControls;
+  readonly turns?: ThreadTurnControls
   /** Opens the log of the turn that posted a reply, from the note under the reply. */
-  readonly onOpenTurnLog?: (turnId: string) => void;
+  readonly onOpenTurnLog?: (turnId: string) => void
 }
 
-const reasons = { mention: "Mention", reply: "Reply", thread: "New thread" } as const;
+const reasons = { mention: "Mention", reply: "Reply", thread: "New thread" } as const
 
 /** The entries with a replies divider after the first message. */
-function withReplies(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
-  const first = entries.findIndex((entry) => entry.kind === "message");
-  if (first === -1) return entries;
-  const replies = entries.slice(first + 1).filter((entry) => entry.kind === "message").length;
+function withReplies(entries: ReadonlyArray<TimelineEntry>): ReadonlyArray<TimelineEntry> {
+  const first = entries.findIndex((entry) => entry.kind === "message")
+  if (first === -1) return entries
+  const replies = entries.slice(first + 1).filter((entry) => entry.kind === "message").length
   return [
     ...entries.slice(0, first + 1),
     {
       kind: "divider",
       id: "replies",
       label: replies === 1 ? "1 reply" : `${replies} replies`,
-      align: "start",
+      align: "start"
     },
-    ...entries.slice(first + 1),
-  ];
+    ...entries.slice(first + 1)
+  ]
 }
 
 /**
@@ -68,14 +68,12 @@ function withReplies(entries: readonly TimelineEntry[]): readonly TimelineEntry[
  * composer. Render it while the thread is open.
  */
 export function ThreadPane(props: ThreadPaneProps) {
-  const scroll = useStickToBottom(() => props.entries.length);
+  const scroll = useStickToBottom(() => props.entries.length)
   return (
     <Shell.Aside aria-label={props.title} onClose={() => props.onClose()}>
       <Pane.Root variant="side">
         <Pane.Header>
-          <Pane.Back onClick={() => props.onClose()}>
-            {props.backLabel ?? props.groupName}
-          </Pane.Back>
+          <Pane.Back onClick={() => props.onClose()}>{props.backLabel ?? props.groupName}</Pane.Back>
           <Pane.Title icon={IconMessage}>{props.title}</Pane.Title>
           <Pane.Actions>
             <Show when={props.follow}>
@@ -130,9 +128,7 @@ export function ThreadPane(props: ThreadPaneProps) {
               </>
             }
           >
-            {(status) => (
-              <ConversationState status={status()} subject="thread" onRetry={props.onRetry} />
-            )}
+            {(status) => <ConversationState status={status()} subject="thread" onRetry={props.onRetry} />}
           </Show>
           <p class={s.typing} role="status">
             {typingText(props.typing ?? [])}
@@ -143,5 +139,5 @@ export function ThreadPane(props: ThreadPaneProps) {
         </Show>
       </Pane.Root>
     </Shell.Aside>
-  );
+  )
 }

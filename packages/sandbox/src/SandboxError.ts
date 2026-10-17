@@ -11,7 +11,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+
+import * as Schema from "effect/Schema"
 
 /**
  * The provider's credentials are missing, invalid, or not authorized for the operation.
@@ -20,14 +21,14 @@ import { Schema } from "effect";
  * @since 0.1.0
  */
 export class AuthenticationError extends Schema.TaggedError<AuthenticationError>(
-  "@amends-dev/sandbox/SandboxError/AuthenticationError",
+  "@amends-dev/sandbox/SandboxError/AuthenticationError"
 )("AuthenticationError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The provider's credentials are missing, invalid, or not authorized";
+    return this.description ?? "The provider's credentials are missing, invalid, or not authorized"
   }
 }
 
@@ -37,15 +38,16 @@ export class AuthenticationError extends Schema.TaggedError<AuthenticationError>
  * @category errors
  * @since 0.1.0
  */
-export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends-dev/sandbox/SandboxError/NotFoundError",
-)("NotFoundError", { description: Schema.optional(Schema.String) }) {
+export class NotFoundError extends Schema.TaggedError<NotFoundError>("@amends-dev/sandbox/SandboxError/NotFoundError")(
+  "NotFoundError",
+  { description: Schema.optional(Schema.String) }
+) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The sandbox does not exist";
+    return this.description ?? "The sandbox does not exist"
   }
 }
 
@@ -56,14 +58,14 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * @since 0.1.0
  */
 export class AlreadyExistsError extends Schema.TaggedError<AlreadyExistsError>(
-  "@amends-dev/sandbox/SandboxError/AlreadyExistsError",
+  "@amends-dev/sandbox/SandboxError/AlreadyExistsError"
 )("AlreadyExistsError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "A sandbox with this id already exists";
+    return this.description ?? "A sandbox with this id already exists"
   }
 }
 
@@ -75,14 +77,14 @@ export class AlreadyExistsError extends Schema.TaggedError<AlreadyExistsError>(
  * @since 0.1.0
  */
 export class InvalidOptionsError extends Schema.TaggedError<InvalidOptionsError>(
-  "@amends-dev/sandbox/SandboxError/InvalidOptionsError",
+  "@amends-dev/sandbox/SandboxError/InvalidOptionsError"
 )("InvalidOptionsError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The provider was given options it does not take";
+    return this.description ?? "The provider was given options it does not take"
   }
 }
 
@@ -94,14 +96,14 @@ export class InvalidOptionsError extends Schema.TaggedError<InvalidOptionsError>
  * @since 0.1.0
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends-dev/sandbox/SandboxError/UnsupportedError",
+  "@amends-dev/sandbox/SandboxError/UnsupportedError"
 )("UnsupportedError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The provider does not support this operation";
+    return this.description ?? "The provider does not support this operation"
   }
 }
 
@@ -112,14 +114,14 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
  * @since 0.1.0
  */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends-dev/sandbox/SandboxError/UnavailableError",
+  "@amends-dev/sandbox/SandboxError/UnavailableError"
 )("UnavailableError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return true;
+    return true
   }
 
   override get message(): string {
-    return this.description ?? "The provider is temporarily unavailable";
+    return this.description ?? "The provider is temporarily unavailable"
   }
 }
 
@@ -129,15 +131,16 @@ export class UnavailableError extends Schema.TaggedError<UnavailableError>(
  * @category errors
  * @since 0.1.0
  */
-export class UnknownError extends Schema.TaggedError<UnknownError>(
-  "@amends-dev/sandbox/SandboxError/UnknownError",
-)("UnknownError", { description: Schema.optional(Schema.String) }) {
+export class UnknownError extends Schema.TaggedError<UnknownError>("@amends-dev/sandbox/SandboxError/UnknownError")(
+  "UnknownError",
+  { description: Schema.optional(Schema.String) }
+) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The provider failed";
+    return this.description ?? "The provider failed"
   }
 }
 
@@ -154,14 +157,14 @@ export const SandboxErrorReason = Schema.Union([
   InvalidOptionsError,
   UnsupportedError,
   UnavailableError,
-  UnknownError,
-]);
+  UnknownError
+]).pipe(Schema.toTaggedUnion("_tag"))
 
 /**
  * @category errors
  * @since 0.1.0
  */
-export type SandboxErrorReason = typeof SandboxErrorReason.Type;
+export type SandboxErrorReason = typeof SandboxErrorReason.Type
 
 /**
  * The error every operation on a sandbox fails with: which provider failed, and why.
@@ -169,38 +172,34 @@ export type SandboxErrorReason = typeof SandboxErrorReason.Type;
  * **Example** (Recovering from one reason)
  *
  * ```ts
- * import { Sandbox, SandboxProvider } from "@amends-dev/sandbox";
- * import { Effect } from "effect";
+ * import { Sandbox, SandboxProvider } from "@amends-dev/sandbox"
+ * import { Effect } from "effect"
  *
- * declare const id: Sandbox.SandboxId;
+ * declare const id: Sandbox.SandboxId
  *
  * // The sandbox with this id, created if it does not exist yet.
  * const sandbox = Effect.gen(function* () {
- *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider
  *   return yield* sandboxProvider
  *     .resume(id)
- *     .pipe(
- *       Effect.catchReason("SandboxError", "NotFoundError", () => sandboxProvider.create({ id })),
- *     );
- * });
+ *     .pipe(Effect.catchReason("SandboxError", "NotFoundError", () => sandboxProvider.create({ id })))
+ * })
  * ```
  *
  * @category errors
  * @since 0.1.0
  */
-export class SandboxError extends Schema.TaggedError<SandboxError>(
-  "@amends-dev/sandbox/SandboxError",
-)("SandboxError", {
+export class SandboxError extends Schema.TaggedError<SandboxError>("@amends-dev/sandbox/SandboxError")("SandboxError", {
   /** The provider that failed, such as `local`. */
   provider: Schema.String,
   reason: SandboxErrorReason,
-  cause: Schema.optional(Schema.Defect()),
+  cause: Schema.optional(Schema.Defect())
 }) {
   get isRetryable(): boolean {
-    return this.reason.isRetryable;
+    return this.reason.isRetryable
   }
 
   override get message(): string {
-    return `${this.provider}: ${this.reason.message}`;
+    return `${this.provider}: ${this.reason.message}`
   }
 }

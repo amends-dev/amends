@@ -5,5 +5,5 @@ export {
   type Status,
   type StatusMarkKind,
   type StatusMarkProps,
-  type StatusMarkSize,
-} from "./status-mark.tsx";
+  type StatusMarkSize
+} from "./status-mark.tsx"

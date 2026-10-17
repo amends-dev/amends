@@ -8,30 +8,12 @@
  *
  * @since 0.1.0
  */
-import {
-  Connection as ConnectionContract,
-  Integration,
-  ModelCatalog,
-} from "@amends-dev/connection";
-import { Schema } from "effect";
-import * as Text from "../text/Text.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
 
-/**
- * Names a connection: `@amends-dev/connection`'s `Connection.ConnectionId`, so that core and an
- * integration name a connection alike.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ConnectionContract.ConnectionId;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ConnectionContract.ConnectionId;
+import { Connection as ConnectionContract, Integration, ModelCatalog } from "@amends-dev/connection"
+import * as Schema from "effect/Schema"
+import * as Text from "../text/Text.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * A connection's name as recorded; names chosen now are `NewName`.
@@ -39,13 +21,13 @@ export type Id = ConnectionContract.ConnectionId;
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
+export const Name = Schema.Trimmed.check(Schema.isMinLength(1))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * A name chosen for a connection: 1 to 80 characters, without hidden ones.
@@ -53,7 +35,7 @@ export type Name = typeof Name.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
+export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName)
 
 /**
  * A connection's settings by name, as the fields of its integration's settings form give them:
@@ -62,16 +44,13 @@ export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isNa
  * @category schemas
  * @since 0.1.0
  */
-export const Settings = Schema.Record(
-  Schema.String,
-  Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
-);
+export const Settings = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Settings = typeof Settings.Type;
+export type Settings = typeof Settings.Type
 
 /**
  * Settings given now, whose text has no surrounding spaces and is what storage keeps as given. The
@@ -82,12 +61,8 @@ export type Settings = typeof Settings.Type;
  */
 export const NewSettings = Schema.Record(
   Schema.String,
-  Schema.Union([
-    Schema.Trimmed.check(Schema.isMaxLength(2048), Text.isStorable),
-    Schema.Finite,
-    Schema.Boolean,
-  ]),
-);
+  Schema.Union([Schema.Trimmed.check(Schema.isMaxLength(2048), Text.isStorable), Schema.Finite, Schema.Boolean])
+)
 
 /**
  * The API key a connection authenticates with, redacted so that logs and errors never show it.
@@ -96,14 +71,14 @@ export const NewSettings = Schema.Record(
  * @since 0.1.0
  */
 export const ApiKey = Schema.Redacted(
-  Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(8192), Text.isStorable),
-);
+  Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(8192), Text.isStorable)
+)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type ApiKey = typeof ApiKey.Type;
+export type ApiKey = typeof ApiKey.Type
 
 /**
  * Whether a connection is in use: `active`, or `removed`. A removed connection's record stays, so
@@ -112,13 +87,13 @@ export type ApiKey = typeof ApiKey.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "removed"]);
+export const Status = Schema.Literals(["active", "removed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * A connection as stored: the integration it links to, what the workspace calls it, its settings,
@@ -129,8 +104,8 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const Connection = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: ConnectionContract.ConnectionId,
+  workspaceId: WorkspaceId.WorkspaceId,
 
   /** The integration the connection links to, as its id names it, such as `anthropic`. */
   integration: Schema.NonEmptyString,
@@ -140,9 +115,9 @@ export const Connection = Schema.Struct({
   /** How the connection authenticates; one that authenticates with a key always has one. */
   auth: ConnectionContract.AuthMethod,
   status: Status,
-  createdBy: MemberId.Id,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdBy: MemberId.MemberId,
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -154,11 +129,11 @@ export interface Connection extends Schema.Schema.Type<typeof Connection> {}
  * The record with the given fields replaced: what a rename, a configuration, or a removal makes of
  * it.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Connection, changes: Partial<Connection>): Connection =>
-  Object.assign({}, record, changes);
+  Object.assign({}, record, changes)
 
 /**
  * A new connection, with its key when it authenticates with one, and only then. The key is stored
@@ -172,14 +147,14 @@ export const CreateInput = Schema.Struct({
   name: NewName,
   settings: NewSettings,
   auth: ConnectionContract.AuthMethod,
-  apiKey: Schema.optionalKey(ApiKey),
+  apiKey: Schema.optionalKey(ApiKey)
 }).check(
   Schema.makeFilter(
     (input) =>
       (input.auth === "apiKey") === (input.apiKey !== undefined) ||
-      "Expected an API key exactly when the connection authenticates with one",
-  ),
-);
+      "Expected an API key exactly when the connection authenticates with one"
+  )
+)
 
 /**
  * @category options
@@ -193,7 +168,11 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const RenameInput = Schema.Struct({ connectionId: Id, name: NewName, expectedName: Name });
+export const RenameInput = Schema.Struct({
+  connectionId: ConnectionContract.ConnectionId,
+  name: NewName,
+  expectedName: Name
+})
 
 /**
  * @category options
@@ -207,7 +186,7 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @category options
  * @since 0.1.0
  */
-export const ConfigureInput = Schema.Struct({ connectionId: Id, settings: NewSettings });
+export const ConfigureInput = Schema.Struct({ connectionId: ConnectionContract.ConnectionId, settings: NewSettings })
 
 /**
  * @category options
@@ -221,7 +200,7 @@ export interface ConfigureInput extends Schema.Schema.Type<typeof ConfigureInput
  * @category options
  * @since 0.1.0
  */
-export const ReplaceKeyInput = Schema.Struct({ connectionId: Id, apiKey: ApiKey });
+export const ReplaceKeyInput = Schema.Struct({ connectionId: ConnectionContract.ConnectionId, apiKey: ApiKey })
 
 /**
  * @category options
@@ -236,7 +215,11 @@ export interface ReplaceKeyInput extends Schema.Schema.Type<typeof ReplaceKeyInp
  * @category schemas
  * @since 0.1.0
  */
-export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id, name: Name });
+export const Renamed = Schema.Struct({
+  workspaceId: WorkspaceId.WorkspaceId,
+  connectionId: ConnectionContract.ConnectionId,
+  name: Name
+})
 
 /**
  * @category schemas
@@ -252,10 +235,10 @@ export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
  * @since 0.1.0
  */
 export const Configured = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  connectionId: Id,
-  settings: Settings,
-});
+  workspaceId: WorkspaceId.WorkspaceId,
+  connectionId: ConnectionContract.ConnectionId,
+  settings: Settings
+})
 
 /**
  * @category schemas
@@ -269,7 +252,10 @@ export interface Configured extends Schema.Schema.Type<typeof Configured> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id });
+export const Reference = Schema.Struct({
+  workspaceId: WorkspaceId.WorkspaceId,
+  connectionId: ConnectionContract.ConnectionId
+})
 
 /**
  * @category schemas
@@ -289,14 +275,14 @@ export interface Reference extends Schema.Schema.Type<typeof Reference> {}
 export const Readiness = Schema.TaggedUnion({
   Ready: {},
   Invalid: { description: Schema.String },
-  Uninstalled: {},
-});
+  Uninstalled: {}
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Readiness = typeof Readiness.Type;
+export type Readiness = typeof Readiness.Type
 
 /**
  * A connection as its readers see it, as `ConnectionService` returns it: the record without its
@@ -306,7 +292,7 @@ export type Readiness = typeof Readiness.Type;
  * @since 0.1.0
  */
 export const View = Schema.Struct({
-  id: Id,
+  id: ConnectionContract.ConnectionId,
   name: Name,
   integration: Schema.NonEmptyString,
   settings: Settings,
@@ -315,9 +301,9 @@ export const View = Schema.Struct({
 
   /** Whether the reader may rename it, change its settings and key, check it, and remove it. */
   manageable: Schema.Boolean,
-  createdBy: MemberId.Id,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdBy: MemberId.MemberId,
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -334,8 +320,8 @@ export interface View extends Schema.Schema.Type<typeof View> {}
  */
 export const Access = Schema.Struct({
   connection: ConnectionContract.Connection,
-  credential: Schema.NullOr(ConnectionContract.Credential),
-});
+  credential: Schema.NullOr(ConnectionContract.Credential)
+})
 
 /**
  * @category schemas
@@ -347,7 +333,7 @@ export interface Access extends Schema.Schema.Type<typeof Access> {}
  * The record as its integration takes it, `@amends-dev/connection`'s `Connection.Connection`:
  * without its workspace, its status, or who created it.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
 export const connectionOf = (record: Connection): ConnectionContract.Connection => ({
@@ -355,13 +341,13 @@ export const connectionOf = (record: Connection): ConnectionContract.Connection 
   integration: record.integration,
   name: record.name,
   settings: record.settings,
-  auth: record.auth,
-});
+  auth: record.auth
+})
 
 /**
  * A connection as its readers see it, as ready as its integration finds it.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const view = (record: Connection, readiness: Readiness, manageable: boolean): View => ({
@@ -373,8 +359,8 @@ export const view = (record: Connection, readiness: Readiness, manageable: boole
   readiness,
   manageable,
   createdBy: record.createdBy,
-  createdAt: record.createdAt,
-});
+  createdAt: record.createdAt
+})
 
 /**
  * An integration its host installs, as readers see it when they connect to it: what it is, how a
@@ -396,8 +382,8 @@ export const IntegrationView = Schema.Struct({
 
   /** Whether the agent of the harnesses a connection gives works only in a sandbox. */
   requiresSandbox: Schema.Boolean,
-  settings: Integration.SettingsForm,
-});
+  settings: Integration.SettingsForm
+})
 
 /**
  * @category schemas
@@ -408,7 +394,7 @@ export interface IntegrationView extends Schema.Schema.Type<typeof IntegrationVi
 /**
  * An installed integration as readers see it, as `ConnectionService.integrations` lists it.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const integrationView = (integration: Integration.Integration): IntegrationView => ({
@@ -418,8 +404,8 @@ export const integrationView = (integration: Integration.Integration): Integrati
   auth: integration.auth,
   provides: integration.provides,
   requiresSandbox: integration.requiresSandbox,
-  settings: integration.settings,
-});
+  settings: integration.settings
+})
 
 /**
  * The models a connection offers an agent: the catalog's models its integration lists, and whether
@@ -431,8 +417,8 @@ export const integrationView = (integration: Integration.Integration): Integrati
  */
 export const Models = Schema.Struct({
   listed: Schema.Array(ModelCatalog.Model),
-  unlisted: Schema.Boolean,
-});
+  unlisted: Schema.Boolean
+})
 
 /**
  * @category schemas

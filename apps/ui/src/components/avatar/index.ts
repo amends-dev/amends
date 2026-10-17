@@ -5,5 +5,5 @@ export {
   type AvatarProps,
   type AvatarSize,
   type AvatarStackPerson,
-  type AvatarStackProps,
-} from "./avatar.tsx";
+  type AvatarStackProps
+} from "./avatar.tsx"

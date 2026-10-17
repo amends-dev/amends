@@ -7112,4 +7112,4 @@ export const snapshot = String.raw`{"providers":[
     {"id":"glm-5.3-flash","name":"GLM-5.3-Flash","protocol":"openai-chat","url":"https://open.bigmodel.cn/api/coding/paas/v4","released":"2026-08-26","limits":{"context":1000000,"output":131072},"modalities":{"input":["text","image","video","pdf"],"output":["text"]},"tools":true,"reasoning":{"toggle":false,"efforts":["low","high","max"]},"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}},
     {"id":"glm-5.3-highspeed","name":"GLM-5.3 Highspeed","protocol":"openai-chat","url":"https://open.bigmodel.cn/api/coding/paas/v4","released":"2026-08-14","limits":{"context":1000000,"output":131072},"modalities":{"input":["text"],"output":["text"]},"tools":true,"reasoning":{"toggle":false,"efforts":["low","high","max"]},"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}
   ]}
-]}`;
+]}`

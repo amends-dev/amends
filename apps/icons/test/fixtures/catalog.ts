@@ -1,1 +1,1 @@
-export { iconCatalog } from "@amends-dev/icons/catalog";
+export { iconCatalog } from "@amends-dev/icons/catalog"

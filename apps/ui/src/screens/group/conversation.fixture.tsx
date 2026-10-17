@@ -1,46 +1,41 @@
 // Workshop harness: a group and thread shaped like the connected app's data, with dated
 // messages, reply summaries, notes, mentions, and loading states. Not exported.
-import { Show, createSignal } from "solid-js";
-import type { MentionCandidate } from "../../components/composer/index.ts";
-import { Profiles } from "../../components/profile-card/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { people, profile } from "../sample.ts";
-import type { ColorPalette } from "../../foundations/color/palettes.ts";
-import type { TimelineEntry } from "../timeline/index.ts";
-import {
-  HomeSidebar,
-  WorkspaceNavigation,
-  type Appearance,
-} from "../workspace-navigation/index.ts";
-import { navigation } from "../sample.ts";
-import { GroupPane } from "./group-pane.tsx";
-import { GroupThreads, type ConversationStatus } from "./group-threads.tsx";
-import { ThreadPane } from "./thread-pane.tsx";
+import { Show, createSignal } from "solid-js"
+import type { MentionCandidate } from "../../components/composer/index.ts"
+import { Profiles } from "../../components/profile-card/index.ts"
+import type { ColorPalette } from "../../foundations/color/palettes.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { people, profile, navigation } from "../sample.ts"
+import type { TimelineEntry } from "../timeline/index.ts"
+import { HomeSidebar, WorkspaceNavigation, type Appearance } from "../workspace-navigation/index.ts"
+import { GroupPane } from "./group-pane.tsx"
+import { GroupThreads, type ConversationStatus } from "./group-threads.tsx"
+import { ThreadPane } from "./thread-pane.tsx"
 
 /** Recent messages fall today whatever the clock says: just after midnight, they count from 1am. */
-const now = new Date(Math.max(Date.now(), new Date().setHours(1, 0, 0, 0)));
-const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+const now = new Date(Math.max(Date.now(), new Date().setHours(1, 0, 0, 0)))
+const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000)
 const daysAgo = (days: number, hour: number) => {
-  const date = new Date(now);
-  date.setDate(date.getDate() - days);
-  date.setHours(hour, 5, 0, 0);
-  return date;
-};
+  const date = new Date(now)
+  date.setDate(date.getDate() - days)
+  date.setHours(hour, 5, 0, 0)
+  return date
+}
 
-export const candidates: readonly MentionCandidate[] = [
+export const candidates: ReadonlyArray<MentionCandidate> = [
   { id: "alex", name: "Alex Morgan" },
   { id: "sara", name: "Sara Lind" },
-  { id: "yumi", name: "Yumi", agent: true },
-];
+  { id: "yumi", name: "Yumi", agent: true }
+]
 
-const openings: readonly TimelineEntry[] = [
+const openings: ReadonlyArray<TimelineEntry> = [
   {
     kind: "message",
     id: "t1",
     author: people.alex,
     at: daysAgo(1, 16),
     text: "The preview is ready for another look.",
-    thread: { replies: 2, unread: true },
+    thread: { replies: 2, unread: true }
   },
   {
     kind: "message",
@@ -49,7 +44,7 @@ const openings: readonly TimelineEntry[] = [
     at: minutesAgo(40),
     text: "Can [@Yumi](member:yumi) check the release notes?",
     mentions: [{ id: "yumi", name: "Yumi" }],
-    thread: { replies: 0, typing: ["Yumi"] },
+    thread: { replies: 0, typing: ["Yumi"] }
   },
   {
     kind: "message",
@@ -57,17 +52,17 @@ const openings: readonly TimelineEntry[] = [
     author: people.aj,
     at: minutesAgo(12),
     text: "Lunch at noon?",
-    thread: { replies: 0 },
-  },
-];
+    thread: { replies: 0 }
+  }
+]
 
-const thread: readonly TimelineEntry[] = [
+const thread: ReadonlyArray<TimelineEntry> = [
   {
     kind: "message",
     id: "r0",
     author: people.alex,
     at: daysAgo(1, 16),
-    text: "The preview is ready for another look.",
+    text: "The preview is ready for another look."
   },
   { kind: "note", id: "n1", at: daysAgo(1, 16), change: "followed", who: "Sara" },
   {
@@ -75,7 +70,7 @@ const thread: readonly TimelineEntry[] = [
     id: "r1",
     author: people.sara,
     at: daysAgo(1, 17),
-    text: "Looks good to me.",
+    text: "Looks good to me."
   },
   { kind: "note", id: "n2", at: minutesAgo(30), change: "unfollowed", who: "You", self: true },
   {
@@ -83,7 +78,7 @@ const thread: readonly TimelineEntry[] = [
     id: "r2",
     author: people.yumi,
     at: minutesAgo(5),
-    text: "Checked the build: all green.",
+    text: "Checked the build: all green."
   },
   // Soon after by the same author, so it stacks under the one before.
   {
@@ -91,39 +86,34 @@ const thread: readonly TimelineEntry[] = [
     id: "r3",
     author: people.yumi,
     at: minutesAgo(4),
-    text: "The release notes are ready too; they cover the paste fix.",
-  },
-];
+    text: "The release notes are ready too; they cover the paste fix."
+  }
+]
 
 export interface ConversationProps {
-  readonly status?: ConversationStatus;
-  readonly threadStatus?: ConversationStatus;
-  readonly open?: boolean;
+  readonly status?: ConversationStatus
+  readonly threadStatus?: ConversationStatus
+  readonly open?: boolean
   /** Older threads remain, or the last older page failed. */
-  readonly earlier?: boolean | "failed";
-  readonly menu?: boolean;
+  readonly earlier?: boolean | "failed"
+  readonly menu?: boolean
 }
 
 /** A group and its open thread over dated data, as the app drives them. */
 export function Conversation(props: ConversationProps) {
-  const [draft, setDraft] = createSignal("");
-  const [reply, setReply] = createSignal("");
-  const [open, setOpen] = createSignal(props.open ?? false);
-  const [following, setFollowing] = createSignal(true);
-  const [appearance, setAppearance] = createSignal<Appearance>("system");
-  const [palette, setPalette] = createSignal<ColorPalette>("neutral");
-  const [entries, setEntries] = createSignal(openings);
+  const [draft, setDraft] = createSignal("")
+  const [reply, setReply] = createSignal("")
+  const [open, setOpen] = createSignal(props.open ?? false)
+  const [following, setFollowing] = createSignal(true)
+  const [appearance, setAppearance] = createSignal<Appearance>("system")
+  const [palette, setPalette] = createSignal<ColorPalette>("neutral")
+  const [entries, setEntries] = createSignal(openings)
   const { onSearch: _search, ...base } = navigation({
     groups: [{ id: "general", name: "general" }],
-    currentGroup: "general",
-  });
+    currentGroup: "general"
+  })
   return (
-    <Profiles.Root
-      profile={profile}
-      onMessage={() => {}}
-      onOpenAgent={() => {}}
-      onChangeName={() => {}}
-    >
+    <Profiles.Root profile={profile} onMessage={() => {}} onOpenAgent={() => {}} onChangeName={() => {}}>
       <Shell.Root>
         <WorkspaceNavigation
           {...base}
@@ -139,9 +129,9 @@ export function Conversation(props: ConversationProps) {
                   onPaletteChange: setPalette,
                   onOpenSettings: () => {},
                   onChangeName: () => {},
-                  onSignOut: () => {},
+                  onSignOut: () => {}
                 }
-              : undefined,
+              : undefined
           }}
         >
           <HomeSidebar
@@ -149,7 +139,7 @@ export function Conversation(props: ConversationProps) {
             groups={[
               { id: "general", name: "general", href: "#general", current: true },
               { id: "design", name: "design", href: "#design", pending: 2 },
-              { id: "product", name: "product", href: "#product", unread: true },
+              { id: "product", name: "product", href: "#product", unread: true }
             ]}
           />
         </WorkspaceNavigation>
@@ -171,9 +161,7 @@ export function Conversation(props: ConversationProps) {
               days
               status={props.status}
               onRetry={() => {}}
-              earlier={
-                props.earlier ? { failed: props.earlier === "failed", onLoad: () => {} } : undefined
-              }
+              earlier={props.earlier ? { failed: props.earlier === "failed", onLoad: () => {} } : undefined}
               openThreadId={open() ? "t1" : undefined}
               onOpenThread={() => setOpen(true)}
               placeholder="Message #general"
@@ -190,10 +178,10 @@ export function Conversation(props: ConversationProps) {
                     at: new Date(),
                     text,
                     mentions: candidates.filter((person) => text.includes(`(member:${person.id})`)),
-                    thread: { replies: 0 },
-                  },
-                ]);
-                setDraft("");
+                    thread: { replies: 0 }
+                  }
+                ])
+                setDraft("")
               }}
             />
           </GroupPane>
@@ -218,5 +206,5 @@ export function Conversation(props: ConversationProps) {
         </Show>
       </Shell.Root>
     </Profiles.Root>
-  );
+  )
 }

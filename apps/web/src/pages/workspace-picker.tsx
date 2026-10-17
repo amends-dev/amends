@@ -1,20 +1,15 @@
-import {
-  paths,
-  useCreateWorkspace,
-  useWorkspacePicker,
-  CreateWorkspaceState,
-} from "@amends-dev/client";
-import { CreateWorkspace, WorkspacePicker } from "@amends-dev/ui/screens/workspaces";
-import { useMatch, useNavigate } from "@solidjs/router";
-import { createEffect, Show } from "solid-js";
-import { useStandaloneAccount } from "../account.ts";
+import { paths, useCreateWorkspace, useWorkspacePicker, CreateWorkspaceState } from "@amends-dev/client"
+import { CreateWorkspace, WorkspacePicker } from "@amends-dev/ui/screens/workspaces"
+import { useMatch, useNavigate } from "@solidjs/router"
+import { createEffect, Show } from "solid-js"
+import { useStandaloneAccount } from "../account.ts"
 
 /** The reader's workspaces and invitations. Creating one opens over it at its own address. */
 export function WorkspacePickerPage() {
-  const picker = useWorkspacePicker();
-  const account = useStandaloneAccount();
-  const navigate = useNavigate();
-  const creating = useMatch(() => paths.createWorkspace);
+  const picker = useWorkspacePicker()
+  const account = useStandaloneAccount()
+  const navigate = useNavigate()
+  const creating = useMatch(() => paths.createWorkspace)
   return (
     <Show when={account()}>
       {(account) => (
@@ -24,7 +19,7 @@ export function WorkspacePickerPage() {
             account={account()}
             workspaces={picker.workspaces().map((workspace) => ({
               ...workspace,
-              href: paths.workspace(workspace.id),
+              href: paths.workspace(workspace.id)
             }))}
             invitations={picker.invitations()}
             refreshFailed={picker.refreshFailed()}
@@ -40,28 +35,27 @@ export function WorkspacePickerPage() {
         </>
       )}
     </Show>
-  );
+  )
 }
 
 /** One creation intent, for as long as the dialog is open; it opens the workspace it creates. */
 function CreateWorkspaceDialog() {
-  const creation = useCreateWorkspace();
-  const navigate = useNavigate();
+  const creation = useCreateWorkspace()
+  const navigate = useNavigate()
   createEffect(() => {
-    const state = creation.state();
-    if (CreateWorkspaceState.$is("Ready")(state))
-      navigate(paths.workspace(state.workspace.id), { replace: true });
-  });
+    const state = creation.state()
+    if (CreateWorkspaceState.$is("Ready")(state)) navigate(paths.workspace(state.workspace.id), { replace: true })
+  })
   const form = () => {
-    const state = creation.state();
-    return CreateWorkspaceState.$is("Form")(state) ? state : undefined;
-  };
+    const state = creation.state()
+    return CreateWorkspaceState.$is("Form")(state) ? state : undefined
+  }
   const created = () => {
-    const state = creation.state();
+    const state = creation.state()
     return CreateWorkspaceState.$is("Created")(state)
       ? { name: state.workspace.name, pending: state.pending, refreshFailed: state.refreshFailed }
-      : undefined;
-  };
+      : undefined
+  }
   return (
     <CreateWorkspace
       open
@@ -76,5 +70,5 @@ function CreateWorkspaceDialog() {
       created={created()}
       onRetry={creation.retryRefresh}
     />
-  );
+  )
 }

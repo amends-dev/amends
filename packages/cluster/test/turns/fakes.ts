@@ -1,36 +1,36 @@
-import { Integration, Integrations } from "@amends-dev/connection";
-import type { AgentQuery } from "@amends-dev/core/agent";
-import { Connection } from "@amends-dev/core/connection";
-import { Identity } from "@amends-dev/core/identity";
-import { Group } from "@amends-dev/core/group";
-import { ThreadId, ThreadParticipation } from "@amends-dev/core/thread";
+import { Integration, Integrations, Connection as ConnectionContract } from "@amends-dev/connection"
+import type { AgentQuery } from "@amends-dev/core/agent"
+import { CoreError } from "@amends-dev/core/error"
+import { GroupId } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
+import { ThreadId, ThreadParticipationId } from "@amends-dev/core/thread"
 import {
   type SessionLog,
   SessionLogStore,
   type SessionStateStore,
-  Turn,
+  type Turn,
   TurnExecution,
   type TurnJobs,
-} from "@amends-dev/core/turn";
-import { Member, Workspace } from "@amends-dev/core/workspace";
-import { Gateway } from "@amends-dev/gateway";
-import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends-dev/harness";
-import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
-import { Prompt } from "effect/ai";
-import { CoreError } from "@amends-dev/core/error";
+  TurnId
+} from "@amends-dev/core/turn"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import { Gateway } from "@amends-dev/gateway"
+import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends-dev/harness"
+import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect"
+import { Prompt } from "effect/ai"
 
-export const workspaceId = Workspace.Id.make("workspace-1");
+export const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 export const job: TurnJobs.Job = {
   workspaceId,
-  memberId: Member.Id.make("member-planner"),
-  threadId: ThreadId.Id.make("thread-1"),
-};
-export const participationId = ThreadParticipation.Id.make("participation-1");
-const at = DateTime.makeUnsafe("2026-10-07T12:00:00.000Z");
+  memberId: MemberId.MemberId.make("member-planner"),
+  threadId: ThreadId.ThreadId.make("thread-1")
+}
+export const participationId = ThreadParticipationId.ThreadParticipationId.make("participation-1")
+const at = DateTime.makeUnsafe("2026-10-07T12:00:00.000Z")
 export const turn: Turn.Turn = {
-  id: Turn.Id.make("turn-1"),
+  id: TurnId.TurnId.make("turn-1"),
   workspaceId,
-  groupId: Group.Id.make("group-1"),
+  groupId: GroupId.GroupId.make("group-1"),
   threadId: job.threadId,
   agentId: Identity.AgentId.make("agent-planner"),
   memberId: job.memberId,
@@ -45,59 +45,59 @@ export const turn: Turn.Turn = {
   cancelReason: null,
   createdAt: at,
   startedAt: at,
-  finishedAt: null,
-};
+  finishedAt: null
+}
 
 /** A connection the runnable names, on `integration`, taking no key. */
 const connectionOn = (integration: string) => ({
   connection: {
-    id: Connection.Id.make(`connection-${integration}`),
+    id: ConnectionContract.ConnectionId.make(`connection-${integration}`),
     integration,
     name: integration,
     settings: {},
-    auth: "none" as const,
+    auth: "none" as const
   },
-  credential: null,
-});
+  credential: null
+})
 /** What the agent runs on: its harness on `harnessIntegration`, a model, and no sandbox. */
 export const runnableOn = (harnessIntegration: string): AgentQuery.Runnable => ({
   instructions: "Plan each change.",
   harness: connectionOn(harnessIntegration),
   model: {
     ...connectionOn("test-models"),
-    model: { connectionId: Connection.Id.make("connection-test-models"), id: "test-model" },
+    model: { connectionId: ConnectionContract.ConnectionId.make("connection-test-models"), id: "test-model" }
   },
-  sandbox: null,
-});
-export const runnable = runnableOn("test-agent");
+  sandbox: null
+})
+export const runnable = runnableOn("test-agent")
 
 /** How the job ended a turn, as the workspace was asked. */
 export type Ending =
   | { readonly kind: "close"; readonly reply: string; readonly resume: SessionStateStore.Resume }
   | {
-      readonly kind: "fail";
-      readonly reason: string;
-      readonly resume: SessionStateStore.Resume | undefined;
+      readonly kind: "fail"
+      readonly reason: string
+      readonly resume: SessionStateStore.Resume | undefined
     }
-  | { readonly kind: "stop"; readonly resume: SessionStateStore.Resume | undefined };
+  | { readonly kind: "stop"; readonly resume: SessionStateStore.Resume | undefined }
 
 export interface FakeWorkspaceOptions {
   /** The turn's prompt, as starting it gives it. */
-  readonly prompt?: Prompt.UserMessage;
+  readonly prompt?: Prompt.UserMessage
   /** What the participation's session resumes from, or none for a new one. */
-  readonly resume?: SessionStateStore.Resume | null;
+  readonly resume?: SessionStateStore.Resume | null
   /** What the agent's job is given to run it on. */
-  readonly runnable?: AgentQuery.Runnable;
+  readonly runnable?: AgentQuery.Runnable
   /** The conversation the agent joined. */
-  readonly joined?: ReadonlyArray<Prompt.Message>;
+  readonly joined?: ReadonlyArray<Prompt.Message>
   /** What the session log holds before the run. */
-  readonly logged?: ReadonlyArray<SessionLog.Entry>;
+  readonly logged?: ReadonlyArray<SessionLog.Entry>
   /** Whether work waits for the agent. True by default. */
-  readonly workWaits?: boolean;
+  readonly workWaits?: boolean
   /** How many times starting the turn fails first, as when storage is down. None by default. */
-  readonly failedStarts?: number;
+  readonly failedStarts?: number
   /** Whether the workspace was ever created. True by default. */
-  readonly created?: boolean;
+  readonly created?: boolean
 }
 
 /**
@@ -109,17 +109,17 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
   const log: Array<SessionLog.Recorded> = (options.logged ?? []).map((entry, index) => ({
     position: index + 1,
     recordedAt: at,
-    entry,
-  }));
-  const endings: Array<Ending> = [];
-  const drafts: Array<Turn.Draft> = [];
-  let active = options.workWaits ?? true;
-  let starts = 0;
+    entry
+  }))
+  const endings: Array<Ending> = []
+  const drafts: Array<Turn.Draft> = []
+  let active = options.workWaits ?? true
+  let starts = 0
   const end = (ending: Ending) =>
     Effect.sync(() => {
-      endings.push(ending);
-      active = false;
-    });
+      endings.push(ending)
+      active = false
+    })
   const turnExecution = TurnExecution.TurnExecution.of({
     accept: () => Effect.succeed(active ? Option.some(turn) : Option.none()),
     start: () =>
@@ -132,60 +132,55 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
                   runnable: options.runnable ?? runnable,
                   prompt: options.prompt ?? userMessage("Alice: Planner, summarize the plan."),
                   messages: 1,
-                  resume: options.resume ?? null,
+                  resume: options.resume ?? null
                 })
-              : TurnExecution.Start.cases.Idle.make({}),
+              : TurnExecution.Start.cases.Idle.make({})
           ),
     joinedConversation: () => Effect.succeed(options.joined ?? []),
     showDraft: (_, draft) => Effect.sync(() => void drafts.push(draft)),
     close: (_, { reply, resume }) =>
-      Effect.as(
-        end({ kind: "close", reply, resume }),
-        TurnExecution.Closing.cases.Closed.make({ messageIds: [] }),
-      ),
+      Effect.as(end({ kind: "close", reply, resume }), TurnExecution.Closing.cases.Closed.make({ messageIds: [] })),
     fail: (_, { reason, resume }) => end({ kind: "fail", reason, resume }),
-    confirmStopped: (_, { resume }) => (active ? end({ kind: "stop", resume }) : Effect.void),
-  });
+    confirmStopped: (_, { resume }) => (active ? end({ kind: "stop", resume }) : Effect.void)
+  })
   /** Append to the log as another writer, after its latest entry. */
   const appendElsewhere = (entry: SessionLog.Entry) =>
-    Effect.sync(() => void log.push({ position: log.length + 1, recordedAt: at, entry }));
+    Effect.sync(() => void log.push({ position: log.length + 1, recordedAt: at, entry }))
   const sessionLogStore = SessionLogStore.SessionLogStore.of({
     head: () => Effect.sync(() => log.length),
     append: (_, entries, after) =>
       Effect.suspend(() => {
         if (after !== log.length)
-          return Effect.fail(
-            new SessionLogStore.Overtaken({ participationId: String(participationId), after }),
-          );
+          return Effect.fail(new SessionLogStore.Overtaken({ participationId: String(participationId), after }))
         const recorded = Array.map(entries, (entry, index) => ({
           position: after + index + 1,
           recordedAt: at,
-          entry,
-        }));
-        log.push(...recorded);
-        return Effect.succeed(recorded);
+          entry
+        }))
+        log.push(...recorded)
+        return Effect.succeed(recorded)
       }),
     read: (_, { after, limit }) => Effect.sync(() => log.slice(after, after + limit)),
-    waitForAppend: () => Effect.never,
-  });
+    waitForAppend: () => Effect.never
+  })
   const services = Context.make(TurnExecution.TurnExecution, turnExecution).pipe(
-    Context.add(SessionLogStore.SessionLogStore, sessionLogStore),
-  );
-  let entered = 0;
+    Context.add(SessionLogStore.SessionLogStore, sessionLogStore)
+  )
+  let entered = 0
   const gateway = Gateway.Gateway.of({
     createWorkspace: () => Effect.die("The fake workspace is never created"),
     asMember: () => Effect.die("The job runs as no member"),
     inWorkspace: (_, program) =>
       Effect.provideContext(
         Effect.gen(function* () {
-          entered += 1;
+          entered += 1
           if (options.created === false)
-            return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId });
-          return yield* program;
+            return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId })
+          return yield* program
         }),
-        services,
-      ) as Effect.Effect<never, never, never>,
-  });
+        services
+      ) as Effect.Effect<never, never, never>
+  })
   return {
     gateway,
     /** The session log's entries, oldest first. */
@@ -196,20 +191,20 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     /** How many times a job entered the workspace. */
     entered: () => entered,
     drafts: () => [...drafts],
-    appendElsewhere,
-  };
-};
+    appendElsewhere
+  }
+}
 
-export type FakeWorkspace = ReturnType<typeof makeFakeWorkspace>;
+export type FakeWorkspace = ReturnType<typeof makeFakeWorkspace>
 
 export interface ScriptedAgent {
-  readonly agent: Agent.Agent;
+  readonly agent: Agent.Agent
   /** What each `createSession` was given, in order. */
-  readonly createdWith: ReadonlyArray<Agent.CreateSessionOptions>;
+  readonly createdWith: ReadonlyArray<Agent.CreateSessionOptions>
   /** What each turn was given, in order. */
-  readonly turns: ReadonlyArray<Agent.TurnOptions>;
+  readonly turns: ReadonlyArray<Agent.TurnOptions>
   /** How many finished steps each continued turn was told of, in order. */
-  readonly continued: ReadonlyArray<number>;
+  readonly continued: ReadonlyArray<number>
 }
 
 /**
@@ -219,28 +214,28 @@ export interface ScriptedAgent {
  */
 export const makeScriptedAgent = (
   script: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
-  { keepsTurns = false }: { readonly keepsTurns?: boolean } = {},
+  { keepsTurns = false }: { readonly keepsTurns?: boolean } = {}
 ): ScriptedAgent => {
-  const createdWith: Array<Agent.CreateSessionOptions> = [];
-  const turns: Array<Agent.TurnOptions> = [];
-  const continued: Array<number> = [];
+  const createdWith: Array<Agent.CreateSessionOptions> = []
+  const turns: Array<Agent.TurnOptions> = []
+  const continued: Array<number> = []
   const agent: Agent.Agent = {
     id: "scripted",
     requiresSandbox: false,
     createSession: (options) =>
       Effect.sync(() => {
-        createdWith.push(options);
+        createdWith.push(options)
         return {
           hasUnfinishedTurn: keepsTurns && options.unfinishedTurn !== undefined,
           promptTurn: (options) =>
             Stream.suspend(() => {
-              turns.push(options);
-              return script;
+              turns.push(options)
+              return script
             }),
           continueTurn: (_, finishedSteps) =>
             Stream.suspend(() => {
-              continued.push(finishedSteps);
-              return script;
+              continued.push(finishedSteps)
+              return script
             }),
           submitToolResult: () => Effect.die("The scripted agent calls no host tool"),
           approve: () => Effect.die("The scripted agent asks for no approval"),
@@ -248,12 +243,12 @@ export const makeScriptedAgent = (
           suspendTurn: Effect.die("The scripted agent suspends no turn"),
           detach: Effect.sync(() => ({ turns: turns.length })),
           stop: Effect.sync(() => ({ turns: turns.length })),
-          destroy: Effect.void,
-        };
-      }),
-  };
-  return { agent, createdWith, turns, continued };
-};
+          destroy: Effect.void
+        }
+      })
+  }
+  return { agent, createdWith, turns, continued }
+}
 
 /** The integrations a host installs for the scripted agent: models, and the agent's harness. */
 export const integrationsFor = (agent: Agent.Agent) =>
@@ -272,22 +267,22 @@ export const integrationsFor = (agent: Agent.Agent) =>
               provider: "test-models",
               model,
               protocol: "openai-chat",
-              url: "https://models.example",
-            }),
+              url: "https://models.example"
+            })
         },
-        check: () => Effect.succeed({ status: "healthy" }),
+        check: () => Effect.succeed({ status: "healthy" })
       }),
       Integration.make({
         id: "test-agent",
         name: "Test agent",
         auth: ["none"],
         harnesses: { requiresSandbox: false, harness: () => Effect.succeed(Harness.make(agent)) },
-        check: () => Effect.succeed({ status: "healthy" }),
-      }),
-    ]),
-  );
+        check: () => Effect.succeed({ status: "healthy" })
+      })
+    ])
+  )
 
-const usage = { inputTokens: {}, outputTokens: {} };
+const usage = { inputTokens: {}, outputTokens: {} }
 /** A step that only calls a tool of the agent's own. */
 export const reading: ReadonlyArray<StreamPart.StreamPart> = [
   { type: "tool-call", id: "call-read", name: "read", params: {}, providerExecuted: true },
@@ -297,19 +292,19 @@ export const reading: ReadonlyArray<StreamPart.StreamPart> = [
     name: "read",
     result: "2 and 3",
     isFailure: false,
-    providerExecuted: true,
+    providerExecuted: true
   },
-  { type: "finish-step", reason: "tool-calls", usage },
-];
+  { type: "finish-step", reason: "tool-calls", usage }
+]
 /** A step that writes `deltas`, one text. */
 export const writing = (...deltas: ReadonlyArray<string>): ReadonlyArray<StreamPart.StreamPart> => [
   { type: "text-start", id: "answer" },
   ...deltas.map((delta) => ({ type: "text-delta" as const, id: "answer", delta })),
   { type: "text-end", id: "answer" },
-  { type: "finish-step", reason: "stop", usage },
-];
-export const finish: StreamPart.StreamPart = { type: "finish", reason: "stop", usage };
+  { type: "finish-step", reason: "stop", usage }
+]
+export const finish: StreamPart.StreamPart = { type: "finish", reason: "stop", usage }
 
 /** A user message with a text part for each of `texts`, as a turn's prompt is. */
 export const userMessage = (...texts: ReadonlyArray<string>): Prompt.UserMessage =>
-  Prompt.makeMessage("user", { content: texts.map((text) => Prompt.makePart("text", { text })) });
+  Prompt.makeMessage("user", { content: texts.map((text) => Prompt.makePart("text", { text })) })

@@ -1,10 +1,10 @@
 // Workshop harness: Agents over local state, with connections shaped like those the local host
 // installs. Not exported.
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { Toast } from "../../components/toast/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { navigation } from "../sample.ts";
-import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { Toast } from "../../components/toast/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { navigation } from "../sample.ts"
+import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts"
 import {
   AddAgent,
   AgentList,
@@ -26,38 +26,37 @@ import {
   type Effort,
   type HarnessOption,
   type ModelChoices,
-  type SetupFieldsProps,
-} from "./index.ts";
+  type SetupFieldsProps
+} from "./index.ts"
 
-export const sampleHarnesses: readonly HarnessOption[] = [
+export const sampleHarnesses: ReadonlyArray<HarnessOption> = [
   { id: "amends", name: "Amends harness", integrationName: "amends", requiresSandbox: false },
-  { id: "opencode", name: "opencode", integrationName: "opencode", requiresSandbox: true },
-];
+  { id: "opencode", name: "opencode", integrationName: "opencode", requiresSandbox: true }
+]
 
-export const sampleModelConnections: readonly ConnectionOption[] = [
+export const sampleModelConnections: ReadonlyArray<ConnectionOption> = [
   { id: "openrouter", name: "OpenRouter", integrationName: "OpenRouter" },
-  { id: "local-models", name: "Local models", integrationName: "OpenAI-compatible API" },
-];
+  { id: "local-models", name: "Local models", integrationName: "OpenAI-compatible API" }
+]
 
-export const sampleSandboxes: readonly ConnectionOption[] = [
+export const sampleSandboxes: ReadonlyArray<ConnectionOption> = [
   { id: "this-machine", name: "This machine", integrationName: "This machine" },
-  { id: "daytona", name: "Daytona", integrationName: "Daytona" },
-];
+  { id: "daytona", name: "Daytona", integrationName: "Daytona" }
+]
 
 /** A connection whose integration this host no longer installs. */
-const uninstalled = { id: "vertex", name: "Vertex" };
+const uninstalled = { id: "vertex", name: "Vertex" }
 
 /**
  * The options with the one an agent names when it is removed or not installed, which shows as
  * unavailable, as the client lists it.
  */
 function withCurrent<Option extends ConnectionOption>(
-  options: readonly Option[],
+  options: ReadonlyArray<Option>,
   id: string | undefined,
-  unavailable: (option: ConnectionOption) => Option,
-): readonly Option[] {
-  if (id === undefined || id === autoHarness || options.some((option) => option.id === id))
-    return options;
+  unavailable: (option: ConnectionOption) => Option
+): ReadonlyArray<Option> {
+  if (id === undefined || id === autoHarness || options.some((option) => option.id === id)) return options
   return [
     ...options,
     unavailable(
@@ -65,16 +64,16 @@ function withCurrent<Option extends ConnectionOption>(
         ? {
             ...uninstalled,
             integrationName: "Vertex AI",
-            unavailable: "Its integration isn’t installed on this host.",
+            unavailable: "Its integration isn’t installed on this host."
           }
         : {
             id,
             name: "Removed connection",
             integrationName: "",
-            unavailable: "This connection was removed.",
-          },
-    ),
-  ];
+            unavailable: "This connection was removed."
+          }
+    )
+  ]
 }
 
 const sampleModels: Readonly<Record<string, ModelChoices>> = {
@@ -84,34 +83,34 @@ const sampleModels: Readonly<Record<string, ModelChoices>> = {
       { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: ["low", "medium", "high", "max"] },
       { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", efforts: ["low", "medium", "high"] },
       { id: "gpt-5-1", name: "GPT-5.1", efforts: ["minimal", "low", "medium", "high"] },
-      { id: "deepseek-v4", name: "DeepSeek V4", efforts: [] },
+      { id: "deepseek-v4", name: "DeepSeek V4", efforts: [] }
     ],
-    unlisted: false,
+    unlisted: false
   },
-  "local-models": { status: "loaded", listed: [], unlisted: true },
-};
+  "local-models": { status: "loaded", listed: [], unlisted: true }
+}
 
-const roles: readonly AgentRoleOption[] = [
+const roles: ReadonlyArray<AgentRoleOption> = [
   { id: "builtin:member", name: "Member", assignable: true },
-  { id: "builtin:administrator", name: "Administrator", assignable: false },
-];
+  { id: "builtin:administrator", name: "Administrator", assignable: false }
+]
 
 /** How an agent is set up, as the fixture keeps it and the form edits it. */
 interface Setup {
-  readonly instructions: string;
-  readonly harness: string;
-  readonly modelConnectionId: string | undefined;
-  readonly model: string;
-  readonly effort?: Effort;
-  readonly sandboxId?: string;
+  readonly instructions: string
+  readonly harness: string
+  readonly modelConnectionId: string | undefined
+  readonly model: string
+  readonly effort?: Effort
+  readonly sandboxId?: string
 }
 
 interface Sample extends Setup {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
 }
 
-const samples: readonly Sample[] = [
+const samples: ReadonlyArray<Sample> = [
   {
     id: "reviewer",
     name: "Reviewer",
@@ -120,7 +119,7 @@ const samples: readonly Sample[] = [
     modelConnectionId: "openrouter",
     model: "claude-opus-5-5",
     effort: "high",
-    sandboxId: "daytona",
+    sandboxId: "daytona"
   },
   {
     id: "planner",
@@ -128,7 +127,7 @@ const samples: readonly Sample[] = [
     instructions: "Break each request into steps, and say who should take each.",
     harness: "amends",
     modelConnectionId: "openrouter",
-    model: "gpt-5-1",
+    model: "gpt-5-1"
   },
   {
     id: "researcher",
@@ -136,7 +135,7 @@ const samples: readonly Sample[] = [
     instructions: "Answer questions about the codebase, citing the files you read.",
     harness: autoHarness,
     modelConnectionId: "local-models",
-    model: "qwen3-coder-30b",
+    model: "qwen3-coder-30b"
   },
   {
     id: "tester",
@@ -145,7 +144,7 @@ const samples: readonly Sample[] = [
     harness: "opencode",
     modelConnectionId: "openrouter",
     model: "claude-sonnet-5-5",
-    sandboxId: "old-sandbox",
+    sandboxId: "old-sandbox"
   },
   {
     id: "archivist",
@@ -153,82 +152,58 @@ const samples: readonly Sample[] = [
     instructions: "Summarize each closed thread for the record.",
     harness: "amends",
     modelConnectionId: "vertex",
-    model: "gemini-3-pro",
-  },
-];
+    model: "gemini-3-pro"
+  }
+]
 
 /** What keeps an agent set up as `setup` from running, as core's readiness finds it. */
-function issuesOf(
-  setup: Setup,
-  harnesses: readonly HarnessOption[] = sampleHarnesses,
-): readonly AgentIssue[] {
-  const issues: AgentIssue[] = [];
-  const harness = harnesses.find((option) => option.id === setup.harness);
+function issuesOf(setup: Setup, harnesses: ReadonlyArray<HarnessOption> = sampleHarnesses): ReadonlyArray<AgentIssue> {
+  const issues: Array<AgentIssue> = []
+  const harness = harnesses.find((option) => option.id === setup.harness)
   if (setup.harness === autoHarness) {
-    const choosable = harnesses.some(
-      (option) => !option.requiresSandbox || setup.sandboxId !== undefined,
-    );
-    if (!choosable) issues.push({ kind: "no-harness" });
-  } else if (!harness) issues.push({ kind: "removed", part: "harness" });
-  else if (harness.requiresSandbox && setup.sandboxId === undefined)
-    issues.push({ kind: "sandbox-required" });
-  const models = setup.modelConnectionId && sampleModels[setup.modelConnectionId];
-  if (setup.modelConnectionId === uninstalled.id)
-    issues.push({ kind: "uninstalled", part: "model" });
-  else if (!models) issues.push({ kind: "removed", part: "model" });
-  else if (
-    models.status === "loaded" &&
-    !models.unlisted &&
-    !models.listed.some((model) => model.id === setup.model)
-  )
+    const choosable = harnesses.some((option) => !option.requiresSandbox || setup.sandboxId !== undefined)
+    if (!choosable) issues.push({ kind: "no-harness" })
+  } else if (!harness) issues.push({ kind: "removed", part: "harness" })
+  else if (harness.requiresSandbox && setup.sandboxId === undefined) issues.push({ kind: "sandbox-required" })
+  const models = setup.modelConnectionId && sampleModels[setup.modelConnectionId]
+  if (setup.modelConnectionId === uninstalled.id) issues.push({ kind: "uninstalled", part: "model" })
+  else if (!models) issues.push({ kind: "removed", part: "model" })
+  else if (models.status === "loaded" && !models.unlisted && !models.listed.some((model) => model.id === setup.model))
     issues.push({
       kind: "invalid",
       part: "model",
-      description: `OpenRouter offers no model ${setup.model}`,
-    });
-  if (
-    setup.sandboxId !== undefined &&
-    !sampleSandboxes.some((option) => option.id === setup.sandboxId)
-  )
-    issues.push({ kind: "removed", part: "sandbox" });
-  return issues;
+      description: `OpenRouter offers no model ${setup.model}`
+    })
+  if (setup.sandboxId !== undefined && !sampleSandboxes.some((option) => option.id === setup.sandboxId))
+    issues.push({ kind: "removed", part: "sandbox" })
+  return issues
 }
 
 /** Each agent's turns in progress, by its id; the others are idle. */
-const sampleTurns: Readonly<Record<string, readonly AgentTurn[]>> = {
+const sampleTurns: Readonly<Record<string, ReadonlyArray<AgentTurn>>> = {
   reviewer: [
     { id: "turn-review", state: "working", place: "#general", href: "#turn-review" },
-    { id: "turn-design", state: "queued", place: "#design", href: "#turn-design" },
+    { id: "turn-design", state: "queued", place: "#design", href: "#turn-design" }
   ],
-  planner: [{ id: "turn-plan", state: "stopping", place: "Jamie Morgan", href: "#turn-plan" }],
-};
+  planner: [{ id: "turn-plan", state: "stopping", place: "Jamie Morgan", href: "#turn-plan" }]
+}
 
-const urgency = { working: 0, stopping: 1, queued: 2 } as const;
+const urgency = { working: 0, stopping: 1, queued: 2 } as const
 
 /** Where an agent is at work, as the client finds it from its turns in progress. */
-const activityOf = (turns: readonly AgentTurn[]): AgentActivity | undefined => {
-  const [state] = turns
-    .map((turn) => turn.state)
-    .toSorted((left, right) => urgency[left] - urgency[right]);
-  return state === undefined ? undefined : { state, places: turns.map((turn) => turn.place) };
-};
+const activityOf = (turns: ReadonlyArray<AgentTurn>): AgentActivity | undefined => {
+  const [state] = turns.map((turn) => turn.state).toSorted((left, right) => urgency[left] - urgency[right])
+  return state === undefined ? undefined : { state, places: turns.map((turn) => turn.place) }
+}
 
 const connectionName = (id: string | undefined) =>
-  [...sampleHarnesses, ...sampleModelConnections, ...sampleSandboxes, uninstalled].find(
-    (option) => option.id === id,
-  )?.name;
+  [...sampleHarnesses, ...sampleModelConnections, ...sampleSandboxes, uninstalled].find((option) => option.id === id)
+    ?.name
 
-function summaryOf(
-  record: Sample,
-  configurable: boolean,
-  harnesses: readonly HarnessOption[],
-): AgentSummary {
-  const models = record.modelConnectionId ? sampleModels[record.modelConnectionId] : undefined;
-  const listed =
-    models?.status === "loaded"
-      ? models.listed.find((model) => model.id === record.model)
-      : undefined;
-  const activity = activityOf(sampleTurns[record.id] ?? []);
+function summaryOf(record: Sample, configurable: boolean, harnesses: ReadonlyArray<HarnessOption>): AgentSummary {
+  const models = record.modelConnectionId ? sampleModels[record.modelConnectionId] : undefined
+  const listed = models?.status === "loaded" ? models.listed.find((model) => model.id === record.model) : undefined
+  const activity = activityOf(sampleTurns[record.id] ?? [])
   return {
     ...(activity && { activity }),
     id: record.id,
@@ -242,21 +217,19 @@ function summaryOf(
     model: {
       connection: {
         id: record.modelConnectionId ?? "",
-        name: connectionName(record.modelConnectionId),
+        name: connectionName(record.modelConnectionId)
       },
       id: record.model,
       name: listed?.name,
-      effort: record.effort,
+      effort: record.effort
     },
     sandbox:
-      record.sandboxId === undefined
-        ? undefined
-        : { id: record.sandboxId, name: connectionName(record.sandboxId) },
+      record.sandboxId === undefined ? undefined : { id: record.sandboxId, name: connectionName(record.sandboxId) },
     issues: issuesOf(record, harnesses),
     configurable,
     createdBy: "Jamie Morgan",
-    createdAt: new Date(2026, 9, 6),
-  };
+    createdAt: new Date(2026, 9, 6)
+  }
 }
 
 const sameSetup = (left: Setup, right: Setup) =>
@@ -265,99 +238,95 @@ const sameSetup = (left: Setup, right: Setup) =>
   left.modelConnectionId === right.modelConnectionId &&
   left.model.trim() === right.model.trim() &&
   left.effort === right.effort &&
-  left.sandboxId === right.sandboxId;
+  left.sandboxId === right.sandboxId
 
 const emptySetup: Setup = {
   instructions: "",
   harness: autoHarness,
   modelConnectionId: undefined,
-  model: "",
-};
+  model: ""
+}
 
 export interface AgentsWorkspaceProps {
   /** An agent's page, by id, in place of the list. */
-  readonly selected?: string;
-  readonly tab?: AgentsTab;
-  readonly dialog?: "add" | "remove";
+  readonly selected?: string
+  readonly tab?: AgentsTab
+  readonly dialog?: "add" | "remove"
   /** The workspace has no agents. */
-  readonly empty?: boolean;
-  readonly status?: "loading" | "failed" | "unavailable";
+  readonly empty?: boolean
+  readonly status?: "loading" | "failed" | "unavailable"
   /** The reader may read agents but not add or change them. */
-  readonly readOnly?: boolean;
+  readonly readOnly?: boolean
   /** Every connection's models are still loading, or couldn't be read. */
-  readonly modelsStatus?: "loading" | "failed";
+  readonly modelsStatus?: "loading" | "failed"
   /** A draft to start adding from. */
-  readonly draft?: Partial<Setup> & { readonly name?: string };
+  readonly draft?: Partial<Setup> & { readonly name?: string }
   /** No connection gives a harness. */
-  readonly withoutHarnesses?: boolean;
+  readonly withoutHarnesses?: boolean
   /** The host refuses the next create, as this says. */
-  readonly refuseCreate?: AgentsFailure;
+  readonly refuseCreate?: AgentsFailure
   /** The host finds this change out of date. */
-  readonly conflict?: AgentsAction;
+  readonly conflict?: AgentsAction
 }
 
 /** Agents in a workspace, over sample connections, with every change applied in place. */
 export function AgentsWorkspace(props: AgentsWorkspaceProps) {
-  const [records, setRecords] = createSignal<readonly Sample[]>(props.empty ? [] : samples);
-  const [selected, setSelected] = createSignal(props.selected);
-  const [tab, setTab] = createSignal<AgentsTab>(props.tab ?? "all");
-  const [query, setQuery] = createSignal("");
-  const [dialog, setDialog] = createSignal(props.dialog);
-  const [names, setNames] = createSignal<Readonly<Record<string, string>>>({});
-  const [drafts, setDrafts] = createSignal<Readonly<Record<string, Setup>>>({});
+  const [records, setRecords] = createSignal<ReadonlyArray<Sample>>(props.empty ? [] : samples)
+  const [selected, setSelected] = createSignal(props.selected)
+  const [tab, setTab] = createSignal<AgentsTab>(props.tab ?? "all")
+  const [query, setQuery] = createSignal("")
+  const [dialog, setDialog] = createSignal(props.dialog)
+  const [names, setNames] = createSignal<Readonly<Record<string, string>>>({})
+  const [drafts, setDrafts] = createSignal<Readonly<Record<string, Setup>>>({})
   const [adding, setAdding] = createSignal({
     name: props.draft?.name ?? "",
     roleId: "builtin:member",
-    setup: { ...emptySetup, ...props.draft },
-  });
-  const [failure, setFailure] = createSignal<AgentsFailure>();
-  const [refusal, setRefusal] = createSignal(props.refuseCreate);
-  const [conflict, setConflict] = createSignal(props.conflict);
-  const [toasts, setToasts] = createSignal<Array<{ id: number; text: string }>>([]);
-  let toastId = 0;
-  const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }]);
-  const harnesses = props.withoutHarnesses ? [] : sampleHarnesses;
+    setup: { ...emptySetup, ...props.draft }
+  })
+  const [failure, setFailure] = createSignal<AgentsFailure>()
+  const [refusal, setRefusal] = createSignal(props.refuseCreate)
+  const [conflict, setConflict] = createSignal(props.conflict)
+  const [toasts, setToasts] = createSignal<Array<{ id: number; text: string }>>([])
+  let toastId = 0
+  const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }])
+  const harnesses = props.withoutHarnesses ? [] : sampleHarnesses
 
   const all = createMemo(() =>
     records()
       .map((record) => summaryOf(record, !props.readOnly, harnesses))
-      .toSorted((left, right) => left.name.localeCompare(right.name)),
-  );
-  const inTab = (agent: AgentSummary, next: AgentsTab) => next === "all" || agent.issues.length > 0;
+      .toSorted((left, right) => left.name.localeCompare(right.name))
+  )
+  const inTab = (agent: AgentSummary, next: AgentsTab) => next === "all" || agent.issues.length > 0
   const shown = createMemo(() => {
-    const words = query().trim().toLowerCase();
-    return all().filter(
-      (agent) => inTab(agent, tab()) && (!words || agent.name.toLowerCase().includes(words)),
-    );
-  });
-  const current = () => all().find((agent) => agent.id === selected());
-  const saved = (id: string) => records().find((record) => record.id === id) ?? samples[0]!;
-  const draftOf = (id: string) => drafts()[id] ?? saved(id);
+    const words = query().trim().toLowerCase()
+    return all().filter((agent) => inTab(agent, tab()) && (!words || agent.name.toLowerCase().includes(words)))
+  })
+  const current = () => all().find((agent) => agent.id === selected())
+  const saved = (id: string) => records().find((record) => record.id === id) ?? samples[0]!
+  const draftOf = (id: string) => drafts()[id] ?? saved(id)
   const update = (id: string, change: Partial<Sample>) =>
-    setRecords(
-      records().map((record) => (record.id === id ? Object.assign({}, record, change) : record)),
-    );
+    setRecords(records().map((record) => (record.id === id ? Object.assign({}, record, change) : record)))
 
   /** Runs a change, unless this scenario finds it out of date first. */
   const change = (action: AgentsAction, apply: () => string | undefined) => {
     if (conflict() === action) {
-      setConflict(undefined);
-      setFailure({ action, error: "changed" });
-      return false;
+      setConflict(undefined)
+      setFailure({ action, error: "changed" })
+      return false
     }
-    setFailure(undefined);
-    toast(agentsToast(action, apply()));
-    return true;
-  };
+    setFailure(undefined)
+    toast(agentsToast(action, apply()))
+    return true
+  }
   const modelsOf = (connectionId: string | undefined): ModelChoices | undefined => {
-    if (connectionId === undefined) return undefined;
-    if (props.modelsStatus) return { status: props.modelsStatus };
-    return sampleModels[connectionId];
-  };
+    if (connectionId === undefined) return undefined
+    if (props.modelsStatus) return { status: props.modelsStatus }
+    return sampleModels[connectionId]
+  }
   /** The setup form's fields over a draft, which `edit` changes. */
   const setupProps = (
     setup: Setup,
-    edit: (change: Partial<Setup>) => void,
+    edit: (change: Partial<Setup>) => void
   ): Omit<SetupFieldsProps, "problems" | "disabled"> => ({
     instructions: setup.instructions,
     onInstructionsChange: (instructions) => edit({ instructions }),
@@ -365,16 +334,11 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
     onHarnessChange: (harness) => edit({ harness }),
     harnesses: withCurrent(harnesses, setup.harness, (option) => ({
       ...option,
-      requiresSandbox: false,
+      requiresSandbox: false
     })),
-    modelConnections: withCurrent(
-      sampleModelConnections,
-      setup.modelConnectionId,
-      (option) => option,
-    ),
+    modelConnections: withCurrent(sampleModelConnections, setup.modelConnectionId, (option) => option),
     modelConnectionId: setup.modelConnectionId,
-    onModelConnectionChange: (modelConnectionId) =>
-      edit({ modelConnectionId, model: "", effort: undefined }),
+    onModelConnectionChange: (modelConnectionId) => edit({ modelConnectionId, model: "", effort: undefined }),
     models: modelsOf(setup.modelConnectionId),
     model: setup.model,
     onModelChange: (model) => edit({ model }),
@@ -382,34 +346,34 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
     onEffortChange: (effort) => edit({ effort }),
     sandboxes: withCurrent(sampleSandboxes, setup.sandboxId, (option) => option),
     sandboxId: setup.sandboxId,
-    onSandboxChange: (sandboxId) => edit({ sandboxId }),
-  });
-  const nameOf = (id: string) => names()[id] ?? all().find((entry) => entry.id === id)?.name ?? "";
+    onSandboxChange: (sandboxId) => edit({ sandboxId })
+  })
+  const nameOf = (id: string) => names()[id] ?? all().find((entry) => entry.id === id)?.name ?? ""
   const close = () => {
-    setFailure(undefined);
-    setDialog(undefined);
-  };
+    setFailure(undefined)
+    setDialog(undefined)
+  }
   const open = (id: string | undefined) => {
-    setFailure(undefined);
-    setSelected(id);
-  };
-  const add = props.readOnly ? undefined : () => setDialog("add");
+    setFailure(undefined)
+    setSelected(id)
+  }
+  const add = props.readOnly ? undefined : () => setDialog("add")
   // The sidebar's and list's links are plain hashes here: follow the list and each agent's page.
   onMount(() => {
     const follow = () => {
-      const target = window.location.hash.slice(1);
+      const target = window.location.hash.slice(1)
       if (target.startsWith("agent-")) {
-        const id = target.slice("agent-".length);
-        if (records().some((entry) => entry.id === id) && id !== selected()) open(id);
+        const id = target.slice("agent-".length)
+        if (records().some((entry) => entry.id === id) && id !== selected()) open(id)
       } else if (target === "all" || target === "needs-setup") {
-        setTab(target);
-        open(undefined);
+        setTab(target)
+        open(undefined)
       }
-    };
-    window.addEventListener("hashchange", follow);
-    onCleanup(() => window.removeEventListener("hashchange", follow));
-  });
-  const nav = navigation({ groups: [{ id: "general", name: "general" }] });
+    }
+    window.addEventListener("hashchange", follow)
+    onCleanup(() => window.removeEventListener("hashchange", follow))
+  })
+  const nav = navigation({ groups: [{ id: "general", name: "general" }] })
   return (
     <Shell.Root>
       <WorkspaceNavigation {...nav} destination="agents">
@@ -430,11 +394,11 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
                     href: `#agent-${agent.id}`,
                     current: selected() === agent.id,
                     person: { name: agent.name, initials: agent.name.charAt(0), tone: "lilac" },
-                    status: agentStatus(agent.issues, agent.activity),
+                    status: agentStatus(agent.issues, agent.activity)
                   })),
               loading: props.status === "loading",
-              empty: "No agents yet",
-            },
+              empty: "No agents yet"
+            }
           ]}
         />
       </WorkspaceNavigation>
@@ -447,15 +411,15 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
               tab={tab()}
               tabHref={(next) => `#${next}`}
               onTabChange={(next) => {
-                setQuery("");
-                setTab(next);
+                setQuery("")
+                setTab(next)
               }}
               counts={
                 props.status
                   ? undefined
                   : {
                       all: all().length,
-                      "needs-setup": all().filter((agent) => inTab(agent, "needs-setup")).length,
+                      "needs-setup": all().filter((agent) => inTab(agent, "needs-setup")).length
                     }
               }
               onAdd={add}
@@ -489,42 +453,37 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
               }
               onSaveName={() =>
                 change("rename", () => {
-                  update(agent().id, { name: nameOf(agent().id).trim() });
-                  const { [agent().id]: _saved, ...rest } = names();
-                  setNames(rest);
-                  return undefined;
+                  update(agent().id, { name: nameOf(agent().id).trim() })
+                  const { [agent().id]: _saved, ...rest } = names()
+                  setNames(rest)
+                  return undefined
                 })
               }
               setup={setupProps(draftOf(agent().id), (edit) =>
                 setDrafts({
                   ...drafts(),
-                  [agent().id]: Object.assign({}, draftOf(agent().id), edit),
-                }),
+                  [agent().id]: Object.assign({}, draftOf(agent().id), edit)
+                })
               )}
-              setupChanged={
-                drafts()[agent().id] !== undefined &&
-                !sameSetup(draftOf(agent().id), saved(agent().id))
-              }
+              setupChanged={drafts()[agent().id] !== undefined && !sameSetup(draftOf(agent().id), saved(agent().id))}
               onSaveSetup={() => {
-                const draft = draftOf(agent().id);
-                const issues = issuesOf(draft, harnesses).filter(
-                  (issue) => issue.kind !== "no-harness",
-                );
+                const draft = draftOf(agent().id)
+                const issues = issuesOf(draft, harnesses).filter((issue) => issue.kind !== "no-harness")
                 if (issues.length > 0) {
-                  setFailure({ action: "configure", error: "incomplete", issues });
-                  return;
+                  setFailure({ action: "configure", error: "incomplete", issues })
+                  return
                 }
                 change("configure", () => {
-                  update(agent().id, draft);
-                  const { [agent().id]: _saved, ...rest } = drafts();
-                  setDrafts(rest);
-                  return undefined;
-                });
+                  update(agent().id, draft)
+                  const { [agent().id]: _saved, ...rest } = drafts()
+                  setDrafts(rest)
+                  return undefined
+                })
               }}
               onDiscardSetup={() => {
-                setFailure(undefined);
-                const { [agent().id]: _discarded, ...rest } = drafts();
-                setDrafts(rest);
+                setFailure(undefined)
+                const { [agent().id]: _discarded, ...rest } = drafts()
+                setDrafts(rest)
               }}
               onRemove={props.readOnly ? undefined : () => setDialog("remove")}
               failure={failure() && !dialog() ? failure() : undefined}
@@ -543,7 +502,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
         roleId={adding().roleId}
         onRoleChange={(roleId) => setAdding({ ...adding(), roleId })}
         setup={setupProps(adding().setup, (edit) =>
-          setAdding({ ...adding(), setup: Object.assign({}, adding().setup, edit) }),
+          setAdding({ ...adding(), setup: Object.assign({}, adding().setup, edit) })
         )}
         ready={
           adding().name.trim() !== "" &&
@@ -551,29 +510,27 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
           adding().setup.model.trim() !== ""
         }
         onCreate={() => {
-          const refused = refusal();
+          const refused = refusal()
           if (refused) {
-            setRefusal(undefined);
-            setFailure(refused);
-            return;
+            setRefusal(undefined)
+            setFailure(refused)
+            return
           }
-          const draft = adding();
-          const issues = issuesOf(draft.setup, harnesses).filter(
-            (issue) => issue.kind !== "no-harness",
-          );
+          const draft = adding()
+          const issues = issuesOf(draft.setup, harnesses).filter((issue) => issue.kind !== "no-harness")
           if (issues.length > 0) {
-            setFailure({ action: "create", error: "incomplete", issues });
-            return;
+            setFailure({ action: "create", error: "incomplete", issues })
+            return
           }
-          const id = draft.name.trim().toLowerCase().replaceAll(/\W+/g, "-");
+          const id = draft.name.trim().toLowerCase().replaceAll(/\W+/g, "-")
           const created = change("create", () => {
-            setRecords([...records(), { id, name: draft.name.trim(), ...draft.setup }]);
-            return draft.name.trim();
-          });
-          if (!created) return;
-          close();
-          setAdding({ name: "", roleId: "builtin:member", setup: emptySetup });
-          setSelected(id);
+            setRecords([...records(), { id, name: draft.name.trim(), ...draft.setup }])
+            return draft.name.trim()
+          })
+          if (!created) return
+          close()
+          setAdding({ name: "", roleId: "builtin:member", setup: emptySetup })
+          setSelected(id)
         }}
         failure={failure()?.action === "create" ? failure() : undefined}
         onRefresh={() => setFailure(undefined)}
@@ -585,15 +542,15 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
             onClose={close}
             name={agent().name}
             onConfirm={() => {
-              const { id, name } = agent();
+              const { id, name } = agent()
               if (
                 change("remove", () => {
-                  setRecords(records().filter((record) => record.id !== id));
-                  return name;
+                  setRecords(records().filter((record) => record.id !== id))
+                  return name
                 })
               ) {
-                close();
-                setSelected(undefined);
+                close()
+                setSelected(undefined)
               }
             }}
             failure={failure()?.action === "remove" ? failure() : undefined}
@@ -604,14 +561,12 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
       <Toast.Region>
         <For each={toasts()}>
           {(item) => (
-            <Toast.Item
-              onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}
-            >
+            <Toast.Item onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}>
               {item.text}
             </Toast.Item>
           )}
         </For>
       </Toast.Region>
     </Shell.Root>
-  );
+  )
 }

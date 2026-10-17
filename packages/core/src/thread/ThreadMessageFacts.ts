@@ -4,12 +4,13 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Group from "../group/Group.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadMessage from "./ThreadMessage.ts";
+
+import * as Schema from "effect/Schema"
+import * as Group from "../group/Group.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as ThreadMessage from "./ThreadMessage.ts"
 
 /**
  * A message was published, as its record says, with its thread's group, whose members may read
@@ -23,8 +24,8 @@ export const Published = Fact.make("thread.message.published", {
   subject: (payload) => Subject.make("thread-message", payload.id),
   occurrence: (payload) => [payload.id],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: Schema.Struct({ ...ThreadMessage.ThreadMessage.fields, groupId: GroupId.Id }),
-});
+  payload: Schema.Struct({ ...ThreadMessage.ThreadMessage.fields, groupId: GroupId.GroupId })
+})
 
 /**
  * A message's text and mentions were replaced, at its next revision. A revision is recorded once,
@@ -38,8 +39,8 @@ export const Edited = Fact.make("thread.message.edited", {
   subject: (payload) => Subject.make("thread-message", payload.messageId),
   occurrence: (payload) => [payload.messageId, String(payload.revision)],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: ThreadMessage.Edited,
-});
+  payload: ThreadMessage.Edited
+})
 
 /**
  * A message was deleted: its text is gone, while its place in the thread stays.
@@ -52,5 +53,5 @@ export const Deleted = Fact.make("thread.message.deleted", {
   subject: (payload) => Subject.make("thread-message", payload.messageId),
   occurrence: (payload) => [payload.messageId],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: ThreadMessage.Deleted,
-});
+  payload: ThreadMessage.Deleted
+})

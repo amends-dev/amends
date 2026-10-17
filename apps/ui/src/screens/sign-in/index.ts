@@ -5,5 +5,5 @@ export {
   type SignInCodeProps,
   type SignInEmailError,
   type SignInEmailProps,
-  type SignInProvider,
-} from "./sign-in.tsx";
+  type SignInProvider
+} from "./sign-in.tsx"

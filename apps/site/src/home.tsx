@@ -1,6 +1,6 @@
 /** The home page: the app first, then the packages it is built from, then how to run it. */
-import { For } from "solid-js";
-import { ButtonLink } from "@amends-dev/ui/components/button";
+
+import { ButtonLink } from "@amends-dev/ui/components/button"
 import {
   AppPreview,
   CodeWindow,
@@ -8,34 +8,35 @@ import {
   FeatureCard,
   Hero,
   Section,
-  type FeatureArtKind,
-} from "@amends-dev/ui/site";
-import { contracts, repository } from "./catalog.ts";
-import { docExample } from "./examples.ts";
-import { Footer, Header, selfHost } from "./site.tsx";
+  type FeatureArtKind
+} from "@amends-dev/ui/site"
+import { For } from "solid-js"
+import { contracts, repository } from "./catalog.ts"
+import { docExample } from "./examples.ts"
+import { Footer, Header, selfHost } from "./site.tsx"
 
 const features: ReadonlyArray<{ kind: FeatureArtKind; title: string; text: string }> = [
   {
     kind: "threads",
     title: "Threads",
-    text: "Talk in groups and direct messages. Replies stay in their thread, and the inbox gathers what needs you.",
+    text: "Talk in groups and direct messages. Replies stay in their thread, and the inbox gathers what needs you."
   },
   {
     kind: "tasks",
     title: "Tasks",
-    text: "Any thread can become a task, with a status, a priority, and an assignee: a person or an agent.",
+    text: "Any thread can become a task, with a status, a priority, and an assignee: a person or an agent."
   },
   {
     kind: "agents",
     title: "Agents",
-    text: "Mention an agent and it takes a turn in the thread, then posts its answer with a log of what it did.",
+    text: "Mention an agent and it takes a turn in the thread, then posts its answer with a log of what it did."
   },
   {
     kind: "connections",
     title: "Connections",
-    text: "Connect the models, sandboxes, agents, and tools your workspace uses. Credentials stay sealed on your host.",
-  },
-];
+    text: "Connect the models, sandboxes, agents, and tools your workspace uses. Credentials stay sealed on your host."
+  }
+]
 
 const terminal = `$ git clone ${repository}
 $ cd amends && bun install
@@ -45,7 +46,7 @@ $ AMENDS_DATABASE_URL=postgresql://localhost/amends \\
 Listening on http://127.0.0.1:8787
 
 # In another terminal, start the web app
-$ bun run --filter @amends-dev/web dev`;
+$ bun run --filter @amends-dev/web dev`
 
 export function Home() {
   return (
@@ -57,8 +58,8 @@ export function Home() {
             <Hero.Badge>Open source · MIT license</Hero.Badge>
             <Hero.Title>Where people and agents work together</Hero.Title>
             <Hero.Lead>
-              Conversations live in threads, work becomes tasks, and agents take turns when a thread
-              needs them, on the models and sandboxes you connect.
+              Conversations live in threads, work becomes tasks, and agents take turns when a thread needs them, on the
+              models and sandboxes you connect.
             </Hero.Lead>
             <Hero.Actions centered>
               <ButtonLink href={selfHost} variant="primary" size="large">
@@ -79,8 +80,8 @@ export function Home() {
               <Section.Title>Threads hold the work. Agents take turns in them.</Section.Title>
             </Section.Heading>
             <Section.Intro>
-              amends is a workspace for teams and the agents they work with. Agents are members like
-              anyone else, each running on the agent, model, and sandbox your workspace connects.
+              amends is a workspace for teams and the agents they work with. Agents are members like anyone else, each
+              running on the agent, model, and sandbox your workspace connects.
             </Section.Intro>
           </Section.Header>
           <Section.Grid columns={4}>
@@ -107,15 +108,13 @@ export function Home() {
                 <Section.Eyebrow>For developers</Section.Eyebrow>
                 <Section.Title>Built from open parts</Section.Title>
                 <Section.Intro>
-                  The parts amends runs agents with are packages of their own on npm, built on
-                  Effect. Use them in any Effect program, not only in amends.
+                  The parts amends runs agents with are packages of their own on npm, built on Effect. Use them in any
+                  Effect program, not only in amends.
                 </Section.Intro>
               </Section.Header>
               <Section.Rows>
                 <For each={contracts}>
-                  {(contract) => (
-                    <Section.Row term={contract.name}>{contract.description}</Section.Row>
-                  )}
+                  {(contract) => <Section.Row term={contract.name}>{contract.description}</Section.Row>}
                 </For>
               </Section.Rows>
               <Section.Actions>
@@ -130,10 +129,7 @@ export function Home() {
             <Section.Part>
               <CodeWindow
                 title="chat.ts"
-                code={docExample(
-                  "packages/harness/src/Harness.ts",
-                  "Providing the harness to a program",
-                )}
+                code={docExample("packages/harness/src/Harness.ts", "Providing the harness to a program")}
               />
             </Section.Part>
           </Section.Split>
@@ -146,9 +142,8 @@ export function Home() {
                 <Section.Eyebrow>Self-host</Section.Eyebrow>
                 <Section.Title>Run it yourself</Section.Title>
                 <Section.Intro>
-                  amends is open source under the MIT license and in early development. Today it
-                  runs on your machine with Bun and PostgreSQL, on the models and sandboxes you
-                  connect.
+                  amends is open source under the MIT license and in early development. Today it runs on your machine
+                  with Bun and PostgreSQL, on the models and sandboxes you connect.
                 </Section.Intro>
               </Section.Header>
               <Section.Actions>
@@ -171,5 +166,5 @@ export function Home() {
       </main>
       <Footer />
     </>
-  );
+  )
 }

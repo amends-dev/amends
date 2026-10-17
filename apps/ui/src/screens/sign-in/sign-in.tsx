@@ -1,49 +1,49 @@
-import { For, Show, createEffect, createSignal, createUniqueId, on, onMount } from "solid-js";
-import { Button } from "../../components/button/index.ts";
-import { CodeInput } from "../../components/code-input/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { Menu } from "../../components/menu/index.ts";
-import { Centered } from "../../patterns/centered/index.ts";
-import * as s from "./sign-in.css.ts";
+import { For, Show, createEffect, createSignal, createUniqueId, on, onMount } from "solid-js"
+import { Button } from "../../components/button/index.ts"
+import { CodeInput } from "../../components/code-input/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { Menu } from "../../components/menu/index.ts"
+import { Centered } from "../../patterns/centered/index.ts"
+import * as s from "./sign-in.css.ts"
 
 export interface SignInProvider {
-  readonly id: string;
+  readonly id: string
   /** Such as "Continue with Google". */
-  readonly label: string;
+  readonly label: string
 }
 
 /** Why a code was not requested. */
-export type SignInEmailError = "invalid-email" | "rate-limited" | "request-failed";
+export type SignInEmailError = "invalid-email" | "rate-limited" | "request-failed"
 
 const emailErrors: { readonly [Error in SignInEmailError]: string } = {
   "invalid-email": "Enter a valid email address.",
   "rate-limited": "Too many codes were requested lately. Try again later.",
-  "request-failed": "We couldn’t request a code. Try again.",
-};
+  "request-failed": "We couldn’t request a code. Try again."
+}
 
 export interface SignInEmailProps {
-  readonly homeHref: string;
-  readonly email: string;
-  readonly onEmailChange: (email: string) => void;
-  readonly onSubmit: () => void;
+  readonly homeHref: string
+  readonly email: string
+  readonly onEmailChange: (email: string) => void
+  readonly onSubmit: () => void
   /** A code is being requested. */
-  readonly pending?: boolean;
-  readonly error?: SignInEmailError;
+  readonly pending?: boolean
+  readonly error?: SignInEmailError
   /** Other ways to sign in, shown under "or". */
-  readonly providers?: readonly SignInProvider[];
+  readonly providers?: ReadonlyArray<SignInProvider>
   /** Further providers, behind "More sign-in options". */
-  readonly moreProviders?: readonly SignInProvider[];
-  readonly onProvider?: (id: string) => void;
+  readonly moreProviders?: ReadonlyArray<SignInProvider>
+  readonly onProvider?: (id: string) => void
 }
 
 /** Sign-in's first step: an email address for a one-time code, and any other providers. */
 export function SignInEmail(props: SignInEmailProps) {
-  const heading = createUniqueId();
-  const [input, setInput] = createSignal<HTMLInputElement>();
+  const heading = createUniqueId()
+  const [input, setInput] = createSignal<HTMLInputElement>()
   // Each visit to this step starts in the field, including on return from the code.
-  onMount(() => input()?.focus());
+  onMount(() => input()?.focus())
   return (
     <Centered.Root>
       <Centered.Header>
@@ -62,13 +62,11 @@ export function SignInEmail(props: SignInEmailProps) {
           // The caller validates, so its message shows in the field rather than a browser bubble.
           noValidate
           onSubmit={(event) => {
-            event.preventDefault();
-            if (!props.pending) props.onSubmit();
+            event.preventDefault()
+            if (!props.pending) props.onSubmit()
           }}
         >
-          <Field.Root
-            error={props.error === "invalid-email" ? emailErrors["invalid-email"] : undefined}
-          >
+          <Field.Root error={props.error === "invalid-email" ? emailErrors["invalid-email"] : undefined}>
             <Field.Label>Email</Field.Label>
             <Input
               ref={setInput}
@@ -104,9 +102,7 @@ export function SignInEmail(props: SignInEmailProps) {
                   <Menu.Content aria-label="More sign-in options">
                     <For each={props.moreProviders}>
                       {(provider) => (
-                        <Menu.Item onSelect={() => props.onProvider?.(provider.id)}>
-                          {provider.label}
-                        </Menu.Item>
+                        <Menu.Item onSelect={() => props.onProvider?.(provider.id)}>{provider.label}</Menu.Item>
                       )}
                     </For>
                   </Menu.Content>
@@ -118,7 +114,7 @@ export function SignInEmail(props: SignInEmailProps) {
         <p class={s.footnote}>Your workspaces appear after you sign in.</p>
       </Centered.Body>
     </Centered.Root>
-  );
+  )
 }
 
 /** Why a code was not accepted or resent. */
@@ -129,7 +125,7 @@ export type SignInCodeError =
   | "unknown"
   | "verify-failed"
   | "resend-limited"
-  | "resend-failed";
+  | "resend-failed"
 
 // The code's own problems mark the field; failed requests leave it valid.
 const codeErrors: { readonly [Error in SignInCodeError]: { field?: string; form?: string } } = {
@@ -139,48 +135,48 @@ const codeErrors: { readonly [Error in SignInCodeError]: { field?: string; form?
   unknown: { field: "This code is no longer available. Request a new one." },
   "verify-failed": { form: "We couldn’t verify your code. Try again." },
   "resend-limited": {
-    form: "Too many codes were requested lately. Use the last one, or try later.",
+    form: "Too many codes were requested lately. Use the last one, or try later."
   },
-  "resend-failed": { form: "We couldn’t request a new code. Try again." },
-};
+  "resend-failed": { form: "We couldn’t request a new code. Try again." }
+}
 
 export interface SignInCodeProps {
-  readonly homeHref: string;
+  readonly homeHref: string
   /** Where the code went. */
-  readonly email: string;
-  readonly onChangeEmail: () => void;
-  readonly code: string;
-  readonly onCodeChange: (code: string) => void;
-  readonly onSubmit: (code: string) => void;
-  readonly pending?: "verifying" | "resending";
+  readonly email: string
+  readonly onChangeEmail: () => void
+  readonly code: string
+  readonly onCodeChange: (code: string) => void
+  readonly onSubmit: (code: string) => void
+  readonly pending?: "verifying" | "resending"
   /** The code stays for editing. */
-  readonly error?: SignInCodeError;
-  readonly onResend: () => void;
+  readonly error?: SignInCodeError
+  readonly onResend: () => void
   /** A new code went out, such as after Send again. */
-  readonly resent?: boolean;
+  readonly resent?: boolean
   /** Where this host delivers codes, such as a terminal. Default: use the most recent code. */
-  readonly deliveryHint?: string;
+  readonly deliveryHint?: string
 }
 
 /** Sign-in's second step: the six-digit code sent to the email address. */
 export function SignInCode(props: SignInCodeProps) {
-  const heading = createUniqueId();
-  const [input, setInput] = createSignal<HTMLInputElement>();
-  onMount(() => input()?.focus());
+  const heading = createUniqueId()
+  const [input, setInput] = createSignal<HTMLInputElement>()
+  onMount(() => input()?.focus())
   // A new code clears the field; typing it starts there.
   createEffect(
     on(
       () => props.resent,
       (resent) => {
-        if (resent) input()?.focus();
+        if (resent) input()?.focus()
       },
-      { defer: true },
-    ),
-  );
-  const error = () => (props.error ? codeErrors[props.error] : undefined);
+      { defer: true }
+    )
+  )
+  const error = () => (props.error ? codeErrors[props.error] : undefined)
   const submit = () => {
-    if (!props.pending) props.onSubmit(props.code);
-  };
+    if (!props.pending) props.onSubmit(props.code)
+  }
   return (
     <Centered.Root>
       <Centered.Header>
@@ -204,21 +200,18 @@ export function SignInCode(props: SignInCodeProps) {
           aria-labelledby={heading}
           noValidate
           onSubmit={(event) => {
-            event.preventDefault();
-            submit();
+            event.preventDefault()
+            submit()
           }}
         >
-          <Field.Root
-            hint={props.deliveryHint ?? "Use your most recent code."}
-            error={error()?.field}
-          >
+          <Field.Root hint={props.deliveryHint ?? "Use your most recent code."} error={error()?.field}>
             <Field.Label>Verification code</Field.Label>
             <CodeInput
               ref={setInput}
               value={props.code}
               onValueChange={props.onCodeChange}
               onComplete={(code) => {
-                if (!props.pending) props.onSubmit(code);
+                if (!props.pending) props.onSubmit(code)
               }}
             />
           </Field.Root>
@@ -249,5 +242,5 @@ export function SignInCode(props: SignInCodeProps) {
         </p>
       </Centered.Body>
     </Centered.Root>
-  );
+  )
 }

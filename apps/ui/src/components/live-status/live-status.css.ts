@@ -1,6 +1,6 @@
-import { keyframes, style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { keyframes, style } from "@vanilla-extract/css"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // A small note floating at the bottom of the screen, like a toast that stays until changes resume.
 export const status = style({
@@ -22,11 +22,11 @@ export const status = style({
   fontWeight: fontWeight.medium,
   selectors: {
     // Empty while live, but still in place so screen readers hear it change.
-    "&:empty": { padding: 0, border: "none", boxShadow: "none" },
-  },
-});
+    "&:empty": { padding: 0, border: "none", boxShadow: "none" }
+  }
+})
 
-const pulse = keyframes({ "50%": { opacity: 0.35 } });
+const pulse = keyframes({ "50%": { opacity: 0.35 } })
 
 export const dot = style({
   width: "0.4375rem",
@@ -34,5 +34,5 @@ export const dot = style({
   borderRadius: "50%",
   backgroundColor: vars.color.text.secondary,
   animation: `${pulse} 1.6s ease-in-out infinite`,
-  "@media": { "(prefers-reduced-motion: reduce)": { animation: "none" } },
-});
+  "@media": { "(prefers-reduced-motion: reduce)": { animation: "none" } }
+})

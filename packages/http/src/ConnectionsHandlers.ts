@@ -6,9 +6,10 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { ConnectionService } from "@amends-dev/core/connection";
-import { HttpApiBuilder } from "effect/http-api";
+
+import { ConnectionService } from "@amends-dev/core/connection"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
 
 /**
  * Register the handlers of connections, each entering the workspace
@@ -19,53 +20,41 @@ import { HttpApiBuilder } from "effect/http-api";
  */
 export const layer = HttpApiBuilder.group(Api.Api, "connections", (handlers) =>
   handlers.handleAll({
-    integrations: () =>
-      ConnectionService.ConnectionService.use(
-        (connectionService) => connectionService.integrations,
-      ),
-    list: () =>
-      ConnectionService.ConnectionService.use((connectionService) => connectionService.list),
+    integrations: () => ConnectionService.ConnectionService.use((connectionService) => connectionService.integrations),
+    list: () => ConnectionService.ConnectionService.use((connectionService) => connectionService.list),
     create: ({ headers, payload }) =>
       ConnectionService.ConnectionService.use((connectionService) =>
-        connectionService.create(payload, { requestKey: headers["idempotency-key"] }),
+        connectionService.create(payload, { requestKey: headers["idempotency-key"] })
       ),
     get: ({ params }) =>
-      ConnectionService.ConnectionService.use((connectionService) =>
-        connectionService.get(params.connectionId),
-      ),
+      ConnectionService.ConnectionService.use((connectionService) => connectionService.get(params.connectionId)),
     models: ({ params }) =>
-      ConnectionService.ConnectionService.use((connectionService) =>
-        connectionService.models(params.connectionId),
-      ),
+      ConnectionService.ConnectionService.use((connectionService) => connectionService.models(params.connectionId)),
     rename: ({ params, payload }) =>
       ConnectionService.ConnectionService.use((connectionService) =>
         connectionService.rename({
           connectionId: params.connectionId,
           name: payload.name,
-          expectedName: payload.expectedName,
-        }),
+          expectedName: payload.expectedName
+        })
       ),
     configure: ({ params, payload }) =>
       ConnectionService.ConnectionService.use((connectionService) =>
         connectionService.configure({
           connectionId: params.connectionId,
-          settings: payload.settings,
-        }),
+          settings: payload.settings
+        })
       ),
     replaceKey: ({ params, payload }) =>
       ConnectionService.ConnectionService.use((connectionService) =>
         connectionService.replaceKey({
           connectionId: params.connectionId,
-          apiKey: payload.apiKey,
-        }),
+          apiKey: payload.apiKey
+        })
       ),
     check: ({ params }) =>
-      ConnectionService.ConnectionService.use((connectionService) =>
-        connectionService.check(params.connectionId),
-      ),
+      ConnectionService.ConnectionService.use((connectionService) => connectionService.check(params.connectionId)),
     remove: ({ params }) =>
-      ConnectionService.ConnectionService.use((connectionService) =>
-        connectionService.remove(params.connectionId),
-      ),
-  }),
-);
+      ConnectionService.ConnectionService.use((connectionService) => connectionService.remove(params.connectionId))
+  })
+)

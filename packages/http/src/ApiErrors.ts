@@ -7,10 +7,11 @@
  *
  * @since 0.1.0
  */
-import { Request } from "@amends-dev/core/request";
-import { Schema } from "effect";
-import { HttpApiSchema } from "effect/http-api";
-import { CoreError } from "@amends-dev/core/error";
+
+import { CoreError } from "@amends-dev/core/error"
+import { Request } from "@amends-dev/core/request"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as Schema from "effect/Schema"
 
 /**
  * The caller cannot open another live-update stream on this server now: the workspace, or the
@@ -22,7 +23,7 @@ import { CoreError } from "@amends-dev/core/error";
 export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
   "ApiErrors.TooManyStreams",
   { limit: Schema.Literals(["workspace", "member"]) },
-  { httpApiStatus: 429 },
+  { httpApiStatus: 429 }
 ) {}
 
 /**
@@ -32,7 +33,7 @@ export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
  * @category errors
  * @since 0.1.0
  */
-export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404));
+export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404))
 /**
  * What the caller expected of a resource, such as its name, title, revision, or roles, changed
  * since they read it, and nothing was recorded: 409, with the resource and the ID.
@@ -40,7 +41,7 @@ export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404));
  * @category errors
  * @since 0.1.0
  */
-export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409));
+export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409))
 /**
  * The caller may not do what they asked, for the `reason` given, such as a grant they lack, a
  * workspace they are not a member of, or an action only a person or the owner takes: 403.
@@ -48,7 +49,7 @@ export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409));
  * @category errors
  * @since 0.1.0
  */
-export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
+export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403))
 /**
  * The state of what the caller acts on refuses the request, for the `reason` given, such as a
  * member already in the group, a turn that already finished, or an invitation no longer open: 409.
@@ -56,7 +57,7 @@ export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
  * @category errors
  * @since 0.1.0
  */
-export const Conflict = CoreError.Conflict.pipe(HttpApiSchema.status(409));
+export const Conflict = CoreError.Conflict.pipe(HttpApiSchema.status(409))
 /**
  * The request cannot be done as asked, whatever the state, for the `reason` given, such as values
  * that do not hold, a fixed roster, or an agent setup that cannot run: 422.
@@ -64,7 +65,7 @@ export const Conflict = CoreError.Conflict.pipe(HttpApiSchema.status(409));
  * @category errors
  * @since 0.1.0
  */
-export const Invalid = CoreError.Invalid.pipe(HttpApiSchema.status(422));
+export const Invalid = CoreError.Invalid.pipe(HttpApiSchema.status(422))
 /**
  * What the operation needs cannot be reached or used now, for the `reason` given, such as storage
  * another writer held or a host that keeps no keys: 503.
@@ -72,7 +73,7 @@ export const Invalid = CoreError.Invalid.pipe(HttpApiSchema.status(422));
  * @category errors
  * @since 0.1.0
  */
-export const Unavailable = CoreError.Unavailable.pipe(HttpApiSchema.status(503));
+export const Unavailable = CoreError.Unavailable.pipe(HttpApiSchema.status(503))
 /**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.
@@ -81,8 +82,8 @@ export const Unavailable = CoreError.Unavailable.pipe(HttpApiSchema.status(503))
  * @since 0.1.0
  */
 export const requestKey = {
-  "idempotency-key": Schema.optionalKey(Request.Key),
-};
+  "idempotency-key": Schema.optionalKey(Request.Key)
+}
 /**
  * The commit's outcome is unknown, so the client reconciles what is stored before repeating it;
  * 500, with the commit's ID.
@@ -90,7 +91,7 @@ export const requestKey = {
  * @category errors
  * @since 0.1.0
  */
-export const Uncertain = CoreError.Uncertain.pipe(HttpApiSchema.status(500));
+export const Uncertain = CoreError.Uncertain.pipe(HttpApiSchema.status(500))
 /**
  * The delegation rules' outcomes, which giving, changing, and taking away a role share, as do
  * issuing and answering an invitation and reading a member's access: `Denied` where only the owner
@@ -101,7 +102,7 @@ export const Uncertain = CoreError.Uncertain.pipe(HttpApiSchema.status(500));
  * @category errors
  * @since 0.1.0
  */
-export const delegation = [Denied, Conflict, Invalid, NotFound] as const;
+export const delegation = [Denied, Conflict, Invalid, NotFound] as const
 /**
  * Assignment outcomes: the delegation rules', and access that changed since the caller read it,
  * 409.
@@ -109,7 +110,7 @@ export const delegation = [Denied, Conflict, Invalid, NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const assignment = [...delegation, Changed] as const;
+export const assignment = [...delegation, Changed] as const
 
 /**
  * Ownership outcomes: a caller who is not the owner is 403, a missing recipient 404, and a
@@ -119,7 +120,7 @@ export const assignment = [...delegation, Changed] as const;
  * @category errors
  * @since 0.1.0
  */
-export const ownership = [Denied, NotFound, Conflict, Changed] as const;
+export const ownership = [Denied, NotFound, Conflict, Changed] as const
 
 /**
  * Group outcomes. A group the caller does not belong to is indistinguishable from a missing one,
@@ -129,7 +130,7 @@ export const ownership = [Denied, NotFound, Conflict, Changed] as const;
  * @category errors
  * @since 0.1.0
  */
-export const group = [NotFound, Conflict] as const;
+export const group = [NotFound, Conflict] as const
 /**
  * Admission outcomes: a missing group, member, or admission is 404; a member no longer active, one
  * admitted already, and an admission ended already are 409; the fixed roster of a direct or the
@@ -138,7 +139,7 @@ export const group = [NotFound, Conflict] as const;
  * @category errors
  * @since 0.1.0
  */
-export const groupMembership = [NotFound, Conflict, Invalid] as const;
+export const groupMembership = [NotFound, Conflict, Invalid] as const
 /**
  * Following outcomes: a missing group, or one the caller does not belong to, is 404; making someone
  * other than an agent follow is 403; a member missing, inactive, or outside the group is 409;
@@ -147,7 +148,7 @@ export const groupMembership = [NotFound, Conflict, Invalid] as const;
  * @category errors
  * @since 0.1.0
  */
-export const groupFollow = [NotFound, Denied, Conflict, Invalid] as const;
+export const groupFollow = [NotFound, Denied, Conflict, Invalid] as const
 
 /**
  * Thread outcomes. Missing threads and threads outside the caller's groups share a 404; an agent
@@ -157,7 +158,7 @@ export const groupFollow = [NotFound, Denied, Conflict, Invalid] as const;
  * @category errors
  * @since 0.1.0
  */
-export const thread = [NotFound, Denied, Conflict, Invalid] as const;
+export const thread = [NotFound, Denied, Conflict, Invalid] as const
 /**
  * Replying outcomes: a thread missing or outside the caller's groups is 404, an agent principal
  * 403, and a mentioned member who cannot take part 409.
@@ -165,7 +166,7 @@ export const thread = [NotFound, Denied, Conflict, Invalid] as const;
  * @category errors
  * @since 0.1.0
  */
-export const message = [NotFound, Denied, Conflict] as const;
+export const message = [NotFound, Denied, Conflict] as const
 /**
  * Editing a message: a missing one, or one in a thread outside the caller's groups, is 404; one
  * someone else wrote is 403; a deleted one, a stale revision, and an unavailable mention are 409.
@@ -173,21 +174,21 @@ export const message = [NotFound, Denied, Conflict] as const;
  * @category errors
  * @since 0.1.0
  */
-export const messageEdit = [NotFound, Denied, Conflict, Changed] as const;
+export const messageEdit = [NotFound, Denied, Conflict, Changed] as const
 /**
  * Deleting a message: a missing or unreadable one is 404; an agent principal is 403.
  *
  * @category errors
  * @since 0.1.0
  */
-export const messageDelete = [NotFound, Denied] as const;
+export const messageDelete = [NotFound, Denied] as const
 /**
  * Saying one is typing: a thread missing or outside the caller's groups is 404.
  *
  * @category errors
  * @since 0.1.0
  */
-export const typing = [NotFound] as const;
+export const typing = [NotFound] as const
 /**
  * Following a thread: a missing thread, or a participation missing or not the caller's, is 404; a
  * participation ended already is 409; and a direct conversation, where everyone takes part, 422.
@@ -195,7 +196,7 @@ export const typing = [NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const participation = [NotFound, Conflict, Invalid] as const;
+export const participation = [NotFound, Conflict, Invalid] as const
 
 /**
  * Task outcomes. A thread the caller cannot read, or without a task, is 404, as is a group the
@@ -205,7 +206,7 @@ export const participation = [NotFound, Conflict, Invalid] as const;
  * @category errors
  * @since 0.1.0
  */
-export const taskRead = [NotFound] as const;
+export const taskRead = [NotFound] as const
 /**
  * Making a conversation a task: a missing or unreadable thread is 404; a thread that is a task
  * already, and an assignee who cannot take part, are 409.
@@ -213,7 +214,7 @@ export const taskRead = [NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const taskCreate = [NotFound, Conflict] as const;
+export const taskCreate = [NotFound, Conflict] as const
 /**
  * Changing a task: a thread missing, unreadable, or without a task is 404; a value that changed
  * meanwhile, and an assignee who cannot take part, are 409.
@@ -221,7 +222,7 @@ export const taskCreate = [NotFound, Conflict] as const;
  * @category errors
  * @since 0.1.0
  */
-export const taskUpdate = [NotFound, Changed, Conflict] as const;
+export const taskUpdate = [NotFound, Changed, Conflict] as const
 
 /**
  * Read-state outcomes: only people keep it, and a position cannot pass the latest activity.
@@ -229,7 +230,7 @@ export const taskUpdate = [NotFound, Changed, Conflict] as const;
  * @category errors
  * @since 0.1.0
  */
-export const readState = [Denied, NotFound, Conflict] as const;
+export const readState = [Denied, NotFound, Conflict] as const
 
 /**
  * Outcomes every operation in a workspace shares: authorization, input, and storage.
@@ -237,7 +238,7 @@ export const readState = [Denied, NotFound, Conflict] as const;
  * @category errors
  * @since 0.1.0
  */
-export const workspace = [Denied, Invalid, Unavailable, Uncertain] as const;
+export const workspace = [Denied, Invalid, Unavailable, Uncertain] as const
 
 /**
  * Channel outcomes. A channel the caller may not read, or removed, is 404, as is a group the caller
@@ -247,7 +248,7 @@ export const workspace = [Denied, Invalid, Unavailable, Uncertain] as const;
  * @category errors
  * @since 0.1.0
  */
-export const channelRead = [NotFound] as const;
+export const channelRead = [NotFound] as const
 /**
  * Creating a channel: a group the caller does not belong to is 404, and a connection that gives no
  * channels, or that the caller may not use, is 422.
@@ -255,14 +256,14 @@ export const channelRead = [NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const channelCreate = [...channelRead, Invalid] as const;
+export const channelCreate = [...channelRead, Invalid] as const
 /**
  * Where a thread came from: a thread missing, unreadable, or that came through no channel is 404.
  *
  * @category errors
  * @since 0.1.0
  */
-export const channelBinding = [NotFound] as const;
+export const channelBinding = [NotFound] as const
 /**
  * What an external system's request to a channel can be answered with: a channel missing or removed
  * is 404, a request its transport rejects 422, and a system that cannot be reached 503.
@@ -270,4 +271,4 @@ export const channelBinding = [NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const channelEvents = [NotFound, Invalid, Unavailable] as const;
+export const channelEvents = [NotFound, Invalid, Unavailable] as const

@@ -7,9 +7,10 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
 
-const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/));
+import * as Schema from "effect/Schema"
+
+const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/))
 
 /**
  * A namespaced entity key within a workspace: a lowercase kind, a colon, and a nonempty ID, which
@@ -18,15 +19,13 @@ const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/));
  * @category schemas
  * @since 0.1.0
  */
-export const Subject = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*:.+$/s)).pipe(
-  Schema.brand("FactSubject"),
-);
+export const Subject = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*:.+$/s)).pipe(Schema.brand("FactSubject"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Subject = typeof Subject.Type;
+export type Subject = typeof Subject.Type
 
 /**
  * The subject of the entity `id` of `kind`, such as `Subject.make("thread", threadId)`. The kind
@@ -37,4 +36,4 @@ export type Subject = typeof Subject.Type;
  * @since 0.1.0
  */
 export const make = (kind: string, id: string): Subject =>
-  Subject.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`);
+  Subject.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`)

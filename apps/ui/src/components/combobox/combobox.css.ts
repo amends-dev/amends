@@ -1,9 +1,9 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts"
 
-export const combobox = style({ position: "relative" });
+export const combobox = style({ position: "relative" })
 
 // Shaped like the Select: the typed value and a chevron that opens the suggestions.
 export const control = style({
@@ -20,10 +20,10 @@ export const control = style({
   selectors: {
     "&:focus-within, &[data-open]": { borderColor: vars.color.border.strong },
     "&[data-invalid]": { borderColor: vars.color.border.danger },
-    "&[data-disabled]": { backgroundColor: vars.color.surface.subtle, cursor: "default" },
+    "&[data-disabled]": { backgroundColor: vars.color.surface.subtle, cursor: "default" }
   },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
 export const input = style({
   ...typeScale.body,
@@ -39,10 +39,10 @@ export const input = style({
   selectors: {
     "&[data-mono]": { fontFamily: monoFamily },
     "&::placeholder": { color: vars.color.text.muted, opacity: 1 },
-    "&:disabled": { color: vars.color.text.disabled },
+    "&:disabled": { color: vars.color.text.disabled }
   },
-  "@media": { [media.mobile]: typeScale.bodyTouch },
-});
+  "@media": { [media.mobile]: typeScale.bodyTouch }
+})
 
 export const toggle = style({
   display: "grid",
@@ -55,10 +55,10 @@ export const toggle = style({
   background: "transparent",
   color: vars.color.text.secondary,
   cursor: "pointer",
-  selectors: { "&:disabled": { cursor: "default" } },
-});
+  selectors: { "&:disabled": { cursor: "default" } }
+})
 
-export const toggleIcon = style({ width: "0.875rem", height: "0.875rem" });
+export const toggleIcon = style({ width: "0.875rem", height: "0.875rem" })
 
 // Fixed to the viewport so scrolling areas cannot clip it; the component places it.
 export const popup = style({
@@ -70,8 +70,8 @@ export const popup = style({
   border: `1px solid ${vars.color.border.default}`,
   backgroundColor: vars.color.surface.popover,
   boxShadow: vars.shadow.popover,
-  color: vars.color.text.primary,
-});
+  color: vars.color.text.primary
+})
 
 export const heading = style({
   ...typeScale.meta,
@@ -79,8 +79,8 @@ export const heading = style({
   padding: "0.5rem 0.5rem 0.375rem",
   color: vars.color.text.secondary,
   fontWeight: fontWeight.medium,
-  textTransform: "uppercase",
-});
+  textTransform: "uppercase"
+})
 
 export const listbox = style({
   flex: "0 1 auto",
@@ -88,8 +88,8 @@ export const listbox = style({
   margin: 0,
   padding: 0,
   overflowY: "auto",
-  listStyle: "none",
-});
+  listStyle: "none"
+})
 
 export const option = style({
   display: "flex",
@@ -100,16 +100,16 @@ export const option = style({
   padding: "0.5rem",
   cursor: "pointer",
   selectors: { "&[data-active]": { backgroundColor: vars.color.surface.subtle } },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
 export const optionText = style({
   display: "flex",
   flex: 1,
   flexDirection: "column",
   gap: "0.25rem",
-  minWidth: 0,
-});
+  minWidth: 0
+})
 
 export const optionLabel = style({
   ...typeScale.control,
@@ -117,8 +117,8 @@ export const optionLabel = style({
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
 export const optionDescription = style({
   ...typeScale.hint,
@@ -126,14 +126,14 @@ export const optionDescription = style({
   color: vars.color.text.secondary,
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
-  selectors: { "&[data-mono]": { fontFamily: monoFamily } },
-});
+  selectors: { "&[data-mono]": { fontFamily: monoFamily } }
+})
 
-export const indicator = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+export const indicator = style({ flex: "none", width: "0.875rem", height: "0.875rem" })
 
 export const footer = style({
   ...typeScale.hint,
   margin: 0,
   padding: "0.5rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})

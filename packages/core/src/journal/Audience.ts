@@ -7,9 +7,10 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
 
-const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/));
+import * as Schema from "effect/Schema"
+
+const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/))
 
 /**
  * One delivery scope: every member of the workspace, or the readers of one kind and ID, such as
@@ -19,15 +20,15 @@ const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/));
  * @category schemas
  * @since 0.1.0
  */
-export const Scope = Schema.String.check(
-  Schema.isPattern(/^(?:workspace|[a-z][a-z0-9-]*:.+)$/s),
-).pipe(Schema.brand("AudienceScope"));
+export const Scope = Schema.String.check(Schema.isPattern(/^(?:workspace|[a-z][a-z0-9-]*:.+)$/s)).pipe(
+  Schema.brand("AudienceScope")
+)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Scope = typeof Scope.Type;
+export type Scope = typeof Scope.Type
 
 /**
  * The scope every member of the workspace holds, for facts about the workspace itself, such as
@@ -36,7 +37,7 @@ export type Scope = typeof Scope.Type;
  * @category constructors
  * @since 0.1.0
  */
-export const workspace: Scope = Scope.make("workspace");
+export const workspace: Scope = Scope.make("workspace")
 
 /**
  * The scope of the readers of one kind and ID, such as `group:<id>`. The kind is lowercase letters,
@@ -47,7 +48,7 @@ export const workspace: Scope = Scope.make("workspace");
  * @since 0.1.0
  */
 export const make = (kind: string, id: string): Scope =>
-  Scope.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`);
+  Scope.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`)
 
 /**
  * Who may learn of a fact beyond the projections that apply it: a reader holding any one of
@@ -56,13 +57,13 @@ export const make = (kind: string, id: string): Scope =>
  * @category schemas
  * @since 0.1.0
  */
-export const Audience = Schema.UniqueArray(Scope);
+export const Audience = Schema.UniqueArray(Scope)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Audience = typeof Audience.Type;
+export type Audience = typeof Audience.Type
 
 /**
  * The empty audience: nothing outside the fact's projections learns of it. `Fact.makeAudience`
@@ -71,4 +72,4 @@ export type Audience = typeof Audience.Type;
  * @category constructors
  * @since 0.1.0
  */
-export const internal: Audience = [];
+export const internal: Audience = []

@@ -1,7 +1,7 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight } from "../../foundations/typography/tokens.ts"
 
 // Six 56px-tall cells, 12px apart, filling the form's width.
 export const root = style({
@@ -9,8 +9,8 @@ export const root = style({
   display: "grid",
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
   gap: "0.75rem",
-  "@media": { [media.mobile]: { gap: "0.5rem" } },
-});
+  "@media": { [media.mobile]: { gap: "0.5rem" } }
+})
 
 export const cell = style({
   display: "grid",
@@ -29,14 +29,14 @@ export const cell = style({
     [`${root}:focus-within &[data-next]`]: { borderColor: vars.color.border.strong },
     // An error outlines every cell, including the focused one.
     [`${root}[data-invalid] &, ${root}[data-invalid]:focus-within &[data-next]`]: {
-      borderColor: vars.color.border.danger,
+      borderColor: vars.color.border.danger
     },
     [`${root}[data-disabled] &`]: {
       backgroundColor: vars.color.surface.subtle,
-      color: vars.color.text.disabled,
-    },
-  },
-});
+      color: vars.color.text.disabled
+    }
+  }
+})
 
 // The real field covers the cells; its own text and caret are hidden.
 export const input = style({
@@ -55,6 +55,6 @@ export const input = style({
   letterSpacing: "2rem",
   selectors: {
     "&::selection": { background: "transparent" },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
+  }
+})
