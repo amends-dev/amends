@@ -105,7 +105,8 @@
         "stacks/**",
         "**/*.config.ts",
         "**/alchemy.run.ts",
-        "**/.storybook/**"
+        "**/.storybook/**",
+        "examples/**"
       ],
       "rules": {
         "no-restricted-imports": [

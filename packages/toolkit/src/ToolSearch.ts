@@ -127,7 +127,9 @@ export const toolkit = Effect.fn("ToolSearch.toolkit")(function* <Tools extends 
     }
   })
 
-  const SearchToolkit = Toolkit.make(Search, Call)
+  // Neither is sent in strict schema mode: a search may leave out `limit`, and a call's input is
+  // whatever the tool it names takes, which strict mode does not allow.
+  const SearchToolkit = Toolkit.make(Search.annotate(Tool.Strict, false), Call.annotate(Tool.Strict, false))
   const handlers = SearchToolkit.toLayer({
     tool_search: ({ query, limit: asked }) =>
       Effect.sync(() => {

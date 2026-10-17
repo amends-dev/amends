@@ -140,9 +140,14 @@ const toolOf = (definition: ToolDefinition.ToolDefinition, needsApproval: boolea
   return needsApproval ? tool.setNeedsApproval(true) : tool
 }
 
-/** The annotations of the hints a source gave, so a hint it left out keeps Effect AI's default. */
+/**
+ * The annotations of the hints a source gave, so a hint it left out keeps Effect AI's default, and
+ * no strict schema mode: the parameters are the source's, which may leave a property optional as
+ * strict mode does not allow, and a call checks the input before the source sees it.
+ */
 const annotationsOf = (hints: ToolDefinition.Annotations) =>
   Context.empty().pipe(
+    Context.add(Tool.Strict, false),
     Context.addOrOmit(Tool.Title, Option.fromUndefinedOr(hints.title)),
     Context.addOrOmit(Tool.Readonly, Option.fromUndefinedOr(hints.readOnly)),
     Context.addOrOmit(Tool.Destructive, Option.fromUndefinedOr(hints.destructive)),

@@ -84,7 +84,10 @@ Effect AI does not check the parameters of a dynamic tool, so a call does, befor
 the input. The input must be an object that matches the tool's JSON Schema, and one that the schema
 closes may have no property it does not name. A `pattern` or a `format` is not checked, since the
 source checks it too and a pattern from a source is not run here, and a schema that Effect cannot
-turn into a check is held only to being an object. The source gets the input as the model gave it.
+turn into a check is held only to being an object. The source gets the input as the model gave it. A
+model API that has a strict schema mode, as OpenAI's does, is asked not to use it for a source's
+tools, since the parameters are the source's and may leave a property optional, which strict mode
+refuses.
 
 Whatever happens to a call is a result the model reads, so that the turn goes on and the model can
 try something else. A failure arrives as `Failure`, `{ code, message, retryable }`, with `isFailure`
@@ -228,7 +231,8 @@ const toolkit = yield * ToolSearch.toolkit(assembled)
 A tool that needs approval needs it when the model calls it through `tool_call`: the approval is the
 tool's own, as its `needsApproval` says, asked about the input the model gave, so a session asks
 about the call as it asks about any other, and the model cannot reach a tool that needs approval by
-another way. `tool_search` runs nothing and needs none.
+another way. `tool_search` runs nothing and needs none. Neither tool is sent in a model API's strict schema mode, which allows no optional
+`limit` and no input whose shape depends on the tool named.
 
 What the model is shown is the same two tools however many there are, and what it reads of the
 others is what it searched for. The names of the presented tools are only text the model reads and
