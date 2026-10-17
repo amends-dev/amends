@@ -10,6 +10,7 @@
 
 import * as McpSchema from "effect/ai/McpSchema"
 import * as Data from "effect/Data"
+import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Sse from "effect/encoding/Sse"
 import type * as HttpClient from "effect/http/HttpClient"
@@ -40,6 +41,12 @@ export interface Options {
 
   /** Tells the server who is asking. */
   readonly clientInfo?: { readonly name: string; readonly version: string }
+
+  /**
+   * How long a request may take, from sending it to reading the server's reply, which a call of a
+   * tool counts in. A request that takes longer fails as `UnavailableError`. A minute by default.
+   */
+  readonly timeout?: Duration.Input
 }
 
 /**
@@ -117,8 +124,6 @@ const Discovered = Schema.Struct({ supportedVersions: Schema.Array(Schema.String
 
 const Initialized = Schema.Struct({ protocolVersion: Schema.String })
 
-// TODO: End a session with a DELETE when the source is released, and give a request that never
-// answers a limit. Both need the source to have a lifetime, which it does not have yet.
 /**
  * Makes the transport to the MCP server at `options.url`. Making it contacts nothing: the server
  * is first reached by the first request.
@@ -126,6 +131,7 @@ const Initialized = Schema.Struct({ protocolVersion: Schema.String })
 export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function* (options: Options) {
   const { name, url, client } = options
   const clientInfo = options.clientInfo ?? { name: "amends", version: "0.0.0" }
+  const timeout = Duration.fromInputUnsafe(options.timeout ?? "1 minute")
   const requestCount = yield* Ref.make(0)
   const settledConnection = yield* Ref.make(Option.none<Connection>())
   const settling = yield* Semaphore.make(1)
@@ -378,6 +384,14 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
       Option.filter((current) => current !== ended)
     )
 
+  const timedOut = Effect.fail(
+    fail(
+      new ToolSourceError.UnavailableError({
+        description: `The server did not answer within ${Duration.toMillis(timeout) / 1000} seconds`
+      })
+    )
+  )
+
   const request: Transport["request"] = (schema, method, params, options) => {
     const attempt = connection.pipe(Effect.flatMap((settled) => exchange(schema, settled, method, params, options)))
     return attempt.pipe(
@@ -394,7 +408,8 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
             )
           )
         )
-      )
+      ),
+      Effect.timeoutOrElse({ duration: timeout, orElse: () => timedOut })
     )
   }
 

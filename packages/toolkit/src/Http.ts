@@ -11,6 +11,7 @@
  * @since 0.1.0
  */
 
+import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import type * as HttpClient from "effect/http/HttpClient"
 import type * as HttpClientError from "effect/http/HttpClientError"
@@ -126,18 +127,31 @@ export interface Options {
 
   /** The tools of the source, which must have distinct names. */
   readonly operations: ReadonlyArray<Operation>
+
+  /**
+   * How long a call may take, from sending its request to reading the answer. A call that takes
+   * longer fails as `UnavailableError`. 30 seconds by default.
+   */
+  readonly timeout?: Duration.Input
+
+  /**
+   * The most characters an answer may have, which is what the model reads. A longer answer fails
+   * the call as `CallFailedError`, telling the model to ask for less. 200,000 by default.
+   */
+  readonly maxAnswerLength?: number
 }
 
 /** The most of an answer that a failed call tells the model, which is all it needs to correct. */
 const maxFailureLength = 500
 
-// TODO: Give a request that never answers, and an answer that never ends or is far too large to
-// read, a limit. Both need a decision about what a call may cost, which the source does not have yet.
+const defaultMaxAnswerLength = 200_000
+
 /**
  * Makes a source of the operations of an HTTP API. A call answered 401 or 403 fails with
  * `AuthenticationError`, 408, 429, or 5xx with `UnavailableError`, and any other 4xx with
  * `CallFailedError`, holding the API's own words cut to 500 characters. A success is the body as
- * JSON, as text, or `null` without one.
+ * JSON, as text, or `null` without one. A call that takes longer than `timeout` fails as
+ * `UnavailableError`, and an answer longer than `maxAnswerLength` as `CallFailedError`.
  *
  * **Example** (A source of an API, from an operation written by hand)
  *
@@ -191,6 +205,8 @@ const maxFailureLength = 500
 export const make = Effect.fnUntraced(function* (options: Options) {
   const { name, client } = options
   const baseUrl = options.baseUrl.replace(/\/+$/, "")
+  const timeout = Duration.fromInputUnsafe(options.timeout ?? "30 seconds")
+  const maxAnswerLength = options.maxAnswerLength ?? defaultMaxAnswerLength
   const operations = new Map(options.operations.map((operation) => [operation.definition.name, operation]))
   if (operations.size !== options.operations.length) {
     return yield* Effect.die(new Error(`${name} has more than one operation of the same name`))
@@ -233,6 +249,14 @@ export const make = Effect.fnUntraced(function* (options: Options) {
   /** What a response with a status that is a success says: the body, as JSON, or as text. */
   const readBody = Effect.fnUntraced(function* (response: HttpClientResponse.HttpClientResponse) {
     const text = yield* readText(response)
+    if (text.length > maxAnswerLength) {
+      // The model reads this, so it can ask for less, such as a page or a field.
+      return yield* fail(
+        new ToolSourceError.CallFailedError({
+          description: `The answer is longer than ${maxAnswerLength} characters, which a tool cannot return; ask for less`
+        })
+      )
+    }
     if (text === "") return null
     const mediaType = (response.headers["content-type"] ?? "").split(";")[0]?.trim().toLowerCase() ?? ""
     if (mediaType === "" || mediaType.startsWith("text/")) return text
@@ -250,25 +274,36 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     )
   })
 
+  /** Sends the operation's request with the input, and reads what the API answered. */
+  const call = Effect.fnUntraced(function* (operation: Operation, input: Schema.JsonObject) {
+    const prepared = yield* Effect.fromResult(prepare(operation.request, input)).pipe(
+      Effect.mapError((description) => fail(new ToolSourceError.InvalidInputError({ description })))
+    )
+    const request = HttpClientRequest.make(operation.request.method)(baseUrl + prepared.path).pipe(
+      HttpClientRequest.setHeaders({ accept: "application/json", ...prepared.headers }),
+      HttpClientRequest.appendUrlParams(prepared.query),
+      (request) => (prepared.body === undefined ? request : HttpClientRequest.bodyJsonUnsafe(request, prepared.body))
+    )
+    const response = yield* send(request)
+    return response.status >= 200 && response.status < 300 ? yield* readBody(response) : yield* failWithStatus(response)
+  })
+
+  const timedOut = Effect.fail(
+    fail(
+      new ToolSourceError.UnavailableError({
+        description: `The API did not answer within ${Duration.toMillis(timeout) / 1000} seconds`
+      })
+    )
+  )
+
   const source: ToolSource.ToolSource = {
     name,
     discover: Effect.succeed(options.operations.map((operation) => operation.definition)),
-    call: Effect.fnUntraced(function* (tool, input) {
+    call: (tool, input) => {
       const operation = operations.get(tool)
-      if (operation === undefined) return yield* fail(new ToolSourceError.NotFoundError({}))
-      const prepared = yield* Effect.fromResult(prepare(operation.request, input)).pipe(
-        Effect.mapError((description) => fail(new ToolSourceError.InvalidInputError({ description })))
-      )
-      const request = HttpClientRequest.make(operation.request.method)(baseUrl + prepared.path).pipe(
-        HttpClientRequest.setHeaders({ accept: "application/json", ...prepared.headers }),
-        HttpClientRequest.appendUrlParams(prepared.query),
-        (request) => (prepared.body === undefined ? request : HttpClientRequest.bodyJsonUnsafe(request, prepared.body))
-      )
-      const response = yield* send(request)
-      return response.status >= 200 && response.status < 300
-        ? yield* readBody(response)
-        : yield* failWithStatus(response)
-    })
+      if (operation === undefined) return Effect.fail(fail(new ToolSourceError.NotFoundError({})))
+      return call(operation, input).pipe(Effect.timeoutOrElse({ duration: timeout, orElse: () => timedOut }))
+    }
   }
   return source
 })

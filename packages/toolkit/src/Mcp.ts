@@ -24,8 +24,8 @@ import * as ToolSourceError from "./ToolSourceError.ts"
 
 export type {
   /**
-   * What `http` takes: the source's name, the server's address, and the client that sends its
-   * requests with the server's credentials.
+   * What `http` takes: the source's name, the server's address, the client that sends its
+   * requests with the server's credentials, and how long a request may take.
    *
    * @category options
    * @since 0.1.0

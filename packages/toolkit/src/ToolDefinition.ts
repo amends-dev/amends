@@ -45,8 +45,6 @@ export const Annotations = Schema.Struct({
  */
 export interface Annotations extends Schema.Schema.Type<typeof Annotations> {}
 
-// TODO: Add the tool's output schema, which MCP and OpenAPI report, once code mode or search
-// presents tools by their results.
 /**
  * A tool as data: its name, what it does, its parameters as JSON Schema, and its source's hints.
  * A source reports these from `discover`, a catalog stores them as JSON, and

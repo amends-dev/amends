@@ -108,7 +108,6 @@ export class CallFailedError extends Schema.TaggedError<CallFailedError>(
   }
 }
 
-// TODO: Say when to try again, which a rate limit gives, once a caller retries by it.
 /**
  * The source cannot answer now: it said that it is down or busy, or it could not be reached. The
  * only reason worth trying again.

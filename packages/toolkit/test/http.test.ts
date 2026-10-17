@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Fiber, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { TestClock } from "effect/testing"
 import * as Http from "../src/Http.ts"
 
 interface Received {
@@ -540,6 +541,76 @@ describe("an API reached over the wire", () => {
       const error = yield* Effect.flip(source.call("get", {}))
 
       expect(error.reason._tag).toBe("UnavailableError")
+    })
+  )
+})
+
+describe("limits", () => {
+  const never = HttpClient.make(() => Effect.never)
+
+  it.effect("fails a call the API does not answer within the timeout, 30 seconds by default, as unavailable", () =>
+    Effect.gen(function* () {
+      const source = yield* connect(never, [operation("ping")])
+      const running = yield* Effect.forkChild(Effect.flip(source.call("ping", {})))
+      yield* Effect.yieldNow
+
+      yield* TestClock.adjust("29 seconds")
+      const early = running.pollUnsafe()
+      yield* TestClock.adjust("1 second")
+      const error = yield* Fiber.join(running)
+
+      expect(early).toBeUndefined()
+      expect(error.reason._tag).toBe("UnavailableError")
+      expect(error.isRetryable).toBe(true)
+      expect(error.reason.message).toBe("The API did not answer within 30 seconds")
+    })
+  )
+
+  it.effect("takes the timeout it is given", () =>
+    Effect.gen(function* () {
+      const source = yield* Http.make({
+        name: "example",
+        baseUrl,
+        client: never,
+        operations: [operation("ping")],
+        timeout: "2 seconds"
+      })
+      const running = yield* Effect.forkChild(Effect.flip(source.call("ping", {})))
+      yield* Effect.yieldNow
+
+      yield* TestClock.adjust("2 seconds")
+      const error = yield* Fiber.join(running)
+
+      expect(error.reason.message).toBe("The API did not answer within 2 seconds")
+    })
+  )
+
+  it.effect("refuses an answer longer than 200,000 characters by default, telling the model to ask for less", () =>
+    Effect.gen(function* () {
+      const { client } = scripted(() => ({ headers: json, body: JSON.stringify({ items: "x".repeat(200_000) }) }))
+      const source = yield* connect(client, [operation("ping")])
+
+      const error = yield* Effect.flip(source.call("ping", {}))
+
+      expect(error.reason._tag).toBe("CallFailedError")
+      expect(error.isRetryable).toBe(false)
+      expect(error.reason.modelMessage).toBe(
+        "The answer is longer than 200000 characters, which a tool cannot return; ask for less"
+      )
+    })
+  )
+
+  it.effect("takes the answer length it is given, and returns an answer within it", () =>
+    Effect.gen(function* () {
+      const { client } = scripted(() => ({ headers: json, body: JSON.stringify({ items: "x".repeat(90) }) }))
+      const make = (maxAnswerLength: number) =>
+        Http.make({ name: "example", baseUrl, client, operations: [operation("ping")], maxAnswerLength })
+
+      const fits = yield* (yield* make(200)).call("ping", {})
+      const error = yield* Effect.flip((yield* make(100)).call("ping", {}))
+
+      expect(fits).toEqual({ items: "x".repeat(90) })
+      expect(error.reason._tag).toBe("CallFailedError")
     })
   )
 })

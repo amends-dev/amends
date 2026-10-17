@@ -32,7 +32,8 @@ const toolkit =
 (`inputSchema`), and `annotations`. The annotations are `title`, `readOnly`, `destructive`,
 `idempotent`, and `openWorld`, named as Effect AI's tool annotations are, and left out when the
 source did not say, so that Effect AI's default for a hint applies. They are a source's claims and
-not guarantees, so a decision about what a tool may do must not rest on them alone.
+not guarantees, so a decision about what a tool may do must not rest on them alone. A definition has
+no output schema, which MCP and OpenAPI report: what a tool answers is JSON the model reads.
 
 ## Sources
 
@@ -58,8 +59,9 @@ harness session asks about before it runs them.
 ## Errors
 
 `ToolSourceError` names the source and holds a `reason`: `AuthenticationError`, `NotFoundError`,
-`InvalidInputError`, `CallFailedError`, which is a tool that ran and said it failed,
-`UnavailableError`, the only one worth trying again, `InvalidResponseError`, `UnsupportedError`, and
+`InvalidInputError`, `CallFailedError`, which is a tool that ran and said it failed, or answered
+more than a tool can return, `UnavailableError`, the only one worth trying again, though it does not
+say when, as a rate limit does with `Retry-After`, `InvalidResponseError`, `UnsupportedError`, and
 `UnknownError`. A host recovers from one with
 `Effect.catchReason("ToolSourceError", "AuthenticationError", ...)`, to ask for a connection again.
 What the model reads of a failure is the reason's `modelMessage`: the description of an
@@ -103,9 +105,10 @@ a number is allowed, though the protocol says otherwise. Only the parameters tha
 to are marks: one under `items`, `anyOf`, `$defs`, or the like makes the tool unusable. A server
 with sessions has no such headers, and its tools are listed as they are.
 
-Not done: a session is not ended when the source is no longer used; a request has no time limit; and
-stdio servers are not reached, though `effect/process` and `effect/encoding` hold what a source
-would need.
+A request that the server does not answer within `timeout`, a minute by default, fails as
+`UnavailableError`, which a call of a tool counts in. Not done: a session is not ended when the
+source is no longer used, and stdio servers are not reached, though `effect/process` and
+`effect/encoding` hold what a source would need.
 
 ## HTTP and OpenAPI
 
@@ -137,9 +140,10 @@ beyond that.
 An operation that cannot be a tool is left out with the reason, in `skipped`, so that a host can
 show what it lost, as for a body that is not JSON, a parameter written in a style other than the
 default or that is an object, a cookie it needs, a path that its parameters do not match, a
-reference to anything but a schema of the document, or a name another operation has. Of the HTTP
-source, not done: a request has no time limit, and an answer has no size limit. A default
-`User-Agent`, which some APIs ask for, is the client's to set.
+reference to anything but a schema of the document, or a name another operation has. A call that
+takes longer than `timeout`, 30 seconds by default, fails as `UnavailableError`, and an answer longer
+than `maxAnswerLength`, 200,000 characters by default, as `CallFailedError`, telling the model to ask
+for less. A default `User-Agent`, which some APIs ask for, is the client's to set.
 
 ## Assembly
 
