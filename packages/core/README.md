@@ -595,10 +595,12 @@ declares an audience, at each version, and no other.
 A commit's `changes` are what it changed in what readers show, each as it is now, so a reader puts it
 in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the
 commit's entries name, the items it recorded and those about a message, turn, or task it changed,
-since an item shows its subject's current state, and a `Preview` of each thread those items are
-in, as its group's stream shows it to every reader. They are read after the commit, so one may reflect
-later commits too, and the last change to an item follows the last commit that changed it. Each
-reaches the readers of its thread's group who hold `thread.read` on the thread, as its read does.
+since an item shows its subject's current state; a `Preview` of each thread those items are in, as
+its group's stream shows it to every reader; and a `GroupLatest` with the latest activity of each of
+their groups. They are read after the commit, so one may reflect later commits too, and the last
+change to an item follows the last commit that changed it. Each reaches the readers its read
+requires: the thread's group with `thread.read` on the thread, or, for a group's latest activity,
+with `group.read` on the group.
 
 Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
 same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with

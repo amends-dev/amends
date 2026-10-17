@@ -53,8 +53,10 @@ group's stream, one thread's timeline, and so on. Writes invalidate the keys the
 [change feed](../../docs/change-feed.md) invalidates the keys each commit affects, so whatever is
 mounted refreshes, or delivers what the commit changed, which shows in place: a timeline shows each
 delivered item in place of the one it read, and those that follow it after (`withDeliveredItems`),
-and a stream each delivered preview in place of the thread it shows, threads that started since
-after the newest, and the positions `ThreadRead` signals carry (`withDeliveredPreviews`).
+a stream each delivered preview in place of the thread it shows, threads that started since
+after the newest, and the positions `ThreadRead` signals carry (`withDeliveredPreviews`), and the
+groups list each group's delivered latest activity and the read times `GroupRead` signals carry
+(`withDeliveredGroupActivity`).
 Paged reads (group streams, timelines, the inbox) keep their pages in one atom and read on from its
 previous value, so a refresh never drops what is on screen; a timeline's refresh reads every item it
 shows again.

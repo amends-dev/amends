@@ -140,6 +140,8 @@ function mount<A>(fetch: typeof globalThis.fetch, use: () => PagedView<A>) {
 
 it("maps conversation facts and signals to the reads of their groups and threads", () => {
   const keys = (names: Array<{ name: string; payload?: unknown }>) => affectedKeys("one", names).toSorted()
+  // Thread activity reads nothing again: its timeline, its group's stream, and the groups list take
+  // what the commit delivers.
   expect(
     keys([
       {
@@ -147,7 +149,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         payload: { groupId: "group", activity: { threadId: "thread" } }
       }
     ])
-  ).toEqual(["workspace/one/groups"])
+  ).toEqual([])
   // Leaving a group also changes which notification sources the reader can still read.
   // Every open thread checks its access again, since the fact names no threads.
   // Public groups show who belongs, so their listing refreshes too.
@@ -239,7 +241,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         readAt: at
       })
     )
-  ).toEqual(["workspace/one/groups"])
+  ).toEqual([])
   expect(
     signalKeys(
       "one",

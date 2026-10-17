@@ -19,7 +19,8 @@ and cache invalidation; apps mount it once per workspace view; features show its
    is now, which shows in place without a read: a `TimelineItem` goes in its thread's timeline, in
    place of the item it read at that position, or after the last while it follows on, and a
    `Preview` goes in its group's stream, in place of the thread it shows, or after the newest one
-   for a thread that started since. The server
+   for a thread that started since, and a `GroupLatest` gives the groups list a group's latest
+   activity, which is new to the reader when it follows their last read of the group. The server
    reads each change once, after the commit, for every reader of what changed, so a change may
    reflect later commits too, and the last change to an item follows the last commit that changed
    it. An edit therefore updates the message's item where it already shows, and a reply the
@@ -28,10 +29,9 @@ and cache invalidation; apps mount it once per workspace view; features show its
    (`apps/client/src/live/api.ts`) and invalidates each once, so every affected read
    refreshes once. A member's rename refreshes the members and the directory. Group creation,
    renames, and membership changes also refresh the public groups, and a public group's creation
-   reaches the whole workspace. Thread activity
-   names its group in its payload, so it refreshes the groups list, while the thread's timeline and
-   its group's stream take the commit's changes; a thread's rename refreshes the thread, and a
-   group's rename the groups list; group membership
+   reaches the whole workspace. Thread activity refreshes nothing: the thread's timeline, its
+   group's stream, and the groups list take the commit's changes. A thread's rename refreshes the
+   thread, and a group's rename the groups list; group membership
    refreshes the groups and that group's stream and roster, and every open timeline and participant
    list, since the fact names no threads and each must check its access again; joining or leaving a
    thread refreshes its participants, workspace membership every roster, and grant changes every
@@ -62,7 +62,8 @@ marks and marking notifications seen write private state rather than a commit, a
 themselves: the signal the server publishes for them reaches every session of the reader, the one
 that wrote included, and refreshes what it changed, once. A `ThreadRead` signal carries the
 position, which the group's streams show without a read; it also follows a start or a reply, once
-it commits, since the author has read what they posted. While the feed is down, what they change
+it commits, since the author has read what they posted. A `GroupRead` signal carries the read
+time, which the groups list shows without a read. While the feed is down, what they change
 catches up when it reconnects, with the rest of the view.
 
 ## Connection

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "@effect/vitest"
 import { cleanup, render, waitFor } from "@solidjs/testing-library"
-import { Layer, Schema } from "effect"
+import { DateTime, Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { createSignal, Show } from "solid-js"
 import { SignIn } from "../src/api/contracts.ts"
@@ -524,4 +524,82 @@ it("shows the previews a commit delivers and the positions read in a stream, wit
     ])
   )
   expect(f.count("/groups/group/openings")).toBe(reads)
+})
+
+it("shows the group activity a commit delivers and the group reads told, without reading the groups again", async () => {
+  let groups!: ReturnType<typeof useGroups>
+  const at = (minute: number) => new Date(Date.UTC(2026, 8, 25, 12, minute)).toISOString()
+  const listed = (id: string, latestActivityAt: string | null, readAt: string | null, newActivity: boolean) => ({
+    group: {
+      id,
+      workspaceId: "one",
+      kind: "Team",
+      visibility: "Private",
+      name: id,
+      createdBy: "owner",
+      createdAt: at(0)
+    },
+    latestActivityAt,
+    readAt,
+    newActivity,
+    following: false,
+    pending: 0,
+    manageable: true,
+    membersRemovable: true,
+    renamable: true
+  })
+  const f = fixture({
+    respond: (_, path) =>
+      path === "/groups"
+        ? Promise.resolve(json([listed("read", at(1), at(2), false), listed("unread", null, null, false)]))
+        : undefined,
+    mount: () => {
+      groups = useGroups("one")
+    }
+  })
+  const feed = await f.connected(0)
+  feed.send(ready("1", false))
+  const shown = () =>
+    (groups.value() ?? []).map((item) => [
+      item.group.id,
+      item.latestActivityAt === null ? null : DateTime.formatIso(item.latestActivityAt),
+      item.newActivity
+    ])
+  await waitFor(() =>
+    expect(shown()).toEqual([
+      ["read", at(1), false],
+      ["unread", null, false]
+    ])
+  )
+  const reads = f.count("/groups")
+  // Activity after a group was read is new, and so is any activity in a group never read.
+  feed.send({
+    ...committed("2"),
+    changes: [
+      { _tag: "GroupLatest", latest: { groupId: "read", occurredAt: at(3) } },
+      { _tag: "GroupLatest", latest: { groupId: "unread", occurredAt: at(4) } }
+    ]
+  })
+  await waitFor(() =>
+    expect(shown()).toEqual([
+      ["read", at(3), true],
+      ["unread", at(4), true]
+    ])
+  )
+  // Reading a group, here or in another session, shows its activity read; a later read is kept.
+  const groupRead = (groupId: string, readAt: string) => ({
+    _tag: "Signal",
+    workspaceId: "one",
+    signal: { _tag: "GroupRead", workspaceId: "one", memberId: "owner", groupId, readAt }
+  })
+  feed.send(groupRead("read", at(5)))
+  feed.send(groupRead("read", at(4)))
+  await waitFor(() =>
+    expect(shown()).toEqual([
+      ["read", at(3), false],
+      ["unread", at(4), true]
+    ])
+  )
+  expect(groups.value()?.[0]?.readAt).toEqual(DateTime.makeUnsafe(at(5)))
+  expect(f.count("/groups")).toBe(reads)
 })

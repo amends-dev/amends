@@ -15,6 +15,9 @@ import * as Layer from "effect/Layer"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Target from "../authorization/Target.ts"
 import * as Group from "../group/Group.ts"
+import type * as GroupId from "../group/GroupId.ts"
+import * as GroupPermissions from "../group/GroupPermissions.ts"
+import * as GroupStore from "../group/GroupStore.ts"
 import type * as Audience from "../journal/Audience.ts"
 import type * as Event from "../journal/Event.ts"
 import type * as Thread from "../thread/Thread.ts"
@@ -55,22 +58,31 @@ export class ChangeFeedChanges extends Context.Service<
 /**
  * The changes over the queries that read what readers show: every timeline item about what the
  * commit's entries are about, and the preview of each thread those items are in, to the thread's
- * readers.
+ * readers, and the latest activity of each group those threads are in, to the group's readers.
  *
  * @category constructors
  * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const threadQuery = yield* ThreadQuery.ThreadQuery
+  const groupStore = yield* GroupStore.GroupStore
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const changesOf = Effect.fn("ChangeFeedChanges.changesOf")(function* (batch: Log.Batch<Event.Envelope>) {
     const subjects = [...new Set(batch.entries.map((entry) => entry.payload.subject))]
     const about = yield* threadQuery.timelineItemsAbout(subjects)
+    if (about.length === 0) return []
     // A thread's preview shows its latest activity, replies, title, and task, which only change
     // with its timeline.
     const threads = new Map(about.map(({ thread }) => [thread.id, thread] as const))
     const previews = yield* threadQuery.previewsOf(yield* threadQuery.listedOf([...threads.values()]))
-    const toReaders = (thread: Thread.Thread, change: ChangeFeed.Change): Prepared => ({
+    // A group's latest activity is its threads' latest message.
+    const groups = yield* groupStore.getLatest([...new Set(previews.map(({ thread }) => thread.groupId))])
+    const toGroupReaders = (groupId: GroupId.GroupId, change: ChangeFeed.Change): Prepared => ({
+      change,
+      audience: [Group.audienceOf(groupId)],
+      requirement: Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId }))
+    })
+    const toThreadReaders = (thread: Thread.Thread, change: ChangeFeed.Change): Prepared => ({
       change,
       audience: [Group.audienceOf(thread.groupId)],
       requirement: Requirement.make(
@@ -79,15 +91,16 @@ export const make = Effect.gen(function* () {
       )
     })
     return [
-      ...about.map(({ thread, item }) => toReaders(thread, ChangeFeed.Change.cases.TimelineItem.make({ item }))),
-      ...previews.map((preview) => toReaders(preview.thread, ChangeFeed.Change.cases.Preview.make({ preview })))
+      ...about.map(({ thread, item }) => toThreadReaders(thread, ChangeFeed.Change.cases.TimelineItem.make({ item }))),
+      ...previews.map((preview) => toThreadReaders(preview.thread, ChangeFeed.Change.cases.Preview.make({ preview }))),
+      ...groups.map((latest) => toGroupReaders(latest.groupId, ChangeFeed.Change.cases.GroupLatest.make({ latest })))
     ]
   })
   return ChangeFeedChanges.of({ changesOf })
 })
 
 /**
- * `ChangeFeedChanges` from `make`, over the thread query.
+ * `ChangeFeedChanges` from `make`, over the thread query and the group store.
  *
  * @category layers
  * @since 0.1.0

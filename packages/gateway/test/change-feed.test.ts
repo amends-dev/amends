@@ -6,7 +6,7 @@ import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { NotificationService } from "@amends-dev/core/notification"
 import { Signal } from "@amends-dev/core/signal"
-import { ThreadMessageFacts, ThreadMessageService, ThreadService, type ThreadTimeline } from "@amends-dev/core/thread"
+import { ThreadMessage, ThreadMessageFacts, ThreadMessageService, ThreadService } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Queue, Stream } from "effect"
@@ -33,8 +33,8 @@ const watch = (options?: ChangeFeed.WatchOptions) =>
   Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) => changeFeedService.watch(options))
 const human = (name: string) => Identity.HumanId.make(name)
 /** The text a timeline item shows, when it shows a message's. */
-const textOf = (item: ThreadTimeline.Item) =>
-  "message" in item && item.message.content._tag === "Text" ? item.message.content.text : undefined
+const textOf = (message: ThreadMessage.ThreadMessage) =>
+  ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? message.content.text : undefined
 const memberActor = (name: string) =>
   Actor.Actor.of({
     workspaceId,
@@ -122,35 +122,43 @@ describe("change feed", () => {
             content: { text: "Secret plan" },
             groupId: group.id
           })
-          // The commit's changes are the timeline items it recorded, as the timeline shows them.
-          // The commit's changes: the timeline items it recorded, as the timeline shows them, and
-          // the preview of their thread, as its group's stream shows it.
+          // The commit's changes: the timeline items it recorded, as the timeline shows them, the
+          // preview of their thread, as its group's stream shows it, and their group's latest
+          // activity, as the groups list shows it.
           const changesOf = (message: ChangeFeed.Message) =>
             committed(message).changes.map((change) =>
               ChangeFeed.Change.match(change, {
-                TimelineItem: ({ item }) => [item.activity.sequence, item.activity.kind, textOf(item)],
+                TimelineItem: ({ item }) => [
+                  item.activity.sequence,
+                  item.activity.kind,
+                  "message" in item ? textOf(item.message) : undefined
+                ],
                 Preview: ({ preview }) => [
                   "preview",
                   preview.latest.sequence,
                   preview.replies,
-                  preview.message.content._tag === "Text" ? preview.message.content.text : undefined
-                ]
+                  textOf(preview.message)
+                ],
+                GroupLatest: ({ latest }) => ["group", latest.groupId]
               })
             )
           expect(changesOf(started)).toEqual([
             [1, "message.published", "Secret plan"],
-            ["preview", 1, 0, "Secret plan"]
+            ["preview", 1, 0, "Secret plan"],
+            ["group", group.id]
           ])
           expect(changesOf(yield* readerFeed)).toEqual([
             [2, "message.published", "First draft"],
-            ["preview", 2, 1, "Secret plan"]
+            ["preview", 2, 1, "Secret plan"],
+            ["group", group.id]
           ])
           // An edit changes the reply's own item in place, as well as recording its own; it is quiet,
           // so the preview's latest activity stays the reply.
           expect(changesOf(yield* readerFeed)).toEqual([
             [2, "message.published", "Final draft"],
             [3, "message.edited", "Final draft"],
-            ["preview", 2, 1, "Secret plan"]
+            ["preview", 2, 1, "Secret plan"],
+            ["group", group.id]
           ])
           expect(committed(yield* readerFeed).events[0]?.name).toBe(RoleFacts.Created.name)
           // Outside the group, or without read permission, only workspace facts arrive, and no change.

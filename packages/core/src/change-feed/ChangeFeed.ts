@@ -11,6 +11,7 @@
 import * as Commit from "@amends-dev/log/Commit"
 import * as Entry from "@amends-dev/log/Entry"
 import * as Schema from "effect/Schema"
+import * as Group from "../group/Group.ts"
 import * as JournalEvent from "../journal/Event.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Signal from "../signal/Signal.ts"
@@ -84,7 +85,9 @@ export const Change = Schema.TaggedUnion({
   /** A timeline item as its thread shows it now: one the commit recorded, or about a record it changed. */
   TimelineItem: { item: ThreadTimeline.Item },
   /** A thread's preview as its group's stream shows it now, for a thread whose timeline the commit changed. */
-  Preview: { preview: Thread.Preview }
+  Preview: { preview: Thread.Preview },
+  /** A group's latest activity as its members' groups lists show it now, for a group whose threads the commit changed. */
+  GroupLatest: { latest: Group.Latest }
 }).annotate({ identifier: "ChangeFeedChange" })
 /**
  * @category schemas

@@ -30,10 +30,12 @@ import {
   type WorkspaceResource
 } from "../api/keys.ts"
 import {
+  deliverGroupLatest,
   deliverPreview,
   deliverTimelineItem,
   forgetDeliveredItems,
   forgetDeliveredPreviews,
+  recordGroupRead,
   recordReadPosition
 } from "../conversations/api.ts"
 import { posted, typing, typistsAtom } from "../conversations/typing.ts"
@@ -124,8 +126,6 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "group.membership.removed": ["groups", "public-groups", "inbox", "active-turns"],
   "group.follow.started": ["groups"],
   "group.follow.ended": ["groups"],
-  // A group's latest activity, and whether it is new to the reader.
-  "thread.activity.recorded": ["groups"],
   // Connections: their names, settings, and readiness, which agents name and follow.
   // Replacing a key changes none of them.
   "connection.created": ["connections", "agents"],
@@ -241,18 +241,17 @@ export const affectedKeys = (
   ]
 }
 /**
- * The reads a signal to the reader's own sessions changes. Reading a thread changes its stream's
- * unread state, and settles notifications from it, changing the inbox and pending counts; seeing
- * notifications changes the inbox and counts; reading a group, the groups.
+ * The reads a signal to the reader's own sessions changes beyond what it carries. Reading a thread
+ * settles notifications from it, changing the inbox and pending counts, and seeing notifications
+ * changes the inbox and counts. Streams take a thread's read position from the signal, and the
+ * groups list a group's read time.
  */
 export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<string> =>
   Signal.Signal.matchOrElse(
     signal,
     {
-      // A stream takes the position the signal carries.
       ThreadRead: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")],
-      NotificationsSeen: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")],
-      GroupRead: () => [workspaceKey(workspaceId, "groups")]
+      NotificationsSeen: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")]
     },
     () => []
   )
@@ -347,7 +346,8 @@ const run = Effect.fnUntraced(function* (
         for (const change of message.changes)
           ChangeFeed.Change.match(change, {
             TimelineItem: ({ item }) => void delivered.timelines.add(deliverTimelineItem(registry, workspaceId, item)),
-            Preview: ({ preview }) => void delivered.streams.add(deliverPreview(registry, workspaceId, preview))
+            Preview: ({ preview }) => void delivered.streams.add(deliverPreview(registry, workspaceId, preview)),
+            GroupLatest: ({ latest }) => deliverGroupLatest(registry, workspaceId, latest)
           })
         // A notification for the reader changes their inbox and pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0)
@@ -359,6 +359,8 @@ const run = Effect.fnUntraced(function* (
           registry.update(typists, (current) => typing(current, signal, Date.now()))
         if (Signal.Signal.isAnyOf(["ThreadRead"])(signal))
           recordReadPosition(registry, workspaceId, signal.threadId, signal.readThrough)
+        if (Signal.Signal.isAnyOf(["GroupRead"])(signal))
+          recordGroupRead(registry, workspaceId, signal.groupId, signal.readAt)
         const keys = signalKeys(workspaceId, signal)
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void
       }

@@ -56,9 +56,63 @@ const split = (key: string) => {
 const joined = (workspaceId: string, id: string) => `${workspaceId}\u0000${id}`
 const valid = (workspaceId: string) => Option.isSome(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId))
 
+/** The later of two times, either of which may be unknown. */
+const later = (left: DateTime.Utc | null, right: DateTime.Utc | undefined) =>
+  right !== undefined && (left === null || DateTime.isGreaterThan(right, left)) ? right : left
+/** `times` with `id` at `time`, unless it already holds that time or a later one. */
+const moveForward = (times: ReadonlyMap<string, DateTime.Utc>, id: string, time: DateTime.Utc) => {
+  const known = times.get(id)
+  return known === undefined || DateTime.isGreaterThan(time, known) ? new Map(times).set(id, time) : times
+}
+/** Each group's latest activity, as the change feed delivered it, in one workspace. */
+const groupLatestOf = Atom.family((_workspaceId: string) => Atom.make<ReadonlyMap<string, DateTime.Utc>>(new Map()))
+/** When the reader read each group, as the change feed told their sessions, in one workspace. */
+const groupReadTimesOf = Atom.family((_workspaceId: string) => Atom.make<ReadonlyMap<string, DateTime.Utc>>(new Map()))
+/** Note a group's latest activity, which the change feed delivered; it only moves forward. */
+export const deliverGroupLatest = (registry: AtomRegistry.AtomRegistry, workspaceId: string, latest: Group.Latest) =>
+  registry.update(groupLatestOf(workspaceId), (times) => moveForward(times, latest.groupId, latest.occurredAt))
+/** Note when the reader read a group; read times only move forward. */
+export const recordGroupRead = (
+  registry: AtomRegistry.AtomRegistry,
+  workspaceId: string,
+  groupId: string,
+  readAt: DateTime.Utc
+) => registry.update(groupReadTimesOf(workspaceId), (times) => moveForward(times, groupId, readAt))
+/**
+ * A group as the reader's groups list shows it with its latest activity and read time, given what
+ * the list showed. Both only move forward. New activity is as the server decides it: after the
+ * group was read, or, never read, after the reader joined, which activity delivered later than
+ * what was shown is.
+ */
+export const groupWith = (
+  item: Group.ListItem,
+  latest: DateTime.Utc | undefined,
+  readAt: DateTime.Utc | undefined
+): Group.ListItem => {
+  const latestActivityAt = later(item.latestActivityAt, latest)
+  const read = later(item.readAt, readAt)
+  if (latestActivityAt === item.latestActivityAt && read === item.readAt) return item
+  const newActivity =
+    latestActivityAt === null
+      ? false
+      : read !== null
+        ? DateTime.isGreaterThan(latestActivityAt, read)
+        : item.newActivity || latestActivityAt !== item.latestActivityAt
+  return Object.assign({}, item, { latestActivityAt, readAt: read, newActivity })
+}
+/** The reader's groups with the latest activity the change feed delivered and the read times it told. */
+export const withDeliveredGroupActivity = (
+  items: ReadonlyArray<Group.ListItem>,
+  latest: ReadonlyMap<string, DateTime.Utc>,
+  readTimes: ReadonlyMap<string, DateTime.Utc>
+): ReadonlyArray<Group.ListItem> =>
+  latest.size === 0 && readTimes.size === 0
+    ? items
+    : items.map((item) => groupWith(item, latest.get(item.group.id), readTimes.get(item.group.id)))
+
 /** Every group the reader belongs to, read page by page, in group-ID order. */
-const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
-  client.runtime
+const groupsOf = perClient((client: ApiClient, workspaceId: string) => {
+  const read = client.runtime
     .atom(
       Effect.gen(function* () {
         const api = yield* client
@@ -76,7 +130,14 @@ const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
       })
     )
     .pipe(Atom.withReactivity([workspaceKey(workspaceId, "groups")]))
-)
+  const latest = groupLatestOf(workspaceId)
+  const readTimes = groupReadTimesOf(workspaceId)
+  // Refreshing the groups reads them again; what the change feed delivered and told stays in place.
+  return Atom.readable(
+    (get) => AsyncResult.map(get(read), (items) => withDeliveredGroupActivity(items, get(latest), get(readTimes))),
+    (refresh) => refresh(read)
+  )
+})
 export const groupsRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId) ? groupsOf(client, workspaceId) : undefined
 
@@ -731,8 +792,8 @@ export type ReadMark =
   | { readonly kind: "group"; readonly groupId: string }
 /**
  * Record a read mark; positions only move forward on the server. The reader's sessions, this one
- * included, refresh the unread state and pending counts it changes when its signal arrives
- * through the change feed.
+ * included, show the position or read time its signal carries, and refresh the pending counts it
+ * changes, when the signal arrives through the change feed.
  */
 export const markRead = (api: WorkspaceApi, mark: ReadMark) =>
   Effect.gen(function* () {
