@@ -25,14 +25,15 @@
     "./*": "./src/*.ts"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "directory": "dist"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends-dev/sandbox": "workspace:*"
+    "@amends-dev/sandbox": "workspace:^"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",

@@ -38,6 +38,8 @@
     "barrels": "bun run scripts/barrels.ts",
     "check:barrels": "bun run scripts/barrels.ts --check",
     "dist": "bun run scripts/dist.ts",
+    "changeset-version": "bun run scripts/changeset-version.ts",
+    "changeset-publish": "bun run dist build && changeset publish",
     "check:icons": "bun run --filter @amends-dev/icons check:generated",
     "lint": "oxlint --disable-nested-config --deny-warnings .",
     "lint:fix": "oxlint --disable-nested-config --fix --deny-warnings .",
@@ -47,6 +49,9 @@
     "prepare": "effect-tsgo patch && lefthook install"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "1.0.1",
+    "@changesets/cli": "3.0.3",
+    "@changesets/read": "1.0.1",
     "@effect/docgen": "4.0.0",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",

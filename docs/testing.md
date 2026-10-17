@@ -109,7 +109,7 @@ pushes to it, as parallel jobs, so a run takes as long as its slowest job:
 | Types          | `bun run typecheck`                                                                      |
 | Tests          | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
 | Frontend build | The web and desktop bundles, the UI workshop, and the site                               |
-| Check          | Succeeds only when every job above does; require it for merging                          |
+| Check          | Succeeds only when every job above does; main's ruleset requires it for merging          |
 
 Each job installs the pinned Bun and the locked dependencies through
 [`.github/actions/setup`](../.github/actions/setup/action.yml), which caches Bun's packages by
@@ -129,6 +129,11 @@ libraries and a Rust build cache.
 amends.dev, and each pull request opened from this repository to a preview that it links in a
 comment and destroys when the pull request closes; see the
 [site](../apps/site/README.md#build-and-deploy).
+
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) runs on pushes to main: it keeps
+the release pull request open while changesets are pending, and publishes the packages when it
+merges; see [publishing](publishing.md#releasing). [`stacks/github.ts`](../stacks/github.ts)
+declares the secrets and settings these workflows need, main's ruleset among them.
 
 ## Choosing a test API
 

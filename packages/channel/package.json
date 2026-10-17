@@ -25,7 +25,8 @@
     "./*": "./src/*.ts"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "directory": "dist"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

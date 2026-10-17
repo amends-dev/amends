@@ -3,15 +3,15 @@
  * workspace consumes as they are. The distribution is `dist/`: the compiled JavaScript and
  * declarations, the README and the license, and a manifest of their own that points at them, with
  * `workspace:` and `catalog:` versions resolved to ranges, and without the scripts and development
- * dependencies.
+ * dependencies. Changesets publishes it, from the directory each manifest's `publishConfig` names.
  *
- *   bun run dist build packages/harness
- *   bun run dist check packages/harness
- *   bun run dist publish packages/harness [--dry-run]
+ *   bun run dist build [package directory]
+ *   bun run dist check [package directory]
  *
- * `check` builds the package and the workspace packages it depends on, then typechecks and runs a
- * consumer of the distribution, as a project that installed it from npm would, under both of
- * TypeScript's module resolutions and on Bun and Node.
+ * Without a directory, each command takes every published package. `check` builds the package and
+ * the workspace packages it depends on, then typechecks and runs a consumer of the distribution,
+ * as a project that installed it from npm would, under both of TypeScript's module resolutions and
+ * on Bun and Node.
  */
 
 import { cp, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises"
@@ -41,7 +41,7 @@ interface Manifest {
   readonly peerDependenciesMeta?: unknown
   readonly optionalDependencies?: Record<string, string>
   readonly engines?: unknown
-  readonly publishConfig?: unknown
+  readonly publishConfig?: { readonly access?: string; readonly directory?: string }
 }
 
 /** The workspace: each package's directory by its name, and the root catalog of versions. */
@@ -64,18 +64,24 @@ const readWorkspace = async (): Promise<Workspace> => {
   return { directories, catalog: manifest.workspaces.catalog }
 }
 
-/** The range the distribution depends on `name` with, for `version` as the repository writes it. */
+/**
+ * The range the distribution depends on `name` with, for `version` as the repository writes it: a
+ * `workspace:` version as Bun publishes it, so `workspace:^` is a caret range of the package's
+ * version and `workspace:*` the version itself, and a `catalog:` one as a caret range of the
+ * catalog's version.
+ */
 const rangeOf = async (name: string, version: string, workspace: Workspace) => {
-  const caret = (exact: string) => (/^\d/.test(exact) ? `^${exact}` : exact)
   if (version.startsWith("workspace:")) {
     const directory = workspace.directories.get(name)
     if (directory === undefined) throw new Error(`${name} is not a workspace package`)
-    return caret((await readManifest(directory)).version)
+    const current = (await readManifest(directory)).version
+    const range = version.slice("workspace:".length)
+    return range === "*" ? current : range === "^" || range === "~" ? `${range}${current}` : range
   }
   if (version === "catalog:") {
     const listed = workspace.catalog[name]
     if (listed === undefined) throw new Error(`${name} is not in the root catalog`)
-    return caret(listed)
+    return /^\d/.test(listed) ? `^${listed}` : listed
   }
   return version
 }
@@ -92,6 +98,8 @@ const distExports = (exports: Exports): Exports =>
   )
 
 const distManifest = async (manifest: Manifest, workspace: Workspace) => {
+  // `directory` tells Changesets where the distribution is; the distribution is that directory.
+  const { directory: _directory, ...publishConfig } = manifest.publishConfig ?? {}
   const ranges = async (section: Record<string, string> | undefined) =>
     section === undefined
       ? undefined
@@ -119,7 +127,7 @@ const distManifest = async (manifest: Manifest, workspace: Workspace) => {
     peerDependenciesMeta: manifest.peerDependenciesMeta,
     optionalDependencies: await ranges(manifest.optionalDependencies),
     engines: manifest.engines,
-    publishConfig: manifest.publishConfig
+    publishConfig
   }
 }
 
@@ -209,37 +217,26 @@ const check = async (directory: string, workspace: Workspace) => {
   console.log(`Checked ${name}: a consumer typechecks and runs it on Bun and Node`)
 }
 
-/** Publishes the distribution, or, as a dry run, lists what it would publish, without a login. */
-const publish = async (directory: string, workspace: Workspace, dryRun: boolean) => {
-  const manifest = await build(directory, workspace)
-  const dist = join(directory, "dist")
-  if (dryRun) {
-    await $`bun pm pack --dry-run`.cwd(dist)
-    console.log(`Would publish ${manifest.name}@${manifest.version} from ${dist}`)
-    return
+/** The directories of every published package, or the one named. */
+const directoriesOf = async (packagePath: string | undefined, workspace: Workspace) => {
+  if (packagePath !== undefined) return [resolve(root, packagePath)]
+  const directories: Array<string> = []
+  for (const directory of workspace.directories.values()) {
+    if ((await readManifest(directory)).private !== true) directories.push(directory)
   }
-  await $`bun publish`.cwd(dist)
-  console.log(`Published ${manifest.name}@${manifest.version}`)
+  return directories.sort()
 }
 
-const [command, packagePath, ...flags] = process.argv.slice(2)
-if (command === undefined || packagePath === undefined) {
-  console.error("Usage: bun run dist <build|check|publish> <package directory> [--dry-run]")
-  process.exit(1)
-}
-const directory = resolve(root, packagePath)
+const [command, packagePath] = process.argv.slice(2)
 const workspace = await readWorkspace()
 switch (command) {
   case "build":
-    await build(directory, workspace)
+    for (const directory of await directoriesOf(packagePath, workspace)) await build(directory, workspace)
     break
   case "check":
-    await check(directory, workspace)
-    break
-  case "publish":
-    await publish(directory, workspace, flags.includes("--dry-run"))
+    for (const directory of await directoriesOf(packagePath, workspace)) await check(directory, workspace)
     break
   default:
-    console.error(`Unknown command ${command}; use build, check, or publish`)
+    console.error("Usage: bun run dist <build|check> [package directory]")
     process.exit(1)
 }
