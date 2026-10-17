@@ -17,6 +17,7 @@ import * as Target from "../authorization/Target.ts"
 import * as Group from "../group/Group.ts"
 import type * as Audience from "../journal/Audience.ts"
 import type * as Event from "../journal/Event.ts"
+import type * as Thread from "../thread/Thread.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -53,7 +54,8 @@ export class ChangeFeedChanges extends Context.Service<
 
 /**
  * The changes over the queries that read what readers show: every timeline item about what the
- * commit's entries are about, to its thread's readers.
+ * commit's entries are about, and the preview of each thread those items are in, to the thread's
+ * readers.
  *
  * @category constructors
  * @since 0.1.0
@@ -64,14 +66,22 @@ export const make = Effect.gen(function* () {
   const changesOf = Effect.fn("ChangeFeedChanges.changesOf")(function* (batch: Log.Batch<Event.Envelope>) {
     const subjects = [...new Set(batch.entries.map((entry) => entry.payload.subject))]
     const about = yield* threadQuery.timelineItemsAbout(subjects)
-    return about.map(({ thread, item }): Prepared => ({
-      change: ChangeFeed.Change.cases.TimelineItem.make({ item }),
+    // A thread's preview shows its latest activity, replies, title, and task, which only change
+    // with its timeline.
+    const threads = new Map(about.map(({ thread }) => [thread.id, thread] as const))
+    const previews = yield* threadQuery.previewsOf(yield* threadQuery.listedOf([...threads.values()]))
+    const toReaders = (thread: Thread.Thread, change: ChangeFeed.Change): Prepared => ({
+      change,
       audience: [Group.audienceOf(thread.groupId)],
       requirement: Requirement.make(
         ThreadPermissions.Read,
         Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
       )
-    }))
+    })
+    return [
+      ...about.map(({ thread, item }) => toReaders(thread, ChangeFeed.Change.cases.TimelineItem.make({ item }))),
+      ...previews.map((preview) => toReaders(preview.thread, ChangeFeed.Change.cases.Preview.make({ preview })))
+    ]
   })
   return ChangeFeedChanges.of({ changesOf })
 })

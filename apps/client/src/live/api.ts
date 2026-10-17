@@ -29,7 +29,13 @@ import {
   type WorkspaceCollection,
   type WorkspaceResource
 } from "../api/keys.ts"
-import { deliverTimelineItem, forgetDeliveredItems } from "../conversations/api.ts"
+import {
+  deliverPreview,
+  deliverTimelineItem,
+  forgetDeliveredItems,
+  forgetDeliveredPreviews,
+  recordReadPosition
+} from "../conversations/api.ts"
 import { posted, typing, typistsAtom } from "../conversations/typing.ts"
 import { watchWake } from "./wake.ts"
 
@@ -157,17 +163,9 @@ interface Target {
 }
 /** The reads of one group or thread each fact can change, found from its payload. */
 const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Target>>> = {
-  // Starting a thread, replying, and joining or leaving it: its group's stream, whose reply counts
-  // and unread state follow. The thread's timeline takes the items the commit delivers.
-  "thread.activity.recorded": (payload) => [{ collection: "streams", id: text(payload, "groupId") }],
-  // A thread's title: the thread itself, and its group's stream, which shows it.
-  "thread.renamed": (payload) => [
-    { collection: "threads", id: text(payload, "threadId") },
-    { collection: "streams", id: text(payload, "groupId") }
-  ],
-  // A thread's task: its group's lists carry it beside each thread.
-  "task.created": (payload) => [{ collection: "streams", id: text(payload, "groupId") }],
-  "task.updated": (payload) => [{ collection: "streams", id: text(payload, "groupId") }],
+  // A thread's title: the thread itself. Its group's stream takes the preview the commit delivers,
+  // and its timeline the items.
+  "thread.renamed": (payload) => [{ collection: "threads", id: text(payload, "threadId") }],
   // Who belongs to a group, and which of its threads the reader may see. A fact names its group
   // but not its threads, so every open timeline and participant list checks its access again.
   "group.membership.added": (payload) => [
@@ -251,11 +249,8 @@ export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<st
   Signal.Signal.matchOrElse(
     signal,
     {
-      ThreadRead: () => [
-        workspaceKey(workspaceId, "groups"),
-        collectionKey(workspaceId, "streams"),
-        workspaceKey(workspaceId, "inbox")
-      ],
+      // A stream takes the position the signal carries.
+      ThreadRead: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")],
       NotificationsSeen: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")],
       GroupRead: () => [workspaceKey(workspaceId, "groups")]
     },
@@ -319,7 +314,7 @@ const run = Effect.fnUntraced(function* (
   let attempt = 0
   let connected = false
   /** The threads whose timelines took items this feed delivered, which a reset forgets. */
-  const delivered = new Set<string>()
+  const delivered = { timelines: new Set<string>(), streams: new Set<string>() }
   let liveSince: number | undefined
   const receive = (message: Message): Effect.Effect<void> =>
     ChangeFeed.Message.match(message, {
@@ -331,8 +326,10 @@ const run = Effect.fnUntraced(function* (
           Queue.offerUnsafe(states, ChangeFeedState.Live())
           if (!message.reset) return Effect.void
           // What was missed may have changed what was delivered: read everything again.
-          forgetDeliveredItems(registry, delivered)
-          delivered.clear()
+          forgetDeliveredItems(registry, delivered.timelines)
+          forgetDeliveredPreviews(registry, delivered.streams)
+          delivered.timelines.clear()
+          delivered.streams.clear()
           return reactivity.invalidate(everything)
         })
       },
@@ -349,7 +346,8 @@ const run = Effect.fnUntraced(function* (
         // What the commit changed shows in place, without reading it again.
         for (const change of message.changes)
           ChangeFeed.Change.match(change, {
-            TimelineItem: ({ item }) => void delivered.add(deliverTimelineItem(registry, workspaceId, item))
+            TimelineItem: ({ item }) => void delivered.timelines.add(deliverTimelineItem(registry, workspaceId, item)),
+            Preview: ({ preview }) => void delivered.streams.add(deliverPreview(registry, workspaceId, preview))
           })
         // A notification for the reader changes their inbox and pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0)
@@ -359,6 +357,8 @@ const run = Effect.fnUntraced(function* (
         const signal = message.signal
         if (Signal.Signal.isAnyOf(["Typing"])(signal))
           registry.update(typists, (current) => typing(current, signal, Date.now()))
+        if (Signal.Signal.isAnyOf(["ThreadRead"])(signal))
+          recordReadPosition(registry, workspaceId, signal.threadId, signal.readThrough)
         const keys = signalKeys(workspaceId, signal)
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void
       }

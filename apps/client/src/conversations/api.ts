@@ -217,10 +217,80 @@ const previousOf = <A>(get: Atom.AtomContext): Option.Option<Paged<A>> =>
 const newerThan = (left: Thread.Thread, right: Thread.Thread) =>
   DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
   (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+/** The previews the change feed delivered for one group's threads, by thread, each as it is now. */
+const deliveredPreviewsOf = Atom.family((_key: string) => Atom.make<ReadonlyMap<string, Thread.Preview>>(new Map()))
+/** How far the reader read each thread, as the change feed told their sessions, in one workspace. */
+const readPositionsOf = Atom.family((_workspaceId: string) => Atom.make<ReadonlyMap<string, number>>(new Map()))
+/** Put a preview the change feed delivered in its group's delivered previews, returning its group's key. */
+export const deliverPreview = (registry: AtomRegistry.AtomRegistry, workspaceId: string, preview: Thread.Preview) => {
+  const key = joined(workspaceId, preview.thread.groupId)
+  registry.update(deliveredPreviewsOf(key), (previews) => new Map(previews).set(preview.thread.id, preview))
+  return key
+}
+/** Forget the delivered previews of the groups with these keys, as `deliverPreview` returned them. */
+export const forgetDeliveredPreviews = (registry: AtomRegistry.AtomRegistry, keys: Iterable<string>) => {
+  for (const key of keys) registry.set(deliveredPreviewsOf(key), new Map())
+}
+/** Note how far the reader read a thread; positions only move forward. */
+export const recordReadPosition = (
+  registry: AtomRegistry.AtomRegistry,
+  workspaceId: string,
+  threadId: string,
+  readThrough: number
+) =>
+  registry.update(readPositionsOf(workspaceId), (positions) =>
+    readThrough > (positions.get(threadId) ?? 0) ? new Map(positions).set(threadId, readThrough) : positions
+  )
+/**
+ * A thread as the reader's stream shows it with its latest preview and position, given what the
+ * stream showed before. Its position only moves forward. Unread is as the server decides it: past
+ * the position read, or, never read, with new activity since the reader joined, which a preview
+ * delivered later than what was shown has.
+ */
+export const openingWith = (
+  preview: Thread.Preview,
+  before: Thread.Opening | undefined,
+  position: number | undefined
+): Thread.Opening => {
+  const read = before?.readThrough ?? null
+  const readThrough = position === undefined ? read : Math.max(position, read ?? 0)
+  const unread =
+    readThrough !== null
+      ? preview.latest.sequence > readThrough
+      : before === undefined || before.unread || preview.latest.sequence > before.latest.sequence
+  return Thread.opening(preview, { readThrough, unread })
+}
+/**
+ * A stream as it shows with the previews the change feed delivered and the positions it told:
+ * each thread read, with its delivered preview and the reader's position, then the delivered
+ * threads that started after the newest one read, oldest first.
+ */
+export const withDeliveredPreviews = (
+  paged: Paged<Thread.Opening>,
+  delivered: ReadonlyMap<string, Thread.Preview>,
+  positions: ReadonlyMap<string, number>
+): Paged<Thread.Opening> => {
+  if (delivered.size === 0 && positions.size === 0) return paged
+  const shown = new Set(paged.items.map((item) => item.thread.id))
+  const newest = paged.items.at(-1)?.thread
+  const started = [...delivered.values()]
+    .filter(
+      (preview) => !shown.has(preview.thread.id) && (newest === undefined || newerThan(preview.thread, newest) > 0)
+    )
+    .toSorted((left, right) => newerThan(left.thread, right.thread))
+  const items = [
+    ...paged.items.map((item) =>
+      openingWith(delivered.get(item.thread.id) ?? item, item, positions.get(item.thread.id))
+    ),
+    ...started.map((preview) => openingWith(preview, undefined, positions.get(preview.thread.id)))
+  ]
+  return { ...paged, items }
+}
+
 const streamOf = perClient((client: ApiClient, key: string): PagedRead<Thread.Opening, unknown> => {
   const { workspaceId, id } = split(key)
   const earlier = Atom.make(0)
-  const atom = client.runtime
+  const read = client.runtime
     .atom(
       Effect.fnUntraced(function* (get) {
         const api = yield* client
@@ -258,9 +328,16 @@ const streamOf = perClient((client: ApiClient, key: string): PagedRead<Thread.Op
       })
     )
     .pipe(Atom.withReactivity(itemKeys(workspaceId, "streams", id)))
+  const delivered = deliveredPreviewsOf(key)
+  const positions = readPositionsOf(workspaceId)
+  // Refreshing the stream reads it again; what the change feed delivered and told stays in place.
+  const atom = Atom.readable(
+    (get) => AsyncResult.map(get(read), (paged) => withDeliveredPreviews(paged, get(delivered), get(positions))),
+    (refresh) => refresh(read)
+  )
   return { atom, earlier }
 })
-/** A group's stream: its readable threads by when they started, oldest shown first. */
+/** A group's stream: its readable threads by when they started, oldest shown first, with what the change feed delivered. */
 export const streamRead = (client: ApiClient, workspaceId: string, groupId: string) =>
   valid(workspaceId) && Option.isSome(Schema.decodeOption(GroupId.GroupId)(groupId))
     ? streamOf(client, joined(workspaceId, groupId))

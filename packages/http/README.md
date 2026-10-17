@@ -144,8 +144,10 @@ before a commit the server cannot read) delivery starts at the head and the clie
 views it keeps; `cursor` is null only for an empty workspace. Later messages contain
 `_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, a `changes`
 array, and a `notifications` array; at least one of the three is nonempty. `changes` holds what the
-commit changed in what the caller may see, each as it is now, such as a `TimelineItem` with an
-`item` exactly as the timeline returns it, which clients put in place of what they show.
+commit changed in what the caller may see, each as it is now, which clients put in place of what
+they show: a `TimelineItem` with an `item` exactly as the timeline returns it, and a `Preview` with
+a `preview` of the thread as the group's stream shows it to every reader, an opening without the
+caller's `readThrough` and `unread`.
 `notifications` holds the notifications
 the commit created for the caller, with the same fields the inbox list returns, so clients can
 update an inbox or badge without a refetch. Each event contains `id`, `name`, `version`,
@@ -168,7 +170,8 @@ Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` ha
 `Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
 readers, and `ThreadRead`, `GroupRead`, and `NotificationsSeen` reach only the caller's own
 sessions, the one that wrote included, after one of them records read state or marks a notification
-seen. A response an agent's turn is writing reaches only those following its log (see
+seen. Starting a thread or replying reads it, so the author's sessions also get a `ThreadRead` once
+the commit lands. A response an agent's turn is writing reaches only those following its log (see
 [Turns](#turns)). Signals have no cursor, are never replayed, and may be missed; after reconnecting,
 refresh read state with the rest of the view. Show a typing indicator until `until` unless another
 `Typing` extends it, and hide the caller's own. Send `POST /threads/:threadId/typing` while the

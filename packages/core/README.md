@@ -267,6 +267,7 @@ read through `ThreadQuery`; a query never writes.
 | `ThreadQuery.listReadable`                                                | A page of a group's readable threads, from any listing, with tasks, latest activity, and positions.    |
 | `ThreadQuery.readTimeline`, `readTimelineItem`                            | Timeline subjects resolved under access, for timeline pages and notification sources.                  |
 | `ThreadQuery.timelineItemsAbout`                                          | The timeline items about some subjects as they are now, checking no access, for the change feed.       |
+| `ThreadQuery.listedOf`, `previewsOf`                                      | Threads with their tasks and latest activity, and their stream previews, for streams and the feed.     |
 | `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message. |
 | `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients.                                     |
 | `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording.            |
@@ -351,8 +352,10 @@ Notifications never create turns, accept their input, or run work. See
 `@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the `ReadStateStore`, which is kept outside the journal.
 `ReadStateStore.markThreadRead` advances the reader's position and marks their notifications from
-the thread seen in one write; marking a thread read, starting one, and replying all use it, so an
-author has read what they posted. It is what makes ambient activity visible in the
+the thread seen in one write. `ReadStateCommand.markThreadRead` is that write with its `ThreadRead`
+signal, published once the caller's commit lands, or at once outside one; marking a thread read,
+starting one, and replying all use it, so an author has read what they posted and their sessions
+know. It is what makes ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
@@ -592,7 +595,8 @@ declares an audience, at each version, and no other.
 A commit's `changes` are what it changed in what readers show, each as it is now, so a reader puts it
 in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the
 commit's entries name, the items it recorded and those about a message, turn, or task it changed,
-since an item shows its subject's current state. They are read after the commit, so one may reflect
+since an item shows its subject's current state, and a `Preview` of each thread those items are
+in, as its group's stream shows it to every reader. They are read after the commit, so one may reflect
 later commits too, and the last change to an item follows the last commit that changed it. Each
 reaches the readers of its thread's group who hold `thread.read` on the thread, as its read does.
 

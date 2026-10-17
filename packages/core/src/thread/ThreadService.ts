@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 
+import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
@@ -30,7 +31,7 @@ import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as ReadStateStore from "../read-state/ReadStateStore.ts"
+import * as ReadStateCommand from "../read-state/ReadStateCommand.ts"
 import * as Request from "../request/Request.ts"
 import * as Task from "../task/Task.ts"
 import * as TaskCommand from "../task/TaskCommand.ts"
@@ -39,13 +40,11 @@ import * as TaskStore from "../task/TaskStore.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Thread from "./Thread.ts"
-import * as ThreadActivityKind from "./ThreadActivityKind.ts"
-import * as ThreadActivityStore from "./ThreadActivityStore.ts"
+import type * as ThreadActivityStore from "./ThreadActivityStore.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
 import * as ThreadFacts from "./ThreadFacts.ts"
 import * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
-import * as ThreadMessageActivity from "./ThreadMessageActivity.ts"
 import * as ThreadMessageId from "./ThreadMessageId.ts"
 import * as ThreadMessageStore from "./ThreadMessageStore.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
@@ -183,9 +182,8 @@ export const make = Effect.gen(function* () {
   const groupCommand = yield* GroupCommand.GroupCommand
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadStore = yield* ThreadStore.ThreadStore
-  const readStateStore = yield* ReadStateStore.ReadStateStore
+  const readStateCommand = yield* ReadStateCommand.ReadStateCommand
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
-  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore
   const taskCommand = yield* TaskCommand.TaskCommand
   const taskStore = yield* TaskStore.TaskStore
   const journal = yield* Journal.Journal
@@ -296,7 +294,7 @@ export const make = Effect.gen(function* () {
       occurredAt
     })
     // Posting reads the thread through the author's own message.
-    yield* readStateStore.markThreadRead(
+    yield* readStateCommand.markThreadRead(
       {
         workspaceId,
         memberId: authorId,
@@ -517,31 +515,8 @@ export const make = Effect.gen(function* () {
         threadId: thread.id
       })
     })
-    if (items.length === 0) return []
-    // A start publishes its opening message as the thread's first activity.
-    const ids = items.map((item) => item.thread.id)
-    const openings = new Map<ThreadId.ThreadId, ThreadMessageId.ThreadMessageId>()
-    for (const activity of yield* threadActivityStore.getFirst(ids)) {
-      const opening = yield* Effect.orDie(ThreadActivityKind.decode(ThreadMessageActivity.Published, activity))
-      openings.set(activity.threadId, opening.details.messageId)
-    }
-    const found = new Map(
-      (yield* threadMessageStore.getMany([...openings.values()])).map((message) => [message.id, message] as const)
-    )
-    // Replies are the thread's messages after its opening one that still have text.
-    const counts = new Map(
-      (yield* threadMessageStore.countByThread(ids)).map((value) => [value.threadId, value.count] as const)
-    )
-    const result: Array<Thread.Opening> = []
-    for (const item of items) {
-      const messageId = openings.get(item.thread.id)
-      const message = messageId === undefined ? undefined : found.get(messageId)
-      if (message === undefined) return yield* Effect.die("A listed thread's opening is missing")
-      const remaining = counts.get(item.thread.id) ?? 0
-      const opening = ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? 1 : 0
-      result.push(Thread.opening(item, message, remaining - opening))
-    }
-    return result
+    const previews = yield* threadQuery.previewsOf(items)
+    return Array.zipWith(previews, items, Thread.opening)
   }, Operation.report)
 
   const readTimeline = Effect.fn("ThreadService.readTimeline")(

@@ -120,6 +120,8 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
         requireAccess: unexpected,
         requireReadable: unexpected,
         timelineItemsAbout: unexpected,
+        listedOf: unexpected,
+        previewsOf: unexpected,
         eligibleMembers: unexpected,
         followers: unexpected,
         currentParticipants: unexpected,

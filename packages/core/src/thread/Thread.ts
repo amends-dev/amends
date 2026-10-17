@@ -152,23 +152,26 @@ export const isUnread = (latest: Latest, readThrough: number | null, admittedAt:
   readThrough === null ? DateTime.isGreaterThan(latest.occurredAt, admittedAt) : latest.sequence > readThrough
 
 /**
- * `thread` as a reader lists it, who read through `readThrough` and joined at `admittedAt`.
+ * A thread as every reader's list shows it: with its task, if any, and its latest activity.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export type Listed = Pick<ListItem, "thread" | "task" | "latest">
+
+/**
+ * A listed thread as one reader lists it, who read through `readThrough` and joined at
+ * `admittedAt`.
  *
  * @category constructors
  * @since 0.1.0
  */
-export const listItem = (
-  thread: Thread,
-  task: Task.Task | null,
-  latest: Latest,
-  readThrough: number | null,
-  admittedAt: DateTime.Utc
-): ListItem => ({
-  thread,
-  task,
-  latest,
+export const listItem = (listed: Listed, readThrough: number | null, admittedAt: DateTime.Utc): ListItem => ({
+  thread: listed.thread,
+  task: listed.task,
+  latest: listed.latest,
   readThrough,
-  unread: isUnread(latest, readThrough, admittedAt)
+  unread: isUnread(listed.latest, readThrough, admittedAt)
 })
 
 /**
@@ -208,19 +211,36 @@ export const OpeningOptions = Schema.Struct({
 export interface OpeningOptions extends Schema.Schema.Type<typeof OpeningOptions> {}
 
 /**
- * A readable thread as its group's stream shows it: the task it tracks, if any, the message that
- * opened it, how many replies followed, its latest message, and the reader's position, with
+ * A thread as its group's stream shows it to everyone who may read it: the task it tracks, if any,
+ * the message that opened it, how many replies followed, and its latest message. The change feed
+ * delivers it as a commit changes it; a reader's stream adds how far they read it, as `Opening`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Preview = Schema.Struct({
+  thread: Thread,
+  task: ListItem.fields.task,
+  message: ThreadMessage.ThreadMessage,
+  replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  latest: Latest
+})
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Preview extends Schema.Schema.Type<typeof Preview> {}
+
+/**
+ * A readable thread as one reader's stream shows it: its preview, and the reader's position, with
  * `unread` as in `ListItem`.
  *
  * @category schemas
  * @since 0.1.0
  */
 export const Opening = Schema.Struct({
-  thread: Thread,
-  task: ListItem.fields.task,
-  message: ThreadMessage.ThreadMessage,
-  replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  latest: Latest,
+  ...Preview.fields,
   readThrough: ListItem.fields.readThrough,
   unread: Schema.Boolean
 })
@@ -232,17 +252,17 @@ export const Opening = Schema.Struct({
 export interface Opening extends Schema.Schema.Type<typeof Opening> {}
 
 /**
- * A listed thread as its group's stream shows it, with its opening `message` and `replies`.
+ * A thread's preview as the reader of a listed thread sees it, with their position from `item`.
  *
  * @category constructors
  * @since 0.1.0
  */
-export const opening = (item: ListItem, message: ThreadMessage.ThreadMessage, replies: number): Opening => ({
-  thread: item.thread,
-  task: item.task,
-  message,
-  replies,
-  latest: item.latest,
+export const opening = (preview: Preview, item: Pick<ListItem, "readThrough" | "unread">): Opening => ({
+  thread: preview.thread,
+  task: preview.task,
+  message: preview.message,
+  replies: preview.replies,
+  latest: preview.latest,
   readThrough: item.readThrough,
   unread: item.unread
 })

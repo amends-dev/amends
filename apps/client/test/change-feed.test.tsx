@@ -12,6 +12,7 @@ import {
   useWorkspaceSettings,
   useTyping,
   useThreadTimeline,
+  useGroupStream,
   useChangeFeed,
   ChangeFeedProvider,
   type SessionStore,
@@ -453,4 +454,74 @@ it("shows the timeline items a commit delivers in place, without reading the tim
   stream.send(ready("5", true))
   await waitFor(() => expect(texts()).toMatchObject([{ text: "Opening, read again" }, { text: "Reply" }]))
   expect(f.count("/threads/thread/timeline")).toBe(reads + 1)
+})
+
+/** A thread of the group that started at `minute`, as its preview shows it to every reader. */
+const preview = (thread: string, minute: number, latest: number, replies: number) => {
+  const startedAt = new Date(Date.UTC(2026, 8, 25, 12, minute)).toISOString()
+  return {
+    thread: {
+      id: thread,
+      workspaceId: "one",
+      groupId: "group",
+      title: null,
+      origin: null,
+      createdBy: { _tag: "Member", memberId: "owner" },
+      createdAt: startedAt
+    },
+    task: null,
+    message: {
+      ...timelineItem(1, `${thread} opening`).message,
+      id: `${thread}-opening`,
+      threadId: thread
+    },
+    replies,
+    latest: { threadId: thread, sequence: latest, occurredAt: startedAt }
+  }
+}
+
+it("shows the previews a commit delivers and the positions read in a stream, without reading it again", async () => {
+  let stream!: ReturnType<typeof useGroupStream>
+  const f = fixture({
+    respond: (_, path) =>
+      path === "/groups/group/openings"
+        ? Promise.resolve(json([{ ...preview("thread-a", 1, 1, 0), readThrough: 1, unread: false }]))
+        : undefined,
+    mount: () => {
+      stream = useGroupStream("one", "group")
+    }
+  })
+  const feed = await f.connected(0)
+  feed.send(ready("1", false))
+  const shown = () =>
+    (stream.value() ?? []).map((item) => [item.thread.id, item.replies, item.readThrough, item.unread])
+  await waitFor(() => expect(shown()).toEqual([["thread-a", 0, 1, false]]))
+  const reads = f.count("/groups/group/openings")
+  // A reply makes the thread unread past the reader's position, and a new thread shows after the newest one.
+  feed.send({
+    ...committed("2"),
+    changes: [
+      { _tag: "Preview", preview: preview("thread-a", 1, 2, 1) },
+      { _tag: "Preview", preview: preview("thread-b", 5, 1, 0) }
+    ]
+  })
+  await waitFor(() =>
+    expect(shown()).toEqual([
+      ["thread-a", 1, 1, true],
+      ["thread-b", 0, null, true]
+    ])
+  )
+  // Reading a thread, here or in another session, shows it read.
+  feed.send({
+    _tag: "Signal",
+    workspaceId: "one",
+    signal: { _tag: "ThreadRead", workspaceId: "one", memberId: "owner", threadId: "thread-a", readThrough: 2 }
+  })
+  await waitFor(() =>
+    expect(shown()).toEqual([
+      ["thread-a", 1, 2, false],
+      ["thread-b", 0, null, true]
+    ])
+  )
+  expect(f.count("/groups/group/openings")).toBe(reads)
 })

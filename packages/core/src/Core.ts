@@ -52,6 +52,7 @@ import * as Journal from "./journal/Journal.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
+import * as ReadStateCommand from "./read-state/ReadStateCommand.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
 import * as TaskCommand from "./task/TaskCommand.ts"
 import * as TaskPermissions from "./task/TaskPermissions.ts"
@@ -257,7 +258,8 @@ const operations = Layer.mergeAll(
     turnCommand,
     taskCommand,
     channelQuery,
-    changeFeedSource
+    changeFeedSource,
+    ReadStateCommand.layer
   ])
 )
 

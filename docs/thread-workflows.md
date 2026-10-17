@@ -478,7 +478,7 @@ Positions and read times are private state, like `Seen`: outside the journal, ne
 for the workspace's conversation writes, and kept when projections are rebuilt. The person's other
 sessions hear of each change as a `ThreadRead` or `GroupRead`
 [signal](../packages/core/README.md#signals). Starting a thread or replying reads it through the
-author's message in the same commit. [Thread lists](#reading-conversations) and
+author's message in the same commit, and the `ThreadRead` signal follows once that commit lands. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups) report unread state from these records; only
 messages count as new activity, not quiet participation changes.
 

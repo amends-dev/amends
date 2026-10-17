@@ -5,6 +5,7 @@ import { GroupFacts, GroupService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { NotificationService } from "@amends-dev/core/notification"
+import { Signal } from "@amends-dev/core/signal"
 import { ThreadMessageFacts, ThreadMessageService, ThreadService, type ThreadTimeline } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
@@ -122,14 +123,34 @@ describe("change feed", () => {
             groupId: group.id
           })
           // The commit's changes are the timeline items it recorded, as the timeline shows them.
-          const itemsOf = (message: ChangeFeed.Message) =>
-            committed(message).changes.map(({ item }) => [item.activity.sequence, item.activity.kind, textOf(item)])
-          expect(itemsOf(started)).toEqual([[1, "message.published", "Secret plan"]])
-          expect(itemsOf(yield* readerFeed)).toEqual([[2, "message.published", "First draft"]])
-          // An edit changes the reply's own item in place, as well as recording its own.
-          expect(itemsOf(yield* readerFeed)).toEqual([
+          // The commit's changes: the timeline items it recorded, as the timeline shows them, and
+          // the preview of their thread, as its group's stream shows it.
+          const changesOf = (message: ChangeFeed.Message) =>
+            committed(message).changes.map((change) =>
+              ChangeFeed.Change.match(change, {
+                TimelineItem: ({ item }) => [item.activity.sequence, item.activity.kind, textOf(item)],
+                Preview: ({ preview }) => [
+                  "preview",
+                  preview.latest.sequence,
+                  preview.replies,
+                  preview.message.content._tag === "Text" ? preview.message.content.text : undefined
+                ]
+              })
+            )
+          expect(changesOf(started)).toEqual([
+            [1, "message.published", "Secret plan"],
+            ["preview", 1, 0, "Secret plan"]
+          ])
+          expect(changesOf(yield* readerFeed)).toEqual([
+            [2, "message.published", "First draft"],
+            ["preview", 2, 1, "Secret plan"]
+          ])
+          // An edit changes the reply's own item in place, as well as recording its own; it is quiet,
+          // so the preview's latest activity stays the reply.
+          expect(changesOf(yield* readerFeed)).toEqual([
             [2, "message.published", "Final draft"],
-            [3, "message.edited", "Final draft"]
+            [3, "message.edited", "Final draft"],
+            ["preview", 2, 1, "Secret plan"]
           ])
           expect(committed(yield* readerFeed).events[0]?.name).toBe(RoleFacts.Created.name)
           // Outside the group, or without read permission, only workspace facts arrive, and no change.
@@ -138,6 +159,50 @@ describe("change feed", () => {
             expect(received.events.map((e) => e.name)).toEqual([RoleFacts.Created.name])
             expect(received.changes).toEqual([])
           }
+        })
+      )
+    )
+  )
+
+  it.effect("posting tells the author's sessions how far they read the thread, once it commits", () =>
+    withStorage((storage) =>
+      runHost(
+        storage,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId)
+          const workspace = yield* initialized(bound)
+          const owner = Actor.Actor.of({ workspaceId, memberId: workspace.ownerMemberId, identity: alice })
+          const services = yield* Layer.build(core(bound))
+          const as = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            program.pipe(Effect.provideService(Actor.Actor, owner), Effect.provide(services))
+          const feed = yield* as(listen(watch()))
+          expect(yield* feed).toMatchObject({ reset: true })
+          const group = yield* as(
+            Effect.flatMap(GroupService.GroupService, (groupService) =>
+              groupService.createTeam({ name: "Plans", memberIds: [owner.memberId] })
+            )
+          )
+          const started = yield* as(
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
+              threadService.startInGroup({ groupId: group.id, mentions: [], text: "Opening" })
+            )
+          )
+          yield* as(
+            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
+              threadMessageService.publish({ threadId: started.thread.id, mentions: [], text: "Reply" })
+            )
+          )
+          // Each post reads the thread through the author's own message, and their sessions hear it.
+          const readThroughs: Array<number> = []
+          while (readThroughs.length < 2) {
+            const message = yield* feed
+            if (
+              ChangeFeed.Message.isAnyOf(["Signal"])(message) &&
+              Signal.Signal.isAnyOf(["ThreadRead"])(message.signal)
+            )
+              readThroughs.push(message.signal.readThrough)
+          }
+          expect(readThroughs).toEqual([1, 2])
         })
       )
     )

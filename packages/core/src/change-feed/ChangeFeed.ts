@@ -14,6 +14,7 @@ import * as Schema from "effect/Schema"
 import * as JournalEvent from "../journal/Event.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Signal from "../signal/Signal.ts"
+import * as Thread from "../thread/Thread.ts"
 import * as ThreadTimeline from "../thread/ThreadTimeline.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
@@ -81,7 +82,9 @@ export interface Event extends Schema.Schema.Type<typeof Event> {}
  */
 export const Change = Schema.TaggedUnion({
   /** A timeline item as its thread shows it now: one the commit recorded, or about a record it changed. */
-  TimelineItem: { item: ThreadTimeline.Item }
+  TimelineItem: { item: ThreadTimeline.Item },
+  /** A thread's preview as its group's stream shows it now, for a thread whose timeline the commit changed. */
+  Preview: { preview: Thread.Preview }
 }).annotate({ identifier: "ChangeFeedChange" })
 /**
  * @category schemas
