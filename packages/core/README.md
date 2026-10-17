@@ -339,7 +339,7 @@ notified as well as the identity (`Notification.ofMember`), so an inbox belongs 
 someone who rejoins under a new member ID starts with an empty one.
 
 `NotificationService` serves the acting member's own `inbox`, newest first with each source they can
-still read as its timeline shows it, its `countPending`, and a person's `markSeen` and
+still read as its timeline shows it, its `countPending`, in all and by group, and a person's `markSeen` and
 `markSeenThrough`; contact and triage inboxes are read only through the store. A person's `Seen` is
 private state the store keeps outside the journal. `NotificationProjection` generates notifications
 from each recorded activity's recipients, and settles pending agent input when a participation ends.

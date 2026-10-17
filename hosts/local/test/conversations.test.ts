@@ -103,7 +103,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -171,7 +170,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(inbox).toMatchObject([{ source: { message: { id: started.message.id } } }])
         const notificationId = inbox[0]!.notification.id
         expect(yield* asAlice.notifications.count()).toEqual({
-          pending: 1
+          pending: 1,
+          groups: [{ groupId, count: 1 }]
         })
         const seen = yield* asAlice.notifications.markSeen({
           params: { notificationId }
@@ -185,7 +185,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           })
         ).toEqual([])
         expect(yield* asAlice.notifications.count()).toEqual({
-          pending: 0
+          pending: 0,
+          groups: []
         })
         // Seeing everything through it again has nothing left to mark.
         expect(

@@ -565,11 +565,11 @@ const inboxOf = perClient((client: ApiClient, key: string): PagedRead<Notificati
 export const inboxRead = (client: ApiClient, workspaceId: string, filter: InboxFilter) =>
   valid(workspaceId) ? inboxOf(client, joined(workspaceId, filter)) : undefined
 
-/** How many notifications are still pending for the reader, as the inbox reads them. */
-export const pendingCountRead = (client: ApiClient, workspaceId: string) =>
+/** How many notifications are still pending for the reader, in all and from each group's threads. */
+export const pendingCountsRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId)
     ? client.query("notifications", "count", {
-        reactivityKeys: [workspaceKey(workspaceId, "inbox")]
+        reactivityKeys: [workspaceKey(workspaceId, "pending")]
       })
     : undefined
 
@@ -681,7 +681,7 @@ export type MembershipChange =
   | { readonly kind: "leave"; readonly groupId: string; readonly membershipId: string }
 /**
  * Change a group's members, then invalidate what that changes: its roster and stream, the groups,
- * and the inbox, whose sources follow group access. Members are added one at a time; one already
+ * and the inbox and its counts, whose sources follow group access. Members are added one at a time; one already
  * added, as by someone else meanwhile, counts as added.
  */
 export const changeMembership = (workspace: string) => (api: WorkspaceApi, change: MembershipChange) =>
@@ -692,7 +692,8 @@ export const changeMembership = (workspace: string) => (api: WorkspaceApi, chang
       itemKey(workspace, "streams", change.groupId),
       workspaceKey(workspace, "groups"),
       workspaceKey(workspace, "public-groups"),
-      workspaceKey(workspace, "inbox")
+      workspaceKey(workspace, "inbox"),
+      workspaceKey(workspace, "pending")
     ])
     switch (change.kind) {
       case "add":

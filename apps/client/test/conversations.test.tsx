@@ -158,6 +158,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/groups",
     "workspace/one/inbox",
     "workspace/one/participants",
+    "workspace/one/pending",
     "workspace/one/public-groups",
     "workspace/one/rosters:group",
     "workspace/one/streams:group",
@@ -198,6 +199,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/members",
     "workspace/one/ownership",
     "workspace/one/participants",
+    "workspace/one/pending",
     "workspace/one/permissions",
     "workspace/one/rosters",
     "workspace/one/settings",
@@ -220,7 +222,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         readThrough: 1
       })
     )
-  ).toEqual(["workspace/one/groups", "workspace/one/inbox"])
+  ).toEqual(["workspace/one/inbox", "workspace/one/pending"])
   expect(
     signalKeys(
       "one",
@@ -230,7 +232,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         notificationIds: ["notification-one"]
       })
     )
-  ).toEqual(["workspace/one/groups", "workspace/one/inbox"])
+  ).toEqual(["workspace/one/inbox", "workspace/one/pending"])
   expect(
     signalKeys(
       "one",
@@ -480,7 +482,7 @@ it("a pending inbox asks for pending notifications, and no longer lists one the 
 it("the inbox's pending count is the inbox's own, from groups left too", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const path = new URL(new Request(input, init).url).pathname
-    return Promise.resolve(json(path.endsWith("/notifications/count") ? { pending: 5 } : []))
+    return Promise.resolve(json(path.endsWith("/notifications/count") ? { pending: 5, groups: [] } : []))
   })
   let pending!: () => number | undefined
   function Consumer() {
@@ -731,7 +733,6 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -941,7 +942,6 @@ it("renames a group it may rename, from the name it started from, saving only a 
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -1250,7 +1250,6 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
           readAt: null,
           newActivity: false,
           following,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -1368,7 +1367,6 @@ it("a follow the read does not show settles on what the read says, and one that 
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -1461,7 +1459,6 @@ it("offers no following in a direct conversation, where everyone takes part in e
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: false,
           membersRemovable: false,
           renamable: false

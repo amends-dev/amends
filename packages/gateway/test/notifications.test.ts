@@ -133,19 +133,20 @@ describe("notifications", () => {
             ])
           )
           yield* bound.notifications.markSeen([Notification.NotificationId.make("red-seen")], recordedAt)
-          const counts = yield* bound.notifications.countPendingByGroup(human, [red, blue])
-          expect(counts.toSorted((a, b) => (a.groupId < b.groupId ? -1 : 1))).toEqual([
+          // Every group with any, in binary group-ID order.
+          expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([
             { groupId: blue, count: 1 },
+            { groupId: green, count: 1 },
             { groupId: red, count: 2 }
           ])
-          expect(yield* bound.notifications.countPendingByGroup(agent, [red, green])).toEqual([
-            { groupId: red, count: 1 }
-          ])
-          expect(yield* bound.notifications.countPendingByGroup(human, [GroupId.GroupId.make("empty")])).toEqual([])
-          expect(yield* bound.notifications.countPendingByGroup(human, [])).toEqual([])
-          yield* bound.notifications.markSeen([Notification.NotificationId.make("red-1")], recordedAt)
-          expect(yield* bound.notifications.countPendingByGroup(human, [red])).toEqual([{ groupId: red, count: 1 }])
-          expect(yield* (yield* boundTo(otherWorkspaceId)).notifications.countPendingByGroup(human, [red])).toEqual([])
+          expect(yield* bound.notifications.countPendingByGroup(agent)).toEqual([{ groupId: red, count: 1 }])
+          expect(yield* bound.notifications.countPendingByGroup(another)).toEqual([{ groupId: red, count: 1 }])
+          yield* bound.notifications.markSeen(
+            ["red-1", "blue-1", "green-1"].map((id) => Notification.NotificationId.make(id)),
+            recordedAt
+          )
+          expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([{ groupId: red, count: 1 }])
+          expect(yield* (yield* boundTo(otherWorkspaceId)).notifications.countPendingByGroup(human)).toEqual([])
         })
       )
     )
@@ -353,15 +354,12 @@ describe("notifications", () => {
           // A reply without mentions notifies every participant of a crowded thread at once.
           const many = Array.makeBy(12_000, (index) => record(`many-${index}`, { thread }))
           yield* bound.store.transaction(bound.notifications.insertMany(many))
-          const groups = [groupId, ...Array.makeBy(40_000, (index) => GroupId.GroupId.make(`absent-${index}`))]
-          expect(yield* bound.notifications.countPendingByGroup(human, groups)).toEqual([
-            { groupId, count: many.length }
-          ])
+          expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([{ groupId, count: many.length }])
           yield* bound.notifications.markSeen(
             many.map((notification) => notification.id),
             recordedAt
           )
-          expect(yield* bound.notifications.countPendingByGroup(human, groups)).toEqual([])
+          expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([])
           const absent = Array.makeBy(40_000, (index) => Notification.NotificationId.make(`absent-${index}`))
           expect(
             yield* Effect.flip(
@@ -686,7 +684,7 @@ describe("notifications", () => {
               }
               expect(yield* notificationService.inbox(options)).toEqual(inboxOf(first))
               expect(yield* notificationService.inbox({ ...options, pendingOnly: true })).toEqual(inboxOf(first))
-              expect(yield* notificationService.countPending).toBe(2)
+              expect((yield* notificationService.countPending).pending).toBe(2)
             })
           )
           const list = Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
@@ -745,7 +743,7 @@ describe("notifications", () => {
                     yield* bound.notifications.insert(value)
                     expect(yield* notificationService.inbox(page)).toEqual(inboxOf(value))
                     expect(yield* notificationService.inbox({ ...page, pendingOnly: true })).toEqual(inboxOf(value))
-                    expect(yield* notificationService.countPending).toBe(1)
+                    expect((yield* notificationService.countPending).pending).toBe(1)
                     return yield* Effect.fail("rollback")
                   })
                 )
@@ -907,7 +905,9 @@ describe("notifications", () => {
               )
             )
           const count = asBob(
-            NotificationService.NotificationService.use((notifications) => notifications.countPending)
+            NotificationService.NotificationService.use((notifications) =>
+              Effect.map(notifications.countPending, (counts) => counts.pending)
+            )
           )
           const left = yield* create("Left")
           const kept = yield* create("Kept")
@@ -978,7 +978,9 @@ describe("notifications", () => {
               )
             )
           )
-          const sidebar = asBob(GroupService.GroupService.use((groups) => groups.listMine(page)))
+          const counts = asBob(
+            NotificationService.NotificationService.use((notifications) => notifications.countPending)
+          )
           const first = yield* join
           const group = yield* asAlice(
             GroupService.GroupService.use((groups) =>
@@ -1000,8 +1002,8 @@ describe("notifications", () => {
               memberships.add({ groupId: group.id, memberId: second.id })
             )
           )
-          // General and Private: nothing waits in either.
-          expect((yield* sidebar).map(({ pending }) => pending)).toEqual([0, 0])
+          // Nothing waits in any group.
+          expect(yield* counts).toEqual({ pending: 0, groups: [] })
           // What reaches his new membership is his.
           const again = yield* mention(group.id, second.id)
           const [notification] = yield* pending
@@ -1009,8 +1011,7 @@ describe("notifications", () => {
             recipient: { _tag: "Human", id: bob.id, memberId: second.id },
             thread: { threadId: again.thread.id }
           })
-          // Private, then general by group ID.
-          expect((yield* sidebar).map(({ pending }) => pending)).toEqual([1, 0])
+          expect(yield* counts).toEqual({ pending: 1, groups: [{ groupId: group.id, count: 1 }] })
         })
       )
     )

@@ -138,7 +138,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
             query: { limit: 10, pendingOnly: true }
           })
         ).toEqual([{ notification: second }, { notification: first }])
-        expect(yield* humanClient.notifications.count()).toEqual({ pending: 2 })
+        // Neither came from a thread, so no group counts them.
+        expect(yield* humanClient.notifications.count()).toEqual({ pending: 2, groups: [] })
         expect(yield* agentClient.notifications.inbox({ query: { limit: 10 } })).toEqual([{ notification: forAgent }])
         expect(
           yield* (yield* client("human", otherWorkspace.id)).notifications.inbox({

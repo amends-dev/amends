@@ -105,7 +105,6 @@ const group = (id: string, name: string) => ({
   readAt: null,
   newActivity: false,
   following: false,
-  pending: 0,
   manageable: true,
   membersRemovable: true,
   renamable: true

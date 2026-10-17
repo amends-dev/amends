@@ -214,8 +214,8 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 /**
  * One of the reader's groups with its activity: a sidebar row. `newActivity` holds when its
  * latest message came after the reader last read it or, if they never have, after they
- * joined. `pending` counts the reader's pending notifications from the group's threads: the
- * activity addressed to them, as opposed to activity they merely have not seen.
+ * joined. What is addressed to the reader there, as opposed to activity they merely have not
+ * seen, is counted apart, in `NotificationInbox.Counts`.
  *
  * @category schemas
  * @since 0.1.0
@@ -226,7 +226,6 @@ export const ListItem = Schema.Struct({
   readAt: Schema.NullOr(Latest.fields.occurredAt),
   newActivity: Schema.Boolean,
   following: Schema.Boolean,
-  pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   /** The reader may add people to the group: a team group they may manage. */
   manageable: Schema.Boolean,
   /**
@@ -266,7 +265,6 @@ export interface Activity {
   readonly latestActivityAt: DateTime.Utc | null
   readonly readAt: DateTime.Utc | null
   readonly following: boolean
-  readonly pending: number
 }
 
 /**
@@ -299,7 +297,6 @@ export const listItem = (group: Group, admittedAt: DateTime.Utc, activity: Activ
     readAt: activity.readAt,
     newActivity: hasNewActivity(activity.latestActivityAt, activity.readAt, admittedAt),
     following: activity.following,
-    pending: activity.pending,
     manageable: team && grants.manage,
     membersRemovable: team && grants.manage && (group.visibility === "Private" || grants.moderate),
     renamable: team && grants.rename

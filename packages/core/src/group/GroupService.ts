@@ -23,8 +23,6 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Notification from "../notification/Notification.ts"
-import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as Request from "../request/Request.ts"
@@ -122,8 +120,8 @@ export class GroupService extends Context.Service<
     /**
      * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
      * its latest activity, when the actor last read it, whether it has new activity for them,
-     * whether they follow it, their pending notifications from it, and what their grants let them
-     * do to it. Each page reads a fixed number of times, however large.
+     * whether they follow it, and what their grants let them do to it. Each page reads a fixed
+     * number of times, however large.
      */
     readonly listMine: (
       options: Group.ListOptions
@@ -155,7 +153,6 @@ export const make = Effect.gen(function* () {
   const groupCommand = yield* GroupCommand.GroupCommand
   const groupFollowStore = yield* GroupFollowStore.GroupFollowStore
   const readStateStore = yield* ReadStateStore.ReadStateStore
-  const notificationStore = yield* NotificationStore.NotificationStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
@@ -294,11 +291,6 @@ export const make = Effect.gen(function* () {
         (follow) => follow.groupMembershipId
       )
     )
-    const pending = new Map(
-      (yield* notificationStore.countPendingByGroup(Notification.ofMember(actor.memberId, actor.identity), ids)).map(
-        (value) => [value.groupId, value.count] as const
-      )
-    )
     const items: Array<Group.ListItem> = []
     for (const groupId of ids) {
       // A membership whose group is no longer stored is skipped, as a missing group reads.
@@ -309,8 +301,7 @@ export const make = Effect.gen(function* () {
       const activity: Group.Activity = {
         latestActivityAt: latest.get(groupId) ?? null,
         readAt: readTimes.get(groupId) ?? null,
-        following: following.has(admission.id),
-        pending: pending.get(groupId) ?? 0
+        following: following.has(admission.id)
       }
       items.push(Group.listItem(group, admission.admittedAt, activity, grant))
     }

@@ -25,7 +25,7 @@ import {
   Identity
 } from "./api.ts"
 import { useMarkGroupRead, useMarkThreadRead } from "./mark-read.ts"
-import { useGroupRoster, useGroupStream, useGroups, useMembers, useThreadTimeline } from "./reads.ts"
+import { useGroupRoster, useGroupStream, useGroups, useMembers, usePendingCounts, useThreadTimeline } from "./reads.ts"
 import { toDate } from "./time.ts"
 import { useTyping } from "./typing.ts"
 
@@ -132,7 +132,11 @@ export interface GroupEntry {
 /** The reader's groups, teams by name and direct groups by their other people, live while mounted. */
 export function useWorkspaceGroups(workspaceId: string) {
   const groups = useGroups(workspaceId)
+  const counts = usePendingCounts(workspaceId)
   const people = usePeople(workspaceId)
+  const pending = createMemo(
+    () => new Map((counts.value()?.groups ?? []).map((group) => [group.groupId as string, group.count] as const))
+  )
   const entryOf = (item: Group.ListItem): GroupEntry => {
     const group = item.group
     const others = group.kind === "Direct" ? group.memberIds.filter((id) => id !== people.selfId()) : []
@@ -144,7 +148,7 @@ export function useWorkspaceGroups(workspaceId: string) {
       general: Group.isGeneral(group),
       latestAt: item.latestActivityAt === null ? undefined : toDate(item.latestActivityAt),
       memberIds: others,
-      pending: item.pending,
+      pending: pending().get(group.id) ?? 0,
       unread: item.newActivity,
       following: item.following,
       manageable: item.manageable,

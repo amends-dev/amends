@@ -8,6 +8,7 @@ import {
   ClientProvider,
   DirectoryProvider,
   useGroups,
+  useInboxPending,
   useMarkThreadRead,
   useWorkspaceSettings,
   useTyping,
@@ -358,23 +359,25 @@ it("shows who is typing until their signal runs out or their message arrives, ne
   await waitFor(() => expect(f.typing("thread")).toEqual([]), { timeout: 2000 })
 })
 
-it("a read mark refreshes the reads it changes when its signal arrives, from any session", async () => {
+it("a read mark refreshes the counts it changes when its signal arrives, from any session", async () => {
   const [through, setThrough] = createSignal<number>()
   const f = fixture({
     respond: (request, path) => {
       if (path === "/groups") return Promise.resolve(json([]))
+      if (path === "/notifications/count") return Promise.resolve(json({ pending: 0, groups: [] }))
       if (request.method === "POST" && path === "/threads/thread/read")
         return Promise.resolve(new Response(null, { status: 204 }))
       return undefined
     },
     mount: () => {
       useGroups("one")
+      useInboxPending("one")
       useMarkThreadRead("one", "thread", through)
     }
   })
   const stream = await f.connected(0)
   stream.send(ready("1", false))
-  await waitFor(() => expect(f.count("/groups")).toBe(1))
+  await waitFor(() => expect([f.count("/groups"), f.count("/notifications/count")]).toEqual([1, 1]))
   const read = (readThrough: number) => ({
     _tag: "Signal",
     workspaceId: "one",
@@ -390,12 +393,14 @@ it("a read mark refreshes the reads it changes when its signal arrives, from any
   await waitFor(() => expect(f.count("/threads/thread/read")).toBe(1))
   // The mark itself refreshes nothing: its signal does, once.
   await new Promise((resolve) => setTimeout(resolve, 50))
-  expect(f.count("/groups")).toBe(1)
+  expect(f.count("/notifications/count")).toBe(1)
   stream.send(read(3))
-  await waitFor(() => expect(f.count("/groups")).toBe(2))
+  await waitFor(() => expect(f.count("/notifications/count")).toBe(2))
   // Reading further on another device refreshes this one the same way.
   stream.send(read(5))
-  await waitFor(() => expect(f.count("/groups")).toBe(3))
+  await waitFor(() => expect(f.count("/notifications/count")).toBe(3))
+  // The groups list shows nothing a read changes but read times, which a group read carries.
+  expect(f.count("/groups")).toBe(1)
 })
 
 /** A published message's timeline item in the thread, saying `text`. */
@@ -543,7 +548,6 @@ it("shows the group activity a commit delivers and the group reads told, without
     readAt,
     newActivity,
     following: false,
-    pending: 0,
     manageable: true,
     membersRemovable: true,
     renamable: true

@@ -104,8 +104,8 @@ export class NotificationService extends Context.Service<
     readonly markSeenThrough: (
       through: NotificationStore.Cursor
     ) => Effect.Effect<number, Exclude<MarkSeenError, CoreError.NotFound | CoreError.Conflict>, Actor.Actor>
-    /** How many notifications are still pending for the acting member, from anywhere. */
-    readonly countPending: Effect.Effect<number, Error, Actor.Actor>
+    /** How many notifications are still pending for the acting member, in all and by group. */
+    readonly countPending: Effect.Effect<NotificationInbox.Counts, Error, Actor.Actor>
   }
 >()("@amends-dev/core/notification/NotificationService") {}
 
@@ -286,7 +286,10 @@ export const make: Effect.Effect<
   }, Operation.report)
   const countPending = Effect.gen(function* () {
     const target = yield* requireRecipient()
-    return yield* notificationStore.countPendingByRecipient(target)
+    return {
+      pending: yield* notificationStore.countPendingByRecipient(target),
+      groups: yield* notificationStore.countPendingByGroup(target)
+    }
   }).pipe(Effect.withSpan("NotificationService.countPending"), Operation.report)
   return NotificationService.of({ inbox, markSeen, markSeenThrough, countPending })
 })

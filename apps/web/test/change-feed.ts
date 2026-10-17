@@ -87,7 +87,7 @@ export function withChangeFeed(
                   ? sidebar.groups()
                   : (sidebar.groups ?? [])
                 : path.endsWith("/notifications/count")
-                  ? { pending: sidebar.pending ?? 0 }
+                  ? { pending: sidebar.pending ?? 0, groups: [] }
                   : path.endsWith("/members")
                     ? (sidebar.members ?? [])
                     : []

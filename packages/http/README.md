@@ -112,8 +112,9 @@ Clients generating the typed client pass it in `headers`.
   authenticated human or agent's membership newest first, each notification with its `source`
   timeline item where the caller can still read it; it takes `limit` from 1 to 50, `pendingOnly`,
   and `before`, the last item's `{ recordedAt, id }` as URL-encoded JSON. Active membership is
-  required, and the caller cannot select a different recipient. `GET /notifications/count` returns `{ pending }`,
-  how many notifications are still pending for the caller, and `POST /notifications/seen` with
+  required, and the caller cannot select a different recipient. `GET /notifications/count` returns `{ pending, groups }`,
+  how many notifications are still pending for the caller, and how many from each group's threads,
+  as `{ groupId, count }` for each group with any, in group-ID order; and `POST /notifications/seen` with
   `{ through: { recordedAt, id } }` marks a person's pending notifications seen up to that one,
   returning `{ marked }`. `POST /notifications/:notificationId/seen` records that the person saw it and returns
   the notification; marking it again returns the first time, a missing record or another recipient's

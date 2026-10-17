@@ -65,7 +65,6 @@ const groups = [
     readAt: null,
     newActivity: false,
     following: true,
-    pending: 1,
     manageable: true,
     membersRemovable: true,
     renamable: true
@@ -148,7 +147,8 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     }
     if (path === "/notifications/count")
       return json({
-        pending: inbox.filter((item) => item.notification.state._tag === "Pending").length
+        pending: inbox.filter((item) => item.notification.state._tag === "Pending").length,
+        groups: []
       })
     if (request.method === "POST" && options.fail) return json({}, 503)
     const markSeen = /\/notifications\/([^/]+)\/seen$/.exec(path)

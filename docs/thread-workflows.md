@@ -414,7 +414,7 @@ Each item carries its notification and, as `source`, the timeline item it points
 reader may still read it (see [notification sources](#notification-sources)). It requires active
 membership only, lists nobody else's notifications, and changes nothing. `countPending` counts what
 is still pending for the acting identity, from any source, including threads they can no longer
-read.
+read, and from each group's threads, for each group with any: a sidebar badge beside the group.
 
 ## Seeing everything at once
 

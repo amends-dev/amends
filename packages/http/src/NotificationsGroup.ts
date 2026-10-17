@@ -43,7 +43,7 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       error: ApiErrors.workspace
     }),
     HttpApiEndpoint.get("count", "/count", {
-      success: Schema.Struct({ pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+      success: NotificationInbox.Counts.annotate({ identifier: "PendingCounts" }),
       error: ApiErrors.workspace
     }),
     HttpApiEndpoint.post("markSeenThrough", "/seen", {

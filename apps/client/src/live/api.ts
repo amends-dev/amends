@@ -90,6 +90,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "members",
     "groups",
     "inbox",
+    "pending",
     "permissions",
     "connections",
     "agents",
@@ -101,6 +102,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "members",
     "groups",
     "inbox",
+    "pending",
     "permissions",
     "connections",
     "agents",
@@ -112,6 +114,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "members",
     "groups",
     "inbox",
+    "pending",
     "permissions",
     "connections",
     "agents",
@@ -122,8 +125,8 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   // A team group's name shows in the sidebar, on its page, and among public groups.
   "group.renamed": ["groups", "public-groups"],
   // Group access decides the same for the group's threads; public groups show who belongs.
-  "group.membership.added": ["groups", "public-groups", "inbox", "active-turns"],
-  "group.membership.removed": ["groups", "public-groups", "inbox", "active-turns"],
+  "group.membership.added": ["groups", "public-groups", "inbox", "pending", "active-turns"],
+  "group.membership.removed": ["groups", "public-groups", "inbox", "pending", "active-turns"],
   "group.follow.started": ["groups"],
   "group.follow.ended": ["groups"],
   // Connections: their names, settings, and readiness, which agents name and follow.
@@ -223,7 +226,7 @@ export const affectedKeys = (
   events: Iterable<{ readonly name: string; readonly payload?: unknown }>,
   notified = false
 ): Array<string> => {
-  const affected = new Set<Affected>(notified ? ["groups", "inbox"] : [])
+  const affected = new Set<Affected>(notified ? ["inbox", "pending"] : [])
   const collections = new Set<WorkspaceCollection>(),
     items = new Set<string>()
   for (const event of events) {
@@ -250,8 +253,8 @@ export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<st
   Signal.Signal.matchOrElse(
     signal,
     {
-      ThreadRead: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")],
-      NotificationsSeen: () => [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")]
+      ThreadRead: () => [workspaceKey(workspaceId, "inbox"), workspaceKey(workspaceId, "pending")],
+      NotificationsSeen: () => [workspaceKey(workspaceId, "inbox"), workspaceKey(workspaceId, "pending")]
     },
     () => []
   )

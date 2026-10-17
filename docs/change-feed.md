@@ -46,7 +46,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
    it refreshes that turn and the active turns; a thread's turns show in its timeline, which takes
    the turn's items as the commit delivers them. Group membership and grant changes refresh the active
    turns. A commit that
-   carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
+   carries a notification for the reader refreshes the inbox and its pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
    value, so the stream and thread panel replace what they show with an unavailable state once a
    refresh answers gone or denied, until a later refresh succeeds. Facts with no mapping refresh nothing. Add
@@ -94,9 +94,9 @@ it against the values then shown. Background refreshes never mark settings pendi
 - Invitations addressed to the signed-in identity from other workspaces reach no workspace
   feed. The directory refreshes when the page wakes instead; an identity-level feed would be
   a backend addition.
-- Read-state signals refresh the groups and streams, since they change unread state and pending
-  counts; reading a thread and seeing notifications also refresh the inbox and its count, since
-  both settle notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
+- Read-state signals carry what streams and the groups list show of them; reading a thread and
+  seeing notifications also refresh the inbox and its pending counts, since both settle
+  notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
   moment each names, or until that member's message is published, and never show the reader. They
   are not replayed, so a reconnect starts with nobody typing. The notifications a commit carries
   refresh the inbox by refetching it rather than being added to it from the message.

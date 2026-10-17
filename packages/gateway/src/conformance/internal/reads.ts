@@ -63,7 +63,7 @@ export const reads = (fixture: Fixture.Fixture) => {
                   const notificationService = yield* NotificationService.NotificationService
                   expect(yield* notificationService.inbox({ limit: 10 })).toEqual([])
                   expect(yield* notificationService.inbox({ limit: 10, pendingOnly: true })).toEqual([])
-                  expect(yield* notificationService.countPending).toBe(0)
+                  expect((yield* notificationService.countPending).pending).toBe(0)
                   expect(
                     yield* Effect.flip(notificationService.markSeen(Notification.NotificationId.make("missing")))
                   ).toMatchObject({ _tag: "CoreError.NotFound" })
