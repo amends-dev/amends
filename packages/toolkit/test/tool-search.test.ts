@@ -83,6 +83,15 @@ describe("ToolSearch.toolkit", () => {
     })
   )
 
+  it.effect("asks a model API not to use its strict schema mode for either tool", () =>
+    Effect.gen(function* () {
+      const toolkit = yield* searchOver()
+
+      expect(Tool.getStrictMode(toolkit.tools.tool_search)).toBe(false)
+      expect(Tool.getStrictMode(toolkit.tools.tool_call)).toBe(false)
+    })
+  )
+
   it.effect("tells the model how many tools it can search", () =>
     Effect.gen(function* () {
       const toolkit = yield* searchOver()

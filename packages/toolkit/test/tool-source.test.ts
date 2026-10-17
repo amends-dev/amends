@@ -59,6 +59,17 @@ const callTool = (
   })
 
 describe("ToolSource.toolkit", () => {
+  it.effect("asks a model API not to use its strict schema mode, which the source's parameters may not fit", () =>
+    Effect.gen(function* () {
+      const { source } = fakeSource()
+
+      const toolkit = yield* ToolSource.toolkit(source, [createIssue, ping])
+
+      expect(Tool.getStrictMode(toolkit.tools["create_issue"]!)).toBe(false)
+      expect(Tool.getStrictMode(toolkit.tools["ping"]!)).toBe(false)
+    })
+  )
+
   it.effect("builds a tool for each definition, with its parameters and the hints it gave", () =>
     Effect.gen(function* () {
       const { source } = fakeSource()
