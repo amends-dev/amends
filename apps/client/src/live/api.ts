@@ -31,12 +31,16 @@ import {
 } from "../api/keys.ts"
 import {
   deliverGroupLatest,
+  deliverNotification,
   deliverPreview,
   deliverTimelineItem,
   forgetDeliveredItems,
+  forgetDeliveredNotifications,
   forgetDeliveredPreviews,
   recordGroupRead,
-  recordReadPosition
+  recordNotificationsSeen,
+  recordReadPosition,
+  recordThreadSeen
 } from "../conversations/api.ts"
 import { posted, typing, typistsAtom } from "../conversations/typing.ts"
 import { watchWake } from "./wake.ts"
@@ -226,7 +230,7 @@ export const affectedKeys = (
   events: Iterable<{ readonly name: string; readonly payload?: unknown }>,
   notified = false
 ): Array<string> => {
-  const affected = new Set<Affected>(notified ? ["inbox", "pending"] : [])
+  const affected = new Set<Affected>(notified ? ["pending"] : [])
   const collections = new Set<WorkspaceCollection>(),
     items = new Set<string>()
   for (const event of events) {
@@ -243,18 +247,33 @@ export const affectedKeys = (
     ...[...items].filter((item) => !whole.some((prefix) => item.startsWith(`${prefix}:`)))
   ]
 }
+/** The timeline item a commit delivered at a notification's source, if it delivered that. */
+const deliveredSourceOf = (
+  changes: ReadonlyArray<ChangeFeed.Change>,
+  thread: { readonly threadId: string; readonly sequence: number } | undefined
+) => {
+  if (thread === undefined) return undefined
+  for (const change of changes)
+    if (
+      ChangeFeed.Change.isAnyOf(["TimelineItem"])(change) &&
+      change.item.activity.threadId === thread.threadId &&
+      change.item.activity.sequence === thread.sequence
+    )
+      return change.item
+  return undefined
+}
 /**
  * The reads a signal to the reader's own sessions changes beyond what it carries. Reading a thread
- * settles notifications from it, changing the inbox and pending counts, and seeing notifications
- * changes the inbox and counts. Streams take a thread's read position from the signal, and the
- * groups list a group's read time.
+ * settles notifications from it, and seeing notifications settles them, changing the pending
+ * counts. Streams take a thread's read position from the signal, the groups list a group's read
+ * time, and the inbox what was seen.
  */
 export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<string> =>
   Signal.Signal.matchOrElse(
     signal,
     {
-      ThreadRead: () => [workspaceKey(workspaceId, "inbox"), workspaceKey(workspaceId, "pending")],
-      NotificationsSeen: () => [workspaceKey(workspaceId, "inbox"), workspaceKey(workspaceId, "pending")]
+      ThreadRead: () => [workspaceKey(workspaceId, "pending")],
+      NotificationsSeen: () => [workspaceKey(workspaceId, "pending")]
     },
     () => []
   )
@@ -301,6 +320,13 @@ const run = Effect.fnUntraced(function* (
     ...workspaceResources.map(key(workspaceId)),
     ...workspaceCollections.map((collection) => collectionKey(workspaceId, collection))
   ]
+  /** The reads of the reader's own read state, which signals carry and a dropped feed may have missed. */
+  const readState = [
+    workspaceKey(workspaceId, "groups"),
+    workspaceKey(workspaceId, "inbox"),
+    workspaceKey(workspaceId, "pending"),
+    collectionKey(workspaceId, "streams")
+  ]
   const id = Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)
   if (Option.isNone(id)) {
     Queue.offerUnsafe(states, ChangeFeedState.Ended({ reason: "unavailable" }))
@@ -324,12 +350,15 @@ const run = Effect.fnUntraced(function* (
         return Effect.flatMap(Clock.currentTimeMillis, (now) => {
           connected = true
           liveSince = now
+          // A feed that resumed after a commit replays the commits it missed, but not its signals.
+          const resumed = cursor !== undefined
           if (message.cursor !== null) cursor = message.cursor
           Queue.offerUnsafe(states, ChangeFeedState.Live())
-          if (!message.reset) return Effect.void
+          if (!message.reset) return resumed ? reactivity.invalidate(readState) : Effect.void
           // What was missed may have changed what was delivered: read everything again.
           forgetDeliveredItems(registry, delivered.timelines)
           forgetDeliveredPreviews(registry, delivered.streams)
+          forgetDeliveredNotifications(registry, workspaceId)
           delivered.timelines.clear()
           delivered.streams.clear()
           return reactivity.invalidate(everything)
@@ -352,7 +381,12 @@ const run = Effect.fnUntraced(function* (
             Preview: ({ preview }) => void delivered.streams.add(deliverPreview(registry, workspaceId, preview)),
             GroupLatest: ({ latest }) => deliverGroupLatest(registry, workspaceId, latest)
           })
-        // A notification for the reader changes their inbox and pending counts.
+        // A notification for the reader shows in their inbox with the timeline item it tells of,
+        // when the commit delivered that too, and changes their pending counts.
+        for (const notification of message.notifications) {
+          const source = deliveredSourceOf(message.changes, notification.thread)
+          deliverNotification(registry, workspaceId, source === undefined ? { notification } : { notification, source })
+        }
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0)
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void
       },
@@ -360,8 +394,12 @@ const run = Effect.fnUntraced(function* (
         const signal = message.signal
         if (Signal.Signal.isAnyOf(["Typing"])(signal))
           registry.update(typists, (current) => typing(current, signal, Date.now()))
-        if (Signal.Signal.isAnyOf(["ThreadRead"])(signal))
+        if (Signal.Signal.isAnyOf(["ThreadRead"])(signal)) {
           recordReadPosition(registry, workspaceId, signal.threadId, signal.readThrough)
+          recordThreadSeen(registry, workspaceId, signal.threadId, signal.readThrough, signal.readAt)
+        }
+        if (Signal.Signal.isAnyOf(["NotificationsSeen"])(signal))
+          recordNotificationsSeen(registry, workspaceId, signal.notificationIds, signal.seenAt)
         if (Signal.Signal.isAnyOf(["GroupRead"])(signal))
           recordGroupRead(registry, workspaceId, signal.groupId, signal.readAt)
         const keys = signalKeys(workspaceId, signal)

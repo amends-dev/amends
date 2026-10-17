@@ -766,12 +766,14 @@ it.effect("typing reaches the thread's readers, and private read state reaches i
           workspaceId,
           memberId: actor.memberId,
           threadId,
-          readThrough: 3
+          readThrough: 3,
+          readAt: at
         })
         const seen = Signal.Signal.cases.NotificationsSeen.make({
           workspaceId,
           memberId: bobMember,
-          notificationIds: [Notification.NotificationId.make("notification")]
+          notificationIds: [Notification.NotificationId.make("notification")],
+          seenAt: at
         })
         yield* signal(typing(threadId, groupId))
         // Withheld: a thread the reader may not read, and a group they do not belong to.

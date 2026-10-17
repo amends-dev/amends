@@ -228,8 +228,14 @@ it("refreshes the reads each commit affects, and every read after a reset", asyn
   expect(f.settings.stale()).toBe(false)
 })
 
-it("resumes after the last commit when the stream drops, without refreshing on resume", async () => {
-  const f = fixture()
+it("resumes after the last commit when the stream drops, refreshing only the read state signals carry", async () => {
+  const f = fixture({
+    respond: (_, path) =>
+      path === "/notifications/count" ? Promise.resolve(json({ pending: 0, groups: [] })) : undefined,
+    mount: () => {
+      useInboxPending("one")
+    }
+  })
   const first = await f.connected(0)
   first.send(ready("2", true))
   first.send(committed("3", event("workspace.invitation.issued", {})))
@@ -243,8 +249,11 @@ it("resumes after the last commit when the stream drops, without refreshing on r
   const second = await f.connected(1)
   expect(new URL(second.request.url).searchParams.get("after")).toBe("3")
   await waitFor(() => expect(f.count("/me/workspaces")).toBe(directory + 1))
+  const counted = f.count("/notifications/count")
   second.send(ready("3", false))
   await waitFor(() => expect(f.feed.state()._tag).toBe("Live"))
+  // Missed commits replay, but signals do not: what they carry is read again.
+  await waitFor(() => expect(f.count("/notifications/count")).toBe(counted + 1))
   await new Promise((resolve) => setTimeout(resolve, 50))
   expect([f.count("/settings"), f.count("/ownership")]).toEqual([2, 2])
   // A stream that ends without a failure also reconnects from the same place.
@@ -376,8 +385,9 @@ it("a read mark refreshes the counts it changes when its signal arrives, from an
     }
   })
   const stream = await f.connected(0)
-  stream.send(ready("1", false))
-  await waitFor(() => expect([f.count("/groups"), f.count("/notifications/count")]).toEqual([1, 1]))
+  stream.send(ready("1", true))
+  // A reset reads both again.
+  await waitFor(() => expect([f.count("/groups"), f.count("/notifications/count")]).toEqual([2, 2]))
   const read = (readThrough: number) => ({
     _tag: "Signal",
     workspaceId: "one",
@@ -386,21 +396,22 @@ it("a read mark refreshes the counts it changes when its signal arrives, from an
       workspaceId: "one",
       memberId: "owner",
       threadId: "thread",
-      readThrough
+      readThrough,
+      readAt: at
     }
   })
   setThrough(3)
   await waitFor(() => expect(f.count("/threads/thread/read")).toBe(1))
   // The mark itself refreshes nothing: its signal does, once.
   await new Promise((resolve) => setTimeout(resolve, 50))
-  expect(f.count("/notifications/count")).toBe(1)
+  expect(f.count("/notifications/count")).toBe(2)
   stream.send(read(3))
-  await waitFor(() => expect(f.count("/notifications/count")).toBe(2))
+  await waitFor(() => expect(f.count("/notifications/count")).toBe(3))
   // Reading further on another device refreshes this one the same way.
   stream.send(read(5))
-  await waitFor(() => expect(f.count("/notifications/count")).toBe(3))
+  await waitFor(() => expect(f.count("/notifications/count")).toBe(4))
   // The groups list shows nothing a read changes but read times, which a group read carries.
-  expect(f.count("/groups")).toBe(1)
+  expect(f.count("/groups")).toBe(2)
 })
 
 /** A published message's timeline item in the thread, saying `text`. */
@@ -520,7 +531,14 @@ it("shows the previews a commit delivers and the positions read in a stream, wit
   feed.send({
     _tag: "Signal",
     workspaceId: "one",
-    signal: { _tag: "ThreadRead", workspaceId: "one", memberId: "owner", threadId: "thread-a", readThrough: 2 }
+    signal: {
+      _tag: "ThreadRead",
+      workspaceId: "one",
+      memberId: "owner",
+      threadId: "thread-a",
+      readThrough: 2,
+      readAt: new Date(Date.UTC(2026, 8, 25, 12, 30)).toISOString()
+    }
   })
   await waitFor(() =>
     expect(shown()).toEqual([

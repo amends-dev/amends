@@ -219,20 +219,22 @@ it("maps conversation facts and signals to the reads of their groups and threads
         _tag: "ThreadRead",
         ...recipient,
         threadId: "thread-one",
-        readThrough: 1
+        readThrough: 1,
+        readAt: at
       })
     )
-  ).toEqual(["workspace/one/inbox", "workspace/one/pending"])
+  ).toEqual(["workspace/one/pending"])
   expect(
     signalKeys(
       "one",
       signal({
         _tag: "NotificationsSeen",
         ...recipient,
-        notificationIds: ["notification-one"]
+        notificationIds: ["notification-one"],
+        seenAt: at
       })
     )
-  ).toEqual(["workspace/one/inbox", "workspace/one/pending"])
+  ).toEqual(["workspace/one/pending"])
   expect(
     signalKeys(
       "one",

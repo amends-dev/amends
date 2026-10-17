@@ -41,7 +41,7 @@ export const committed = (
 export const notificationsSeen = (workspaceId: string, memberId: string, notificationIds: ReadonlyArray<string>) => ({
   _tag: "Signal",
   workspaceId,
-  signal: { _tag: "NotificationsSeen", workspaceId, memberId, notificationIds }
+  signal: { _tag: "NotificationsSeen", workspaceId, memberId, notificationIds, seenAt: "2026-10-02T12:00:00.000Z" }
 })
 
 /**

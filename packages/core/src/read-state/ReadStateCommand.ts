@@ -57,7 +57,8 @@ export const make = Effect.gen(function* () {
         workspaceId: position.workspaceId,
         memberId: position.memberId,
         threadId: position.threadId,
-        readThrough: position.readThrough
+        readThrough: position.readThrough,
+        readAt: at
       })
     )
     const storeTransaction = yield* Effect.serviceOption(Store.Transaction)

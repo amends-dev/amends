@@ -147,7 +147,8 @@ export const signals = (fixture: Fixture.Fixture) => {
               workspaceId: Support.workspaceId,
               memberId: reader.memberId,
               threadId: ThreadId.ThreadId.make("thread"),
-              readThrough: n
+              readThrough: n,
+              readAt: DateTime.makeUnsafe("2026-10-17T12:00:00.000Z")
             })
           const subscribe = (host: Context.Context<Fixture.Host>, id = Support.workspaceId) =>
             hubOf(host, id).pipe(

@@ -171,9 +171,11 @@ returns 403.
 
 Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
 `Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
-readers, and `ThreadRead`, `GroupRead`, and `NotificationsSeen` reach only the caller's own
+readers, and `ThreadRead` (`threadId`, `readThrough`, and `readAt`), `GroupRead` (`groupId` and
+`readAt`), and `NotificationsSeen` (`notificationIds` and `seenAt`) reach only the caller's own
 sessions, the one that wrote included, after one of them records read state or marks a notification
-seen. Starting a thread or replying reads it, so the author's sessions also get a `ThreadRead` once
+seen. Reading a thread through a position marks the caller's pending notifications from it up to
+there seen at `readAt`. Starting a thread or replying reads it, so the author's sessions also get a `ThreadRead` once
 the commit lands. A response an agent's turn is writing reaches only those following its log (see
 [Turns](#turns)). Signals have no cursor, are never replayed, and may be missed; after reconnecting,
 refresh read state with the rest of the view. Show a typing indicator until `until` unless another

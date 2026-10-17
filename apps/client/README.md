@@ -56,7 +56,9 @@ delivered item in place of the one it read, and those that follow it after (`wit
 a stream each delivered preview in place of the thread it shows, threads that started since
 after the newest, and the positions `ThreadRead` signals carry (`withDeliveredPreviews`), and the
 groups list each group's delivered latest activity and the read times `GroupRead` signals carry
-(`withDeliveredGroupActivity`).
+(`withDeliveredGroupActivity`), and the inbox the notifications delivered after its page was read,
+the timeline items delivered at their sources, and what `ThreadRead` and `NotificationsSeen`
+signals settled (`withDeliveredNotifications`).
 Paged reads (group streams, timelines, the inbox) keep their pages in one atom and read on from its
 previous value, so a refresh never drops what is on screen; a timeline's refresh reads every item it
 shows again.

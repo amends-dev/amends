@@ -517,14 +517,124 @@ const recordedAfter = (left: Notification.Notification, right: Notification.Noti
   (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
 /** Everything in the reader's inbox, or only what is still pending for them. */
 export type InboxFilter = "all" | "pending"
+/**
+ * The notifications the change feed delivered to the reader in one workspace, each with the source
+ * the same commit delivered, in the order they arrived, and how many it has delivered in all. The
+ * count only grows while the client runs, so an inbox page can say which deliveries it covers.
+ */
+interface DeliveredNotifications {
+  readonly count: number
+  readonly items: ReadonlyArray<{ readonly item: NotificationInbox.Item; readonly delivery: number }>
+}
+const deliveredNotificationsOf = Atom.family((_workspaceId: string) =>
+  Atom.make<DeliveredNotifications>({ count: 0, items: [] }).pipe(Atom.keepAlive)
+)
+/** Put a notification the change feed delivered in the reader's inbox, with its source if delivered too. */
+export const deliverNotification = (
+  registry: AtomRegistry.AtomRegistry,
+  workspaceId: string,
+  item: NotificationInbox.Item
+) =>
+  registry.update(deliveredNotificationsOf(workspaceId), ({ count, items }) => ({
+    count: count + 1,
+    items: [...items, { item, delivery: count + 1 }]
+  }))
+/** Forget the notifications the change feed delivered, as when what was missed may have changed them. */
+export const forgetDeliveredNotifications = (registry: AtomRegistry.AtomRegistry, workspaceId: string) =>
+  registry.update(deliveredNotificationsOf(workspaceId), ({ count }) => ({ count, items: [] }))
+/**
+ * What the change feed told the reader's sessions they saw in one workspace: notifications seen by
+ * ID, and each thread's reads in the order told, which settle its notifications up to each.
+ */
+interface SeenMarks {
+  readonly notifications: ReadonlyMap<string, DateTime.Utc>
+  readonly threads: ReadonlyMap<string, ReadonlyArray<{ readonly readThrough: number; readonly readAt: DateTime.Utc }>>
+}
+const seenMarksOf = Atom.family((_workspaceId: string) =>
+  Atom.make<SeenMarks>({ notifications: new Map(), threads: new Map() })
+)
+/** Note that the reader saw these notifications at `seenAt`. */
+export const recordNotificationsSeen = (
+  registry: AtomRegistry.AtomRegistry,
+  workspaceId: string,
+  notificationIds: ReadonlyArray<string>,
+  seenAt: DateTime.Utc
+) =>
+  registry.update(seenMarksOf(workspaceId), (seen) => {
+    const notifications = new Map(seen.notifications)
+    for (const id of notificationIds) if (!notifications.has(id)) notifications.set(id, seenAt)
+    return { ...seen, notifications }
+  })
+/** Note that the reader read a thread through `readThrough` at `readAt`. */
+export const recordThreadSeen = (
+  registry: AtomRegistry.AtomRegistry,
+  workspaceId: string,
+  threadId: string,
+  readThrough: number,
+  readAt: DateTime.Utc
+) =>
+  registry.update(seenMarksOf(workspaceId), (seen) => ({
+    ...seen,
+    threads: new Map(seen.threads).set(threadId, [...(seen.threads.get(threadId) ?? []), { readThrough, readAt }])
+  }))
+/**
+ * A notification as the reader's sessions were told they saw it: a person's pending notification is
+ * seen once they saw it, or read its thread through it, at the first time that did.
+ */
+export const seenWith = (notification: Notification.Notification, seen: SeenMarks): Notification.Notification => {
+  if (!Notification.State.isAnyOf(["Pending"])(notification.state)) return notification
+  if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient)) return notification
+  const thread = notification.thread
+  const seenAt =
+    seen.notifications.get(notification.id) ??
+    (thread === undefined
+      ? undefined
+      : seen.threads.get(thread.threadId)?.find((read) => read.readThrough >= thread.sequence)?.readAt)
+  return seenAt === undefined
+    ? notification
+    : Object.assign({}, notification, { state: Notification.State.cases.Seen.make({ seenAt }) })
+}
+/** An inbox page, and how many notifications the change feed had delivered when it was read. */
+interface InboxPage extends Paged<NotificationInbox.Item> {
+  readonly covered: number
+}
+/**
+ * An inbox as it shows with what the change feed delivered and told: notifications delivered after
+ * the page was read and not on it, newest first, then the page, each seen as told and with the
+ * timeline item delivered at its source's position, and, for the pending inbox, only those still
+ * pending.
+ */
+export const withDeliveredNotifications = (
+  page: InboxPage,
+  pendingOnly: boolean,
+  delivered: DeliveredNotifications,
+  seen: SeenMarks,
+  sourceOf: (thread: Notification.ThreadReference) => ThreadTimeline.Item | undefined
+): Paged<NotificationInbox.Item> => {
+  const shown = new Set(page.items.map((item) => item.notification.id))
+  const arrived = delivered.items
+    .filter(({ item, delivery }) => delivery > page.covered && !shown.has(item.notification.id))
+    .map(({ item }) => item)
+    .toSorted((left, right) => recordedAfter(right.notification, left.notification))
+  const items = [...arrived, ...page.items].flatMap((item): Array<NotificationInbox.Item> => {
+    const notification = seenWith(item.notification, seen)
+    if (pendingOnly && !Notification.State.isAnyOf(["Pending"])(notification.state)) return []
+    const source = (notification.thread && sourceOf(notification.thread)) ?? item.source
+    return [source === undefined ? { notification } : { notification, source }]
+  })
+  return { items, complete: page.complete, earlier: page.earlier }
+}
 const inboxOf = perClient((client: ApiClient, key: string): PagedRead<NotificationInbox.Item, unknown> => {
   const { workspaceId, id: filter } = split(key)
   const earlier = Atom.make(0)
-  const atom = client.runtime
+  const delivered = deliveredNotificationsOf(workspaceId)
+  const read = client.runtime
     .atom(
       Effect.fnUntraced(function* (get) {
         const api = yield* client
         const requested = get(earlier)
+        // Whatever the change feed delivers from now on may be missing from what this reads.
+        const covered = get.once(delivered).count
         const previous = previousOf<NotificationInbox.Item>(get)
         // The oldest notification shown stays shown: a refresh reads down to it, and a request
         // for more reads one page past it. New notifications arrive at the top.
@@ -555,10 +665,22 @@ const inboxOf = perClient((client: ApiClient, key: string): PagedRead<Notificati
             : recordedAfter(last.notification, oldest) <= 0
           if (done) break
         }
-        return { items: newestFirst, complete, earlier: requested }
+        const result: InboxPage = { items: newestFirst, complete, earlier: requested, covered }
+        return result
       })
     )
     .pipe(Atom.withReactivity([workspaceKey(workspaceId, "inbox")]))
+  const seen = seenMarksOf(workspaceId)
+  // Refreshing the inbox reads it again; what the change feed delivered and told stays in place.
+  const atom = Atom.readable(
+    (get) =>
+      AsyncResult.map(get(read), (page) =>
+        withDeliveredNotifications(page, filter === "pending", get(delivered), get(seen), (thread) =>
+          get(deliveredItemsOf(joined(workspaceId, thread.threadId))).get(thread.sequence)
+        )
+      ),
+    (refresh) => refresh(read)
+  )
   return { atom, earlier }
 })
 /** The reader's inbox, newest first, with each notification's source where they can read it. */
@@ -575,8 +697,8 @@ export const pendingCountsRead = (client: ApiClient, workspaceId: string) =>
 
 /**
  * Record that the reader saw everything still pending for them up to the newest notification
- * they are shown; what arrived after it stays. Their sessions, this one included, refresh the
- * inbox and pending counts when its signal arrives through the change feed.
+ * they are shown; what arrived after it stays. Their sessions, this one included, show it seen
+ * and refresh the pending counts when its signal arrives through the change feed.
  */
 export const markSeenThrough = (api: WorkspaceApi, through: Pick<Notification.Notification, "recordedAt" | "id">) =>
   Effect.gen(function* () {
@@ -588,8 +710,8 @@ export const markSeenThrough = (api: WorkspaceApi, through: Pick<Notification.No
 
 /**
  * Record that the reader saw a notification; seeing it again keeps the first time. Their
- * sessions, this one included, refresh the inbox and pending counts when its signal arrives
- * through the change feed.
+ * sessions, this one included, show it seen and refresh the pending counts when its signal
+ * arrives through the change feed.
  */
 export const markSeen = (api: WorkspaceApi, notificationId: string) =>
   Effect.gen(function* () {
