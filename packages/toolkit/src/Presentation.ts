@@ -104,7 +104,8 @@ const notFound = (name: string, available: ReadonlyArray<string>) =>
   })
 
 /**
- * A toolkit of the tools of `presented` that `names` names, which run as they do in `presented`.
+ * A toolkit of the tools of `presented` that `names` names, which run as they do in `presented`. It
+ * is typed as `presented` is, since its tools are among `presented`'s.
  *
  * @category constructors
  * @since 0.1.0
@@ -112,13 +113,12 @@ const notFound = (name: string, available: ReadonlyArray<string>) =>
 export const restrict = <Tools extends Record<string, Tool.Any>>(
   presented: Toolkit.WithHandler<Tools>,
   names: ReadonlySet<string>
-): Toolkit.WithHandler<Record<string, Tool.Any>> => ({
-  tools: Object.fromEntries(Object.entries(presented.tools).filter(([name]) => names.has(name))),
+): Toolkit.WithHandler<Tools> => ({
+  tools: Object.fromEntries(Object.entries(presented.tools).filter(([name]) => names.has(name))) as Tools,
   handle: (name, params, toolCallId, options) =>
-    hasTool(presented, name) && names.has(name)
-      ? // The tool checks its own parameters, whatever they are.
-        presented.handle(name, params as Tool.ParametersEncoded<Tools[typeof name]>, toolCallId, options)
-      : Effect.fail(notFound(name, [...names]))
+    names.has(String(name))
+      ? presented.handle(name, params, toolCallId, options)
+      : Effect.fail(notFound(String(name), [...names]))
 })
 
 /**
@@ -155,16 +155,19 @@ export const restrict = <Tools extends Record<string, Tool.Any>>(
 export const merge = <First extends Record<string, Tool.Any>, Second extends Record<string, Tool.Any>>(
   first: Toolkit.WithHandler<First>,
   second: Toolkit.WithHandler<Second>
-): Toolkit.WithHandler<Record<string, Tool.Any>> => ({
-  tools: { ...second.tools, ...first.tools },
-  handle: (name, params, toolCallId, options) => {
-    // Each toolkit checks the parameters of its own tools.
-    if (hasTool(first, name)) {
-      return first.handle(name, params as Tool.ParametersEncoded<First[typeof name]>, toolCallId, options)
-    }
-    if (hasTool(second, name)) {
-      return second.handle(name, params as Tool.ParametersEncoded<Second[typeof name]>, toolCallId, options)
-    }
-    return Effect.fail(notFound(name, Object.keys({ ...second.tools, ...first.tools })))
+): Toolkit.WithHandler<Toolkit.MergeRecords<First | Second>> => {
+  const tools: Record<string, Tool.Any> = { ...second.tools, ...first.tools }
+  const merged: Toolkit.WithHandler<Record<string, Tool.Any>> = {
+    tools,
+    handle: (name, params, toolCallId, options) =>
+      // Each toolkit checks the parameters of its own tools.
+      hasTool(first, name)
+        ? first.handle(name, params as Tool.ParametersEncoded<First[typeof name]>, toolCallId, options)
+        : hasTool(second, name)
+          ? second.handle(name, params as Tool.ParametersEncoded<Second[typeof name]>, toolCallId, options)
+          : Effect.fail(notFound(name, Object.keys(tools)))
   }
-})
+  // The merged record's type is computed from both, which TypeScript cannot relate a handler's
+  // result to before the toolkits are known.
+  return merged as unknown as Toolkit.WithHandler<Toolkit.MergeRecords<First | Second>>
+}

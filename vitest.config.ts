@@ -19,7 +19,8 @@ export default defineConfig({
           include: [
             "packages/*/test/**/*.test.ts",
             "adapters/sandbox-*/test/**/*.test.ts",
-            "adapters/harness-*/test/**/*.test.ts"
+            "adapters/harness-*/test/**/*.test.ts",
+            "adapters/codemode-*/test/**/*.test.ts"
           ]
         }
       },

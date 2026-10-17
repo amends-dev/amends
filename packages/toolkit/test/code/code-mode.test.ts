@@ -68,7 +68,7 @@ const inProcess: CodeMode.CodeRuntime = {
               })
             )
             if (!outcome.failed) return outcome.value
-            throw Object.assign(new Error(outcome.failure.message), outcome.failure)
+            throw new Error(`${outcome.failure.code}: ${outcome.failure.message}`)
           }
         ])
       )
@@ -108,17 +108,20 @@ const codeOver = (
     return yield* CodeMode.toolkit(presented, options.runtime ?? inProcess, options.codeOptions)
   })
 
-type CodeToolkit = Effect.Success<ReturnType<typeof codeOver>>
-
 /** Has the model call a tool of the toolkit, as a harness does, and returns its last result. */
-const call = (toolkit: CodeToolkit, name: string, params: unknown) =>
+const call = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+  name: string,
+  params: unknown
+) =>
   Effect.gen(function* () {
-    const results = yield* toolkit.handle(name, params as never).pipe(Effect.flatMap(Stream.runCollect))
+    const results = yield* toolkit.handle(name as keyof Tools, params as never).pipe(Effect.flatMap(Stream.runCollect))
     const last = results[results.length - 1]
     return { result: last?.result as unknown, isFailure: last?.isFailure }
   })
 
-const execute = (toolkit: CodeToolkit, code: string) => call(toolkit, "execute", { code })
+const execute = <Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.WithHandler<Tools>, code: string) =>
+  call(toolkit, "execute", { code })
 
 describe("CodeMode.toolkit", () => {
   it.effect("has execute, and the tools that need approval as tools of their own", () =>
@@ -352,12 +355,12 @@ describe("execute", () => {
       const { result, isFailure } = yield* execute(
         toolkit,
         `try { await tools.github__list_issues({ text: "x" }); }
-         catch (error) { return { message: error.message, code: error.code, retryable: error.retryable }; }`
+         catch (error) { return { message: error.message }; }`
       )
 
       expect(isFailure).toBe(false)
       expect(result).toEqual({
-        result: { message: "No such repository", code: "CallFailedError", retryable: false },
+        result: { message: "CallFailedError: No such repository" },
         logs: []
       })
     })
@@ -384,7 +387,7 @@ describe("execute", () => {
       expect(isFailure).toBe(true)
       expect(result).toEqual({
         code: "CodeError",
-        message: "No such repository\n\nLogged before it failed:\nabout to call",
+        message: "CallFailedError: No such repository\n\nLogged before it failed:\nabout to call",
         retryable: false
       })
     })

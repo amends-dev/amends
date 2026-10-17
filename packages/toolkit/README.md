@@ -272,10 +272,11 @@ const toolkit = yield * CodeMode.toolkit(assembled, runtime)
 Running the code is a `CodeRuntime`'s, an interface this package does not implement: `run` takes the
 code, the names of the tools it may call, and `call`, which calls one, and gives the result and
 logs, or fails with `CodeError`. A runtime has to run the code in an isolate that can reach nothing
-but those tools, gives it `tools` and `console`, and stops when interrupted. It is the adapter that
-has such an isolate, such as one of QuickJS or a sandbox's, that implements it. No adapter does yet,
-so nothing runs `execute`, and the tests of this module use a runtime that runs the code in the same
-process, which isolates nothing and must not be used for anything else.
+but those tools, gives it `tools` and `console`, and stops when interrupted. It is an adapter that
+has such an isolate that implements it:
+[`@amends-dev/codemode-opencode`](../../adapters/codemode-opencode) runs the code on opencode's
+interpreter. The tests of this module use a runtime that runs the code in the same process, which
+isolates nothing and must not be used for anything else.
 
 ## Presentations
 

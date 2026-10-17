@@ -7,6 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends-dev/codemode-opencode": "workspace:*",
     "@amends-dev/harness": "workspace:*",
     "@amends-dev/harness-amends": "workspace:*",
     "@amends-dev/harness-claude": "workspace:*",

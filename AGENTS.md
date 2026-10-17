@@ -84,6 +84,9 @@ runs them, and keeps `console` to tests and scripts.
   bridge in a sandbox; each gives the integration a host installs. `sandbox-local` and
   `sandbox-daytona` implement the sandbox contract over this machine's directories and over
   Daytona, and depend on it and their platform's SDK alone; the host declares their integrations.
+  `codemode-opencode` implements the toolkit's `CodeRuntime` over `@opencode/codemode`, opencode's
+  interpreter for code mode; the root manifest's `overrides` keeps that package on the catalog's
+  Effect until it declares Effect as a peer.
   `storage-postgresql` implements workspace storage, the workspace directory, accounts, and sign-in
   storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field, except
   the kind-specific `details` of a thread activity or a session log entry, stored as JSON. The

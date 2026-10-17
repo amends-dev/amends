@@ -8,9 +8,10 @@
  *
  * Running code is the job of a `CodeRuntime`, which this package does not have: it takes an
  * isolate that cannot reach anything but the tools it is given, and an adapter that has one
- * implements the interface. Everything else is here. A tool the code calls runs as it does when a
- * model calls it directly, so its input is checked and its failures are what it says. The code fails
- * when it throws, runs too long, or returns too much, and the model reads that.
+ * implements the interface, as `@amends-dev/codemode-opencode` does over opencode's interpreter.
+ * Everything else is here. A tool the code calls runs as it does when a model calls it directly, so
+ * its input is checked and its failures are what it says. The code fails when it throws, runs too
+ * long, or returns too much, and the model reads that.
  *
  * A tool that needs approval cannot be called from code, which a session cannot ask a person about
  * in the middle of a run. It stays a tool of its own beside `execute`, and a session asks about its
@@ -89,8 +90,8 @@ export interface Outcome extends Schema.Schema.Type<typeof Outcome> {}
 
 /**
  * Runs code in an isolate that can reach nothing but the tools of the execution, which it gives
- * the code as `tools`, beside `console`. An adapter that has such an isolate implements it; this
- * package does not.
+ * the code as `tools`, beside `console`. An adapter that has such an isolate implements it, as
+ * `@amends-dev/codemode-opencode` does; this package does not.
  *
  * @category models
  * @since 0.1.0
