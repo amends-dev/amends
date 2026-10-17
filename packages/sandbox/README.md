@@ -142,8 +142,11 @@ and a layer with what those need and the HTTP client the suites reach ports with
 `@effect/vitest`, an optional peer dependency that only a provider's tests install. The
 documentation of `run` shows such a test file.
 [`@amends-dev/sandbox-local`](../../adapters/sandbox-local) and
-[`@amends-dev/sandbox-daytona`](../../adapters/sandbox-daytona) are the providers in this
-repository.
+[`@amends-dev/sandbox-daytona`](../../adapters/sandbox-daytona),
+[`@amends-dev/sandbox-e2b`](../../adapters/sandbox-e2b), and
+[`@amends-dev/sandbox-vercel`](../../adapters/sandbox-vercel) are the providers in this repository.
+Each adapter's guide records the operations its platform supports and the limitations of its
+lifecycle, network policies, and file and process services.
 
 ## Development
 

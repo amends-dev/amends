@@ -1,0 +1,47 @@
+{
+  "name": "@amends-dev/sandbox-vercel",
+  "version": "0.1.0",
+  "description": "Sandboxes on Vercel for the @amends-dev/sandbox contract.",
+  "keywords": [
+    "agent",
+    "effect",
+    "sandbox",
+    "vercel"
+  ],
+  "homepage": "https://github.com/amends-dev/amends/tree/main/adapters/sandbox-vercel#readme",
+  "bugs": {
+    "url": "https://github.com/amends-dev/amends/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amends-dev/amends.git",
+    "directory": "adapters/sandbox-vercel"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./internal/*": null
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@amends-dev/sandbox": "workspace:*",
+    "@vercel/sandbox": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "catalog:",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}

@@ -29,8 +29,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   conversation in each participation's session log, from which the agent's next turn there
   resumes; resuming reads the whole log each turn and goes on from its latest compaction. A turn
   whose run stopped short continues where its agent kept it, as opencode does behind its bridge,
-  and runs again from its prompt otherwise, and a session's sandbox is left
-  running between turns, never stopped or destroyed. A reader with a turn's log open follows it as
+  and runs again from its prompt otherwise. The host leaves a session's sandbox running between
+  turns, never stopping or destroying it itself; a provider's timeout may still stop it.
+  A reader with a turn's log open follows it as
   a stream of its items and the step being written; the text being written is best effort, and a
   reader who starts following midway, or misses a draft while reconnecting, sees a step's text
   from its next text part, or once the step finishes. The [turn screens](turns.md) follow, stop,
@@ -41,9 +42,17 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   turns in the workspace. Triage has no inbox outside the store.
 - The [harness](../packages/harness/README.md) runs amends's own agent
   ([harness-amends](../adapters/harness-amends)) and
-  [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
-  the local host runs turns on both, opencode as two integrations, one for each of opencode's
-  session APIs. Amends's agent compacts by itself only for a model whose context window the
+  [opencode](../adapters/harness-opencode/README.md),
+  [Codex](../adapters/harness-codex/README.md), and
+  [Claude Agent](../adapters/harness-claude/README.md), which work in sandboxes behind their bridges;
+  the local host installs them, opencode as two integrations, one for each of opencode's
+  session APIs. Each adapter's guide records its supported model protocols and session operations.
+  Codex takes Responses endpoints but cannot enforce `maxOutputTokens`, and cannot return the
+  summary required for manual compaction; its automatic compaction stays in native history, while
+  portable history remains uncompressed. Claude takes Anthropic Messages endpoints with an
+  explicit API key, imports another agent's history as context rather than native messages, and
+  leaves context capacity to Claude's model; it does not take `minimal` reasoning effort.
+  Amends's agent compacts by itself only for a model whose context window the
   catalog knows, not one of an OpenAI-compatible connection; it tells the model nothing of its own
   beyond a turn's instructions and its tools' descriptions, such as where it works; and it asks
   Anthropic's models for an effort but never for adaptive thinking, which an endpoint does not say
@@ -67,11 +76,26 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   `approve` answers, but the turn job answers none, so a turn whose tool opencode asks about waits
   until it is stopped. A running turn takes no further input: a message sent during a turn starts
   the next, where Claude Code, Codex, and opencode take input while they work.
-- The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
+- The [sandbox contract](../packages/sandbox) has four providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
-  [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare
-  exists; Cloudflare's SDK runs only inside a Worker, so
-  reaching it from a host needs its Bridge Worker. A sandbox is created from one agent's template,
+  [Daytona](../adapters/sandbox-daytona/README.md),
+  [E2B](../adapters/sandbox-e2b/README.md), and [Vercel](../adapters/sandbox-vercel/README.md).
+  No Cloudflare provider exists. Reaching its Worker-side sandbox operations from this host needs
+  a deployed Worker API; its
+  [1.0 SDK has no generic bridge](https://developers.cloudflare.com/sandbox/sdk/migrate/other-features/#replace-the-bridge).
+  E2B has no atomic custom-name
+  reservation: creates serialize within one provider instance and detect competing metadata
+  claims, but concurrent hosts cannot guarantee one winner. Resuming an ambiguous name fails
+  rather than picking a machine. E2B's request transformations cannot express the contract's
+  path and header conditions, so they are unsupported. E2B and Vercel prepare every new sandbox
+  rather than caching contract templates as shared snapshots, and their running timeouts default
+  to one hour with files preserved. They do not renew running timeouts in the background. Vercel
+  transformations require exact hosts in a domain allow list, no allowed CIDRs, and one rule per
+  host; while rules exist, changing the network policy is unsupported because Vercel redacts
+  their credentials on reads. Firewall policies edited outside the Vercel adapter are unsupported:
+  the SDK omits some native rules when reading them. Vercel port updates replace the whole list, so independent hosts
+  must coordinate changes to avoid losing ports. Its exposed routes are public; harness bridges
+  authenticate them with their own token. A sandbox is created from one agent's template,
   and another agent's template runs in it when that agent first launches there: under the
   sandbox's network policy, which may deny what it downloads, and paying its install time then,
   where a snapshot of the whole set of agents would start at once. A sandbox's request

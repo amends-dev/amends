@@ -1,9 +1,8 @@
 # Publishing
 
 The packages that other developers use, the contracts `@amends-dev/harness`, `@amends-dev/sandbox`,
-and `@amends-dev/channel`, the sandbox providers `@amends-dev/sandbox-local` and
-`@amends-dev/sandbox-daytona`, and the agents `@amends-dev/harness-amends` and
-`@amends-dev/harness-opencode` so far, are published to npm from this repository, at
+and `@amends-dev/channel`, and their [sandbox and harness adapters](../adapters/README.md), are
+published to npm from this repository, at
 [amends-dev/amends](https://github.com/amends-dev/amends). The repository's manifests keep pointing at sources,
 which the workspace consumes as they are; what npm gets is a package's distribution, which
 `bun run dist` builds, checks, and publishes.

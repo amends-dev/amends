@@ -23,9 +23,13 @@ yet.
 | [`@amends-dev/harness`](packages/harness)                   | Runs an agent and streams its turns in one format, whichever agent it is.               |
 | [`@amends-dev/harness-amends`](adapters/harness-amends)     | An agent in your own process, over an Effect AI language model, with sandbox tools.     |
 | [`@amends-dev/harness-opencode`](adapters/harness-opencode) | opencode as an agent, working in a sandbox behind its bridge.                           |
+| [`@amends-dev/harness-codex`](adapters/harness-codex)       | Codex app-server as an agent behind the harness bridge.                                 |
+| [`@amends-dev/harness-claude`](adapters/harness-claude)     | Claude Agent SDK as an agent behind the harness bridge.                                 |
 | [`@amends-dev/sandbox`](packages/sandbox)                   | The contract every sandbox provider implements, and the suites each provider runs.      |
 | [`@amends-dev/sandbox-local`](adapters/sandbox-local)       | Sandboxes as directories on this machine, for development and tests.                    |
 | [`@amends-dev/sandbox-daytona`](adapters/sandbox-daytona)   | Sandboxes on Daytona, each a Linux machine of its own.                                  |
+| [`@amends-dev/sandbox-e2b`](adapters/sandbox-e2b)           | E2B sandboxes with files preserved across stops.                                        |
+| [`@amends-dev/sandbox-vercel`](adapters/sandbox-vercel)     | Sandboxes on Vercel.                                                                    |
 | [`@amends-dev/channel`](packages/channel)                   | The contract every channel transport implements, bringing an external system's talk in. |
 
 ## Run it locally

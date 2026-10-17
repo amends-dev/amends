@@ -1,0 +1,52 @@
+{
+  "name": "@amends-dev/harness-claude",
+  "version": "0.1.0",
+  "description": "Claude Agent SDK behind the amends sandbox bridge.",
+  "keywords": [
+    "agent",
+    "ai",
+    "claude",
+    "effect",
+    "harness",
+    "sandbox"
+  ],
+  "homepage": "https://github.com/amends-dev/amends/tree/main/adapters/harness-claude#readme",
+  "bugs": {
+    "url": "https://github.com/amends-dev/amends/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amends-dev/amends.git",
+    "directory": "adapters/harness-claude"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./internal/*": null
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@anthropic-ai/sdk": "catalog:",
+    "@effect/platform-bun": "catalog:"
+  },
+  "devDependencies": {
+    "@amends-dev/sandbox-local": "workspace:*",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}

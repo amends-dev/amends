@@ -103,8 +103,9 @@ export interface Options {
 /**
  * The integrations this host installs, which workspaces connect to: each model provider in the
  * catalog and any OpenAI-compatible API, for models; MCP servers and HTTP APIs, for tools;
- * sandboxes as directories under `directory`, for development, and on Daytona; and amends's agent
- * and opencode's two, as harnesses. opencode's bridges take tokens derived from `credentialKey`.
+ * sandboxes as directories under `directory`, for development, and on Daytona, E2B, and Vercel;
+ * and amends, opencode, Codex, and Claude as harnesses. Bridges take tokens derived from
+ * `credentialKey`, with a separate secret for each agent.
  *
  * @category constructors
  * @since 0.1.0
@@ -112,9 +113,13 @@ export interface Options {
 export const makeIntegrations = Effect.fnUntraced(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
     // A host reaches a bridge another host launched.
-    const bridgeSecret = LocalConfig.deriveSecret(credentialKey, "amends/opencode-bridge")
+    const bridgeTokenFor = (agent: string) => {
+      const bridgeSecret = LocalConfig.deriveSecret(credentialKey, `amends/${agent}-bridge`)
+      return (sandboxId: string) =>
+        Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url"))
+    }
     const opencodeOptions: HarnessIntegrations.OpencodeOptions = {
-      token: (sandboxId) => Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url"))
+      token: bridgeTokenFor("opencode")
     }
     return [
       ...(yield* ModelIntegrations.catalogProviders),
@@ -123,9 +128,13 @@ export const makeIntegrations = Effect.fnUntraced(
       yield* ToolIntegrations.openApi,
       yield* SandboxIntegrations.local({ directory }),
       yield* SandboxIntegrations.daytona,
+      yield* SandboxIntegrations.e2b,
+      yield* SandboxIntegrations.vercel(),
       yield* HarnessIntegrations.amends(),
       yield* HarnessIntegrations.opencode(opencodeOptions),
-      yield* HarnessIntegrations.opencode2(opencodeOptions)
+      yield* HarnessIntegrations.opencode2(opencodeOptions),
+      yield* HarnessIntegrations.codex({ token: bridgeTokenFor("codex") }),
+      yield* HarnessIntegrations.claude({ token: bridgeTokenFor("claude") })
     ]
   },
   Effect.provide([

@@ -13,8 +13,14 @@ it.effect("the host installs integrations of every capability, with distinct ids
         .filter((integration) => integration.provides.includes(capability))
         .map((integration) => integration.id)
 
-    expect(providing("harnesses")).toEqual(["amends", "opencode-agent", "opencode2-agent"])
-    expect(providing("sandboxes")).toEqual(["local", "daytona"])
+    expect(providing("harnesses")).toEqual([
+      "amends",
+      "opencode-agent",
+      "opencode2-agent",
+      "codex-agent",
+      "claude-agent"
+    ])
+    expect(providing("sandboxes")).toEqual(["local", "daytona", "e2b", "vercel"])
     expect(providing("tools")).toEqual(["mcp", "openapi"])
     expect(providing("models")).toContain("anthropic")
     expect(providing("models")).toContain("openai-compatible")

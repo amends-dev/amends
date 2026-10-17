@@ -159,6 +159,46 @@ const sonnet = {
 
 const makeOpencode = HarnessIntegrations.opencode({ token: () => Redacted.make("bridge-token") })
 
+layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))("additional harness integrations", (it) => {
+  for (const agent of [
+    {
+      id: "codex",
+      make: HarnessIntegrations.codex,
+      model: {
+        provider: "scripted",
+        model: "scripted-codex",
+        protocol: "openai-responses" as const,
+        url: "http://scripted.invalid/v1"
+      },
+      incompatible: sonnet
+    },
+    {
+      id: "claude",
+      make: HarnessIntegrations.claude,
+      model: sonnet,
+      incompatible: endpointOf("scripted-other")
+    }
+  ]) {
+    it.effect(`${agent.id} builds its sandbox harness and refuses incompatible model protocols`, () =>
+      Effect.gen(function* () {
+        const integration = yield* agent.make({ token: () => Redacted.make("bridge-token") })
+        const connection = connectionTo(`${agent.id}-agent`, agent.id, "none")
+        const harness = yield* integration.harness(connection, undefined, { model: agent.model })
+        expect(integration.id).toBe(`${agent.id}-agent`)
+        expect(integration.provides).toEqual(["harnesses"])
+        expect(integration.requiresSandbox).toBe(true)
+        expect(harness.agent.id).toBe(agent.id)
+        expect(harness.agent.template?.name).toBe(agent.id)
+        expect(yield* integration.check(connection, undefined)).toEqual({ status: "healthy" })
+
+        const failure = yield* Effect.flip(integration.harness(connection, undefined, { model: agent.incompatible }))
+        expect(failure.integration).toBe(`${agent.id}-agent`)
+        expect(failure.reason._tag).toBe("UnsupportedError")
+      })
+    )
+  }
+})
+
 layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))("HarnessIntegrations.opencode", (it) => {
   it.effect("gives harnesses of opencode, which work in a sandbox its template prepares", () =>
     Effect.gen(function* () {
