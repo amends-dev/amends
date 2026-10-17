@@ -7,7 +7,8 @@
       "packages/*",
       "adapters/*",
       "hosts/*",
-      "apps/*"
+      "apps/*",
+      "examples"
     ],
     "catalog": {
       "@effect/platform-bun": "4.0.5",

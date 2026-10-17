@@ -17,6 +17,7 @@ remaining gaps with links to their owning code.
 | [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, read state, and typing.                                  |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers.             |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                                         |
+| [Examples](../examples/README.md)                                    | One-file programs that run the published packages: sandboxes, agents, your own tools, and tool sources.                         |
 | [Publishing](publishing.md)                                          | Building and checking a package's distribution, versions in lines, changesets, and the release workflow that publishes to npm.  |
 | [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                                        |
 | [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                                 |

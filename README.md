@@ -33,6 +33,9 @@ yet.
 | [`@amends-dev/toolkit`](packages/toolkit)                   | Tools from MCP servers and HTTP APIs, assembled under a policy into the toolkit an agent calls. |
 | [`@amends-dev/channel`](packages/channel)                   | The contract every channel transport implements, bringing an external system's talk in.         |
 
+[Examples](examples) are one-file programs that run each of them, such as a sandbox on this machine,
+an agent in a local sandbox, or an MCP server's tools given to an agent: `bun examples/harness-amends.ts`.
+
 ## Run it locally
 
 You need [Bun](https://bun.com) 1.3 and PostgreSQL. From the repository root:
