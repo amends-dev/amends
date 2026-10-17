@@ -10,6 +10,7 @@ platform, or an agent, and installs that system's dependencies, which is why it 
 | [`harness-opencode`](harness-opencode/README.md)     | opencode as an agent, behind its bridge in a sandbox                | npm       |
 | [`harness-codex`](harness-codex/README.md)           | Codex app-server behind the harness bridge in a sandbox             | npm       |
 | [`harness-claude`](harness-claude/README.md)         | Claude Agent SDK behind the harness bridge in a sandbox             | npm       |
+| [`codemode-opencode`](codemode-opencode/README.md)   | opencode's code mode as the runtime of the toolkit's code mode      | npm       |
 | [`sandbox-local`](sandbox-local/README.md)           | Sandboxes as directories on this machine, for development and tests | npm       |
 | [`sandbox-daytona`](sandbox-daytona/README.md)       | Sandboxes on Daytona                                                | npm       |
 | [`sandbox-e2b`](sandbox-e2b/README.md)               | Sandboxes on E2B                                                    | npm       |
@@ -19,11 +20,12 @@ platform, or an agent, and installs that system's dependencies, which is why it 
 Each adapter extends `../../tsconfig.base.json`, enables its own runtime's types, and has a
 `typecheck` script.
 
-## Agents and sandbox providers
+## Agents, sandbox providers, and the code runtime
 
 The agents implement the [harness contract](../packages/harness/README.md) and the sandbox
 providers the [sandbox contract](../packages/sandbox/README.md), whose conformance suites each
-provider runs against itself. Each depends on its contract and its platform's own client alone. The
+provider runs against itself, and the code runtime the [toolkit](../packages/toolkit/README.md)'s
+`CodeMode.CodeRuntime`. Each depends on its contract and its platform's own client alone. The
 [local host](../hosts/local/README.md) declares the integrations workspaces connect to them through;
 [contributing](../CONTRIBUTING.md#adding-an-integration) describes adding another.
 

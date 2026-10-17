@@ -38,6 +38,7 @@ remaining gaps with links to their owning code.
 | [Daytona sandboxes](../adapters/sandbox-daytona/README.md)           | Sandboxes on Daytona for the sandbox contract, and running their tests with an API key.                                         |
 | [E2B sandboxes](../adapters/sandbox-e2b/README.md)                   | E2B lifecycle, naming, files, processes, and provider tests.                                                                    |
 | [Vercel sandboxes](../adapters/sandbox-vercel/README.md)             | Vercel lifecycle, files, processes, and provider tests.                                                                         |
+| [opencode code runtime](../adapters/codemode-opencode/README.md)     | opencode's code mode as the runtime of the toolkit's code mode: what the model's code can do, and its limits.                   |
 | [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.                        |
 | [Memory storage](../packages/core/README.md#memory)                  | The in-memory reference implementation of the storage contracts, in core and the gateway.                                       |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                                    |

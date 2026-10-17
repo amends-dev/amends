@@ -26,7 +26,8 @@
       "@anthropic-ai/claude-agent-sdk": "0.3.302",
       "@anthropic-ai/sdk": "0.135.0",
       "e2b": "2.56.0",
-      "alchemy": "2.0.0-beta.81"
+      "alchemy": "2.0.0-beta.81",
+      "@opencode/codemode": "2.0.32"
     }
   },
   "type": "module",

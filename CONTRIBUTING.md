@@ -118,7 +118,8 @@ The root manifest's `workspaces.catalog` pins every Effect package, and `repos/e
 matching source as a squashed Git subtree of [Effect-TS/effect](https://github.com/Effect-TS/effect),
 at tag `effect@4.0.5`, commit `7f524e25cfb49a71ac39b0f44278d08d40dda5de`. Upgrade both together:
 
-1. Set the new version for every Effect package in the catalog, and run `bun install`.
+1. Set the new version for every Effect package in the catalog, and run `bun install`. The root
+   manifest's `overrides` keeps `@opencode/codemode` on the catalog's Effect, so it moves with it.
 2. Commit, then pull the matching tag, replacing `<version>` with the catalog's version:
 
    ```sh
