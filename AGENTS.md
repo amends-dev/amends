@@ -64,9 +64,14 @@ runs them, and keeps `console` to tests and scripts.
   fixture: what the storage contracts promise, from transactions and logs to accounts, across hosts
   over the same storage. The gateway's tests run them over the memory implementation, and test
   core's operations as a host runs them; adapter tests keep only what one adapter stores or fails
-  differently. `harness` is the contract every harness implements: an agent's sessions and turns,
-  streamed in one format whichever agent runs them, and the bridge through which a host drives an
-  agent inside a sandbox. `sandbox` is the contract every sandbox provider implements, with the
+  differently. `log` is typed, append-only logs over host storage: the `Store` contract every
+  storage adapter implements, `Log` handles and the commits that span them, a memory store, and the
+  suites each adapter runs from `@amends-dev/log/conformance`. It is published apart from core so
+  that a harness's session logs, or any other consumer's, need no workspace; core's journal builds
+  facts, projections, and checkpoints over it, and binds each workspace's store to the workspace
+  it names, `WorkspaceId.CurrentWorkspaceId`. `harness` is the contract every harness implements:
+  an agent's sessions and turns, streamed in one format whichever agent runs them, and the bridge
+  through which a host drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements, with the
   suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing of what
   harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server or an
   HTTP API, one shape. `channel` is the contract every channel transport implements: how one

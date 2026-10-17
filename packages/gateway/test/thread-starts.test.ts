@@ -1,7 +1,7 @@
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group, GroupService, GroupStore, GroupMembershipStore } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Publication } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -17,6 +17,7 @@ import {
   ThreadMessageId
 } from "@amends-dev/core/thread"
 import { Member, MemberFacts, MemberStore, MemberId } from "@amends-dev/core/workspace"
+import { Entry } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Context } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -42,7 +43,7 @@ describe("thread starts", () => {
     program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound))))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 200 })

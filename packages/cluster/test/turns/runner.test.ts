@@ -34,7 +34,7 @@ const runnerFor = (
   agentOptions: Parameters<typeof makeScriptedAgent>[1] = {}
 ) =>
   Effect.gen(function* () {
-    const workspace = makeFakeWorkspace(options)
+    const workspace = yield* makeFakeWorkspace(options)
     const scripted = makeScriptedAgent(typeof script === "function" ? script(workspace) : script, agentOptions)
     const services = Layer.merge(Layer.succeed(Gateway.Gateway, workspace.gateway), integrationsFor(scripted.agent))
     const turnRunner = yield* Effect.provide(TurnRunner.make(job), services)
@@ -75,19 +75,17 @@ describe("a turn's run", () => {
         [["Alice: Planner, summarize the plan."], "Plan each change."]
       ])
       // The turn starts with the agent's first part, as the agent announces no start.
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Joined", "Prompted", "Started", "Step", "Step"])
-      expect(workspace.log()[2]).toEqual({ _tag: "Started", turnId: turn.id, agent: "scripted" })
-      // Steps are named after the run's opening position in the log, as their drafts are.
-      expect(
-        workspace
-          .log()
-          .filter(SessionLog.Entry.isAnyOf(["Step"]))
-          .map((entry) => entry.id)
-      ).toEqual(["2.0", "2.1"])
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual(["Joined", "Prompted", "Started", "Step", "Step"])
+      expect((yield* workspace.log)[2]).toEqual({ _tag: "Started", turnId: turn.id, agent: "scripted" })
+      // Steps are named after the position of the run's opening batch, as their drafts are.
+      expect((yield* workspace.log).filter(SessionLog.Entry.isAnyOf(["Step"])).map((entry) => entry.id)).toEqual([
+        "0.0",
+        "0.1"
+      ])
       // The first text arrives at once, and the rest once the text ends.
       expect(workspace.drafts()).toEqual([
-        { responseId: "2.1", part: 0, offset: 0, text: "The plan " },
-        { responseId: "2.1", part: 0, offset: 9, text: "is on track." }
+        { responseId: "0.1", part: 0, offset: 0, text: "The plan " },
+        { responseId: "0.1", part: 0, offset: 9, text: "is on track." }
       ])
       expect(workspace.endings()).toEqual([
         {
@@ -154,7 +152,13 @@ describe("a turn's run", () => {
       // The session starts without the turn, which its prompt brings.
       expect(scripted.createdWith[0]?.history).toEqual(Prompt.empty)
       expect(scripted.createdWith[0]?.unfinishedTurn).toBeUndefined()
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Step", "Interrupted", "Started", "Step"])
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual([
+        "Prompted",
+        "Step",
+        "Interrupted",
+        "Started",
+        "Step"
+      ])
       expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Again." }])
     })
   )
@@ -169,8 +173,8 @@ describe("a turn's run", () => {
         ])
       )
       yield* runNextTurn
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step"])
-      expect(workspace.log()[1]).toEqual({
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step"])
+      expect((yield* workspace.log)[1]).toEqual({
         _tag: "Started",
         turnId: turn.id,
         agent: "scripted",
@@ -214,7 +218,13 @@ describe("a turn's run", () => {
       expect(scripted.createdWith[0]?.agentState).toBeUndefined()
       expect(scripted.turns).toEqual([])
       expect(scripted.continued).toEqual([1])
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step", "Interrupted", "Step"])
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual([
+        "Prompted",
+        "Started",
+        "Step",
+        "Interrupted",
+        "Step"
+      ])
       expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Rest." }])
     })
   )
@@ -227,7 +237,7 @@ describe("a turn's run", () => {
         { keepsTurns: true }
       )
       yield* runNextTurn
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step", "Interrupted"])
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step", "Interrupted"])
       expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Half" }])
     })
   )
@@ -245,7 +255,7 @@ describe("a turn's run", () => {
       yield* runNextTurn
       expect(scripted.createdWith[0]?.unfinishedTurn).toEqual({ turn: "turn-a" })
       expect(scripted.turns.map(({ prompt }) => userTexts(prompt))).toEqual([["Alice: The prompt told."]])
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual([
         "Prompted",
         "Started",
         "Step",
@@ -253,7 +263,7 @@ describe("a turn's run", () => {
         "Started",
         "Step"
       ])
-      expect(workspace.log()[4]).toMatchObject({ agentState: { turn: "turn-b" } })
+      expect((yield* workspace.log)[4]).toMatchObject({ agentState: { turn: "turn-b" } })
       expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Again." }])
     })
   )
@@ -269,7 +279,7 @@ describe("a turn's run", () => {
         ])
       )
       yield* runNextTurn
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step"])
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step"])
       expect(workspace.endings()).toEqual([
         {
           kind: "fail",
@@ -329,7 +339,7 @@ describe("a turn's run", () => {
       while (workspace.drafts().length === 0) yield* Effect.yieldNow
       yield* stopTurn(turn.id)
       expect(yield* Fiber.join(running)).toEqual(Option.some(turn.id))
-      expect(workspace.log().at(-1)).toMatchObject({
+      expect((yield* workspace.log).at(-1)).toMatchObject({
         _tag: "Step",
         step: { parts: [{ type: "text", text: "Halfway" }] }
       })
@@ -363,7 +373,7 @@ describe("a turn's run", () => {
         )
       )
       expect(yield* runNextTurn).toEqual(Option.some(turn.id))
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Interrupted"])
+      expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual(["Prompted", "Interrupted"])
       expect(workspace.endings()).toEqual([])
     })
   )
@@ -375,7 +385,7 @@ describe("a turn's run", () => {
       })
       expect(yield* runNextTurn).toEqual(Option.none())
       expect(scripted.createdWith).toEqual([])
-      expect(workspace.log()).toEqual([])
+      expect(yield* workspace.log).toEqual([])
     })
   )
 })

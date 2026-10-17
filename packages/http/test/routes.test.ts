@@ -12,7 +12,6 @@ import {
   GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry } from "@amends-dev/core/journal"
 import { Notification, NotificationService } from "@amends-dev/core/notification"
 import { ReadStateService } from "@amends-dev/core/read-state"
 import { Request } from "@amends-dev/core/request"
@@ -36,6 +35,7 @@ import {
   MemberId
 } from "@amends-dev/core/workspace"
 import { Accounts, SessionTokens, Gateway, SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
+import { Entry } from "@amends-dev/log"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
 import type { Scope } from "effect"

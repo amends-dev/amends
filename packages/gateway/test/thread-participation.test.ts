@@ -10,7 +10,7 @@ import {
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupService, GroupMembershipService, GroupMembershipFacts, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Event, Fact, Journal, Publication, StoreError } from "@amends-dev/core/journal"
+import { Event, Fact, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -38,6 +38,7 @@ import {
 } from "@amends-dev/core/thread"
 import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -84,7 +85,7 @@ describe("thread participation", () => {
     asActor(effect, actor).pipe(Effect.provide(core(bound)))
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound))))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
@@ -121,7 +122,7 @@ describe("thread participation", () => {
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
-          workspaceId: bound.store.workspaceId,
+          workspaceId: bound.workspaceId,
           assignmentId: Assignment.AssignmentId.make(
             `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`
           ),
@@ -130,9 +131,7 @@ describe("thread participation", () => {
             _tag: "Direct",
             grant: Grant.make(
               permission,
-              target === undefined
-                ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
-                : { _tag: "Target", target }
+              target === undefined ? { _tag: "Workspace", workspaceId: bound.workspaceId } : { _tag: "Target", target }
             )
           }
         })
@@ -146,7 +145,7 @@ describe("thread participation", () => {
           Effect.gen(function* () {
             for (const memberId of [humanId, otherId, agentId])
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
+                workspaceId: bound.workspaceId,
                 memberId,
                 identity: identityFor(memberId),
                 name: Member.Name.make(memberId)
@@ -215,7 +214,7 @@ describe("thread participation", () => {
           ) =>
             facts(
               bound,
-              Effect.flatMap(Journal.Journal, (journal) => journal.read({ name: fact.name, limit: 100 }))
+              Effect.flatMap(Journal.Journal, (journal) => journal.log.readEntries({ name: fact.name, limit: 100 }))
             ).pipe(
               Effect.flatMap((entries) =>
                 Effect.forEach(entries, (entry) =>
@@ -1228,7 +1227,7 @@ describe("thread participation", () => {
               yield* facts(
                 bound,
                 Effect.flatMap(Journal.Journal, (journal) =>
-                  journal.read({ name: ThreadParticipationFacts.Ended.name, limit: 100 })
+                  journal.log.readEntries({ name: ThreadParticipationFacts.Ended.name, limit: 100 })
                 )
               )
             ).toEqual([])

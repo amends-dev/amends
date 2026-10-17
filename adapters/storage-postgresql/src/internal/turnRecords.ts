@@ -9,10 +9,10 @@
  * and requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import type { ThreadId } from "@amends-dev/core/thread"
 import { Turn, TurnStore } from "@amends-dev/core/turn"
 import type { MemberId } from "@amends-dev/core/workspace"
+import { StoreError } from "@amends-dev/log"
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

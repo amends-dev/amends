@@ -4,7 +4,7 @@ import { Assignment, AssignmentFacts, BuiltinRoles, Grant, RoleFacts } from "@am
 import { CoreError } from "@amends-dev/core/error"
 import { GroupService, GroupMembershipService, GroupMembershipFacts, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal"
+import { Event, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -26,6 +26,7 @@ import {
 } from "@amends-dev/core/thread"
 import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, StoreError } from "@amends-dev/log"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -69,7 +70,7 @@ describe("threads", () => {
     asActor(program, actor).pipe(Effect.provide(core(bound)))
   const publish = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(core(bound))
     )
   const startOnly = (
@@ -110,7 +111,7 @@ describe("threads", () => {
               [otherId, { _tag: "Human", id: Identity.HumanId.make("other") }]
             ] as const)
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
+                workspaceId: bound.workspaceId,
                 memberId,
                 identity,
                 name: Member.Name.make(identity.id)
@@ -182,8 +183,8 @@ describe("threads", () => {
           const events = yield* publish(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
-              journal
-                .read({ name: ThreadActivityFacts.Recorded.name, limit: 100 })
+              journal.log
+                .readEntries({ name: ThreadActivityFacts.Recorded.name, limit: 100 })
                 .pipe(
                   Effect.flatMap((entries) =>
                     Effect.forEach(entries, (entry) => Event.decode(ThreadActivityFacts.Recorded, entry))

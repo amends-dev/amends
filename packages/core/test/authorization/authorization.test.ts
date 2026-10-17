@@ -1,4 +1,8 @@
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Option } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -21,12 +25,8 @@ import * as Target from "../../src/authorization/Target.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
 import * as Member from "../../src/workspace/Member.ts"
 import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
@@ -105,6 +105,7 @@ const dependencies = (fixture: Fixture, overrides: Overrides = {}) =>
     Layer.succeed(RoleStore.RoleStore, RoleStore.RoleStore.of({ ...fixture.roles, ...overrides.roles })),
     Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
     Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove, Create])
   )
 const configured = (fixture: Fixture, overrides: Overrides = {}) =>
@@ -134,7 +135,10 @@ const seed = (
 it.effect("authorization reads each caller's actor and uses an agent's own grants", () =>
   Effect.gen(function* () {
     expectTypeOf<Layer.Services<typeof Authorization.layer>>().toEqualTypeOf<
-      MemberStore.MemberStore | GrantResolver.GrantResolver | PermissionCatalog.PermissionCatalog | Store.Store
+      | MemberStore.MemberStore
+      | GrantResolver.GrantResolver
+      | PermissionCatalog.PermissionCatalog
+      | WorkspaceId.CurrentWorkspaceId
     >()
     expectTypeOf<Layer.Error<typeof Authorization.layer>>().toEqualTypeOf<never>()
     expectTypeOf<
@@ -530,6 +534,7 @@ it.effect("authorization observes transactional changes and protects the mutatio
     }).pipe(
       Effect.provide([configured(fixture), Log.layer]),
       Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
       Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(MemberStore.MemberStore, fixture.members),
       Effect.provideService(RoleStore.RoleStore, fixture.roles),

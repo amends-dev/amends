@@ -1,7 +1,7 @@
 import { AssignmentService, BuiltinRoles, Role } from "@amends-dev/core/authorization"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, StoreError } from "@amends-dev/core/journal"
 import type { Gateway } from "@amends-dev/gateway"
+import { Entry, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Result } from "effect"
 import { withStorage } from "./fixture.ts"

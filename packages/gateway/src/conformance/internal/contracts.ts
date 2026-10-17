@@ -1,7 +1,7 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupMembership, GroupService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { type Checkpoint, Entry, type Store } from "@amends-dev/core/journal"
+import type { Checkpoint } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import {
   ThreadActivity,
@@ -15,6 +15,7 @@ import {
 } from "@amends-dev/core/thread"
 import { Turn, TurnId } from "@amends-dev/core/turn"
 import { Member, MemberPermissions, type WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import { Entry, type Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -541,7 +542,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
             retry: null,
             status,
             acceptedThroughSequence: 1,
-            logAfter: 0,
+            logAfter: null,
             selection: null,
             messageIds: [],
             failure: null,

@@ -6,18 +6,19 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import type * as Group from "./Group.ts"
 import * as GroupId from "./GroupId.ts"
 import * as GroupMembership from "./GroupMembership.ts"
@@ -125,7 +126,7 @@ export const make = (
   driver: GroupMembershipStore["Service"]
 ): GroupMembershipStore["Service"] => {
   const read = StoreInput.read("GroupMembershipStore")
-  const write = StoreInput.write("GroupMembershipStore", workspaceId)
+  const write = StoreInput.write("GroupMembershipStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", GroupMembership.GroupMembershipId, id), driver.get),
     getMany: (ids) =>
@@ -183,7 +184,7 @@ const byId = (left: GroupMembership.GroupMembership, right: GroupMembership.Grou
  * Recorded group admissions; one active admission per group and workspace membership.
  */
 const makeMemory = Effect.fn("GroupMembershipStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("groupMemberships")))
   const driver: GroupMembershipStore["Service"] = {
     get: Effect.fn("GroupMembershipStore.memory.get")(
@@ -327,7 +328,7 @@ const makeMemory = Effect.fn("GroupMembershipStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `GroupMembershipStore` in process memory, over the workspace's `Store.MemoryBinding`:
+ * Provide `GroupMembershipStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`:
  * each group admission, active and removed. It keeps what the contract leaves to storage: a reused
  * ID is rejected, and so is a second active admission of one member to one group; removing
  * is rejected unless the admission is stored, active, and of the group and member named. `make`

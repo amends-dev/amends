@@ -24,21 +24,6 @@ export * as Checkpoint from "./Checkpoint.ts"
 /**
  * @since 0.1.0
  */
-export * as Codec from "./Codec.ts"
-
-/**
- * @since 0.1.0
- */
-export * as Commit from "./Commit.ts"
-
-/**
- * @since 0.1.0
- */
-export * as Entry from "./Entry.ts"
-
-/**
- * @since 0.1.0
- */
 export * as Event from "./Event.ts"
 
 /**
@@ -54,7 +39,7 @@ export * as Journal from "./Journal.ts"
 /**
  * @since 0.1.0
  */
-export * as Log from "./Log.ts"
+export * as MemoryBinding from "./MemoryBinding.ts"
 
 /**
  * @since 0.1.0
@@ -84,24 +69,4 @@ export * as Reaction from "./Reaction.ts"
 /**
  * @since 0.1.0
  */
-export * as Store from "./Store.ts"
-
-/**
- * @since 0.1.0
- */
-export * as StoreError from "./StoreError.ts"
-
-/**
- * @since 0.1.0
- */
-export * as StoreInput from "./StoreInput.ts"
-
-/**
- * @since 0.1.0
- */
 export * as Subject from "./Subject.ts"
-
-/**
- * @since 0.1.0
- */
-export * as Transaction from "./Transaction.ts"

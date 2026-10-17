@@ -17,10 +17,10 @@ import * as CoreError from "../error/CoreError.ts"
 import type * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentCommand from "./AssignmentCommand.ts"
 import * as AssignmentPermissions from "./AssignmentPermissions.ts"
@@ -136,7 +136,7 @@ export const make: Effect.Effect<
   | Journal.Journal
   | Crypto.Crypto
   | PermissionCatalog.PermissionCatalog
-  | Store.Store
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const assignmentStore = yield* AssignmentStore.AssignmentStore
   const memberStore = yield* MemberStore.MemberStore
@@ -146,7 +146,7 @@ export const make: Effect.Effect<
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const manageRequirement = Requirement.make(
     AssignmentPermissions.Manage,
     Target.Reference.cases.Workspace.make({ workspaceId })

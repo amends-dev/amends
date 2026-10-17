@@ -8,20 +8,20 @@
  * @since 0.1.0
  */
 
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as GroupId from "../group/GroupId.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ReadState from "./ReadState.ts"
 
 /**
@@ -79,7 +79,7 @@ export const make = (
   driver: ReadStateStore["Service"]
 ): ReadStateStore["Service"] => {
   const read = StoreInput.read("ReadStateStore")
-  const write = StoreInput.write("ReadStateStore", workspaceId)
+  const write = StoreInput.write("ReadStateStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     getThreadPositions: Effect.fn("ReadStateStore.getThreadPositions")(function* (memberId, threadIds) {
       return yield* driver.getThreadPositions(
@@ -125,7 +125,7 @@ const isSettledBy = (record: Notification.Notification, position: ReadState.Thre
  * transaction when there is one and otherwise apply at once.
  */
 const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
-  const { workspaceId, read, join, exclusive } = yield* Store.MemoryBinding
+  const { workspaceId, read, join, exclusive } = yield* MemoryBinding.MemoryBinding
   const driver: ReadStateStore["Service"] = {
     getThreadPositions: Effect.fn("ReadStateStore.memory.getThreadPositions")(
       function* (memberId, threadIds) {
@@ -188,7 +188,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `ReadStateStore` in process memory, over the workspace's `Store.MemoryBinding`: each
+ * Provide `ReadStateStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: each
  * member's private read state, the sequence read through in each thread and when they last read
  * each group, kept beside the projected records so rebuilding projections keeps it. A write keeps
  * the later of the stored and given value; it joins the caller's transaction when there is one and

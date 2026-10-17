@@ -15,6 +15,7 @@
     "@amends-dev/core": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
     "@amends-dev/harness": "workspace:*",
+    "@amends-dev/log": "workspace:*",
     "@amends-dev/sandbox": "workspace:*",
     "effect": "catalog:"
   },

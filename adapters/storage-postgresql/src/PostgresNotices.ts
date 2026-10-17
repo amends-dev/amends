@@ -5,7 +5,7 @@
  * connection, rather than inside its transaction, where the notification lock would serialize
  * every notifying commit on the server; a notice lost between the two leaves readers to their
  * poll. One listener per pool, on one connection, routes them all. `PostgresDatabase` makes one
- * for each pool; `Journal` and `SessionLogs` wait on its append notices,
+ * for each pool; `Journal`, the log store, waits on its append notices,
  * `PostgresClusterStorage` on its job request notices, and `PostgresSignalHub` relays each
  * workspace's signals through it.
  *
@@ -48,22 +48,13 @@ const encodeNotice = Schema.encodeSync(Notice)
 const decodeNotice = Schema.decodeUnknownOption(Notice)
 
 /**
- * The notice an append sends for each log it appended to: a journal log, by its id, or a session
- * log, by `sessionLogKey`.
+ * The notice an append sends for each log it appended to, by its id.
  *
  * @category constructors
  * @since 0.1.0
  */
 export const appendNotice = (workspaceId: WorkspaceId.WorkspaceId, logId: string): string =>
   encodeNotice(["append", workspaceId, logId])
-
-/**
- * How appends name a participation's session log, apart from every journal log's id.
- *
- * @category constructors
- * @since 0.1.0
- */
-export const sessionLogKey = (participationId: string): string => JSON.stringify(["session-log", participationId])
 
 /**
  * The notice a commit that stored job requests sends, so the runner that owns each job, in

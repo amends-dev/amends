@@ -21,10 +21,11 @@ import {
   GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Checkpoint, Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal"
+import { Checkpoint, Journal, Publication } from "@amends-dev/core/journal"
 import { ThreadService } from "@amends-dev/core/thread"
 import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, Store, StoreError } from "@amends-dev/log"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Context, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -56,7 +57,7 @@ describe("group reads", () => {
     asActor(effect, actor).pipe(Effect.provide(core(bound)))
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(core(bound))
     )
   const get = (id: GroupId.GroupId) => Effect.flatMap(GroupService.GroupService, (groupService) => groupService.get(id))
@@ -105,7 +106,7 @@ describe("group reads", () => {
           Effect.gen(function* () {
             for (const memberId of [readerId, otherId, agentId])
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
+                workspaceId: bound.workspaceId,
                 memberId,
                 identity: actorFor(memberId).identity,
                 name: Member.Name.make(memberId)
@@ -124,7 +125,7 @@ describe("group reads", () => {
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
-          workspaceId: bound.store.workspaceId,
+          workspaceId: bound.workspaceId,
           assignmentId: Assignment.AssignmentId.make(`${memberId}-${permission.name}-${groupId ?? "workspace"}`),
           memberId,
           source: {
@@ -132,10 +133,10 @@ describe("group reads", () => {
             grant: Grant.make(
               permission,
               groupId === undefined
-                ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
+                ? { _tag: "Workspace", workspaceId: bound.workspaceId }
                 : {
                     _tag: "Target",
-                    target: { _tag: "Group", workspaceId: bound.store.workspaceId, groupId }
+                    target: { _tag: "Group", workspaceId: bound.workspaceId, groupId }
                   }
             )
           }

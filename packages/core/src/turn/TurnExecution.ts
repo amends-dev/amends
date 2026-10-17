@@ -4,7 +4,7 @@
  * step being written, and ending the turn by closing, failing, or confirming it stopped. It is
  * one of core's `JobServices`, which Cluster's `TurnRunner` calls through the gateway for each
  * turn job. It holds nothing in memory and runs no harness: the job runs the agent and writes the
- * participation's session log (`SessionLogStore`), and each change here is its own commit,
+ * participation's session log (`SessionLog.SessionLogs`), and each change here is its own commit,
  * attributed to the turn's agent.
  *
  * @since 0.1.0
@@ -32,7 +32,6 @@ import * as Identity from "../identity/Identity.ts"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
@@ -55,7 +54,8 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
-import * as SessionLogStore from "./SessionLogStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as SessionLog from "./SessionLog.ts"
 import * as SessionStateStore from "./SessionStateStore.ts"
 import * as Turn from "./Turn.ts"
 import * as TurnActivity from "./TurnActivity.ts"
@@ -268,7 +268,7 @@ const pageSize = 100
 export const make = Effect.gen(function* () {
   const turnStore = yield* TurnStore.TurnStore
   const sessionStateStore = yield* SessionStateStore.SessionStateStore
-  const sessionLogStore = yield* SessionLogStore.SessionLogStore
+  const sessionLogs = yield* SessionLog.SessionLogs
   const notificationStore = yield* NotificationStore.NotificationStore
   const memberStore = yield* MemberStore.MemberStore
   const contactStore = yield* ContactStore.ContactStore
@@ -285,7 +285,7 @@ export const make = Effect.gen(function* () {
   const journal = yield* Journal.Journal
   const signalHub = yield* SignalHub.SignalHub
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const requireTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const found = yield* turnStore.get(turnId)
@@ -512,7 +512,7 @@ export const make = Effect.gen(function* () {
       participationId: latest.participationId,
       retry: null,
       acceptedThroughSequence: Math.max(...accepted.map(({ sequence }) => sequence)),
-      logAfter: yield* sessionLogStore.head(latest.participationId),
+      logAfter: Option.getOrNull(yield* sessionLogs.open(latest.participationId).head),
       createdAt: yield* DateTime.now
     })
     const event = yield* journal.publish(TurnFacts.Created, Object.assign({}, created, { notificationIds }))

@@ -9,10 +9,15 @@ agent examples below illustrate consumers rather than available application oper
 
 ## Ownership
 
+The log itself, its `Log` handles, its `Store` contract, the `Transaction` coordinator, and their
+entries, codecs, and errors, is the published package
+[`@amends-dev/log`](../packages/log/README.md), with a memory store and the suites every storage
+adapter runs. The journal builds facts, projections, checkpoints, and reactions over it in core.
+
 - **Fact** defines a domain statement's name, version, payload schema, required
   subject rule, optional occurrence identity, and optional audience.
-- **Log** provides typed appends, lookup, paged reads, finite streams, and live tails
-  for a log ID.
+- **Log** (the log package) provides typed appends, lookup, paged reads, entry reads by
+  name or subject, finite streams, and live tails for a log ID.
   Opening a handle performs no storage operation; the first append creates the
   log as needed. Reopening the same ID addresses the same history.
 - **Journal** binds a domain log to registered projections. Its public log view
@@ -24,18 +29,18 @@ agent examples below illustrate consumers rather than available application oper
   from the log, in checkpointed batches.
 - **Checkpoint** is the host-implemented store for rebuild progress, keyed by log ID,
   projection name, and projection version, and for each log's live projection versions.
-- **Transaction** coordinates implicit and explicit commits, nested calls,
+- **Transaction** (the log package) coordinates implicit and explicit commits, nested calls,
   publication ordering, failure tracking, and transaction lifetime.
-- **Store** is the host-implemented persistence contract. It supplies a native
+- **Store** (the log package) is the host-implemented persistence contract. It supplies a native
   transaction and enlists log writes, domain projection stores, and checkpoint writes. The
   transaction's `afterCommit(effect)` runs `effect` once it has committed and released what it
   held, never after a rollback; hosts use it to tell a reader that something the commit stored,
   such as a Cluster request, can be read now.
 
-The core imports Effect only. Hosts choose storage and provide `Store.Store`,
-`Checkpoint.Checkpoint`, and the domain store services used by projection handlers.
-`Log.layer` builds the common log service and transaction coordinator from that
-store, which is bound to one workspace.
+Core imports Effect and the log package. Hosts choose storage and provide `Store.Store`, bound to
+one workspace, the workspace it is bound to as `WorkspaceId.CurrentWorkspaceId`,
+`Checkpoint.Checkpoint`, and the domain store services used by projection handlers. `Log.layer`
+builds the common log service and transaction coordinator from that store.
 `Journal.layer({ logId, projections })` builds `Journal.Journal`, whose
 interface stays the same as projections are added. `Journal.make` remains available
 as its constructor and returns that same interface.
@@ -64,32 +69,26 @@ All normal writers to a domain log must use the same projection registrations.
 
 ## Storage envelope
 
-`Store.Content` separates optional `Event.Header` metadata from binary `payload`
-bytes. `Store.Entry` adds the entry ID, commit, log position, index, and recording
-time. The journal supplies the fact subject, name, version, and provenance as the header;
-only the domain payload is encoded through its fact schema. `Event.Envelope`
-remains the in-memory shape used by journal readers and projections, without a
-second binary wrapper in storage.
+`Store.Content` is an entry's binary `payload`, with an optional `name` and `subject` that
+storage indexes. `Store.Entry` adds the entry ID, commit, log position, index, and recording
+time. The journal's codec, `Event.storageCodec`, gives each fact's entry the fact's name and
+subject, and encodes its version and provenance into the bytes beside the payload its fact schema
+encodes. `Event.Envelope` remains the in-memory shape used by journal readers and projections.
 
-The PostgreSQL adapter stores `subject`, `fact_name`, and `fact_version` as columns in
-`log_entries`. Separate indexes cover workspace/log/name and workspace/log/subject,
-each ordered by position and entry index. Provenance's performer, cause, correlation,
-and occurrence time have separate columns. Workspace IDs in PostgreSQL
-provenance are reconstructed from the containing row; the journal store checks that
-every appended fact names the workspace before the adapter omits those repeated IDs. Neither adapter duplicates the
-fact header inside a second binary wrapper.
+The PostgreSQL adapter stores `name` and `subject` as columns in `log_entries`. Separate indexes
+cover workspace/log/name and workspace/log/subject, each ordered by position and entry index.
+Storage knows nothing of provenance: the journal checks that every fact it publishes names its
+workspace.
 
-Generic execution logs have no fact header and continue to encode their complete
-schema-defined value. `Log.open` defaults to `Codec.makeEntryCodec(schema)`;
-the journal explicitly selects `Event.storageCodec` to preserve the header.
-Opening a fact log with an ordinary payload codec fails on read rather than
-silently discarding its metadata. The storage adapter receives the distinction
+Generic execution logs have neither name nor subject and encode their complete schema-defined
+value. `Log.open` defaults to `Codec.makeEntryCodec(schema)`; the journal selects
+`Event.storageCodec`. Opening the journal's log with an ordinary codec fails on read, since its
+entries carry names, rather than misreading them. The storage adapter receives the distinction
 directly and never infers a new entry's kind by inspecting its bytes.
 
 Each adapter has one baseline for fresh local databases. Schema changes update
 that baseline and development databases are reset. There is no upgrade chain,
 legacy-envelope decoder, data backfill, or support for unattributed fact events.
-Generic execution logs still have no fact header.
 
 ## Fact subjects and filtered reads
 
@@ -101,15 +100,14 @@ cannot collide even when their IDs match. Subjects are local to the workspace;
 queries additionally select a log.
 
 Publication validates the decoded payload before deriving and validating its
-subject. It persists that subject on the header and exposes it on decoded events.
+subject. It stores that subject as the entry's subject and exposes it on decoded events.
 `Event.decode` checks the persisted subject against the fact's declaration,
 including during projection replay. Generic execution entries have no subject.
 All domain facts require one; there is no fallback or legacy null-subject path.
 
-`journal.read({ subject, after?, limit })` reads an entity's facts across names and
+`journal.log.readEntries({ subject, after?, limit })` reads an entity's facts across names and
 versions. A name can narrow that query, and name-only queries remain supported.
-At least one of subject or name is required; a version filter also requires a
-name. Pages use an exclusive `{ position, index }` cursor, so filtering or splitting
+At least one of subject or name is required. Pages use an exclusive `{ position, index }` cursor, so filtering or splitting
 one commit across pages cannot skip its remaining matching entries. Reads are
 bounded and ordered by that cursor. Use `Event.decode(fact, entry)` for payloads.
 
@@ -168,7 +166,7 @@ for the same record ID. Schema versions are excluded: publishing another version
 of an existing occurrence conflicts rather than creating a second occurrence.
 
 The key identifies one occurrence within a workspace and log. Another workspace
-or log has an independent key space. `Occurrence.Key` is that key, and every append's
+or log has an independent key space. The log package's `Store.IdempotencyKey` is that key, and every append's
 `idempotencyKey` takes it, whether a fact derives it or a caller gives it. Treat the
 fact name, identity components, and key encoding as persistence contracts. Definitions registered for
 the same fact name and version must share the payload schema, subject function, and occurrence
@@ -187,7 +185,7 @@ key fails with `StoreError` (`Rejected`); callers cannot override the declared i
 Use an explicit key for request-level retries of a repeatable fact:
 
 ```ts
-const options = { idempotencyKey: Occurrence.Key.make(operationId) }
+const options = { idempotencyKey: Store.IdempotencyKey.make(operationId) }
 const rename = Effect.gen(function* () {
   return yield* journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options)
 })
@@ -450,16 +448,14 @@ opens no transaction, sees staged entries inside a caller's transaction, and cha
 projection, or checkpoint state. Application authorization remains separate: notification source
 resolution checks ownership and current thread access before returning conversation content.
 
-`journal.read({ name, version?, after?, limit })` queries matching fact entries
-directly in storage. Omitting `version` includes every stored version of that name;
-supplying it selects an exact version. Results are `Log.Entry<Event.Envelope>`
-values, whose domain payload bytes can be decoded with the corresponding fact:
+`journal.log.readEntries({ name, after?, limit })` queries matching fact entries
+directly in storage, every stored version of that name. Results are
+`Log.Entry<Event.Envelope>` values, which decode with the corresponding fact:
 
 ```ts
 const readCreatedRoles = Effect.gen(function* () {
-  const entries = yield* journal.read({
+  const entries = yield* journal.log.readEntries({
     name: RoleFacts.Created.name,
-    version: RoleFacts.Created.version,
     limit: 100
   })
   return yield* Effect.forEach(entries, (entry) => Event.decode(RoleFacts.Created, entry))

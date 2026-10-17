@@ -41,7 +41,8 @@ contracts, in [core](../packages/core/README.md#memory) and the
 Both have one shape. A workspace binding owns one workspace's view of the database and its
 transaction boundary, and each store implements core's store contract over it: in the adapter, a
 module per store, such as `ThreadMessages.ts`, and in memory, each contract's `layerMemory`, over
-`Store.MemoryBinding`. `layerWorkspace` merges the adapter's stores over one binding, and
+`MemoryBinding.MemoryBinding`. The binding also gives core the workspace it is bound to, as
+`WorkspaceId.CurrentWorkspaceId`. `layerWorkspace` merges the adapter's stores over one binding, and
 `PostgresWorkspaceStorage` builds those views on demand as `WorkspaceStorage.WorkspaceStorage`, as
 `WorkspaceStorage.layerMemory` does in memory. Database tables and migrations belong to the adapter;
 domain records and store contracts belong to core. `PostgresStorage.layer` composes workspace

@@ -4,52 +4,52 @@
  * located by its log, position, and index, and each log's positions are its own. `Log` and `Store`
  * build their entries on this metadata.
  *
- * @since 0.1.0
+ * @since 0.2.0
  */
 
 import * as Schema from "effect/Schema"
 import * as Commit from "./Commit.ts"
 
 /**
- * Names one log entry within its workspace. A fact event's ID is its entry's.
+ * Names one log entry within the store. A reader that keeps an entry's ID can find it again with
+ * `Log.getEntry`.
  *
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const EntryId = Schema.NonEmptyString.pipe(Schema.brand("LogEntryId"))
 
 /**
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export type EntryId = typeof EntryId.Type
 
 /**
- * Names a log within a workspace, such as the workspace journal's. Reopening the same ID addresses
- * the same history.
+ * Names a log within the store. Reopening the same ID addresses the same history.
  *
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const LogId = Schema.NonEmptyString.pipe(Schema.brand("LogId"))
 
 /**
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export type LogId = typeof LogId.Type
 
 /**
- * A commit's position within one log. Different logs have independent cursors.
+ * A commit's position within one log, from 0. Different logs have independent positions.
  *
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const Position = Schema.Natural.pipe(Schema.brand("LogPosition"))
 
 /**
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export type Position = typeof Position.Type
 
@@ -58,7 +58,7 @@ export type Position = typeof Position.Type
  * when.
  *
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const Metadata = Schema.Struct({
   id: EntryId,
@@ -72,6 +72,6 @@ export const Metadata = Schema.Struct({
 
 /**
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}

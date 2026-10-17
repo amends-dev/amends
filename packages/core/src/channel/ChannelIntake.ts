@@ -25,7 +25,6 @@ import * as Identity from "../identity/Identity.ts"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
 import * as Task from "../task/Task.ts"
@@ -39,6 +38,7 @@ import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts"
 import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import type * as Channel from "./Channel.ts"
 import type * as ChannelBinding from "./ChannelBinding.ts"
 import * as ChannelBindingStore from "./ChannelBindingStore.ts"
@@ -157,7 +157,7 @@ export const make = Effect.gen(function* () {
   const taskCommand = yield* TaskCommand.TaskCommand
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** Run `step` in its own commit, attributed to the contact `contactId`. */
   const asContact = <A, E, R>(contactId: Identity.ContactId, step: Effect.Effect<A, E, R>) =>

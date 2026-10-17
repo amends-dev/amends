@@ -2,7 +2,7 @@
  * Storage held in this process's memory, the reference implementation of every storage contract:
  * it enforces with plain maps what the PostgreSQL adapter enforces with keys and indexes. It keeps
  * every workspace's logs, projected records, and read state, and every host connected to it shares
- * them; nothing survives the process. A host connects through a `Connection`; `Store.layerMemory`
+ * them; nothing survives the process. A host connects through a `Connection`; `MemoryBinding.layer`
  * binds one workspace over it, which each store's `layerMemory` reads and writes through; and the
  * gateway's memory accounts, directory, and sign-in storage keep their `table`s beside it.
  * `makeRows` is how every memory store keeps its records.
@@ -10,6 +10,7 @@
  * @since 0.1.0
  */
 
+import { MemoryStore } from "@amends-dev/log"
 import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -18,35 +19,6 @@ import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
 import * as LocalSignalHub from "../signal/LocalSignalHub.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
-import type * as Commit from "./Commit.ts"
-import type * as Entry from "./Entry.ts"
-import type * as Store from "./Store.ts"
-
-/**
- * One commit's entries in one log, at one position. Stored batches are never changed: a commit's
- * further appends to the log replace its batch with a longer one in the transaction's snapshot.
- *
- * @category models
- * @since 0.1.0
- */
-export interface Batch {
-  readonly position: Entry.Position
-  readonly commitId: Commit.CommitId
-  readonly entries: ReadonlyArray<Store.Entry>
-}
-
-/**
- * The slice of a batch one keyed append wrote: its commit, and where in the batch its entries
- * begin and how many there are. The memory `Store` returns it as the append's receipt.
- *
- * @category models
- * @since 0.1.0
- */
-export interface Append {
-  readonly commitId: Commit.CommitId
-  readonly firstIndex: number
-  readonly entryCount: number
-}
 
 /**
  * Rows of one kind: the JSON of each record's encoded form, by ID. `makeRows` encodes and
@@ -94,12 +66,8 @@ export class Records implements Iterable<Table> {
  * @since 0.1.0
  */
 export interface Space {
-  /** Every commit to the workspace's logs by ID, with its entry count. */
-  readonly commits: Map<string, Commit.Commit>
-  /** Each log's batches in position order. */
-  readonly logs: Map<string, ReadonlyArray<Batch>>
-  /** Keyed append slices by log and key. */
-  readonly appends: Map<string, Append>
+  /** The workspace's logs: its commits, each log's batches, and the slices keyed appends wrote. */
+  readonly logs: MemoryStore.Space
   /**
    * Projected records by kind, with the progress of projections being rebuilt and the versions
    * that are live. A rebuild discards these; the journal restores them.
@@ -119,7 +87,7 @@ export interface Space {
 
 /**
  * The storage every connected host shares: each workspace's committed state and who is writing
- * it, the session logs, and the tables and locks beside them. `make` builds an empty one and
+ * it, and the tables and locks beside them. `make` builds an empty one and
  * `layer` provides it; a host connects through a `Connection`.
  *
  * @category services
@@ -136,11 +104,6 @@ export class MemoryDatabase extends Context.Service<
      */
     readonly writers: Map<WorkspaceId.WorkspaceId, object>
     /**
-     * Each participation's session log by workspace and participation: its entries' JSON in position
-     * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
-     */
-    readonly sessionLogs: Map<string, ReadonlyArray<string>>
-    /**
      * Tables beside the workspaces' state, by name, each created on first use: what a host stores
      * across its workspaces, such as its accounts, as JSON rows by ID.
      */
@@ -150,7 +113,7 @@ export class MemoryDatabase extends Context.Service<
      * transaction until it ends, and whatever else changes one at a time.
      */
     readonly locks: Map<string, Semaphore.Semaphore>
-    /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
+    /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
     appended: Deferred.Deferred<void>
     /** Every workspace's signals, across every host; signals themselves are never kept. */
     readonly signals: LocalSignalHub.LocalSignalHub
@@ -166,9 +129,7 @@ export class MemoryDatabase extends Context.Service<
  * @since 0.1.0
  */
 export const empty = (): Space => ({
-  commits: new Map(),
-  logs: new Map(),
-  appends: new Map(),
+  logs: MemoryStore.empty(),
   records: new Records(),
   threadPositions: new Map(),
   groupTimes: new Map(),
@@ -185,9 +146,7 @@ export const empty = (): Space => ({
  * @since 0.1.0
  */
 export const copy = (space: Space): Space => ({
-  commits: new Map(space.commits),
-  logs: new Map(space.logs),
-  appends: new Map(space.appends),
+  logs: MemoryStore.copy(space.logs),
   records: space.records.copy(),
   threadPositions: new Map(space.threadPositions),
   groupTimes: new Map(space.groupTimes),
@@ -293,16 +252,7 @@ export const commit = (
   written: Written
 ) => {
   const current = committed(database, workspaceId)
-  const logs = new Map(current.logs)
-  for (const logId of written.logs) {
-    const batches = staged.logs.get(logId)
-    if (batches !== undefined) logs.set(logId, batches)
-  }
-  const shared = {
-    logs,
-    commits: new Map([...current.commits, ...staged.commits]),
-    appends: new Map([...current.appends, ...staged.appends])
-  }
+  const shared = { logs: MemoryStore.commit(current.logs, staged.logs, written.logs) }
   database.spaces.set(
     workspaceId,
     written.workspace
@@ -316,8 +266,9 @@ export const commit = (
 }
 
 /**
- * A log's writer lock, created on first use. The memory `Store` takes it on a transaction's first
- * append to the log, or lookup of one of its keys, and releases it when the transaction ends.
+ * A log's writer lock, created on first use: what `MemoryBinding` gives the memory store as its
+ * `logLock`, which a transaction takes on its first append to the log, or lookup of one of its
+ * keys, and releases when it ends.
  *
  * @category getters
  * @since 0.1.0
@@ -326,9 +277,8 @@ export const logLock = (database: MemoryDatabase["Service"], workspaceId: Worksp
   lock(database, JSON.stringify(["log", workspaceId, logId]))
 
 /**
- * Wake every reader waiting for an append, after a commit with entries or a session log append;
- * the memory `Store` and `SessionLogStore` wait on `appended`
- * for their `waitForAppend`.
+ * Wake every reader waiting for an append, after a commit with entries; the memory store waits on
+ * `appended` for its `waitForAppend`.
  *
  * @category mutations
  * @since 0.1.0
@@ -350,7 +300,6 @@ export const make = Effect.gen(function* () {
   return MemoryDatabase.of({
     spaces: new Map(),
     writers: new Map(),
-    sessionLogs: new Map(),
     tables: new Map(),
     locks: new Map(),
     appended: yield* Deferred.make<void>(),
@@ -370,7 +319,7 @@ export const layer = Layer.effect(MemoryDatabase, make)
 /**
  * One host's connection to the storage, like one database connection: the storage it reaches, and
  * the gate the host's transactions take turns on, whichever workspace they write.
- * `Store.layerMemory` binds a workspace over it, and the gateway's `WorkspaceStorage.layerMemory`
+ * `MemoryBinding.layer` binds a workspace over it, and the gateway's `WorkspaceStorage.layerMemory`
  * requires it.
  *
  * @category services
@@ -461,7 +410,7 @@ export const compareBinary = (left: string, right: string): number => {
 
 /**
  * A composite key for maps, unambiguous whatever its parts contain: the read-state maps key by
- * member and thread or group, and the journal's append slices by log and idempotency key.
+ * member and thread or group, and checkpoints by log and projection.
  *
  * @category constructors
  * @since 0.1.0

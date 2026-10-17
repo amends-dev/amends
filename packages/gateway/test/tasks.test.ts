@@ -3,7 +3,7 @@ import { Assignment, AssignmentFacts, Grant, type Permission, type Target } from
 import { CoreError } from "@amends-dev/core/error"
 import { GroupService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Publication } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { Request } from "@amends-dev/core/request"
 import { type Task, TaskPermissions, TaskService } from "@amends-dev/core/task"
@@ -16,6 +16,7 @@ import {
   ThreadId
 } from "@amends-dev/core/thread"
 import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
+import { Entry } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -49,7 +50,7 @@ describe("tasks", () => {
     effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(core(bound))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
@@ -76,7 +77,7 @@ describe("tasks", () => {
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
-          workspaceId: bound.store.workspaceId,
+          workspaceId: bound.workspaceId,
           assignmentId: Assignment.AssignmentId.make(`${memberId}:${permission.name}:${JSON.stringify(target)}`),
           memberId,
           source: { _tag: "Direct", grant: Grant.make(permission, { _tag: "Target", target }) }
@@ -90,7 +91,7 @@ describe("tasks", () => {
         journal.commit(
           Effect.forEach([humanId, otherId, agentId], (memberId) =>
             journal.publish(MemberFacts.Added, {
-              workspaceId: bound.store.workspaceId,
+              workspaceId: bound.workspaceId,
               memberId,
               identity: identityFor(memberId),
               name: Member.Name.make(memberId)

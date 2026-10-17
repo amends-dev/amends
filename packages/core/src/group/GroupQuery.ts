@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -16,7 +17,6 @@ import * as Schema from "effect/Schema"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as GroupId from "./GroupId.ts"
 import type * as GroupMembership from "./GroupMembership.ts"
 import * as GroupMembershipStore from "./GroupMembershipStore.ts"

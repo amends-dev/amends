@@ -25,13 +25,13 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as Request from "../request/Request.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
 import type * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
@@ -176,7 +176,7 @@ export const make = Effect.gen(function* () {
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
   const signalHub = yield* SignalHub.SignalHub
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   /**
    * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
    * from its author and key, so a retry names the message its first attempt published.

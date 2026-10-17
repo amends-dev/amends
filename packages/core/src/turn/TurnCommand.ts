@@ -8,6 +8,8 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -17,8 +19,6 @@ import type * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
 import type * as Projection from "../journal/Projection.ts"
 import type * as Publication from "../journal/Publication.ts"
-import type * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as ThreadCommand from "../thread/ThreadCommand.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
 import type * as ThreadMessageId from "../thread/ThreadMessageId.ts"

@@ -1,27 +1,27 @@
-import { Entry, Occurrence, Store } from "@amends-dev/core/journal"
 import { describe, expect, it } from "@effect/vitest"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import * as Option from "effect/Option"
+import * as Entry from "../../Entry.ts"
+import * as Store from "../../Store.ts"
 import type * as Fixture from "../Fixture.ts"
-import * as Support from "../Support.ts"
 
 const execution = Entry.LogId.make("execution")
 const byValue = (left: number | undefined, right: number | undefined) => (left ?? 0) - (right ?? 0)
 const entry = (byte: number): Store.Content => ({ payload: new Uint8Array([byte]) })
-const alone = (bound: Support.Bound, byte: number, options: Store.AppendOptions = {}) =>
-  bound.store.append(Object.assign({ logId: execution, entries: [entry(byte)] }, options))
+const alone = (store: Store.Store["Service"], byte: number, options: Store.AppendOptions = {}) =>
+  store.append(Object.assign({ logId: execution, entries: [entry(byte)] }, options))
 
 /**
- * Hold a transaction open on the bound workspace until released, after it appends to the given
- * logs; the fiber ends with its commit or rollback.
+ * Hold a transaction open on the store until released, after it appends to the given logs; the
+ * fiber ends with its commit or rollback.
  */
-const holding = (bound: Support.Bound, logs: ReadonlyArray<Entry.LogId>, outcome: "commit" | "rollback") =>
+const holding = (store: Store.Store["Service"], logs: ReadonlyArray<Entry.LogId>, outcome: "commit" | "rollback") =>
   Effect.gen(function* () {
     const entered = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
-    const fiber = yield* bound.store
+    const fiber = yield* store
       .transaction(
         Effect.gen(function* () {
           const storeTransaction = yield* Store.Transaction
@@ -39,23 +39,23 @@ const holding = (bound: Support.Bound, logs: ReadonlyArray<Entry.LogId>, outcome
 /** Appends outside any transaction, which wait only for their log's other writers. */
 export const standaloneAppends = (fixture: Fixture.Fixture) => {
   describe.skipIf(!fixture.available)(`${fixture.name}: standalone appends`, () => {
-    it.effect("a standalone append commits while another host's transaction holds the workspace", () =>
+    it.effect("a standalone append commits while another host's transaction holds the store", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const writer = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
-          const other = yield* Support.forWorkspace(yield* storage.connect({ failFast: true }), Support.workspaceId)
+          const writer = yield* storage.connect()
+          const other = yield* storage.connect({ failFast: true })
           const held = yield* holding(writer, [Entry.LogId.make("background")], "commit")
           const [appended] = yield* alone(other, 1)
           expect(appended).toMatchObject({ logId: execution, position: 0, index: 0 })
-          // The workspace itself is still busy for a transaction.
-          expect(yield* Effect.flip(other.store.transaction(Effect.void))).toMatchObject({
+          // The store itself is still busy for a transaction.
+          expect(yield* Effect.flip(other.transaction(Effect.void))).toMatchObject({
             _tag: "StoreError",
             store: "Store",
             reason: { _tag: "Contended" }
           })
           yield* held.release
           expect((yield* held.done)._tag).toBe("Success")
-          const [batch] = yield* writer.store.read(execution, { limit: 10 })
+          const [batch] = yield* writer.read(execution, { limit: 10 })
           expect(batch?.entries).toEqual([appended])
           expect(batch?.commit).toMatchObject({ id: appended?.commitId, entryCount: 1 })
         })
@@ -65,21 +65,19 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
     it.effect("standalone appends from several hosts take consecutive positions, and none is lost", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const hosts = yield* Effect.forEach([1, 2, 3], () =>
-            Effect.flatMap(storage.connect(), (host) => Support.forWorkspace(host, Support.workspaceId))
-          )
+          const hosts = yield* Effect.forEach([1, 2, 3], () => storage.connect())
           const bytes = hosts.flatMap((_, host) => [0, 1, 2, 3, 4].map((n) => host * 10 + n))
           yield* Effect.forEach(
             bytes,
             (byte) => {
-              const bound = hosts[Math.floor(byte / 10)]
-              return bound === undefined ? Effect.die("Missing host") : alone(bound, byte)
+              const store = hosts[Math.floor(byte / 10)]
+              return store === undefined ? Effect.die("Missing host") : alone(store, byte)
             },
             { concurrency: "unbounded" }
           )
           const [first] = hosts
           if (first === undefined) return yield* Effect.die("Missing host")
-          const batches = yield* first.store.read(execution, { limit: 100 })
+          const batches = yield* first.read(execution, { limit: 100 })
           expect(batches.map((batch) => batch.position)).toEqual(bytes.map((_, index) => index))
           expect(new Set(batches.map((batch) => batch.commit.id)).size).toBe(bytes.length)
           expect(batches.flatMap((batch) => batch.entries.map((e) => e.payload[0])).toSorted(byValue)).toEqual(
@@ -92,15 +90,15 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
     it.live("a transaction holding a log keeps its standalone appends waiting, and only those", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const writer = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
-          const other = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
+          const writer = yield* storage.connect()
+          const other = yield* storage.connect()
           for (const outcome of ["commit", "rollback"] as const) {
-            const before = yield* writer.store.head(execution)
+            const before = yield* writer.head(execution)
             const next = Option.match(before, { onNone: () => 0, onSome: (p) => p + 1 })
             const held = yield* holding(writer, [execution], outcome)
             const waiting = yield* Effect.forkChild(alone(other, 9))
             // Another log is not held, so its append goes ahead meanwhile.
-            yield* other.store.append({
+            yield* other.append({
               logId: Entry.LogId.make("unrelated"),
               entries: [entry(1)]
             })
@@ -112,7 +110,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
             // It follows the transaction's batch when that commits, or takes its place.
             expect(appended?.position).toBe(outcome === "commit" ? next + 1 : next)
           }
-          const positions = (yield* writer.store.read(execution, { limit: 10 })).map((batch) => batch.position)
+          const positions = (yield* writer.read(execution, { limit: 10 })).map((batch) => batch.position)
           expect(positions).toEqual([0, 1, 2])
         })
       )
@@ -121,15 +119,15 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
     it.live("a key a transaction looked up stays free until it commits, then answers the retry", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const writer = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
-          const other = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
-          const key = Occurrence.Key.make("output")
+          const writer = yield* storage.connect()
+          const other = yield* storage.connect()
+          const key = Store.IdempotencyKey.make("output")
           const looked = yield* Deferred.make<void>()
           const release = yield* Deferred.make<void>()
-          const transaction = yield* writer.store
+          const transaction = yield* writer
             .transaction(
               Effect.gen(function* () {
-                expect(yield* writer.store.getAppend(execution, key)).toEqual(Option.none())
+                expect(yield* writer.getAppend(execution, key)).toEqual(Option.none())
                 yield* Deferred.succeed(looked, undefined)
                 yield* Deferred.await(release)
                 const storeTransaction = yield* Store.Transaction
@@ -149,7 +147,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
           yield* Deferred.succeed(release, undefined)
           const written = yield* Fiber.join(transaction)
           expect(yield* Fiber.join(retry)).toEqual(written)
-          expect((yield* writer.store.read(execution, { limit: 10 })).length).toBe(1)
+          expect((yield* writer.read(execution, { limit: 10 })).length).toBe(1)
         })
       )
     )
@@ -157,9 +155,9 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
     it.effect("keys and expected positions hold across standalone and transaction appends", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const writer = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
-          const other = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
-          const key = Occurrence.Key.make("output-1")
+          const writer = yield* storage.connect()
+          const other = yield* storage.connect()
+          const key = Store.IdempotencyKey.make("output-1")
           const original = yield* alone(other, 1, { idempotencyKey: key })
           expect(yield* alone(writer, 1, { idempotencyKey: key })).toEqual(original)
           expect(yield* Effect.flip(alone(writer, 2, { idempotencyKey: key }))).toMatchObject({
@@ -175,7 +173,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
           // A transaction already open when another host appends still sees that append.
           const entered = yield* Deferred.make<void>()
           const appended = yield* Deferred.make<void>()
-          const transaction = yield* writer.store
+          const transaction = yield* writer
             .transaction(
               Effect.gen(function* () {
                 yield* Deferred.succeed(entered, undefined)
@@ -184,7 +182,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
                 const retried = yield* storeTransaction.append({
                   logId: execution,
                   entries: [entry(3)],
-                  idempotencyKey: Occurrence.Key.make("output-2")
+                  idempotencyKey: Store.IdempotencyKey.make("output-2")
                 })
                 const next = yield* storeTransaction.append({
                   logId: execution,
@@ -197,7 +195,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
             .pipe(Effect.forkChild)
           yield* Deferred.await(entered)
           const [second] = yield* alone(other, 3, {
-            idempotencyKey: Occurrence.Key.make("output-2"),
+            idempotencyKey: Store.IdempotencyKey.make("output-2"),
             expectedAfter: Option.some(Entry.Position.make(0))
           })
           yield* Deferred.succeed(appended, undefined)
@@ -206,10 +204,10 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
           expect(next[0]?.position).toBe(2)
           expect(
             yield* Effect.flip(
-              writer.store.transaction(Effect.suspend(() => writer.store.append({ logId: execution, entries: [] })))
+              writer.transaction(Effect.suspend(() => writer.append({ logId: execution, entries: [] })))
             )
           ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } })
-          expect((yield* writer.store.read(execution, { limit: 10 })).length).toBe(3)
+          expect((yield* writer.read(execution, { limit: 10 })).length).toBe(3)
         })
       )
     )

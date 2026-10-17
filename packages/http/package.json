@@ -17,5 +17,8 @@
     "@amends-dev/core": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@amends-dev/log": "workspace:*"
   }
 }

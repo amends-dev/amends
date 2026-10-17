@@ -25,7 +25,7 @@ The package root composes one workspace's core:
 - `Operations` is the set of services a gateway runs for an actor. Programs may require only these,
   so they cannot bypass the membership and permission checks each operation performs.
 - `JobServices` is what a host's jobs call as no actor: `TurnExecution`, `ChannelIntake`,
-  `DeliveryExecution`, and the `SessionLogStore` a turn's job writes. They act as the agent, the
+  `DeliveryExecution`, and the `SessionLog.SessionLogs` a turn's job writes. They act as the agent, the
   contact, or delivery itself and check no actor's permissions, so only jobs a host trusts run them.
 - `journalLog` names the workspace journal's log; a workspace that was never created has no batch in
   it, which hosts can check without booting the workspace.
@@ -42,7 +42,7 @@ implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journ
 | `workspace`     | Workspace metadata and initialization, with members, invitations, ownership, and settings.                                |
 | `authorization` | Access evaluation and permissions, with roles and assignments.                                                            |
 | `identity`      | Human, agent, and contact references, actors, and performers.                                                             |
-| `journal`       | The log, transactions, facts, codecs, projections, and reactions every domain publishes through.                          |
+| `journal`       | The facts, projections, checkpoints, and reactions every domain publishes through, over the log package's logs.           |
 | `group`         | Team and direct groups, admissions, follows, public discovery and joining, and the audience check. See [groups](#groups). |
 | `thread`        | Threads, participation, messages, and timeline activity. See [threads](#threads).                                         |
 | `task`          | The work a thread tracks: its status, priority, and assignee. See [tasks](#tasks).                                        |
@@ -101,9 +101,9 @@ repeatable changes need a request or occurrence ID, or return `null`. Facts regi
 name and version share their payload schema, subject, and occurrence functions. See
 [idempotent publication](../../docs/journal.md#idempotent-publication-and-append).
 
-The storage envelope separates `Event.Header` (subject, name, version, provenance) from encoded
-payload bytes, so storage keeps the header in columns. Read matching history with
-`journal.read({ subject?, name?, version?, after?, limit })`, giving a subject, a name, or both,
+A fact's entry carries its subject and name, which storage indexes, and its version and
+provenance in its bytes beside the encoded payload. Read matching history with
+`journal.log.readEntries({ subject?, name?, after?, limit })`, giving a subject, a name, or both,
 with a `{ position, index }` cursor, and decode payloads with `Event.decode(fact, entry)`. An
 execution-log append outside a commit goes through `Store.append`, a commit of its own that waits
 only for the log's other writers; see
@@ -468,9 +468,10 @@ way a turn ends, including a queued turn stopped by a reader, goes through `Turn
 which publishes the turn's fact and records `turn.ended` in its thread's timeline in the ending
 commit.
 
-Each participation has a session log, the record of the agent's conversation in the thread, apart
-from the journal and every commit (`SessionLogStore`: `head`, `append` after the position the writer
-read to, which a log past it refuses with `Overtaken`, `read` past a position, and `waitForAppend`).
+Each participation has a session log, the record of the agent's conversation in the thread: one of
+the workspace's logs, apart from the journal, which `SessionLog.SessionLogs` opens and a run appends
+to outside every commit, each batch after the one it wrote last (`expectedAfter`), so a log another
+run wrote past refuses it. Its entries are stored as JSON.
 Its entries (`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming
 its turn, `Prompted`, `Started` when a run started the turn, on which harness agent and with what
 continues the turn when the agent gives that, each `Step`, and `Interrupted` when a run stopped
@@ -623,23 +624,25 @@ Nothing survives the process.
 
 Every store contract builds its store with `make(workspaceId, driver)`, over the driver an adapter
 implements: the store checks each input against its schema, and a record against the workspace,
-through `StoreInput`, before the driver sees it. The checkpoint and session log stores, whose inputs
-name no workspace, take the driver alone, and `Store.make` reads the workspace from its driver. A
+through the log package's `StoreInput`, with `WorkspaceId.rejectForeign`, before the driver sees
+it. The checkpoint store, whose inputs name no workspace, takes the driver alone,
+as the log package's `Store.make` does. A
 driver keeps only what storage keeps, such as reused IDs and conditional writes, which it rejects
 with `StoreError` (`Rejected`), and an adapter's module returns the contract's `make` over its
 driver from its constructor, as each `layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
-  workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
+  workspace has one `Space`: its logs, as the log package's `MemoryStore.Space`, projected records by
   kind, with the live projection versions and rebuild checkpoints, and private read state. Beside
   the workspaces sit the session logs, and tables and locks by name, created on first use, for what
   a host stores across its workspaces, such as its accounts. `MemoryDatabase.makeRows` is how a
   store keeps one kind of record.
 - `MemoryDatabase.Connection` is one host's connection: its transactions take turns on a
   one-permit gate, as on one database connection.
-- `Store.layerMemory(workspaceId)` binds one workspace over the connection: it provides the
-  workspace's logs and the `Store.MemoryBinding` that every other store's `layerMemory`, and the
-  signal hub's, reads and writes through. The gateway's
+- `MemoryBinding.layer(workspaceId)` binds one workspace over the connection: it provides the
+  workspace's log store, the log package's `MemoryStore` over the same transactions, its
+  `WorkspaceId.CurrentWorkspaceId`, and the `MemoryBinding` that every other store's `layerMemory`,
+  and the signal hub's, reads and writes through. The gateway's
   [memory workspace storage](../gateway/README.md#memory) merges them all for each workspace it
   opens.
 
@@ -700,7 +703,7 @@ only kinds; see [errors by kind](#errors-by-kind). Every store fails with one `S
 operation, whose reason says whether storage `Failed`, `Rejected` a write, or was `Contended`; an
 operation reports contention as `CoreError.Unavailable` and the rest as defects. Any other
 error belongs to the module that raises it, and its tag is its name there, as
-`SessionLogStore.Overtaken`. Helpers no consumer imports go under `internal/`.
+`ThreadCommand.PositionChanged`. Helpers no consumer imports go under `internal/`.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

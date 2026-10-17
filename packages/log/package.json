@@ -1,0 +1,52 @@
+{
+  "name": "@amends-dev/log",
+  "version": "0.2.0",
+  "description": "Typed append-only logs over host storage: positions, commits that span logs, idempotent appends, paged reads, and live tails, with a memory implementation and the suites every adapter runs.",
+  "keywords": [
+    "append-only",
+    "effect",
+    "event-sourcing",
+    "journal",
+    "log",
+    "storage"
+  ],
+  "homepage": "https://github.com/amends-dev/amends/tree/main/packages/log#readme",
+  "bugs": {
+    "url": "https://github.com/amends-dev/amends/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amends-dev/amends.git",
+    "directory": "packages/log"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./conformance": "./src/conformance/index.ts",
+    "./conformance/internal/*": null,
+    "./*": "./src/*.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@effect/vitest": {
+      "optional": true
+    }
+  }
+}

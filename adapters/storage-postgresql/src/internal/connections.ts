@@ -10,7 +10,7 @@
 
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection, ConnectionStore } from "@amends-dev/core/connection"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

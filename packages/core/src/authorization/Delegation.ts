@@ -11,6 +11,7 @@
  * @since 0.1.0
  */
 
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -19,10 +20,8 @@ import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as WorkspaceStore from "../workspace/WorkspaceStore.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentPermissions from "./AssignmentPermissions.ts"
@@ -152,14 +151,14 @@ export const make: Effect.Effect<
   | RoleStore.RoleStore
   | Authorization.Authorization
   | PermissionCatalog.PermissionCatalog
-  | Store.Store
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
   const assignmentStore = yield* AssignmentStore.AssignmentStore
   const roleStore = yield* RoleStore.RoleStore
   const authorization = yield* Authorization.Authorization
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const readOwnerId = Effect.fn("Delegation.readOwnerId")(function* () {
     const found = yield* workspaceStore.get
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing")

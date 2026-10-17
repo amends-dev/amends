@@ -1,7 +1,6 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import { Entry, Store } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
 import {
   Invitation,
@@ -11,6 +10,7 @@ import {
   type WorkspaceId,
   MemberId
 } from "@amends-dev/core/workspace"
+import { Entry, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"

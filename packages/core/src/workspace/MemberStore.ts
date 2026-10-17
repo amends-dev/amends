@@ -6,6 +6,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -13,13 +16,11 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Identity from "../identity/Identity.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as Member from "./Member.ts"
 import * as MemberId from "./MemberId.ts"
-import type * as WorkspaceId from "./WorkspaceId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * The membership store, bound to one workspace by the host: what a storage adapter implements for
@@ -92,7 +93,7 @@ export class MemberStore extends Context.Service<
  */
 export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: MemberStore["Service"]): MemberStore["Service"] => {
   const read = StoreInput.read("MemberStore")
-  const write = StoreInput.write("MemberStore", workspaceId)
+  const write = StoreInput.write("MemberStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (memberId) => Effect.flatMap(read("get", MemberId.MemberId, memberId), driver.get),
     getMany: (memberIds) => Effect.flatMap(read("getMany", Schema.Array(MemberId.MemberId), memberIds), driver.getMany),
@@ -127,7 +128,7 @@ const isActive = (member: Member.Member, identity: Identity.MemberReference) =>
  * Memberships, active and removed; one active membership per identity.
  */
 const makeMemory = Effect.fn("MemberStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const all = (operation: string) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("members"))).pipe(
       Effect.mapError(StoreError.failed("MemberStore", operation))
@@ -189,7 +190,7 @@ const makeMemory = Effect.fn("MemberStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `MemberStore` in process memory, over the workspace's `Store.MemoryBinding`: memberships,
+ * Provide `MemberStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: memberships,
  * active and removed. It keeps what the contract leaves to storage: a reused ID is rejected, and
  * so is a second active membership for one identity; renaming and removing are rejected unless the
  * membership is stored and active. `make` checks every input first.

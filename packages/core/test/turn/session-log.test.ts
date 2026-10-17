@@ -1,8 +1,9 @@
-import { ThreadMessageId } from "@amends-dev/core/thread"
+import { ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { TurnId } from "@amends-dev/core/turn"
 import type { StreamPart } from "@amends-dev/harness"
+import { Commit, Entry, type Log } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
-import { DateTime } from "effect"
+import { DateTime, Option } from "effect"
 import { Prompt } from "effect/ai"
 import * as SessionLog from "../../src/turn/SessionLog.ts"
 import * as Turn from "../../src/turn/Turn.ts"
@@ -59,9 +60,24 @@ const started: SessionLog.Entry = {
   agentState: { turn: "turn-1" }
 }
 
+const logId = SessionLog.logIdOf(ThreadParticipationId.ThreadParticipationId.make("participation-1"))
+/** Each entry as a batch of its own from position `first`, as runs that append one at a time leave them. */
+const batchesOf = (entries: ReadonlyArray<SessionLog.Entry>, first = 0): Array<Log.Batch<SessionLog.Entry>> =>
+  entries.map((payload, offset) => {
+    const position = Entry.Position.make(first + offset)
+    const commit = { id: Commit.CommitId.make(`commit-${position}`), entryCount: 1, recordedAt: at }
+    const id = Entry.EntryId.make(`entry-${position}`)
+    return {
+      logId,
+      position,
+      commit,
+      entries: [{ id, logId, position, commitId: commit.id, index: 0, recordedAt: at, payload }]
+    }
+  })
+
 const itemsOf = (entries: ReadonlyArray<SessionLog.Entry>, ended?: ReadonlyArray<ThreadMessageId.ThreadMessageId>) => {
-  const reader = SessionLog.reader(turnId, 0)
-  reader.add(entries.map((entry, index) => ({ position: index + 1, recordedAt: at, entry })))
+  const reader = SessionLog.reader(turnId, Option.none())
+  reader.add(batchesOf(entries))
   if (ended !== undefined) reader.end(ended)
   return reader.items()
 }
@@ -104,16 +120,12 @@ describe("a turn's log items", () => {
 
   it("take the turn's entries past where its log begins, and know how far they read", () => {
     const other = TurnId.TurnId.make("turn-0")
-    const reader = SessionLog.reader(turnId, 2)
-    const recorded = [prompted("Ada: Earlier.", other), step("a", writing("Old."), other)].map((entry, index) => ({
-      position: index + 1,
-      recordedAt: at,
-      entry
-    }))
-    reader.add([...recorded, { position: 3, recordedAt: at, entry: prompted() }])
-    reader.add([{ position: 3, recordedAt: at, entry: prompted() }])
-    reader.add([{ position: 4, recordedAt: at, entry: step("b", writing("Half")) }])
-    expect(reader.position()).toBe(4)
+    // The earlier turn's entries are at positions 0 and 1, before the turn's log begins.
+    const reader = SessionLog.reader(turnId, Option.some(Entry.Position.make(1)))
+    reader.add(batchesOf([prompted("Ada: Earlier.", other), step("a", writing("Old."), other), prompted()]))
+    reader.add(batchesOf([prompted()], 2))
+    reader.add(batchesOf([step("b", writing("Half"))], 3))
+    expect(reader.position()).toEqual(Option.some(3))
     expect(reader.items().map(({ _tag }) => _tag)).toEqual(["InputTaken", "Responded"])
   })
 

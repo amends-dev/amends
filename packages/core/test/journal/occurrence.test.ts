@@ -1,16 +1,15 @@
 import { Subject } from "@amends-dev/core/journal"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
-import * as Occurrence from "../../src/journal/Occurrence.ts"
 import * as Projection from "../../src/journal/Projection.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { Counter, make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
@@ -41,13 +40,19 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint | Publication.Publication
+    | Log.Log
+    | Transaction.Transaction
+    | Counter
+    | Checkpoint.Checkpoint
+    | Publication.Publication
+    | WorkspaceId.CurrentWorkspaceId
   >
 ) =>
   program.pipe(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter)
   )
@@ -68,7 +73,7 @@ it.effect("occurrence tuples have a stable, namespaced encoding without delimite
     })
     yield* Effect.gen(function* () {
       const key = yield* Fact.makeOccurrenceKey(Received, input)
-      expect(key).toBe(Occurrence.Key.make('fact:["counter.received",["provider","message"]]'))
+      expect(key).toBe(Store.IdempotencyKey.make('fact:["counter.received",["provider","message"]]'))
       expect(yield* Fact.makeOccurrenceKey(version2, input)).toBe(key)
       const keys = yield* Effect.all([
         Fact.makeOccurrenceKey(Received, { ...input, source: "a:b", requestId: "c" }),
@@ -160,7 +165,7 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup
-          const manual = Occurrence.Key.make("manual-request")
+          const manual = Store.IdempotencyKey.make("manual-request")
           expect(yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: manual }))).toMatchObject({
             _tag: "StoreError",
             reason: { _tag: "Rejected" }

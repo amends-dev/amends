@@ -7,18 +7,19 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as Ownership from "./Ownership.ts"
 import * as Workspace from "./Workspace.ts"
-import type * as WorkspaceId from "./WorkspaceId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 import * as WorkspaceSettings from "./WorkspaceSettings.ts"
 
 /**
@@ -65,7 +66,7 @@ export const make = (
   workspaceId: WorkspaceId.WorkspaceId,
   driver: WorkspaceStore["Service"]
 ): WorkspaceStore["Service"] => {
-  const write = StoreInput.write("WorkspaceStore", workspaceId)
+  const write = StoreInput.write("WorkspaceStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     rename: (change) => Effect.flatMap(write("rename", WorkspaceSettings.NameChange, change), driver.rename),
     get: driver.get,
@@ -88,7 +89,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Workspace.Workspace))
  * Workspace metadata, with ownership changes guarded by the previous owner.
  */
 const makeMemory = Effect.fn("WorkspaceStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const driver: WorkspaceStore["Service"] = {
     get: Effect.flatMap(read, (space) => rows.get(space.records.of("workspace"), workspaceId)).pipe(
       Effect.mapError(StoreError.failed("WorkspaceStore", "get"))
@@ -134,7 +135,7 @@ const makeMemory = Effect.fn("WorkspaceStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `WorkspaceStore` in process memory, over the workspace's `Store.MemoryBinding`: the bound
+ * Provide `WorkspaceStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: the bound
  * workspace's one record, keyed by its ID. It keeps what the contract leaves to storage: a second
  * insert is rejected, and a rename or ownership transfer is a conditional write that is rejected
  * unless the stored name or owner is still the one the change replaces. `make` checks every input

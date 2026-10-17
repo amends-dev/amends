@@ -21,13 +21,13 @@ import * as GroupPermissions from "../group/GroupPermissions.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
 import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ReadState from "./ReadState.ts"
 import * as ReadStateStore from "./ReadStateStore.ts"
 
@@ -79,7 +79,7 @@ export const make = Effect.gen(function* () {
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore
   const readStateStore = yield* ReadStateStore.ReadStateStore
   const signalHub = yield* SignalHub.SignalHub
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The acting person's membership; agents keep no read state. */
   const requireHuman = Effect.fnUntraced(function* () {

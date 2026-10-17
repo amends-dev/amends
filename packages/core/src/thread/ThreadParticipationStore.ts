@@ -6,6 +6,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import type * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -13,11 +16,9 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as GroupMembership from "../group/GroupMembership.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadParticipationId from "./ThreadParticipationId.ts"
@@ -107,7 +108,7 @@ export const make = (
   driver: ThreadParticipationStore["Service"]
 ): ThreadParticipationStore["Service"] => {
   const read = StoreInput.read("ThreadParticipationStore")
-  const write = StoreInput.write("ThreadParticipationStore", workspaceId)
+  const write = StoreInput.write("ThreadParticipationStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", ThreadParticipationId.ThreadParticipationId, id), driver.get),
     getMany: (ids) =>
@@ -160,7 +161,7 @@ const byId = (left: ThreadParticipation.ThreadParticipation, right: ThreadPartic
  * writes.
  */
 const makeMemory = Effect.fn("ThreadParticipationStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("threadParticipations")))
 
   const driver: ThreadParticipationStore["Service"] = {
@@ -275,7 +276,7 @@ const makeMemory = Effect.fn("ThreadParticipationStore.makeMemory")(function* ()
 })
 
 /**
- * Provide `ThreadParticipationStore` in process memory, over the workspace's `Store.MemoryBinding`.
+ * Provide `ThreadParticipationStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`.
  * It keeps what the contract leaves to storage: a reused ID is rejected, and so is a second active
  * participation of one participant in one thread; ending is rejected unless the participation is
  * stored, active, and in the thread named. An ended participation keeps its row. `make` checks

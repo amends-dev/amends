@@ -7,17 +7,18 @@
  */
 
 import { ChannelTransport } from "@amends-dev/channel"
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ChannelBinding from "./ChannelBinding.ts"
 import * as ChannelId from "./ChannelId.ts"
 
@@ -66,7 +67,7 @@ export const make = (
   driver: ChannelBindingStore["Service"]
 ): ChannelBindingStore["Service"] => {
   const read = StoreInput.read("ChannelBindingStore")
-  const write = StoreInput.write("ChannelBindingStore", workspaceId)
+  const write = StoreInput.write("ChannelBindingStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (threadId) => Effect.flatMap(read("get", ThreadId.ThreadId, threadId), driver.get),
     findByConversation: Effect.fn("ChannelBindingStore.findByConversation")(function* (channelId, conversationId) {
@@ -85,7 +86,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(ChannelBinding.Channe
  * Channel bindings over the current workspace transaction, keyed by thread.
  */
 const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const driver: ChannelBindingStore["Service"] = {
     get: Effect.fn("ChannelBindingStore.memory.get")(
       function* (threadId) {
@@ -123,7 +124,7 @@ const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `ChannelBindingStore` in process memory, over the workspace's `Store.MemoryBinding`.
+ * Provide `ChannelBindingStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`.
  * Bindings are keyed by thread. It keeps what the contract leaves to storage: a thread binds to one
  * conversation and a channel's conversation to one thread, so a second binding of either is
  * rejected. `make` checks every input first.

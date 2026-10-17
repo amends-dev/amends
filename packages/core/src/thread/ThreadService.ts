@@ -29,7 +29,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as Request from "../request/Request.ts"
@@ -38,6 +37,7 @@ import * as TaskCommand from "../task/TaskCommand.ts"
 import * as TaskPermissions from "../task/TaskPermissions.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 import * as ThreadActivityStore from "./ThreadActivityStore.ts"
@@ -190,7 +190,7 @@ export const make = Effect.gen(function* () {
   const taskStore = yield* TaskStore.TaskStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   /**
    * The IDs a start gives its thread and opening message. Without a key they are new each time. A
    * keyed start derives them from its author and key, so a retry names what its first attempt

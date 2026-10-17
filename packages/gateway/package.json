@@ -17,6 +17,7 @@
   "dependencies": {
     "@amends-dev/connection": "workspace:*",
     "@amends-dev/core": "workspace:*",
+    "@amends-dev/log": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

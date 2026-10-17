@@ -29,7 +29,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
 import type * as Member from "../workspace/Member.ts"
@@ -37,6 +36,7 @@ import * as MemberCommand from "../workspace/MemberCommand.ts"
 import * as MemberFacts from "../workspace/MemberFacts.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Agent from "./Agent.ts"
 import * as AgentFacts from "./AgentFacts.ts"
 import * as AgentPermissions from "./AgentPermissions.ts"
@@ -161,7 +161,7 @@ export const make = Effect.gen(function* () {
   const integrations = yield* Integrations.Integrations
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const memberTarget = (memberId: MemberId.MemberId) => Target.Reference.cases.Member.make({ workspaceId, memberId })
   const connectionTarget = (connectionId: ConnectionContract.ConnectionId) =>

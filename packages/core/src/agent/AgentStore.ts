@@ -6,17 +6,18 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Identity from "../identity/Identity.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Agent from "./Agent.ts"
 
 /**
@@ -53,7 +54,7 @@ export class AgentStore extends Context.Service<
  */
 export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: AgentStore["Service"]): AgentStore["Service"] => {
   const read = StoreInput.read("AgentStore")
-  const write = StoreInput.write("AgentStore", workspaceId)
+  const write = StoreInput.write("AgentStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", Identity.AgentId, id), driver.get),
     list: driver.list,
@@ -68,7 +69,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Agent.Agent))
  * Agent records over the current workspace transaction.
  */
 const makeMemory = Effect.fn("AgentStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
   const requireOwnMembership = (operation: string, record: Agent.Agent, space: MemoryDatabase.Space) =>
     Effect.gen(function* () {
@@ -113,7 +114,7 @@ const makeMemory = Effect.fn("AgentStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `AgentStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps what
+ * Provide `AgentStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It keeps what
  * the contract leaves to storage: a reused ID or an update of a missing agent is rejected, and
  * so is a second agent for one membership, which PostgreSQL refuses with a unique index. `make`
  * checks every input first.

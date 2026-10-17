@@ -32,6 +32,7 @@
     "@amends-dev/channel": "workspace:*",
     "@amends-dev/connection": "workspace:*",
     "@amends-dev/harness": "workspace:*",
+    "@amends-dev/log": "workspace:*",
     "effect": "catalog:"
   }
 }

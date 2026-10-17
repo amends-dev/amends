@@ -3,7 +3,6 @@ import { BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization"
 import { Delivery, ChannelId, DeliveryId } from "@amends-dev/core/channel"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import type { Store } from "@amends-dev/core/journal"
 import {
   ThreadActivity,
   ThreadActivityKind,
@@ -15,6 +14,7 @@ import {
 } from "@amends-dev/core/thread"
 import { TurnId } from "@amends-dev/core/turn"
 import { Invitation, MemberId } from "@amends-dev/core/workspace"
+import type { Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -133,7 +133,7 @@ describe("workspace isolation", () => {
               retry: null,
               status: "queued",
               acceptedThroughSequence: 1,
-              logAfter: 0,
+              logAfter: null,
               selection: null,
               messageIds: [],
               failure: null,

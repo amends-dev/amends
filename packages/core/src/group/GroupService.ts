@@ -23,13 +23,13 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as Request from "../request/Request.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
 import * as GroupCommand from "./GroupCommand.ts"
 import * as GroupFacts from "./GroupFacts.ts"
@@ -158,7 +158,7 @@ export const make = Effect.gen(function* () {
   const notificationStore = yield* NotificationStore.NotificationStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const createGroupRequirement = Requirement.make(
     GroupPermissions.Create,
     Target.Reference.cases.Workspace.make({ workspaceId })

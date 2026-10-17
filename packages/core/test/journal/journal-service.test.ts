@@ -1,15 +1,15 @@
 import { Subject } from "@amends-dev/core/journal"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as Transaction from "@amends-dev/log/Transaction"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Context, Effect, Exit, Layer, Option, Ref, Schema } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Projection from "../../src/journal/Projection.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as Transaction from "../../src/journal/Transaction.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { Counter, make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
@@ -65,11 +65,12 @@ it.effect.each(["make", "layer"] as const)(
       expectTypeOf<Layer.Services<typeof fromArray>>().toEqualTypeOf<Layer.Services<typeof configured>>()
       expectTypeOf<Layer.Success<typeof configured>>().toEqualTypeOf<Journal.Journal>()
       expectTypeOf<Layer.Services<typeof configured>>().toEqualTypeOf<
-        Log.Log | Transaction.Transaction | Checkpoint.Checkpoint | Counter | Audit
+        Log.Log | Transaction.Transaction | Checkpoint.Checkpoint | Counter | Audit | WorkspaceId.CurrentWorkspaceId
       >()
       expectTypeOf<Effect.Success<ReturnType<typeof Journal.make>>>().toEqualTypeOf<Journal.Journal["Service"]>()
       const host = Layer.mergeAll(
         Layer.succeed(Store.Store, fixture.store),
+        Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
         Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
         Layer.succeed(Counter, fixture.counter),
         Layer.succeed(Audit, {
@@ -150,7 +151,10 @@ it.effect("each evaluation of the transaction constructor owns a separate coordi
       expect(yield* fixture.attempts).toBe(1)
       yield* second.run(second.run(Effect.void))
       expect(yield* fixture.attempts).toBe(2)
-    }).pipe(Effect.provideService(Store.Store, fixture.store))
+    }).pipe(
+      Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId)
+    )
   })
 )
 
@@ -205,6 +209,7 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
     }).pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
       Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(Counter, fixture.counter)
     )
@@ -219,6 +224,7 @@ it.effect("projection defects remain defects and still roll back the publication
       Layer.provide(Log.layer),
       Layer.provide([
         Layer.succeed(Store.Store, fixture.store),
+        Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
         Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
         Layer.succeed(Counter, fixture.counter)
       ])

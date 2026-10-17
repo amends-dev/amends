@@ -12,7 +12,7 @@ import {
   GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal"
+import { Event, Journal, Publication } from "@amends-dev/core/journal"
 import {
   Invitation,
   InvitationFacts,
@@ -23,6 +23,7 @@ import {
   MemberId
 } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -60,7 +61,7 @@ describe("group memberships", () => {
     effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(core(bound))
     )
   const history = (bound: Bound) => bound.store.read(journalId, { limit: 100 })
@@ -82,7 +83,7 @@ describe("group memberships", () => {
               [agentId, { _tag: "Agent", id: Identity.AgentId.make("new-agent") }]
             ] as const)
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
+                workspaceId: bound.workspaceId,
                 memberId,
                 identity,
                 name: Member.Name.make(identity.id)
@@ -117,14 +118,14 @@ describe("group memberships", () => {
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
-          workspaceId: bound.store.workspaceId,
+          workspaceId: bound.workspaceId,
           assignmentId: Assignment.AssignmentId.make("group-management"),
           memberId: managerId,
           source: {
             _tag: "Direct",
             grant: Grant.make(GroupMembershipPermissions.Manage, {
               _tag: "Target",
-              target: { _tag: "Group", workspaceId: bound.store.workspaceId, groupId }
+              target: { _tag: "Group", workspaceId: bound.workspaceId, groupId }
             })
           }
         })
@@ -780,7 +781,7 @@ describe("group memberships", () => {
               const events = yield* publish(
                 bound,
                 Effect.flatMap(Journal.Journal, (journal) =>
-                  journal.read({ name: GroupMembershipFacts.Added.name, limit: 100 })
+                  journal.log.readEntries({ name: GroupMembershipFacts.Added.name, limit: 100 })
                 )
               )
               // One fact per admission, including the prepared groups' own and the owner's in the
@@ -899,8 +900,8 @@ describe("group memberships", () => {
           const events = yield* publish(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
-              journal
-                .read({ name: GroupMembershipFacts.Removed.name, limit: 100 })
+              journal.log
+                .readEntries({ name: GroupMembershipFacts.Removed.name, limit: 100 })
                 .pipe(
                   Effect.flatMap((entries) =>
                     Effect.forEach(entries, (entry) => Event.decode(GroupMembershipFacts.Removed, entry))
@@ -982,8 +983,8 @@ describe("group memberships", () => {
           const events = yield* publish(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
-              journal
-                .read({ name: GroupMembershipFacts.Removed.name, limit: 100 })
+              journal.log
+                .readEntries({ name: GroupMembershipFacts.Removed.name, limit: 100 })
                 .pipe(
                   Effect.flatMap((entries) =>
                     Effect.forEach(entries, (entry) => Event.decode(GroupMembershipFacts.Removed, entry))
@@ -1207,8 +1208,8 @@ describe("group memberships", () => {
             const removals = yield* publish(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
-                journal
-                  .read({ name: MemberFacts.Removed.name, limit: 100 })
+                journal.log
+                  .readEntries({ name: MemberFacts.Removed.name, limit: 100 })
                   .pipe(
                     Effect.flatMap((entries) =>
                       Effect.forEach(entries, (entry) => Event.decode(MemberFacts.Removed, entry))
@@ -1219,8 +1220,8 @@ describe("group memberships", () => {
             const departures = yield* publish(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
-                journal
-                  .read({ name: GroupMembershipFacts.Removed.name, limit: 100 })
+                journal.log
+                  .readEntries({ name: GroupMembershipFacts.Removed.name, limit: 100 })
                   .pipe(
                     Effect.flatMap((entries) =>
                       Effect.forEach(entries, (entry) => Event.decode(GroupMembershipFacts.Removed, entry))
@@ -1489,8 +1490,8 @@ describe("group memberships", () => {
               const events = yield* publish(
                 bound,
                 Effect.flatMap(Journal.Journal, (journal) =>
-                  journal
-                    .read({ name: GroupMembershipFacts.Removed.name, limit: 100 })
+                  journal.log
+                    .readEntries({ name: GroupMembershipFacts.Removed.name, limit: 100 })
                     .pipe(
                       Effect.flatMap((entries) =>
                         Effect.forEach(entries, (entry) => Event.decode(GroupMembershipFacts.Removed, entry))
@@ -1776,7 +1777,7 @@ describe("group memberships", () => {
             bound,
             Effect.gen(function* () {
               const journal = yield* Journal.Journal
-              const entries = yield* journal.read({
+              const entries = yield* journal.log.readEntries({
                 name: GroupMembershipFacts.Removed.name,
                 limit: 100
               })

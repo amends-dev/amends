@@ -1,4 +1,5 @@
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Codec from "@amends-dev/log/Codec"
 import { expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -8,7 +9,6 @@ import * as Permission from "../../src/authorization/Permission.ts"
 import * as Role from "../../src/authorization/Role.ts"
 import * as Scope from "../../src/authorization/Scope.ts"
 import * as Target from "../../src/authorization/Target.ts"
-import * as Codec from "../../src/journal/Codec.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
@@ -86,7 +86,7 @@ it.effect("both assignment sources reject foreign workspace and exact-target sco
 
 it.effect("assignment creation facts preserve workspace checks through the journal codec", () =>
   Effect.gen(function* () {
-    const codec = Codec.make(AssignmentFacts.Created)
+    const codec = Codec.makeForSchema(AssignmentFacts.Created.payload)
     // Encode invalid stored data without the cross-field check to exercise replay decoding.
     const unchecked = Codec.makeForSchema(Schema.Struct(AssignmentFacts.Created.payload.fields))
     const identifiers = {

@@ -19,6 +19,8 @@
  * @since 0.1.0
  */
 
+import * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import type * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -26,8 +28,6 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import type * as Thread from "../thread/Thread.ts"
 import type * as ThreadActivity from "../thread/ThreadActivity.ts"
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
@@ -39,6 +39,7 @@ import * as ThreadStore from "../thread/ThreadStore.ts"
 import * as TurnCommand from "../turn/TurnCommand.ts"
 import * as TurnStore from "../turn/TurnStore.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Task from "./Task.ts"
 import * as TaskActivity from "./TaskActivity.ts"
 import * as TaskFacts from "./TaskFacts.ts"
@@ -181,7 +182,7 @@ export const make = Effect.gen(function* () {
   const threadStore = yield* ThreadStore.ThreadStore
   const turnCommand = yield* TurnCommand.TurnCommand
   const turnStore = yield* TurnStore.TurnStore
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The thread a task belongs to, which a task cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (task: Task.Task) {

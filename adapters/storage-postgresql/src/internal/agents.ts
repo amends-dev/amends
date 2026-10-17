@@ -11,7 +11,7 @@
 
 import { Agent, AgentStore } from "@amends-dev/core/agent"
 import type { Identity } from "@amends-dev/core/identity"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

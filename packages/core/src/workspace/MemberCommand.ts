@@ -7,6 +7,8 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import type * as DateTime from "effect/DateTime"
@@ -21,11 +23,10 @@ import * as GroupStore from "../group/GroupStore.ts"
 import type * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import type * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import type * as Member from "./Member.ts"
 import * as MemberFacts from "./MemberFacts.ts"
 import * as MemberId from "./MemberId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * What adding a member can fail with: the failures of assigning its role, of reading the general
@@ -91,7 +92,7 @@ export const make = Effect.gen(function* () {
   const groupStore = yield* GroupStore.GroupStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const add = Effect.fn("MemberCommand.add")(function* (member: NewMember) {
     const added: Member.Member = {

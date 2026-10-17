@@ -1,16 +1,15 @@
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
-import * as Occurrence from "../../src/journal/Occurrence.ts"
 import * as Projection from "../../src/journal/Projection.ts"
 import * as Publication from "../../src/journal/Publication.ts"
 import type * as Reaction from "../../src/journal/Reaction.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
 import * as Subject from "../../src/journal/Subject.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { Counter, make } from "../memory.ts"
@@ -77,6 +76,7 @@ const journalWith = Effect.fnUntraced(function* (requests: Context.Service.Shape
   const fixture = yield* make()
   const host = Layer.mergeAll(
     Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
     Layer.succeed(Counter, fixture.counter),
     Layer.succeed(Requests, requests)
@@ -146,7 +146,7 @@ it.effect("a retried publication and a projection's rebuild run no reaction agai
   Effect.gen(function* () {
     const requests = recordedRequests()
     const { plain, counting, fixture } = yield* journalWith(requests.service)
-    const once = { idempotencyKey: Occurrence.Key.make("count-once") }
+    const once = { idempotencyKey: Store.IdempotencyKey.make("count-once") }
     yield* Effect.gen(function* () {
       const journal = yield* Journal.Journal
       yield* journal.commit(journal.publish(Counted, 2, once))

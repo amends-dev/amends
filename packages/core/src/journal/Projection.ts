@@ -10,19 +10,19 @@
  * @since 0.1.0
  */
 
+import * as Entry from "@amends-dev/log/Entry"
+import type * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
+import * as Transaction from "@amends-dev/log/Transaction"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Checkpoint from "./Checkpoint.ts"
-import * as Entry from "./Entry.ts"
 import * as Event from "./Event.ts"
 import type * as Fact from "./Fact.ts"
-import type * as Log from "./Log.ts"
-import * as Store from "./Store.ts"
-import type * as StoreError from "./StoreError.ts"
-import * as Transaction from "./Transaction.ts"
 
 /**
  * The decoded event supplied to a handler for this fact.

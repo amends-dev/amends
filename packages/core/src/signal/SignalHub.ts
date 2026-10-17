@@ -12,7 +12,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type * as Scope from "effect/Scope"
 import type * as Stream from "effect/Stream"
-import * as Store from "../journal/Store.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import type * as Signal from "./Signal.ts"
 
 /**
@@ -40,7 +40,7 @@ export class SignalHub extends Context.Service<
  * own bounded queue; nothing is kept.
  */
 const makeMemory = Effect.fn("SignalHub.makeMemory")(function* () {
-  const { workspaceId, connection } = yield* Store.MemoryBinding
+  const { workspaceId, connection } = yield* MemoryBinding.MemoryBinding
   const { signals } = connection.database
   return SignalHub.of({
     publish: signals.publish,
@@ -49,7 +49,7 @@ const makeMemory = Effect.fn("SignalHub.makeMemory")(function* () {
 })
 
 /**
- * Provide the workspace's signals in process memory, over the workspace's `Store.MemoryBinding`:
+ * Provide the workspace's signals in process memory, over the workspace's `MemoryBinding.MemoryBinding`:
  * its view of the hub `MemoryDatabase` holds, which every host connected to the same storage
  * shares, so no relay is needed between them. A signal reaches the subscribers present when it is
  * published; nothing is kept.

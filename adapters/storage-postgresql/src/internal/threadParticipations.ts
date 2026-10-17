@@ -10,8 +10,8 @@
  * its `guard`, which lets a read join the caller's transaction and requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { ThreadParticipation, ThreadParticipationStore } from "@amends-dev/core/thread"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

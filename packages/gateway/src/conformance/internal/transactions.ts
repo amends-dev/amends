@@ -1,6 +1,7 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
-import { Journal, Store, StoreError } from "@amends-dev/core/journal"
+import { Journal } from "@amends-dev/core/journal"
 import { WorkspaceInitialization } from "@amends-dev/core/workspace"
+import { Store, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"

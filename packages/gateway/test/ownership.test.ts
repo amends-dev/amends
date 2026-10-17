@@ -1,6 +1,6 @@
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant, RoleFacts } from "@amends-dev/core/authorization"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Journal, Publication, StoreError } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import {
   Member,
   MemberFacts,
@@ -9,6 +9,7 @@ import {
   OwnershipPermissions,
   MemberId
 } from "@amends-dev/core/workspace"
+import { StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Result } from "effect"
 import { withStorage } from "./fixture.ts"

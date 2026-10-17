@@ -19,7 +19,7 @@ import {
   type GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal"
+import { Event, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -40,6 +40,7 @@ import {
 } from "@amends-dev/core/thread"
 import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, StoreError } from "@amends-dev/log"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -86,7 +87,7 @@ describe("thread replies", () => {
     asActor(effect, actor).pipe(Effect.provide(core(bound)))
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(core(bound))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
@@ -126,7 +127,7 @@ describe("thread replies", () => {
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
-          workspaceId: bound.store.workspaceId,
+          workspaceId: bound.workspaceId,
           assignmentId: Assignment.AssignmentId.make(
             `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`
           ),
@@ -135,9 +136,7 @@ describe("thread replies", () => {
             _tag: "Direct",
             grant: Grant.make(
               permission,
-              target === undefined
-                ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
-                : { _tag: "Target", target }
+              target === undefined ? { _tag: "Workspace", workspaceId: bound.workspaceId } : { _tag: "Target", target }
             )
           }
         })
@@ -151,7 +150,7 @@ describe("thread replies", () => {
           Effect.gen(function* () {
             for (const memberId of [humanId, otherId, agentId])
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
+                workspaceId: bound.workspaceId,
                 memberId,
                 identity: identityFor(memberId),
                 name: Member.Name.make(memberId)
@@ -270,8 +269,8 @@ describe("thread replies", () => {
           const events = yield* facts(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
-              journal
-                .read({ name: ThreadActivityFacts.Recorded.name, limit: 100 })
+              journal.log
+                .readEntries({ name: ThreadActivityFacts.Recorded.name, limit: 100 })
                 .pipe(
                   Effect.flatMap((entries) =>
                     Effect.forEach(entries, (entry) => Event.decode(ThreadActivityFacts.Recorded, entry))

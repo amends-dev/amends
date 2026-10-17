@@ -9,6 +9,8 @@
  * @since 0.1.0
  */
 
+import * as LogConformance from "@amends-dev/log/conformance"
+import * as Effect from "effect/Effect"
 import type * as Fixture from "./Fixture.ts"
 import { accounts } from "./internal/accounts.ts"
 import { changeFeed } from "./internal/changeFeed.ts"
@@ -17,11 +19,10 @@ import { factMetadata } from "./internal/factMetadata.ts"
 import { idempotency } from "./internal/idempotency.ts"
 import { journal } from "./internal/journal.ts"
 import { reads } from "./internal/reads.ts"
-import { sessionLogs } from "./internal/sessionLogs.ts"
 import { signals } from "./internal/signals.ts"
 import { signInStorage } from "./internal/signInStorage.ts"
-import { standaloneAppends } from "./internal/standalone-appends.ts"
 import { transactions } from "./internal/transactions.ts"
+import * as Support from "./Support.ts"
 
 export type {
   /**
@@ -70,12 +71,24 @@ export * as Support from "./Support.ts"
  * @since 0.1.0
  */
 export const run = (fixture: Fixture.Fixture) => {
+  // A workspace's logs keep what the log package promises of every store.
+  LogConformance.run({
+    name: fixture.name,
+    available: fixture.available,
+    withStorage: (use) =>
+      fixture.withStorage((storage) =>
+        use({
+          connect: (options) =>
+            Effect.flatMap(storage.connect(options), (host) =>
+              Effect.map(Support.forWorkspace(host, Support.workspaceId), (bound) => bound.store)
+            )
+        })
+      )
+  })
   journal(fixture)
   transactions(fixture)
   changeFeed(fixture)
   signals(fixture)
-  sessionLogs(fixture)
-  standaloneAppends(fixture)
   idempotency(fixture)
   factMetadata(fixture)
   reads(fixture)

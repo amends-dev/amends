@@ -1,30 +1,15 @@
 /**
- * The identity of one occurrence of an append, which makes it idempotent: a retry under the same
- * key, scoped to the workspace and log, returns the original entries. A fact's `occurrence` rule
- * names an occurrence with stable parts, such as a record's ID, and the journal turns the fact's
- * name and those parts into a key, so a retry returns the original event. The key's encoding is a
- * persistence contract.
+ * The identity of one occurrence of a fact, which makes publishing it idempotent: a fact's
+ * `occurrence` rule names an occurrence with stable parts, such as a record's ID, and the journal
+ * turns the fact's name and those parts into the idempotency key of its append, so a retry returns
+ * the original event. The key's encoding is a persistence contract.
  *
  * @since 0.1.0
  */
 
+import { Store } from "@amends-dev/log"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-
-/**
- * Stable identity for one append within a workspace and log, which `Store` and `Log` take as an
- * append's `idempotencyKey`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Key = Schema.NonEmptyString.check(Schema.isTrimmed()).pipe(Schema.brand("LogIdempotencyKey"))
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Key = typeof Key.Type
 
 const component = Schema.String.check(Schema.isPattern(/\S/, { title: "nonblank occurrence component" }))
 
@@ -56,5 +41,5 @@ export type Parts = typeof Parts.Type
 export const makeKey = Effect.fnUntraced(function* (name: string, input: ReadonlyArray<string>) {
   const factName = yield* Schema.decodeEffect(component)(name)
   const parts = yield* Schema.decodeUnknownEffect(Parts)(input)
-  return Key.make(`fact:${JSON.stringify([factName, parts])}`)
+  return Store.IdempotencyKey.make(`fact:${JSON.stringify([factName, parts])}`)
 })

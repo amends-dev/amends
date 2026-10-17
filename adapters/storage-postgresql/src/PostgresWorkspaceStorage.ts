@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 
-import type { WorkspaceId } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { WorkspaceStorage } from "@amends-dev/gateway"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
@@ -36,7 +36,6 @@ import * as Members from "./internal/members.ts"
 import * as Notifications from "./internal/notifications.ts"
 import * as ReadStates from "./internal/readStates.ts"
 import * as Roles from "./internal/roles.ts"
-import * as SessionLogs from "./internal/sessionLogs.ts"
 import * as SessionStates from "./internal/sessionStates.ts"
 import * as Tasks from "./internal/tasks.ts"
 import * as ThreadActivities from "./internal/threadActivities.ts"
@@ -91,7 +90,6 @@ const layerStores = Layer.mergeAll(
   Connections.layer,
   ConnectionCredentials.layer,
   SessionStates.layer,
-  SessionLogs.layer,
   Agents.layer,
   TurnRecords.layer,
   PostgresSignalHub.layer
@@ -108,7 +106,11 @@ export const layerWorkspace = (
   workspaceId: WorkspaceId.WorkspaceId,
   options: Options = {},
   credentialKey: Option.Option<CredentialKey.Cipher> = Option.none()
-) => layerStores.pipe(Layer.provide([Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)]))
+) =>
+  layerStores.pipe(
+    Layer.provide([Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)]),
+    Layer.merge(Layer.succeed(WorkspaceId.CurrentWorkspaceId, workspaceId))
+  )
 
 /**
  * One pool, with inexpensive workspace-bound views over it. The stores hold no

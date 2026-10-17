@@ -5,14 +5,14 @@
  * @since 0.1.0
  */
 
+import type * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import * as Effect from "effect/Effect"
 import type * as PlatformError from "effect/PlatformError"
 import * as Schema from "effect/Schema"
 import * as CoreError from "../error/CoreError.ts"
-import type * as Log from "../journal/Log.ts"
 import * as Projection from "../journal/Projection.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
 import type * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
 import type * as ThreadCommand from "../thread/ThreadCommand.ts"
 

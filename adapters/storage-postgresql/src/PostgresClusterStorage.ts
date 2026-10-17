@@ -12,7 +12,7 @@
  */
 
 import { JobRequests } from "@amends-dev/cluster"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import * as Sharding from "effect/cluster/Sharding"
 import * as Snowflake from "effect/cluster/Snowflake"
 import * as DateTime from "effect/DateTime"

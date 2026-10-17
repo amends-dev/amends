@@ -17,6 +17,7 @@
     "@amends-dev/core": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
     "@amends-dev/harness": "workspace:*",
+    "@amends-dev/log": "workspace:*",
     "@effect/sql-pg": "catalog:",
     "drizzle-orm": "1.0.0-rc.5-5935859",
     "effect": "catalog:"

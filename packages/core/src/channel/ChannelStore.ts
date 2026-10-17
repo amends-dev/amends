@@ -6,16 +6,17 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Channel from "./Channel.ts"
 import * as ChannelId from "./ChannelId.ts"
 
@@ -56,7 +57,7 @@ export const make = (
   driver: ChannelStore["Service"]
 ): ChannelStore["Service"] => {
   const read = StoreInput.read("ChannelStore")
-  const write = StoreInput.write("ChannelStore", workspaceId)
+  const write = StoreInput.write("ChannelStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", ChannelId.ChannelId, id), driver.get),
     listActive: driver.listActive,
@@ -71,7 +72,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Channel.Channel))
  * Channel records over the current workspace transaction.
  */
 const makeMemory = Effect.fn("ChannelStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const driver: ChannelStore["Service"] = {
     get: Effect.fn("ChannelStore.memory.get")(
       function* (id) {
@@ -109,7 +110,7 @@ const makeMemory = Effect.fn("ChannelStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `ChannelStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * Provide `ChannelStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It keeps
  * what the contract leaves to storage: a reused ID is rejected, and so is an update of a missing
  * channel. `make` checks every input first.
  *

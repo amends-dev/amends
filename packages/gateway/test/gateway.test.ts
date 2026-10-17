@@ -5,14 +5,15 @@ import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/con
 import { CoreError } from "@amends-dev/core/error"
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Checkpoint, Commit, Entry, Store, StoreError } from "@amends-dev/core/journal"
+import { Checkpoint } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { SignalHub } from "@amends-dev/core/signal"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadStore, ThreadParticipationStore, ThreadMessageStore, ThreadActivityStore } from "@amends-dev/core/thread"
-import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends-dev/core/turn"
+import { SessionStateStore, TurnJobs, TurnStore } from "@amends-dev/core/turn"
 import { InvitationStore, Member, MemberStore, WorkspaceStore, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import { Commit, Entry, Store, StoreError } from "@amends-dev/log"
 import { expect, it } from "@effect/vitest"
 import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -42,7 +43,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
   return Context.make(
     Store.Store,
     Store.Store.of({
-      readFacts: () => Effect.succeed([]),
+      readEntries: () => Effect.succeed([]),
       getEntry: () => Effect.succeedNone,
       transaction: (program) =>
         program.pipe(
@@ -55,13 +56,13 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       get: unexpected,
       read: options.read ?? (() => Effect.succeed([])),
       head: options.head ?? (() => Effect.succeedSome(Entry.Position.make(0))),
-      workspaceId: boundWorkspaceId,
       waitForAppend: unexpected,
       getAppend: unexpected,
       append: unexpected
     })
   )
     .pipe(
+      Context.add(WorkspaceId.CurrentWorkspaceId, boundWorkspaceId),
       Context.add(
         Checkpoint.Checkpoint,
         Checkpoint.Checkpoint.of({
@@ -288,15 +289,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         SessionStateStore.SessionStateStore.of({ get: unexpected, set: unexpected })
       ),
       Context.add(
-        SessionLogStore.SessionLogStore,
-        SessionLogStore.SessionLogStore.of({
-          head: unexpected,
-          append: unexpected,
-          read: unexpected,
-          waitForAppend: unexpected
-        })
-      ),
-      Context.add(
         ConnectionStore.ConnectionStore,
         ConnectionStore.ConnectionStore.of({
           get: unexpected,
@@ -371,8 +363,8 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
             : gateway.asMember(workspaceId, alice, program)
         const missing = new CoreError.NotFound({ resource: "Member", id: memberId })
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing)
-        // A job's own store, such as the session log, fails as that store does.
-        const failure = StoreError.failed("SessionLogStore", "append")(new Error("database detail"))
+        // A store a job reaches, such as the log store, fails as that store does.
+        const failure = StoreError.failed("Store", "append")(new Error("database detail"))
         expect(yield* Effect.flip(enter(Effect.fail(failure)))).toBe(failure)
         const interrupted = yield* Effect.exit(enter(Effect.interrupt))
         expect(Exit.hasInterrupts(interrupted)).toBe(true)

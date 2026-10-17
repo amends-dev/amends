@@ -14,13 +14,13 @@
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
+import * as Commit from "@amends-dev/log/Commit"
 import * as Schema from "effect/Schema"
 import * as Agent from "../agent/Agent.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Role from "../authorization/Role.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
-import * as Commit from "../journal/Commit.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts"

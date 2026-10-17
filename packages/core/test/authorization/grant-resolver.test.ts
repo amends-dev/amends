@@ -1,4 +1,8 @@
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Layer } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -16,12 +20,8 @@ import * as RoleStore from "../../src/authorization/RoleStore.ts"
 import * as Scope from "../../src/authorization/Scope.ts"
 import * as Target from "../../src/authorization/Target.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
@@ -213,6 +213,7 @@ it.effect("one resolver observes staged journal changes, later role edits, and a
     }).pipe(
       Effect.provide([configured(fixture), Log.layer]),
       Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
       Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(RoleStore.RoleStore, fixture.roles),
       Effect.provideService(AssignmentStore.AssignmentStore, fixture.assignments)

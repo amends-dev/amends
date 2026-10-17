@@ -1,10 +1,10 @@
 import { TurnJob } from "@amends-dev/cluster"
 import { Integrations } from "@amends-dev/connection"
-import { Store } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
-import { SessionLogStore, TurnExecution, TurnJobs } from "@amends-dev/core/turn"
+import { SessionLog, TurnExecution, TurnJobs } from "@amends-dev/core/turn"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Store } from "@amends-dev/log"
 import { PostgresClusterStorage, type PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
@@ -45,12 +45,11 @@ const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => Effect.
           })
         ).pipe(
           Context.add(
-            SessionLogStore.SessionLogStore,
-            SessionLogStore.SessionLogStore.of({
-              head: unexpected,
-              append: unexpected,
-              read: unexpected,
-              waitForAppend: unexpected
+            SessionLog.SessionLogs,
+            SessionLog.SessionLogs.of({
+              open: () => {
+                throw new Error("Only accepting work is expected")
+              }
             })
           )
         )

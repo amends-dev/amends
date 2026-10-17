@@ -10,8 +10,8 @@
  * own, without the workspace's lock.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { ReadState, ReadStateStore } from "@amends-dev/core/read-state"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, sql } from "drizzle-orm"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"

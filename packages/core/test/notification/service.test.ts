@@ -1,4 +1,8 @@
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Crypto, DateTime, Effect, Layer, Option, Schema } from "effect"
 import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts"
@@ -10,12 +14,8 @@ import * as CoreError from "../../src/error/CoreError.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
 import * as Notification from "../../src/notification/Notification.ts"
 import * as NotificationService from "../../src/notification/NotificationService.ts"
 import * as NotificationStore from "../../src/notification/NotificationStore.ts"
@@ -103,6 +103,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
   })
   const host = Layer.mergeAll(
     Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
     Layer.succeed(MemberStore.MemberStore, fixture.members),
     Layer.succeed(RoleStore.RoleStore, fixture.roles),
@@ -156,7 +157,7 @@ it.effect("inbox reads require the current actor, need no role grant, and leave 
       | Journal.Journal
       | ThreadQuery.ThreadQuery
       | SignalHub.SignalHub
-      | Store.Store
+      | WorkspaceId.CurrentWorkspaceId
     >()
     expectTypeOf<
       Effect.Services<ReturnType<NotificationService.NotificationService["Service"]["inbox"]>>

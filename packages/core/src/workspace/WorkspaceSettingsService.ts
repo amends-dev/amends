@@ -25,13 +25,13 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as InvitationPermissions from "./InvitationPermissions.ts"
 import * as MemberPermissions from "./MemberPermissions.ts"
 import * as MemberService from "./MemberService.ts"
 import type * as Workspace from "./Workspace.ts"
 import * as WorkspaceFacts from "./WorkspaceFacts.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 import * as WorkspaceSettings from "./WorkspaceSettings.ts"
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts"
 import * as WorkspaceStore from "./WorkspaceStore.ts"
@@ -111,7 +111,7 @@ export const make = Effect.gen(function* () {
     memberService = yield* MemberService.MemberService,
     journal = yield* Journal.Journal,
     crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const readWorkspace = Effect.gen(function* () {
     const value = yield* workspaceStore.get
     if (Option.isNone(value)) return yield* Effect.die("A workspace's record is missing")

@@ -1,18 +1,18 @@
 import { Subject } from "@amends-dev/core/journal"
+import * as Codec from "@amends-dev/log/Codec"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, it } from "@effect/vitest"
 import { Context, Deferred, Effect, Fiber, Option, Ref, Schema, SchemaGetter } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Codec from "../../src/journal/Codec.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Event from "../../src/journal/Event.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Projection from "../../src/journal/Projection.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { Counter, make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
@@ -44,13 +44,19 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Publication.Publication | Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint
+    | Publication.Publication
+    | Log.Log
+    | Transaction.Transaction
+    | Counter
+    | Checkpoint.Checkpoint
+    | WorkspaceId.CurrentWorkspaceId
   >
 ) =>
   program.pipe(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter)
   )
@@ -672,7 +678,7 @@ it.effect("corrupt fact payloads roll back earlier handlers in the same replay b
             subject: testSubject(),
             name: Changed.name,
             version: Changed.version,
-            payload: yield* Codec.make(Changed).encode({ amount: 1 }),
+            payload: yield* Codec.makeForSchema(Changed.payload).encode({ amount: 1 }),
             provenance: testProvenance(workspaceId)
           },
           {

@@ -6,10 +6,10 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import type * as Effect from "effect/Effect"
 import type * as Event from "./Event.ts"
-import type * as Store from "./Store.ts"
-import type * as StoreError from "./StoreError.ts"
 
 /**
  * What a commit does, in that same commit, when it publishes a fact, such as requesting a job.

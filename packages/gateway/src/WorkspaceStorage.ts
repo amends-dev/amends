@@ -16,13 +16,13 @@ import { ChannelBindingStore, ChannelStore, ContactStore, DeliveryStore } from "
 import type { DeliveryJobs } from "@amends-dev/core/channel"
 import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection"
 import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends-dev/core/group"
-import { Checkpoint, MemoryDatabase, Store } from "@amends-dev/core/journal"
+import { Checkpoint, MemoryDatabase, MemoryBinding } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { SignalHub } from "@amends-dev/core/signal"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadActivityStore, ThreadMessageStore, ThreadParticipationStore, ThreadStore } from "@amends-dev/core/thread"
-import { SessionLogStore, SessionStateStore, TurnStore } from "@amends-dev/core/turn"
+import { SessionStateStore, TurnStore } from "@amends-dev/core/turn"
 import type { TurnJobs } from "@amends-dev/core/turn"
 import { InvitationStore, MemberStore, WorkspaceStore, type WorkspaceId } from "@amends-dev/core/workspace"
 import * as Context from "effect/Context"
@@ -88,7 +88,6 @@ const layerMemoryStores = Layer.mergeAll(
   AgentStore.layerMemory,
   TurnStore.layerMemory,
   SessionStateStore.layerMemory,
-  SessionLogStore.layerMemory,
   SignalHub.layerMemory
 )
 
@@ -102,7 +101,7 @@ const makeMemory = Effect.fn("WorkspaceStorage.makeMemory")(function* () {
   const forWorkspace: WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn("WorkspaceStorage.memory.forWorkspace")(
     function* (workspaceId: WorkspaceId.WorkspaceId) {
       return yield* Effect.scoped(
-        Layer.build(layerMemoryStores.pipe(Layer.provideMerge(Store.layerMemory(workspaceId))))
+        Layer.build(layerMemoryStores.pipe(Layer.provideMerge(MemoryBinding.layer(workspaceId))))
       )
     },
     Effect.provideService(MemoryDatabase.Connection, connection)

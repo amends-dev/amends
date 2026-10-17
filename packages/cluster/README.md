@@ -101,7 +101,7 @@ trying. The runner counts the tries it made of each delivery, which the delivery
 ## Running a turn
 
 `TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Gateway` and the host's
-`Integrations`. It calls core's `TurnExecution` and the session log store directly, entering the
+`Integrations`. It calls core's `TurnExecution` and `SessionLog.SessionLogs` directly, entering the
 job's workspace through the gateway for each call, so the runner holds the workspace only while a
 call runs, never for the minutes a turn runs. `runNextTurn` runs one turn at a time:
 

@@ -8,6 +8,8 @@
  * @since 0.1.0
  */
 
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
 import * as Layer from "effect/Layer"
 import * as AgentPermissions from "./agent/AgentPermissions.ts"
 import * as AgentProjection from "./agent/AgentProjection.ts"
@@ -45,9 +47,7 @@ import * as GroupPermissions from "./group/GroupPermissions.ts"
 import * as GroupProjection from "./group/GroupProjection.ts"
 import * as GroupQuery from "./group/GroupQuery.ts"
 import * as GroupService from "./group/GroupService.ts"
-import * as Entry from "./journal/Entry.ts"
 import * as Journal from "./journal/Journal.ts"
-import * as Log from "./journal/Log.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
@@ -73,7 +73,7 @@ import * as ThreadProjection from "./thread/ThreadProjection.ts"
 import * as ThreadQuery from "./thread/ThreadQuery.ts"
 import * as ThreadService from "./thread/ThreadService.ts"
 import * as ThreadTitleTimeline from "./thread/ThreadTitleTimeline.ts"
-import type * as SessionLogStore from "./turn/SessionLogStore.ts"
+import * as SessionLog from "./turn/SessionLog.ts"
 import * as TurnCommand from "./turn/TurnCommand.ts"
 import * as TurnExecution from "./turn/TurnExecution.ts"
 import * as TurnJobs from "./turn/TurnJobs.ts"
@@ -275,6 +275,7 @@ const jobServices = Layer.mergeAll(TurnExecution.layer, ChannelIntake.layer, Del
  * @since 0.1.0
  */
 export const layer = Layer.mergeAll(operations, jobServices).pipe(
+  Layer.provideMerge(SessionLog.layer),
   Layer.provideMerge([journal, authorization]),
   Layer.provideMerge(PermissionCatalog.layer(permissions))
 )
@@ -309,4 +310,4 @@ export type Operations = Layer.Success<typeof operations>
  * @category models
  * @since 0.1.0
  */
-export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.SessionLogStore
+export type JobServices = Layer.Success<typeof jobServices> | SessionLog.SessionLogs

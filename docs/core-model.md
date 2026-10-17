@@ -945,10 +945,11 @@ commit that ends it.
 
 ### The log is written apart from the journal
 
-The log is written apart from the journal and every commit, by appending after the position the
-writer read to, so a host can keep it in a store built for appending. An append that finds the log
-past that position is refused: another run of the same turn took over, as when the turn's job moved
-to another machine, and this run stops without ending the turn. Readers follow a turn's entries as
+The log is one of the workspace's logs, apart from the journal: a run appends to it alone, outside
+every commit, so its writes wait only for the log's other writers and never for the conversation's.
+Each append comes after the batch the writer last wrote, and one that finds the log past it is
+refused: another run of the same turn took over, as when the turn's job moved to another machine,
+and this run stops without ending the turn. Readers follow a turn's entries as
 they are appended, with the step being written as drafts that are not kept.
 
 ### Compaction belongs to the harness

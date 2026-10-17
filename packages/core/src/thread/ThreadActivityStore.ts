@@ -7,17 +7,18 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadId from "./ThreadId.ts"
 
@@ -118,7 +119,7 @@ export const make = (
   driver: ThreadActivityStore["Service"]
 ): ThreadActivityStore["Service"] => {
   const read = StoreInput.read("ThreadActivityStore")
-  const write = StoreInput.write("ThreadActivityStore", workspaceId)
+  const write = StoreInput.write("ThreadActivityStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", ThreadActivity.ThreadActivityId, id), driver.get),
     listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, id), driver.listByThread),
@@ -143,7 +144,7 @@ const bySequence = (left: ThreadActivity.ThreadActivity, right: ThreadActivity.T
  * `ThreadActivityProjection` writes.
  */
 const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const inThread = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const records = yield* rows.all((yield* read).records.of("threadActivities"))
     return records.filter((record) => record.threadId === threadId).toSorted(bySequence)
@@ -222,7 +223,7 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `ThreadActivityStore` in process memory, over the workspace's `Store.MemoryBinding`: each
+ * Provide `ThreadActivityStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: each
  * thread's timeline. It keeps what the contract leaves to storage: an activity is rejected unless
  * its sequence follows the thread's last, so each timeline stays contiguous from 1, and a reused
  * ID, or a second activity for one occurrence, is rejected. `make` checks every input first.

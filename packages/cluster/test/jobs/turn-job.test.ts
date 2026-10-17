@@ -1,7 +1,7 @@
-import { Commit, Store } from "@amends-dev/core/journal"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { Gateway } from "@amends-dev/gateway"
 import type { StreamPart } from "@amends-dev/harness"
+import { Commit, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Duration, Effect, Layer, Stream } from "effect"
 import { MessageStorage, RunnerHealth, Runners, RunnerStorage, Sharding, ShardingConfig } from "effect/cluster"
@@ -32,8 +32,11 @@ const cluster = Sharding.layer.pipe(
  * Turn jobs on Cluster in memory, over a workspace in memory whose agent's turns stream `script`,
  * with the workspace to look into.
  */
-const turnJobsFor = (script: Stream.Stream<StreamPart.StreamPart>, options: FakeWorkspaceOptions = {}) => {
-  const workspace = makeFakeWorkspace(options)
+const turnJobsFor = Effect.fnUntraced(function* (
+  script: Stream.Stream<StreamPart.StreamPart>,
+  options: FakeWorkspaceOptions = {}
+) {
+  const workspace = yield* makeFakeWorkspace(options)
   const layer = TurnJob.layer.pipe(
     Layer.provide(JobRequests.layerWakeLocal),
     Layer.provideMerge(cluster),
@@ -42,7 +45,7 @@ const turnJobsFor = (script: Stream.Stream<StreamPart.StreamPart>, options: Fake
     )
   )
   return { workspace, layer }
-}
+})
 
 /** Run `request` in a commit `commitId`, then what it asked to run once the commit is done. */
 const inCommit = <E>(
@@ -72,7 +75,7 @@ const hasEnded = (workspace: FakeWorkspace) => () => workspace.endings().length 
 describe("a turn job", () => {
   it.effect("runs the agent's turn when a commit asks it to", () =>
     Effect.gen(function* () {
-      const { workspace, layer } = turnJobsFor(Stream.fromIterable([...writing("Done."), finish]))
+      const { workspace, layer } = yield* turnJobsFor(Stream.fromIterable([...writing("Done."), finish]))
       yield* Effect.gen(function* () {
         yield* inCommit("commit-1", (turnJobs) => turnJobs.requestRun(job))
         yield* until(hasEnded(workspace))
@@ -83,7 +86,7 @@ describe("a turn job", () => {
 
   it.effect("stops the turn it runs when a commit asks it to", () =>
     Effect.gen(function* () {
-      const { workspace, layer } = turnJobsFor(
+      const { workspace, layer } = yield* turnJobsFor(
         Stream.concat(
           Stream.fromIterable<StreamPart.StreamPart>([
             { type: "text-start", id: "answer" },
@@ -104,7 +107,7 @@ describe("a turn job", () => {
 
   it.effect("runs a turn again after its run failed, and gives it up once its runs keep failing", () =>
     Effect.gen(function* () {
-      const recovers = turnJobsFor(Stream.fromIterable([...writing("Done."), finish]), {
+      const recovers = yield* turnJobsFor(Stream.fromIterable([...writing("Done."), finish]), {
         failedStarts: 2
       })
       yield* Effect.gen(function* () {
@@ -114,7 +117,7 @@ describe("a turn job", () => {
       expect(recovers.workspace.starts()).toBe(3)
       expect(recovers.workspace.endings()).toMatchObject([{ kind: "close", reply: "Done." }])
 
-      const failing = turnJobsFor(Stream.fromIterable([...writing("Done."), finish]), {
+      const failing = yield* turnJobsFor(Stream.fromIterable([...writing("Done."), finish]), {
         failedStarts: JobRequests.maxFailures
       })
       yield* Effect.gen(function* () {
@@ -130,7 +133,7 @@ describe("a turn job", () => {
 
   it.effect("drops a request whose workspace was never created, without trying again", () =>
     Effect.gen(function* () {
-      const { workspace, layer } = turnJobsFor(Stream.empty, { created: false })
+      const { workspace, layer } = yield* turnJobsFor(Stream.empty, { created: false })
       yield* Effect.gen(function* () {
         yield* inCommit("commit-1", (turnJobs) => turnJobs.requestRun(job))
         yield* until(() => workspace.entered() > 1, "10 seconds")

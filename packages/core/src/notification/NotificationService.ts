@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 
+import * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -19,14 +20,13 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
 import type * as Thread from "../thread/Thread.ts"
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Notification from "./Notification.ts"
 import * as NotificationInbox from "./NotificationInbox.ts"
 import * as NotificationStore from "./NotificationStore.ts"
@@ -143,14 +143,14 @@ export const make: Effect.Effect<
   | Journal.Journal
   | ThreadQuery.ThreadQuery
   | SignalHub.SignalHub
-  | Store.Store
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const notificationStore = yield* NotificationStore.NotificationStore
   const signalHub = yield* SignalHub.SignalHub
   const authorization = yield* Authorization.Authorization
   const journal = yield* Journal.Journal
   const threadQuery = yield* ThreadQuery.ThreadQuery
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The acting member as a recipient, once their membership is checked. */
   const requireRecipient = Effect.fnUntraced(function* () {

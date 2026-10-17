@@ -1,6 +1,10 @@
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Identity } from "@amends-dev/core/identity"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Exit, Option } from "effect"
 import * as Agent from "../../src/agent/Agent.ts"
@@ -8,12 +12,8 @@ import * as AgentFacts from "../../src/agent/AgentFacts.ts"
 import * as AgentProjection from "../../src/agent/AgentProjection.ts"
 import * as AgentStore from "../../src/agent/AgentStore.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
 import { make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
@@ -65,6 +65,7 @@ const commit = (
       Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
       Effect.provide(Log.layer),
       Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
       Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(AgentStore.AgentStore, agentStore)
     )

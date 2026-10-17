@@ -7,6 +7,7 @@
  * @since 0.1.0
  */
 
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
@@ -24,8 +25,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as Operation from "../operation/Operation.ts"
 import type * as Thread from "../thread/Thread.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
@@ -33,6 +32,7 @@ import * as ThreadMessage from "../thread/ThreadMessage.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Task from "./Task.ts"
 import * as TaskCommand from "./TaskCommand.ts"
 import * as TaskPermissions from "./TaskPermissions.ts"
@@ -130,7 +130,7 @@ export const make = Effect.gen(function* () {
   const taskStore = yield* TaskStore.TaskStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The thread's task, which it must have. */
   const requireTask = Effect.fnUntraced(function* (thread: Thread.Thread) {

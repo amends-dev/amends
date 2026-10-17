@@ -13,7 +13,7 @@ import * as Option from "effect/Option"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as WorkspaceStore from "../workspace/WorkspaceStore.ts"
 import * as BuiltinRoles from "./BuiltinRoles.ts"
 import type * as Permission from "./Permission.ts"
@@ -62,7 +62,7 @@ export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (option
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
   const journal = yield* Journal.Journal
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const revision = yield* BuiltinRoles.Revision.makeEffect(options?.revision ?? BuiltinRoles.revision)
   const definitions = options?.definitions ?? permissionCatalog.definitions
   // A workspace recorded before revisions existed holds the bundles of revision zero.

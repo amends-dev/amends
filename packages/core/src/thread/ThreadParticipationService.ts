@@ -21,8 +21,8 @@ import * as GroupStore from "../group/GroupStore.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
 import type * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
@@ -79,7 +79,7 @@ export const make = Effect.gen(function* () {
   const groupStore = yield* GroupStore.GroupStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const follow = Effect.fn("ThreadParticipationService.follow")(
     function* (threadId: ThreadId.ThreadId) {
       const thread = yield* threadQuery.requireAccess(threadId)

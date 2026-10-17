@@ -13,8 +13,8 @@
  * transaction and requires one for a write, except `markSeen`, which also runs on its own.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
+import { StoreError } from "@amends-dev/log"
 import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm"
 import type { PgInsertValue } from "drizzle-orm/pg-core"
 import * as Array from "effect/Array"
