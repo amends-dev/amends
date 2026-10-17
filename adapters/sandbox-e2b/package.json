@@ -26,14 +26,15 @@
     "./internal/*": null
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "directory": "dist"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends-dev/sandbox": "workspace:*",
+    "@amends-dev/sandbox": "workspace:^",
     "e2b": "catalog:"
   },
   "devDependencies": {
