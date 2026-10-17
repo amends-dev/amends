@@ -150,7 +150,9 @@ addition fits the design system, and verify that UI component in its workshop be
 into an app page.
 
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
-package links. Run `bun install` at the repository root after manifest changes.
+package links, except that a published package links to another with `workspace:^`, which publishes
+as a caret range ([publishing](docs/publishing.md#versions)). Run `bun install` at the repository
+root after manifest changes.
 `bun run check:packages` checks shared-package dependency declarations. A barrel, an `index.ts`
 marked `// @barrel`, is generated as Effect's are: `bun run barrels` lists every module beside it,
 and `bun run check:barrels` fails when one is out of date.
