@@ -29,6 +29,7 @@ import {
   type WorkspaceCollection,
   type WorkspaceResource
 } from "../api/keys.ts"
+import { deliverTimelineItem, forgetDeliveredItems } from "../conversations/api.ts"
 import { posted, typing, typistsAtom } from "../conversations/typing.ts"
 import { watchWake } from "./wake.ts"
 
@@ -156,12 +157,9 @@ interface Target {
 }
 /** The reads of one group or thread each fact can change, found from its payload. */
 const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Target>>> = {
-  // Starting a thread, replying, and joining or leaving it: the thread's timeline and its group's
-  // stream, whose reply counts and unread state follow.
-  "thread.activity.recorded": (payload) => [
-    { collection: "timelines", id: text(payload, "activity", "threadId") },
-    { collection: "streams", id: text(payload, "groupId") }
-  ],
+  // Starting a thread, replying, and joining or leaving it: its group's stream, whose reply counts
+  // and unread state follow. The thread's timeline takes the items the commit delivers.
+  "thread.activity.recorded": (payload) => [{ collection: "streams", id: text(payload, "groupId") }],
   // A thread's title: the thread itself, and its group's stream, which shows it.
   "thread.renamed": (payload) => [
     { collection: "threads", id: text(payload, "threadId") },
@@ -320,6 +318,8 @@ const run = Effect.fnUntraced(function* (
   let cursor: Extract<Message, { _tag: "Committed" }>["cursor"] | undefined
   let attempt = 0
   let connected = false
+  /** The threads whose timelines took items this feed delivered, which a reset forgets. */
+  const delivered = new Set<string>()
   let liveSince: number | undefined
   const receive = (message: Message): Effect.Effect<void> =>
     ChangeFeed.Message.match(message, {
@@ -329,7 +329,11 @@ const run = Effect.fnUntraced(function* (
           liveSince = now
           if (message.cursor !== null) cursor = message.cursor
           Queue.offerUnsafe(states, ChangeFeedState.Live())
-          return message.reset ? reactivity.invalidate(everything) : Effect.void
+          if (!message.reset) return Effect.void
+          // What was missed may have changed what was delivered: read everything again.
+          forgetDeliveredItems(registry, delivered)
+          delivered.clear()
+          return reactivity.invalidate(everything)
         })
       },
       Committed: (message) => {
@@ -342,6 +346,11 @@ const run = Effect.fnUntraced(function* (
             if (threadId && memberId)
               registry.update(typists, (current) => posted(current, threadId, memberId, Date.now()))
           }
+        // What the commit changed shows in place, without reading it again.
+        for (const change of message.changes)
+          ChangeFeed.Change.match(change, {
+            TimelineItem: ({ item }) => void delivered.add(deliverTimelineItem(registry, workspaceId, item))
+          })
         // A notification for the reader changes their inbox and pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0)
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void

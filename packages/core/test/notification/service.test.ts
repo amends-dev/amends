@@ -119,6 +119,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
       Layer.succeed(ThreadQuery.ThreadQuery, {
         requireAccess: unexpected,
         requireReadable: unexpected,
+        timelineItemsAbout: unexpected,
         eligibleMembers: unexpected,
         followers: unexpected,
         currentParticipants: unexpected,

@@ -148,17 +148,19 @@ export const make = Effect.gen(function* () {
             // Reload first, so a commit that admits the reader also delivers what it admits.
             if (delivery.events.some(changesAccessOf(actor))) access = yield* resolveAccess(actor)
             const events = delivery.events.filter(isVisibleTo(access)).map((p) => p.event)
+            const changes = delivery.changes.filter((p) => reaches(access, p)).map((p) => p.change)
             const notifications = delivery.events.flatMap((p) =>
               p.notifications.flatMap((n) => (access.scopes.has(n.scope) ? [n.record] : []))
             )
             const message =
-              events.length + notifications.length > 0
+              events.length + changes.length + notifications.length > 0
                 ? Stream.make(
                     ChangeFeed.Message.cases.Committed.make({
                       workspaceId,
                       cursor: ChangeFeed.cursorOf(delivery.position),
                       commitId: delivery.commitId,
                       events,
+                      changes,
                       notifications
                     })
                   )

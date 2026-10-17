@@ -5,7 +5,7 @@ import { GroupFacts, GroupService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { NotificationService } from "@amends-dev/core/notification"
-import { ThreadMessageFacts, ThreadService } from "@amends-dev/core/thread"
+import { ThreadMessageFacts, ThreadMessageService, ThreadService, type ThreadTimeline } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Queue, Stream } from "effect"
@@ -31,6 +31,9 @@ const committed = (message: ChangeFeed.Message) => {
 const watch = (options?: ChangeFeed.WatchOptions) =>
   Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) => changeFeedService.watch(options))
 const human = (name: string) => Identity.HumanId.make(name)
+/** The text a timeline item shows, when it shows a message's. */
+const textOf = (item: ThreadTimeline.Item) =>
+  "message" in item && item.message.content._tag === "Text" ? item.message.content.text : undefined
 const memberActor = (name: string) =>
   Actor.Actor.of({
     workspaceId,
@@ -84,7 +87,7 @@ describe("change feed", () => {
               })
             )
           )
-          yield* as(
+          const thread = yield* as(
             owner,
             Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.startInGroup({
@@ -92,6 +95,18 @@ describe("change feed", () => {
                 mentions: [],
                 text: "Secret plan"
               })
+            )
+          )
+          const reply = yield* as(
+            owner,
+            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
+              threadMessageService.publish({ threadId: thread.thread.id, mentions: [], text: "First draft" })
+            )
+          )
+          yield* as(
+            owner,
+            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
+              threadMessageService.edit({ messageId: reply.id, mentions: [], text: "Final draft", expectedRevision: 1 })
             )
           )
           // A role every member may see marks the end of what each reader receives.
@@ -106,10 +121,23 @@ describe("change feed", () => {
             content: { text: "Secret plan" },
             groupId: group.id
           })
+          // The commit's changes are the timeline items it recorded, as the timeline shows them.
+          const itemsOf = (message: ChangeFeed.Message) =>
+            committed(message).changes.map(({ item }) => [item.activity.sequence, item.activity.kind, textOf(item)])
+          expect(itemsOf(started)).toEqual([[1, "message.published", "Secret plan"]])
+          expect(itemsOf(yield* readerFeed)).toEqual([[2, "message.published", "First draft"]])
+          // An edit changes the reply's own item in place, as well as recording its own.
+          expect(itemsOf(yield* readerFeed)).toEqual([
+            [2, "message.published", "Final draft"],
+            [3, "message.edited", "Final draft"]
+          ])
           expect(committed(yield* readerFeed).events[0]?.name).toBe(RoleFacts.Created.name)
-          // Outside the group, or without read permission, only workspace facts arrive.
-          for (const next of [outsiderFeed, unpermittedFeed])
-            expect(committed(yield* next).events.map((e) => e.name)).toEqual([RoleFacts.Created.name])
+          // Outside the group, or without read permission, only workspace facts arrive, and no change.
+          for (const next of [outsiderFeed, unpermittedFeed]) {
+            const received = committed(yield* next)
+            expect(received.events.map((e) => e.name)).toEqual([RoleFacts.Created.name])
+            expect(received.changes).toEqual([])
+          }
         })
       )
     )

@@ -142,8 +142,11 @@ the subscription registers. With `reset: false`, the commits after the given cur
 live ones. With `reset: true` (no cursor, an unknown one, one more than 500 commits behind, or one
 before a commit the server cannot read) delivery starts at the head and the client must refresh the
 views it keeps; `cursor` is null only for an empty workspace. Later messages contain
-`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, and a
-`notifications` array; at least one of the two is nonempty. `notifications` holds the notifications
+`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, a `changes`
+array, and a `notifications` array; at least one of the three is nonempty. `changes` holds what the
+commit changed in what the caller may see, each as it is now, such as a `TimelineItem` with an
+`item` exactly as the timeline returns it, which clients put in place of what they show.
+`notifications` holds the notifications
 the commit created for the caller, with the same fields the inbox list returns, so clients can
 update an inbox or badge without a refetch. Each event contains `id`, `name`, `version`,
 `recordedAt` (UTC ISO string), `provenance`, and its JSON-encoded `payload`. Provenance includes the

@@ -607,7 +607,7 @@ it("refreshes a turn's log and the active turns as its facts arrive", () => {
       "workspace/one/active-turns",
       "workspace/one/turns:turn-1"
     ])
-  // A thread's timeline follows the turn activity recorded there.
+  // A thread's timeline takes the turn's items as the commit delivers them, rather than read again.
   expect(
     affectedKeys("one", [
       {
@@ -615,7 +615,7 @@ it("refreshes a turn's log and the active turns as its facts arrive", () => {
         payload: { groupId: "general", activity: { threadId: "thread", kind: "turn.ended" } }
       }
     ])
-  ).toContain("workspace/one/timelines:thread")
+  ).not.toContain("workspace/one/timelines:thread")
 })
 
 it("drafts continue their part in order, marking a gap rather than showing text out of place", () => {

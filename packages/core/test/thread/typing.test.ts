@@ -67,7 +67,8 @@ const run = <A, E>(
       findParticipants: unexpected,
       listReadable: unexpected,
       readTimeline: unexpected,
-      readTimelineItem: unexpected
+      readTimelineItem: unexpected,
+      timelineItemsAbout: unexpected
     })
     const authorization = Authorization.Authorization.of({
       require: (needed) =>

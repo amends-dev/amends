@@ -51,8 +51,11 @@ consumer of that client and live while mounted; a workspace's reads go through i
 from `api/keys.ts`: the directory, a workspace resource such as `members` or `agents`, or one
 group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, and the
 [change feed](../../docs/change-feed.md) invalidates the keys each commit affects, so whatever is
-mounted refreshes. Paged reads (group streams, timelines, the inbox) keep their pages in one atom
-and read on from its previous value, so a refresh never drops what is on screen.
+mounted refreshes, or delivers what the commit changed, which shows in place: a timeline shows each
+delivered item in place of the one it read, and those that follow it after (`withDeliveredItems`).
+Paged reads (group streams, timelines, the inbox) keep their pages in one atom and read on from its
+previous value, so a refresh never drops what is on screen; a timeline's refresh reads every item it
+shows again.
 
 ## Writes
 

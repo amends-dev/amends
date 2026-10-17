@@ -37,17 +37,22 @@ import * as Authorization from "../../src/authorization/Authorization.ts"
 import * as GrantResolver from "../../src/authorization/GrantResolver.ts"
 import type * as Permission from "../../src/authorization/Permission.ts"
 import * as PermissionCatalog from "../../src/authorization/PermissionCatalog.ts"
+import * as Requirement from "../../src/authorization/Requirement.ts"
 import * as Role from "../../src/authorization/Role.ts"
 import * as RoleFacts from "../../src/authorization/RoleFacts.ts"
 import * as RoleStore from "../../src/authorization/RoleStore.ts"
 import * as GrantScope from "../../src/authorization/Scope.ts"
+import * as Target from "../../src/authorization/Target.ts"
 import * as ChangeFeed from "../../src/change-feed/ChangeFeed.ts"
+import * as ChangeFeedChanges from "../../src/change-feed/ChangeFeedChanges.ts"
 import * as ChangeFeedService from "../../src/change-feed/ChangeFeedService.ts"
 import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts"
 import * as CoreError from "../../src/error/CoreError.ts"
+import * as Group from "../../src/group/Group.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
+import type * as Event from "../../src/journal/Event.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
 import * as Publication from "../../src/journal/Publication.ts"
@@ -149,6 +154,10 @@ const Internal = Fact.make("test.internal", {
 
 interface Options {
   readonly source?: ChangeFeedSource.Options
+  /** What each commit changed in what readers show; none by default. */
+  readonly changes?: (
+    batch: Log.Batch<Event.Envelope>
+  ) => Effect.Effect<ReadonlyArray<ChangeFeedChanges.Prepared>, Schema.SchemaError | ThreadActivityKind.Mismatch>
   /**
    * The actor's grants; by default thread, group, and member reads and invitation management
    * across the workspace, so every delivered fact reaches them.
@@ -259,7 +268,18 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       GrantResolver.layer
     ).pipe(Layer.provideMerge(host))
     const configured = ChangeFeedService.layer.pipe(
-      Layer.provide(ChangeFeedSource.layer(options.source)),
+      Layer.provide(
+        ChangeFeedSource.layer(options.source).pipe(
+          Layer.provide(
+            Layer.succeed(
+              ChangeFeedChanges.ChangeFeedChanges,
+              ChangeFeedChanges.ChangeFeedChanges.of({
+                changesOf: (batch) => (options.changes?.(batch) ?? Effect.succeed([])).pipe(Effect.orDie)
+              })
+            )
+          )
+        )
+      ),
       Layer.provideMerge(services)
     )
     return yield* use({
@@ -489,6 +509,57 @@ it.effect("thread events also need the reader's thread.read grant for that threa
   )
 )
 
+/** A published message's timeline item in `thread` of `group`, for the readers of that thread. */
+const timelineChange = Effect.fnUntraced(function* (thread: ThreadId.ThreadId, group: GroupId.GroupId) {
+  const { groupId: _, ...record } = message(`in-${thread}`, thread, group)
+  const activity = yield* ThreadActivityKind.decode(
+    ThreadMessageActivity.Published,
+    ThreadActivityKind.makeRecordUnsafe(
+      ThreadMessageActivity.Published,
+      {
+        id: ThreadActivity.ThreadActivityId.make(`activity-${thread}`),
+        workspaceId,
+        threadId: thread,
+        sequence: 1,
+        occurredAt: at
+      },
+      { messageId: record.id }
+    )
+  )
+  return {
+    change: ChangeFeed.Change.cases.TimelineItem.make({ item: { activity, message: record } }),
+    audience: [Group.audienceOf(group)],
+    requirement: Requirement.make(
+      ThreadPermissions.Read,
+      Target.Reference.cases.Thread.make({ workspaceId, threadId: thread })
+    )
+  } satisfies ChangeFeedChanges.Prepared
+})
+
+it.effect("a commit's changes reach the readers of what changed, who hold its read permission", () =>
+  run(
+    ({ admitted }) =>
+      Effect.gen(function* () {
+        admitted.add(groupId)
+        const feed = yield* listen()
+        yield* feed.next
+        yield* commit(publish(ThreadMessageFacts.Published, message("granted", threadId, groupId)))
+        // The reader is in the group and may read the thread; not the other thread, nor the other group.
+        const received = committed(yield* feed.next)
+        expect(received.changes).toEqual([(yield* timelineChange(threadId, groupId)).change])
+      }),
+    {
+      grants: [threadGrant(threadId)],
+      changes: () =>
+        Effect.all([
+          timelineChange(threadId, groupId),
+          timelineChange(otherThreadId, groupId),
+          timelineChange(threadId, otherGroupId)
+        ])
+    }
+  )
+)
+
 it.effect("follows reach only their owner, and thread views hide recipients and routing", () =>
   run(({ admitted }) =>
     Effect.gen(function* () {
@@ -575,8 +646,8 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
               sequence: 1,
               kind: "message.published",
               version: 1,
-              subject: "message:message",
-              occurrence: JSON.stringify(["message.published", "message:message"]),
+              subject: "thread-message:message",
+              occurrence: JSON.stringify(["message.published", "thread-message:message"]),
               newActivity: true,
               details: { messageId: "message" },
               occurredAt: "2026-09-20T12:00:00.123Z"

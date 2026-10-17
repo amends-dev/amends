@@ -5,6 +5,7 @@ import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
+import * as ChangeFeedChanges from "../../src/change-feed/ChangeFeedChanges.ts"
 import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
 import * as Fact from "../../src/journal/Fact.ts"
@@ -62,7 +63,13 @@ it.effect("a follower whose read fails follows on from its last commit, and nobo
         .commit(journal.publish(Noted, text))
         .pipe(Effect.provideService(Publication.Publication, testProvenance()))
 
-    const source = yield* ChangeFeedSource.make().pipe(Effect.provideService(Journal.Journal, flaky))
+    const source = yield* ChangeFeedSource.make().pipe(
+      Effect.provideService(Journal.Journal, flaky),
+      Effect.provideService(
+        ChangeFeedChanges.ChangeFeedChanges,
+        ChangeFeedChanges.ChangeFeedChanges.of({ changesOf: () => Effect.succeed([]) })
+      )
+    )
     const subscription = yield* source.subscribe(Option.none())
     const received = yield* Effect.forkChild(subscription.deliveries.pipe(Stream.take(2), Stream.runCollect))
     yield* TestClock.adjust("10 millis")

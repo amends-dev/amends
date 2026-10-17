@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "2f1a73a0-0f64-4637-bbf7-71601191224d",
+  "id": "acd5b252-4e9f-47d3-ae6f-244841463533",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -5310,6 +5310,34 @@
       "method": "btree",
       "concurrently": false,
       "name": "thread_activity_occurrence",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "subject",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "thread_activity_subject",
       "entityType": "indexes",
       "schema": "public",
       "table": "thread_activities"

@@ -11,6 +11,7 @@ import {
   useMarkThreadRead,
   useWorkspaceSettings,
   useTyping,
+  useThreadTimeline,
   useChangeFeed,
   ChangeFeedProvider,
   type SessionStore,
@@ -62,6 +63,7 @@ const committed = (cursor: string, ...events: Array<ReturnType<typeof event>>) =
   cursor,
   commitId: `commit-${cursor}`,
   events,
+  changes: [],
   notifications: []
 })
 
@@ -393,4 +395,62 @@ it("a read mark refreshes the reads it changes when its signal arrives, from any
   // Reading further on another device refreshes this one the same way.
   stream.send(read(5))
   await waitFor(() => expect(f.count("/groups")).toBe(3))
+})
+
+/** A published message's timeline item in the thread, saying `text`. */
+const timelineItem = (sequence: number, text: string) => ({
+  activity: {
+    id: `activity-${sequence}`,
+    workspaceId: "one",
+    threadId: "thread",
+    sequence,
+    occurredAt: at,
+    kind: "message.published",
+    version: 1,
+    subject: `thread-message:message-${sequence}`,
+    occurrence: JSON.stringify(["message.published", `thread-message:message-${sequence}`]),
+    newActivity: true,
+    details: { messageId: `message-${sequence}` }
+  },
+  message: {
+    id: `message-${sequence}`,
+    workspaceId: "one",
+    threadId: "thread",
+    author: { _tag: "Member", memberId: "owner" },
+    via: null,
+    publishedAt: at,
+    content: { _tag: "Text", text, mentions: [], revision: 1, editedAt: null }
+  }
+})
+
+it("shows the timeline items a commit delivers in place, without reading the timeline again", async () => {
+  let timeline!: ReturnType<typeof useThreadTimeline>
+  const read = [timelineItem(1, "Opening")]
+  const f = fixture({
+    // Every item fits one page, so each read is the whole timeline, from its newest end.
+    respond: (_, path) => (path === "/threads/thread/timeline" ? Promise.resolve(json(read)) : undefined),
+    mount: () => {
+      timeline = useThreadTimeline("one", "thread")
+    }
+  })
+  const stream = await f.connected(0)
+  stream.send(ready("1", false))
+  const texts = () => (timeline.value() ?? []).map((item) => ("message" in item ? item.message.content : undefined))
+  await waitFor(() => expect(texts()).toMatchObject([{ text: "Opening" }]))
+  const reads = f.count("/threads/thread/timeline")
+  // A reply shows after what was read, and an edit replaces the item it changed.
+  stream.send({ ...committed("2"), changes: [{ _tag: "TimelineItem", item: timelineItem(2, "Reply") }] })
+  await waitFor(() => expect(texts()).toMatchObject([{ text: "Opening" }, { text: "Reply" }]))
+  stream.send({ ...committed("3"), changes: [{ _tag: "TimelineItem", item: timelineItem(1, "Opening, edited") }] })
+  await waitFor(() => expect(texts()).toMatchObject([{ text: "Opening, edited" }, { text: "Reply" }]))
+  // An item that does not follow on waits until what comes before it arrives.
+  stream.send({ ...committed("4"), changes: [{ _tag: "TimelineItem", item: timelineItem(4, "Later") }] })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(texts()).toHaveLength(2)
+  expect(f.count("/threads/thread/timeline")).toBe(reads)
+  // A reset reads the timeline again and forgets what was delivered, since what was missed may have changed it.
+  read.splice(0, 1, timelineItem(1, "Opening, read again"), timelineItem(2, "Reply"))
+  stream.send(ready("5", true))
+  await waitFor(() => expect(texts()).toMatchObject([{ text: "Opening, read again" }, { text: "Reply" }]))
+  expect(f.count("/threads/thread/timeline")).toBe(reads + 1)
 })

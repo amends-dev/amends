@@ -15,13 +15,19 @@ and cache invalidation; apps mount it once per workspace view; features show its
    per group stream, group roster, thread timeline, thread participants, and turn within their
    collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
    follows it by its own stream (see the [turn guide](turns.md)).
-3. Each `Committed` message maps its events to the keys they affect
+3. Each `Committed` message carries what the commit changed in what the reader may see, each as it
+   is now, which shows in place without a read: a `TimelineItem` goes in its thread's timeline, in
+   place of the item it read at that position, or after the last while it follows on. The server
+   reads each change once, after the commit, for every reader of what changed, so a change may
+   reflect later commits too, and the last change to an item follows the last commit that changed
+   it. An edit therefore updates the message's item where it already shows.
+4. Each `Committed` message maps its events to the keys they affect
    (`apps/client/src/live/api.ts`) and invalidates each once, so every affected read
    refreshes once. A member's rename refreshes the members and the directory. Group creation,
    renames, and membership changes also refresh the public groups, and a public group's creation
    reaches the whole workspace. Thread activity
    names its thread and group in its payload, so it refreshes
-   that thread's timeline and that group's stream, and the groups list; a group's rename refreshes
+   that group's stream and the groups list, while the thread's timeline takes the commit's changes; a group's rename refreshes
    the groups list; group membership
    refreshes the groups and that group's stream and roster, and every open timeline and participant
    list, since the fact names no threads and each must check its access again; joining or leaving a
@@ -34,16 +40,18 @@ and cache invalidation; apps mount it once per workspace view; features show its
    fact, and the `connection.*` facts, but a replaced key, and the membership and grant facts
    their readiness, names, and access follow; a connection's models refresh with connections.
    Every `turn.*` fact names its turn, so
-   it refreshes that turn and the active turns; a thread's turns show in its timeline, which the
-   turn activity recorded there refreshes. Group membership and grant changes refresh the active
+   it refreshes that turn and the active turns; a thread's turns show in its timeline, which takes
+   the turn's items as the commit delivers them. Group membership and grant changes refresh the active
    turns. A commit that
    carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
    value, so the stream and thread panel replace what they show with an unavailable state once a
    refresh answers gone or denied, until a later refresh succeeds. Facts with no mapping refresh nothing. Add
    a mapping when a read starts depending on a fact.
-4. `Ready` with `reset` invalidates every key for the workspace and the directory. A first
-   connection always resets, because reads loaded before it may have missed commits.
+5. `Ready` with `reset` invalidates every key for the workspace and the directory, and forgets the
+   changes delivered so far, since what was missed may have changed them. A first connection always
+   resets, because reads loaded before it may have missed commits. A timeline's refresh reads again
+   every item it shows.
 
 A write that commits still refreshes the reads it changed before reporting success, so its result
 appears at once; the feed then delivers the same commit and refreshes those reads again. Read

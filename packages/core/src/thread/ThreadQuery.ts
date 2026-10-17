@@ -24,6 +24,7 @@ import type * as GroupMembership from "../group/GroupMembership.ts"
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
+import type * as Subject from "../journal/Subject.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Member from "../workspace/Member.ts"
@@ -67,6 +68,17 @@ export type AccessError = Authorization.Error | StoreError.StoreError | Schema.S
  * @since 0.1.0
  */
 export type TimelineError = AccessError | StoreError.StoreError
+
+/**
+ * A timeline item as it is now, with its thread, whose group is its audience.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export interface AboutItem {
+  readonly thread: Thread.Thread
+  readonly item: Thread.TimelineItem
+}
 
 /**
  * What listing a group's readable threads can fail with, beyond the listing's own failures.
@@ -170,6 +182,14 @@ export class ThreadQuery extends Context.Service<
     readonly readTimelineItem: (
       activityId: ThreadActivity.ThreadActivityId
     ) => Effect.Effect<Thread.TimelineItem, TimelineError, Actor.Actor>
+    /**
+     * Every timeline item about one of these subjects as it is now, with its thread: what a
+     * commit naming them changed in the timelines. It checks no one's access; the change feed
+     * checks each reader's.
+     */
+    readonly timelineItemsAbout: (
+      subjects: ReadonlyArray<Subject.Subject>
+    ) => Effect.Effect<ReadonlyArray<AboutItem>, StoreError.StoreError>
   }
 >()("@amends-dev/core/thread/ThreadQuery") {}
 
@@ -379,6 +399,28 @@ export const make = Effect.gen(function* () {
     return item
   })
 
+  const timelineItemsAbout = Effect.fn("ThreadQuery.timelineItemsAbout")(function* (
+    subjects: ReadonlyArray<Subject.Subject>
+  ) {
+    const activities = yield* threadActivityStore.listBySubjects(subjects)
+    if (activities.length === 0) return []
+    const threads = new Map(
+      (yield* threadStore.getMany([...new Set(activities.map(({ threadId }) => threadId))])).map(
+        (thread) => [thread.id, thread] as const
+      )
+    )
+    const byThread = new Map<ThreadId.ThreadId, Array<ThreadActivity.ThreadActivity>>()
+    for (const activity of activities)
+      byThread.set(activity.threadId, [...(byThread.get(activity.threadId) ?? []), activity])
+    const items: Array<AboutItem> = []
+    for (const [threadId, inThread] of byThread) {
+      const thread = threads.get(threadId)
+      if (thread === undefined) return yield* Effect.die("A thread with activity is missing")
+      for (const item of yield* threadActivityResolvers.resolve(thread, inThread)) items.push({ thread, item })
+    }
+    return items
+  })
+
   return ThreadQuery.of({
     requireAccess,
     requireReadable,
@@ -389,7 +431,8 @@ export const make = Effect.gen(function* () {
     findParticipants,
     listReadable,
     readTimeline,
-    readTimelineItem
+    readTimelineItem,
+    timelineItemsAbout
   })
 })
 

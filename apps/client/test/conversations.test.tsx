@@ -147,7 +147,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         payload: { groupId: "group", activity: { threadId: "thread" } }
       }
     ])
-  ).toEqual(["workspace/one/groups", "workspace/one/streams:group", "workspace/one/timelines:thread"])
+  ).toEqual(["workspace/one/groups", "workspace/one/streams:group"])
   // Leaving a group also changes which notification sources the reader can still read.
   // Every open thread checks its access again, since the fact names no threads.
   // Public groups show who belongs, so their listing refreshes too.
@@ -164,8 +164,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
   // A payload without the expected field refreshes the whole collection rather than none.
   expect(keys([{ name: "thread.activity.recorded", payload: {} }])).toEqual([
     "workspace/one/groups",
-    "workspace/one/streams",
-    "workspace/one/timelines"
+    "workspace/one/streams"
   ])
   expect(keys([{ name: "workspace.assignment.revoked" }])).toContain("workspace/one/streams")
   // A new name shows wherever the groups list names the group, and among public groups.
@@ -328,7 +327,7 @@ it("an older page that fails says so, and loading again tries it once more", asy
   expect(view().earlierFailed()).toBe(false)
 })
 
-it("a timeline opens at its newest activity, pages back once, and a change reads only what followed", async () => {
+it("a timeline opens at its newest activity, pages back once, and a refresh reads again what it shows", async () => {
   const timeline = Array.from({ length: 70 }, (_, index) => item(index + 1))
   const { fetch, requests } = host([], timeline)
   const view = mount(fetch, () => useThreadTimeline("one", "thread"))
@@ -338,23 +337,19 @@ it("a timeline opens at its newest activity, pages back once, and a change reads
       ?.map((entry: ThreadTimeline.Item) => entry.activity.sequence) ?? []
   await waitFor(() => expect(sequences()).toHaveLength(50))
   expect([sequences()[0], sequences().at(-1)]).toEqual([21, 70])
-  // The first read and its catch-up are the only reads so far.
   expect(requests.map((url) => url.search)).toEqual(["?limit=50&from=newest"])
   requests.length = 0
+  // A refresh reads every item shown again, down to the oldest, and shows no more than that.
   timeline.push(item(71), item(72))
   view().retry()
   await waitFor(() => expect(sequences().at(-1)).toBe(72))
-  expect(requests.map((url) => url.searchParams.get("afterSequence"))).toEqual(["70"])
+  expect([sequences()[0], view().complete()]).toEqual([21, false])
+  expect(requests.map((url) => url.searchParams.get("beforeSequence"))).toEqual([null, "23"])
   requests.length = 0
   view().loadEarlier()
   await waitFor(() => expect(view().complete()).toBe(true))
   expect(sequences()).toEqual(Array.from({ length: 72 }, (_, index) => index + 1))
-  expect(
-    requests.map((url) => [url.searchParams.get("beforeSequence"), url.searchParams.get("afterSequence")])
-  ).toEqual([
-    ["21", null],
-    [null, "72"]
-  ])
+  expect(requests.map((url) => url.searchParams.get("beforeSequence"))).toEqual([null, "23"])
 })
 
 /** A notification for Alice recorded at the given minute, from the given thread position. */

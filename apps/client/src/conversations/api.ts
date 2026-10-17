@@ -17,6 +17,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as Reactivity from "effect/reactivity/Reactivity"
 import * as Schema from "effect/Schema"
 import type { ApiClient, WorkspaceApi } from "../api/client.ts"
@@ -265,10 +266,48 @@ export const streamRead = (client: ApiClient, workspaceId: string, groupId: stri
     ? streamOf(client, joined(workspaceId, groupId))
     : undefined
 
+/**
+ * The timeline items the change feed delivered for one thread, by position, each as it is now. They
+ * live while the thread's timeline is shown, and a reset forgets them, since what was missed may
+ * have changed them.
+ */
+const deliveredItemsOf = Atom.family((_key: string) => Atom.make<ReadonlyMap<number, ThreadTimeline.Item>>(new Map()))
+/** Put a timeline item the change feed delivered in its thread's delivered items, returning its thread's key. */
+export const deliverTimelineItem = (
+  registry: AtomRegistry.AtomRegistry,
+  workspaceId: string,
+  item: ThreadTimeline.Item
+) => {
+  const key = joined(workspaceId, item.activity.threadId)
+  registry.update(deliveredItemsOf(key), (items) => new Map(items).set(item.activity.sequence, item))
+  return key
+}
+/** Forget the delivered items of the threads with these keys, as `deliverTimelineItem` returned them. */
+export const forgetDeliveredItems = (registry: AtomRegistry.AtomRegistry, keys: Iterable<string>) => {
+  for (const key of keys) registry.set(deliveredItemsOf(key), new Map())
+}
+/**
+ * A timeline as it shows with the items the change feed delivered: each item read in its delivered
+ * form, then the delivered items that follow the last one read, while they follow on.
+ */
+export const withDeliveredItems = (
+  paged: Paged<ThreadTimeline.Item>,
+  delivered: ReadonlyMap<number, ThreadTimeline.Item>
+): Paged<ThreadTimeline.Item> => {
+  if (delivered.size === 0) return paged
+  const items = paged.items.map((item) => delivered.get(item.activity.sequence) ?? item)
+  for (let next = (items.at(-1)?.activity.sequence ?? 0) + 1; ; next++) {
+    const item = delivered.get(next)
+    if (item === undefined) break
+    items.push(item)
+  }
+  return { ...paged, items }
+}
+
 const timelineOf = perClient((client: ApiClient, key: string): PagedRead<ThreadTimeline.Item, unknown> => {
   const { workspaceId, id } = split(key)
   const earlier = Atom.make(0)
-  const atom = client.runtime
+  const read = client.runtime
     .atom(
       Effect.fnUntraced(function* (get) {
         const api = yield* client
@@ -280,31 +319,53 @@ const timelineOf = perClient((client: ApiClient, key: string): PagedRead<ThreadT
           readonly beforeSequence?: number
           readonly from?: "newest"
         }) => api.threads.timeline({ params, query: { limit: pageSize, ...query } })
-        if (Option.isNone(previous)) {
-          const page = yield* read({ from: "newest" })
-          return { items: page, complete: page.length < pageSize, earlier: requested }
-        }
-        let { items, complete } = previous.value
-        // A timeline only grows: older pages are read once, and a change reads what followed.
-        const first = items[0]
-        if (requested > previous.value.earlier && first !== undefined && !complete) {
-          const page = yield* read({ beforeSequence: first.activity.sequence, from: "newest" })
-          items = [...page, ...items]
-          complete = page.length < pageSize
-        }
+        // The oldest item shown stays shown: a refresh reads every item down to it, since the change
+        // feed may have missed changes to them, and a request for more reads one page past it.
+        const oldest = Option.flatMap(previous, (view) => Option.fromUndefinedOr(view.items[0]?.activity.sequence))
+        const more = Option.isNone(previous) || requested > previous.value.earlier
+        /** The pages read, oldest first. */
+        const pages: Array<ReadonlyArray<ThreadTimeline.Item>> = []
+        let complete = false
+        let before: number | undefined
         while (true) {
-          const last = items.at(-1)
-          const page = yield* read({ afterSequence: last?.activity.sequence ?? 0 })
-          items = [...items, ...page]
-          if (page.length < pageSize) break
+          const page = yield* read(
+            before === undefined ? { from: "newest" } : { beforeSequence: before, from: "newest" }
+          )
+          pages.unshift(page)
+          const first = page[0]
+          if (page.length < pageSize || first === undefined) {
+            complete = true
+            break
+          }
+          before = first.activity.sequence
+          if (Option.isNone(oldest)) break
+          const done = more
+            ? pages.flat().filter((item) => item.activity.sequence < oldest.value).length >= pageSize
+            : first.activity.sequence <= oldest.value
+          if (done) break
+        }
+        let items = pages.flat()
+        // A refresh shows what was shown, however far back its last page reached.
+        if (Option.isSome(oldest) && !more) {
+          const shown = items.filter((item) => item.activity.sequence >= oldest.value)
+          if (shown.length < items.length) {
+            items = shown
+            complete = false
+          }
         }
         return { items, complete, earlier: requested }
       })
     )
     .pipe(Atom.withReactivity(itemKeys(workspaceId, "timelines", id)))
+  const delivered = deliveredItemsOf(key)
+  // Refreshing the timeline reads it again; what the change feed delivered stays in place.
+  const atom = Atom.readable(
+    (get) => AsyncResult.map(get(read), (paged) => withDeliveredItems(paged, get(delivered))),
+    (refresh) => refresh(read)
+  )
   return { atom, earlier }
 })
-/** A thread's timeline from its newest activity, oldest shown first. */
+/** A thread's timeline from its newest activity, oldest shown first, with what the change feed delivered. */
 export const timelineRead = (client: ApiClient, workspaceId: string, threadId: string) =>
   valid(workspaceId) && Option.isSome(Schema.decodeOption(ThreadId.ThreadId)(threadId))
     ? timelineOf(client, joined(workspaceId, threadId))

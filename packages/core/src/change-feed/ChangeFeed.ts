@@ -1,7 +1,8 @@
 /**
  * The change feed as a reader sees it: the `Message`s one subscription delivers, from `Ready`
- * through each commit the reader may see and the signals happening meanwhile, and the `Cursor` a
- * reader stores to resume after the last commit it received. `ChangeFeedService.watch` serves
+ * through each commit the reader may see and the signals happening meanwhile, the `Change`s a commit
+ * makes to what readers show, and the `Cursor` a reader stores to resume after the last commit it
+ * received. `ChangeFeedService.watch` serves
  * it, and the HTTP API streams it as server-sent events.
  *
  * @since 0.1.0
@@ -13,6 +14,7 @@ import * as Schema from "effect/Schema"
 import * as JournalEvent from "../journal/Event.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Signal from "../signal/Signal.ts"
+import * as ThreadTimeline from "../thread/ThreadTimeline.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
@@ -70,12 +72,30 @@ export const Event = Schema.Struct({
 export interface Event extends Schema.Schema.Type<typeof Event> {}
 
 /**
+ * Something a reader's view shows, as it is now, that a commit changed: what the reader puts in
+ * place of what they show, rather than reading it again. Each is computed once, after the commit,
+ * so it may reflect later commits too; the last change to anything follows its last commit.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Change = Schema.TaggedUnion({
+  /** A timeline item as its thread shows it now: one the commit recorded, or about a record it changed. */
+  TimelineItem: { item: ThreadTimeline.Item }
+}).annotate({ identifier: "ChangeFeedChange" })
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Change = typeof Change.Type
+
+/**
  * What one subscription delivers. Ready opens every subscription. With `reset`, the consumer must refresh its view: it gave no
  * cursor, an unknown one, or one too far behind to replay. Without it, the commits after the
  * consumer's cursor follow. Its cursor is where delivery starts; null means an empty journal.
  * Committed carries one commit for the reader, with the cursor that resumes after it: the events
- * they may see, in order, and the notifications it created for them, as their inbox lists them.
- * It is sent only when at least one of the two is present. Signal carries something happening now,
+ * they may see, in order, what it changed in what they may see, and the notifications it created
+ * for them, as their inbox lists them. It is sent only when one of these is present. Signal carries something happening now,
  * such as typing, that the reader may see; it has no cursor, is never replayed, and may be missed.
  *
  * @category schemas
@@ -92,6 +112,7 @@ export const Message = Schema.TaggedUnion({
     cursor: Cursor,
     commitId: Commit.CommitId,
     events: Schema.Array(Event),
+    changes: Schema.Array(Change),
     notifications: Schema.Array(Notification.Notification)
   },
   Signal: {

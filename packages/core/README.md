@@ -266,6 +266,7 @@ read through `ThreadQuery`; a query never writes.
 | `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones.                                          |
 | `ThreadQuery.listReadable`                                                | A page of a group's readable threads, from any listing, with tasks, latest activity, and positions.    |
 | `ThreadQuery.readTimeline`, `readTimelineItem`                            | Timeline subjects resolved under access, for timeline pages and notification sources.                  |
+| `ThreadQuery.timelineItemsAbout`                                          | The timeline items about some subjects as they are now, checking no access, for the change feed.       |
 | `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message. |
 | `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients.                                     |
 | `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording.            |
@@ -558,8 +559,9 @@ feed reads the workspace journal, so it carries every commit from any host or pr
 storage, including commits whose acknowledgment was lost; nothing is published from the commit path.
 
 `ChangeFeedSource` shares one follower of the journal per workspace runtime, started by the first
-subscriber at the journal's head and stopped when the last leaves. It decodes each commit once and
-buffers it for every subscriber, waiting for the next with `Store.waitForAppend`. A subscriber
+subscriber at the journal's head and stopped when the last leaves. It decodes each commit once,
+reads once what the commit changed in what readers show (`ChangeFeedChanges`), and buffers it for
+every subscriber, waiting for the next with `Store.waitForAppend`. A subscriber
 registers before reading the journal, so no commit falls between the two, and one that falls more
 than 256 commits behind reads what it lost from the journal instead of failing. When reading fails,
 the follower logs it and follows again from the last commit it delivered, backing off up to five
@@ -568,8 +570,8 @@ version this host does not know or a payload its schema rejects, is logged and e
 subscription so the consumer refreshes, and the follower goes on past it.
 
 `watch` checks active membership, then emits `Ready { workspaceId, cursor, reset }` and a
-`Committed { workspaceId, cursor, commitId, events, notifications }` for each later commit with
-something the reader may see. A cursor is opaque and resumes after the commit that carried it. Given
+`Committed { workspaceId, cursor, commitId, events, changes, notifications }` for each later commit
+with something the reader may see. A cursor is opaque and resumes after the commit that carried it. Given
 `after`, the feed replays the commits after it, up to 500, with `reset: false`; without one, or with
 a cursor it cannot resume from, `Ready` has `reset: true` at the head and the consumer must refresh
 its view. `Ready`'s cursor is null only for an empty journal.
@@ -586,6 +588,13 @@ The commit that removes the reader from the workspace is delivered, then the str
 views give some facts their public shape: activity omits its recipients, and participation omits
 routing identities and admissions. A core test checks that the registry holds every fact that
 declares an audience, at each version, and no other.
+
+A commit's `changes` are what it changed in what readers show, each as it is now, so a reader puts it
+in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the
+commit's entries name, the items it recorded and those about a message, turn, or task it changed,
+since an item shows its subject's current state. They are read after the commit, so one may reflect
+later commits too, and the last change to an item follows the last commit that changed it. Each
+reaches the readers of its thread's group who hold `thread.read` on the thread, as its read does.
 
 Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
 same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with

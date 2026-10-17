@@ -12,7 +12,7 @@ import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 
 const subject = ({ participationId }: { readonly participationId: ThreadParticipationId.ThreadParticipationId }) =>
-  Subject.make("participation", participationId)
+  Subject.make("thread-participation", participationId)
 
 /**
  * A member joined the thread by following it. Joining by replying or being mentioned records no

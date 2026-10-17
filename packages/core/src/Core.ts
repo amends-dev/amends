@@ -24,6 +24,7 @@ import * as Delegation from "./authorization/Delegation.ts"
 import * as GrantResolver from "./authorization/GrantResolver.ts"
 import * as PermissionCatalog from "./authorization/PermissionCatalog.ts"
 import * as RoleProjection from "./authorization/RoleProjection.ts"
+import * as ChangeFeedChanges from "./change-feed/ChangeFeedChanges.ts"
 import * as ChangeFeedService from "./change-feed/ChangeFeedService.ts"
 import * as ChangeFeedSource from "./change-feed/ChangeFeedSource.ts"
 import * as ChannelIntake from "./channel/ChannelIntake.ts"
@@ -215,7 +216,9 @@ const memberCommand = MemberCommand.layer.pipe(Layer.provide([AssignmentCommand.
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
  */
-const changeFeedSource = ChangeFeedSource.layer()
+const changeFeedSource = ChangeFeedSource.layer().pipe(
+  Layer.provide(ChangeFeedChanges.layer.pipe(Layer.provide(threadQuery)))
+)
 const changeFeedService = ChangeFeedService.layer.pipe(Layer.provide([changeFeedSource, GrantResolver.layer]))
 
 /**
