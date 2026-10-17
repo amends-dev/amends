@@ -125,6 +125,30 @@ export const restrict = <Tools extends Record<string, Tool.Any>>(
  * A toolkit of the tools of both, whose names are the tools' own, which run as they do in the
  * toolkit they come from. A name that both have is `first`'s.
  *
+ * **Example** (The host's own tools beside a workspace's sources)
+ *
+ * ```ts
+ * import { Assembly, Presentation } from "@amends-dev/toolkit"
+ * import { Effect, Schema } from "effect"
+ * import { Tool, Toolkit } from "effect/ai"
+ *
+ * const Remember = Tool.make("remember", {
+ *   description: "Keeps a note for later turns",
+ *   parameters: Schema.Struct({ note: Schema.String }),
+ *   success: Schema.Void
+ * })
+ * const Own = Toolkit.make(Remember)
+ *
+ * declare const members: ReadonlyArray<Assembly.Member>
+ *
+ * const program = Effect.gen(function* () {
+ *   const own = yield* Own.pipe(Effect.provide(Own.toLayer({ remember: () => Effect.void })))
+ *   const assembled = yield* Assembly.toolkit(members, () => "allow")
+ *   // `remember` runs as the host wrote it, and `github__create_issue` as its source does.
+ *   return Presentation.merge(own, assembled)
+ * })
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

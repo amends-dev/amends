@@ -139,6 +139,52 @@ const maxFailureLength = 500
  * `CallFailedError`, holding the API's own words cut to 500 characters. A success is the body as
  * JSON, as text, or `null` without one.
  *
+ * **Example** (A source of an API, from an operation written by hand)
+ *
+ * ```ts
+ * import { Http } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ * import { FetchHttpClient, HttpClient } from "effect/http"
+ *
+ * const listIssues: Http.Operation = {
+ *   definition: {
+ *     name: "list_issues",
+ *     description: "Lists the open issues of a repository",
+ *     inputSchema: {
+ *       type: "object",
+ *       properties: {
+ *         owner: { type: "string" },
+ *         repo: { type: "string" },
+ *         labels: { type: "string", description: "Labels the issues must have, separated by commas" }
+ *       },
+ *       required: ["owner", "repo"]
+ *     },
+ *     annotations: { readOnly: true }
+ *   },
+ *   request: {
+ *     method: "GET",
+ *     path: "/repos/{owner}/{repo}/issues",
+ *     parameters: [
+ *       { in: "path", name: "owner", property: "owner" },
+ *       { in: "path", name: "repo", property: "repo" },
+ *       { in: "query", name: "labels", property: "labels" }
+ *     ]
+ *   }
+ * }
+ *
+ * const program = Effect.gen(function* () {
+ *   const client = yield* HttpClient.HttpClient
+ *   const github = yield* Http.make({
+ *     name: "github",
+ *     baseUrl: "https://api.github.com",
+ *     client,
+ *     operations: [listIssues]
+ *   })
+ *   // Sends GET /repos/amends-dev/amends/issues?labels=bug, and answers with the body as JSON.
+ *   return yield* github.call("list_issues", { owner: "amends-dev", repo: "amends", labels: "bug" })
+ * }).pipe(Effect.provide(FetchHttpClient.layer))
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

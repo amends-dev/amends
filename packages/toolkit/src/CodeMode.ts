@@ -126,6 +126,25 @@ const executeName = "execute"
  * Makes the toolkit of `execute`, and the tools of `presented` that need approval, over `presented`
  * and the runtime that runs the code. Building contacts nothing.
  *
+ * **Example** (Presenting tools as code the model writes)
+ *
+ * ```ts
+ * import { Assembly, CodeMode } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ *
+ * declare const members: ReadonlyArray<Assembly.Member>
+ * declare const runtime: CodeMode.CodeRuntime // an isolate that reaches only the tools it is given
+ *
+ * const program = Effect.gen(function* () {
+ *   const assembled = yield* Assembly.toolkit(members, (_source, definition) =>
+ *     definition.annotations.readOnly === true ? "allow" : "approve"
+ *   )
+ *   // The model is shown `execute`, which calls the read-only tools as `await tools.<name>(input)`,
+ *   // and each tool that needs approval as a tool of its own.
+ *   return yield* CodeMode.toolkit(assembled, runtime, { timeout: "30 seconds" })
+ * })
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

@@ -240,6 +240,21 @@ export const reasonFromHttpClientError = (error: HttpClientError.HttpClientError
  * What every operation of a tool source fails with: the source that failed, by its name, and the
  * reason. Only an `UnavailableError` is worth trying again, as `isRetryable` says.
  *
+ * **Example** (Recovering from one reason)
+ *
+ * ```ts
+ * import type { ToolSource } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ *
+ * declare const github: ToolSource.ToolSource
+ * declare const askToConnectAgain: Effect.Effect<void>
+ *
+ * // A refused credential is the connection's to fix; the other reasons stay failures.
+ * const definitions = github.discover.pipe(
+ *   Effect.catchReason("ToolSourceError", "AuthenticationError", () => Effect.as(askToConnectAgain, []))
+ * )
+ * ```
+ *
  * @category errors
  * @since 0.1.0
  */

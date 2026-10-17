@@ -84,6 +84,30 @@ export interface Failure extends Schema.Schema.Type<typeof Failure> {}
  *
  * Building contacts nothing: the source is reached only when the model calls a tool.
  *
+ * **Example** (The tools of a source, given to a model)
+ *
+ * ```ts
+ * import { ToolSource } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ * import { LanguageModel } from "effect/ai"
+ *
+ * declare const github: ToolSource.ToolSource // from Mcp.http or Http.make
+ *
+ * const program = Effect.gen(function* () {
+ *   // The definitions come from the host's catalog, which `discover` fills when it refreshes.
+ *   const definitions = yield* github.discover
+ *   const toolkit = yield* ToolSource.toolkit(github, definitions, {
+ *     needsApproval: (definition) => definition.annotations.readOnly !== true
+ *   })
+ *   // The model calls a tool by the name the source gave it, and reads a failure as a result.
+ *   const response = yield* LanguageModel.generateText({
+ *     prompt: "Which issues of amends-dev/amends are open?",
+ *     toolkit
+ *   })
+ *   return response.text
+ * })
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

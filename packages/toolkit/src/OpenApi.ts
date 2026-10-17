@@ -88,6 +88,27 @@ const methods: ReadonlyArray<Http.Method> = ["GET", "PUT", "POST", "DELETE", "OP
  * Reads the operations of the API that `document` specifies, which is JSON already read. Nothing
  * it refers to outside itself is fetched.
  *
+ * **Example** (A source of an API, from its OpenAPI document)
+ *
+ * ```ts
+ * import { Http, OpenApi } from "@amends-dev/toolkit"
+ * import { Effect, Schema } from "effect"
+ * import { FetchHttpClient, HttpClient } from "effect/http"
+ *
+ * declare const document: Schema.Json // the API's OpenAPI document, read as JSON
+ *
+ * const program = Effect.gen(function* () {
+ *   const { operations, servers, skipped } = yield* OpenApi.readOperations(document)
+ *   // An operation that cannot be a tool is in `skipped`, with why, for a person to read.
+ *   for (const { operation, reason } of skipped) yield* Effect.logWarning(`${operation}: ${reason}`)
+ *   // The document's first server is where its requests go, unless the host says otherwise.
+ *   const baseUrl = servers[0] ?? "https://petstore.example.com/api"
+ *   const client = yield* HttpClient.HttpClient
+ *   const petstore = yield* Http.make({ name: "petstore", baseUrl, client, operations })
+ *   return yield* petstore.discover
+ * }).pipe(Effect.provide(FetchHttpClient.layer))
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

@@ -65,6 +65,21 @@ export interface Options {
 /**
  * Makes the toolkit of `tool_search` and `tool_call` over `presented`. Building contacts nothing.
  *
+ * **Example** (Presenting a large set of tools as a search)
+ *
+ * ```ts
+ * import { Assembly, ToolSearch } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ *
+ * declare const members: ReadonlyArray<Assembly.Member> // an API's hundreds of operations
+ *
+ * const program = Effect.gen(function* () {
+ *   const assembled = yield* Assembly.toolkit(members, () => "allow")
+ *   // The model is shown `tool_search` and `tool_call`, however many tools there are.
+ *   return yield* ToolSearch.toolkit(assembled, { limit: 10 })
+ * })
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

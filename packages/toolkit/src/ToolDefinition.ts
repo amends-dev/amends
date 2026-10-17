@@ -52,6 +52,21 @@ export interface Annotations extends Schema.Schema.Type<typeof Annotations> {}
  * A source reports these from `discover`, a catalog stores them as JSON, and
  * `ToolSource.toolkit` and `Assembly.toolkit` build from them the tools a model calls.
  *
+ * **Example** (A catalog of a source's tools, stored as JSON)
+ *
+ * ```ts
+ * import { ToolDefinition, type ToolSource } from "@amends-dev/toolkit"
+ * import { Effect, Schema } from "effect"
+ *
+ * declare const github: ToolSource.ToolSource
+ * declare const store: (catalog: string) => Effect.Effect<void>
+ *
+ * const CatalogJson = Schema.fromJsonString(Schema.toCodecJson(Schema.Array(ToolDefinition.ToolDefinition)))
+ *
+ * // Refreshing the catalog asks the source what it has now, and stores it for the turns to come.
+ * const refresh = github.discover.pipe(Effect.flatMap(Schema.encodeEffect(CatalogJson)), Effect.flatMap(store))
+ * ```
+ *
  * @category schemas
  * @since 0.1.0
  */

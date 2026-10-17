@@ -73,6 +73,27 @@ const maxToolPages = 100
  * fails as `CallFailedError`, with what it said, and one that asks for input first as
  * `UnsupportedError`.
  *
+ * **Example** (A source of an MCP server, with the server's credentials on the client)
+ *
+ * ```ts
+ * import { Mcp } from "@amends-dev/toolkit"
+ * import { Config, Effect, Redacted } from "effect"
+ * import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
+ *
+ * const program = Effect.gen(function* () {
+ *   const token = yield* Config.Redacted("MCP_TOKEN")
+ *   // The client carries the credentials, so the source never sees them.
+ *   const client = (yield* HttpClient.HttpClient).pipe(
+ *     HttpClient.mapRequest(HttpClientRequest.bearerToken(Redacted.value(token)))
+ *   )
+ *   const tasks = yield* Mcp.http({ name: "tasks", url: "https://mcp.example.com/mcp", client })
+ *   // The server is first reached here: the catalog stores what it lists.
+ *   const definitions = yield* tasks.discover
+ *   const result = yield* tasks.call("list_tasks", { status: "open" })
+ *   return { definitions, result }
+ * }).pipe(Effect.provide(FetchHttpClient.layer))
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */
