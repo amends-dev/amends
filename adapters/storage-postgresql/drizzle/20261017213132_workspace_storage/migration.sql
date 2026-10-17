@@ -238,23 +238,11 @@ CREATE TABLE "log_entries" (
 	"entry_index" integer NOT NULL,
 	"recorded_at" timestamp with time zone NOT NULL,
 	"payload" bytea NOT NULL,
+	"name" text,
 	"subject" text,
-	"fact_name" text,
-	"fact_version" double precision,
-	"performer_kind" text,
-	"performer_member_id" text,
-	"performer_identity_kind" text,
-	"performer_identity_id" text,
-	"performer_system_id" text,
-	"cause_log_id" text,
-	"cause_commit_id" text,
-	"cause_entry_id" text,
-	"correlation_id" text,
-	"occurred_at" timestamp with time zone,
 	CONSTRAINT "log_entries_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "log_entries_fact_header" CHECK (("subject" IS NULL AND "fact_name" IS NULL AND "fact_version" IS NULL AND "performer_kind" IS NULL) OR ("subject" IS NOT NULL AND "fact_name" IS NOT NULL AND "fact_version" IS NOT NULL AND "performer_kind" IS NOT NULL)),
-	CONSTRAINT "log_entries_provenance" CHECK (("performer_kind" IS NULL AND "performer_member_id" IS NULL AND "performer_identity_kind" IS NULL AND "performer_identity_id" IS NULL AND "performer_system_id" IS NULL AND "correlation_id" IS NULL AND "occurred_at" IS NULL AND "cause_log_id" IS NULL AND "cause_commit_id" IS NULL AND "cause_entry_id" IS NULL) OR ("performer_kind" IS NOT NULL AND "correlation_id" IS NOT NULL AND "occurred_at" IS NOT NULL AND (("performer_kind" = 'Member' AND "performer_member_id" IS NOT NULL AND "performer_identity_kind" IN ('Human', 'Agent') AND "performer_identity_kind" IS NOT NULL AND "performer_identity_id" IS NOT NULL AND "performer_system_id" IS NULL) OR ("performer_kind" = 'Identity' AND "performer_member_id" IS NULL AND "performer_identity_kind" IN ('Human', 'Agent', 'Contact') AND "performer_identity_kind" IS NOT NULL AND "performer_identity_id" IS NOT NULL AND "performer_system_id" IS NULL) OR ("performer_kind" = 'System' AND "performer_member_id" IS NULL AND "performer_identity_kind" IS NULL AND "performer_identity_id" IS NULL AND "performer_system_id" IS NOT NULL)))),
-	CONSTRAINT "log_entries_cause" CHECK (("cause_log_id" IS NULL AND "cause_commit_id" IS NULL AND "cause_entry_id" IS NULL) OR ("cause_log_id" IS NOT NULL AND "cause_commit_id" IS NOT NULL AND "cause_entry_id" IS NOT NULL))
+	CONSTRAINT "log_entries_name" CHECK ("name" IS NULL OR "name" <> ''),
+	CONSTRAINT "log_entries_subject" CHECK ("subject" IS NULL OR "subject" <> '')
 );
 --> statement-breakpoint
 CREATE TABLE "members" (
@@ -511,7 +499,7 @@ CREATE UNIQUE INDEX "log_batches_by_commit" ON "log_batches" ("workspace_id","lo
 CREATE UNIQUE INDEX "log_entries_by_position" ON "log_entries" ("workspace_id","log_id","position","entry_index");--> statement-breakpoint
 CREATE INDEX "log_entries_by_commit" ON "log_entries" ("workspace_id","log_id","commit_id","entry_index");--> statement-breakpoint
 CREATE INDEX "log_entries_by_subject" ON "log_entries" ("workspace_id","log_id","subject","position","entry_index");--> statement-breakpoint
-CREATE INDEX "log_entries_by_fact" ON "log_entries" ("workspace_id","log_id","fact_name","position","entry_index");--> statement-breakpoint
+CREATE INDEX "log_entries_by_name" ON "log_entries" ("workspace_id","log_id","name","position","entry_index");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_member_identity" ON "members" ("workspace_id","identity_kind","identity_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "members_by_identity" ON "members" ("identity_kind","identity_id","workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "notifications_by_source_recipient" ON "notifications" ("workspace_id","source_log_id","source_entry_id","recipient_kind",coalesce("recipient_id", ''));--> statement-breakpoint

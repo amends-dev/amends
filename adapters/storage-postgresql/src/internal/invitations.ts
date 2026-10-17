@@ -10,8 +10,8 @@
  * requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { Invitation, InvitationStore, type WorkspaceId } from "@amends-dev/core/workspace"
+import { StoreError } from "@amends-dev/log"
 import { and, asc, eq, type SQL } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

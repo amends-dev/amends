@@ -22,10 +22,10 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
 import * as GroupCommand from "./GroupCommand.ts"
 import * as GroupId from "./GroupId.ts"
@@ -125,7 +125,7 @@ export const make = Effect.gen(function* () {
   const groupQuery = yield* GroupQuery.GroupQuery
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /**
    * Management needs the grant and membership of the group; to anyone outside it, it is missing.

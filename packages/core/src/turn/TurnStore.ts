@@ -7,19 +7,20 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Turn from "./Turn.ts"
 import * as TurnId from "./TurnId.ts"
 
@@ -80,7 +81,7 @@ export class TurnStore extends Context.Service<
  */
 export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: TurnStore["Service"]): TurnStore["Service"] => {
   const read = StoreInput.read("TurnStore")
-  const write = StoreInput.write("TurnStore", workspaceId)
+  const write = StoreInput.write("TurnStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", TurnId.TurnId, id), driver.get),
     findActive: Effect.fn("TurnStore.findActive")(function* (memberId, threadId) {
@@ -118,7 +119,7 @@ const byCreated = (left: Turn.Turn, right: Turn.Turn) =>
  * Turn records over the current workspace transaction.
  */
 const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const all = (operation: string) =>
     Effect.gen(function* () {
       return yield* rows.all((yield* read).records.of("turns"))
@@ -206,7 +207,7 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `TurnStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps what
+ * Provide `TurnStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It keeps what
  * the contract leaves to storage: a reused ID is rejected, and so is a second active turn of one
  * agent on one thread, inserted or updated; an update of a missing turn is rejected. An agent's
  * turns on a thread order by creation time, then how far each accepted input, then ID. `make`

@@ -12,7 +12,7 @@ import { Core } from "@amends-dev/core"
 import type { DeliveryJobs } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import { Actor, type Identity } from "@amends-dev/core/identity"
-import { Checkpoint, Store } from "@amends-dev/core/journal"
+import { Checkpoint } from "@amends-dev/core/journal"
 import { Operation } from "@amends-dev/core/operation"
 import { Request } from "@amends-dev/core/request"
 import type { TurnJobs } from "@amends-dev/core/turn"
@@ -24,6 +24,7 @@ import {
   WorkspaceStore,
   WorkspaceId
 } from "@amends-dev/core/workspace"
+import { Store } from "@amends-dev/log"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"

@@ -1,6 +1,6 @@
+import * as Codec from "@amends-dev/log/Codec"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
-import * as Codec from "../../src/journal/Codec.ts"
 import * as Notification from "../../src/notification/Notification.ts"
 import * as NotificationStore from "../../src/notification/NotificationStore.ts"
 

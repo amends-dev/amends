@@ -8,12 +8,12 @@
  * @since 0.1.0
  */
 
+import * as Entry from "@amends-dev/log/Entry"
 import type * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
 import * as DeliveryId from "../channel/DeliveryId.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
-import * as Entry from "../journal/Entry.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
 import * as TurnId from "../turn/TurnId.ts"

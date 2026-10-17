@@ -1,7 +1,7 @@
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationService, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -11,6 +11,7 @@ import {
 } from "@amends-dev/core/thread"
 import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, Store, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect"
 import { TestClock } from "effect/testing"

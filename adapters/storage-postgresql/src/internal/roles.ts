@@ -9,7 +9,7 @@
  */
 
 import { Role, RoleStore } from "@amends-dev/core/authorization"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, lt } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"

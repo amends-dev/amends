@@ -186,6 +186,7 @@
         "@amends-dev/core": "workspace:*",
         "@amends-dev/gateway": "workspace:*",
         "@amends-dev/harness": "workspace:*",
+        "@amends-dev/log": "workspace:*",
         "@effect/sql-pg": "catalog:",
         "drizzle-orm": "1.0.0-rc.5-5935859",
         "effect": "catalog:",
@@ -372,6 +373,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@amends-dev/log": "workspace:*",
         "@amends-dev/toolkit": "workspace:*",
         "@effect/sql-pg": "catalog:",
       },
@@ -394,6 +396,7 @@
         "@amends-dev/core": "workspace:*",
         "@amends-dev/gateway": "workspace:*",
         "@amends-dev/harness": "workspace:*",
+        "@amends-dev/log": "workspace:*",
         "@amends-dev/sandbox": "workspace:*",
         "effect": "catalog:",
       },
@@ -425,6 +428,7 @@
         "@amends-dev/channel": "workspace:*",
         "@amends-dev/connection": "workspace:*",
         "@amends-dev/harness": "workspace:*",
+        "@amends-dev/log": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -434,6 +438,7 @@
       "dependencies": {
         "@amends-dev/connection": "workspace:*",
         "@amends-dev/core": "workspace:*",
+        "@amends-dev/log": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -471,6 +476,24 @@
         "@amends-dev/gateway": "workspace:*",
         "effect": "catalog:",
       },
+      "devDependencies": {
+        "@amends-dev/log": "workspace:*",
+      },
+    },
+    "packages/log": {
+      "name": "@amends-dev/log",
+      "version": "0.2.0",
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "optionalPeers": [
+        "@effect/vitest",
+      ],
     },
     "packages/sandbox": {
       "name": "@amends-dev/sandbox",
@@ -570,6 +593,8 @@
     "@amends-dev/http": ["@amends-dev/http@workspace:packages/http"],
 
     "@amends-dev/icons": ["@amends-dev/icons@workspace:apps/icons"],
+
+    "@amends-dev/log": ["@amends-dev/log@workspace:packages/log"],
 
     "@amends-dev/sandbox": ["@amends-dev/sandbox@workspace:packages/sandbox"],
 

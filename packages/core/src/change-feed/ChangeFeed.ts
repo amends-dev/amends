@@ -7,9 +7,9 @@
  * @since 0.1.0
  */
 
+import * as Commit from "@amends-dev/log/Commit"
+import * as Entry from "@amends-dev/log/Entry"
 import * as Schema from "effect/Schema"
-import * as Commit from "../journal/Commit.ts"
-import * as Entry from "../journal/Entry.ts"
 import * as JournalEvent from "../journal/Event.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Signal from "../signal/Signal.ts"

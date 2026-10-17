@@ -10,7 +10,7 @@
  */
 
 import { GroupFollow, GroupFollowStore } from "@amends-dev/core/group"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

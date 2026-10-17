@@ -1,4 +1,4 @@
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core"
 import * as Cause from "effect/Cause"
 import * as Option from "effect/Option"

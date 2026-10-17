@@ -1,18 +1,17 @@
 import { Subject } from "@amends-dev/core/journal"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Event from "../../src/journal/Event.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
-import * as Occurrence from "../../src/journal/Occurrence.ts"
 import * as Projection from "../../src/journal/Projection.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { Counter, make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
@@ -20,7 +19,7 @@ import { testProvenance } from "../publication.ts"
 const testSubject = () => Subject.make("test", "entity")
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("journal")
-const key = Occurrence.Key.make("operation/one")
+const key = Store.IdempotencyKey.make("operation/one")
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
   version: 1,
@@ -35,7 +34,13 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Log | Transaction.Transaction | Journal.Journal | Counter | Checkpoint.Checkpoint | Publication.Publication
+    | Log.Log
+    | Transaction.Transaction
+    | Journal.Journal
+    | Counter
+    | Checkpoint.Checkpoint
+    | Publication.Publication
+    | WorkspaceId.CurrentWorkspaceId
   >
 ) =>
   Effect.gen(function* () {
@@ -45,6 +50,7 @@ const run = <A, E>(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
     Effect.scoped
@@ -134,7 +140,7 @@ it.effect("conflicting key reuse aborts the enclosing commit and failed projecti
       Effect.gen(function* () {
         const journal = yield* Journal.Journal
         yield* journal.publish(Changed, 1, { idempotencyKey: key })
-        const second = Occurrence.Key.make("operation/two")
+        const second = Store.IdempotencyKey.make("operation/two")
         const error = yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
@@ -206,17 +212,17 @@ it.effect("appendAll receipts isolate slices, reject changed count or order, and
             reason: { _tag: "Rejected" }
           })
         expect(
-          (yield* Effect.flip(executionLog.appendAll([], { idempotencyKey: Occurrence.Key.make("empty") })))._tag
+          (yield* Effect.flip(executionLog.appendAll([], { idempotencyKey: Store.IdempotencyKey.make("empty") })))._tag
         ).toBe("SchemaError")
         expect(
           yield* Effect.flip(
             executionLog.append("new", {
-              idempotencyKey: Occurrence.Key.make("new"),
+              idempotencyKey: Store.IdempotencyKey.make("new"),
               expectedAfter: Option.none()
             })
           )
         ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Contended" } })
-        expect(yield* executionLog.getAppend(Occurrence.Key.make("new"))).toEqual(Option.none())
+        expect(yield* executionLog.getAppend(Store.IdempotencyKey.make("new"))).toEqual(Option.none())
         const other = log.open({ id: Entry.LogId.make("other"), schema: Schema.String })
         yield* other.append("different", { idempotencyKey: key })
         const a = yield* executionLog.append("unkeyed")

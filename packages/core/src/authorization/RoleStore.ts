@@ -8,16 +8,17 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as BuiltinRoles from "./BuiltinRoles.ts"
 import * as Role from "./Role.ts"
 
@@ -87,7 +88,7 @@ export class RoleStore extends Context.Service<
  */
 export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: RoleStore["Service"]): RoleStore["Service"] => {
   const read = StoreInput.read("RoleStore")
-  const write = StoreInput.write("RoleStore", workspaceId)
+  const write = StoreInput.write("RoleStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (roleId) => Effect.flatMap(read("get", Role.RoleId, roleId), driver.get),
     insert: (record) => Effect.flatMap(write("insert", Role.Role, record), driver.insert),
@@ -118,7 +119,7 @@ const revisionKey = "builtin"
  * Named permission bundles; edits keep the role's identity.
  */
 const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   /** Replace one role with an edited record. */
   const edit = Effect.fn("RoleStore.memory.edit")(
     function* (operation: string, id: Role.RoleId, change: (role: Role.Role) => Role.Role) {
@@ -167,7 +168,7 @@ const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `RoleStore` in process memory, over the workspace's `Store.MemoryBinding`: roles, and the
+ * Provide `RoleStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: roles, and the
  * revision of the built-in roles the workspace was last given, as one row. It keeps what the
  * contract leaves to storage: a reused ID is rejected, renaming or setting permissions of a missing
  * role is rejected, and a built-in revision no later than the recorded one is rejected. `make`

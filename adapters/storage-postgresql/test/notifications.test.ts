@@ -1,7 +1,7 @@
 import { Identity } from "@amends-dev/core/identity"
-import { Entry, type StoreError } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { MemberId } from "@amends-dev/core/workspace"
+import { Entry, type StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/sql"

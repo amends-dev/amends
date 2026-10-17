@@ -5,11 +5,12 @@ import { type Connection, ConnectionPermissions, ConnectionService } from "@amen
 import { CoreError } from "@amends-dev/core/error"
 import { Group } from "@amends-dev/core/group"
 import { type Actor, Identity } from "@amends-dev/core/identity"
-import { Journal, Publication, StoreError } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { Request } from "@amends-dev/core/request"
 import type { WorkspaceId } from "@amends-dev/core/workspace"
 import { MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Redacted } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -156,23 +157,20 @@ const grant = (bound: Bound, memberId: MemberId.MemberId, grants: ReadonlyArray<
         (value) =>
           journal.publish(AssignmentFacts.Created, {
             assignmentId: Assignment.AssignmentId.make(`direct-${(directGrants += 1)}`),
-            workspaceId: bound.store.workspaceId,
+            workspaceId: bound.workspaceId,
             memberId,
             source: { _tag: "Direct", grant: value }
           }),
         { discard: true }
       )
     )
-  ).pipe(
-    Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
-    Effect.provide(core(bound))
-  )
+  ).pipe(Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)), Effect.provide(core(bound)))
 /** Take every role the member has away, as alice. */
 const revokeRoles = (bound: Bound, memberId: MemberId.MemberId) =>
   Effect.flatMap(bound.assignments.listActiveByMember(memberId), (assignments) =>
     Effect.forEach(
       assignments,
-      (assignment) => Operations.revokeAssignment(bound.store.workspaceId, alice, memberId, assignment.id),
+      (assignment) => Operations.revokeAssignment(bound.workspaceId, alice, memberId, assignment.id),
       { discard: true }
     )
   )

@@ -9,6 +9,9 @@
  * @since 0.1.0
  */
 
+import type * as Commit from "@amends-dev/log/Commit"
+import type * as Entry from "@amends-dev/log/Entry"
+import type * as Log from "@amends-dev/log/Log"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Data from "effect/Data"
@@ -24,11 +27,8 @@ import type * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
 import * as CoreError from "../error/CoreError.ts"
-import type * as Commit from "../journal/Commit.ts"
-import type * as Entry from "../journal/Entry.ts"
 import type * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
-import type * as Log from "../journal/Log.ts"
 import * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
 
 /**

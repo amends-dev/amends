@@ -1,5 +1,5 @@
-import { Entry, Store } from "@amends-dev/core/journal"
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import { Entry, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Clock, Context, DateTime, Deferred, Duration, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { SqlClient, SqlError } from "effect/sql"

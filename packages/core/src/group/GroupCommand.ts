@@ -10,6 +10,9 @@
  * @since 0.1.0
  */
 
+import type * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import type * as DateTime from "effect/DateTime"
@@ -21,13 +24,11 @@ import type * as Schema from "effect/Schema"
 import * as CoreError from "../error/CoreError.ts"
 import type * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
-import type * as Log from "../journal/Log.ts"
 import type * as Projection from "../journal/Projection.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
 import * as GroupFacts from "./GroupFacts.ts"
 import * as GroupId from "./GroupId.ts"
@@ -139,7 +140,7 @@ export const make = Effect.gen(function* () {
   const memberStore = yield* MemberStore.MemberStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const admitMember = Effect.fn("GroupCommand.admitMember")(function* (
     groupId: GroupId.GroupId,

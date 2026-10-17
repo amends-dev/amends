@@ -10,8 +10,8 @@
  * caller's transaction and requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { Thread, ThreadStore, ThreadMessage } from "@amends-dev/core/thread"
+import { StoreError } from "@amends-dev/log"
 import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

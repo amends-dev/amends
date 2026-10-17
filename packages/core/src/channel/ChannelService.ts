@@ -28,12 +28,12 @@ import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Channel from "./Channel.ts"
 import type * as ChannelBinding from "./ChannelBinding.ts"
 import * as ChannelBindingStore from "./ChannelBindingStore.ts"
@@ -170,7 +170,7 @@ export const make = Effect.gen(function* () {
   const connectionStore = yield* ConnectionStore.ConnectionStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const channelTarget = (channelId: ChannelId.ChannelId) =>
     Target.Reference.cases.Channel.make({ workspaceId, channelId })

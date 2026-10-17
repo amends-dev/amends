@@ -6,6 +6,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
@@ -13,12 +16,10 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
 import * as GroupId from "./GroupId.ts"
 
@@ -86,7 +87,7 @@ export class GroupStore extends Context.Service<
  */
 export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: GroupStore["Service"]): GroupStore["Service"] => {
   const read = StoreInput.read("GroupStore")
-  const write = StoreInput.write("GroupStore", workspaceId)
+  const write = StoreInput.write("GroupStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", GroupId.GroupId, id), driver.get),
     getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(GroupId.GroupId), ids), driver.getMany),
@@ -109,7 +110,7 @@ const directKeyOf = (record: Group.Group) => (record.kind === "Direct" ? Group.d
  * Group records over the current workspace transaction.
  */
 const makeMemory = Effect.fn("GroupStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const driver: GroupStore["Service"] = {
     get: Effect.fn("GroupStore.memory.get")(
       function* (id) {
@@ -200,7 +201,7 @@ const makeMemory = Effect.fn("GroupStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `GroupStore` in process memory, over the workspace's `Store.MemoryBinding`: group
+ * Provide `GroupStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: group
  * records, and each group's latest activity as a row of its own. It keeps what the contract leaves
  * to storage: a reused ID is rejected, and so is a second direct group for one member set; renaming
  * is rejected unless the group is a stored team, and recording latest activity is rejected for a

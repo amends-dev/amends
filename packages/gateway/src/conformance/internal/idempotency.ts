@@ -1,5 +1,6 @@
 import { Role, RoleFacts } from "@amends-dev/core/authorization"
-import { Entry, Journal, Log, Occurrence, Publication, Store } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
+import { Entry, Log, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -8,7 +9,7 @@ import * as Schema from "effect/Schema"
 import type * as Fixture from "../Fixture.ts"
 import * as Support from "../Support.ts"
 
-const key = Occurrence.Key.make("occurrence/one")
+const key = Store.IdempotencyKey.make("occurrence/one")
 const executionId = Entry.LogId.make("execution")
 const options = { idempotencyKey: key }
 
@@ -24,7 +25,7 @@ export const idempotency = (fixture: Fixture.Fixture) => {
           yield* Effect.gen(function* () {
             const journal = yield* Journal.Journal
             const log = (yield* Log.Log).open({ id: executionId, schema: Schema.String })
-            const keyOf = (index: number) => Occurrence.Key.make(`output/${index}`)
+            const keyOf = (index: number) => Store.IdempotencyKey.make(`output/${index}`)
             const count = 6_000
             yield* journal.commit(
               Effect.gen(function* () {
@@ -157,13 +158,13 @@ export const idempotency = (fixture: Fixture.Fixture) => {
                 _tag: "StoreError",
                 reason: { _tag: "Rejected" }
               })
-            expect(yield* Effect.flip(bound.store.transaction(append([], Occurrence.Key.make("empty"))))).toMatchObject(
-              { _tag: "StoreError", reason: { _tag: "Rejected" } }
-            )
+            expect(
+              yield* Effect.flip(bound.store.transaction(append([], Store.IdempotencyKey.make("empty"))))
+            ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } })
             const invalid: Store.AppendInput = {
               logId: executionId,
               entries: input.map((payload) => ({ payload })),
-              idempotencyKey: Occurrence.Key.make("valid")
+              idempotencyKey: Store.IdempotencyKey.make("valid")
             }
             Reflect.set(invalid, "idempotencyKey", " ")
             expect(

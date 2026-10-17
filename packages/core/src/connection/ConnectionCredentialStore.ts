@@ -9,16 +9,17 @@
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type * as CoreError from "../error/CoreError.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 
 /**
  * Protected storage for connections' credentials, one for each connection that authenticates with
@@ -80,7 +81,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(Co
  * Each connection's credential in the workspace's memory, written in its transactions.
  */
 const makeMemory = Effect.fn("ConnectionCredentialStore.makeMemory")(function* () {
-  const { read, write } = yield* Store.MemoryBinding
+  const { read, write } = yield* MemoryBinding.MemoryBinding
   const driver: ConnectionCredentialStore["Service"] = {
     set: Effect.fn("ConnectionCredentialStore.memory.set")(
       function* (connectionId, credential) {
@@ -107,7 +108,7 @@ const makeMemory = Effect.fn("ConnectionCredentialStore.makeMemory")(function* (
 
 /**
  * Provide `ConnectionCredentialStore` in process memory, over the workspace's
- * `Store.MemoryBinding`. Each connection's credential is kept beside the projected records, outside
+ * `MemoryBinding.MemoryBinding`. Each connection's credential is kept beside the projected records, outside
  * the journal, so rebuilding projections keeps it; writes require the caller's transaction. A
  * credential is stored as JSON, its key as it is, unprotected, so this store is for tests and
  * development. `make` checks every input first.

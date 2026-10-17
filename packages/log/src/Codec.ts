@@ -2,16 +2,15 @@
  * How log values become stored bytes and back. Every payload is encoded in the binary format
  * `SchemaBinary.toCodec` derives from its schema, a persistence contract: stored bytes must stay
  * readable when dependencies change. An ordinary log stores its whole value through
- * `makeEntryCodec`; the journal stores a fact's header beside its payload through
- * `Event.storageCodec`, and encodes the payload alone with `make`.
+ * `makeEntryCodec`; a log whose entries carry a name or subject beside the payload, which storage
+ * indexes, gives `Log.open` an entry codec of its own over `makeForSchema`.
  *
- * @since 0.1.0
+ * @since 0.2.0
  */
 
 import * as Effect from "effect/Effect"
 import * as SchemaBinary from "effect/encoding/SchemaBinary"
 import * as Schema from "effect/Schema"
-import type * as Fact from "./Fact.ts"
 import type * as Store from "./Store.ts"
 
 /**
@@ -19,7 +18,7 @@ import type * as Store from "./Store.ts"
  * schema needs to encode and decode. `Log.open` takes one, and defaults to `makeEntryCodec`.
  *
  * @category models
- * @since 0.1.0
+ * @since 0.2.0
  */
 export interface EntryCodec<S extends Schema.Constraint> {
   readonly encode: (value: S["Type"]) => Effect.Effect<Store.Content, Schema.SchemaError, S["EncodingServices"]>
@@ -28,18 +27,19 @@ export interface EntryCodec<S extends Schema.Constraint> {
 
 /**
  * The entry codec of an ordinary log: the whole value is the payload, encoded with
- * `makeForSchema`, and an entry has no fact header. Decoding an entry that has one fails, so a fact
- * log opened with this codec is never misread.
+ * `makeForSchema`, and an entry has neither name nor subject. Decoding an entry that has either
+ * fails, so a log whose entries carry them is never misread through this codec.
  *
  * @category constructors
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const makeEntryCodec = <S extends Schema.Constraint>(schema: S): EntryCodec<S> => {
   const codec = makeForSchema(schema)
+  const unnamed = Schema.decodeUnknownEffect(Schema.Undefined)
   return {
     encode: (value) => Effect.map(codec.encode(value), (payload) => ({ payload })),
     decode: Effect.fn("Codec.decodeEntry")(function* (entry) {
-      yield* Schema.decodeUnknownEffect(Schema.Undefined)(entry.fact)
+      yield* unnamed(entry.name ?? entry.subject)
       return yield* codec.decode(entry.payload)
     })
   }
@@ -50,25 +50,15 @@ export const makeEntryCodec = <S extends Schema.Constraint>(schema: S): EntryCod
  * payloads share.
  *
  * @category models
- * @since 0.1.0
+ * @since 0.2.0
  */
 export interface PayloadCodec<S extends Schema.Constraint> {
   /** Produces an independently owned byte buffer for storage. */
   readonly encode: (
     payload: S["Type"]
   ) => Effect.Effect<Uint8Array<ArrayBuffer>, Schema.SchemaError, S["EncodingServices"]>
-  /** Validates stored bytes and reconstructs the decoded domain payload. */
+  /** Validates stored bytes and reconstructs the decoded value. */
   readonly decode: (bytes: Uint8Array) => Effect.Effect<S["Type"], Schema.SchemaError, S["DecodingServices"]>
-}
-
-/**
- * A payload codec paired with the fact definition it encodes.
- *
- * @category models
- * @since 0.1.0
- */
-export interface FactCodec<F extends Fact.Definition> extends PayloadCodec<F["payload"]> {
-  readonly fact: F
 }
 
 /**
@@ -77,7 +67,7 @@ export interface FactCodec<F extends Fact.Definition> extends PayloadCodec<F["pa
  * encoder's buffer.
  *
  * @category constructors
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const makeForSchema = <S extends Schema.Constraint>(payload: S): PayloadCodec<S> => {
   const schema = SchemaBinary.toCodec(payload)
@@ -95,15 +85,3 @@ export const makeForSchema = <S extends Schema.Constraint>(payload: S): PayloadC
     })
   }
 }
-
-/**
- * The codec of a fact's payload, in the binary format every log's payloads share.
- * `Journal.publish` encodes with it, and `Event.decode` decodes with it.
- *
- * @category constructors
- * @since 0.1.0
- */
-export const make = <F extends Fact.Definition>(fact: F): FactCodec<F> => ({
-  fact,
-  ...makeForSchema<F["payload"]>(fact.payload)
-})

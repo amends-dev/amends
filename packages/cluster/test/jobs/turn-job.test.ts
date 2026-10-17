@@ -1,7 +1,7 @@
-import { Commit, Store } from "@amends-dev/core/journal"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { Gateway } from "@amends-dev/gateway"
 import type { StreamPart } from "@amends-dev/harness"
+import { Commit, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Duration, Effect, Layer, Stream } from "effect"
 import { MessageStorage, RunnerHealth, Runners, RunnerStorage, Sharding, ShardingConfig } from "effect/cluster"

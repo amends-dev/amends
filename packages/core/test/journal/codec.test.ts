@@ -1,7 +1,7 @@
+import * as Codec from "@amends-dev/log/Codec"
 import { expect, it } from "@effect/vitest"
 import { Effect, Result, Schema } from "effect"
 import { Hex } from "effect/encoding"
-import * as Codec from "../../src/journal/Codec.ts"
 import * as ThreadMessageFacts from "../../src/thread/ThreadMessageFacts.ts"
 import * as WorkspaceFacts from "../../src/workspace/WorkspaceFacts.ts"
 import { fixtures } from "./codec-fixtures.ts"

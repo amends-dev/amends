@@ -10,7 +10,8 @@
  * caller's transaction and requires one for a write; failures are the journal store's.
  */
 
-import { Checkpoint, StoreError } from "@amends-dev/core/journal"
+import { Checkpoint } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"

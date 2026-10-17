@@ -413,19 +413,10 @@ export const logEntries = pgTable(
     entryIndex: integer("entry_index").notNull(),
     recordedAt: instant("recorded_at").notNull(),
     payload: bytes("payload").notNull(),
-    subject: text("subject"),
-    factName: text("fact_name"),
-    factVersion: doublePrecision("fact_version"),
-    performerKind: text("performer_kind", { enum: ["Member", "Identity", "System"] }),
-    performerMemberId: text("performer_member_id"),
-    performerIdentityKind: text("performer_identity_kind", { enum: identityKinds }),
-    performerIdentityId: text("performer_identity_id"),
-    performerSystemId: text("performer_system_id"),
-    causeLogId: text("cause_log_id"),
-    causeCommitId: text("cause_commit_id"),
-    causeEntryId: text("cause_entry_id"),
-    correlationId: text("correlation_id"),
-    occurredAt: instant("occurred_at")
+    /** What kind of entry it is, such as a fact's name, for logs whose entries have kinds. */
+    name: text("name"),
+    /** What the entry is about, such as a fact's subject, for logs whose entries have subjects. */
+    subject: text("subject")
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
@@ -433,19 +424,9 @@ export const logEntries = pgTable(
     // Appends and keyed receipts address an open or committed batch by its commit.
     index("log_entries_by_commit").on(table.workspaceId, table.logId, table.commitId, table.entryIndex),
     index("log_entries_by_subject").on(table.workspaceId, table.logId, table.subject, table.position, table.entryIndex),
-    index("log_entries_by_fact").on(table.workspaceId, table.logId, table.factName, table.position, table.entryIndex),
-    check(
-      "log_entries_fact_header",
-      sql`(${table.subject} IS NULL AND ${table.factName} IS NULL AND ${table.factVersion} IS NULL AND ${table.performerKind} IS NULL) OR (${table.subject} IS NOT NULL AND ${table.factName} IS NOT NULL AND ${table.factVersion} IS NOT NULL AND ${table.performerKind} IS NOT NULL)`
-    ),
-    check(
-      "log_entries_provenance",
-      sql`(${table.performerKind} IS NULL AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NULL AND ${table.correlationId} IS NULL AND ${table.occurredAt} IS NULL AND ${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.performerKind} IS NOT NULL AND ${table.correlationId} IS NOT NULL AND ${table.occurredAt} IS NOT NULL AND ((${table.performerKind} = 'Member' AND ${table.performerMemberId} IS NOT NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'Identity' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent', 'Contact') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'System' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NOT NULL)))`
-    ),
-    check(
-      "log_entries_cause",
-      sql`(${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.causeLogId} IS NOT NULL AND ${table.causeCommitId} IS NOT NULL AND ${table.causeEntryId} IS NOT NULL)`
-    ),
+    index("log_entries_by_name").on(table.workspaceId, table.logId, table.name, table.position, table.entryIndex),
+    check("log_entries_name", sql`${table.name} IS NULL OR ${table.name} <> ''`),
+    check("log_entries_subject", sql`${table.subject} IS NULL OR ${table.subject} <> ''`),
     foreignKey({
       columns: [table.workspaceId, table.logId, table.position],
       foreignColumns: [logBatches.workspaceId, logBatches.logId, logBatches.position],

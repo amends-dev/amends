@@ -12,9 +12,9 @@
  */
 
 import { DeliveryJobs } from "@amends-dev/core/channel"
-import { Store, StoreError } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import { Store, StoreError } from "@amends-dev/log"
 import * as ClusterSchema from "effect/cluster/ClusterSchema"
 import * as Entity from "effect/cluster/Entity"
 import * as Effect from "effect/Effect"

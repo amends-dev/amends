@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -23,13 +24,12 @@ import type * as GroupMembership from "../group/GroupMembership.ts"
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Member from "../workspace/Member.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts"
@@ -191,7 +191,7 @@ export const make = Effect.gen(function* () {
   const threadActivityResolvers = yield* ThreadActivityResolvers.ThreadActivityResolvers
   const readStateStore = yield* ReadStateStore.ReadStateStore
   const taskStore = yield* TaskStore.TaskStore
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const requireAccess = Effect.fn("ThreadQuery.requireAccess")(function* (threadId: ThreadId.ThreadId) {
     const id = yield* Schema.decodeEffect(ThreadId.ThreadId)(threadId)

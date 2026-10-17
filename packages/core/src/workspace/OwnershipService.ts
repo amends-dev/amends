@@ -27,7 +27,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import type * as MemberId from "./MemberId.ts"
 import * as MemberStore from "./MemberStore.ts"
@@ -35,6 +34,7 @@ import * as Ownership from "./Ownership.ts"
 import * as OwnershipPermissions from "./OwnershipPermissions.ts"
 import type * as Workspace from "./Workspace.ts"
 import * as WorkspaceFacts from "./WorkspaceFacts.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 import * as WorkspaceStore from "./WorkspaceStore.ts"
 
 /**
@@ -96,7 +96,7 @@ export const make: Effect.Effect<
   | AssignmentCommand.AssignmentCommand
   | Journal.Journal
   | Crypto.Crypto
-  | Store.Store
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
   const memberStore = yield* MemberStore.MemberStore
@@ -106,7 +106,7 @@ export const make: Effect.Effect<
   const assignmentCommand = yield* AssignmentCommand.AssignmentCommand
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const requirement = Requirement.make(
     OwnershipPermissions.Transfer,
     Target.Reference.cases.Workspace.make({ workspaceId })

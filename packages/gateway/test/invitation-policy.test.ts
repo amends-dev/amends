@@ -1,6 +1,7 @@
 import { AssignmentFacts, BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization"
-import { Entry, Journal, Publication } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { MemberFacts, MemberId } from "@amends-dev/core/workspace"
+import { Entry } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"

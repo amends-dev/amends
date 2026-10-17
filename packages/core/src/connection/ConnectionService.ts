@@ -25,9 +25,9 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Connection from "./Connection.ts"
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts"
 import * as ConnectionFacts from "./ConnectionFacts.ts"
@@ -220,7 +220,7 @@ export const make = Effect.gen(function* () {
   const integrations = yield* Integrations.Integrations
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const connectionTarget = (connectionId: ConnectionContract.ConnectionId) =>
     Target.Reference.cases.Connection.make({ workspaceId, connectionId })

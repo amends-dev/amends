@@ -32,7 +32,6 @@ import * as Identity from "../identity/Identity.ts"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
@@ -55,6 +54,7 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as SessionLogStore from "./SessionLogStore.ts"
 import * as SessionStateStore from "./SessionStateStore.ts"
 import * as Turn from "./Turn.ts"
@@ -285,7 +285,7 @@ export const make = Effect.gen(function* () {
   const journal = yield* Journal.Journal
   const signalHub = yield* SignalHub.SignalHub
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const requireTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const found = yield* turnStore.get(turnId)

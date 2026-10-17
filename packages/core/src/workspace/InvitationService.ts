@@ -25,7 +25,6 @@ import * as Identity from "../identity/Identity.ts"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
 import * as Invitation from "./Invitation.ts"
@@ -35,6 +34,7 @@ import * as InvitationStore from "./InvitationStore.ts"
 import * as Member from "./Member.ts"
 import * as MemberCommand from "./MemberCommand.ts"
 import * as MemberStore from "./MemberStore.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * What the invitation operations can fail with.
@@ -112,7 +112,7 @@ export const make: Effect.Effect<
   | MemberCommand.MemberCommand
   | Journal.Journal
   | Crypto.Crypto
-  | Store.Store
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const invitationStore = yield* InvitationStore.InvitationStore
   const memberStore = yield* MemberStore.MemberStore
@@ -121,7 +121,7 @@ export const make: Effect.Effect<
   const memberCommand = yield* MemberCommand.MemberCommand
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const manage = Requirement.make(InvitationPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId }))
 
   const authorizeInvitation = Effect.fn("InvitationService.authorizeInvitation")(function* (

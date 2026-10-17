@@ -10,6 +10,7 @@
  * @since 0.1.0
  */
 
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -18,10 +19,8 @@ import * as Schema from "effect/Schema"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Grant from "./Grant.ts"
 import * as GrantResolver from "./GrantResolver.ts"
 import * as PermissionCatalog from "./PermissionCatalog.ts"
@@ -90,12 +89,15 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make: Effect.Effect<
   Authorization["Service"],
   never,
-  MemberStore.MemberStore | GrantResolver.GrantResolver | PermissionCatalog.PermissionCatalog | Store.Store
+  | MemberStore.MemberStore
+  | GrantResolver.GrantResolver
+  | PermissionCatalog.PermissionCatalog
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const memberStore = yield* MemberStore.MemberStore
   const grantResolver = yield* GrantResolver.GrantResolver
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** Validate the actor, and that each requirement names a declared permission in this workspace. */
   const validateRequirements = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Requirement>) {

@@ -6,17 +6,18 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Identity from "../identity/Identity.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Contact from "./Contact.ts"
 
 /**
@@ -60,7 +61,7 @@ export const make = (
   driver: ContactStore["Service"]
 ): ContactStore["Service"] => {
   const read = StoreInput.read("ContactStore")
-  const write = StoreInput.write("ContactStore", workspaceId)
+  const write = StoreInput.write("ContactStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", Identity.ContactId, id), driver.get),
     getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Identity.ContactId), ids), driver.getMany),
@@ -75,7 +76,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Contact.Contact))
  * Contact records over the current workspace transaction.
  */
 const makeMemory = Effect.fn("ContactStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const driver: ContactStore["Service"] = {
     get: Effect.fn("ContactStore.memory.get")(
       function* (id) {
@@ -115,7 +116,7 @@ const makeMemory = Effect.fn("ContactStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `ContactStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * Provide `ContactStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It keeps
  * what the contract leaves to storage: a reused ID is rejected, and so is an update of a missing
  * contact. `make` checks every input first.
  *

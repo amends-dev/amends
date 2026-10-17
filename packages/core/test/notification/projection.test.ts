@@ -14,18 +14,18 @@ import {
   ThreadParticipationId
 } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
 import * as GroupMembership from "../../src/group/GroupMembership.ts"
 import * as GroupMembershipFacts from "../../src/group/GroupMembershipFacts.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as NotificationProjection from "../../src/notification/NotificationProjection.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { make, type Fixture } from "../memory.ts"
@@ -69,6 +69,7 @@ const run = <A, E>(
     E,
     | Publication.Publication
     | Log.Log
+    | WorkspaceId.CurrentWorkspaceId
     | Transaction.Transaction
     | Checkpoint.Checkpoint
     | NotificationStore.NotificationStore
@@ -80,6 +81,7 @@ const run = <A, E>(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints)
   )
 it.effect("facts without a notification handler rebuild and publish without reading or writing domain stores", () =>

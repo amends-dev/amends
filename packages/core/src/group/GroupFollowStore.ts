@@ -6,6 +6,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import type * as DateTime from "effect/DateTime"
@@ -13,11 +16,9 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as GroupFollow from "./GroupFollow.ts"
 import * as GroupId from "./GroupId.ts"
 import * as GroupMembership from "./GroupMembership.ts"
@@ -78,7 +79,7 @@ export const make = (
   driver: GroupFollowStore["Service"]
 ): GroupFollowStore["Service"] => {
   const read = StoreInput.read("GroupFollowStore")
-  const write = StoreInput.write("GroupFollowStore", workspaceId)
+  const write = StoreInput.write("GroupFollowStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", GroupFollow.GroupFollowId, id), driver.get),
     findActive: (groupMembershipId) =>
@@ -113,7 +114,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(GroupFollow.GroupFoll
  * Group follows, active and ended; one active follow per group admission.
  */
 const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const active = Effect.flatMap(read, (space) => rows.all(space.records.of("groupFollows"))).pipe(
     Effect.map((records) => records.filter((record) => record.status === "active"))
   )
@@ -189,7 +190,7 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `GroupFollowStore` in process memory, over the workspace's `Store.MemoryBinding`. It
+ * Provide `GroupFollowStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It
  * keeps what the contract leaves to storage: a reused ID is rejected, and so is a second active
  * follow for one group admission; ending a follow is rejected unless it is stored, active, and of
  * the group and member named. An ended follow keeps its row. `make` checks every input first.

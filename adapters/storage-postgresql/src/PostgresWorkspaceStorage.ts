@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 
-import type { WorkspaceId } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { WorkspaceStorage } from "@amends-dev/gateway"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
@@ -108,7 +108,11 @@ export const layerWorkspace = (
   workspaceId: WorkspaceId.WorkspaceId,
   options: Options = {},
   credentialKey: Option.Option<CredentialKey.Cipher> = Option.none()
-) => layerStores.pipe(Layer.provide([Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)]))
+) =>
+  layerStores.pipe(
+    Layer.provide([Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)]),
+    Layer.merge(Layer.succeed(WorkspaceId.CurrentWorkspaceId, workspaceId))
+  )
 
 /**
  * One pool, with inexpensive workspace-bound views over it. The stores hold no

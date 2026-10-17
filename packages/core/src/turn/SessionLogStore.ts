@@ -8,6 +8,8 @@
  * @since 0.1.0
  */
 
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
@@ -15,10 +17,8 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
 import * as SessionLog from "./SessionLog.ts"
 
@@ -132,7 +132,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(Se
  * append takes part in no transaction and is kept at once.
  */
 const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
-  const { workspaceId, connection } = yield* Store.MemoryBinding
+  const { workspaceId, connection } = yield* MemoryBinding.MemoryBinding
   const { database } = connection
   const logKeyOf = (participationId: string) => MemoryDatabase.keyOf(workspaceId, participationId)
   const logOf = (participationId: string) => database.sessionLogs.get(logKeyOf(participationId)) ?? []
@@ -175,7 +175,7 @@ const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `SessionLogStore` in process memory, over the workspace's `Store.MemoryBinding`: each
+ * Provide `SessionLogStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: each
  * participation's session log, kept in `MemoryDatabase` beside the workspaces' state. An append
  * takes part in no transaction: it is kept at once and wakes waiting readers. It keeps what the
  * contract leaves to storage: an append is rejected unless the log ends where its writer read it

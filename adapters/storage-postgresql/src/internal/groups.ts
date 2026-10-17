@@ -12,7 +12,7 @@
  */
 
 import { Group, GroupStore } from "@amends-dev/core/group"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

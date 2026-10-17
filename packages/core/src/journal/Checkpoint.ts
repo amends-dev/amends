@@ -9,17 +9,18 @@
  * @since 0.1.0
  */
 
+import * as Commit from "@amends-dev/log/Commit"
+import * as Entry from "@amends-dev/log/Entry"
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import * as Commit from "./Commit.ts"
-import * as Entry from "./Entry.ts"
+import * as MemoryBinding from "./MemoryBinding.ts"
 import * as MemoryDatabase from "./MemoryDatabase.ts"
-import * as Store from "./Store.ts"
-import * as StoreError from "./StoreError.ts"
-import * as StoreInput from "./StoreInput.ts"
 
 /**
  * Names one projection version's progress on one log: the log, the projection's name, and its
@@ -169,7 +170,7 @@ const idOf = (key: Key) => MemoryDatabase.keyOf(key.logId, key.name, key.version
  * projection's rows, and the versions that are live.
  */
 const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
-  const { read, write } = yield* Store.MemoryBinding
+  const { read, write } = yield* MemoryBinding.MemoryBinding
   const driver: Checkpoint["Service"] = {
     get: Effect.fn("Checkpoint.memory.get")(
       function* (key) {
@@ -207,7 +208,7 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
 })
 
 /**
- * Provide `Checkpoint` in process memory, over the workspace's `Store.MemoryBinding`: each
+ * Provide `Checkpoint` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: each
  * projection version's progress through one log while it is rebuilt, and the versions live on each
  * log, kept as one row per log. Both are written in the caller's transaction, with the projection's
  * rows, so progress and rows commit together. Its failures are the journal's

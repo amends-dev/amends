@@ -8,17 +8,18 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Assignment from "./Assignment.ts"
 import * as Role from "./Role.ts"
 
@@ -89,7 +90,7 @@ export const make = (
   driver: AssignmentStore["Service"]
 ): AssignmentStore["Service"] => {
   const read = StoreInput.read("AssignmentStore")
-  const write = StoreInput.write("AssignmentStore", workspaceId)
+  const write = StoreInput.write("AssignmentStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (assignmentId) => Effect.flatMap(read("get", Assignment.AssignmentId, assignmentId), driver.get),
     listActiveByMember: (memberId) =>
@@ -115,7 +116,7 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Assignment.Assignment
  * Access assigned to memberships, by role or directly; revoked rows keep their source.
  */
 const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const select = (operation: string, predicate: (record: Assignment.Assignment) => boolean) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("assignments"))).pipe(
       Effect.map((records) => records.filter(predicate)),
@@ -162,7 +163,7 @@ const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `AssignmentStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * Provide `AssignmentStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It keeps
  * what the contract leaves to storage: a reused ID is rejected, and revoking is rejected unless the
  * assignment is stored and active. A revoked assignment keeps its row and its source. `make` checks
  * every input first.

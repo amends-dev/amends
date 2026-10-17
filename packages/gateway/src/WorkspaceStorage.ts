@@ -16,7 +16,7 @@ import { ChannelBindingStore, ChannelStore, ContactStore, DeliveryStore } from "
 import type { DeliveryJobs } from "@amends-dev/core/channel"
 import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection"
 import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends-dev/core/group"
-import { Checkpoint, MemoryDatabase, Store } from "@amends-dev/core/journal"
+import { Checkpoint, MemoryDatabase, MemoryBinding } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { SignalHub } from "@amends-dev/core/signal"
@@ -102,7 +102,7 @@ const makeMemory = Effect.fn("WorkspaceStorage.makeMemory")(function* () {
   const forWorkspace: WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn("WorkspaceStorage.memory.forWorkspace")(
     function* (workspaceId: WorkspaceId.WorkspaceId) {
       return yield* Effect.scoped(
-        Layer.build(layerMemoryStores.pipe(Layer.provideMerge(Store.layerMemory(workspaceId))))
+        Layer.build(layerMemoryStores.pipe(Layer.provideMerge(MemoryBinding.layer(workspaceId))))
       )
     },
     Effect.provideService(MemoryDatabase.Connection, connection)

@@ -6,6 +6,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -13,12 +16,10 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Identity from "../identity/Identity.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as Invitation from "./Invitation.ts"
-import type * as WorkspaceId from "./WorkspaceId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * The invitation store, bound to one workspace by the host: what a storage adapter implements for
@@ -72,7 +73,7 @@ export const make = (
   driver: InvitationStore["Service"]
 ): InvitationStore["Service"] => {
   const read = StoreInput.read("InvitationStore")
-  const write = StoreInput.write("InvitationStore", workspaceId)
+  const write = StoreInput.write("InvitationStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", Invitation.InvitationId, id), driver.get),
     listPendingByRecipient: (recipientId) =>
@@ -112,7 +113,7 @@ const byIssue = (left: Invitation.Invitation, right: Invitation.Invitation) =>
  * Invitations and their grants; settlement records who acted and when.
  */
 const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const all = (operation: string) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("invitations"))).pipe(
       Effect.mapError(StoreError.failed("InvitationStore", operation))
@@ -158,7 +159,7 @@ const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `InvitationStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * Provide `InvitationStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It keeps
  * what the contract leaves to storage: a reused ID is rejected, and settling is rejected unless the
  * invitation is stored and pending. A settled invitation keeps its row, with who acted and when.
  * `make` checks every input first.

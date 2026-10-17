@@ -8,6 +8,8 @@
  * @since 0.1.0
  */
 
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
 import * as Layer from "effect/Layer"
 import * as AgentPermissions from "./agent/AgentPermissions.ts"
 import * as AgentProjection from "./agent/AgentProjection.ts"
@@ -45,9 +47,7 @@ import * as GroupPermissions from "./group/GroupPermissions.ts"
 import * as GroupProjection from "./group/GroupProjection.ts"
 import * as GroupQuery from "./group/GroupQuery.ts"
 import * as GroupService from "./group/GroupService.ts"
-import * as Entry from "./journal/Entry.ts"
 import * as Journal from "./journal/Journal.ts"
-import * as Log from "./journal/Log.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"

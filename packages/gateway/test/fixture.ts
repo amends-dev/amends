@@ -42,14 +42,15 @@ export const fixture: Fixture = {
           footprint: Effect.sync(() => {
             let total = 0
             for (const space of database.spaces.values()) {
-              total += space.commits.size + space.appends.size
+              total += space.logs.commits.size + space.logs.appends.size
               total +=
                 space.threadPositions.size +
                 space.groupTimes.size +
                 space.notificationsSeen.size +
                 space.connectionCredentials.size +
                 space.sessionStates.size
-              for (const batches of space.logs.values()) for (const batch of batches) total += 1 + batch.entries.length
+              for (const batches of space.logs.batches.values())
+                for (const batch of batches) total += 1 + batch.entries.length
               for (const table of space.records) total += table.size
             }
             for (const log of database.sessionLogs.values()) total += log.length

@@ -14,7 +14,7 @@
 import { Connection } from "@amends-dev/connection"
 import { ConnectionCredentialStore } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"

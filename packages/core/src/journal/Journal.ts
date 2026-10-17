@@ -15,23 +15,24 @@
  * @since 0.1.0
  */
 
+import * as Codec from "@amends-dev/log/Codec"
+import type * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as Transaction from "@amends-dev/log/Transaction"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Checkpoint from "./Checkpoint.ts"
-import * as Codec from "./Codec.ts"
-import type * as Entry from "./Entry.ts"
 import * as Event from "./Event.ts"
 import * as Fact from "./Fact.ts"
-import * as Log from "./Log.ts"
 import * as Projection from "./Projection.ts"
 import * as Publication from "./Publication.ts"
 import type * as Reaction from "./Reaction.ts"
-import * as Store from "./Store.ts"
-import * as StoreError from "./StoreError.ts"
-import * as Transaction from "./Transaction.ts"
 
 /**
  * The journal of one log, through which every domain publishes its facts. Domains obtain it with
@@ -46,16 +47,10 @@ export class Journal extends Context.Service<
   {
     /**
      * The journal's log, read-only: its batches, entries, keyed appends, streams, and live tails
-     * of fact envelopes. Facts are written only through `publish`.
+     * of fact envelopes, and its entries by fact name, subject, or both, which `Event.decode`
+     * decodes. Facts are written only through `publish`.
      */
     readonly log: Log.Reader<typeof Event.Envelope>
-    /**
-     * Read matching envelopes by fact name and/or subject, ordered by position and entry index,
-     * after the exclusive `after` cursor and up to `limit`. Decode them with `Event.decode`.
-     */
-    readonly read: (
-      options: Store.ReadFactsOptions
-    ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>
     /**
      * Runs `program` as one commit, or as part of the current one: its publications, appends to
      * other logs, and projection writes become visible together or not at all. A write that fails
@@ -117,7 +112,8 @@ export interface Options<Requirements extends ReadonlyArray<unknown> = readonly 
 
 /**
  * Construct a domain journal from a log and its projections, over `Log.Log`,
- * `Transaction.Transaction`, and `Checkpoint.Checkpoint`. Definitions sharing a fact name and
+ * `Transaction.Transaction`, `Checkpoint.Checkpoint`, and the workspace it publishes for,
+ * `WorkspaceId.CurrentWorkspaceId`. Definitions sharing a fact name and
  * version must share its payload schema, subject function, and occurrence function, and each
  * projection version is registered once. Projection and reaction dependencies are supplied here;
  * the resulting service interface is independent of registration.
@@ -132,6 +128,7 @@ export const make = Effect.fnUntraced(function* <
   const log = yield* Log.Log
   const transaction = yield* Transaction.Transaction
   const checkpoint = yield* Checkpoint.Checkpoint
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   // Captured outside any transaction; the publishing commit supplies its own.
   const reactionServices = yield* Effect.context<ReactionRequirements>()
   const reactions = new Map<string, Array<Reaction.Definition<ReactionRequirements>>>()
@@ -145,7 +142,7 @@ export const make = Effect.fnUntraced(function* <
   const validateProvenance = Schema.decodeUnknownEffect(
     Schema.toType(Event.Provenance).check(
       Schema.makeFilter((value) =>
-        value.workspaceId === transaction.workspaceId ? undefined : "Publication belongs to another workspace"
+        value.workspaceId === workspaceId ? undefined : "Publication belongs to another workspace"
       )
     )
   )
@@ -239,7 +236,7 @@ export const make = Effect.fnUntraced(function* <
         ) {
           return yield* new Event.FactMismatch({ name: fact.name, version: fact.version })
         }
-        const encoded = yield* Codec.make(fact).encode(payload)
+        const encoded = yield* Codec.makeForSchema<F["payload"]>(fact.payload).encode(payload)
         const subject = yield* Fact.makeSubject(fact, payload)
         const occurrenceKey = yield* Fact.makeOccurrenceKey(fact, payload)
         if (occurrenceKey !== null && request.idempotencyKey !== undefined)
@@ -313,6 +310,7 @@ export const make = Effect.fnUntraced(function* <
     getEntry: journalLog.getEntry,
     getAppend: journalLog.getAppend,
     read: journalLog.read,
+    readEntries: journalLog.readEntries,
     head: journalLog.head,
     stream: journalLog.stream,
     tail: journalLog.tail
@@ -339,7 +337,6 @@ export const make = Effect.fnUntraced(function* <
 
   return Journal.of({
     log: reader,
-    read: journalLog.readFacts,
     commit: transaction.run,
     replay,
     publish

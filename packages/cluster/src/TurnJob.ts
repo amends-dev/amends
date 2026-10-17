@@ -11,10 +11,10 @@
  * @since 0.1.0
  */
 
-import { Store, StoreError } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
 import { TurnJobs, TurnId } from "@amends-dev/core/turn"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import { Store, StoreError } from "@amends-dev/log"
 import * as ClusterSchema from "effect/cluster/ClusterSchema"
 import * as Entity from "effect/cluster/Entity"
 import * as Effect from "effect/Effect"

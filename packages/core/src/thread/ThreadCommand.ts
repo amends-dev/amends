@@ -10,6 +10,9 @@
  * @since 0.1.0
  */
 
+import type * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import type * as DateTime from "effect/DateTime"
@@ -24,15 +27,13 @@ import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
 import type * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
-import type * as Log from "../journal/Log.ts"
 import type * as Projection from "../journal/Projection.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Task from "../task/Task.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadActivityFacts from "./ThreadActivityFacts.ts"
@@ -385,7 +386,7 @@ export const make = Effect.gen(function* () {
   const taskStore = yield* TaskStore.TaskStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The position the thread's next activity takes, read in the caller's transaction. */
   const nextSequence = Effect.fn("ThreadCommand.nextSequence")(function* (threadId: ThreadId.ThreadId) {

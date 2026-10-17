@@ -26,11 +26,11 @@ import * as GroupMembershipStore from "../group/GroupMembershipStore.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Audience from "../journal/Audience.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
 import * as Member from "../workspace/Member.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ChangeFeed from "./ChangeFeed.ts"
 import * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
 import * as ChangeFeedSource from "./ChangeFeedSource.ts"
@@ -105,7 +105,7 @@ export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const grantResolver = yield* GrantResolver.GrantResolver
   const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const resolveAccess = Effect.fnUntraced(function* (actor: Actor.Actor["Service"]) {
     const admissions = yield* groupMembershipStore.listActiveByMember(actor.memberId)

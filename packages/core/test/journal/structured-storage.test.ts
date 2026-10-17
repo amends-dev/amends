@@ -1,17 +1,16 @@
 import { Subject } from "@amends-dev/core/journal"
+import * as Codec from "@amends-dev/log/Codec"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, it } from "@effect/vitest"
 import { Effect, Option, Schema } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Codec from "../../src/journal/Codec.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Event from "../../src/journal/Event.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
-import * as Occurrence from "../../src/journal/Occurrence.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
@@ -36,12 +35,17 @@ const Other = Fact.make("example.other", {
 })
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Log.Log | Transaction.Transaction | Publication.Publication | Checkpoint.Checkpoint>
+  program: Effect.Effect<
+    A,
+    E,
+    Log.Log | WorkspaceId.CurrentWorkspaceId | Transaction.Transaction | Publication.Publication | Checkpoint.Checkpoint
+  >
 ) =>
   program.pipe(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints)
   )
 it.effect("storage keeps the fact header separate and filtered entry pages preserve mixed-version commit order", () =>
@@ -62,14 +66,18 @@ it.effect("storage keeps the fact header separate and filtered entry pages prese
         )
         const stored = (yield* fixture.store.read(logId, { limit: 1 }))[0]?.entries
         expect(stored).toHaveLength(4)
-        expect(stored?.[0]?.fact).toEqual({
+        const firstStored = stored?.[0]
+        if (firstStored === undefined) return yield* Effect.die("Missing stored entry")
+        // Storage indexes the name and subject; the version and provenance travel in the bytes.
+        expect(firstStored).toMatchObject({ name: Changed.name, subject: testSubject() })
+        expect(yield* Event.storageCodec.decode(firstStored)).toEqual({
           subject: testSubject(),
           name: Changed.name,
           version: 1,
-          provenance: events[0]?.provenance
+          provenance: events[0]?.provenance,
+          payload: yield* Codec.makeForSchema(Changed.payload).encode(1)
         })
-        expect(stored?.[0]?.payload).toEqual(yield* Codec.make(Changed).encode(1))
-        const firstPage = yield* journal.read({
+        const firstPage = yield* journal.log.readEntries({
           subject: testSubject(),
           name: Changed.name,
           limit: 1
@@ -77,7 +85,7 @@ it.effect("storage keeps the fact header separate and filtered entry pages prese
         const first = firstPage[0]
         if (first === undefined) return yield* Effect.die("Missing first fact")
         expect(yield* Event.decode(Changed, first)).toEqual(events[0])
-        const secondPage = yield* journal.read({
+        const secondPage = yield* journal.log.readEntries({
           subject: testSubject(),
           name: Changed.name,
           after: first,
@@ -85,15 +93,7 @@ it.effect("storage keeps the fact header separate and filtered entry pages prese
         })
         expect(secondPage.map((entry) => entry.id)).toEqual(events.slice(1).map((event) => event.id))
         expect(secondPage.map((entry) => entry.index)).toEqual([2, 3])
-        expect(
-          (yield* journal.read({
-            subject: testSubject(),
-            name: Changed.name,
-            version: 2,
-            limit: 10
-          })).map((entry) => entry.id)
-        ).toEqual([events[2]?.id])
-        expect(yield* journal.read({ name: "absent", limit: 10 })).toEqual([])
+        expect(yield* journal.log.readEntries({ name: "absent", limit: 10 })).toEqual([])
         expect((yield* journal.log.read({ limit: 1 }))[0]?.entries).toHaveLength(4)
         const plain = (yield* Log.Log).open({ id: logId, schema: Schema.Uint8Array })
         expect((yield* Effect.flip(plain.read({ limit: 1 })))._tag).toBe("SchemaError")
@@ -115,28 +115,27 @@ it.effect("filtered reads reject malformed adapter pages instead of skipping or 
     const original = (yield* fixture.store.read(logId, { limit: 1 }))[0]?.entries
     if (original === undefined || original[0] === undefined) throw new Error("Missing stored entries")
     const first = original[0]
-    if (first.fact === undefined) throw new Error("Missing fact header")
-    const withoutFact = { ...first }
-    Reflect.deleteProperty(withoutFact, "fact")
+    const withoutName = { ...first }
+    Reflect.deleteProperty(withoutName, "name")
     for (const entries of [
       [...original].reverse(),
       [first, first],
       [...original, first],
       [{ ...first, logId: Entry.LogId.make("other") }],
-      [{ ...first, fact: { ...first.fact, name: Other.name } }],
-      [{ ...first, fact: { ...first.fact, subject: Subject.make("test", "other") } }],
-      [withoutFact]
+      [{ ...first, name: Other.name }],
+      [{ ...first, subject: Subject.make("test", "other") }],
+      [withoutName]
     ]) {
       const broken: Fixture = {
         ...fixture,
-        store: { ...fixture.store, readFacts: () => Effect.succeed(entries) }
+        store: { ...fixture.store, readEntries: () => Effect.succeed(entries) }
       }
       yield* run(
         broken,
         Effect.gen(function* () {
           const journal = yield* Journal.make({ logId, projections: [] })
           expect(
-            (yield* Effect.flip(journal.read({ subject: testSubject(), name: Changed.name, limit: 2 })))._tag
+            (yield* Effect.flip(journal.log.readEntries({ subject: testSubject(), name: Changed.name, limit: 2 })))._tag
           ).toBe("SchemaError")
         })
       )
@@ -166,9 +165,9 @@ it.effect("subjects are required, namespaced, and derived only from validated pa
       Reflect.set(malformed, "subject", () => "unqualified")
       expect((yield* Effect.flip(Fact.makeSubject(malformed, { id: "one" })))._tag).toBe("SchemaError")
     })
-    const decode = Schema.decodeUnknownOption(Store.ReadFactsOptions)
+    const decode = Schema.decodeUnknownOption(Store.EntriesOptions)
     expect(decode({ limit: 1 })._tag).toBe("None")
-    expect(decode({ subject: Subject.make("thread", "one"), version: 1, limit: 1 })._tag).toBe("None")
+    expect(decode({ subject: Subject.make("thread", "one"), limit: 1 })._tag).toBe("Some")
   })
 )
 
@@ -179,7 +178,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
       fixture,
       Effect.gen(function* () {
         const journal = yield* Journal.make({ logId, projections: [] })
-        const key = Occurrence.Key.make("subject-retry")
+        const key = Store.IdempotencyKey.make("subject-retry")
         const first = yield* journal.publish(Changed, 1, { idempotencyKey: key })
         expect(yield* journal.publish(Changed, 1, { idempotencyKey: key })).toEqual(first)
         const changed = Fact.make(Changed.name, {
@@ -191,7 +190,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
           _tag: "StoreError",
           reason: { _tag: "Rejected" }
         })
-        const page = yield* journal.read({ subject: testSubject(), limit: 10 })
+        const page = yield* journal.log.readEntries({ subject: testSubject(), limit: 10 })
         const entry = page[0]
         if (entry === undefined) return yield* Effect.die("Missing event")
         expect(

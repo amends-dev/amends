@@ -2,17 +2,7 @@ import { Core } from "@amends-dev/core"
 import { BuiltinRoles, Role, RoleFacts } from "@amends-dev/core/authorization"
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import {
-  Entry,
-  Fact,
-  Journal,
-  Log,
-  Projection,
-  Publication,
-  Store,
-  Subject,
-  type Checkpoint
-} from "@amends-dev/core/journal"
+import { Fact, Journal, Projection, Publication, Subject, type Checkpoint } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -21,6 +11,7 @@ import {
   ThreadParticipationActivity
 } from "@amends-dev/core/thread"
 import { InvitationService, MemberPermissions, MemberId } from "@amends-dev/core/workspace"
+import { Entry, Log, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"

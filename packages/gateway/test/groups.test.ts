@@ -14,8 +14,9 @@ import {
   GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Publication, type Store, StoreError } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
+import { Entry, type Store, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Context, DateTime, Effect, Option, Ref } from "effect"
 import { withStorage } from "./fixture.ts"

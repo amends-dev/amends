@@ -1,19 +1,19 @@
 import { Subject } from "@amends-dev/core/journal"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Context, Crypto, DateTime, Deferred, Effect, Exit, Option, Schema } from "effect"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Performer from "../../src/identity/Performer.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Event from "../../src/journal/Event.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Projection from "../../src/journal/Projection.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as MemberId from "../../src/workspace/MemberId.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { make, type Fixture } from "../memory.ts"
@@ -29,11 +29,16 @@ const Changed = Fact.make("example.changed", {
 })
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Log.Log | Transaction.Transaction | Checkpoint.Checkpoint | Crypto.Crypto>
+  program: Effect.Effect<
+    A,
+    E,
+    Log.Log | WorkspaceId.CurrentWorkspaceId | Transaction.Transaction | Checkpoint.Checkpoint | Crypto.Crypto
+  >
 ) =>
   program.pipe(
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Crypto.Crypto, testCrypto)
   )

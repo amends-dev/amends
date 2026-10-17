@@ -9,9 +9,9 @@
  * `guard`, which lets a read join the caller's transaction and requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { Task, TaskStore } from "@amends-dev/core/task"
 import { ThreadMessage } from "@amends-dev/core/thread"
+import { StoreError } from "@amends-dev/log"
 import { and, desc, eq, isNull, sql } from "drizzle-orm"
 import type { SQL } from "drizzle-orm"
 import * as Array from "effect/Array"

@@ -1,5 +1,9 @@
 import { GroupCommand } from "@amends-dev/core/group"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Crypto, Effect, Layer, Option } from "effect"
 import * as Assignment from "../../../src/authorization/Assignment.ts"
@@ -18,12 +22,8 @@ import * as GroupMembershipStore from "../../../src/group/GroupMembershipStore.t
 import * as Actor from "../../../src/identity/Actor.ts"
 import * as Identity from "../../../src/identity/Identity.ts"
 import * as Checkpoint from "../../../src/journal/Checkpoint.ts"
-import * as Entry from "../../../src/journal/Entry.ts"
 import * as Journal from "../../../src/journal/Journal.ts"
-import * as Log from "../../../src/journal/Log.ts"
 import * as Publication from "../../../src/journal/Publication.ts"
-import * as Store from "../../../src/journal/Store.ts"
-import * as StoreError from "../../../src/journal/StoreError.ts"
 import * as InvitationStore from "../../../src/workspace/InvitationStore.ts"
 import * as Member from "../../../src/workspace/Member.ts"
 import * as MemberFacts from "../../../src/workspace/MemberFacts.ts"
@@ -80,6 +80,7 @@ const configured = (
   const host = Layer.mergeAll(
     members,
     Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
     Layer.succeed(RoleStore.RoleStore, fixture.roles),
     Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
@@ -133,6 +134,7 @@ const configured = (
       groupMemberships,
       delegation,
       Layer.succeed(Store.Store, fixture.store),
+      Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
       Layer.succeed(GroupCommand.GroupCommand, {
         admitMember: () => Effect.die("These member tests admit no one to a group"),
         removeMembership: () => Effect.die("These member tests have no group admissions"),
@@ -202,7 +204,7 @@ it.effect("member reads require only the current actor and leave the journal unc
       | Delegation.Delegation
       | Journal.Journal
       | Crypto.Crypto
-      | Store.Store
+      | WorkspaceId.CurrentWorkspaceId
     >()
     expectTypeOf<Layer.Error<typeof MemberService.layer>>().toEqualTypeOf<never>()
     expectTypeOf<

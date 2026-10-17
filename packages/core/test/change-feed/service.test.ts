@@ -24,6 +24,9 @@ import {
   ThreadParticipationId
 } from "@amends-dev/core/thread"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Exit, Fiber, Layer, Option, Queue, Schema, type Scope, Stream } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -45,12 +48,9 @@ import * as CoreError from "../../src/error/CoreError.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
 import * as Notification from "../../src/notification/Notification.ts"
 import * as Signal from "../../src/signal/Signal.ts"
 import * as SignalHub from "../../src/signal/SignalHub.ts"
@@ -235,6 +235,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     })
     const host = Layer.mergeAll(
       Layer.succeed(Store.Store, fixture.store),
+      Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
       Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
       Layer.succeed(
         MemberStore.MemberStore,

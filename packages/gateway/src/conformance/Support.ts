@@ -21,7 +21,7 @@ import { ChannelBindingStore, ChannelStore, ContactStore, DeliveryJobs, Delivery
 import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection"
 import { GroupQuery, GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends-dev/core/group"
 import { type Actor, Identity, Performer } from "@amends-dev/core/identity"
-import { Checkpoint, Entry, Event, Journal, Publication, Store, type StoreError } from "@amends-dev/core/journal"
+import { Checkpoint, Event, Journal, Publication } from "@amends-dev/core/journal"
 import { type Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { TaskStore, TaskTimeline } from "@amends-dev/core/task"
@@ -51,6 +51,7 @@ import {
   WorkspaceStore,
   WorkspaceId
 } from "@amends-dev/core/workspace"
+import { Entry, Store, type StoreError } from "@amends-dev/log"
 import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
@@ -133,6 +134,7 @@ export const bind = (
   channelBindings: Context.get(context, ChannelBindingStore.ChannelBindingStore),
   contacts: Context.get(context, ContactStore.ContactStore),
   deliveries: Context.get(context, DeliveryStore.DeliveryStore),
+  workspaceId: Context.get(context, WorkspaceId.CurrentWorkspaceId),
   store: Context.get(context, Store.Store),
   checkpoints: Context.get(context, Checkpoint.Checkpoint),
   workspace: Context.get(context, WorkspaceStore.WorkspaceStore),
@@ -291,28 +293,25 @@ export const seed = (
       Effect.gen(function* () {
         for (const member of members)
           yield* journal.publish(MemberFacts.Added, {
-            workspaceId: bound.store.workspaceId,
+            workspaceId: bound.workspaceId,
             memberId: member.memberId,
             identity: member.identity,
             name: Member.Name.make(member.identity.id)
           })
         for (const viewer of viewers)
           yield* journal.publish(AssignmentFacts.Created, {
-            workspaceId: bound.store.workspaceId,
+            workspaceId: bound.workspaceId,
             assignmentId: Assignment.AssignmentId.make(`viewer:${viewer.memberId}`),
             memberId: viewer.memberId,
             source: {
               _tag: "Role",
               roleId: BuiltinRoles.MemberId,
-              scope: { _tag: "Workspace", workspaceId: bound.store.workspaceId }
+              scope: { _tag: "Workspace", workspaceId: bound.workspaceId }
             }
           })
       })
     )
-  ).pipe(
-    Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
-    Effect.provide(core(bound))
-  )
+  ).pipe(Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)), Effect.provide(core(bound)))
 
 /**
  * Run a program on a gateway over a new host, which stays open for the enclosing scope.

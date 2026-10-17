@@ -9,6 +9,7 @@
  */
 
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
+import type * as Log from "@amends-dev/log/Log"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -34,7 +35,6 @@ import * as GroupPermissions from "../group/GroupPermissions.ts"
 import type * as Audience from "../journal/Audience.ts"
 import * as Event from "../journal/Event.ts"
 import * as Fact from "../journal/Fact.ts"
-import type * as Log from "../journal/Log.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as TaskFacts from "../task/TaskFacts.ts"
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"

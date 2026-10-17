@@ -10,8 +10,8 @@
  */
 
 import { Assignment, AssignmentStore } from "@amends-dev/core/authorization"
-import { StoreError } from "@amends-dev/core/journal"
 import type { WorkspaceId } from "@amends-dev/core/workspace"
+import { StoreError } from "@amends-dev/log"
 import { and, eq, type SQL } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"

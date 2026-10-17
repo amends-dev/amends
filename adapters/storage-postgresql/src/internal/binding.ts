@@ -8,8 +8,8 @@
  * writers instead. `Journal` builds the journal's transactions and standalone appends on it.
  */
 
-import { Commit, Store, type Entry, StoreError } from "@amends-dev/core/journal"
 import type { WorkspaceId } from "@amends-dev/core/workspace"
+import { Commit, Store, type Entry, StoreError } from "@amends-dev/log"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"

@@ -9,6 +9,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -17,14 +20,12 @@ import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import * as GroupId from "../group/GroupId.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
 import * as MemberId from "../workspace/MemberId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Notification from "./Notification.ts"
 
 /**
@@ -278,7 +279,7 @@ export const make = (
   driver: NotificationStore["Service"]
 ): NotificationStore["Service"] => {
   const read = StoreInput.read("NotificationStore")
-  const write = StoreInput.write("NotificationStore", workspaceId)
+  const write = StoreInput.write("NotificationStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", Notification.NotificationId, id), driver.get),
     listPendingByRecipient: Effect.fn("NotificationStore.listPendingByRecipient")(function* (recipient, options) {
@@ -414,7 +415,7 @@ const withSeen = (space: MemoryDatabase.Space, record: Notification.Notification
  * recipient's Seen is also kept beside them, where rebuilding projections leaves it.
  */
 const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
-  const { workspaceId, read, write, exclusive } = yield* Store.MemoryBinding
+  const { workspaceId, read, write, exclusive } = yield* MemoryBinding.MemoryBinding
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("notifications")))
 
   const listPending = Effect.fnUntraced(function* (recipient: Notification.Recipient, options: ReadOptions) {
@@ -687,7 +688,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `NotificationStore` in process memory, over the workspace's `Store.MemoryBinding`. It
+ * Provide `NotificationStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It
  * keeps what the contract leaves to storage: an insert writes every record or none, and a reused
  * ID, or a second notification for one source entry and recipient, is rejected. Marking seen is
  * rejected unless each notification is stored, of a human recipient, and pending or already seen,

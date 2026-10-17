@@ -6,11 +6,10 @@
  */
 
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import { type Commit, Store, type StoreError } from "@amends-dev/log"
 import { Context, Effect, Layer, Ref } from "effect"
 import { AssignmentStore, RoleStore } from "../src/authorization/index.ts"
-import type { Commit } from "../src/journal/index.ts"
-import { Checkpoint, MemoryDatabase, Store } from "../src/journal/index.ts"
-import type * as StoreError from "../src/journal/StoreError.ts"
+import { Checkpoint, MemoryBinding, MemoryDatabase } from "../src/journal/index.ts"
 import { MemberStore } from "../src/workspace/index.ts"
 
 /** A projection target: a number the transaction stages, like any projected record. */
@@ -39,13 +38,13 @@ export const make = Effect.fn("JournalTest.memory")(function* (
         RoleStore.layerMemory,
         AssignmentStore.layerMemory
       ).pipe(
-        Layer.provideMerge(Store.layerMemory(id)),
+        Layer.provideMerge(MemoryBinding.layer(id)),
         Layer.provide(Layer.succeed(MemoryDatabase.Connection, connection))
       )
     )
     return {
       context,
-      binding: Context.get(context, Store.MemoryBinding),
+      binding: Context.get(context, MemoryBinding.MemoryBinding),
       store: Context.get(context, Store.Store),
       checkpoints: Context.get(context, Checkpoint.Checkpoint),
       members: Context.get(context, MemberStore.MemberStore),
@@ -112,6 +111,7 @@ export const make = Effect.fn("JournalTest.memory")(function* (
   })
 
   return {
+    workspaceId,
     store,
     counter,
     checkpoints: bound.checkpoints,
@@ -128,7 +128,7 @@ export const make = Effect.fn("JournalTest.memory")(function* (
     snapshot: Effect.sync(() => {
       const space = MemoryDatabase.committed(database, workspaceId)
       return {
-        logs: space.logs,
+        logs: space.logs.batches,
         checkpoints: space.records.of("checkpoints"),
         members: space.records.of("members"),
         roles: space.records.of("roles"),

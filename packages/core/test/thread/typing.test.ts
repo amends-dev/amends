@@ -1,6 +1,7 @@
 import { GroupId } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Store from "@amends-dev/log/Store"
 import { expect, it } from "@effect/vitest"
 import { type Context, Crypto, DateTime, Effect, Layer } from "effect"
 import { TestClock } from "effect/testing"
@@ -10,7 +11,6 @@ import * as CoreError from "../../src/error/CoreError.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Store from "../../src/journal/Store.ts"
 import * as ReadStateStore from "../../src/read-state/ReadStateStore.ts"
 import * as Signal from "../../src/signal/Signal.ts"
 import * as SignalHub from "../../src/signal/SignalHub.ts"
@@ -101,6 +101,7 @@ const run = <A, E>(
             Layer.succeed(Authorization.Authorization, authorization),
             Layer.succeed(SignalHub.SignalHub, signalHub),
             Layer.succeed(Store.Store, (yield* make(workspaceId)).store),
+            Layer.succeed(WorkspaceId.CurrentWorkspaceId, workspaceId),
             unused(ThreadCommand.ThreadCommand),
             unused(ReadStateStore.ReadStateStore),
             unused(ThreadMessageStore.ThreadMessageStore),

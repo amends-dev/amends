@@ -1,17 +1,18 @@
 /**
- * The PostgreSQL driver for `Store.Store`, the journal's storage of the workspace's logs, over
- * `commits`, `log_batches`, `log_entries`, and `log_append_keys`. A transaction stages its appends
- * in memory and writes them just before `COMMIT`, or earlier when it reads a log's batches, head,
- * or facts, in as few inserts as the parameter limit allows. Appending to a log, or looking up one
- * of its keys, holds the log's advisory lock until the transaction ends; a standalone append is a
- * commit of its own that holds only its log. `JournalEntry` maps entries to their columns.
+ * The PostgreSQL driver for `Store.Store`, the storage of the workspace's logs, over `commits`,
+ * `log_batches`, `log_entries`, and `log_append_keys`; an entry's name and subject have columns of
+ * their own beside its bytes, which reads select by. A transaction stages its appends in memory and
+ * writes them just before `COMMIT`, or earlier when it reads a log's batches, head, or entries, in
+ * as few inserts as the parameter limit allows. Appending to a log, or looking up one of its keys,
+ * holds the log's advisory lock until the transaction ends; a standalone append is a commit of its
+ * own that holds only its log.
  * `Store.make` checks every input before the driver sees it, so the driver keeps only what storage
  * keeps: a key reused with different content, a log that moved past `expectedAfter`, and
  * contention, each a `StoreError.StoreError`. A commit that appended notifies once it commits,
  * waking `waitForAppend` in every process; the binding's poll interval covers a lost notice.
  */
 
-import { Commit, Entry, Occurrence, Store, StoreError } from "@amends-dev/core/journal"
+import { Commit, Entry, Store, StoreError } from "@amends-dev/log"
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Crypto from "effect/Crypto"
@@ -24,7 +25,6 @@ import * as Schema from "effect/Schema"
 import * as PostgresNotices from "../PostgresNotices.ts"
 import * as Binding from "./binding.ts"
 import { isContention, raceError } from "./errors.ts"
-import * as JournalEntry from "./journalEntry.ts"
 import { insertChunked } from "./parameters.ts"
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts"
 
@@ -38,12 +38,38 @@ const BatchHeaderRow = Schema.Struct({
 const AppendHeaderRows = Schema.Array(
   Schema.Struct({
     logId: Entry.LogId,
-    key: Occurrence.Key,
+    key: Store.IdempotencyKey,
     commitId: Commit.CommitId,
     firstIndex: Schema.Natural,
     entryCount: Schema.Int.check(Schema.isGreaterThan(0))
   })
 )
+
+/** The `log_entries` columns a read selects, named as `EntryRow` expects them. */
+const entryColumns = {
+  id: logEntries.id,
+  logId: logEntries.logId,
+  position: logEntries.position,
+  commitId: logEntries.commitId,
+  index: logEntries.entryIndex,
+  recordedAt: logEntries.recordedAt,
+  payload: logEntries.payload,
+  name: logEntries.name,
+  subject: logEntries.subject
+}
+const EntryRow = Schema.Struct({
+  ...Store.Entry.fields,
+  recordedAt: Schema.DateTimeUtcFromDate,
+  name: Schema.NullOr(Store.Content.fields.name),
+  subject: Schema.NullOr(Store.Content.fields.subject)
+})
+/** Rows selected with `entryColumns` as entries, without the name or subject they lack. */
+const decodeEntries = Effect.fnUntraced(function* (input: unknown) {
+  const rows = yield* Schema.decodeUnknownEffect(Schema.Array(EntryRow))(input)
+  return rows.map(({ name, subject, payload, ...row }) =>
+    Object.assign(row, { payload: payload.slice() }, name === null ? {} : { name }, subject === null ? {} : { subject })
+  )
+})
 
 /**
  * What one transaction has appended but not yet written, and what it learned about its logs.
@@ -67,7 +93,7 @@ interface Staging {
 /** Entries per insert, fewer than their parameters allow, since each carries its payload. */
 const entriesPerInsert = 500
 
-const receiptKey = (logId: Entry.LogId, key: Occurrence.Key) => JSON.stringify([logId, key])
+const receiptKey = (logId: Entry.LogId, key: Store.IdempotencyKey) => JSON.stringify([logId, key])
 const copyEntry = (entry: Store.Entry): Store.Entry => Object.assign({}, entry, { payload: entry.payload.slice() })
 const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
   Object.assign({}, receipt, { entries: receipt.entries.map(copyEntry) })
@@ -89,15 +115,13 @@ export const make = Effect.gen(function* () {
     recordedAt: commits.recordedAt,
     entryCount: commits.entryCount
   }
-  const entryColumns = JournalEntry.columns
-  const decodeEntries = (input: unknown) => JournalEntry.decodeRows(workspaceId, input)
   const headers = () =>
     db
       .select(headerColumns)
       .from(logBatches)
       .innerJoin(commits, and(eq(commits.workspaceId, logBatches.workspaceId), eq(commits.id, logBatches.commitId)))
 
-  const storedAppend = Effect.fn("Journal.storedAppend")(function* (logId: Entry.LogId, key: Occurrence.Key) {
+  const storedAppend = Effect.fn("Journal.storedAppend")(function* (logId: Entry.LogId, key: Store.IdempotencyKey) {
     const found = yield* db
       .select({
         logId: logAppendKeys.logId,
@@ -214,7 +238,7 @@ export const make = Effect.gen(function* () {
               recordedAt: DateTime.toDate(entry.recordedAt),
               payload: entry.payload
             },
-            JournalEntry.toColumns(entry)
+            { name: entry.name ?? null, subject: entry.subject ?? null }
           )
         ),
         (chunk) => db.insert(logEntries).values(chunk),
@@ -279,7 +303,7 @@ export const make = Effect.gen(function* () {
   })
 
   /** A keyed append, from what this transaction staged or looked up before, else from storage. */
-  const receiptIn = Effect.fnUntraced(function* (staging: Staging, logId: Entry.LogId, key: Occurrence.Key) {
+  const receiptIn = Effect.fnUntraced(function* (staging: Staging, logId: Entry.LogId, key: Store.IdempotencyKey) {
     const id = receiptKey(logId, key)
     const known = staging.receipts.get(id)
     if (known !== undefined) return Option.map(known, copyReceipt)
@@ -381,7 +405,6 @@ export const make = Effect.gen(function* () {
   })
 
   const driver: Store.Store["Service"] = {
-    workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
         // An entry is either staged by this transaction or stored; staged ones need no write.
@@ -403,7 +426,7 @@ export const make = Effect.gen(function* () {
       },
       Effect.mapError(StoreError.failed("Store", "getEntry"))
     ),
-    readFacts: Effect.fn("Journal.readFacts")(function* (logId, options) {
+    readEntries: Effect.fn("Journal.readEntries")(function* (logId, options) {
       return yield* flushed(
         guard(
           db
@@ -413,9 +436,8 @@ export const make = Effect.gen(function* () {
               and(
                 eq(logEntries.workspaceId, workspaceId),
                 eq(logEntries.logId, logId),
-                options.name === undefined ? undefined : eq(logEntries.factName, options.name),
+                options.name === undefined ? undefined : eq(logEntries.name, options.name),
                 options.subject === undefined ? undefined : eq(logEntries.subject, options.subject),
-                options.version === undefined ? undefined : eq(logEntries.factVersion, options.version),
                 // A row comparison bounds the index scan; the equivalent OR form only filters it.
                 options.after === undefined
                   ? undefined
@@ -426,7 +448,7 @@ export const make = Effect.gen(function* () {
             .limit(options.limit)
             .pipe(Effect.flatMap(decodeEntries))
         )
-      ).pipe(Effect.mapError(StoreError.failed("Store", "readFacts")))
+      ).pipe(Effect.mapError(StoreError.failed("Store", "readEntries")))
     }),
     getAppend: (logId, key) =>
       guard(

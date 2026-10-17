@@ -8,7 +8,7 @@
  */
 
 import { Contact, ContactStore } from "@amends-dev/core/channel"
-import { StoreError } from "@amends-dev/core/journal"
+import { StoreError } from "@amends-dev/log"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

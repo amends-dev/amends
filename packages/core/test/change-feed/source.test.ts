@@ -1,16 +1,17 @@
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
 import { expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Fact from "../../src/journal/Fact.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
 import * as Subject from "../../src/journal/Subject.ts"
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
@@ -31,6 +32,7 @@ it.effect("a follower whose read fails follows on from its last commit, and nobo
         Log.layer.pipe(
           Layer.provideMerge([
             Layer.succeed(Store.Store, fixture.store),
+            Layer.succeed(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
             Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints)
           ])
         )

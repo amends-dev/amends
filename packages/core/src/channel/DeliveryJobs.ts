@@ -9,14 +9,14 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import type * as Event from "../journal/Event.ts"
 import type * as Reaction from "../journal/Reaction.ts"
-import type * as Store from "../journal/Store.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"
 import * as ThreadId from "../thread/ThreadId.ts"

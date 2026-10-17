@@ -10,6 +10,7 @@
  */
 
 import { Integrations, type Connection as ConnectionContract } from "@amends-dev/connection"
+import type * as StoreError from "@amends-dev/log/StoreError"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -21,7 +22,6 @@ import * as ConnectionCredentialStore from "../connection/ConnectionCredentialSt
 import * as ConnectionStore from "../connection/ConnectionStore.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Identity from "../identity/Identity.ts"
-import type * as StoreError from "../journal/StoreError.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as Agent from "./Agent.ts"

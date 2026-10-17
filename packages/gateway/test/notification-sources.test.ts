@@ -2,7 +2,7 @@ import type { Core } from "@amends-dev/core"
 import { Assignment, AssignmentFacts, Grant, type Permission, type Target } from "@amends-dev/core/authorization"
 import { GroupService, GroupMembershipService, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal"
+import { Event, Journal, Publication } from "@amends-dev/core/journal"
 import {
   Notification,
   NotificationService,
@@ -25,6 +25,7 @@ import {
 } from "@amends-dev/core/thread"
 import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
+import { Entry, Store, StoreError } from "@amends-dev/log"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Context, DateTime, Effect, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -68,7 +69,7 @@ describe("notification sources", () => {
     asActor(effect, actor).pipe(Effect.provide(core(bound)))
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound))))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
@@ -103,7 +104,7 @@ describe("notification sources", () => {
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
-          workspaceId: bound.store.workspaceId,
+          workspaceId: bound.workspaceId,
           assignmentId: Assignment.AssignmentId.make(
             `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`
           ),
@@ -112,9 +113,7 @@ describe("notification sources", () => {
             _tag: "Direct",
             grant: Grant.make(
               permission,
-              target === undefined
-                ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
-                : { _tag: "Target", target }
+              target === undefined ? { _tag: "Workspace", workspaceId: bound.workspaceId } : { _tag: "Target", target }
             )
           }
         })
@@ -128,7 +127,7 @@ describe("notification sources", () => {
           Effect.gen(function* () {
             for (const memberId of [humanId, otherId, agentId])
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
+                workspaceId: bound.workspaceId,
                 memberId,
                 identity: identityFor(memberId),
                 name: Member.Name.make(memberId)
@@ -207,7 +206,7 @@ describe("notification sources", () => {
               ...bound.store,
               transaction: () => Effect.die("Source reads must not open a transaction"),
               read: () => Effect.die("Source reads must not scan log batches"),
-              readFacts: () => Effect.die("Source reads must not scan journal facts"),
+              readEntries: () => Effect.die("Source reads must not scan journal facts"),
               getEntry: (logId, entryId) => {
                 lookups++
                 return bound.store.getEntry(logId, entryId)
@@ -502,7 +501,7 @@ describe("notification sources", () => {
           const note = yield* noteFor(bound, humanId)
           const nonActivity = (yield* history(bound))
             .flatMap((b) => b.entries)
-            .find((e) => e.fact?.name === MemberFacts.Added.name)
+            .find((e) => e.name === MemberFacts.Added.name)
           if (!nonActivity) return yield* Effect.die("Missing fixture fact")
           for (const source of [
             { logId: note.source.logId, entryId: Entry.EntryId.make("missing") },
@@ -511,11 +510,12 @@ describe("notification sources", () => {
           ])
             expect(yield* run(withNote(bound, changed(note, { source })), human, sourceOf(note.id))).toBeUndefined()
           const entry = Option.getOrThrow(yield* bound.store.getEntry(note.source.logId, note.source.entryId))
-          const header = entry.fact
-          if (!header) return yield* Effect.die("Missing fact header")
+          // The same entry, recorded with a version of the fact this host does not know.
+          const envelope = yield* Event.storageCodec.decode(entry)
+          const unknownVersion = yield* Event.storageCodec.encode(changed(envelope, { version: 999 }))
           const context = Context.add(bound.context, Store.Store, {
             ...bound.store,
-            getEntry: () => Effect.succeedSome(changed(entry, { fact: changed(header, { version: 999 }) }))
+            getEntry: () => Effect.succeedSome(changed(entry, unknownVersion))
           })
           expect(yield* run({ ...bound, context }, human, sourceOf(note.id))).toBeUndefined()
           expect(yield* bound.store.getEntry(Entry.LogId.make("another-log"), entry.id)).toEqual(Option.none())

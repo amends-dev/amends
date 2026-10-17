@@ -1,10 +1,10 @@
 /**
- * A commit: one transaction of a workspace's storage, which may append to several logs and write
- * projection stores and checkpoints. Each log it touches records its entries as one batch, at that
- * log's next position; every entry names the commit that wrote it, and `Store.Transaction` gives a
- * commit its ID.
+ * A commit: one transaction of the store, which may append to several logs, and whatever else the
+ * host enlists in it. Each log it touches records its entries as one batch, at that log's next
+ * position; every entry names the commit that wrote it, and `Store.Transaction` gives a commit its
+ * ID.
  *
- * @since 0.1.0
+ * @since 0.2.0
  */
 
 import * as Schema from "effect/Schema"
@@ -14,13 +14,13 @@ import * as Schema from "effect/Schema"
  * outcome was not confirmed can be looked up.
  *
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
-export const CommitId = Schema.NonEmptyString.pipe(Schema.brand("JournalCommitId"))
+export const CommitId = Schema.NonEmptyString.pipe(Schema.brand("LogCommitId"))
 
 /**
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export type CommitId = typeof CommitId.Type
 
@@ -29,7 +29,7 @@ export type CommitId = typeof CommitId.Type
  * every log, and when it was recorded.
  *
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export const Commit = Schema.Struct({
   id: CommitId,
@@ -40,6 +40,6 @@ export const Commit = Schema.Struct({
 
 /**
  * @category schemas
- * @since 0.1.0
+ * @since 0.2.0
  */
 export interface Commit extends Schema.Schema.Type<typeof Commit> {}

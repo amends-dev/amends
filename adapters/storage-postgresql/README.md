@@ -50,10 +50,9 @@ for changing the schema.
 
 ### Journal
 
-Journal entries keep `subject`, `fact_name`, and `fact_version` in columns and only the domain
-payload as binary, with the provenance's performer, cause, correlation, and time in columns of their
-own; check constraints require a complete header and a valid performer and cause. Execution log
-entries leave the header null. `log_entries_by_fact` serves ordered reads by fact name,
+Log entries keep their `name` and `subject` in columns beside their bytes: a journal entry's fact
+name and subject, with its version and provenance in the bytes, and nulls for an execution log's
+entries. `log_entries_by_name` serves ordered reads by name,
 `log_entries_by_subject` an entity's history across fact names, and `log_entries_by_commit` keyed
 append receipts and batch reads by commit. `log_append_keys` stores durable append receipts by
 workspace, log, and key: a matching retry returns the original append, and conflicting content

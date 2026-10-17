@@ -1,4 +1,4 @@
-import { Entry, Store } from "@amends-dev/core/journal"
+import { Entry, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option } from "effect"
 import { SqlClient } from "effect/sql"

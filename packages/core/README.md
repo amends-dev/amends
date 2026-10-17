@@ -42,7 +42,7 @@ implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journ
 | `workspace`     | Workspace metadata and initialization, with members, invitations, ownership, and settings.                                |
 | `authorization` | Access evaluation and permissions, with roles and assignments.                                                            |
 | `identity`      | Human, agent, and contact references, actors, and performers.                                                             |
-| `journal`       | The log, transactions, facts, codecs, projections, and reactions every domain publishes through.                          |
+| `journal`       | The facts, projections, checkpoints, and reactions every domain publishes through, over the log package's logs.           |
 | `group`         | Team and direct groups, admissions, follows, public discovery and joining, and the audience check. See [groups](#groups). |
 | `thread`        | Threads, participation, messages, and timeline activity. See [threads](#threads).                                         |
 | `task`          | The work a thread tracks: its status, priority, and assignee. See [tasks](#tasks).                                        |
@@ -101,9 +101,9 @@ repeatable changes need a request or occurrence ID, or return `null`. Facts regi
 name and version share their payload schema, subject, and occurrence functions. See
 [idempotent publication](../../docs/journal.md#idempotent-publication-and-append).
 
-The storage envelope separates `Event.Header` (subject, name, version, provenance) from encoded
-payload bytes, so storage keeps the header in columns. Read matching history with
-`journal.read({ subject?, name?, version?, after?, limit })`, giving a subject, a name, or both,
+A fact's entry carries its subject and name, which storage indexes, and its version and
+provenance in its bytes beside the encoded payload. Read matching history with
+`journal.log.readEntries({ subject?, name?, after?, limit })`, giving a subject, a name, or both,
 with a `{ position, index }` cursor, and decode payloads with `Event.decode(fact, entry)`. An
 execution-log append outside a commit goes through `Store.append`, a commit of its own that waits
 only for the log's other writers; see
@@ -623,23 +623,25 @@ Nothing survives the process.
 
 Every store contract builds its store with `make(workspaceId, driver)`, over the driver an adapter
 implements: the store checks each input against its schema, and a record against the workspace,
-through `StoreInput`, before the driver sees it. The checkpoint and session log stores, whose inputs
-name no workspace, take the driver alone, and `Store.make` reads the workspace from its driver. A
+through the log package's `StoreInput`, with `WorkspaceId.rejectForeign`, before the driver sees
+it. The checkpoint and session log stores, whose inputs name no workspace, take the driver alone,
+as the log package's `Store.make` does. A
 driver keeps only what storage keeps, such as reused IDs and conditional writes, which it rejects
 with `StoreError` (`Rejected`), and an adapter's module returns the contract's `make` over its
 driver from its constructor, as each `layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
-  workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
+  workspace has one `Space`: its logs, as the log package's `MemoryStore.Space`, projected records by
   kind, with the live projection versions and rebuild checkpoints, and private read state. Beside
   the workspaces sit the session logs, and tables and locks by name, created on first use, for what
   a host stores across its workspaces, such as its accounts. `MemoryDatabase.makeRows` is how a
   store keeps one kind of record.
 - `MemoryDatabase.Connection` is one host's connection: its transactions take turns on a
   one-permit gate, as on one database connection.
-- `Store.layerMemory(workspaceId)` binds one workspace over the connection: it provides the
-  workspace's logs and the `Store.MemoryBinding` that every other store's `layerMemory`, and the
-  signal hub's, reads and writes through. The gateway's
+- `MemoryBinding.layer(workspaceId)` binds one workspace over the connection: it provides the
+  workspace's log store, the log package's `MemoryStore` over the same transactions, its
+  `WorkspaceId.CurrentWorkspaceId`, and the `MemoryBinding` that every other store's `layerMemory`,
+  and the signal hub's, reads and writes through. The gateway's
   [memory workspace storage](../gateway/README.md#memory) merges them all for each workspace it
   opens.
 

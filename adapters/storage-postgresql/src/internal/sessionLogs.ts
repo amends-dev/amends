@@ -10,8 +10,8 @@
  * runs under its `guard`.
  */
 
-import { Store, StoreError } from "@amends-dev/core/journal"
 import { SessionLog, SessionLogStore } from "@amends-dev/core/turn"
+import { Store, StoreError } from "@amends-dev/log"
 import { and, asc, eq, gt, max } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"

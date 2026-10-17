@@ -31,7 +31,6 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
 import * as Signal from "../signal/Signal.ts"
@@ -40,6 +39,7 @@ import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as SessionLog from "./SessionLog.ts"
 import * as SessionLogStore from "./SessionLogStore.ts"
 import * as Turn from "./Turn.ts"
@@ -203,7 +203,7 @@ export const make = Effect.gen(function* () {
   const signalHub = yield* SignalHub.SignalHub
   const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const readThreadRequirement = (threadId: ThreadId.ThreadId) =>
     Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))

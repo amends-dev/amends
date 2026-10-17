@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 
-import { Store, type StoreError } from "@amends-dev/core/journal"
+import { Store, type StoreError } from "@amends-dev/log"
 import * as Sharding from "effect/cluster/Sharding"
 import * as Context from "effect/Context"
 import * as Data from "effect/Data"

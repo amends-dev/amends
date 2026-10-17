@@ -9,8 +9,8 @@
  * and requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { ThreadMessage, ThreadMessageStore, type ThreadMessageId } from "@amends-dev/core/thread"
+import { StoreError } from "@amends-dev/log"
 import { and, count, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"

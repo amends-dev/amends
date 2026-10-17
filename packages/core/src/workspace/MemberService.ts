@@ -25,7 +25,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Invitation from "./Invitation.ts"
 import * as InvitationFacts from "./InvitationFacts.ts"
@@ -35,6 +34,7 @@ import * as MemberFacts from "./MemberFacts.ts"
 import * as MemberId from "./MemberId.ts"
 import * as MemberPermissions from "./MemberPermissions.ts"
 import * as MemberStore from "./MemberStore.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 import * as WorkspaceStore from "./WorkspaceStore.ts"
 
 /**
@@ -130,7 +130,7 @@ export const make: Effect.Effect<
   | Delegation.Delegation
   | Journal.Journal
   | Crypto.Crypto
-  | Store.Store
+  | WorkspaceId.CurrentWorkspaceId
 > = Effect.gen(function* () {
   const memberStore = yield* MemberStore.MemberStore
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
@@ -141,7 +141,7 @@ export const make: Effect.Effect<
   const delegation = yield* Delegation.Delegation
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const requireMember = Effect.fnUntraced(function* (id: MemberId.MemberId) {
     const found = yield* memberStore.get(id)

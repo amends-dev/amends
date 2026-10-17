@@ -2,7 +2,7 @@ import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends-dev/co
 import { CoreError } from "@amends-dev/core/error"
 import { type Group, GroupService, GroupFollowService, GroupMembershipService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Publication } from "@amends-dev/core/journal"
+import { Journal, Publication } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { type ReadState, ReadStateService } from "@amends-dev/core/read-state"
 import {
@@ -14,6 +14,7 @@ import {
   ThreadId
 } from "@amends-dev/core/thread"
 import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
+import { Entry } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Deferred, Effect, Fiber, Tracer } from "effect"
 import { TestClock } from "effect/testing"
@@ -40,7 +41,7 @@ describe("read state", () => {
     program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.workspaceId)),
       Effect.provide(core(bound))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 })

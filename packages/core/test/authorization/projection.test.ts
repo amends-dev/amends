@@ -1,4 +1,9 @@
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
+import * as Entry from "@amends-dev/log/Entry"
+import * as Log from "@amends-dev/log/Log"
+import * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import type * as Transaction from "@amends-dev/log/Transaction"
 import { expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -14,13 +19,8 @@ import * as Scope from "../../src/authorization/Scope.ts"
 import * as Target from "../../src/authorization/Target.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
-import * as Entry from "../../src/journal/Entry.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
-import * as Store from "../../src/journal/Store.ts"
-import * as StoreError from "../../src/journal/StoreError.ts"
-import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as Member from "../../src/workspace/Member.ts"
 import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
@@ -84,6 +84,7 @@ const run = <A, E>(
     E,
     | Publication.Publication
     | Log.Log
+    | WorkspaceId.CurrentWorkspaceId
     | Transaction.Transaction
     | Checkpoint.Checkpoint
     | RoleStore.RoleStore
@@ -95,6 +96,7 @@ const run = <A, E>(
     Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(WorkspaceId.CurrentWorkspaceId, fixture.workspaceId),
     Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(RoleStore.RoleStore, fixture.roles),
     Effect.provideService(AssignmentStore.AssignmentStore, fixture.assignments),

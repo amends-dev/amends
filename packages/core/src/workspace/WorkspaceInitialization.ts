@@ -24,7 +24,6 @@ import * as Identity from "../identity/Identity.ts"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as MemberFacts from "./MemberFacts.ts"
 import * as MemberId from "./MemberId.ts"
 import * as Workspace from "./Workspace.ts"
@@ -65,7 +64,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   const createdBy = yield* Schema.decodeEffect(Identity.HumanId)(creator)
   const { name, memberName } = yield* Schema.decodeEffect(Workspace.CreateInput)(input)
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog

@@ -7,6 +7,8 @@
  * @since 0.1.0
  */
 
+import type * as Log from "@amends-dev/log/Log"
+import type * as Store from "@amends-dev/log/Store"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
@@ -14,11 +16,10 @@ import * as Layer from "effect/Layer"
 import type * as PlatformError from "effect/PlatformError"
 import type * as Schema from "effect/Schema"
 import * as Journal from "../journal/Journal.ts"
-import type * as Log from "../journal/Log.ts"
 import type * as Projection from "../journal/Projection.ts"
 import type * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentFacts from "./AssignmentFacts.ts"
 import type * as Role from "./Role.ts"
@@ -68,7 +69,7 @@ export class AssignmentCommand extends Context.Service<
 export const make = Effect.gen(function* () {
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const assignRole = Effect.fn("AssignmentCommand.assignRole")(function* (
     memberId: MemberId.MemberId,

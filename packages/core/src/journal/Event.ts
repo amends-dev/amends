@@ -1,22 +1,22 @@
 /**
  * A fact event: a fact as the journal recorded it, with the subject, name, version, and provenance
- * it was published with, and the metadata of its log entry. `Header` is what storage keeps beside
- * the encoded payload, `Envelope` the entry as the journal's log reads and writes it, and `Event`
- * and `Type` the decoded event that projections, reactions, and readers receive. `decode` turns an
- * envelope into an event with the fact's versioned definition.
+ * it was published with, and the metadata of its log entry. `Header` is that metadata, `Envelope`
+ * the entry as the journal's log reads and writes it, through `storageCodec`, and `Event` and `Type`
+ * the decoded event that projections, reactions, and readers receive. `decode` turns an envelope
+ * into an event with the fact's versioned definition.
  *
  * @since 0.1.0
  */
 
+import * as Codec from "@amends-dev/log/Codec"
+import * as Commit from "@amends-dev/log/Commit"
+import * as Entry from "@amends-dev/log/Entry"
+import type * as Log from "@amends-dev/log/Log"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Performer from "../identity/Performer.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
-import * as Codec from "./Codec.ts"
-import * as Commit from "./Commit.ts"
-import * as Entry from "./Entry.ts"
 import * as Fact from "./Fact.ts"
-import type * as Log from "./Log.ts"
 import * as Subject from "./Subject.ts"
 
 /**
@@ -86,15 +86,15 @@ export const Provenance = Schema.Struct({
 export interface Provenance extends Schema.Schema.Type<typeof Provenance> {}
 
 /**
- * Queryable fact metadata, stored separately from the encoded domain payload, so that reads can
- * select facts by subject, name, and version.
+ * A fact's metadata beside its encoded payload: its subject and name, which storage indexes so that
+ * reads can select facts by either, and its version and provenance.
  *
  * @category schemas
  * @since 0.1.0
  */
 export const Header = Schema.Struct({
   subject: Subject.Subject,
-  name: Schema.String,
+  name: Schema.NonEmptyString,
   version: Schema.Finite,
   provenance: Provenance
 })
@@ -107,7 +107,7 @@ export interface Header extends Schema.Schema.Type<typeof Header> {}
 
 /**
  * A fact event as the journal's log reads and writes it: the header, and the payload's encoded
- * bytes. Only the payload is stored as binary, through `storageCodec`.
+ * bytes, which `storageCodec` stores.
  *
  * @category schemas
  * @since 0.1.0
@@ -120,22 +120,32 @@ export const Envelope = Schema.Struct({ ...Header.fields, payload: Schema.Uint8A
  */
 export interface Envelope extends Schema.Schema.Type<typeof Envelope> {}
 
+/** What an entry's bytes hold: the fact's version and provenance, and its encoded payload. */
+const storedCodec = Codec.makeForSchema(
+  Schema.Struct({ version: Header.fields.version, provenance: Provenance, payload: Schema.Uint8Array })
+)
+/** What storage indexes of an entry, as it gives them back. */
+const decodeIndexed = Schema.decodeUnknownEffect(
+  Schema.Struct({ name: Header.fields.name, subject: Header.fields.subject })
+)
+
 /**
- * The journal log's entry codec: the header goes to storage as `Store.Content.fact` and the
- * payload bytes as they are, preserving the envelope's typed metadata without encoding a second
- * binary wrapper. Each direction copies the bytes.
+ * The journal log's entry codec: the fact's name and subject are the entry's own, which storage
+ * indexes, and its version and provenance go into the entry's bytes with the encoded payload.
+ * Each direction copies the bytes.
  *
  * @category serialization
  * @since 0.1.0
  */
 export const storageCodec: Codec.EntryCodec<typeof Envelope> = {
   encode: Effect.fn("Event.encodeEntry")(function* (input) {
-    const { payload, ...fact } = yield* Schema.decodeEffect(Schema.toType(Envelope))(input)
-    return { fact, payload: payload.slice() }
+    const { name, subject, version, provenance, payload } = yield* Schema.decodeEffect(Schema.toType(Envelope))(input)
+    return { name, subject, payload: yield* storedCodec.encode({ version, provenance, payload }) }
   }),
   decode: Effect.fn("Event.decodeEntry")(function* (entry) {
-    const fact = yield* Schema.decodeUnknownEffect(Schema.toType(Header))(entry.fact)
-    return { ...fact, payload: entry.payload.slice() }
+    const { name, subject } = yield* decodeIndexed(entry)
+    const { version, provenance, payload } = yield* storedCodec.decode(entry.payload)
+    return { name, subject, version, provenance, payload: payload.slice() }
   })
 }
 
@@ -275,7 +285,7 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
   if (entry.payload.name !== fact.name || entry.payload.version !== fact.version) {
     return yield* new FactMismatch({ name: fact.name, version: fact.version })
   }
-  const payload = yield* Codec.make(fact).decode(entry.payload.payload)
+  const payload = yield* Codec.makeForSchema<F["payload"]>(fact.payload).decode(entry.payload.payload)
   const subject = yield* Fact.makeSubject(fact, payload)
   if (entry.payload.subject !== subject) return yield* new FactMismatch({ name: fact.name, version: fact.version })
   const provenance = snapshotProvenance(entry.payload.provenance)

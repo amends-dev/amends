@@ -197,7 +197,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             { limit: 2 }
           )
           const facts = yield* Effect.flatMap(Journal.Journal, (journal) =>
-            journal.read({ name: "thread.created", limit: 1 })
+            journal.log.readEntries({ name: "thread.created", limit: 1 })
           ).pipe(Effect.provide(core(bound)))
           const sql = yield* SqlClient.SqlClient
           yield* sql`ANALYZE`
@@ -279,9 +279,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
               query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND participation_id = ${inbox[0]!.participationId ?? ""} AND recipient_kind = 'Agent' AND state = 'Pending'`
             },
             {
-              index: "log_entries_by_fact",
+              index: "log_entries_by_name",
               condition: 'ROW("position", entry_index) >',
-              query: sql`SELECT id FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND fact_name = ${"thread.created"} AND (position, entry_index) > (${facts[0]!.position}, ${facts[0]!.index}) ORDER BY position, entry_index LIMIT 20`
+              query: sql`SELECT id FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND name = ${"thread.created"} AND (position, entry_index) > (${facts[0]!.position}, ${facts[0]!.index}) ORDER BY position, entry_index LIMIT 20`
             },
             {
               index: "members_by_identity",

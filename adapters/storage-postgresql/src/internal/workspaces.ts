@@ -8,8 +8,8 @@
  * lets a read join the caller's transaction and requires one for a write.
  */
 
-import { StoreError } from "@amends-dev/core/journal"
 import { Workspace, WorkspaceStore } from "@amends-dev/core/workspace"
+import { StoreError } from "@amends-dev/log"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"

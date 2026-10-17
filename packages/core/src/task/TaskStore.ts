@@ -6,6 +6,9 @@
  * @since 0.1.0
  */
 
+import type * as Store from "@amends-dev/log/Store"
+import * as StoreError from "@amends-dev/log/StoreError"
+import * as StoreInput from "@amends-dev/log/StoreInput"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -13,12 +16,10 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as GroupId from "../group/GroupId.ts"
+import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Store from "../journal/Store.ts"
-import * as StoreError from "../journal/StoreError.ts"
-import * as StoreInput from "../journal/StoreInput.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Task from "./Task.ts"
 
 /**
@@ -74,7 +75,7 @@ export class TaskStore extends Context.Service<
  */
 export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: TaskStore["Service"]): TaskStore["Service"] => {
   const read = StoreInput.read("TaskStore")
-  const write = StoreInput.write("TaskStore", workspaceId)
+  const write = StoreInput.write("TaskStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (threadId) => Effect.flatMap(read("get", ThreadId.ThreadId, threadId), driver.get),
     getMany: (threadIds) => Effect.flatMap(read("getMany", Schema.Array(ThreadId.ThreadId), threadIds), driver.getMany),
@@ -106,7 +107,7 @@ const newestFirst = (
  * Tasks by thread, over one workspace's binding.
  */
 const makeMemory = Effect.fn("TaskStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const driver: TaskStore["Service"] = {
     get: Effect.fn("TaskStore.memory.get")(
       function* (threadId) {
@@ -170,7 +171,7 @@ const makeMemory = Effect.fn("TaskStore.makeMemory")(function* () {
 })
 
 /**
- * Provide `TaskStore` in process memory, over the workspace's `Store.MemoryBinding`: tasks keyed by
+ * Provide `TaskStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`: tasks keyed by
  * their thread. It keeps what the contract leaves to storage: a second task for one thread
  * is rejected, and a change applies only to a stored task that still holds the value the change
  * replaces, so a change made against a stale value is rejected. A group's tasks list newest first,

@@ -22,9 +22,9 @@ import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
-import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as GroupFollow from "./GroupFollow.ts"
 import * as GroupFollowFacts from "./GroupFollowFacts.ts"
 import * as GroupFollowStore from "./GroupFollowStore.ts"
@@ -87,7 +87,7 @@ export const make = Effect.gen(function* () {
   const groupFollowStore = yield* GroupFollowStore.GroupFollowStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const { workspaceId } = yield* Store.Store
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The admission whose follow changes, after the checks that apply to the actor and target. */
   const authorizeFollowChange = Effect.fnUntraced(function* (input: GroupFollow.Input, following: boolean) {
