@@ -67,8 +67,11 @@ export interface CreateOptions<E> {
   /** The ports to expose from the start; `Sandbox.exposePorts` exposes more later. */
   readonly ports?: ReadonlyArray<Network.Port>
 
-  /** Prepares the sandbox before `create` returns it. */
-  readonly template?: Template.Template<E>
+  /**
+   * Prepares the sandbox before `create` returns it. It may be given as `undefined`, as an agent's
+   * `template` is when the agent needs no sandbox.
+   */
+  readonly template?: Template.Template<E> | undefined
 
   /**
    * The outbound network policy the sandbox starts under, `AllowAll` when omitted. It is in force
