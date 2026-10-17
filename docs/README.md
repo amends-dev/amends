@@ -17,7 +17,7 @@ remaining gaps with links to their owning code.
 | [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, read state, and typing.                                  |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers.             |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                                         |
-| [Publishing](publishing.md)                                          | Building a package's distribution, checking it as a consumer would use it, and publishing it to npm.                            |
+| [Publishing](publishing.md)                                          | Building and checking a package's distribution, versions in lines, changesets, and the release workflow that publishes to npm.  |
 | [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                                        |
 | [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                                 |
 | [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                                          |
@@ -30,9 +30,13 @@ remaining gaps with links to their owning code.
 | [Connections](../packages/connection/README.md)                      | Integrations a host installs, the connections workspaces make to them, and the model catalog.                                   |
 | [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                                 |
 | [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for the harness contract, behind its bridge in a sandbox, on opencode 1 or opencode 2.                     |
+| [Codex harness](../adapters/harness-codex/README.md)                 | Codex app-server behind the harness bridge, supported models, and session behavior.                                             |
+| [Claude harness](../adapters/harness-claude/README.md)               | Claude Agent SDK behind the harness bridge, supported models, and session behavior.                                             |
 | [amends agent](../adapters/harness-amends/README.md)                 | An agent in the host's own process for the harness contract, over an Effect AI language model.                                  |
 | [Local sandboxes](../adapters/sandbox-local/README.md)               | Sandboxes as directories on this machine for the sandbox contract, for development and tests.                                   |
 | [Daytona sandboxes](../adapters/sandbox-daytona/README.md)           | Sandboxes on Daytona for the sandbox contract, and running their tests with an API key.                                         |
+| [E2B sandboxes](../adapters/sandbox-e2b/README.md)                   | E2B lifecycle, naming, files, processes, and provider tests.                                                                    |
+| [Vercel sandboxes](../adapters/sandbox-vercel/README.md)             | Vercel lifecycle, files, processes, and provider tests.                                                                         |
 | [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.                        |
 | [Memory storage](../packages/core/README.md#memory)                  | The in-memory reference implementation of the storage contracts, in core and the gateway.                                       |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                                    |

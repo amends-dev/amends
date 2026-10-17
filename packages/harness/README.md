@@ -15,7 +15,10 @@ Add an adapter for each agent you run, such as
 [`@amends-dev/harness-opencode`](../../adapters/harness-opencode) for opencode in a sandbox or
 [`@amends-dev/harness-amends`](../../adapters/harness-amends) for an agent in your own process, and
 a sandbox provider, such as `@amends-dev/sandbox-local` for this machine or
-`@amends-dev/sandbox-daytona`.
+`@amends-dev/sandbox-daytona`. The
+[`Codex adapter`](../../adapters/harness-codex) runs Codex's app-server, and the
+[`Claude adapter`](../../adapters/harness-claude) runs Claude Agent SDK, each behind the same bridge
+in a sandbox. Their guides describe the model endpoints and session operations they support.
 
 ## Quick start
 

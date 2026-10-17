@@ -109,7 +109,7 @@ pushes to it, as parallel jobs, so a run takes as long as its slowest job:
 | Types          | `bun run typecheck`                                                                      |
 | Tests          | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
 | Frontend build | The web and desktop bundles, the UI workshop, and the site                               |
-| Check          | Succeeds only when every job above does; require it for merging                          |
+| Check          | Succeeds only when every job above does; main's ruleset requires it for merging          |
 
 Each job installs the pinned Bun and the locked dependencies through
 [`.github/actions/setup`](../.github/actions/setup/action.yml), which caches Bun's packages by
@@ -129,6 +129,11 @@ libraries and a Rust build cache.
 amends.dev, and each pull request opened from this repository to a preview that it links in a
 comment and destroys when the pull request closes; see the
 [site](../apps/site/README.md#build-and-deploy).
+
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) runs on pushes to main: it keeps
+the release pull request open while changesets are pending, and publishes the packages when it
+merges; see [publishing](publishing.md#releasing). [`stacks/github.ts`](../stacks/github.ts)
+declares the secrets and settings these workflows need, main's ruleset among them.
 
 ## Choosing a test API
 
@@ -220,14 +225,37 @@ directories, apart from this machine's opencode. With `AMENDS_TEST_DAYTONA=1` an
 too, the hosts' tests also run on Daytona, in sandboxes started from the snapshot of the template's
 version once Daytona has made it.
 
-The sandbox providers in `adapters/sandbox-local` and
-`adapters/sandbox-daytona` run the suites `@amends-dev/sandbox/conformance` exports, and
+The sandbox providers in `adapters/sandbox-local`, `adapters/sandbox-daytona`,
+`adapters/sandbox-e2b`, and `adapters/sandbox-vercel` run the suites
+`@amends-dev/sandbox/conformance` exports, and
 `packages/sandbox/test` checks the contract's own rules, such as what names a template. The local
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
 policies Daytona enforces, create real sandboxes and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
 `.env`; they take about a minute. Daytona's provider also checks, everywhere, that options Daytona
 does not take fail a create before Daytona is asked.
+
+E2B's default tests use the installed SDK against a local fake API, covering creation, cleanup
+ownership, name conflicts, pagination, and policy validation. Its conformance and cloud-specific
+tests require `AMENDS_TEST_E2B=1` and `E2B_API_KEY`; they allocate paid sandboxes. These include
+filesystem-only pause/resume and rejecting stale process handles after a reboot. See the
+[E2B guide](../adapters/sandbox-e2b/README.md#verification) for provider requirements and limits.
+
+Vercel's default tests also use its real SDK against local fake APIs, covering persistent names,
+cleanup, policy changes, credential transformations, ports, and binary process transport. Its
+cloud tests require `AMENDS_TEST_VERCEL=1`, `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and
+`VERCEL_PROJECT_ID`. They run the shared conformance suite and check persistence, process handles
+after resume, stdin EOF, and deny-all enforcement. See the
+[Vercel guide](../adapters/sandbox-vercel/README.md#verification). Neither provider's local tests
+establish cloud behavior when its live suite is skipped.
+
+Codex and Claude harness tests run scripted native subprocesses through the real bridge, with
+fake protocol or SDK events for errors, approvals, cancellation, history, and model options.
+The Codex test gated by `AMENDS_TEST_CODEX_NATIVE=1` runs the pinned Codex CLI on `PATH` against
+a scripted local Responses endpoint and the real MCP relay. It makes no external model calls.
+Claude's test gated by `AMENDS_TEST_CLAUDE=1` uses `ANTHROPIC_API_KEY` and makes paid model calls;
+`AMENDS_TEST_CLAUDE_MODEL` selects its model. It prepares an isolated temporary home, runs turns,
+resumes state, and checks structured output. Both adapters' default tests need no model keys.
 
 `packages/connection` and `adapters/harness-amends` run everywhere against fakes: a client
 that answers as each model API does, an MCP server in the test's process, and an HTTP API with an

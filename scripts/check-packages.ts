@@ -2,6 +2,9 @@ import { dirname, resolve } from "node:path"
 
 interface PackageManifest {
   name: string
+  version: string
+  private?: boolean
+  publishConfig?: { directory?: string }
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
   peerDependencies?: Record<string, string>
@@ -33,6 +36,39 @@ for (const { path, manifest } of packages) {
         }
       } else {
         errors.push(`${path}: ${section}.${name} is not Effect, @effect/vitest, or a shared workspace package.`)
+      }
+    }
+  }
+}
+
+// Published packages release in lines: they share a version's major and minor, so each works with
+// every other on its line, and a fix releases its own package alone. They depend on each other with
+// `workspace:^`, which publishes as a caret range that later fixes on the line satisfy, and
+// Changesets publishes their distribution, which `bun run dist build` writes to `dist`.
+const published: Array<{ path: string; manifest: PackageManifest }> = []
+for (const pattern of ["packages/*/package.json", "adapters/*/package.json"]) {
+  for await (const path of new Bun.Glob(pattern).scan({ cwd: root })) {
+    const manifest: PackageManifest = await Bun.file(`${root}/${path}`).json()
+    if (manifest.private !== true) published.push({ path, manifest })
+  }
+}
+const publishedNames = new Set(published.map(({ manifest }) => manifest.name))
+const lineOf = (version: string) => version.split(".").slice(0, 2).join(".")
+if (new Set(published.map(({ manifest }) => lineOf(manifest.version))).size > 1) {
+  errors.push(
+    `Published packages must share one line, a major and minor version: ${published
+      .map(({ manifest }) => `${manifest.name} is ${manifest.version}`)
+      .join(", ")}.`
+  )
+}
+for (const { path, manifest } of published) {
+  if (manifest.publishConfig?.directory !== "dist") {
+    errors.push(`${path}: publishConfig.directory must be "dist", the distribution Changesets publishes.`)
+  }
+  for (const section of ["dependencies", "peerDependencies", "optionalDependencies"] as const) {
+    for (const [name, version] of Object.entries(manifest[section] ?? {})) {
+      if (publishedNames.has(name) && version !== "workspace:^") {
+        errors.push(`${path}: ${section}.${name} must be workspace:^, which publishes as a caret range.`)
       }
     }
   }
@@ -193,6 +229,6 @@ if (errors.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `Checked ${packages.length} shared packages, icons/ui/client/web/desktop import boundaries, and app styles.`
+    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/client/web/desktop import boundaries, and app styles.`
   )
 }

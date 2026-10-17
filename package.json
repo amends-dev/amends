@@ -21,6 +21,10 @@
       "@effect/ai-openai": "4.0.0",
       "@effect/ai-openai-compat": "4.0.0",
       "@daytona/sdk": "0.223.1",
+      "@vercel/sandbox": "3.8.0",
+      "@anthropic-ai/claude-agent-sdk": "0.3.302",
+      "@anthropic-ai/sdk": "0.135.0",
+      "e2b": "2.56.0",
       "alchemy": "2.0.0-beta.81"
     }
   },
@@ -34,6 +38,8 @@
     "barrels": "bun run scripts/barrels.ts",
     "check:barrels": "bun run scripts/barrels.ts --check",
     "dist": "bun run scripts/dist.ts",
+    "changeset-version": "bun run scripts/changeset-version.ts",
+    "changeset-publish": "bun run dist build && changeset publish",
     "check:icons": "bun run --filter @amends-dev/icons check:generated",
     "lint": "oxlint --disable-nested-config --deny-warnings .",
     "lint:fix": "oxlint --disable-nested-config --fix --deny-warnings .",
@@ -43,6 +49,9 @@
     "prepare": "effect-tsgo patch && lefthook install"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "1.0.1",
+    "@changesets/cli": "3.0.3",
+    "@changesets/read": "1.0.1",
     "@effect/docgen": "4.0.0",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",

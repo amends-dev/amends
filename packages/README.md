@@ -20,11 +20,12 @@ the user interface in [apps](../apps/README.md).
 
 ## Dependencies
 
-A shared package depends on `effect` and on other packages here, through `workspace:*`, and on
-nothing else: no host, adapter, or app, and no other external package, except `@effect/vitest` for
-a package that ships test suites, such as the gateway's conformance suites. Effect's version comes from the
-root catalog, as `catalog:`. The rule covers every dependency section, so development tools live at
-the repository root. `bun run check:packages` enforces it.
+A shared package depends on `effect` and on other packages here, through `workspace:*`, or
+`workspace:^` from one published package to another, and on nothing else: no host, adapter, or
+app, and no other external package, except `@effect/vitest` for a package that ships test suites,
+such as the gateway's conformance suites. Effect's version comes from the root catalog, as
+`catalog:`. The rule covers every dependency section, so development tools live at the repository
+root. `bun run check:packages` enforces it.
 
 Packages extend `../../tsconfig.base.json`, which gives them no Bun, Node, or browser globals:
 what a package needs from its runtime, it asks for as an Effect service. Each package exports its

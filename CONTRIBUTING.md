@@ -44,17 +44,18 @@ Import from the installed packages, never from `repos/`.
 
 ## Checks
 
-| Command                  | What it does                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| `bun run check`          | Dependency boundaries, generated barrels and icons, types, lint, and formatting  |
-| `bun run test`           | Every test suite: backend, PostgreSQL, and the frontend workspaces               |
-| `bun run test <path>`    | The tests under one path, such as `bun run test packages/harness`                |
-| `bun run format`         | Format files with Oxfmt                                                          |
-| `bun run lint:fix`       | Apply Oxlint's safe fixes                                                        |
-| `bun run typecheck`      | TypeScript 7 with Effect's diagnostics, across every workspace                   |
-| `bun run check:packages` | Which package may depend on which                                                |
-| `bun run barrels`        | Write every barrel, each `index.ts` marked `// @barrel`, from its folder         |
-| `bun run dist`           | Build, check, or publish a package for npm; see [publishing](docs/publishing.md) |
+| Command                  | What it does                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `bun run check`          | Dependency boundaries, generated barrels and icons, types, lint, and formatting |
+| `bun run test`           | Every test suite: backend, PostgreSQL, and the frontend workspaces              |
+| `bun run test <path>`    | The tests under one path, such as `bun run test packages/harness`               |
+| `bun run format`         | Format files with Oxfmt                                                         |
+| `bun run lint:fix`       | Apply Oxlint's safe fixes                                                       |
+| `bun run typecheck`      | TypeScript 7 with Effect's diagnostics, across every workspace                  |
+| `bun run check:packages` | Which package may depend on which                                               |
+| `bun run barrels`        | Write every barrel, each `index.ts` marked `// @barrel`, from its folder        |
+| `bun run dist`           | Build or check a package as npm gets it; see [publishing](docs/publishing.md)   |
+| `bun changeset`          | Describe a change to published packages for their next release                  |
 
 Run `bun run check` after every change and the tests after any change in behavior.
 [Testing](docs/testing.md) covers the test APIs, fixtures, and how CI splits the suites.
@@ -82,10 +83,13 @@ Two changes need more:
 1. Branch from `main`, and keep one concern per pull request.
 2. Update every consumer of what you change, and the READMEs and guides that describe it. When a
    change finishes something [known limitations](docs/current-status.md) lists, remove it there.
-3. Write commits that each say, in one sentence, what changed and why: "Move the channel transport
+3. When a published package's users would see the change, add a changeset with `bun changeset`:
+   a patch for a fix, and a minor for a feature or, before 1.0, a breaking change, which moves
+   every published package to the next line. See [releasing](docs/publishing.md#releasing).
+4. Write commits that each say, in one sentence, what changed and why: "Move the channel transport
    contract into its own package, as the harness and sandbox contracts are." Explain the reason
    in the body when it needs more than the subject.
-4. Open a pull request that says what changed, why, and how you verified it.
+5. Open a pull request that says what changed, why, and how you verified it.
 
 Code is reviewed by how a newcomer reads it, as AGENTS.md's
 [design and review](AGENTS.md#design-and-review) section describes: one word per concept, no layer

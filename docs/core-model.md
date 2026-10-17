@@ -978,13 +978,14 @@ reads and writes files, exposes ports, when it is created or later, each as a UR
 headers needed to reach it, and stops or is destroyed. An agent's bridge listens on a port the
 sandbox picks, which its harness exposes as it connects, so a session that moves to another agent
 keeps its sandbox. What a provider cannot do fails as unsupported rather than being assumed, as
-enforcing a network policy does where a platform offers none. Platforms differ further: Vercel and
-Cloudflare cannot write to a running process's input, and a local directory provides no
-isolation. Anything the host talks to inside a sandbox therefore listens on a port rather than
-relying on standard input. A provider that can snapshot uses it to start sandboxes from a prepared
-template; a snapshot is a reference that only the provider which took it can restore or delete.
-The contract and its conformance suites are [`@amends-dev/sandbox`](../packages/sandbox), with local
-and Daytona providers in `adapters/`.
+enforcing a network policy does where a platform offers none. Process input and network controls
+differ between providers, and a local directory provides no isolation. Anything the host talks to
+inside a sandbox therefore listens on a port rather than relying on a continuing standard-input
+connection. A provider can use snapshots to start sandboxes from a prepared template; a snapshot
+is a reference that only the provider which took it can restore or delete. The contract and its
+conformance suites are [`@amends-dev/sandbox`](../packages/sandbox), with local, Daytona, E2B, and
+Vercel providers in `adapters/`. Their guides describe which snapshot and process operations they
+implement.
 
 ## Agreed: each participation's session works in its own sandbox
 

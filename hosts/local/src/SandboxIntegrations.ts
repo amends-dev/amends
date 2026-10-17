@@ -1,8 +1,8 @@
 /**
  * The integrations of the sandbox providers this host runs, which workspaces connect to: this
  * machine's sandboxes, under a directory the host gives, since a workspace cannot say where on the
- * host's disk its sandboxes go; and those of Daytona organizations. `LocalHost.makeIntegrations`
- * installs both.
+ * host's disk its sandboxes go; and those of cloud providers. `LocalHost.makeIntegrations`
+ * installs them.
  *
  * @since 0.1.0
  */
@@ -10,8 +10,17 @@
 import { Connection, Integration } from "@amends-dev/connection"
 import { Sandbox } from "@amends-dev/sandbox"
 import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona"
+import { E2bSandboxProvider } from "@amends-dev/sandbox-e2b"
 import { LocalSandboxProvider } from "@amends-dev/sandbox-local"
+import { VercelSandboxProvider } from "@amends-dev/sandbox-vercel"
 import { Daytona, type DaytonaConfig, DaytonaError } from "@daytona/sdk"
+import { APIError as VercelApiError, Sandbox as VercelSandbox } from "@vercel/sandbox"
+import {
+  AuthenticationError as E2bAuthenticationError,
+  type ConnectionOpts as E2bConnectionOpts,
+  Sandbox as E2bSandbox,
+  SandboxError as E2bError
+} from "e2b"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import type * as FileSystem from "effect/FileSystem"
@@ -113,6 +122,130 @@ export const daytona = Effect.map(Crypto.Crypto, (crypto) =>
       checkOrganization({ apiKey: Redacted.value(apiKey), ...settings }, settings.apiUrl ?? "Daytona")
   })
 )
+
+/**
+ * E2B sandboxes, authenticated with an organization's API key. Checking a connection lists
+ * sandboxes without creating one. A custom API URL and domain support self-hosted E2B.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const e2b = Effect.map(Crypto.Crypto, (crypto) =>
+  Integration.make({
+    id: "e2b",
+    name: "E2B",
+    docs: "https://e2b.dev/docs",
+    settings: Schema.Struct({
+      apiUrl: Schema.optionalKey(Schema.NonEmptyString).annotate({
+        title: "API URL",
+        description: "E2B's control API, when using a self-hosted installation."
+      }),
+      domain: Schema.optionalKey(Schema.NonEmptyString).annotate({
+        title: "Domain",
+        description: "The sandbox domain of a self-hosted E2B installation."
+      }),
+      template: Schema.optionalKey(Schema.NonEmptyString).annotate({
+        title: "Template",
+        description: "The E2B template to start sandboxes from."
+      }),
+      timeoutMs: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        title: "Timeout (milliseconds)",
+        description: "How long a sandbox runs before E2B pauses it with its files preserved."
+      })
+    }),
+    auth: ["apiKey"],
+    sandboxes: ({ settings, apiKey }) =>
+      E2bSandboxProvider.make({ apiKey, ...settings }).pipe(Effect.provideService(Crypto.Crypto, crypto)),
+    check: ({ settings, apiKey }) => {
+      const url = settings.apiUrl ?? "E2B"
+      const connection: E2bConnectionOpts = {
+        apiKey: Redacted.value(apiKey),
+        apiUrl: settings.apiUrl ?? `https://api.${settings.domain ?? "e2b.app"}`,
+        domain: settings.domain ?? "e2b.app",
+        debug: false,
+        retries: 0,
+        requestTimeoutMs: 15_000
+      }
+      return Effect.tryPromise({
+        try: (signal) => E2bSandbox.list({ ...connection, limit: 1 }).nextItems({ signal }),
+        catch: (error) =>
+          error instanceof E2bAuthenticationError ? 401 : error instanceof E2bError ? error.statusCode : undefined
+      }).pipe(
+        Effect.as<Connection.Health>({ status: "healthy" }),
+        Effect.timeout("15 seconds"),
+        Effect.catch((failure) =>
+          Effect.succeed(
+            typeof failure === "number" ? Connection.healthOfStatus(failure, url) : Connection.unanswered(url)
+          )
+        )
+      )
+    }
+  })
+)
+
+/**
+ * The HTTP transport the host uses for Vercel, with the SDK's transport as the default.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export type VercelOptions = Pick<VercelSandboxProvider.Options, "fetch">
+
+/**
+ * Vercel sandboxes in a named team and project. The connection's API key is a Vercel token;
+ * checking it lists one sandbox without allocating a machine.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const vercel = (options: VercelOptions = {}) =>
+  Effect.map(Crypto.Crypto, (crypto) =>
+    Integration.make({
+      id: "vercel",
+      name: "Vercel",
+      docs: "https://vercel.com/docs/sandbox",
+      settings: Schema.Struct({
+        teamId: Schema.NonEmptyString.annotate({ title: "Team ID" }),
+        projectId: Schema.NonEmptyString.annotate({ title: "Project ID" }),
+        image: Schema.optionalKey(Schema.NonEmptyString).annotate({
+          title: "Image",
+          description: "The image to start sandboxes from."
+        }),
+        timeoutMs: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+          title: "Timeout (milliseconds)",
+          description: "How long a sandbox runs before Vercel stops it and saves its files."
+        })
+      }),
+      auth: ["apiKey"],
+      sandboxes: ({ settings, apiKey }) =>
+        VercelSandboxProvider.make({ token: apiKey, ...settings, ...options }).pipe(
+          Effect.provideService(Crypto.Crypto, crypto)
+        ),
+      check: ({ settings, apiKey }) =>
+        Effect.tryPromise({
+          try: (signal) =>
+            VercelSandbox.list({
+              token: Redacted.value(apiKey),
+              teamId: settings.teamId,
+              projectId: settings.projectId,
+              limit: 1,
+              signal,
+              ...options
+            }),
+          catch: (error) => (error instanceof VercelApiError ? error.response.status : undefined)
+        }).pipe(
+          Effect.as<Connection.Health>({ status: "healthy" }),
+          Effect.timeout("15 seconds"),
+          Effect.catch((failure) =>
+            Effect.succeed(
+              typeof failure === "number"
+                ? Connection.healthOfStatus(failure, "Vercel")
+                : Connection.unanswered("Vercel")
+            )
+          )
+        )
+    })
+  )
 
 /**
  * Asks Daytona, reached as `config` says, for one of the organization's sandboxes, which it lists

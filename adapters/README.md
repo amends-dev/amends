@@ -8,8 +8,12 @@ platform, or an agent, and installs that system's dependencies, which is why it 
 | ---------------------------------------------------- | ------------------------------------------------------------------- | --------- |
 | [`harness-amends`](harness-amends/README.md)         | amends's own agent, a loop over an Effect AI language model         | npm       |
 | [`harness-opencode`](harness-opencode/README.md)     | opencode as an agent, behind its bridge in a sandbox                | npm       |
+| [`harness-codex`](harness-codex/README.md)           | Codex app-server behind the harness bridge in a sandbox             | npm       |
+| [`harness-claude`](harness-claude/README.md)         | Claude Agent SDK behind the harness bridge in a sandbox             | npm       |
 | [`sandbox-local`](sandbox-local/README.md)           | Sandboxes as directories on this machine, for development and tests | npm       |
 | [`sandbox-daytona`](sandbox-daytona/README.md)       | Sandboxes on Daytona                                                | npm       |
+| [`sandbox-e2b`](sandbox-e2b/README.md)               | Sandboxes on E2B                                                    | npm       |
+| [`sandbox-vercel`](sandbox-vercel/README.md)         | Sandboxes on Vercel                                                 | npm       |
 | [`storage-postgresql`](storage-postgresql/README.md) | Workspace storage and the workspace directory over PostgreSQL       | No        |
 
 Each adapter extends `../../tsconfig.base.json`, enables its own runtime's types, and has a

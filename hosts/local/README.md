@@ -72,16 +72,20 @@ workspaces connect to:
 - MCP servers and HTTP APIs, as tools;
 - the [local](../../adapters/sandbox-local) sandbox provider, keeping each connection's sandboxes in
   a directory of its own under the sandbox directory, and
-  [Daytona](../../adapters/sandbox-daytona/README.md), a connection to which is an organization
-  reached with its API key, checked by listing one of its sandboxes; `SandboxIntegrations` declares
-  both;
+  [Daytona](../../adapters/sandbox-daytona/README.md),
+  [E2B](../../adapters/sandbox-e2b/README.md), and
+  [Vercel](../../adapters/sandbox-vercel/README.md), reached with the connection's credentials and
+  settings; their checks list sandboxes without creating any. `SandboxIntegrations` declares them;
 - amends's own [agent](../../adapters/harness-amends) and
   [opencode](../../adapters/harness-opencode/README.md) as harnesses, which `HarnessIntegrations`
   declares: `opencode`, which runs opencode 1, and `opencode 2`, which runs opencode 2 and cannot
-  answer in JSON.
+  answer in JSON; [Codex](../../adapters/harness-codex/README.md), which uses Responses endpoints;
+  and [Claude Agent](../../adapters/harness-claude/README.md), which uses Anthropic Messages endpoints.
+  Their guides list the model settings and operations each supports. Creating a harness connection
+  installs nothing until a session prepares its sandbox.
 
 None of them gives channels, so no channel can be created on this host. Connections' keys are sealed
-with `AMENDS_CREDENTIAL_KEY`, and opencode's bridge tokens derive from it, so a host reaches a
+with `AMENDS_CREDENTIAL_KEY`, and the agents' bridge tokens derive from it, so a host reaches a
 bridge any host over the database launched; without a key they derive from a secret of this
 process's own, which only a single process can use.
 
