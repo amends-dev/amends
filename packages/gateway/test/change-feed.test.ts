@@ -139,7 +139,8 @@ describe("change feed", () => {
                   preview.replies,
                   textOf(preview.message)
                 ],
-                GroupLatest: ({ latest }) => ["group", latest.groupId]
+                GroupLatest: ({ latest }) => ["group", latest.groupId],
+                Turn: ({ turn }) => ["turn", turn.id]
               })
             )
           expect(changesOf(started)).toEqual([

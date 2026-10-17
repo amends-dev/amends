@@ -80,6 +80,7 @@ import * as TurnCommand from "./turn/TurnCommand.ts"
 import * as TurnExecution from "./turn/TurnExecution.ts"
 import * as TurnJobs from "./turn/TurnJobs.ts"
 import * as TurnProjection from "./turn/TurnProjection.ts"
+import * as TurnQuery from "./turn/TurnQuery.ts"
 import * as TurnService from "./turn/TurnService.ts"
 import type * as TurnStore from "./turn/TurnStore.ts"
 import * as TurnTimeline from "./turn/TurnTimeline.ts"
@@ -209,6 +210,7 @@ const threadQuery = ThreadQuery.layer.pipe(
   Layer.provide([groupQuery, ThreadActivityResolvers.layer(activityResolvers)])
 )
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery))
+const turnQuery = TurnQuery.layer
 const turnCommand = TurnCommand.layer.pipe(Layer.provide([threadQuery, threadCommand]))
 const taskCommand = TaskCommand.layer.pipe(Layer.provide([threadQuery, threadCommand, turnCommand]))
 const channelQuery = ChannelQuery.layer
@@ -218,7 +220,7 @@ const memberCommand = MemberCommand.layer.pipe(Layer.provide([AssignmentCommand.
  * following a turn's log, who stop when their access changes.
  */
 const changeFeedSource = ChangeFeedSource.layer().pipe(
-  Layer.provide(ChangeFeedChanges.layer.pipe(Layer.provide(threadQuery)))
+  Layer.provide(ChangeFeedChanges.layer.pipe(Layer.provide([threadQuery, turnQuery])))
 )
 const changeFeedService = ChangeFeedService.layer.pipe(Layer.provide([changeFeedSource, GrantResolver.layer]))
 
@@ -255,6 +257,7 @@ const operations = Layer.mergeAll(
     groupCommand,
     threadQuery,
     threadCommand,
+    turnQuery,
     turnCommand,
     taskCommand,
     channelQuery,

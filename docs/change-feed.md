@@ -20,7 +20,10 @@ and cache invalidation; apps mount it once per workspace view; features show its
    place of the item it read at that position, or after the last while it follows on, and a
    `Preview` goes in its group's stream, in place of the thread it shows, or after the newest one
    for a thread that started since, and a `GroupLatest` gives the groups list a group's latest
-   activity, which is new to the reader when it follows their last read of the group. The server
+   activity, which is new to the reader when it follows their last read of the group. A `Turn`
+   is a turn as the reader sees it, with whether they may stop or retry it, which the active turns
+   and the turn show in place of what they read; a read shows only what was delivered after it
+   began, so a refresh after a grant changes what the reader may do. The server
    reads each change once, after the commit, for every reader of what changed, so a change may
    reflect later commits too, and the last change to an item follows the last commit that changed
    it. An edit therefore updates the message's item where it already shows, and a reply the
@@ -42,9 +45,9 @@ and cache invalidation; apps mount it once per workspace view; features show its
    and ownership changes, which decide who may manage them. Agents follow every `agent.*`
    fact, and the `connection.*` facts, but a replaced key, and the membership and grant facts
    their readiness, names, and access follow; a connection's models refresh with connections.
-   Every `turn.*` fact names its turn, so
-   it refreshes that turn and the active turns; a thread's turns show in its timeline, which takes
-   the turn's items as the commit delivers them. Group membership and grant changes refresh the active
+   A `turn.*` fact refreshes nothing: the commit delivers each turn it changes, and the one a
+   retry supersedes, and a thread's turns show in its timeline, which takes the turn's items as
+   the commit delivers them. Group membership and grant changes refresh the active
    turns. A notification for the reader shows at the top of their inbox, with the timeline item
    it tells of when the same commit delivers it, and refreshes their pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last

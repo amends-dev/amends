@@ -16,8 +16,8 @@ src/
   provider.tsx    ClientProvider: the credential, and the API clients and atom registry made for it
   configuration.ts  resolveApiBaseUrl: the API URL an app resolves once at startup
   sign-in.ts      useSignIn
-  api/            shared plumbing: the clients, failures, invalidation keys, useMutation,
-                  useWorkspaceMutation, useChanges, refreshResult, the directory read
+  api/            shared plumbing: the clients, failures, how live streams back off, invalidation
+                  keys, useMutation, useWorkspaceMutation, useChanges, refreshResult, the directory read
   session/        the browser session store; DirectoryProvider, useDirectory, useWorkspace
   live/           the change feed: its stream (api.ts), provider, status, and wake detection
   workspaces/  conversations/  agents/  connections/  settings/  turns/
@@ -58,7 +58,8 @@ after the newest, and the positions `ThreadRead` signals carry (`withDeliveredPr
 groups list each group's delivered latest activity and the read times `GroupRead` signals carry
 (`withDeliveredGroupActivity`), and the inbox the notifications delivered after its page was read,
 the timeline items delivered at their sources, and what `ThreadRead` and `NotificationsSeen`
-signals settled (`withDeliveredNotifications`).
+signals settled (`withDeliveredNotifications`), and the active turns and a turn the turns
+delivered after they were read (`withDeliveredTurns`, `turnWith`).
 Paged reads (group streams, timelines, the inbox) keep their pages in one atom and read on from its
 previous value, so a refresh never drops what is on screen; a timeline's refresh reads every item it
 shows again.

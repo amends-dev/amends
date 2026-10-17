@@ -488,7 +488,8 @@ reasoning or tool calls.
 
 `TurnService` lets a reader who may read a thread `get` its turns as `Turn.View`s, with whether the
 reader may stop (`stoppable`) or retry (`retryable`) them now, and `listActive` the workspace's
-active turns in threads the reader may read. A turn in a thread outside the reader's audience is
+active turns in threads the reader may read. `Turn.view` builds a view from what the reader may
+direct and `TurnQuery.whyNotRetryable`, which the change feed shares. A turn in a thread outside the reader's audience is
 `NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who
 may direct its agent may `cancel` an active turn, a queued one at once and a running one once its
 job confirms it, and `retry` a failed or stopped turn as a new queued turn for the same agent,
@@ -596,11 +597,14 @@ A commit's `changes` are what it changed in what readers show, each as it is now
 in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the
 commit's entries name, the items it recorded and those about a message, turn, or task it changed,
 since an item shows its subject's current state; a `Preview` of each thread those items are in, as
-its group's stream shows it to every reader; and a `GroupLatest` with the latest activity of each of
-their groups. They are read after the commit, so one may reflect later commits too, and the last
-change to an item follows the last commit that changed it. Each reaches the readers its read
-requires: the thread's group with `thread.read` on the thread, or, for a group's latest activity,
-with `group.read` on the group.
+its group's stream shows it to every reader; a `GroupLatest` with the latest activity of each of
+their groups; and a `Turn` for each turn the entries name, and each turn one of those retries, as
+`TurnService.get` gives it to that reader. They are read after the commit, so one may reflect later
+commits too, and the last change to an item follows the last commit that changed it. Each reaches
+the readers its read requires: the thread's group with `thread.read` on the thread, or, for a
+group's latest activity, with `group.read` on the group. `ChangeFeedChanges.Prepared.changeFor`
+gives a change as one reader sees it, from whether their grants cover a permission it shows, such
+as directing a turn's agent.
 
 Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
 same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with

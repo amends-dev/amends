@@ -148,9 +148,9 @@ array, and a `notifications` array; at least one of the three is nonempty. `chan
 commit changed in what the caller may see, each as it is now, which clients put in place of what
 they show: a `TimelineItem` with an `item` exactly as the timeline returns it, and a `Preview` with
 a `preview` of the thread as the group's stream shows it to every reader, an opening without the
-caller's `readThrough` and `unread`, and a `GroupLatest` with the `latest` activity of a group, as
+caller's `readThrough` and `unread`, a `GroupLatest` with the `latest` activity of a group, as
 `groupId` and `occurredAt`, from which the groups list derives `latestActivityAt` and
-`newActivity`.
+`newActivity`, and a `Turn` with a `turn` exactly as `GET /turns/:turnId` returns it to the caller.
 `notifications` holds the notifications
 the commit created for the caller, with the same fields the inbox list returns, so clients can
 update an inbox or badge without a refetch. Each event contains `id`, `name`, `version`,

@@ -69,6 +69,11 @@ export * as TurnPrompt from "./TurnPrompt.ts"
 /**
  * @since 0.1.0
  */
+export * as TurnQuery from "./TurnQuery.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as TurnService from "./TurnService.ts"
 
 /**

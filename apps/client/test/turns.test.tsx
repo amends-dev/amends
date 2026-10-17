@@ -15,6 +15,7 @@ import {
   type TurnControls
 } from "../src/index.ts"
 import { affectedKeys } from "../src/live/api.ts"
+import { Turn, turnWith, withDeliveredTurns } from "../src/turns/api.ts"
 import { drafted, writing, type Drafts } from "../src/turns/drafts.ts"
 
 afterEach(cleanup)
@@ -594,7 +595,7 @@ it("tells a failed turn's end once, rather than as an interruption and again as 
   })
 })
 
-it("refreshes a turn's log and the active turns as its facts arrive", () => {
+it("reads nothing again as a turn's facts arrive, since the commit delivers the turn", () => {
   for (const name of [
     "turn.created",
     "turn.retried",
@@ -603,10 +604,7 @@ it("refreshes a turn's log and the active turns as its facts arrive", () => {
     "turn.failed",
     "turn.cancelled"
   ])
-    expect(affectedKeys("one", [{ name, payload: { threadId: "thread", turnId: "turn-1" } }]).toSorted()).toEqual([
-      "workspace/one/active-turns",
-      "workspace/one/turns:turn-1"
-    ])
+    expect(affectedKeys("one", [{ name, payload: { threadId: "thread", turnId: "turn-1" } }])).toEqual([])
   // A thread's timeline takes the turn's items as the commit delivers them, rather than read again.
   expect(
     affectedKeys("one", [
@@ -616,6 +614,49 @@ it("refreshes a turn's log and the active turns as its facts arrive", () => {
       }
     ])
   ).not.toContain("workspace/one/timelines:thread")
+})
+
+it("shows the turns the change feed delivered after a read in place of what it read", () => {
+  const view = (id: string, status: Turn.Status, minute: number) =>
+    Schema.decodeSync(Turn.View)({
+      id,
+      workspaceId: "one",
+      groupId: "general",
+      threadId: "thread",
+      agentId: "scout",
+      memberId: "member-scout",
+      participationId: "p-member-scout",
+      retry: null,
+      status,
+      acceptedThroughSequence: 1,
+      selection: null,
+      messageIds: [],
+      failure: null,
+      cancelReason: null,
+      createdAt: at(minute),
+      startedAt: null,
+      finishedAt: null,
+      stoppable: false,
+      retryable: false
+    })
+  const delivered = (deliveries: ReadonlyArray<Turn.View>) => ({
+    count: deliveries.length,
+    turns: new Map(deliveries.map((turn, index) => [turn.id as string, { turn, delivery: index + 1 }]))
+  })
+  const read = [view("first", "running", 1), view("second", "queued", 2)]
+  // After the read: the first turn ended, and a third started; the read covered the delivery before.
+  const later = delivered([view("second", "running", 2), view("first", "completed", 1), view("third", "queued", 3)])
+  expect(withDeliveredTurns(read, 1, later).map((turn) => [turn.id, turn.status])).toEqual([
+    ["second", "queued"],
+    ["third", "queued"]
+  ])
+  expect(withDeliveredTurns(read, 0, later).map((turn) => [turn.id, turn.status])).toEqual([
+    ["second", "running"],
+    ["third", "queued"]
+  ])
+  expect(turnWith(read[0]!, 0, later).status).toBe("completed")
+  // A read that began after every delivery shows what it read.
+  expect(turnWith(read[0]!, 3, later).status).toBe("running")
 })
 
 it("drafts continue their part in order, marking a gap rather than showing text out of place", () => {

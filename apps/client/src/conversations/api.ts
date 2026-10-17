@@ -20,7 +20,7 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as Reactivity from "effect/reactivity/Reactivity"
 import * as Schema from "effect/Schema"
-import type { ApiClient, WorkspaceApi } from "../api/client.ts"
+import { perClient, type ApiClient, type WorkspaceApi } from "../api/client.ts"
 import { command } from "../api/failures.ts"
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "../api/keys.ts"
 import type { RequestKey } from "../api/mutation.ts"
@@ -40,15 +40,6 @@ export {
 /** How many threads or timeline items one page reads. */
 export const pageSize = 50
 
-/** One read per client and key, shared by every consumer while any is mounted. */
-const perClient = <K extends string, A extends object>(make: (client: ApiClient, key: K) => A) => {
-  const families = new WeakMap<ApiClient, (key: K) => A>()
-  return (client: ApiClient, key: K): A => {
-    const family = families.get(client) ?? Atom.family((key: K) => make(client, key))
-    families.set(client, family)
-    return family(key)
-  }
-}
 const split = (key: string) => {
   const [workspaceId = "", id = ""] = key.split("\u0000")
   return { workspaceId, id }
@@ -539,9 +530,6 @@ export const deliverNotification = (
     count: count + 1,
     items: [...items, { item, delivery: count + 1 }]
   }))
-/** Forget the notifications the change feed delivered, as when what was missed may have changed them. */
-export const forgetDeliveredNotifications = (registry: AtomRegistry.AtomRegistry, workspaceId: string) =>
-  registry.update(deliveredNotificationsOf(workspaceId), ({ count }) => ({ count, items: [] }))
 /**
  * What the change feed told the reader's sessions they saw in one workspace: notifications seen by
  * ID, and each thread's reads in the order told, which settle its notifications up to each.

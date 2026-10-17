@@ -12,6 +12,9 @@ import { Entry as LogEntry } from "@amends-dev/log"
 import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
 import * as Agent from "../agent/Agent.ts"
+import * as AgentPermissions from "../agent/AgentPermissions.ts"
+import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
@@ -199,6 +202,32 @@ export const View = Schema.Struct({
  * @since 0.1.0
  */
 export interface View extends Schema.Schema.Type<typeof View> {}
+
+/**
+ * What directing a turn's agent requires, which stopping and retrying the turn both need: using the
+ * agent's membership.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const directRequirement = (turn: Turn): Requirement.Requirement =>
+  Requirement.make(
+    AgentPermissions.Use,
+    Target.Reference.cases.Member.make({ workspaceId: turn.workspaceId, memberId: turn.memberId })
+  )
+
+/**
+ * `turn` as a reader sees it, who may direct its agent or not, when nothing else keeps it from
+ * running again or not.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const view = (turn: Turn, directs: boolean, retryOpen: boolean): View =>
+  Object.assign({}, Struct.omit(turn, ["logAfter"]), {
+    stoppable: directs && active(turn.status) && turn.status !== "cancelling",
+    retryable: directs && retryOpen
+  })
 
 /**
  * More of a response a turn is writing, before it completes: `text` continues the response's part

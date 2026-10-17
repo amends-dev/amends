@@ -6,13 +6,10 @@ import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
 import * as Data from "effect/Data"
-import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
-import * as Sse from "effect/encoding/Sse"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Queue from "effect/Queue"
-import * as Random from "effect/Random"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as Reactivity from "effect/reactivity/Reactivity"
@@ -29,13 +26,13 @@ import {
   type WorkspaceCollection,
   type WorkspaceResource
 } from "../api/keys.ts"
+import { errorsOf, retryDelay } from "../api/retry.ts"
 import {
   deliverGroupLatest,
   deliverNotification,
   deliverPreview,
   deliverTimelineItem,
   forgetDeliveredItems,
-  forgetDeliveredNotifications,
   forgetDeliveredPreviews,
   recordGroupRead,
   recordNotificationsSeen,
@@ -43,6 +40,7 @@ import {
   recordThreadSeen
 } from "../conversations/api.ts"
 import { posted, typing, typistsAtom } from "../conversations/typing.ts"
+import { deliverTurn } from "../turns/api.ts"
 import { watchWake } from "./wake.ts"
 
 export { Signal }
@@ -141,19 +139,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "connection.removed": ["connections", "agents"],
   // Agents: how each is set up, and so its readiness.
   "agent.created": ["agents"],
-  "agent.configured": ["agents"],
-  // Where agents are at work: a turn starting, changing state, or ending.
-  ...Object.fromEntries(
-    [
-      "turn.created",
-      "turn.retried",
-      "turn.started",
-      "turn.cancel-requested",
-      "turn.completed",
-      "turn.failed",
-      "turn.cancelled"
-    ].map((name): [string, ReadonlyArray<Affected>] => [name, ["active-turns"]])
-  )
+  "agent.configured": ["agents"]
 }
 /** A field of an event's JSON payload, when it is a string. */
 const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {
@@ -190,25 +176,6 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
   // Who takes part in a thread, and so follows it.
   "thread.participation.added": (payload) => [{ collection: "participants", id: text(payload, "threadId") }],
   "thread.participation.ended": (payload) => [{ collection: "participants", id: text(payload, "threadId") }],
-  // A turn: what it is doing, and how it ended. Its log is followed apart, and its thread's
-  // timeline follows from the turn activity recorded there.
-  ...Object.fromEntries(
-    [
-      "turn.created",
-      "turn.retried",
-      "turn.started",
-      "turn.cancel-requested",
-      "turn.completed",
-      "turn.failed",
-      "turn.cancelled"
-    ].map((name) => [
-      name,
-      (payload: unknown): ReadonlyArray<Target> => [
-        // A new turn's fact names it by its own ID; the others by `turnId`.
-        { collection: "turns", id: text(payload, "turnId") ?? text(payload, "id") }
-      ]
-    ])
-  ),
   // Rosters list active workspace members only.
   "workspace.member.added": () => [{ collection: "rosters", id: undefined }],
   "workspace.member.removed": () => [{ collection: "rosters", id: undefined }]
@@ -278,28 +245,12 @@ export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<st
     () => []
   )
 
-const failures = (cause: Cause.Cause<unknown>) =>
-  cause.reasons.flatMap((reason) => (Cause.isFailReason(reason) ? [reason.error] : []))
 const unavailable = (cause: Cause.Cause<unknown>) =>
-  failures(cause).some(
+  errorsOf(cause).some(
     (error) => Schema.is(ApiErrors.Denied)(error) && CoreError.DeniedReason.isAnyOf(["NotMember"])(error.reason)
   )
 /** How long a connection must stay live before its failure counts as the first in a row. */
 const healthy = 10_000
-/**
- * How long a live stream waits before reconnecting after its `attempt`th failure in a row: what
- * the server asked for, or exponential from one second to thirty, halved at random so clients do
- * not return together, and at least fifteen seconds while too many streams are open.
- */
-export const retryDelay = Effect.fnUntraced(function* (attempt: number, cause: Cause.Cause<unknown>) {
-  const errors = failures(cause)
-  const requested = errors.find((error) => Sse.Retry.is(error))
-  if (requested) return requested.duration
-  const exponential = Math.min(30_000, 1_000 * 2 ** Math.min(attempt - 1, 5))
-  const limited = errors.some(Schema.is(ApiErrors.TooManyStreams)) ? Math.max(exponential, 15_000) : exponential
-  return Duration.millis(limited * (0.5 + (yield* Random.next) / 2))
-})
-
 /**
  * Keep one workspace's change stream open, emitting its connection state. Each commit
  * invalidates the reads it affects; a reset invalidates all of them. Reconnection resumes after
@@ -358,7 +309,6 @@ const run = Effect.fnUntraced(function* (
           // What was missed may have changed what was delivered: read everything again.
           forgetDeliveredItems(registry, delivered.timelines)
           forgetDeliveredPreviews(registry, delivered.streams)
-          forgetDeliveredNotifications(registry, workspaceId)
           delivered.timelines.clear()
           delivered.streams.clear()
           return reactivity.invalidate(everything)
@@ -379,7 +329,8 @@ const run = Effect.fnUntraced(function* (
           ChangeFeed.Change.match(change, {
             TimelineItem: ({ item }) => void delivered.timelines.add(deliverTimelineItem(registry, workspaceId, item)),
             Preview: ({ preview }) => void delivered.streams.add(deliverPreview(registry, workspaceId, preview)),
-            GroupLatest: ({ latest }) => deliverGroupLatest(registry, workspaceId, latest)
+            GroupLatest: ({ latest }) => deliverGroupLatest(registry, workspaceId, latest),
+            Turn: ({ turn }) => deliverTurn(registry, workspaceId, turn)
           })
         // A notification for the reader shows in their inbox with the timeline item it tells of,
         // when the commit delivered that too, and changes their pending counts.

@@ -17,6 +17,7 @@ import * as Notification from "../notification/Notification.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as Thread from "../thread/Thread.ts"
 import * as ThreadTimeline from "../thread/ThreadTimeline.ts"
+import * as Turn from "../turn/Turn.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
@@ -87,7 +88,9 @@ export const Change = Schema.TaggedUnion({
   /** A thread's preview as its group's stream shows it now, for a thread whose timeline the commit changed. */
   Preview: { preview: Thread.Preview },
   /** A group's latest activity as its members' groups lists show it now, for a group whose threads the commit changed. */
-  GroupLatest: { latest: Group.Latest }
+  GroupLatest: { latest: Group.Latest },
+  /** A turn as the reader sees it now, with what they may do with it, for a turn the commit changed. */
+  Turn: { turn: Turn.View }
 }).annotate({ identifier: "ChangeFeedChange" })
 /**
  * @category schemas

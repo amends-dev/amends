@@ -4,48 +4,121 @@ import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import type { TurnProblem } from "@amends-dev/ui/screens/turns"
 import * as Cause from "effect/Cause"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Queue from "effect/Queue"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import { isUnauthorized, type ApiClient, type WorkspaceApi } from "../api/client.ts"
+import { isUnauthorized, perClient, type ApiClient, type WorkspaceApi } from "../api/client.ts"
 import { command } from "../api/failures.ts"
 import { itemKeys, workspaceKey } from "../api/keys.ts"
-import { retryDelay } from "../live/api.ts"
+import { retryDelay } from "../api/retry.ts"
 import { watchWake } from "../live/wake.ts"
 import { drafted, type Drafts } from "./drafts.ts"
 
 export { Turn }
 
 /**
- * The workspace's active turns in threads the reader may open, for marks where agents are at work.
- * Undefined for an invalid workspace ID.
+ * The turns the change feed delivered to the reader in one workspace, each as they see it now, and
+ * how many it has delivered in all. The count only grows while the client runs, so a read can say
+ * which deliveries it covers: those it began after.
  */
-export const activeTurnsRead = (client: ApiClient, workspaceId: string) => {
-  const workspace = Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)
-  if (Option.isNone(workspace)) return undefined
-  return client.query("turns", "listActive", {
-    query: { limit: 100 },
-    reactivityKeys: [workspaceKey(workspaceId, "active-turns")]
-  })
+interface DeliveredTurns {
+  readonly count: number
+  readonly turns: ReadonlyMap<string, { readonly turn: Turn.View; readonly delivery: number }>
+}
+const deliveredTurnsOf = Atom.family((_workspaceId: string) =>
+  Atom.make<DeliveredTurns>({ count: 0, turns: new Map() }).pipe(Atom.keepAlive)
+)
+/** Note a turn as the change feed delivered it, as the reader sees it now. */
+export const deliverTurn = (registry: AtomRegistry.AtomRegistry, workspaceId: string, turn: Turn.View) =>
+  registry.update(deliveredTurnsOf(workspaceId), ({ count, turns }) => ({
+    count: count + 1,
+    turns: new Map(turns).set(turn.id, { turn, delivery: count + 1 })
+  }))
+/** Oldest first, as the workspace's active turns are listed. */
+const byCreated = (left: Turn.View, right: Turn.View) =>
+  DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
+  left.acceptedThroughSequence - right.acceptedThroughSequence ||
+  (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+/**
+ * The active turns as they show with the turns the change feed delivered after the read, which
+ * covered `covered` deliveries: each delivered turn in place of the one read, those that started
+ * since added, and those that ended dropped, oldest first.
+ */
+export const withDeliveredTurns = (
+  active: ReadonlyArray<Turn.View>,
+  covered: number,
+  delivered: DeliveredTurns
+): ReadonlyArray<Turn.View> => {
+  const turns = new Map(active.map((turn) => [turn.id as string, turn]))
+  for (const [id, { turn, delivery }] of delivered.turns) if (delivery > covered) turns.set(id, turn)
+  return [...turns.values()].filter((turn) => Turn.active(turn.status)).toSorted(byCreated)
+}
+/** A turn as it shows with what the change feed delivered of it after the read that covered `covered`. */
+export const turnWith = (turn: Turn.View, covered: number, delivered: DeliveredTurns): Turn.View => {
+  const later = delivered.turns.get(turn.id)
+  return later !== undefined && later.delivery > covered ? later.turn : turn
 }
 
+const activeTurnsOf = perClient((client: ApiClient, workspaceId: string) => {
+  const delivered = deliveredTurnsOf(workspaceId)
+  const read = client.runtime
+    .atom(
+      Effect.fnUntraced(function* (get) {
+        const api = yield* client
+        // Whatever the change feed delivers from now on may be missing from what this reads.
+        const covered = get.once(delivered).count
+        return { active: yield* api.turns.listActive({ query: { limit: 100 } }), covered }
+      })
+    )
+    .pipe(Atom.withReactivity([workspaceKey(workspaceId, "active-turns")]))
+  return Atom.readable(
+    (get) => AsyncResult.map(get(read), ({ active, covered }) => withDeliveredTurns(active, covered, get(delivered))),
+    (refresh) => refresh(read)
+  )
+})
 /**
- * A turn as the reader sees it, following its facts: where it stands and what they may do with it.
- * Its log is followed apart, by `turnLogFeed`. Undefined for invalid IDs.
+ * The workspace's active turns in threads the reader may open, for marks where agents are at work,
+ * with what the change feed delivered. Undefined for an invalid workspace ID.
  */
-export const turnRead = (client: ApiClient, workspaceId: string, turnId: string) => {
-  const workspace = Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)
-  const turn = Schema.decodeOption(TurnId.TurnId)(turnId)
-  if (Option.isNone(workspace) || Option.isNone(turn)) return undefined
-  return client.query("turns", "get", {
-    params: { turnId: turn.value },
-    reactivityKeys: itemKeys(workspaceId, "turns", turnId)
-  })
-}
+export const activeTurnsRead = (client: ApiClient, workspaceId: string) =>
+  Option.isSome(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId))
+    ? activeTurnsOf(client, workspaceId)
+    : undefined
+
+const turnOf = perClient((client: ApiClient, key: string) => {
+  const [workspaceId = "", turnId = ""] = key.split("\u0000")
+  const delivered = deliveredTurnsOf(workspaceId)
+  const read = client.runtime
+    .atom(
+      Effect.fnUntraced(function* (get) {
+        const api = yield* client
+        const covered = get.once(delivered).count
+        return { turn: yield* api.turns.get({ params: { turnId: TurnId.TurnId.make(turnId) } }), covered }
+      })
+    )
+    .pipe(Atom.withReactivity(itemKeys(workspaceId, "turns", turnId)))
+  return Atom.readable(
+    (get) => AsyncResult.map(get(read), ({ turn, covered }) => turnWith(turn, covered, get(delivered))),
+    (refresh) => refresh(read)
+  )
+})
+/**
+ * A turn as the reader sees it, following its facts: where it stands and what they may do with it,
+ * with what the change feed delivered. Its log is followed apart, by `turnLogFeed`. Undefined for
+ * invalid IDs.
+ */
+export const turnRead = (client: ApiClient, workspaceId: string, turnId: string) =>
+  Option.isSome(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)) &&
+  Option.isSome(Schema.decodeOption(TurnId.TurnId)(turnId))
+    ? turnOf(client, `${workspaceId}\u0000${turnId}`)
+    : undefined
 
 /** A stop or retry of one turn. */
 export interface TurnCommand {

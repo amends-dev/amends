@@ -22,8 +22,6 @@ import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
 import type * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
-import * as Struct from "effect/Struct"
-import * as AgentPermissions from "../agent/AgentPermissions.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Target from "../authorization/Target.ts"
@@ -37,7 +35,6 @@ import * as Request from "../request/Request.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
-import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -47,6 +44,7 @@ import * as TurnActivity from "./TurnActivity.ts"
 import * as TurnCommand from "./TurnCommand.ts"
 import * as TurnFacts from "./TurnFacts.ts"
 import * as TurnId from "./TurnId.ts"
+import * as TurnQuery from "./TurnQuery.ts"
 import * as TurnStore from "./TurnStore.ts"
 
 /**
@@ -194,7 +192,7 @@ const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: TurnId.TurnId) =>
  */
 export const make = Effect.gen(function* () {
   const turnStore = yield* TurnStore.TurnStore
-  const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore
+  const turnQuery = yield* TurnQuery.TurnQuery
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const authorization = yield* Authorization.Authorization
   const turnCommand = yield* TurnCommand.TurnCommand
@@ -226,33 +224,13 @@ export const make = Effect.gen(function* () {
     )
     return turn
   })
-  const directAgentRequirement = (turn: Turn.Turn) =>
-    Requirement.make(AgentPermissions.Use, Target.Reference.cases.Member.make({ workspaceId, memberId: turn.memberId }))
-
-  /** Why the turn can't be retried now, or undefined when it can. */
-  const whyNotRetryable = Effect.fnUntraced(function* (turn: Turn.Turn) {
-    if (Turn.active(turn.status)) return "active" as const
-    if (turn.status === "completed") return "completed" as const
-    if (Option.isSome(yield* turnStore.findActive(turn.memberId, turn.threadId))) return "superseded" as const
-    const latest = yield* turnStore.findLatest(turn.memberId, turn.threadId)
-    if (Option.isSome(latest) && latest.value.id !== turn.id) return "superseded" as const
-    const participation = yield* threadParticipationStore.get(turn.participationId)
-    if (Option.isNone(participation) || participation.value.status !== "active") return "departed" as const
-    return undefined
-  })
-
   /** The turns as the reader sees them, with what they may do with each now. */
   const toViews = Effect.fnUntraced(function* (list: ReadonlyArray<Turn.Turn>) {
-    const directed = yield* authorization.permitted(list.map(directAgentRequirement))
+    const directed = yield* authorization.permitted(list.map(Turn.directRequirement))
     return yield* Effect.forEach(list, (turn, index) =>
-      Effect.gen(function* () {
-        const mayDirect = directed[index] === true
-        const view: Turn.View = Object.assign({}, Struct.omit(turn, ["logAfter"]), {
-          stoppable: mayDirect && Turn.active(turn.status) && turn.status !== "cancelling",
-          retryable: mayDirect && (yield* whyNotRetryable(turn)) === undefined
-        })
-        return view
-      })
+      Effect.map(turnQuery.whyNotRetryable(turn), (reason) =>
+        Turn.view(turn, directed[index] === true, reason === undefined)
+      )
     )
   })
   const toView = (turn: Turn.Turn) => Effect.map(toViews([turn]), (views) => views[0] as Turn.View)
@@ -409,7 +387,7 @@ export const make = Effect.gen(function* () {
   const cancel = Effect.fn("TurnService.cancel")(
     function* (turnId: TurnId.TurnId) {
       const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(TurnId.TurnId)(turnId))
-      yield* authorization.require([directAgentRequirement(turn)])
+      yield* authorization.require([Turn.directRequirement(turn)])
       if (!Turn.active(turn.status))
         return yield* new CoreError.Conflict({
           reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status })
@@ -427,12 +405,12 @@ export const make = Effect.gen(function* () {
     function* (turnId: TurnId.TurnId) {
       const id = yield* Schema.decodeEffect(TurnId.TurnId)(turnId)
       const turn = yield* requireReadableTurn(id)
-      yield* authorization.require([directAgentRequirement(turn)])
+      yield* authorization.require([Turn.directRequirement(turn)])
       // A turn is retried at most once, since its retry supersedes it, so the retry's ID comes from
       // the turn it retries and asking again returns that retry.
       const retryId = TurnId.TurnId.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]))
       if (Option.isSome(yield* turnStore.get(retryId))) return yield* toView(yield* requireReadableTurn(retryId))
-      const reason = yield* whyNotRetryable(turn)
+      const reason = yield* turnQuery.whyNotRetryable(turn)
       if (reason !== undefined)
         return yield* new CoreError.Conflict({
           reason: new CoreError.NotRetryable({ turnId: turn.id, reason })

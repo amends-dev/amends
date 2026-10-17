@@ -37,3 +37,12 @@ export type Subject = typeof Subject.Type
  */
 export const make = (kind: string, id: string): Subject =>
   Subject.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`)
+
+/**
+ * The ID of the entity `subject` names when it is of `kind`, or undefined for another kind.
+ *
+ * @category getters
+ * @since 0.1.0
+ */
+export const idOf = (kind: string, subject: Subject): string | undefined =>
+  subject.startsWith(`${kind}:`) ? subject.slice(kind.length + 1) : undefined

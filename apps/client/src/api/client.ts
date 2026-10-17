@@ -10,6 +10,7 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import * as Layer from "effect/Layer"
+import * as Atom from "effect/reactivity/Atom"
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi"
 import * as Schema from "effect/Schema"
 import type { SignIn } from "./contracts.ts"
@@ -86,3 +87,13 @@ export type Api = Pick<WorkspaceApi, "session" | "me" | "workspaces">
 const unauthorized = Schema.is(Authentication.Unauthorized)
 export const isUnauthorized = (cause: Cause.Cause<unknown>): boolean =>
   cause.reasons.some((reason) => Cause.isFailReason(reason) && unauthorized(reason.error))
+
+/** One read per client and key, shared by every consumer while any is mounted. */
+export const perClient = <K extends string, A extends object>(make: (client: ApiClient, key: K) => A) => {
+  const families = new WeakMap<ApiClient, (key: K) => A>()
+  return (client: ApiClient, key: K): A => {
+    const family = families.get(client) ?? Atom.family((key: K) => make(client, key))
+    families.set(client, family)
+    return family(key)
+  }
+}

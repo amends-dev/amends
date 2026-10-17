@@ -526,14 +526,16 @@ const timelineChange = Effect.fnUntraced(function* (thread: ThreadId.ThreadId, g
       { messageId: record.id }
     )
   )
+  const change = ChangeFeed.Change.cases.TimelineItem.make({ item: { activity, message: record } })
   return {
-    change: ChangeFeed.Change.cases.TimelineItem.make({ item: { activity, message: record } }),
+    change,
+    changeFor: () => change,
     audience: [Group.audienceOf(group)],
     requirement: Requirement.make(
       ThreadPermissions.Read,
       Target.Reference.cases.Thread.make({ workspaceId, threadId: thread })
     )
-  } satisfies ChangeFeedChanges.Prepared
+  } satisfies ChangeFeedChanges.Prepared & { readonly change: ChangeFeed.Change }
 })
 
 it.effect("a commit's changes reach the readers of what changed, who hold its read permission", () =>
@@ -545,17 +547,28 @@ it.effect("a commit's changes reach the readers of what changed, who hold its re
         yield* feed.next
         yield* commit(publish(ThreadMessageFacts.Published, message("granted", threadId, groupId)))
         // The reader is in the group and may read the thread; not the other thread, nor the other group.
+        // A change that shows what the reader may do is given as their grants decide.
         const received = committed(yield* feed.next)
-        expect(received.changes).toEqual([(yield* timelineChange(threadId, groupId)).change])
+        const granted = yield* timelineChange(threadId, groupId)
+        const other = yield* timelineChange(otherThreadId, groupId)
+        expect(received.changes).toEqual([granted.change, granted.change, other.change])
       }),
     {
       grants: [threadGrant(threadId)],
       changes: () =>
-        Effect.all([
-          timelineChange(threadId, groupId),
-          timelineChange(otherThreadId, groupId),
-          timelineChange(threadId, otherGroupId)
-        ])
+        Effect.gen(function* () {
+          const granted = yield* timelineChange(threadId, groupId)
+          const other = yield* timelineChange(otherThreadId, groupId)
+          const asGranted = (covers: (requirement: Requirement.Requirement) => boolean) =>
+            covers(granted.requirement) ? granted.change : other.change
+          return [
+            granted,
+            other,
+            yield* timelineChange(threadId, otherGroupId),
+            { ...granted, changeFor: asGranted },
+            { ...granted, changeFor: (covers) => asGranted((requirement) => !covers(requirement)) }
+          ] satisfies ReadonlyArray<ChangeFeedChanges.Prepared>
+        })
     }
   )
 )

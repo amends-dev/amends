@@ -148,7 +148,8 @@ export const make = Effect.gen(function* () {
             // Reload first, so a commit that admits the reader also delivers what it admits.
             if (delivery.events.some(changesAccessOf(actor))) access = yield* resolveAccess(actor)
             const events = delivery.events.filter(isVisibleTo(access)).map((p) => p.event)
-            const changes = delivery.changes.filter((p) => reaches(access, p)).map((p) => p.change)
+            const covers = (requirement: Requirement.Requirement) => Grant.anyCovers(access.grants, requirement)
+            const changes = delivery.changes.filter((p) => reaches(access, p)).map((p) => p.changeFor(covers))
             const notifications = delivery.events.flatMap((p) =>
               p.notifications.flatMap((n) => (access.scopes.has(n.scope) ? [n.record] : []))
             )
