@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Fiber } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/http"
+import { TestClock } from "effect/testing"
 import * as Mcp from "../../src/Mcp.ts"
 
 interface Call {
@@ -733,6 +734,61 @@ describe("the tools of a stateless server that mark their parameters", () => {
 
       expect(calls.map((call) => call.method)).toEqual(["tools/call"])
       expect(Object.keys(calls[0]?.headers ?? {}).filter((n) => n.startsWith("mcp-param-"))).toEqual([])
+    })
+  )
+})
+
+describe("limits", () => {
+  /** A server that answers everything but a call of a tool, which it never answers. */
+  const neverCalls = () => {
+    const client = HttpClient.make((request) => {
+      const sent = (request.body as { readonly body?: Uint8Array }).body
+      const message = JSON.parse(new TextDecoder().decode(sent)) as { readonly id?: number; readonly method: string }
+      if (message.method === "tools/call") return Effect.never
+      const result =
+        message.method === "server/discover" ? { supportedVersions: ["2026-07-28"] } : { tools: [tool("slow")] }
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(request, new Response(JSON.stringify({ jsonrpc: "2.0", id: message.id, result })))
+      )
+    })
+    return client
+  }
+
+  it.effect("fails a request the server does not answer within a minute by default, as unavailable", () =>
+    Effect.gen(function* () {
+      const source = yield* connect(HttpClient.make(() => Effect.never))
+      const running = yield* Effect.forkChild(Effect.flip(source.discover))
+      yield* Effect.yieldNow
+
+      yield* TestClock.adjust("59 seconds")
+      const early = running.pollUnsafe()
+      yield* TestClock.adjust("1 second")
+      const error = yield* Fiber.join(running)
+
+      expect(early).toBeUndefined()
+      expect(error.reason._tag).toBe("UnavailableError")
+      expect(error.isRetryable).toBe(true)
+      expect(error.reason.message).toBe("The server did not answer within 60 seconds")
+    })
+  )
+
+  it.effect("takes the timeout it is given, which a call of a tool counts in", () =>
+    Effect.gen(function* () {
+      const source = yield* Mcp.http({
+        name: "wire",
+        url: "http://localhost/mcp",
+        client: neverCalls(),
+        timeout: "5 seconds"
+      })
+      const listed = yield* source.discover
+      const running = yield* Effect.forkChild(Effect.flip(source.call("slow", {})))
+      yield* Effect.yieldNow
+
+      yield* TestClock.adjust("5 seconds")
+      const error = yield* Fiber.join(running)
+
+      expect(listed.map((definition) => definition.name)).toEqual(["slow"])
+      expect(error.reason.message).toBe("The server did not answer within 5 seconds")
     })
   )
 })

@@ -27,10 +27,10 @@
     },
     "adapters/harness-amends": {
       "name": "@amends-dev/harness-amends",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/harness": "workspace:*",
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/harness": "workspace:^",
+        "@amends-dev/sandbox": "workspace:^",
         "@effect/ai-anthropic": "catalog:",
         "@effect/ai-openai": "catalog:",
         "@effect/ai-openai-compat": "catalog:",
@@ -47,10 +47,10 @@
     },
     "adapters/harness-claude": {
       "name": "@amends-dev/harness-claude",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/harness": "workspace:*",
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/harness": "workspace:^",
+        "@amends-dev/sandbox": "workspace:^",
         "@anthropic-ai/claude-agent-sdk": "catalog:",
         "@anthropic-ai/sdk": "catalog:",
         "@effect/platform-bun": "catalog:",
@@ -66,10 +66,10 @@
     },
     "adapters/harness-codex": {
       "name": "@amends-dev/harness-codex",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/harness": "workspace:*",
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/harness": "workspace:^",
+        "@amends-dev/sandbox": "workspace:^",
         "@effect/platform-bun": "catalog:",
       },
       "devDependencies": {
@@ -83,10 +83,10 @@
     },
     "adapters/harness-opencode": {
       "name": "@amends-dev/harness-opencode",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/harness": "workspace:*",
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/harness": "workspace:^",
+        "@amends-dev/sandbox": "workspace:^",
         "@effect/platform-bun": "catalog:",
       },
       "devDependencies": {
@@ -101,9 +101,9 @@
     },
     "adapters/sandbox-daytona": {
       "name": "@amends-dev/sandbox-daytona",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/sandbox": "workspace:^",
         "@daytona/sdk": "catalog:",
       },
       "devDependencies": {
@@ -117,7 +117,7 @@
     },
     "adapters/sandbox-e2b": {
       "name": "@amends-dev/sandbox-e2b",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@amends-dev/sandbox": "workspace:*",
         "e2b": "catalog:",
@@ -133,9 +133,9 @@
     },
     "adapters/sandbox-local": {
       "name": "@amends-dev/sandbox-local",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/sandbox": "workspace:^",
       },
       "devDependencies": {
         "@effect/platform-bun": "catalog:",
@@ -148,7 +148,7 @@
     },
     "adapters/sandbox-vercel": {
       "name": "@amends-dev/sandbox-vercel",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@amends-dev/sandbox": "workspace:*",
         "@vercel/sandbox": "catalog:",
@@ -312,6 +312,23 @@
         "vite-plugin-solid": "^2.11.14",
       },
     },
+    "examples": {
+      "name": "@amends-dev/examples",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends-dev/harness": "workspace:*",
+        "@amends-dev/harness-amends": "workspace:*",
+        "@amends-dev/harness-claude": "workspace:*",
+        "@amends-dev/harness-codex": "workspace:*",
+        "@amends-dev/harness-opencode": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/sandbox-daytona": "workspace:*",
+        "@amends-dev/sandbox-local": "workspace:*",
+        "@amends-dev/toolkit": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+      },
+    },
     "hosts/local": {
       "name": "@amends-dev/host-local",
       "version": "0.0.0",
@@ -345,7 +362,7 @@
     },
     "packages/channel": {
       "name": "@amends-dev/channel",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "devDependencies": {
         "effect": "catalog:",
       },
@@ -417,9 +434,9 @@
     },
     "packages/harness": {
       "name": "@amends-dev/harness",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
-        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/sandbox": "workspace:^",
       },
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -441,7 +458,7 @@
     },
     "packages/sandbox": {
       "name": "@amends-dev/sandbox",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -456,7 +473,7 @@
     },
     "packages/toolkit": {
       "name": "@amends-dev/toolkit",
-      "version": "0.0.0",
+      "version": "0.2.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -513,6 +530,8 @@
     "@amends-dev/core": ["@amends-dev/core@workspace:packages/core"],
 
     "@amends-dev/desktop": ["@amends-dev/desktop@workspace:apps/desktop"],
+
+    "@amends-dev/examples": ["@amends-dev/examples@workspace:examples"],
 
     "@amends-dev/gateway": ["@amends-dev/gateway@workspace:packages/gateway"],
 

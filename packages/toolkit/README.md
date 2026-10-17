@@ -1,28 +1,64 @@
 # @amends-dev/toolkit
 
-A tool source is a system that tells which tools it has and runs them, such as an MCP server or an
-HTTP API. This package gives every kind of source one shape, `ToolSource`, and builds from sources
-the Effect AI toolkit that a model, or a [harness](../harness) session, is given as its `toolkit`.
-It depends only on Effect. [Connection](../connection/README.md)'s tool integrations make MCP and
-HTTP sources from it for the connections a workspace makes; agents do not take toolkits yet, as
-[known limitations](../../docs/current-status.md) records. It is internal to this repository and not
-published to npm.
+Tools for agents from wherever they come: an MCP server, an HTTP API with an OpenAPI document, or
+operations written by hand. Every kind of source has one shape, `ToolSource`, and `Assembly` builds
+from sources the Effect AI toolkit that a model, or a [harness](../harness) session, is given as
+its `toolkit`, under a policy that says what each tool may do. `ToolSearch` and `CodeMode` present a
+large set of tools as a few. The package depends only on Effect.
 
 No credential enters the package. A source is built over an HTTP client that the caller has already
 given the credentials its system asks for, so what a source sends is never decided by the model, and
 what authorizes it is never seen here.
 
-```ts
-const { operations } = yield * OpenApi.readOperations(spec)
-const github = yield * Http.make({ name: "github", baseUrl, client, operations })
+## Install
 
-const toolkit =
-  yield *
-  Assembly.toolkit(
-    [{ source: github, definitions: operations.map((operation) => operation.definition) }],
-    (source, definition) => policy.decide(source, definition.name) // what the host stored
-  )
+```sh
+bun add @amends-dev/toolkit effect
 ```
+
+In amends, [connection](../connection/README.md)'s tool integrations make MCP and HTTP sources for
+the connections a workspace makes; agents do not take toolkits yet, as
+[known limitations](../../docs/current-status.md) records.
+
+## Quick start
+
+A source is made over a client that carries its credentials. Its `discover` lists the tools, which a
+host stores as its catalog, and `Assembly.toolkit` builds from the catalog the toolkit of a turn,
+deciding for each tool whether the model may call it, must have the call approved, or is not shown
+it. The toolkit is Effect AI's, so a `LanguageModel` calls its tools, and so does a harness session,
+given it as its `toolkit`.
+
+```ts
+import { Assembly, Mcp } from "@amends-dev/toolkit"
+import { Config, Effect, Redacted } from "effect"
+import { LanguageModel } from "effect/ai"
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
+
+const program = Effect.gen(function* () {
+  // The client carries the server's credentials; the source never sees them.
+  const token = yield* Config.Redacted("MCP_TOKEN")
+  const client = (yield* HttpClient.HttpClient).pipe(
+    HttpClient.mapRequest(HttpClientRequest.bearerToken(Redacted.value(token)))
+  )
+  const tasks = yield* Mcp.http({ name: "tasks", url: "https://mcp.example.com/mcp", client })
+
+  // The catalog: what the source has now, which a host stores and refreshes.
+  const definitions = yield* tasks.discover
+
+  // The toolkit of a turn: the tools that read, and none that write, as this host decides.
+  const toolkit = yield* Assembly.toolkit([{ source: tasks, definitions }], (_source, definition) =>
+    definition.annotations.readOnly === true ? "allow" : "block"
+  )
+
+  // The model calls `tasks__list_tasks`, and reads a call that failed as a result.
+  const response = yield* LanguageModel.generateText({ prompt: "What is due this week?", toolkit })
+  return response.text
+}).pipe(Effect.provide(FetchHttpClient.layer))
+```
+
+A [harness](../harness/README.md#host-tools) session takes the same `toolkit`: it runs the tools on
+the host as the agent calls them, whichever agent it is, and asks a person about a tool the policy
+set to `approve` before it runs.
 
 ## Definitions
 
@@ -32,7 +68,8 @@ const toolkit =
 (`inputSchema`), and `annotations`. The annotations are `title`, `readOnly`, `destructive`,
 `idempotent`, and `openWorld`, named as Effect AI's tool annotations are, and left out when the
 source did not say, so that Effect AI's default for a hint applies. They are a source's claims and
-not guarantees, so a decision about what a tool may do must not rest on them alone.
+not guarantees, so a decision about what a tool may do must not rest on them alone. A definition has
+no output schema, which MCP and OpenAPI report: what a tool answers is JSON the model reads.
 
 ## Sources
 
@@ -47,7 +84,10 @@ Effect AI does not check the parameters of a dynamic tool, so a call does, befor
 the input. The input must be an object that matches the tool's JSON Schema, and one that the schema
 closes may have no property it does not name. A `pattern` or a `format` is not checked, since the
 source checks it too and a pattern from a source is not run here, and a schema that Effect cannot
-turn into a check is held only to being an object. The source gets the input as the model gave it.
+turn into a check is held only to being an object. The source gets the input as the model gave it. A
+model API that has a strict schema mode, as OpenAI's does, is asked not to use it for a source's
+tools, since the parameters are the source's and may leave a property optional, which strict mode
+refuses.
 
 Whatever happens to a call is a result the model reads, so that the turn goes on and the model can
 try something else. A failure arrives as `Failure`, `{ code, message, retryable }`, with `isFailure`
@@ -58,8 +98,9 @@ harness session asks about before it runs them.
 ## Errors
 
 `ToolSourceError` names the source and holds a `reason`: `AuthenticationError`, `NotFoundError`,
-`InvalidInputError`, `CallFailedError`, which is a tool that ran and said it failed,
-`UnavailableError`, the only one worth trying again, `InvalidResponseError`, `UnsupportedError`, and
+`InvalidInputError`, `CallFailedError`, which is a tool that ran and said it failed, or answered
+more than a tool can return, `UnavailableError`, the only one worth trying again, though it does not
+say when, as a rate limit does with `Retry-After`, `InvalidResponseError`, `UnsupportedError`, and
 `UnknownError`. A host recovers from one with
 `Effect.catchReason("ToolSourceError", "AuthenticationError", ...)`, to ask for a connection again.
 What the model reads of a failure is the reason's `modelMessage`: the description of an
@@ -103,9 +144,10 @@ a number is allowed, though the protocol says otherwise. Only the parameters tha
 to are marks: one under `items`, `anyOf`, `$defs`, or the like makes the tool unusable. A server
 with sessions has no such headers, and its tools are listed as they are.
 
-Not done: a session is not ended when the source is no longer used; a request has no time limit; and
-stdio servers are not reached, though `effect/process` and `effect/encoding` hold what a source
-would need.
+A request that the server does not answer within `timeout`, a minute by default, fails as
+`UnavailableError`, which a call of a tool counts in. Not done: a session is not ended when the
+source is no longer used, and stdio servers are not reached, though `effect/process` and
+`effect/encoding` hold what a source would need.
 
 ## HTTP and OpenAPI
 
@@ -137,9 +179,10 @@ beyond that.
 An operation that cannot be a tool is left out with the reason, in `skipped`, so that a host can
 show what it lost, as for a body that is not JSON, a parameter written in a style other than the
 default or that is an object, a cookie it needs, a path that its parameters do not match, a
-reference to anything but a schema of the document, or a name another operation has. Of the HTTP
-source, not done: a request has no time limit, and an answer has no size limit. A default
-`User-Agent`, which some APIs ask for, is the client's to set.
+reference to anything but a schema of the document, or a name another operation has. A call that
+takes longer than `timeout`, 30 seconds by default, fails as `UnavailableError`, and an answer longer
+than `maxAnswerLength`, 200,000 characters by default, as `CallFailedError`, telling the model to ask
+for less. A default `User-Agent`, which some APIs ask for, is the client's to set.
 
 ## Assembly
 
@@ -188,7 +231,8 @@ const toolkit = yield * ToolSearch.toolkit(assembled)
 A tool that needs approval needs it when the model calls it through `tool_call`: the approval is the
 tool's own, as its `needsApproval` says, asked about the input the model gave, so a session asks
 about the call as it asks about any other, and the model cannot reach a tool that needs approval by
-another way. `tool_search` runs nothing and needs none.
+another way. `tool_search` runs nothing and needs none. Neither tool is sent in a model API's strict schema mode, which allows no optional
+`limit` and no input whose shape depends on the tool named.
 
 What the model is shown is the same two tools however many there are, and what it reads of the
 others is what it searched for. The names of the presented tools are only text the model reads and
@@ -281,6 +325,9 @@ They require of a source that it:
 bun run test packages/toolkit
 ```
 
+`bun run dist check packages/toolkit` builds the package as npm gets it and checks it as a consumer;
+see [publishing](../../docs/publishing.md).
+
 `test/tool-source.test.ts`, `test/tool-source-error.test.ts`, `test/tool-definition.test.ts`,
 `test/assembly.test.ts`, `test/tool-search.test.ts`, `test/presentation.test.ts`, and
 `test/code/code-mode.test.ts` run over fake sources and toolkits, and
@@ -297,3 +344,10 @@ streams with other messages in them, pagination, and each status and error code;
 `test/openapi.test.ts` reads documents written in each test and takes one through the toolkit to a
 request. These tests need `Request`, `Response`, and `Bun`, which shared packages do not have, so
 the root `tsconfig.json` checks them. See [testing](../../docs/testing.md).
+
+## Inspiration
+
+The catalog a host stores and refreshes, and the policy kept apart from which tools a model is
+shown, follow [executor](https://github.com/UsefulSoftwareCo/executor). Search and code mode follow
+Anthropic's writing on [code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
+and the AI SDK's tool search and code mode.

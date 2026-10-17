@@ -116,6 +116,34 @@ export interface Options {
  * that `decide` asks to `approve` needs approval before it runs. Building contacts none of the
  * sources.
  *
+ * **Example** (The toolkit of a turn, from a workspace's sources and its policy)
+ *
+ * ```ts
+ * import { Assembly, type ToolSource } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ *
+ * declare const github: ToolSource.ToolSource
+ * declare const linear: ToolSource.ToolSource
+ * // What the host stored of each source: a decision for a tool, and the one for the others.
+ * declare const policy: ReadonlyMap<
+ *   string,
+ *   { readonly tools: ReadonlyMap<string, Assembly.Decision>; readonly others: Assembly.Decision }
+ * >
+ *
+ * const program = Effect.gen(function* () {
+ *   // The definitions come from the host's catalog, filled from `discover` when it refreshed.
+ *   const members = yield* Effect.forEach([github, linear], (source) =>
+ *     Effect.map(source.discover, (definitions) => ({ source, definitions }))
+ *   )
+ *   const toolkit = yield* Assembly.toolkit(members, (source, definition) => {
+ *     const stored = policy.get(source)
+ *     return stored?.tools.get(definition.name) ?? stored?.others ?? "block"
+ *   })
+ *   // The model knows the tools as `github__create_issue`, and a call reaches its source.
+ *   return toolkit
+ * })
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */

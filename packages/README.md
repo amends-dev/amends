@@ -13,7 +13,7 @@ the user interface in [apps](../apps/README.md).
 | [`http`](http/README.md)             | The HTTP API: the contract clients call and its server, over the gateway.            |
 | [`cluster`](cluster/README.md)       | Jobs, the work outside requests, on Effect Cluster: agents' turns and deliveries.    |
 | [`connection`](connection/README.md) | The integrations a host installs, a workspace's connections, and the model catalog.  |
-| [`toolkit`](toolkit/README.md)       | Tool sources, such as MCP servers and HTTP APIs, in one shape.                       |
+| [`toolkit`](toolkit/README.md)       | Tool sources, such as MCP servers and HTTP APIs, in one shape. Published to npm.     |
 | [`harness`](harness/README.md)       | Runs an agent and streams its turns in one format. Published to npm.                 |
 | [`sandbox`](sandbox/README.md)       | The contract every sandbox provider implements. Published to npm.                    |
 | [`channel`](channel/README.md)       | The contract every channel transport implements. Published to npm.                   |

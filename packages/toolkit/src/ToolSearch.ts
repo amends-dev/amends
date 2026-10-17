@@ -65,6 +65,21 @@ export interface Options {
 /**
  * Makes the toolkit of `tool_search` and `tool_call` over `presented`. Building contacts nothing.
  *
+ * **Example** (Presenting a large set of tools as a search)
+ *
+ * ```ts
+ * import { Assembly, ToolSearch } from "@amends-dev/toolkit"
+ * import { Effect } from "effect"
+ *
+ * declare const members: ReadonlyArray<Assembly.Member> // an API's hundreds of operations
+ *
+ * const program = Effect.gen(function* () {
+ *   const assembled = yield* Assembly.toolkit(members, () => "allow")
+ *   // The model is shown `tool_search` and `tool_call`, however many tools there are.
+ *   return yield* ToolSearch.toolkit(assembled, { limit: 10 })
+ * })
+ * ```
+ *
  * @category constructors
  * @since 0.1.0
  */
@@ -112,7 +127,9 @@ export const toolkit = Effect.fn("ToolSearch.toolkit")(function* <Tools extends 
     }
   })
 
-  const SearchToolkit = Toolkit.make(Search, Call)
+  // Neither is sent in strict schema mode: a search may leave out `limit`, and a call's input is
+  // whatever the tool it names takes, which strict mode does not allow.
+  const SearchToolkit = Toolkit.make(Search.annotate(Tool.Strict, false), Call.annotate(Tool.Strict, false))
   const handlers = SearchToolkit.toLayer({
     tool_search: ({ query, limit: asked }) =>
       Effect.sync(() => {

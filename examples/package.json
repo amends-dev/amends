@@ -1,0 +1,22 @@
+{
+  "name": "@amends-dev/examples",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/harness-amends": "workspace:*",
+    "@amends-dev/harness-claude": "workspace:*",
+    "@amends-dev/harness-codex": "workspace:*",
+    "@amends-dev/harness-opencode": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
+    "@amends-dev/sandbox-daytona": "workspace:*",
+    "@amends-dev/sandbox-local": "workspace:*",
+    "@amends-dev/toolkit": "workspace:*",
+    "@effect/platform-bun": "catalog:",
+    "effect": "catalog:"
+  }
+}
