@@ -110,6 +110,8 @@ the agent calls one, the session runs its handler on the host, streams the resul
 side by side, and their results stream as they come; a step ends only once the tools it called have
 answered. The agent's own tools run inside the agent, and their calls and results stream as
 `providerExecuted`.
+[`@amends-dev/toolkit`](../toolkit) builds such a toolkit from MCP servers and HTTP APIs, under a
+policy, and presents a large set of tools as a search or as code.
 
 A tool with `needsApproval` is asked about first: the turn streams a `tool-approval-request` after
 the call and waits, while the agent waits for the result, until `approve` allows the call or

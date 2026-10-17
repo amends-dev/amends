@@ -1,28 +1,64 @@
 # @amends-dev/toolkit
 
-A tool source is a system that tells which tools it has and runs them, such as an MCP server or an
-HTTP API. This package gives every kind of source one shape, `ToolSource`, and builds from sources
-the Effect AI toolkit that a model, or a [harness](../harness) session, is given as its `toolkit`.
-It depends only on Effect. [Connection](../connection/README.md)'s tool integrations make MCP and
-HTTP sources from it for the connections a workspace makes; agents do not take toolkits yet, as
-[known limitations](../../docs/current-status.md) records. It is internal to this repository and not
-published to npm.
+Tools for agents from wherever they come: an MCP server, an HTTP API with an OpenAPI document, or
+operations written by hand. Every kind of source has one shape, `ToolSource`, and `Assembly` builds
+from sources the Effect AI toolkit that a model, or a [harness](../harness) session, is given as
+its `toolkit`, under a policy that says what each tool may do. `ToolSearch` and `CodeMode` present a
+large set of tools as a few. The package depends only on Effect.
 
 No credential enters the package. A source is built over an HTTP client that the caller has already
 given the credentials its system asks for, so what a source sends is never decided by the model, and
 what authorizes it is never seen here.
 
-```ts
-const { operations } = yield * OpenApi.readOperations(spec)
-const github = yield * Http.make({ name: "github", baseUrl, client, operations })
+## Install
 
-const toolkit =
-  yield *
-  Assembly.toolkit(
-    [{ source: github, definitions: operations.map((operation) => operation.definition) }],
-    (source, definition) => policy.decide(source, definition.name) // what the host stored
-  )
+```sh
+bun add @amends-dev/toolkit effect
 ```
+
+In amends, [connection](../connection/README.md)'s tool integrations make MCP and HTTP sources for
+the connections a workspace makes; agents do not take toolkits yet, as
+[known limitations](../../docs/current-status.md) records.
+
+## Quick start
+
+A source is made over a client that carries its credentials. Its `discover` lists the tools, which a
+host stores as its catalog, and `Assembly.toolkit` builds from the catalog the toolkit of a turn,
+deciding for each tool whether the model may call it, must have the call approved, or is not shown
+it. The toolkit is Effect AI's, so a `LanguageModel` calls its tools, and so does a harness session,
+given it as its `toolkit`.
+
+```ts
+import { Assembly, Mcp } from "@amends-dev/toolkit"
+import { Config, Effect, Redacted } from "effect"
+import { LanguageModel } from "effect/ai"
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
+
+const program = Effect.gen(function* () {
+  // The client carries the server's credentials; the source never sees them.
+  const token = yield* Config.Redacted("MCP_TOKEN")
+  const client = (yield* HttpClient.HttpClient).pipe(
+    HttpClient.mapRequest(HttpClientRequest.bearerToken(Redacted.value(token)))
+  )
+  const tasks = yield* Mcp.http({ name: "tasks", url: "https://mcp.example.com/mcp", client })
+
+  // The catalog: what the source has now, which a host stores and refreshes.
+  const definitions = yield* tasks.discover
+
+  // The toolkit of a turn: the tools that read, and none that write, as this host decides.
+  const toolkit = yield* Assembly.toolkit([{ source: tasks, definitions }], (_source, definition) =>
+    definition.annotations.readOnly === true ? "allow" : "block"
+  )
+
+  // The model calls `tasks__list_tasks`, and reads a call that failed as a result.
+  const response = yield* LanguageModel.generateText({ prompt: "What is due this week?", toolkit })
+  return response.text
+}).pipe(Effect.provide(FetchHttpClient.layer))
+```
+
+A [harness](../harness/README.md#host-tools) session takes the same `toolkit`: it runs the tools on
+the host as the agent calls them, whichever agent it is, and asks a person about a tool the policy
+set to `approve` before it runs.
 
 ## Definitions
 
@@ -285,6 +321,9 @@ They require of a source that it:
 bun run test packages/toolkit
 ```
 
+`bun run dist check packages/toolkit` builds the package as npm gets it and checks it as a consumer;
+see [publishing](../../docs/publishing.md).
+
 `test/tool-source.test.ts`, `test/tool-source-error.test.ts`, `test/tool-definition.test.ts`,
 `test/assembly.test.ts`, `test/tool-search.test.ts`, `test/presentation.test.ts`, and
 `test/code/code-mode.test.ts` run over fake sources and toolkits, and
@@ -301,3 +340,10 @@ streams with other messages in them, pagination, and each status and error code;
 `test/openapi.test.ts` reads documents written in each test and takes one through the toolkit to a
 request. These tests need `Request`, `Response`, and `Bun`, which shared packages do not have, so
 the root `tsconfig.json` checks them. See [testing](../../docs/testing.md).
+
+## Inspiration
+
+The catalog a host stores and refreshes, and the policy kept apart from which tools a model is
+shown, follow [executor](https://github.com/UsefulSoftwareCo/executor). Search and code mode follow
+Anthropic's writing on [code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
+and the AI SDK's tool search and code mode.
