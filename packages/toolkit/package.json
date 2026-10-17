@@ -1,7 +1,26 @@
 {
   "name": "@amends-dev/toolkit",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.0",
+  "description": "Tools from MCP servers and HTTP APIs in one shape, assembled into the toolkit an agent calls, with search and code mode to present many tools as few, and the conformance suites each source runs.",
+  "keywords": [
+    "agent",
+    "ai",
+    "effect",
+    "mcp",
+    "openapi",
+    "toolkit",
+    "tools"
+  ],
+  "homepage": "https://github.com/amends-dev/amends/tree/main/packages/toolkit#readme",
+  "bugs": {
+    "url": "https://github.com/amends-dev/amends/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amends-dev/amends.git",
+    "directory": "packages/toolkit"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -11,8 +30,13 @@
     "./*": "./src/*.ts",
     "./internal/*": null
   },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist"
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
