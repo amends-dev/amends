@@ -211,6 +211,7 @@
         "foldkit": "0.168.0",
       },
       "devDependencies": {
+        "@amends-dev/channel": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@foldkit/vite-plugin": "0.27.1",
         "fake-indexeddb": "6.2.5",

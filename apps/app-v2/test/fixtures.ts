@@ -1,6 +1,7 @@
 import { Integration } from "@amends-dev/connection"
 import { Core } from "@amends-dev/core"
 import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
+import { Channel, Contact } from "@amends-dev/core/channel"
 import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
@@ -219,11 +220,7 @@ export const connectionOf = (id: string, name: string) =>
   })
 
 /** An integration whose connections give `provides`, and take no settings or key, as its readers see it. */
-export const integrationGiving = (
-  id: string,
-  name: string,
-  provides: ReadonlyArray<"models" | "harnesses" | "sandboxes">
-) =>
+export const integrationGiving = (id: string, name: string, provides: Connection.IntegrationView["provides"]) =>
   Schema.decodeSync(Connection.IntegrationView)({
     id,
     name,
@@ -278,4 +275,27 @@ export const offered = Schema.decodeSync(Connection.Models)({
     }
   ],
   unlisted: true
+})
+
+/** A channel over the channels connection, opening tasks in general, which alice added. */
+export const support = Schema.decodeSync(Channel.Channel)({
+  id: "channel-1",
+  workspaceId: "workspace-1",
+  connectionId: "channels-1",
+  groupId: "general",
+  name: "Support",
+  opensTasks: true,
+  status: "active",
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
+/** A person a channel's conversation brought in. */
+export const dana = Schema.decodeSync(Contact.Contact)({
+  id: "contact-1",
+  workspaceId: "workspace-1",
+  channelId: "channel-1",
+  externalId: "dana",
+  name: "Dana",
+  createdAt: "2026-10-18T12:00:00Z"
 })

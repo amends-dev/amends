@@ -1,6 +1,7 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
 import { Task } from "@amends-dev/core/task"
+import { ThreadMessage } from "@amends-dev/core/thread"
 import { Turn } from "@amends-dev/core/turn"
 import { Invitation } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
@@ -36,6 +37,7 @@ import {
   AddGroupMember,
   ChangeRole,
   CreateAgent,
+  CreateChannel,
   CreateTask,
   CreateTeam,
   Dismiss,
@@ -44,6 +46,7 @@ import {
   managedResources,
   MarkAllNotificationsSeen,
   PostReply,
+  RedirectChannel,
   RemoveGroupMember,
   RetryTurn,
   RevokeInvitation,
@@ -61,6 +64,7 @@ import {
   bobInDesign,
   bobIsMember,
   connectionOf,
+  dana,
   design,
   general,
   integrationGiving,
@@ -78,6 +82,7 @@ import {
   session,
   signedIn,
   signedOut,
+  support,
   task,
   testApi,
   thread,
@@ -642,6 +647,104 @@ describe("the app", () => {
       expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist(),
       expect(role("button", { name: "Change setup" })).toBeAbsent(),
       expect(role("button", { name: "Add an agent" })).toBeAbsent()
+    )
+  })
+
+  it("an owner adds a channel and moves it, a member reads where it opens, and a contact's message bears their name", () => {
+    const channels = keylessConnection("channels-1", "test-channels", "Chat")
+    const fromDana = Schema.decodeSync(ThreadMessage.ThreadMessage)({
+      ...Schema.encodeSync(ThreadMessage.ThreadMessage)(opening),
+      id: "message-3",
+      author: { _tag: "Contact", contactId: dana.id }
+    })
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(Message.GotRoles({ roles })),
+      Subscription.emit(Message.GotAssignments({ assignments: [{ assignment: aliceOwns, pending: false }] })),
+      Subscription.emit(
+        Message.GotGroups({
+          groups: [
+            { group: general, pending: false },
+            { group: design, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(
+        Message.GotMemberships({
+          memberships: [
+            { membership: aliceInGeneral, pending: false },
+            { membership: aliceInDesign, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(Message.GotConnections({ connections: [{ connection: channels, pending: false }] })),
+      click(role("button", { name: "Channels" })),
+      Command.resolve(
+        LoadIntegrations,
+        Message.GotIntegrations({ integrations: [integrationGiving("test-channels", "Test channels", ["channels"])] })
+      ),
+      expect(text("No channels yet.")).toExist(),
+      click(role("button", { name: "Add a channel" })),
+      inside(
+        role("form", { name: "Add a channel" }),
+        change(label("Connection"), channels.id),
+        change(label("Opens conversations in"), general.id),
+        type(label("Name"), "Support"),
+        click(role("button", { name: "Add" }))
+      ),
+      Command.expectExact(
+        CreateChannel({ connectionId: channels.id, groupId: general.id, name: "Support", opensTasks: false })
+      ),
+      Command.resolve(CreateChannel, Message.WroteAction()),
+      Subscription.emit(Message.GotChannels({ channels: [{ channel: support, pending: false }] })),
+      inside(
+        role("region", { name: "Channels" }),
+        expect(text(" · from Chat into General")).toExist(),
+        click(role("button", { name: "Move" }))
+      ),
+      inside(
+        role("form", { name: "Move the channel" }),
+        change(label("Opens new conversations in"), design.id),
+        click(role("button", { name: "Move" }))
+      ),
+      Command.expectExact(RedirectChannel({ channelId: support.id, groupId: design.id })),
+      Command.resolve(RedirectChannel, Message.WroteAction()),
+      // A member reads where it opens, and manages nothing.
+      Subscription.emit(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: roleOf("assignment-3", membership.member.id, BuiltinRoles.MemberId), pending: false }
+          ]
+        })
+      ),
+      expect(role("button", { name: "Move" })).toBeAbsent(),
+      expect(role("button", { name: "Add a channel" })).toBeAbsent(),
+      // In a thread the channel opened, the contact's message bears the name they gave.
+      Subscription.emit(Message.GotContacts({ contacts: [dana] })),
+      click(role("button", { name: "General" })),
+      Subscription.emit(
+        Message.GotThreads({
+          groupId: general.id,
+          threads: [{ thread, opening: Option.some(fromDana), task: Option.none(), pending: false, unread: 0 }]
+        })
+      ),
+      click(role("button", { name: "Plans for the week" })),
+      Subscription.emit(
+        Message.GotThread({
+          threadId: thread.id,
+          messages: [{ message: fromDana, pending: false }],
+          following: Option.none(),
+          latest: 0,
+          readThrough: 0,
+          task: Option.none(),
+          turns: []
+        })
+      ),
+      inside(role("region", { name: "Thread" }), expect(text("Dana")).toExist())
     )
   })
 

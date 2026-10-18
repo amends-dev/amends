@@ -1,5 +1,6 @@
 import { Agent } from "@amends-dev/core/agent"
 import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
+import { Channel } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
@@ -712,4 +713,36 @@ describe("Pending, for the workspace's agents", () => {
       { value: { ...member.value, name: "Reviewer" }, pending: true }
     ])
   })
+})
+
+describe("Pending, for the workspace's channels", () => {
+  const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
+  const written = { ...author, key: Request.Key.make("action-9"), writtenAt: at(9) }
+
+  it.effect("adds a channel under the ID the server gives it, moves one, and removes one", () =>
+    Effect.gen(function* () {
+      const input = { connectionId: "channels-1", groupId: "general", name: "Support", opensTasks: true }
+      const made = (yield* Pending.effectsOf("ChannelCreated").creates!(input, written, findAmong([]))).filter(
+        ReplicaRecord.ReplicaRecord.isAnyOf(["Channel"])
+      )
+      const id = yield* Effect.provideService(Channel.newId, Request.Current, written)
+      expect(made.map(({ value }) => value)).toEqual([
+        {
+          id,
+          workspaceId: author.workspaceId,
+          ...input,
+          status: "active",
+          createdBy: author.memberId,
+          createdAt: at(9)
+        }
+      ])
+      const pending = [
+        unfinished("ChannelRedirected", { channelId: id, groupId: "design" }, 10),
+        unfinished("ChannelRemoved", { channelId: id }, 11)
+      ]
+      expect(view(Pending.overlay("Channel", everywhere, made, pending))).toEqual([
+        { value: { ...made[0]!.value, groupId: "design", status: "removed" }, pending: true }
+      ])
+    }).pipe(Effect.provide(BrowserCrypto.layer))
+  )
 })

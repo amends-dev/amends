@@ -178,15 +178,16 @@ The web and desktop apps have been removed, and their replacement,
 workspaces, and keeps the one they open in sync through
 [`@amends-dev/sync`](../packages/sync/README.md), its replica in IndexedDB. It shows a workspace's
 groups, a group's threads, a thread's messages, its task and its agents' turns, the person's
-inbox, the workspace's settings, its connections, and its agents, and takes what a person does to
-them as actions: creating a
+inbox, the workspace's settings, its connections, its agents, and its channels, and takes what a
+person does to them as actions: creating a
 team or starting a conversation, renaming a team, admitting and removing its members, joining,
 leaving, and following it; starting and renaming a thread, replying, editing and deleting their
 messages, following it, and reading it; making a thread a task and changing its status, priority,
 and assignee; stopping a turn and running one again; and renaming the workspace and themselves,
 changing a member's role, removing a member, handing the workspace to another person, inviting by
 address and revoking an invitation, marking notifications seen, renaming, configuring, and
-removing a connection, and adding, setting up, and renaming an agent. Adding a connection,
+removing a connection, adding, setting up, and renaming an agent, and adding, moving, and removing
+a channel. Adding a connection,
 replacing its key, and checking it go over HTTP, since a key never enters an action. Each shows at
 once and is
 sent when the host can be reached, and a control shows only when the person's grants, read from

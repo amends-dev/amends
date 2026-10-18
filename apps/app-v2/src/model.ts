@@ -6,6 +6,7 @@
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, Role } from "@amends-dev/core/authorization"
+import { Channel, ChannelId, Contact } from "@amends-dev/core/channel"
 import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
@@ -281,16 +282,42 @@ export const Agents = Schema.Struct({
 })
 export type Agents = typeof Agents.Type
 
+/** A channel of the workspace, and whether a change to it is on its way. */
+export const ChannelItem = Schema.Struct({ channel: Channel.Channel, pending: Schema.Boolean })
+export type ChannelItem = typeof ChannelItem.Type
+
+/**
+ * The form open among the workspace's channels: adding one, over a connection that gives channels,
+ * into a group, called something, and opening tasks or not; or sending one's conversations to come
+ * to another group.
+ */
+export const ChannelForm = defineTaggedUnion({
+  Adding: {
+    connectionId: Schema.String,
+    groupId: Schema.String,
+    name: Schema.String,
+    opensTasks: Schema.Boolean,
+    error: Schema.Option(Schema.String)
+  },
+  Redirecting: { channelId: ChannelId.ChannelId, groupId: Schema.String }
+})
+export type ChannelForm = typeof ChannelForm.Type
+
+/** The workspace's channels as the person manages them: the form open among them. */
+export const Channels = Schema.Struct({ form: Schema.Option(ChannelForm) })
+export type Channels = typeof Channels.Type
+
 /**
  * What the open workspace shows beside its groups: a group, the person's inbox, its settings, its
- * connections, or its agents.
+ * connections, its agents, or its channels.
  */
 export const Pane = defineTaggedUnion({
   Group: { group: OpenGroup },
   Inbox: {},
   Settings: { settings: Settings },
   Connections: { connections: Connections },
-  Agents: { agents: Agents }
+  Agents: { agents: Agents },
+  Channels: { channels: Channels }
 })
 export type Pane = typeof Pane.Type
 
@@ -305,7 +332,8 @@ export type Composing = typeof Composing.Type
  * The workspace the person opened, as their member of it: the workspace, and whether a change to
  * it is on its way; its store; what the replica holds of it: its groups, members, roles and their
  * assignments, invitations, the person's notifications, groups' memberships, the person's
- * follows among them, its connections, and its agents; the integrations the host installs, once asked for; the
+ * follows among them, its connections, agents, channels, and the contacts its channels brought; the
+ * integrations the host installs, once asked for; the
  * actions not finished yet, why the last one could not be written, what the person is starting,
  * and the pane open in it.
  */
@@ -324,6 +352,8 @@ export const Opened = Schema.Struct({
   follows: Schema.Array(FollowItem),
   connections: Schema.Array(ConnectionItem),
   agents: Schema.Array(AgentItem),
+  channels: Schema.Array(ChannelItem),
+  contacts: Schema.Array(Contact.Contact),
   integrations: Schema.Option(Integrations),
   actions: Schema.Array(ActionItem),
   notice: Schema.Option(Schema.String),

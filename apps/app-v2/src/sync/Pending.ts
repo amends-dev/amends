@@ -11,6 +11,7 @@
 
 import { Agent } from "@amends-dev/core/agent"
 import { Assignment, type Role, Scope } from "@amends-dev/core/authorization"
+import { Channel } from "@amends-dev/core/channel"
 import { Group, type GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
@@ -21,6 +22,7 @@ import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thr
 import { Turn } from "@amends-dev/core/turn"
 import { Invitation, Member, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
 import type * as AgentSync from "@amends-dev/sync/AgentSync"
+import type * as ChannelSync from "@amends-dev/sync/ChannelSync"
 import type * as ConnectionSync from "@amends-dev/sync/ConnectionSync"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
@@ -101,6 +103,7 @@ const isTask = ReplicaRecord.ReplicaRecord.isAnyOf(["Task"])
 const isTurn = ReplicaRecord.ReplicaRecord.isAnyOf(["Turn"])
 const isConnection = ReplicaRecord.ReplicaRecord.isAnyOf(["Connection"])
 const isAgent = ReplicaRecord.ReplicaRecord.isAnyOf(["Agent"])
+const isChannel = ReplicaRecord.ReplicaRecord.isAnyOf(["Channel"])
 
 /** `record`, a notification, as seen when `action` was written. */
 const seen = (record: Replica.RecordOf<"Notification">, action: Action) =>
@@ -643,6 +646,43 @@ export const agents: EffectsOf<typeof AgentSync.Actions> = {
   }
 }
 
+/**
+ * What the person does with the workspace's channels: adding one, sending one's conversations to
+ * come to another group, and removing one.
+ */
+export const channels: EffectsOf<typeof ChannelSync.Actions> = {
+  ChannelCreated: {
+    creates: (input, action) =>
+      asRequest(
+        action,
+        Effect.map(Channel.newId, (id) => [
+          cases.Channel.make({
+            value: {
+              id,
+              workspaceId: action.workspaceId,
+              ...input,
+              status: "active",
+              createdBy: action.memberId,
+              createdAt: action.writtenAt
+            }
+          })
+        ])
+      )
+  },
+  ChannelRedirected: {
+    changes: ({ channelId, groupId }, record) =>
+      isChannel(record) && record.value.id === channelId
+        ? cases.Channel.make({ value: { ...record.value, groupId } })
+        : undefined
+  },
+  ChannelRemoved: {
+    changes: ({ channelId }, record) =>
+      isChannel(record) && record.value.id === channelId && record.value.status === "active"
+        ? cases.Channel.make({ value: { ...record.value, status: "removed" } })
+        : undefined
+  }
+}
+
 const effectsByTag = {
   ...threads,
   ...groups,
@@ -651,7 +691,8 @@ const effectsByTag = {
   ...tasks,
   ...turns,
   ...connections,
-  ...agents
+  ...agents,
+  ...channels
 } as Readonly<Record<string, Effects<unknown> | undefined>>
 
 /** What the action `tag` does, if anything, before the server's changes arrive. */

@@ -1,3 +1,4 @@
+import { ChannelTransport } from "@amends-dev/channel"
 import { Integration } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 // @vitest-environment node
@@ -79,8 +80,22 @@ const testModels = Integration.make({
   check: () => Effect.succeed({ status: "healthy" })
 })
 
+/** An integration whose connections give channels over a transport that receives and posts nothing. */
+const testChannels = Integration.make({
+  id: "test-channels",
+  name: "Test channels",
+  auth: ["none"],
+  channels: () =>
+    Effect.succeed({
+      self: ChannelTransport.ExternalId.make("bot"),
+      receive: () => Effect.die("No test receives"),
+      post: () => Effect.die("No test posts")
+    }),
+  check: () => Effect.succeed({ status: "healthy" })
+})
+
 /**
- * A host over memory storage, which installs the test API and test models: the gateway, its
+ * A host over memory storage, which installs the test API, models, and channels: the gateway, its
  * storage, and the HTTP API and sync server it serves.
  */
 const host = Effect.gen(function* () {
@@ -92,7 +107,7 @@ const host = Effect.gen(function* () {
     SyncStorage.layerMemory
   ).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provideMerge(BunCrypto.layer))
   return yield* Layer.build(
-    Gateway.layer({ integrations: [testApi, testModels] }).pipe(
+    Gateway.layer({ integrations: [testApi, testModels, testChannels] }).pipe(
       Layer.provideMerge([storage, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner]),
       Layer.provide(MemoryDatabase.layer)
     )
@@ -596,6 +611,54 @@ describe("Store, for the workspace's agents", () => {
         expect(settled.member!.record.value.id).toBe(memberId)
         expect(yield* firstWhere(store.actions, () => true)).toEqual([])
       }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+})
+
+describe("Store, for the workspace's channels", () => {
+  it.live("a channel added here is the one the host makes, under the same ID, and moves at once", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      const client = yield* memberClient(apiUrl, alice, workspace.id)
+      const chat = yield* client.connections.create({
+        headers: {},
+        payload: { integration: "test-channels", name: "Chat", settings: {}, auth: "none" }
+      })
+      yield* firstWhere(store.list("Connection", everywhere), (held) => held.length === 1)
+      const crew = yield* client.groups.create({
+        headers: {},
+        payload: { name: "Crew", memberIds: [workspace.ownerMemberId] }
+      })
+
+      yield* store.write("ChannelCreated", {
+        connectionId: chat.id,
+        groupId: Group.GeneralId,
+        name: "Support",
+        opensTasks: true
+      })
+      const [shown] = yield* firstWhere(store.list("Channel", everywhere), ([held]) => held?.pending === true)
+      const [arrived] = yield* firstWhere(store.list("Channel", everywhere), ([held]) => held?.pending === false)
+      expect(arrived!.record.value).toMatchObject({
+        id: shown!.record.value.id,
+        groupId: Group.GeneralId,
+        name: "Support"
+      })
+
+      yield* store.write("ChannelRedirected", { channelId: arrived!.record.value.id, groupId: crew.id })
+      yield* firstWhere(
+        store.list("Channel", everywhere),
+        ([held]) => held?.pending === true && held.record.value.groupId === crew.id
+      )
+      yield* firstWhere(
+        store.list("Channel", everywhere),
+        ([held]) => held?.pending === false && held.record.value.groupId === crew.id
+      )
+      expect(yield* firstWhere(store.actions, () => true)).toEqual([])
+    }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })
 

@@ -1,12 +1,13 @@
 /**
  * How each message changes the app: signing in a step at a time, listing and opening workspaces,
  * following the open store, what the person does in its groups, threads and their tasks and turns,
- * settings, connections, and agents, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
+ * settings, connections, agents, and channels, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
  * person signed out, changes nothing.
  */
 
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
+import { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Task } from "@amends-dev/core/task"
@@ -38,6 +39,8 @@ import { Message } from "./message.ts"
 import {
   AgentForm,
   type Agents,
+  ChannelForm,
+  type Channels,
   Check,
   ConnectionForm,
   type Connections,
@@ -66,6 +69,7 @@ import {
   ChangeRole,
   ConfigureAgent,
   ConfigureConnection,
+  CreateChannel,
   CreateAgent,
   CreateTask,
   CreateTeam,
@@ -81,6 +85,8 @@ import {
   MarkNotificationSeen,
   MarkThreadRead,
   PostReply,
+  RedirectChannel,
+  RemoveChannel,
   RemoveConnection,
   RemoveGroupMember,
   RemoveMember,
@@ -430,6 +436,63 @@ const agentNameOf = (opened: Opened, agentId: Identity.AgentId) =>
     Option.fromUndefinedOr(opened.members.find(({ member }) => member.id === agent.memberId)?.member.name)
   )
 
+/** The open channels pane as `change` makes it, while it is open; otherwise nothing. */
+const atChannels = (model: Model, change: (channels: Channels) => Channels): UpdateReturn =>
+  atOpened(model, (opened) =>
+    modifyFields(opened, {
+      pane: Option.map(
+        Pane.matchOrElse({ Channels: ({ channels }) => Pane.Channels({ channels: change(channels) }) }, (pane) => pane)
+      )
+    })
+  )
+
+/** The form open among the channels as `change` makes it, while one is open; otherwise nothing. */
+const atChannelForm = (model: Model, change: (form: ChannelForm) => ChannelForm) =>
+  atChannels(model, (channels) => modifyFields(channels, { form: Option.map(change) }))
+
+/** The form open among the channels, while one is. */
+const channelFormIn = (model: Model): Option.Option<ChannelForm> =>
+  Option.flatMap(openedIn(model), ({ pane }) =>
+    Option.flatMap(
+      pane,
+      Pane.matchOrElse({ Channels: ({ channels }) => channels.form }, () => Option.none())
+    )
+  )
+
+/** Send the form open among the channels, as an action, or say what it still wants. */
+const submitChannelForm = (model: Model, form: ChannelForm): UpdateReturn => {
+  const leaving = (next: Option.Option<ChannelForm>) =>
+    atChannels(model, (channels) => modifyFields(channels, { form: () => next }))
+  return ChannelForm.match(form, {
+    Adding: (adding) => {
+      const wanting =
+        adding.connectionId === ""
+          ? Option.some("Choose the connection that receives its conversations.")
+          : adding.groupId === ""
+            ? Option.some("Choose the group its conversations open in.")
+            : Option.none()
+      return Option.match(wanting, {
+        onSome: (error) => leaving(Option.some(ChannelForm.Adding({ ...adding, error: Option.some(error) }))),
+        onNone: () => ({
+          ...leaving(Option.none()),
+          commands: [
+            CreateChannel({
+              connectionId: adding.connectionId,
+              groupId: adding.groupId,
+              name: adding.name,
+              opensTasks: adding.opensTasks
+            })
+          ]
+        })
+      })
+    },
+    Redirecting: ({ channelId, groupId }) => ({
+      ...leaving(Option.none()),
+      commands: groupId === "" ? [] : [RedirectChannel({ channelId, groupId: GroupId.GroupId.make(groupId) })]
+    })
+  })
+}
+
 /** The open settings, and the workspace they are of, while they are open. */
 const settingsIn = (model: Model): Option.Option<{ readonly settings: Settings; readonly opened: Opened }> =>
   Option.flatMap(openedIn(model), (opened) =>
@@ -708,6 +771,8 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                     follows: [],
                     connections: [],
                     agents: [],
+                    channels: [],
+                    contacts: [],
                     integrations: Option.none(),
                     actions: [],
                     notice: Option.none(),
@@ -1102,6 +1167,89 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           )
         })
       ),
+    GotChannels: ({ channels }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, {
+          channels: () => channels,
+          // A form about a channel no longer there, as one removed, closes.
+          pane: Option.map(
+            Pane.matchOrElse(
+              {
+                Channels: ({ channels: pane }) =>
+                  Pane.Channels({
+                    channels: modifyFields(pane, {
+                      form: Option.filter((form) =>
+                        ChannelForm.matchOrElse(
+                          form,
+                          { Redirecting: ({ channelId }) => channels.some(({ channel }) => channel.id === channelId) },
+                          () => true
+                        )
+                      )
+                    })
+                  })
+              },
+              (pane) => pane
+            )
+          )
+        })
+      ),
+    GotContacts: ({ contacts }) => atOpened(model, (opened) => modifyFields(opened, { contacts: () => contacts })),
+    ClickedChannels: () => openingWithIntegrations(model, Pane.Channels({ channels: { form: Option.none() } })),
+    ClickedAddChannel: () =>
+      atChannels(model, (channels) =>
+        modifyFields(channels, {
+          form: () =>
+            Option.some(
+              ChannelForm.Adding({ connectionId: "", groupId: "", name: "", opensTasks: false, error: Option.none() })
+            )
+        })
+      ),
+    ChoseChannelConnection: ({ connectionId }) =>
+      atChannelForm(model, (form) =>
+        ChannelForm.matchOrElse(
+          form,
+          { Adding: (adding) => ChannelForm.Adding({ ...adding, connectionId, error: Option.none() }) },
+          () => form
+        )
+      ),
+    ChoseChannelGroup: ({ groupId }) =>
+      atChannelForm(model, (form) =>
+        ChannelForm.match(form, {
+          Adding: (adding) => ChannelForm.Adding({ ...adding, groupId, error: Option.none() }),
+          Redirecting: (redirecting) => ChannelForm.Redirecting({ ...redirecting, groupId })
+        })
+      ),
+    TypedChannelName: ({ name }) =>
+      atChannelForm(model, (form) =>
+        ChannelForm.matchOrElse(form, { Adding: (adding) => ChannelForm.Adding({ ...adding, name }) }, () => form)
+      ),
+    ToggledOpensTasks: ({ opensTasks }) =>
+      atChannelForm(model, (form) =>
+        ChannelForm.matchOrElse(form, { Adding: (adding) => ChannelForm.Adding({ ...adding, opensTasks }) }, () => form)
+      ),
+    SubmittedChannelForm: () =>
+      Option.match(channelFormIn(model), {
+        onNone: () => ({ model }),
+        onSome: (form) => submitChannelForm(model, form)
+      }),
+    ClickedCancelChannelForm: () =>
+      atChannels(model, (channels) => modifyFields(channels, { form: () => Option.none() })),
+    ClickedRedirectChannel: ({ channelId }) =>
+      Option.match(
+        Option.flatMap(openedIn(model), ({ channels }) =>
+          Option.fromUndefinedOr(channels.find(({ channel }) => channel.id === channelId)?.channel)
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: (channel) =>
+            atChannels(model, (channels) =>
+              modifyFields(channels, {
+                form: () => Option.some(ChannelForm.Redirecting({ channelId, groupId: channel.groupId }))
+              })
+            )
+        }
+      ),
+    ClickedRemoveChannel: ({ channelId }) => ({ model, commands: [RemoveChannel({ channelId })] }),
     ClickedSettings: () =>
       atOpened(model, (opened) =>
         modifyFields(opened, { pane: () => Option.some(Pane.Settings({ settings: freshSettings })) })

@@ -9,6 +9,7 @@
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Agent } from "@amends-dev/core/agent"
 import { Assignment, Role } from "@amends-dev/core/authorization"
+import { Channel, ChannelId } from "@amends-dev/core/channel"
 import { Connection } from "@amends-dev/core/connection"
 import type { CoreError } from "@amends-dev/core/error"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
@@ -310,6 +311,16 @@ export const subscriptions = Subscription.make<
                     Message.GotAgents({
                       agents: agents.map(({ record, pending }) => ({ agent: record.value, pending }))
                     })
+                  ),
+                  Stream.map(store.list("Channel", workspace), (channels): Message =>
+                    Message.GotChannels({
+                      channels: channels
+                        .filter(({ record }) => record.value.status === "active")
+                        .map(({ record, pending }) => ({ channel: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.list("Contact", workspace), (contacts): Message =>
+                    Message.GotContacts({ contacts: contacts.map(({ record }) => record.value) })
                   ),
                   Stream.map(store.list("Connection", workspace), (connections): Message =>
                     Message.GotConnections({
@@ -804,4 +815,31 @@ export const RenameAgent = Command.define("RenameAgent", {
         onSuccess: (input) => toStore((store) => store.write("AgentRenamed", input))
       })
     )
+})
+
+/** Add a channel over `connectionId`, opening its conversations in `groupId`, as tasks or not. */
+export const CreateChannel = Command.define("CreateChannel", {
+  args: { connectionId: Schema.String, groupId: Schema.String, name: Schema.String, opensTasks: Schema.Boolean },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Channel.CreateInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A channel needs a connection, a group, and a name.")),
+        onSuccess: (input) => toStore((store) => store.write("ChannelCreated", input))
+      })
+    )
+})
+
+/** Open the conversations to come of `channelId` in `groupId`. */
+export const RedirectChannel = Command.define("RedirectChannel", {
+  args: { channelId: ChannelId.ChannelId, groupId: GroupId.GroupId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("ChannelRedirected", input))
+})
+
+/** Remove `channelId` from the workspace. */
+export const RemoveChannel = Command.define("RemoveChannel", {
+  args: { channelId: ChannelId.ChannelId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("ChannelRemoved", input))
 })

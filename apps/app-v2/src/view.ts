@@ -19,7 +19,6 @@ import { Turn } from "@amends-dev/core/turn"
 import {
   Invitation,
   InvitationPermissions,
-  type Member,
   MemberPermissions,
   OwnershipPermissions,
   WorkspaceSettingsPermissions
@@ -30,6 +29,7 @@ import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Document, Html, HtmlBuilder } from "foldkit/html"
 import { agentsView } from "./agentsView.ts"
+import { channelsView } from "./channelsView.ts"
 import { connectionsView } from "./connectionsView.ts"
 import { button, choiceSelect, field, memberSelect, sending, submit, textarea, toggle } from "./controls.ts"
 import { Message } from "./message.ts"
@@ -55,6 +55,7 @@ import {
   type TurnLog,
   Workspaces
 } from "./model.ts"
+import { belongsTo, groupName, memberName } from "./opened.ts"
 import { givableRoles, isOwner, may, mayActOn, permits, workspaceRolesOf } from "./permissions.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
@@ -125,40 +126,14 @@ const workspacesView = (workspaces: Workspaces, h: HtmlBuilder<Message>): Html =
           )
   })
 
-/** A member by their name here. */
-const memberName = (memberId: Member.Member["id"], opened: Opened) =>
-  opened.members.find(({ member }) => member.id === memberId)?.member.name ?? "Someone"
-
-/** A group's name: a team's own, or the person's direct group's other members, by their names here. */
-const groupName = (group: Group.Group, opened: Opened) =>
-  "name" in group
-    ? group.name
-    : group.memberIds
-        .filter((id) => id !== opened.memberId)
-        .map((id) => memberName(id, opened))
-        .join(", ")
-
-/**
- * Whether the person belongs to `groupId`: whether it is a direct group of theirs, whose members are
- * fixed, or they hold an active membership of it, or are being admitted.
- */
-const belongsTo = (opened: Opened, groupId: Group.Group["id"]) =>
-  opened.groups.some(
-    ({ group }) => group.id === groupId && group.kind === "Direct" && group.memberIds.includes(opened.memberId)
-  ) ||
-  opened.memberships.some(
-    ({ membership }) =>
-      membership.groupId === groupId && membership.memberId === opened.memberId && membership.status === "active"
-  )
-
 /** Whether anyone in the workspace may join `group`: whether it is a public team. */
 const isJoinable = (group: Group.Group) => group.kind === "Team" && group.visibility === "Public"
 
-/** Who wrote a message, by their name here. */
+/** Who wrote a message, by their name here: a member's, or the name a channel's contact gave. */
 const authorName = (message: ThreadMessage.ThreadMessage, opened: Opened) =>
   ThreadMessage.Author.match(message.author, {
     Member: ({ memberId }) => memberName(memberId, opened),
-    Contact: () => "A contact"
+    Contact: ({ contactId }) => opened.contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
   })
 
 const textOf = (message: ThreadMessage.ThreadMessage) =>
@@ -1111,6 +1086,7 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
       button(h, "Settings", Message.ClickedSettings()),
       button(h, "Connections", Message.ClickedConnections()),
       button(h, "Agents", Message.ClickedAgents()),
+      button(h, "Channels", Message.ClickedChannels()),
       StoreState.match(opened.store, {
         Opening: () => h.p([], ["Opening…"]),
         Failed: ({ error }) => h.p([h.Role("alert")], [error]),
@@ -1131,7 +1107,8 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
                   Inbox: () => inboxView(opened, h),
                   Settings: ({ settings }) => settingsView(settings, opened, h),
                   Connections: ({ connections }) => connectionsView(connections, opened, h),
-                  Agents: ({ agents }) => agentsView(agents, opened, h)
+                  Agents: ({ agents }) => agentsView(agents, opened, h),
+                  Channels: ({ channels }) => channelsView(channels, opened, h)
                 })
               })
             ]

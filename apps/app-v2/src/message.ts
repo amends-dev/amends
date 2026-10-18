@@ -5,6 +5,7 @@
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Role } from "@amends-dev/core/authorization"
+import { ChannelId, Contact } from "@amends-dev/core/channel"
 import { Connection } from "@amends-dev/core/connection"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
@@ -21,6 +22,7 @@ import {
   ActionItem,
   AgentItem,
   AssignmentItem,
+  ChannelItem,
   ConnectionItem,
   FollowItem,
   Following,
@@ -102,6 +104,18 @@ export const Message = defineMessageUnion({
   ClickedConfigureAgent: { agentId: Identity.AgentId },
   GotModels: { connectionId: ConnectionContract.ConnectionId, models: Connection.Models },
   FailedLoadModels: { connectionId: ConnectionContract.ConnectionId, error: Schema.String },
+  GotChannels: { channels: Schema.Array(ChannelItem) },
+  GotContacts: { contacts: Schema.Array(Contact.Contact) },
+  ClickedChannels: {},
+  ClickedAddChannel: {},
+  ChoseChannelConnection: { connectionId: Schema.String },
+  ChoseChannelGroup: { groupId: Schema.String },
+  TypedChannelName: { name: Schema.String },
+  ToggledOpensTasks: { opensTasks: Schema.Boolean },
+  SubmittedChannelForm: {},
+  ClickedCancelChannelForm: {},
+  ClickedRedirectChannel: { channelId: ChannelId.ChannelId },
+  ClickedRemoveChannel: { channelId: ChannelId.ChannelId },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
   ToggledTeamPublic: { isPublic: Schema.Boolean },

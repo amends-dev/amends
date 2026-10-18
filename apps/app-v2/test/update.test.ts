@@ -27,6 +27,7 @@ import {
   ConfigureAgent,
   ConfigureConnection,
   CreateAgent,
+  CreateChannel,
   CreateTask,
   CreateTeam,
   DeleteMessage,
@@ -40,6 +41,8 @@ import {
   MarkNotificationSeen,
   MarkThreadRead,
   PostReply,
+  RedirectChannel,
+  RemoveChannel,
   RemoveConnection,
   RemoveGroupMember,
   RemoveMember,
@@ -83,6 +86,7 @@ import {
   session,
   signedIn,
   signedOut,
+  support,
   task,
   testApi,
   thread,
@@ -819,6 +823,59 @@ describe("a workspace", () => {
       model((model) => {
         expect(formIn(model)).toEqual(Option.none())
       })
+    )
+  })
+
+  it("adds a channel into a group the person belongs to, moves one, and removes one", () => {
+    const channels = keylessConnection("channels-1", "test-channels", "Chat")
+    const formIn = (model: Model) =>
+      Option.flatMap(openedIn(model), ({ pane }) =>
+        Option.flatMap(
+          pane,
+          Pane.matchOrElse({ Channels: ({ channels }) => channels.form }, () => Option.none())
+        )
+      )
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.GotConnections({ connections: [{ connection: channels, pending: false }] })),
+      message(Message.ClickedChannels()),
+      Command.resolve(
+        LoadIntegrations,
+        Message.GotIntegrations({ integrations: [integrationGiving("test-channels", "Test channels", ["channels"])] })
+      ),
+      message(Message.ClickedAddChannel()),
+      message(Message.ChoseChannelConnection({ connectionId: channels.id })),
+      message(Message.TypedChannelName({ name: "Support" })),
+      // Without a group it says what it wants, and sends nothing.
+      message(Message.SubmittedChannelForm()),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(
+          Option.some({ error: Option.some("Choose the group its conversations open in.") })
+        )
+      }),
+      message(Message.ChoseChannelGroup({ groupId: general.id })),
+      message(Message.ToggledOpensTasks({ opensTasks: true })),
+      message(Message.SubmittedChannelForm()),
+      Command.expectExact(
+        CreateChannel({ connectionId: channels.id, groupId: general.id, name: "Support", opensTasks: true })
+      ),
+      Command.resolve(CreateChannel, Message.WroteAction()),
+      message(Message.GotChannels({ channels: [{ channel: support, pending: false }] })),
+      message(Message.ClickedRedirectChannel({ channelId: support.id })),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(Option.some({ _tag: "Redirecting", groupId: general.id }))
+      }),
+      message(Message.ChoseChannelGroup({ groupId: design.id })),
+      message(Message.SubmittedChannelForm()),
+      Command.expectExact(RedirectChannel({ channelId: support.id, groupId: design.id })),
+      Command.resolve(RedirectChannel, Message.WroteAction()),
+      message(Message.ClickedRemoveChannel({ channelId: support.id })),
+      Command.expectExact(RemoveChannel({ channelId: support.id })),
+      Command.resolve(RemoveChannel, Message.WroteAction())
     )
   })
 
