@@ -17,7 +17,6 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
-import * as LocalSignalHub from "../signal/LocalSignalHub.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
@@ -73,12 +72,6 @@ export interface Space {
    * that are live. A rebuild discards these; the journal restores them.
    */
   readonly records: Records
-  /** Private read state by member and thread: the sequence read through. Kept through rebuilds. */
-  readonly threadPositions: Map<string, number>
-  /** Private read state by member and group: when they last read it, in epoch milliseconds. */
-  readonly groupTimes: Map<string, number>
-  /** Private Seen by notification ID: when its human recipient first saw it. Kept through rebuilds. */
-  readonly notificationsSeen: Map<string, number>
   /** Each connection's credential by connection ID, outside the journal, which rebuilds keep. */
   readonly connectionCredentials: Map<string, string>
   /** Each participation's harness session, outside the journal, which rebuilds keep. */
@@ -115,8 +108,6 @@ export class MemoryDatabase extends Context.Service<
     readonly locks: Map<string, Semaphore.Semaphore>
     /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
     appended: Deferred.Deferred<void>
-    /** Every workspace's signals, across every host; signals themselves are never kept. */
-    readonly signals: LocalSignalHub.LocalSignalHub
     /** Issue an identifier unique within this storage, for commits and entries. */
     readonly nextId: (prefix: string) => string
   }
@@ -131,9 +122,6 @@ export class MemoryDatabase extends Context.Service<
 export const empty = (): Space => ({
   logs: MemoryStore.empty(),
   records: new Records(),
-  threadPositions: new Map(),
-  groupTimes: new Map(),
-  notificationsSeen: new Map(),
   connectionCredentials: new Map(),
   sessionStates: new Map()
 })
@@ -148,9 +136,6 @@ export const empty = (): Space => ({
 export const copy = (space: Space): Space => ({
   logs: MemoryStore.copy(space.logs),
   records: space.records.copy(),
-  threadPositions: new Map(space.threadPositions),
-  groupTimes: new Map(space.groupTimes),
-  notificationsSeen: new Map(space.notificationsSeen),
   connectionCredentials: new Map(space.connectionCredentials),
   sessionStates: new Map(space.sessionStates)
 })
@@ -164,21 +149,6 @@ export const copy = (space: Space): Space => ({
  */
 export const committed = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId): Space =>
   database.spaces.get(workspaceId) ?? empty()
-
-/**
- * Committed state of one workspace, created on first write: what a write outside a transaction
- * changes, through the binding's `join` and `exclusive`.
- *
- * @category getters
- * @since 0.1.0
- */
-export const writable = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId): Space => {
-  const existing = database.spaces.get(workspaceId)
-  if (existing !== undefined) return existing
-  const created = empty()
-  database.spaces.set(workspaceId, created)
-  return created
-}
 
 /**
  * A table beside the workspaces' state, created on first use: where the gateway's memory accounts
@@ -210,20 +180,6 @@ export const lock = (database: MemoryDatabase["Service"], key: string): Semaphor
   return created
 }
 
-/** Keep the later of two read-state values for each key. */
-const later = (current: Map<string, number>, staged: Map<string, number>) => {
-  const merged = new Map(current)
-  for (const [key, value] of staged) merged.set(key, Math.max(value, merged.get(key) ?? value))
-  return merged
-}
-
-/** Keep the earlier of two values for each key: a first time. */
-const earlier = (current: Map<string, number>, staged: Map<string, number>) => {
-  const merged = new Map(current)
-  for (const [key, value] of staged) merged.set(key, Math.min(value, merged.get(key) ?? value))
-  return merged
-}
-
 /**
  * What a commit wrote: the logs it held, and whether it held the workspace's writer. A standalone
  * append holds only its log.
@@ -239,8 +195,7 @@ export interface Written {
 /**
  * Make a transaction's snapshot the committed state of what it wrote. Its logs replace the
  * committed ones it held; other logs keep what their own writers committed meanwhile, and keys
- * and commits combine. Holding the workspace, its records replace the committed ones, and read
- * state keeps the later value of each key, or the earlier first time for Seen.
+ * and commits combine. Holding the workspace, its records replace the committed ones.
  *
  * @category mutations
  * @since 0.1.0
@@ -255,13 +210,7 @@ export const commit = (
   const shared = { logs: MemoryStore.commit(current.logs, staged.logs, written.logs) }
   database.spaces.set(
     workspaceId,
-    written.workspace
-      ? Object.assign({}, staged, shared, {
-          threadPositions: later(current.threadPositions, staged.threadPositions),
-          groupTimes: later(current.groupTimes, staged.groupTimes),
-          notificationsSeen: earlier(current.notificationsSeen, staged.notificationsSeen)
-        })
-      : Object.assign({}, current, shared)
+    written.workspace ? Object.assign({}, staged, shared) : Object.assign({}, current, shared)
   )
 }
 
@@ -303,7 +252,6 @@ export const make = Effect.gen(function* () {
     tables: new Map(),
     locks: new Map(),
     appended: yield* Deferred.make<void>(),
-    signals: yield* LocalSignalHub.make,
     nextId: (prefix) => `${prefix}-${++issued}`
   })
 })
@@ -409,8 +357,8 @@ export const compareBinary = (left: string, right: string): number => {
 }
 
 /**
- * A composite key for maps, unambiguous whatever its parts contain: the read-state maps key by
- * member and thread or group, and checkpoints by log and projection.
+ * A composite key for maps, unambiguous whatever its parts contain: read state keys by member and
+ * thread or group, and checkpoints by log and projection.
  *
  * @category constructors
  * @since 0.1.0

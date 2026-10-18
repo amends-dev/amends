@@ -61,7 +61,7 @@ export class AssignmentCommand extends Context.Service<
 >()("@amends-dev/core/authorization/AssignmentCommand") {}
 
 /**
- * Capture the journal, crypto, and workspace; a new assignment takes a random ID.
+ * Capture the journal, crypto, and workspace; a new assignment takes its ID from `Assignment.newId`.
  *
  * @category constructors
  * @since 0.1.0
@@ -76,7 +76,7 @@ export const make = Effect.gen(function* () {
     roleId: Role.RoleId
   ) {
     const assignment = Assignment.Assignment.make({
-      id: Assignment.AssignmentId.make(yield* crypto.randomUUIDv4()),
+      id: yield* Assignment.newId(memberId, roleId).pipe(Effect.provideService(Crypto.Crypto, crypto)),
       workspaceId,
       memberId,
       status: "active",

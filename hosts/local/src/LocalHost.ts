@@ -15,7 +15,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { DeliveryJob, JobPruning, TurnJob } from "@amends-dev/cluster"
 import { Integrations, ModelCatalog, ModelIntegrations, ToolIntegrations } from "@amends-dev/connection"
-import { type Accounts, Gateway, type SignInStorage, type WorkspaceDirectory } from "@amends-dev/gateway"
+import {
+  type Accounts,
+  Gateway,
+  type SignInStorage,
+  type SyncStorage,
+  type WorkspaceDirectory
+} from "@amends-dev/gateway"
 import { Models } from "@amends-dev/harness-amends"
 import { PostgresClusterStorage, PostgresDatabase, PostgresStorage } from "@amends-dev/storage-postgresql"
 import * as BunClusterSocket from "@effect/platform-bun/BunClusterSocket"
@@ -42,14 +48,18 @@ import * as SandboxIntegrations from "./SandboxIntegrations.ts"
 
 /**
  * What `layer` provides for one host's lifetime: the gateway, the workspace directory, the
- * accounts, and sign-in's storage, which `LocalServer.layer` serves the HTTP API over. `E` is what
- * the host fails to start with.
+ * accounts, sign-in's storage, and sync storage, which `LocalServer.layer` serves the HTTP API
+ * over. `E` is what the host fails to start with.
  *
  * @category models
  * @since 0.1.0
  */
 export type HostLayer<E> = Layer.Layer<
-  Gateway.Gateway | WorkspaceDirectory.WorkspaceDirectory | Accounts.Accounts | SignInStorage.SignInStorage,
+  | Gateway.Gateway
+  | WorkspaceDirectory.WorkspaceDirectory
+  | Accounts.Accounts
+  | SignInStorage.SignInStorage
+  | SyncStorage.SyncStorage,
   E
 >
 
@@ -191,9 +201,9 @@ const layerCluster = (options: Options) => {
 }
 
 /**
- * The gateway, the workspace directory, the accounts, and sign-in's storage over one PostgreSQL
- * database, through the storage adapter, whose commits store job requests and wake the runners for
- * them. A process that runs jobs also runs the turn jobs that run agents' turns and the delivery
+ * The gateway, the workspace directory, the accounts, sign-in's storage, and sync storage over one
+ * PostgreSQL database, through the storage adapter, whose commits store job requests and wake the
+ * runners for them. A process that runs jobs also runs the turn jobs that run agents' turns and the delivery
  * jobs that carry messages to channels, both on the integrations the host installs, listens for
  * requests other processes store, and prunes handled job requests after seven days. The HTTP
  * server resolves bearer tokens before entering the gateway.

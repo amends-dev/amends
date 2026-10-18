@@ -1,21 +1,16 @@
 /**
  * The facts recorded about channels, the threads they bind, and the contacts they hear from.
- * Channels and contacts are workspace configuration and acquaintance: every member may learn of
- * them. A binding belongs to its thread's group, which is on its payload because an audience is
- * derived from the payload alone. Deliveries have facts of their own, in `DeliveryFacts`.
+ * Channels and contacts are workspace configuration and acquaintance, which every member may read.
+ * A binding belongs to its thread's group, which its payload carries. Deliveries have facts of their own, in `DeliveryFacts`.
  *
  * @since 0.1.0
  */
 
-import * as Group from "../group/Group.ts"
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Channel from "./Channel.ts"
 import * as ChannelBinding from "./ChannelBinding.ts"
 import * as Contact from "./Contact.ts"
-
-const workspace = () => [Audience.workspace]
 
 /**
  * A channel was created, as its record says.
@@ -27,7 +22,6 @@ export const Created = Fact.make("channel.created", {
   version: 1,
   subject: (payload) => Subject.make("channel", payload.id),
   occurrence: (payload) => [payload.id],
-  audience: workspace,
   payload: Channel.Channel
 })
 
@@ -40,7 +34,6 @@ export const Created = Fact.make("channel.created", {
 export const Redirected = Fact.make("channel.redirected", {
   version: 1,
   subject: (payload) => Subject.make("channel", payload.channelId),
-  audience: workspace,
   payload: Channel.Redirected
 })
 
@@ -54,7 +47,6 @@ export const Removed = Fact.make("channel.removed", {
   version: 1,
   subject: (payload) => Subject.make("channel", payload.channelId),
   occurrence: (payload) => [payload.channelId],
-  audience: workspace,
   payload: Channel.Reference
 })
 
@@ -68,7 +60,6 @@ export const Bound = Fact.make("channel.bound", {
   version: 1,
   subject: (payload) => Subject.make("channel-binding", payload.threadId),
   occurrence: (payload) => [payload.threadId],
-  audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: ChannelBinding.ChannelBinding
 })
 
@@ -82,7 +73,6 @@ export const ContactCreated = Fact.make("channel.contact.created", {
   version: 1,
   subject: (payload) => Subject.make("contact", payload.id),
   occurrence: (payload) => [payload.id],
-  audience: workspace,
   payload: Contact.Contact
 })
 
@@ -95,6 +85,5 @@ export const ContactCreated = Fact.make("channel.contact.created", {
 export const ContactRenamed = Fact.make("channel.contact.renamed", {
   version: 1,
   subject: (payload) => Subject.make("contact", payload.contactId),
-  audience: workspace,
   payload: Contact.Renamed
 })

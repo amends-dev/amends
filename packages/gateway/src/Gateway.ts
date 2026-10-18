@@ -14,6 +14,7 @@ import { CoreError } from "@amends-dev/core/error"
 import { Actor, type Identity } from "@amends-dev/core/identity"
 import { Checkpoint } from "@amends-dev/core/journal"
 import { Operation } from "@amends-dev/core/operation"
+import type { PresenceRelay } from "@amends-dev/core/presence"
 import { Request } from "@amends-dev/core/request"
 import type { TurnJobs } from "@amends-dev/core/turn"
 import {
@@ -50,12 +51,14 @@ export class Gateway extends Context.Service<
   {
     /**
      * Allocate a workspace ID and run core initialization for its creator. The
-     * caller has authenticated the creator and checked their entitlement.
+     * caller has authenticated the creator and checked their entitlement. With a request key, the
+     * creator's retry returns the workspace its first attempt created. The key is given here rather
+     * than as `Request.Current`, since the creator is no member of any workspace yet.
      */
     readonly createWorkspace: (
       creator: Identity.HumanId,
       input: Workspace.CreateInput,
-      options?: Request.Options
+      requestKey?: Request.Key
     ) => Effect.Effect<Workspace.Workspace, CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain>
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
@@ -126,7 +129,12 @@ export const make = Effect.fnUntraced(function* (
 ): Effect.fn.Return<
   Gateway["Service"],
   never,
-  WorkspaceStorage.WorkspaceStorage | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs | Crypto.Crypto | Scope.Scope
+  | WorkspaceStorage.WorkspaceStorage
+  | TurnJobs.TurnJobs
+  | DeliveryJobs.DeliveryJobs
+  | PresenceRelay.PresenceRelay
+  | Crypto.Crypto
+  | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options)
   /**
@@ -224,9 +232,8 @@ export const make = Effect.fnUntraced(function* (
   const createWorkspace: Gateway["Service"]["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(function* (
     creator: Identity.HumanId,
     input: Workspace.CreateInput,
-    options: Request.Options = {}
+    key?: Request.Key
   ) {
-    const key = options.requestKey
     const id =
       key === undefined
         ? WorkspaceId.WorkspaceId.make(yield* Effect.orDie(crypto.randomUUIDv4()))

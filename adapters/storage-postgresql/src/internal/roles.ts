@@ -10,7 +10,7 @@
 
 import { Role, RoleStore } from "@amends-dev/core/authorization"
 import { StoreError } from "@amends-dev/log"
-import { and, eq, lt } from "drizzle-orm"
+import { and, eq, lt, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -54,6 +54,13 @@ export const make = Effect.gen(function* () {
           .from(roles)
           .where(and(inWorkspace, eq(roles.id, id)))
       ).pipe(Effect.flatMap(decode), Effect.map(Array.head), Effect.mapError(StoreError.failed("RoleStore", "get"))),
+    list: guard(
+      db
+        .select()
+        .from(roles)
+        .where(inWorkspace)
+        .orderBy(sql`${roles.id} COLLATE "C"`)
+    ).pipe(Effect.flatMap(decode), Effect.mapError(StoreError.failed("RoleStore", "list"))),
     insert: Effect.fn("Roles.insert")(function* (record) {
       yield* guard(
         db.insert(roles).values({

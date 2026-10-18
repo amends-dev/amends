@@ -7,7 +7,7 @@ import { PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Context, DateTime, Effect, Layer, Redacted } from "effect"
-import { HttpClient, HttpRouter } from "effect/http"
+import { HttpClient } from "effect/http"
 import * as DevelopmentSignIn from "../src/DevelopmentSignIn.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -39,21 +39,10 @@ const server = (url: string) => {
       revoke: () => Effect.void
     })
   )
-  return HttpRouter.serve(LocalServer.layerRoutes, {
+  return LocalServer.serve(LocalHost.layer(Redacted.make(url)), Layer.merge(DevelopmentSignIn.layer(), sessionTokens), {
     disableLogger: true,
     disableListenLog: true
-  }).pipe(
-    Layer.provide(
-      Layer.merge(
-        DevelopmentSignIn.layer().pipe(
-          Layer.provide(BunCrypto.layer),
-          Layer.provideMerge(LocalHost.layer(Redacted.make(url)))
-        ),
-        sessionTokens
-      )
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  }).pipe(Layer.provideMerge(BunHttpServer.layerTest))
 }
 const record = (
   workspaceId: WorkspaceId.WorkspaceId,

@@ -75,6 +75,7 @@ describe("invitation policy", () => {
           const workspace = yield* Operations.createWorkspace(alice.id)
           const invitation = yield* Operations.invite(workspace.id, alice, {
             recipientId: bob.id,
+            recipientEmail: "bob@example.com",
             expiresAt: yield* future,
             roleId: BuiltinRoles.AdministratorId
           })

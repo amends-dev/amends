@@ -1,7 +1,8 @@
 # @amends-dev/host-local
 
 The Bun host that runs amends over a PostgreSQL database: it serves the
-[HTTP API](../../packages/http/README.md), runs [jobs](../../packages/cluster/README.md) such as
+[HTTP API](../../packages/http/README.md) and, beside it, the [sync](../../packages/sync/README.md)
+server's WebSocket, runs [jobs](../../packages/cluster/README.md) such as
 agents' turns, installs the integrations workspaces connect to, and signs people in with emailed codes.
 One process serves any number of workspaces, and several processes can share one database, each
 serving the API, running jobs, or both. It
@@ -23,9 +24,9 @@ createdb amends
 AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
 
-The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at `/openapi.json` and
-interactive documentation at `/docs`. `bun run dev` restarts it when its source changes. The web
-app's development server proxies `/api` here, and the desktop app connects to it directly.
+The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at `/openapi.json`,
+interactive documentation at `/docs`, and the sync server's WebSocket at `/sync`, which a browser
+reaches through `SyncClient` once it registered its key with `PUT /me/sync-keys/:publicKey`. `bun run dev` restarts it when its source changes.
 
 | Setting                     | Default           | Accepted value                                                                  |
 | --------------------------- | ----------------- | ------------------------------------------------------------------------------- |
@@ -52,16 +53,18 @@ without it, a code works only on the process that sent it.
 
 The pool size is the most connections the host opens. A process that runs jobs holds three: its
 runner-address claim, the cluster's shard locks, and the notice listener, which wakes it to job
-requests and serves the change feed's streams too. One that only serves the API holds just the
-listener, once a stream opens. The minimum of five leaves two for requests, so one long commit does
+requests and serves turn logs' streams too. One that only serves the API holds just the listener,
+once a stream opens. The minimum of five leaves two for requests, so one long commit does
 not stall every read. A busy workspace's writers
 wait for each other in memory rather than each holding a connection, and its reads use at most three
 at once; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
 
 The server refuses request bodies over one mebibyte with 413, and serves at most a thousand live
-streams per workspace and twenty per member of it, answering 429 beyond them. When the host stops,
-open streams end first, telling their clients to reconnect, so the process exits once ordinary
-requests finish.
+streams per workspace and twenty per member of it, answering 429 beyond them; sync sockets have no
+such limit yet. When the host stops, open streams and sync sockets end first, telling their clients
+to reconnect, and no socket opens after. The process exits once ordinary requests finish, except
+that on Bun 1.3.14 a graceful stop that begins with a WebSocket open waits for its limit even once
+the socket closed, so a host that had one exits only at that limit, twenty seconds.
 
 ## Integrations
 
@@ -134,16 +137,10 @@ that run jobs commit to the same workspaces, so they must register the same
 [projections](../../docs/current-status.md#projection-sets-across-hosts), and a job's request one
 process stores is read by whichever process runs the job. Deploy them together.
 
-## Browser and desktop access
+## Browser access
 
-The web development server proxies `/api` to this host. Desktop connects directly to
-`http://127.0.0.1:8787`; it does not start a host process. The server's CORS layer allows
-`http://127.0.0.1:1420`, `tauri://localhost`, `http://tauri.localhost`, and
-`https://tauri.localhost`, with the authorization, content-type, idempotency-key,
-`Amends-Workspace`, and tracing headers (`traceparent`, `tracestate`, and the Effect client's compact `b3` header). It applies to
-authentication failures too, so clients can handle a 401. Other origins receive no allow-origin
-header. Requests carry bearer tokens, not cookies, so a different web origin needs a same-origin
-proxy or a change to the host's CORS layer.
+The host sends no CORS headers, so a browser reaches it from the same origin, such as through a
+development server's proxy. Requests carry bearer tokens, not cookies.
 
 ## Sign-in
 
@@ -199,18 +196,18 @@ and core's outcomes keep their tags, such as `CoreError.NotFound` with 404.
 Follow the [host conventions](../README.md). Importing any module but the entry point reads no
 configuration and starts nothing.
 
-| Module                         | Responsibility                                                                                                                                                                                     |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                                   |
-| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                                |
-| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                              |
-| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                           |
-| `LocalConfig.ts`               | `LocalConfig.options`, validating every setting before any resource is acquired, and `deriveSecret`.                                                                                               |
-| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                              |
-| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                                |
-| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning unless `runJobs` is false; `layerDatabase`; and `makeIntegrations`. |
-| `LocalServer.ts`               | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                                       |
-| `index.ts`                     | Loads configuration, builds the host layer for `AMENDS_ROLE`, serves it with the authentication `AMENDS_SIGN_IN` names unless the role is `jobs`, and launches through `BunRuntime.runMain`.       |
+| Module                         | Responsibility                                                                                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                                                           |
+| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                                                        |
+| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                      |
+| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                                                   |
+| `LocalConfig.ts`               | `LocalConfig.options`, validating every setting before any resource is acquired, and `deriveSecret`.                                                                                                                       |
+| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                                                      |
+| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                                                        |
+| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, sign-in storage, and sync storage over PostgreSQL, with jobs and pruning unless `runJobs` is false; `layerDatabase`; and `makeIntegrations`.           |
+| `LocalServer.ts`               | `LocalServer.serve(host, authentication, options?)`: the routes, documentation, and sync WebSocket over a host and its authentication, on the HTTP server beneath; `layer(host, authentication, port)` puts Bun's beneath. |
+| `index.ts`                     | Loads configuration, builds the host layer for `AMENDS_ROLE`, serves it with the authentication `AMENDS_SIGN_IN` names unless the role is `jobs`, and launches through `BunRuntime.runMain`.                               |
 
 Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Accounts`, and email sign-in
 also its `SignInStorage.SignInStorage`; development session tokens are built synchronously. None
@@ -231,13 +228,16 @@ bun run test --project postgresql hosts/local
 ```
 
 They cover authentication and configuration, the HTTP routes over PostgreSQL for workspaces,
-conversations, notifications, connections, agents, and the change feed, the installed integrations,
+conversations, notifications, connections, and agents, the installed integrations,
 jobs stored with the commits that request them and run at once by whichever process runs them,
 whether that process serves the API too or not, over the database or over sockets, the
-runner-address claim, and agents' turns over HTTP with a model provider of the test's own, in one
-process and with the API and its jobs apart, through the real entry point too.
+runner-address claim, agents' turns over HTTP with a model provider of the test's own, in one
+process and with the API and its jobs apart, through the real entry point too, and a browser's
+sync over the real entry point's WebSocket: registering its key, its replica and actions, the
+smallest pool beside open sync streams, and its socket closing as the host stops.
 Subprocess tests start the real entry point with their own database and port, disable
-environment-file loading, drain both output streams, and bound startup and termination.
+environment-file loading, drain both output streams, and bound startup and termination;
+`withServer` runs a Promise-based test over it, and `serving` keeps it for an Effect's scope.
 
 ### Verify
 

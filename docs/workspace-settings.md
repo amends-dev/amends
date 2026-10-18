@@ -49,9 +49,7 @@ interrupted invitation, check the history before creating another. Unmounting or
 replacement cancels requests and ignores late responses; a server commit may already have
 completed.
 
-Tabs stay current through the workspace change feed, which the app mounts around the workspace
-layout: changes made elsewhere refresh the affected reads without replacing drafts. Rows are
-keyed by ID, so refreshes keep focus and open dialogs. See [change feed](change-feed.md).
+Rows are keyed by ID, so refreshes keep focus and open dialogs.
 
 The UI workshop plays the settings flows over a local fixture. Client tests cover the hook's
 shaping, stale drafts, invitation retries, and refresh recovery over a scripted transport; app

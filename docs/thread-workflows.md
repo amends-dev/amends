@@ -87,7 +87,7 @@ title: one renamed meanwhile is `CoreError.Changed`, so a rename is never silent
 and nothing is recorded. The activity notifies no one and makes nothing unread, and the title
 never derives from a message: editing the opening message leaves the title as it is, and renaming
 leaves every message as it is. Readers see the new title through the thread and its group's
-stream, and the change feed delivers the fact to the group's readers. The [thread model](threads.md)
+stream. The [thread model](threads.md)
 sets these rules.
 
 ## Tasks
@@ -298,18 +298,23 @@ with its title alone.
 
 ## Retrying safely
 
-Starts (`startInGroup` and `startDirect`) and replies take an optional second argument,
-`{ requestKey }`. A client chooses a new key, such as a UUID, for each message it sends and repeats
-it on every retry. A retry returns the thread or message the first attempt created and records
+Starts (`startInGroup` and `startDirect`) and replies run as a request when the protocol gives them a
+key with `Request.withKey`, as HTTP does from the `Idempotency-Key` header. A client chooses a new
+key, such as a UUID, for each request it sends and repeats it on every retry. A retry returns the thread or message the first attempt created and records
 nothing more, including when the first attempt committed but its answer was lost. The key alone
 names the request: sent again with different text or mentions, it still returns what the first
-attempt created. A retry after an attempt that rolled back runs again. Keys belong to their member
-and their operation, so another member's key, or the same key on a reply rather than a start, is a
-separate request. Without a key, every call creates anew.
+attempt created. A retry after an attempt that rolled back runs again. Keys belong to their member,
+so another member's key is a separate request; a key names one request, so sending it with another
+finds what the first created where their records coincide. Without a key, every call creates anew. A
+protocol that needs no answer, such as the browser's outbox, runs a rename or any other request
+once with `RequestService.runOnce`, so a retry changes nothing; see core's
+[request keys](../packages/core/README.md#request-keys).
 
-A keyed start derives its thread's and opening message's IDs from the operation, the author, and
-the key (`Request.derivedId`), and a keyed reply derives its message's ID the same way, so a retry
-finds what its first attempt created by those IDs and records no receipt. A retry passes the same
+Within a request, a start's thread and opening message, a reply's message, and every participation
+and activity they record take IDs derived from the author, the key, and what each is
+(`Thread.newId`, `ThreadMessage.newId`, and their kin), so a retry finds what its first attempt
+created by those IDs and records no receipt, and the client that sent the request knows them
+beforehand. A direct group's ID comes from its members (`Group.directId`). A retry passes the same
 checks as the first attempt before it looks: for a start, group membership, `thread.start`, and a
 human author, so an author who has since left the group receives `CoreError.NotFound`; for a reply,
 access to the thread, `thread.publish`, and a human author.
@@ -421,8 +426,8 @@ read, and from each group's threads, for each group with any: a sidebar badge be
 `NotificationService.markSeenThrough({ recordedAt, id })` records `Seen` for every
 notification still pending for the acting human up to and including that position in inbox
 order, typically the newest one they are shown, so a notification that arrives meanwhile stays
-pending. It marks them in batches of 100, each written as `markSeen` writes one and heard by
-the person's other sessions as one `NotificationsSeen` signal, and returns how many it marked;
+pending. It marks them in batches of 100, each written as `markSeen` writes one, and returns how
+many it marked;
 nothing left to mark returns zero. Batches are not one transaction: a failure keeps what earlier
 batches marked, and a retry continues. A batch that a departure settles part of meanwhile is read
 again without those, up to twice. Agents receive `CoreError.Denied` (`HumanRequired`).
@@ -454,10 +459,9 @@ mark it at once. Missing and other recipients' IDs return `CoreError.NotFound`; 
 notification returns `CoreError.Denied` (`HumanRequired`), and a discarded one `CoreError.Conflict`
 (`AlreadyHandled`), including one that leaving its group settles while it is being marked.
 
-`Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
-workspace's write order, and survives rebuilding projections. It creates no activity or
-notifications. The person's other connected sessions hear of it as a `NotificationsSeen`
-[signal](../packages/core/README.md#signals). Handing work to an agent's turn, or a message to a
+`Seen` is private to the person, like read positions, and recorded as a `notification.seen` fact,
+which only they are shown; rebuilding projections restores it. It creates no activity or
+notifications. Handing work to an agent's turn, or a message to a
 delivery, is recorded by those workflows as `Accepted`, not by marking it seen.
 
 ## Marking conversations read
@@ -474,22 +478,11 @@ timeline does not mark it read; clients call this for what they have shown.
 membership and `group.read`, and returns `CoreError.NotFound` otherwise; the read time also only
 moves forward.
 
-Positions and read times are private state, like `Seen`: outside the journal, never waiting
-for the workspace's conversation writes, and kept when projections are rebuilt. The person's other
-sessions hear of each change as a `ThreadRead` or `GroupRead`
-[signal](../packages/core/README.md#signals). Starting a thread or replying reads it through the
-author's message in the same commit, and the `ThreadRead` signal follows once that commit lands. [Thread lists](#reading-conversations) and
+Positions and read times are private to the person, like `Seen`, and recorded as
+`read-state.thread-read` and `read-state.group-read` facts; one that does not move forward records
+nothing. Starting a thread or replying reads it through the author's message in the same commit. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups) report unread state from these records; only
 messages count as new activity, not quiet participation changes.
-
-## Typing
-
-`ThreadMessageService.typing(threadId)`, and `POST /threads/:threadId/typing`
-over HTTP, tells the thread's readers that the acting member is composing there. It needs the same
-current group access and `thread.publish` as publishing, and returns `CoreError.NotFound`
-for missing and inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's
-members with `thread.read` for the thread, on every host, and lasts six seconds unless repeated;
-repeats within two seconds are dropped. It is never stored.
 
 ## Departure and pending input
 
@@ -511,7 +504,7 @@ the pending count and pending lists, kept in the full inbox as history. Ones alr
 Seen. All of it shares the departure's commit, and rebuilding from the journal settles them the same
 way, since the projections derive it from the recorded departure.
 
-## Recorded history and delivery
+## Recorded history
 
 A start records the thread, its initial participations, the message, and one `message.published`
 activity at sequence 1, in one commit; each later message, follow, and departure adds activity at
@@ -520,11 +513,3 @@ derived from the activity and participation, never recomputed from today's group
 therefore reproduces the same timeline, recipients, and departures after permissions and
 membership change. Recording the same fact again reuses the original, and a keyed start or reply
 returns its first result on a retry ([retrying safely](#retrying-safely)).
-
-Thread, participation, message, and activity facts reach the group's members with `thread.read`
-for that thread over the [change feed](../packages/core/README.md#change-feed). Messages carry their
-full text, so clients render them without a refetch. Activity events omit their recipients, and
-participation events omit routing identities and admissions. Each notification an activity creates
-reaches its human or agent recipient's membership in the same commit message, as their inbox
-lists it, whether or not they may read the thread. Notifications carry source references, not continuing authority to
-read the source.

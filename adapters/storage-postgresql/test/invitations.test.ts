@@ -19,6 +19,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               id: Invitation.InvitationId.make(id),
               workspaceId,
               recipientId: bob.id,
+              recipientEmail: "bob@example.com",
               inviterMemberId: workspace.ownerMemberId,
               issuedAt,
               expiresAt: DateTime.add(issuedAt, { hours: 1 }),

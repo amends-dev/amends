@@ -1,5 +1,5 @@
 import { Identity } from "@amends-dev/core/identity"
-import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway"
+import { Accounts, SessionTokens, SyncStorage, WorkspaceDirectory } from "@amends-dev/gateway"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Redacted, Ref } from "effect"
 import { HttpClientRequest, HttpServer } from "effect/http"
@@ -48,6 +48,16 @@ it.effect.each(["make", "layer"] as const)(
             findByIds: () => Effect.succeed([])
           })
         )
+        const syncStorage = Layer.succeed(
+          SyncStorage.SyncStorage,
+          SyncStorage.SyncStorage.of({
+            remoteId: Effect.die("unused"),
+            registerKey: () => Effect.die("unused"),
+            removeKey: () => Effect.die("unused"),
+            personOf: () => Effect.die("unused"),
+            bindSigningKey: () => Effect.die("unused")
+          })
+        )
         const clientAuthentication = HttpApiMiddleware.layerClient(
           Authentication.Authentication,
           Effect.fnUntraced(function* ({ next, request }) {
@@ -67,7 +77,7 @@ it.effect.each(["make", "layer"] as const)(
           HttpServer.layerServices
         ).pipe(
           Layer.provideMerge(authentication),
-          Layer.provide([directory, accounts, Layer.succeed(SessionTokens.SessionTokens, sessionTokens)])
+          Layer.provide([directory, accounts, syncStorage, Layer.succeed(SessionTokens.SessionTokens, sessionTokens)])
         )
         yield* Effect.gen(function* () {
           const client = yield* HttpApiTest.groups(Api.Api, ["me"])

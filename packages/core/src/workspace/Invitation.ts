@@ -3,15 +3,18 @@
  * pending until they accept it, it is revoked, or it expires. This module holds its record: the
  * issuance, which never changes, and the state it settles into. `InvitationService` is the
  * operations on invitations and `InvitationStore` keeps them; the host resolves an email address
- * to the human ID an invitation names, so a person who has never signed in can be invited.
+ * to the human ID an invitation names, so a person who has never signed in can be invited, and the
+ * invitation keeps the address too, so the people who manage invitations can tell whom it is for.
  *
  * @since 0.1.0
  */
 
 import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Role from "../authorization/Role.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "./MemberId.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
 
@@ -39,6 +42,8 @@ export type InvitationId = typeof InvitationId.Type
 export const IssueInput = Schema.Struct({
   /** The person invited; the host resolves an address to it, creating the account if needed. */
   recipientId: Identity.HumanId,
+  /** The address the host resolved the person from, which tells people whom the invitation is for. */
+  recipientEmail: Schema.Trimmed.check(Schema.isMinLength(1)),
   /** The built-in role acceptance assigns at workspace scope; Owner cannot be invited. */
   roleId: Role.RoleId,
   /** After this, acceptance fails as expired; it is compared to the clock, never updated. */
@@ -116,3 +121,11 @@ export const Invitation = Schema.Struct({ details: Issuance, state: State }).ann
  * @since 0.1.0
  */
 export interface Invitation extends Schema.Schema.Type<typeof Invitation> {}
+
+/**
+ * The ID of the invitation the current request issues, as `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = Effect.map(Request.newId("invitation", []), (id) => InvitationId.make(id))

@@ -24,9 +24,6 @@ import * as Delegation from "./authorization/Delegation.ts"
 import * as GrantResolver from "./authorization/GrantResolver.ts"
 import * as PermissionCatalog from "./authorization/PermissionCatalog.ts"
 import * as RoleProjection from "./authorization/RoleProjection.ts"
-import * as ChangeFeedChanges from "./change-feed/ChangeFeedChanges.ts"
-import * as ChangeFeedService from "./change-feed/ChangeFeedService.ts"
-import * as ChangeFeedSource from "./change-feed/ChangeFeedSource.ts"
 import * as ChannelIntake from "./channel/ChannelIntake.ts"
 import * as ChannelPermissions from "./channel/ChannelPermissions.ts"
 import * as ChannelProjection from "./channel/ChannelProjection.ts"
@@ -52,8 +49,13 @@ import * as Journal from "./journal/Journal.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
-import * as ReadStateCommand from "./read-state/ReadStateCommand.ts"
+import * as PresenceService from "./presence/PresenceService.ts"
+import * as ReadStateProjection from "./read-state/ReadStateProjection.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
+import * as ReplicaCommits from "./replica/ReplicaCommits.ts"
+import * as ReplicaQuery from "./replica/ReplicaQuery.ts"
+import * as ReplicaService from "./replica/ReplicaService.ts"
+import * as RequestService from "./request/RequestService.ts"
 import * as TaskCommand from "./task/TaskCommand.ts"
 import * as TaskPermissions from "./task/TaskPermissions.ts"
 import * as TaskProjection from "./task/TaskProjection.ts"
@@ -80,7 +82,6 @@ import * as TurnCommand from "./turn/TurnCommand.ts"
 import * as TurnExecution from "./turn/TurnExecution.ts"
 import * as TurnJobs from "./turn/TurnJobs.ts"
 import * as TurnProjection from "./turn/TurnProjection.ts"
-import * as TurnQuery from "./turn/TurnQuery.ts"
 import * as TurnService from "./turn/TurnService.ts"
 import type * as TurnStore from "./turn/TurnStore.ts"
 import * as TurnTimeline from "./turn/TurnTimeline.ts"
@@ -121,6 +122,7 @@ export const projections = [
   ChannelProjection.definition,
   DeliveryProjection.definition,
   NotificationProjection.definition,
+  ReadStateProjection.definition,
   ConnectionProjection.definition,
   AgentProjection.definition,
   TurnProjection.definition
@@ -210,19 +212,14 @@ const threadQuery = ThreadQuery.layer.pipe(
   Layer.provide([groupQuery, ThreadActivityResolvers.layer(activityResolvers)])
 )
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery))
-const turnQuery = TurnQuery.layer
 const turnCommand = TurnCommand.layer.pipe(Layer.provide([threadQuery, threadCommand]))
 const taskCommand = TaskCommand.layer.pipe(Layer.provide([threadQuery, threadCommand, turnCommand]))
 const channelQuery = ChannelQuery.layer
 const memberCommand = MemberCommand.layer.pipe(Layer.provide([AssignmentCommand.layer, groupCommand]))
-/**
- * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
- * following a turn's log, who stop when their access changes.
- */
-const changeFeedSource = ChangeFeedSource.layer().pipe(
-  Layer.provide(ChangeFeedChanges.layer.pipe(Layer.provide([threadQuery, turnQuery])))
-)
-const changeFeedService = ChangeFeedService.layer.pipe(Layer.provide([changeFeedSource, GrantResolver.layer]))
+
+/** The replica's reads, and the one reader of the workspace's commits every member's replica shares. */
+const replicaQuery = ReplicaQuery.layer.pipe(Layer.provide(GrantResolver.layer))
+const replicaCommits = ReplicaCommits.layer.pipe(Layer.provide(replicaQuery))
 
 /**
  * Application operations, sharing one journal and one authorization check. These
@@ -235,7 +232,6 @@ const operations = Layer.mergeAll(
   AssignmentService.layer,
   OwnershipService.layer,
   NotificationService.layer,
-  changeFeedService,
   GroupService.layer,
   GroupMembershipService.layer,
   GroupFollowService.layer,
@@ -247,7 +243,10 @@ const operations = Layer.mergeAll(
   ChannelService.layer,
   ConnectionService.layer,
   AgentService.layer,
-  TurnService.layer
+  TurnService.layer,
+  PresenceService.layer,
+  RequestService.layer,
+  ReplicaService.layer
 ).pipe(
   Layer.provide([
     Delegation.layer,
@@ -257,12 +256,11 @@ const operations = Layer.mergeAll(
     groupCommand,
     threadQuery,
     threadCommand,
-    turnQuery,
     turnCommand,
     taskCommand,
     channelQuery,
-    changeFeedSource,
-    ReadStateCommand.layer
+    replicaQuery,
+    replicaCommits
   ])
 )
 
@@ -290,7 +288,7 @@ export const layer = Layer.mergeAll(operations, jobServices).pipe(
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
- * store, cryptography, the workspace's signals, the integrations it installs, and its turn jobs.
+ * store, cryptography, the integrations it installs, and its turn jobs.
  * Adding a required store changes this type and makes incomplete host compositions fail type
  * checking.
  *

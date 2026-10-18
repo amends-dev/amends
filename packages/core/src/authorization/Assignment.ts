@@ -7,7 +7,9 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Grant from "./Grant.ts"
@@ -171,3 +173,25 @@ export const Access = Schema.Struct({
  * @since 0.1.0
  */
 export interface Access extends Schema.Schema.Type<typeof Access> {}
+
+/**
+ * Whether `assignment` gives a role across the whole workspace, rather than a direct grant or a role
+ * on one target; its source then names the role.
+ *
+ * @category predicates
+ * @since 0.1.0
+ */
+export const isWorkspaceRole = (
+  assignment: Assignment
+): assignment is Assignment & { readonly source: Extract<Source, { readonly _tag: "Role" }> } =>
+  Source.isAnyOf(["Role"])(assignment.source) && Scope.Scope.isAnyOf(["Workspace"])(assignment.source.scope)
+
+/**
+ * The ID of the assignment the current request gives `memberId` of a role, as `Request.newId`
+ * derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (memberId: MemberId.MemberId, roleId: Role.RoleId) =>
+  Effect.map(Request.newId("assignment", [memberId, roleId]), (id) => AssignmentId.make(id))

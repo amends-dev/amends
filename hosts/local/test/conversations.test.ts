@@ -3,10 +3,10 @@ import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Request } from "@amends-dev/core/request"
 import { ThreadMessage, ThreadParticipation, type ThreadTimeline } from "@amends-dev/core/thread"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
-import { HttpBody, HttpClient, HttpRouter } from "effect/http"
+import { HttpBody, HttpClient } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -16,15 +16,14 @@ import { setup } from "./database.ts"
 const alice = Identity.HumanId.make("alice")
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string) =>
-  HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
-    Layer.provide(
-      DevelopmentAuthentication.layer(() => Effect.void).pipe(
-        Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url)))
-      )
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  LocalServer.serve(
+    LocalHost.layer(Redacted.make(url)),
+    DevelopmentAuthentication.layer(() => Effect.void),
+    {
+      disableLogger: true,
+      disableListenLog: true
+    }
+  ).pipe(Layer.provideMerge(BunHttpServer.layerTest))
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const workspace = yield* (yield* client(alice)).workspaces.create({

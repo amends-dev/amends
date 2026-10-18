@@ -1,11 +1,10 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { Request } from "@amends-dev/core/request"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
 import { Base64 } from "effect/encoding"
-import { HttpRouter } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -16,15 +15,11 @@ const alice = Identity.HumanId.make("alice")
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))))
 /** The real routes, gateway, integrations, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string) =>
-  HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
-    Layer.provide(
-      DevelopmentAuthentication.layer(() => Effect.void).pipe(
-        Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url), { credentialKey }))
-      )
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  LocalServer.serve(
+    LocalHost.layer(Redacted.make(url), { credentialKey }),
+    DevelopmentAuthentication.layer(() => Effect.void),
+    { disableLogger: true, disableListenLog: true }
+  ).pipe(Layer.provideMerge(BunHttpServer.layerTest))
 
 /** Alice owns a workspace that Bob joined as a member: a client for each in it. */
 const workspaceWithBob = Effect.gen(function* () {

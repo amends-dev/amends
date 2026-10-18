@@ -8,7 +8,9 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as GroupId from "./GroupId.ts"
@@ -104,3 +106,13 @@ export const Ending = Schema.Struct({
  * @since 0.1.0
  */
 export interface Ending extends Schema.Schema.Type<typeof Ending> {}
+
+/**
+ * The ID of the follow the current request starts for `memberId` in a group, as `Request.newId`
+ * derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
+  Effect.map(Request.newId("group-follow", [groupId, memberId]), (id) => GroupFollowId.make(id))

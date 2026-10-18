@@ -3,7 +3,7 @@
  * `TurnService`: `listActive`, `get`, `watchLog`, `cancel`, and `retry`. Every endpoint needs
  * active membership and a thread the caller may open, and stopping or retrying a turn needs
  * permission to direct its agent. Following a log is a server-sent event stream of
- * `Turn.LogMessage` that counts within the same limits as change streams, and ends with
+ * `Turn.LogMessage` that counts within the process's limits on open streams, and ends with
  * `CoreError.Unavailable` when it cannot go on. `TurnsHandlers` implements it.
  *
  * @since 0.1.0

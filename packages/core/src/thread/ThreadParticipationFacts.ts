@@ -7,7 +7,6 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Group from "../group/Group.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
@@ -24,7 +23,6 @@ export const Added = Fact.make("thread.participation.added", {
   version: 1,
   subject: (payload) => Subject.make("thread-participation", payload.id),
   occurrence: (payload) => [payload.id],
-  audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Schema.Struct({ ...ThreadParticipation.Admission.fields, groupId: GroupId.GroupId })
 })
 
@@ -39,7 +37,6 @@ export const Ended = Fact.make("thread.participation.ended", {
   version: 1,
   subject: (payload) => Subject.make("thread-participation", payload.participationId),
   occurrence: (payload) => [payload.participationId],
-  audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Schema.Struct({
     ...ThreadParticipation.Departure.fields,
     groupId: GroupId.GroupId,

@@ -67,6 +67,18 @@ export const make = Effect.gen(function* () {
       },
       Effect.mapError(StoreError.failed("DeliveryStore", "get"))
     ),
+    listByThread: Effect.fn("Deliveries.listByThread")(
+      function* (threadId) {
+        return yield* guard(
+          db
+            .select()
+            .from(channelDeliveries)
+            .where(and(inWorkspace, eq(channelDeliveries.threadId, threadId)))
+            .orderBy(sql`${channelDeliveries.id} COLLATE "C"`)
+        ).pipe(Effect.flatMap(decodeRows))
+      },
+      Effect.mapError(StoreError.failed("DeliveryStore", "listByThread"))
+    ),
     listRequestedByThread: Effect.fn("Deliveries.listRequestedByThread")(
       function* (threadId) {
         return yield* guard(

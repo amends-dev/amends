@@ -8,6 +8,7 @@
  */
 
 import { ConnectionService } from "@amends-dev/core/connection"
+import { Request } from "@amends-dev/core/request"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
 import * as Api from "./Api.ts"
 
@@ -23,8 +24,8 @@ export const layer = HttpApiBuilder.group(Api.Api, "connections", (handlers) =>
     integrations: () => ConnectionService.ConnectionService.use((connectionService) => connectionService.integrations),
     list: () => ConnectionService.ConnectionService.use((connectionService) => connectionService.list),
     create: ({ headers, payload }) =>
-      ConnectionService.ConnectionService.use((connectionService) =>
-        connectionService.create(payload, { requestKey: headers["idempotency-key"] })
+      ConnectionService.ConnectionService.use((connectionService) => connectionService.create(payload)).pipe(
+        Request.withKey(headers["idempotency-key"])
       ),
     get: ({ params }) =>
       ConnectionService.ConnectionService.use((connectionService) => connectionService.get(params.connectionId)),

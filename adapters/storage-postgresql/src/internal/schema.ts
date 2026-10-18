@@ -47,7 +47,7 @@ export const scopeKinds = ["Workspace", "Target"] as const
 export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection", "Channel"] as const
 export const deliveryStatuses = ["requested", "sent", "failed"] as const
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const
-/** A notification's state; a human recipient's Seen is also kept in notification_seen. */
+/** A notification's state. */
 export const notificationStates = ["Pending", "Seen", "Accepted", "Discarded", "Informational"] as const
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
@@ -252,6 +252,7 @@ export const invitations = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     recipientId: text("recipient_id").notNull(),
+    recipientEmail: text("recipient_email").notNull(),
     inviterMemberId: text("inviter_member_id").notNull(),
     roleId: text("role_id").notNull(),
     issuedAt: instant("issued_at").notNull(),
@@ -295,7 +296,7 @@ export const notifications = pgTable(
     recipientMemberId: text("recipient_member_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
-    // When a human saw it: a copy of notification_seen, which keeps it across rebuilds.
+    // When a human saw it.
     seenAt: instant("seen_at"),
     // The thread, its group, and the timeline position of thread-activity notifications.
     threadId: text("thread_id"),
@@ -519,10 +520,7 @@ export const threads = pgTable(
     )
   ]
 )
-/**
- * Private read state, outside the journal. It references no projection tables, so rebuilding
- * projections from the journal leaves it intact.
- */
+/** Each person's read position in each thread they read, which `ReadStateProjection` keeps. */
 export const threadReadPositions = pgTable(
   "thread_read_positions",
   {
@@ -536,19 +534,7 @@ export const threadReadPositions = pgTable(
     check("thread_read_position", sql`${t.readThrough} > 0`)
   ]
 )
-/**
- * When a human recipient first saw each notification: private state outside the journal, kept
- * when projections are rebuilt, so it references notifications by ID without a foreign key.
- */
-export const notificationSeen = pgTable(
-  "notification_seen",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    notificationId: text("notification_id").notNull(),
-    seenAt: instant("seen_at").notNull()
-  },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.notificationId] })]
-)
+/** When each person last read each group, which `ReadStateProjection` keeps. */
 export const groupReadTimes = pgTable(
   "group_read_times",
   {
@@ -637,9 +623,11 @@ export const threadMessages = pgTable(
       sql`(${t.contentKind} = 'Text' AND ${t.text} IS NOT NULL AND ${t.mentions} IS NOT NULL AND ${t.revision} > 0 AND ${t.deletedAt} IS NULL) OR (${t.contentKind} = 'Deleted' AND ${t.text} IS NULL AND ${t.mentions} IS NULL AND ${t.revision} IS NULL AND ${t.editedAt} IS NULL AND ${t.deletedAt} IS NOT NULL)`
     ),
     // A thread's messages that still have text, counted per thread for reply counts.
-    index("thread_messages_by_thread")
+    index("text_messages_by_thread")
       .on(t.workspaceId, t.threadId)
-      .where(sql`${t.contentKind} = 'Text'`)
+      .where(sql`${t.contentKind} = 'Text'`),
+    // Every message of a thread, for a replica's snapshot.
+    index("thread_messages_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`)
   ]
 )
 /** A thread's task: its current status, priority, and assignee. A thread has at most one, keyed by it. */
@@ -694,8 +682,6 @@ export const threadActivities = pgTable(
     uniqueIndex("thread_activity_sequence").on(t.workspaceId, t.threadId, t.sequence),
     // At most one activity per occurrence key; activities without one are repeatable.
     uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
-    // What a commit changed in the timelines: the activities about the subjects it names.
-    index("thread_activity_subject").on(t.workspaceId, t.subject),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
     check("thread_activity_positive_version", sql`${t.version} > 0`)
   ]
@@ -809,6 +795,8 @@ export const channelDeliveries = pgTable(
     index("channel_deliveries_requested_by_thread")
       .on(t.workspaceId, t.threadId, t.sequence)
       .where(sql`${t.status} = 'requested'`),
+    // Every delivery of a thread, for a replica's snapshot.
+    index("channel_deliveries_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
     // The delivery that posted an external message, so that receiving it again is known as an echo.
     index("channel_deliveries_by_external_message").on(
       t.workspaceId,
@@ -900,6 +888,8 @@ export const turns = pgTable(
       .on(t.workspaceId, t.memberId, t.threadId)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
     index("turns_by_agent_thread").on(t.workspaceId, t.memberId, t.threadId, t.createdAt),
+    // Every turn of a thread, for a replica's snapshot.
+    index("turns_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
     index("active_turns")
       .on(t.workspaceId, t.createdAt)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
@@ -968,3 +958,26 @@ export const signInSessions = pgTable(
   },
   (table) => [index("sign_in_sessions_by_human").on(table.humanId)]
 )
+
+/**
+ * The remote ID browsers know the sync server over this database by: one row, made the first time
+ * a host reads it; outside every workspace, like the accounts.
+ */
+export const syncServer = pgTable(
+  "sync_server",
+  {
+    singleton: boolean("singleton").primaryKey().default(true),
+    remoteId: bytes("remote_id").notNull()
+  },
+  (table) => [check("sync_server_singleton", sql`${table.singleton}`)]
+)
+
+/**
+ * The keys people registered for their browsers, each with the signing key it first authenticated
+ * with; outside every workspace, like the accounts.
+ */
+export const syncKeys = pgTable("sync_keys", {
+  publicKey: text("public_key").primaryKey(),
+  humanId: text("human_id").notNull(),
+  signingPublicKey: bytes("signing_public_key")
+})

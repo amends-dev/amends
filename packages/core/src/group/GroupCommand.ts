@@ -31,7 +31,7 @@ import * as MemberStore from "../workspace/MemberStore.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
 import * as GroupFacts from "./GroupFacts.ts"
-import * as GroupId from "./GroupId.ts"
+import type * as GroupId from "./GroupId.ts"
 import * as GroupMembership from "./GroupMembership.ts"
 import * as GroupMembershipFacts from "./GroupMembershipFacts.ts"
 import * as GroupStore from "./GroupStore.ts"
@@ -149,7 +149,7 @@ export const make = Effect.gen(function* () {
   ) {
     yield* Store.Transaction
     const membership = {
-      id: GroupMembership.GroupMembershipId.make(yield* crypto.randomUUIDv4()),
+      id: yield* GroupMembership.newId(groupId, memberId).pipe(Effect.provideService(Crypto.Crypto, crypto)),
       workspaceId,
       groupId,
       memberId,
@@ -188,7 +188,7 @@ export const make = Effect.gen(function* () {
           reason: new CoreError.ParticipantUnavailable({ memberId })
         })
     const group: Group.Direct = {
-      id: GroupId.GroupId.make(yield* crypto.randomUUIDv4()),
+      id: yield* Group.directId(workspaceId, requested).pipe(Effect.provideService(Crypto.Crypto, crypto)),
       workspaceId,
       kind: "Direct",
       memberIds: requested,

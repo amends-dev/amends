@@ -1,15 +1,17 @@
 /**
  * One item of a thread's timeline, in the shape every kind shares: its position, a dotted kind
- * name, what it is about, and the kind's details as JSON. Storage, facts, and the change feed carry
- * this shape and nothing more, so adding a kind changes none of them; `ThreadActivityKind` defines
+ * name, what it is about, and the kind's details as JSON. Storage and facts carry this shape and
+ * nothing more, so adding a kind changes none of them; `ThreadActivityKind` defines
  * a kind and reads its details.
  *
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Subject from "../journal/Subject.ts"
 import * as Notification from "../notification/Notification.ts"
+import * as Request from "../request/Request.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipationId from "./ThreadParticipationId.ts"
@@ -110,3 +112,13 @@ export const Recipient = Schema.Struct({
  * @since 0.1.0
  */
 export interface Recipient extends Schema.Schema.Type<typeof Recipient> {}
+
+/**
+ * The ID of an activity of `kind` about `subject` the current request records in a thread, as
+ * `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (threadId: ThreadId.ThreadId, kind: Kind, subject: Subject.Subject) =>
+  Effect.map(Request.newId("thread-activity", [threadId, kind, subject]), (id) => ThreadActivityId.make(id))

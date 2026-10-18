@@ -8,7 +8,8 @@
  * the state; `Unavailable`, for what an operation needs that cannot be reached or used now; and
  * `Uncertain`, for a commit storage could not confirm. Denied, Conflict, Invalid, and Unavailable
  * say why in their `reason`, as `NotGranted` or `AlreadyMember`, so a caller recovers from one
- * reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`. `CoreError` is all seven.
+ * reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`. `CoreError` is all seven,
+ * and `Rejection` the five that reject a request.
  *
  * @since 0.1.0
  */
@@ -296,26 +297,15 @@ export class Reloading extends Schema.TaggedError<Reloading>()("Reloading", {}) 
 }
 
 /**
- * The change feed stopped; the reader subscribes again and refreshes what it shows.
- *
- * @category errors
- * @since 0.1.0
- */
-export class ChangeFeedInterrupted extends Schema.TaggedError<ChangeFeedInterrupted>()("ChangeFeedInterrupted", {}) {
-  override get message(): string {
-    return "The change feed stopped; subscribe again and refresh"
-  }
-}
-
-/**
- * Following a turn's log stopped short; the reader follows it again from the start.
+ * Following a log stopped short: a turn's, which the reader follows again from the start, or the
+ * workspace's changes, which a replica follows again from the last position it holds.
  *
  * @category errors
  * @since 0.1.0
  */
 export class LogInterrupted extends Schema.TaggedError<LogInterrupted>()("LogInterrupted", {}) {
   override get message(): string {
-    return "Following the turn's log stopped short; follow it again from the start"
+    return "Following stopped short; follow again"
   }
 }
 
@@ -359,7 +349,6 @@ export class CredentialsUnavailable extends Schema.TaggedError<CredentialsUnavai
 export const UnavailableReason = Schema.Union([
   Contention,
   Reloading,
-  ChangeFeedInterrupted,
   LogInterrupted,
   ChannelUnreachable,
   CredentialsUnavailable
@@ -937,3 +926,17 @@ export const CoreError = Schema.Union([NotFound, Changed, Denied, Conflict, Inva
  * @since 0.1.0
  */
 export type CoreError = typeof CoreError.Type
+
+/**
+ * The kinds that reject a request as it was asked: every kind but `Unavailable` and `Uncertain`,
+ * which leave it to be asked again.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Rejection = Schema.Union([NotFound, Changed, Denied, Conflict, Invalid])
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Rejection = typeof Rejection.Type

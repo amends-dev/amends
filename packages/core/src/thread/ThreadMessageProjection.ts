@@ -12,7 +12,7 @@ import * as ThreadMessageStore from "./ThreadMessageStore.ts"
 
 /**
  * Inserts each published message, and replaces its content on each edit and deletion. The group
- * on the facts is for their audience, not for the row.
+ * on the facts is not part of the row.
  *
  * @category projections
  * @since 0.1.0

@@ -12,6 +12,7 @@
     "packages/http/test/**/*.ts",
     "packages/toolkit/test/**/*.ts",
     "packages/connection/test/**/*.ts",
+    "packages/sync/test/**/*.ts",
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "repos", "dist", "out", "coverage"]

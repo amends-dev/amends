@@ -1,5 +1,5 @@
 import { CoreError } from "@amends-dev/core/error"
-import { SignIn } from "@amends-dev/gateway"
+import { SignIn, SyncStorage } from "@amends-dev/gateway"
 import { expect, it } from "@effect/vitest"
 import type { SchemaAST } from "effect"
 import { HttpApi } from "effect/http-api"
@@ -7,7 +7,7 @@ import { Api, ApiErrors, Authentication } from "../src/index.ts"
 
 /** The constructor an error schema declares, which every schema of that error shares. */
 const constructorOf = (ast: SchemaAST.AST): unknown => ast.annotations?.["~constructor"]
-/** Errors the HTTP layer raises itself, beside core: authentication, sign-in, and limits. */
+/** Errors the HTTP layer raises itself, beside core: authentication, sign-in, sync keys, and limits. */
 const transport = new Set(
   [
     Authentication.Unauthorized,
@@ -15,7 +15,8 @@ const transport = new Set(
     ApiErrors.TooManyStreams,
     SignIn.Rejected,
     SignIn.Limited,
-    SignIn.Unavailable
+    SignIn.Unavailable,
+    SyncStorage.KeyTaken
   ].map((error) => constructorOf(error.ast))
 )
 

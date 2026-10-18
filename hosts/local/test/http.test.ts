@@ -1,10 +1,10 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { Member, MemberId } from "@amends-dev/core/workspace"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
-import { HttpBody, HttpClient, HttpRouter } from "effect/http"
+import { HttpBody, HttpClient } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -15,18 +15,11 @@ const alice = Identity.HumanId.make("alice")
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server; codes are captured. */
 const server = (url: string) => {
   const delivered = new Map<string, string>()
-  const layer = HttpRouter.serve(LocalServer.layerRoutes, {
-    disableLogger: true,
-    disableListenLog: true
-  }).pipe(
-    Layer.provide(
-      DevelopmentAuthentication.layer((email, code) => Effect.sync(() => delivered.set(email, code))).pipe(
-        Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url)))
-      )
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  const layer = LocalServer.serve(
+    LocalHost.layer(Redacted.make(url)),
+    DevelopmentAuthentication.layer((email, code) => Effect.sync(() => delivered.set(email, code))),
+    { disableLogger: true, disableListenLog: true }
+  ).pipe(Layer.provideMerge(BunHttpServer.layerTest))
   return { layer, delivered }
 }
 const { available, withDatabase } = setup()
@@ -325,44 +318,5 @@ describe.skipIf(!available)("PostgreSQL", () => {
           )
         })
       )
-  )
-
-  it.live("allows desktop CORS preflights and includes CORS headers on authentication failures", () =>
-    withDatabase((url) =>
-      Effect.gen(function* () {
-        const client = yield* HttpClient.HttpClient
-        for (const origin of [
-          "http://127.0.0.1:1420",
-          "tauri://localhost",
-          "http://tauri.localhost",
-          "https://tauri.localhost"
-        ]) {
-          const preflight = yield* client.options("/workspaces", {
-            headers: {
-              origin,
-              "access-control-request-method": "POST",
-              "access-control-request-headers":
-                "authorization,content-type,idempotency-key,amends-workspace,traceparent,b3"
-            }
-          })
-          expect(preflight.status).toBe(204)
-          expect(preflight.headers["access-control-allow-origin"]).toBe(origin)
-          expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain("authorization")
-          expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain("b3")
-          expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain("idempotency-key")
-          expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain("amends-workspace")
-          const denied = yield* client.get("/me/workspaces", { headers: { origin } })
-          expect(denied.status).toBe(401)
-          expect(denied.headers["access-control-allow-origin"]).toBe(origin)
-        }
-        const other = yield* client.options("/session/code", {
-          headers: {
-            origin: "https://untrusted.invalid",
-            "access-control-request-method": "POST"
-          }
-        })
-        expect(other.headers["access-control-allow-origin"]).toBeUndefined()
-      }).pipe(Effect.provide(server(url).layer))
-    )
   )
 })

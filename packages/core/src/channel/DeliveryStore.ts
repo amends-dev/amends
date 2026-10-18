@@ -38,6 +38,10 @@ export class DeliveryStore extends Context.Service<
   DeliveryStore,
   {
     readonly get: (id: DeliveryId.DeliveryId) => Effect.Effect<Option.Option<Delivery.Delivery>, StoreError.StoreError>
+    /** Every delivery of a thread, whatever its status, in binary ID order. */
+    readonly listByThread: (
+      threadId: ThreadId.ThreadId
+    ) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, StoreError.StoreError>
     /** The thread's deliveries not yet sent or failed, by their messages' positions, then by id. */
     readonly listRequestedByThread: (
       threadId: ThreadId.ThreadId
@@ -74,6 +78,7 @@ export const make = (
   const write = StoreInput.write("DeliveryStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", DeliveryId.DeliveryId, id), driver.get),
+    listByThread: (threadId) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, threadId), driver.listByThread),
     listRequestedByThread: (threadId) =>
       Effect.flatMap(read("listRequestedByThread", ThreadId.ThreadId, threadId), driver.listRequestedByThread),
     findByExternalMessage: Effect.fn("DeliveryStore.findByExternalMessage")(
@@ -103,6 +108,14 @@ const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
         return yield* rows.get((yield* read).records.of("deliveries"), id)
       },
       Effect.mapError(StoreError.failed("DeliveryStore", "get"))
+    ),
+    listByThread: Effect.fn("DeliveryStore.memory.listByThread")(
+      function* (threadId) {
+        return (yield* rows.all((yield* read).records.of("deliveries")))
+          .filter((delivery) => delivery.threadId === threadId)
+          .toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))
+      },
+      Effect.mapError(StoreError.failed("DeliveryStore", "listByThread"))
     ),
     listRequestedByThread: Effect.fn("DeliveryStore.memory.listRequestedByThread")(
       function* (threadId) {

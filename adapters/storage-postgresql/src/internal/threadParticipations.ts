@@ -122,6 +122,18 @@ export const make = Effect.gen(function* () {
       },
       Effect.mapError(StoreError.failed("ThreadParticipationStore", "listByThread"))
     ),
+    listByAdmission: Effect.fn("ThreadParticipations.listByAdmission")(
+      function* (id) {
+        return yield* guard(
+          db
+            .select()
+            .from(threadParticipations)
+            .where(and(inWorkspace, eq(threadParticipations.groupMembershipId, id)))
+            .orderBy(sql`${threadParticipations.id} COLLATE "C"`)
+        ).pipe(Effect.flatMap(decodeRows))
+      },
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "listByAdmission"))
+    ),
     pageActiveByThread: Effect.fn("ThreadParticipations.pageActiveByThread")(
       function* (id, options) {
         const orderedId = sql`${threadParticipations.id} COLLATE "C"`

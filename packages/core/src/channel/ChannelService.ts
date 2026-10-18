@@ -29,7 +29,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Request from "../request/Request.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
@@ -119,12 +118,10 @@ export class ChannelService extends Context.Service<
     /**
      * Create a channel under `channel.create`: over a connection the actor may read and use, whose
      * integration gives channels, and into a group the actor belongs to and may start threads in,
-     * since every member of that group will read the channel's conversations. Returns the channel.
+     * since every member of that group will read the channel's conversations. Returns the channel;
+     * within a request, a retry returns the channel its first attempt created.
      */
-    readonly create: (
-      input: Channel.CreateInput,
-      options?: Request.Options
-    ) => Effect.Effect<Channel.Channel, CreateError, Actor.Actor>
+    readonly create: (input: Channel.CreateInput) => Effect.Effect<Channel.Channel, CreateError, Actor.Actor>
     /** The workspace's channels the actor may read, by name. */
     readonly list: Effect.Effect<ReadonlyArray<Channel.Channel>, ReadError, Actor.Actor>
     /**
@@ -220,18 +217,15 @@ export const make = Effect.gen(function* () {
   })
 
   const create = Effect.fn("ChannelService.create")(
-    function* (input: Channel.CreateInput, options: Request.Options = {}) {
+    function* (input: Channel.CreateInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Channel.CreateInput))(input)
       yield* authorization.require([
         Requirement.make(ChannelPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
       ])
       const actor = yield* Actor.Actor
-      const channelId = ChannelId.ChannelId.make(
-        yield* Request.idFor(options.requestKey, ["channel.create", workspaceId, actor.memberId])
-      )
+      const channelId = yield* Channel.newId
       // A retry returns the channel its first attempt created, unless it was removed since.
-      if (options.requestKey !== undefined && Option.isSome(yield* channelStore.get(channelId)))
-        return yield* channelQuery.requireActive(channelId)
+      if (Option.isSome(yield* channelStore.get(channelId))) return yield* channelQuery.requireActive(channelId)
       yield* requireDestination(request.groupId)
       yield* requireUsableConnection(request.connectionId)
       const created: Channel.Channel = {

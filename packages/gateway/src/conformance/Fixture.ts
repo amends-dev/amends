@@ -13,13 +13,13 @@ import type * as Effect from "effect/Effect"
 import type * as Scope from "effect/Scope"
 import type * as Accounts from "../Accounts.ts"
 import type * as SignInStorage from "../SignInStorage.ts"
+import type * as SyncStorage from "../SyncStorage.ts"
 import type * as WorkspaceDirectory from "../WorkspaceDirectory.ts"
 import type * as WorkspaceStorage from "../WorkspaceStorage.ts"
 
 /**
  * The gateway contracts a storage adapter implements, with the cryptography it was built over;
- * one host holds them all. Hosts over the same storage share each workspace's signals, as
- * processes over one system do.
+ * one host holds them all.
  *
  * @category testing
  * @since 0.1.0
@@ -29,6 +29,7 @@ export type Host =
   | WorkspaceDirectory.WorkspaceDirectory
   | Accounts.Accounts
   | SignInStorage.SignInStorage
+  | SyncStorage.SyncStorage
   | Crypto.Crypto
 
 /**
@@ -58,8 +59,8 @@ export interface Storage {
    */
   readonly connect: (options?: HostOptions) => Effect.Effect<Context.Context<Host>, never, Scope.Scope>
   /**
-   * Discard every projected record and checkpoint, keeping logs and read state, as rebuilding
-   * projections does before replaying the journal. No storage contract performs this.
+   * Discard every projected record and checkpoint, keeping logs and what is kept outside the
+   * journal, as rebuilding projections does before replaying it. No storage contract performs this.
    */
   readonly discardProjections: Effect.Effect<void>
   /** Count every stored record of any kind, so a test can show a rolled-back write left none. */

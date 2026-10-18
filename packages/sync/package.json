@@ -1,0 +1,23 @@
+{
+  "name": "@amends-dev/sync",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./internal/*": null
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/http": "workspace:*",
+    "@amends-dev/log": "workspace:*",
+    "effect": "catalog:"
+  }
+}

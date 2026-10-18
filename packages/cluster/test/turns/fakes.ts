@@ -104,7 +104,7 @@ export interface FakeWorkspaceOptions {
  * A workspace in memory, as the job reaches it through a gateway: one turn of the agent's, which
  * accepting gives while it is active and starting readies, and the participation's session log,
  * in a memory store, which holds each entry `logged` as a batch of its own. It records how the
- * turn ended and the drafts it showed.
+ * turn ended.
  */
 export const makeFakeWorkspace = Effect.fnUntraced(function* (options: FakeWorkspaceOptions = {}) {
   const sessionLogs = yield* Effect.service(SessionLog.SessionLogs).pipe(
@@ -113,7 +113,6 @@ export const makeFakeWorkspace = Effect.fnUntraced(function* (options: FakeWorks
   const sessionLog = sessionLogs.open(participationId)
   for (const entry of options.logged ?? []) yield* Effect.orDie(sessionLog.append(entry))
   const endings: Array<Ending> = []
-  const drafts: Array<Turn.Draft> = []
   let active = options.workWaits ?? true
   let starts = 0
   const end = (ending: Ending) =>
@@ -138,7 +137,6 @@ export const makeFakeWorkspace = Effect.fnUntraced(function* (options: FakeWorks
               : TurnExecution.Start.cases.Idle.make({})
           ),
     joinedConversation: () => Effect.succeed(options.joined ?? []),
-    showDraft: (_, draft) => Effect.sync(() => void drafts.push(draft)),
     close: (_, { reply, resume }) =>
       Effect.as(end({ kind: "close", reply, resume }), TurnExecution.Closing.cases.Closed.make({ messageIds: [] })),
     fail: (_, { reason, resume }) => end({ kind: "fail", reason, resume }),
@@ -177,7 +175,6 @@ export const makeFakeWorkspace = Effect.fnUntraced(function* (options: FakeWorks
     starts: () => starts,
     /** How many times a job entered the workspace. */
     entered: () => entered,
-    drafts: () => [...drafts],
     appendElsewhere
   }
 })

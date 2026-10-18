@@ -265,7 +265,8 @@ describe("thread replies", () => {
           expect(yield* bound.activities.latest(first.thread.id)).toEqual(Option.some(again.activity))
           expect(yield* (yield* boundTo(otherWorkspaceId)).activities.latest(first.thread.id)).toEqual(Option.none())
           const entries = (yield* history(bound)).at(-1)?.entries ?? []
-          expect(entries).toHaveLength(2)
+          // The message, its activity, and the author's read position.
+          expect(entries).toHaveLength(3)
           const events = yield* facts(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>

@@ -14,8 +14,8 @@ published to npm.
 ## Use
 
 `Gateway.make(options?)` builds a `Gateway.Gateway["Service"]` in the host's scope from
-`WorkspaceStorage.WorkspaceStorage`, core's `TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs`, and
-`Crypto.Crypto`. It opens no workspace and resolves no actor until it is called. Its options:
+`WorkspaceStorage.WorkspaceStorage`, core's `TurnJobs.TurnJobs`, `DeliveryJobs.DeliveryJobs`, and
+`PresenceRelay.PresenceRelay`, and `Crypto.Crypto`. It opens no workspace and resolves no actor until it is called. Its options:
 
 - `idleTimeToLive`: how long an unused workspace stays prepared, five minutes by default.
 - `integrations`: the [integrations](../connection/README.md) the host installs, with distinct ids,
@@ -24,9 +24,9 @@ published to npm.
 `Gateway.layer(options?)` provides `Gateway.Gateway` and owns the gateway's scope; a direct caller
 of `make` keeps that scope open for the gateway's lifetime. The gateway's operations:
 
-- `createWorkspace(creator, input, options?)` creates a workspace with a required name and runs
-  core's initialization for the creator. With `options.requestKey`, the workspace's ID derives from
-  the creator and the key, so a retry returns what its first attempt created, whatever name it
+- `createWorkspace(creator, input, requestKey?)` creates a workspace with a required name and runs
+  core's initialization for the creator. With a request key, the workspace's ID derives from the
+  creator and the key, so a retry returns what its first attempt created, whatever name it
   gives. The caller has authenticated the creator and checked that they may create one.
 - `asMember(workspaceId, identity, program)` resolves the identity's active membership into
   `Actor.Actor`, binds the workspace, and runs the program. A non-member, or a workspace that does
@@ -44,7 +44,7 @@ until the client disconnects, or one the caller closes. Identities must come fro
 never from client input.
 
 A host provides `WorkspaceStorage.WorkspaceStorage`, whose `forWorkspace` returns one workspace's
-stores and signal hub (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It
+stores (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It
 also provides core's job services, which take every workspace's job requests, each naming its
 workspace; a host that runs no jobs provides each one's `layerNoRunner`, so requests are accepted
 and work waits.
@@ -64,9 +64,8 @@ is prepared first, and membership is then resolved from what its boot restores.
 
 Each request and each open stream holds a lease on its workspace's runtime. A runtime stays prepared
 while a lease is open and for the idle time-to-live after the last one closes, then is released with
-its services, including its change-feed follower; the next request boots it again. Memory therefore
-follows the workspaces in recent use. Each process follows the journal itself, so subscribers on
-different hosts see the same commits.
+its services; the next request boots it again. Memory therefore follows the workspaces in recent
+use.
 
 A failed boot closes what it acquired and fails its waiting requests as a defect, and a later
 acquisition can retry; a request's cancellation does not cancel a shared boot. After replay, boot
@@ -83,9 +82,7 @@ directory reads projection tables directly.
 
 ## Host contracts
 
-- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores and its `SignalHub.SignalHub`,
-  which delivers [signals](../core/README.md#signals) between every process over the same storage,
-  best effort.
+- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores.
 - `Accounts.Accounts` holds the people a host knows across its workspaces: `findOrCreate` gives an
   address's `Accounts.Account`, its `id`, the human ID core names the person by, and its `email`,
   creating it the first time the address comes up; `findByIds` reads accounts back by ID. The ID is
@@ -106,38 +103,47 @@ directory reads projection tables directly.
   decision makes of it, one change to an address at a time, and sessions, each a
   `SignInStorage.Session` named by its token's digest, are inserted, found, extended, and
   deleted. Storage adapters implement it.
+- `SyncStorage.SyncStorage` keeps what the [sync](../sync/README.md) server shares across hosts:
+  the `remoteId` browsers know it by, made the first time it is read and kept for the storage's
+  life, and the keys people register for their browsers' eventlog identities. A key, a
+  `SyncStorage.PublicKey`, belongs to the person who registered it, and `registerKey` fails with
+  `SyncStorage.KeyTaken` for anyone else, until `removeKey` removes it; `bindSigningKey` binds it
+  to the first signing key any host binds. Storage adapters implement it.
 - `EmailSender.EmailSender` hands an `EmailSender.Message` to the host's email provider, failing
   with `EmailSender.Undelivered`.
 
 These span workspaces or issue credentials, which core never does, so hosts implement them, apart
 from sign-in and session tokens, which [email sign-in](#email-sign-in) implements. The `./Accounts`,
-`./SignIn`, and `./WorkspaceDirectory` exports carry their schemas for contracts. On the wire, a
+`./SignIn`, `./SyncStorage`, and `./WorkspaceDirectory` exports carry their schemas for contracts. On the wire, a
 membership's `activeMemberCount` is `people`.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
-`inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do.
+`inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do, and its
+`PresenceRelay` between their processes: `layerMemory` for a host of one, or a storage adapter's,
+as the PostgreSQL adapter's over its notices.
 
 ## Memory
 
 Each host contract for storage has a `layerMemory` that implements it in process memory, over
 core's [memory storage](../core/README.md#memory): `WorkspaceStorage.layerMemory` over a
-`MemoryDatabase.Connection`, and the directory, accounts, and sign-in storage over the
-`MemoryDatabase` itself, with cryptography from the host for new human IDs. Merged over a new
-connection, they are one host; building them again over the same database is another host over the
-same storage, which is how tests of what several hosts do together run. Accounts, sign-in codes,
-and sessions are tables beside the workspaces' state, and a change to an address's code holds the
-address's lock across every host.
+`MemoryDatabase.Connection`, and the directory, accounts, sign-in storage, and sync storage over
+the `MemoryDatabase` itself, with cryptography from the host for new human IDs and the remote ID.
+Merged over a new connection, they are one host; building them again over the same database is
+another host over the same storage, which is how tests of what several hosts do together run.
+Accounts, sign-in codes, sessions, the remote ID, and sync keys are tables beside the workspaces'
+state, and a change to an address's code, or to a key, holds its lock across every host.
 
 ```ts
 import { MemoryDatabase } from "@amends-dev/core/journal"
-import { Accounts, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway"
+import { Accounts, SignInStorage, SyncStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway"
 import { Layer } from "effect"
 
 const storage = Layer.mergeAll(
   WorkspaceStorage.layerMemory,
   WorkspaceDirectory.layerMemory,
   Accounts.layerMemory,
-  SignInStorage.layerMemory
+  SignInStorage.layerMemory,
+  SyncStorage.layerMemory
 ).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provide(MemoryDatabase.layer))
 ```
 
@@ -156,12 +162,12 @@ store. An adapter's tests call `run` with a `Fixture`, by convention in its `tes
 `withStorage` gives the test a `Storage`:
 
 - `connect(options?)` opens another host over the same storage, with its own connection or pool,
-  closed with the test's scope: its storage, directory, accounts, sign-in storage, and signal hub,
-  with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
+  closed with the test's scope: its storage, directory, accounts, sign-in storage, and sync
+  storage, with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
   would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
-  keeping logs and read state, as rebuilding projections does before replay. No storage contract
-  performs this.
+  keeping logs and what is kept outside the journal, as rebuilding projections does before replay.
+  No storage contract performs this.
 - `footprint` counts every stored record, so a test can show that a rolled-back write left none.
 
 The suites need `@effect/vitest`, an optional peer dependency that only an adapter's tests install.
@@ -172,11 +178,10 @@ by name, and a core or gateway over a host.
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `journal`       | Appends seen across hosts, log heads, isolation of identical log IDs, projections going live and rebuilding, and commits refused meanwhile.                                               |
 | `transactions`  | Competing initialization, rollback without leftovers, interruption, foreign and expired handles, and contention from another host.                                                        |
-| `changeFeed`    | Commits from another host, and resuming from a cursor on another host.                                                                                                                    |
-| `signals`       | Delivery between hosts in order, only to subscribers present and in their workspace, and the audiences of typing and read state.                                                          |
 | `idempotency`   | Keyed appends across reopening, content validation, rollback, byte ownership, concurrent attempts, and more keys than one statement binds.                                                |
 | `factMetadata`  | Fact names and subjects indexed and their versions and provenance kept across reopening, paged reads by either, retries that compare them, and publication refused for another workspace. |
-| `reads`         | Workspace reads and change-feed opening while another host holds the writer.                                                                                                              |
+| `reads`         | Workspace reads while another host holds the writer.                                                                                                                                      |
+| `replica`       | A member's snapshot reading every kind of record they see, and a departure naming the participations it ended.                                                                            |
 | `contracts`     | Direct store calls: a conflict rolling back its transaction, IDs never reused, one active record per subject, timelines contiguous, and the live projections.                             |
 | `accounts`      | One account per address, however typed and from any host, concurrent first requests sharing one, and accounts read back by ID.                                                            |
 | `signInStorage` | An address's pending code replaced and removed one change at a time from every host, and sessions found, extended, and deleted.                                                           |

@@ -11,6 +11,7 @@ the user interface in [apps](../apps/README.md).
 | [`core`](core/README.md)             | One workspace's domain: its journal, authorization, and operations.                  |
 | [`gateway`](gateway/README.md)       | How a host enters core, and what a host implements: storage, sign-in, the directory. |
 | [`http`](http/README.md)             | The HTTP API: the contract clients call and its server, over the gateway.            |
+| [`sync`](sync/README.md)             | Keeps a browser's workspace in sync over eventlog: its contract, server, and client. |
 | [`cluster`](cluster/README.md)       | Jobs, the work outside requests, on Effect Cluster: agents' turns and deliveries.    |
 | [`connection`](connection/README.md) | The integrations a host installs, a workspace's connections, and the model catalog.  |
 | [`toolkit`](toolkit/README.md)       | Tool sources, such as MCP servers and HTTP APIs, in one shape. Published to npm.     |
@@ -36,8 +37,7 @@ Every package declares `"sideEffects": false`: importing a module runs nothing b
 declarations, so a bundler drops what a client does not use. A protocol contract reaches core's
 records, inputs, and errors, never its operations: the errors a protocol exposes are
 `CoreError`'s kinds, schemas alone in `error/CoreError.ts`. A browser bundle then carries core's
-schemas without their implementation; the web app's bundle test fails when an implementation
-reaches it.
+schemas without their implementation.
 
 ## Features and module names
 

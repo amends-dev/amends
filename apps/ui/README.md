@@ -1,14 +1,13 @@
 # @amends-dev/ui
 
-The amends design system: foundations, components, the six layout patterns, and a presentational
-screen for every page of the [web](../web/README.md) and [desktop](../desktop/README.md) apps, the
-sections of the [site](../site/README.md), and a Storybook workshop to build and review them in. It is built from the Lunacy mocks in
+The amends design system: foundations, components, the six layout patterns, presentational
+screens for a workspace's pages, the sections of the [site](../site/README.md), and a Storybook
+workshop to build and review them in. It is built from the Lunacy mocks in
 [`design-system/Amends Group Exploration.free`](../../design-system/), which are the visual
 reference: open the file in Lunacy and compare a screen with its story.
 
-Screens are presentation only: data arrives as props and actions leave as callbacks.
-[Client](../client/README.md) supplies them as hooks, and the apps join the two; UI imports nothing
-from client, routing, or the API. The package is internal to this repository and not published to
+Screens are presentation only: data arrives as props and actions leave as callbacks. UI imports
+nothing from routing or the API. The package is internal to this repository and not published to
 npm.
 
 ## The workshop

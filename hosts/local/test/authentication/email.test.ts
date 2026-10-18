@@ -1,9 +1,8 @@
 import { Accounts, SignIn } from "@amends-dev/gateway"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Logger, Redacted } from "effect"
 import { Base64 } from "effect/encoding"
-import { HttpRouter } from "effect/http"
 import * as EmailAuthentication from "../../src/EmailAuthentication.ts"
 import * as LocalConfig from "../../src/LocalConfig.ts"
 import * as LocalHost from "../../src/LocalHost.ts"
@@ -19,19 +18,11 @@ const server = (url: string) => {
   const capture = Logger.make(({ message }) => {
     logged.push(Array.isArray(message) ? message.join(" ") : String(message))
   })
-  const layer = HttpRouter.serve(LocalServer.layerRoutes, {
-    disableLogger: true,
-    disableListenLog: true
-  }).pipe(
-    Layer.provide(
-      EmailAuthentication.layer(credentialKey).pipe(
-        Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url), { credentialKey }))
-      )
-    ),
-    Layer.provide(Logger.layer([capture])),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  const layer = LocalServer.serve(
+    LocalHost.layer(Redacted.make(url), { credentialKey }),
+    EmailAuthentication.layer(credentialKey),
+    { disableLogger: true, disableListenLog: true }
+  ).pipe(Layer.provide(Logger.layer([capture])), Layer.provideMerge(BunHttpServer.layerTest))
   /** The code in the last email logged to the address. */
   const lastCode = (email: Accounts.Email) => {
     const line = logged.findLast((line) => line.startsWith(`Email to ${email}:`))!

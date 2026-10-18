@@ -199,7 +199,7 @@ export const UpdateInput = Schema.Struct({ threadId: ThreadId.ThreadId, change: 
 export interface UpdateInput extends Schema.Schema.Type<typeof UpdateInput> {}
 
 /**
- * What changing a task records: the change, and when. The group is the fact's audience.
+ * What changing a task records: the change, and when, with the thread's group.
  *
  * @category schemas
  * @since 0.1.0

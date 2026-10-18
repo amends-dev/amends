@@ -15,6 +15,8 @@ const projections = [
   "assignments",
   "invitations",
   "notifications",
+  "thread_read_positions",
+  "group_read_times",
   "groups",
   "group_memberships",
   "group_follows",

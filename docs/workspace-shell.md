@@ -1,5 +1,8 @@
 # Workspace shell
 
+> Historical: this describes the web and desktop apps, which have been removed. The UI's screens
+> remain; the app being rebuilt decides its own routes and state.
+
 Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout, built on the
 [UI](../apps/ui/README.md) Shell pattern from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: a rail, a sidebar, the main content, and a side
@@ -138,8 +141,8 @@ Mode persists under `amends.appearance` and palette under `amends.palette` in lo
 and synchronize same-origin windows. Web and desktop origins remain independent. Blocked storage
 retains the choice in memory.
 
-When workspace changes stop arriving for two seconds, a note at the bottom of the screen says
-"Connecting…" or "Reconnecting…" until they resume; see [change feed](change-feed.md).
+When workspace changes stopped arriving for two seconds, a note at the bottom of the screen said
+"Connecting…" or "Reconnecting…" until they resumed.
 
 ## Verification
 

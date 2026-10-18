@@ -213,6 +213,7 @@ describe("gateway", () => {
                 Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
                   invitationService.issue({
                     recipientId: bob.id,
+                    recipientEmail: "bob@example.com",
                     expiresAt,
                     roleId: BuiltinRoles.MemberId
                   })

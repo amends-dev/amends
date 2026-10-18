@@ -1,0 +1,30 @@
+{
+  "name": "@amends-dev/app-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/http": "workspace:*",
+    "@amends-dev/sync": "workspace:*",
+    "@effect/platform-browser": "catalog:",
+    "@foldkit/ui": "0.168.0",
+    "effect": "catalog:",
+    "foldkit": "0.168.0"
+  },
+  "devDependencies": {
+    "@amends-dev/channel": "workspace:*",
+    "@effect/platform-bun": "catalog:",
+    "@foldkit/vite-plugin": "0.27.1",
+    "fake-indexeddb": "6.2.5",
+    "happy-dom": "^20.10.6",
+    "vite": "8.3.4"
+  }
+}

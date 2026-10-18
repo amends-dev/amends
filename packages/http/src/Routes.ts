@@ -4,8 +4,9 @@
  * `/docs`, and `layerHandlers` is the group layers and the server's side of the middleware alone,
  * for tests: `BearerAuthentication`, and `WorkspaceMember` entering through the gateway. A
  * host provides `Gateway.Gateway`, `Accounts.Accounts`, `SignIn.SignIn`,
- * `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and its platform's HTTP
- * services, then serves the routes with `HttpRouter.serve` or `HttpRouter.toWebHandler`.
+ * `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, `SyncStorage.SyncStorage`,
+ * and its platform's HTTP services, then serves the routes with `HttpRouter.serve` or
+ * `HttpRouter.toWebHandler`.
  *
  * @since 0.1.0
  */
@@ -18,7 +19,6 @@ import * as AgentsHandlers from "./AgentsHandlers.ts"
 import * as Api from "./Api.ts"
 import * as AssignmentsHandlers from "./AssignmentsHandlers.ts"
 import * as BearerAuthentication from "./BearerAuthentication.ts"
-import * as ChangeFeedHandlers from "./ChangeFeedHandlers.ts"
 import * as ChannelsHandlers from "./ChannelsHandlers.ts"
 import * as ConnectionsHandlers from "./ConnectionsHandlers.ts"
 import * as GroupsHandlers from "./GroupsHandlers.ts"
@@ -27,6 +27,7 @@ import * as InvitationsHandlers from "./InvitationsHandlers.ts"
 import * as MeHandlers from "./MeHandlers.ts"
 import * as MembersHandlers from "./MembersHandlers.ts"
 import * as NotificationsHandlers from "./NotificationsHandlers.ts"
+import * as PresenceHandlers from "./PresenceHandlers.ts"
 import * as SessionHandlers from "./SessionHandlers.ts"
 import * as SettingsHandlers from "./SettingsHandlers.ts"
 import * as TasksHandlers from "./TasksHandlers.ts"
@@ -57,14 +58,14 @@ export const layerHandlers = Layer.mergeAll(
   ConnectionsHandlers.layer,
   AgentsHandlers.layer,
   TurnsHandlers.layer,
-  ChannelsHandlers.layer,
-  ChangeFeedHandlers.layer
+  PresenceHandlers.layer,
+  ChannelsHandlers.layer
 ).pipe(Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)))
 
 /**
  * The API routes and its OpenAPI document. Hosts provide `Gateway.Gateway`, `Accounts.Accounts`,
- * `SignIn.SignIn`, `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and
- * their platform's HTTP services, then serve this through `HttpRouter.serve` or
+ * `SignIn.SignIn`, `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`,
+ * `SyncStorage.SyncStorage`, and their platform's HTTP services, then serve this through `HttpRouter.serve` or
  * `HttpRouter.toWebHandler`.
  *
  * @category layers

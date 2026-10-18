@@ -8,10 +8,12 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as ChannelId from "../channel/ChannelId.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Request from "../request/Request.ts"
 import * as Characters from "../text/Text.ts"
 import * as TurnId from "../turn/TurnId.ts"
 import * as MemberId from "../workspace/MemberId.ts"
@@ -221,8 +223,8 @@ export const EditInput = Schema.Struct({
 export interface EditInput extends Schema.Schema.Type<typeof EditInput> {}
 
 /**
- * What editing a message records: its next revision, the new text and mentions, and when. The
- * group is the fact's audience.
+ * What editing a message records: its next revision, the new text and mentions, and when, with
+ * the thread's group.
  *
  * @category schemas
  * @since 0.1.0
@@ -245,7 +247,7 @@ export const Edited = Schema.Struct({
 export interface Edited extends Schema.Schema.Type<typeof Edited> {}
 
 /**
- * What deleting a message records: which, and when. The group is the fact's audience.
+ * What deleting a message records: which, and when, with the thread's group.
  *
  * @category schemas
  * @since 0.1.0
@@ -263,3 +265,12 @@ export const Deleted = Schema.Struct({
  * @since 0.1.0
  */
 export interface Deleted extends Schema.Schema.Type<typeof Deleted> {}
+
+/**
+ * The ID of the message the current request publishes in a thread, as `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (threadId: ThreadId.ThreadId) =>
+  Effect.map(Request.newId("thread-message", [threadId]), (id) => ThreadMessageId.ThreadMessageId.make(id))

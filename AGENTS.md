@@ -56,10 +56,13 @@ runs them, and keeps `console` to tests and scripts.
   command may read through the query, a query never writes, and a step with one caller stays a
   private function of that caller. `gateway` is how a
   host enters core: it bootstraps a workspace and resolves an authenticated identity into the actor,
-  and it holds the host contracts for storage, accounts, sign-in, session token resolution, and the
-  workspace directory. `http` is the HTTP protocol: the contract clients call, which they import by
-  module, and the handlers that implement it over the gateway, including its authentication. Another
-  protocol adds its own package over the same gateway rather than new gateway methods. The gateway's
+  and it holds the host contracts for storage, accounts, sign-in, session token resolution, the
+  workspace directory, and the keys browsers sync with. `http` is the HTTP protocol: the contract
+  clients call, which they import by module, and the handlers that implement it over the gateway,
+  including its authentication. Another protocol adds its own package over the same gateway rather
+  than new gateway methods: `sync` is how a member's browser keeps a workspace in sync, as Effect
+  eventlog events, the actions their browser writes and the changes and rejections the server
+  writes back to their store, over a WebSocket a host serves beside the HTTP API. The gateway's
   `conformance` module holds the test suites every storage adapter runs against itself through a
   fixture: what the storage contracts promise, from transactions and logs to accounts, across hosts
   over the same storage. The gateway's tests run them over the memory implementation, and test
@@ -92,9 +95,10 @@ runs them, and keeps `console` to tests and scripts.
   `codemode-opencode` implements the toolkit's `CodeRuntime` over `@opencode/codemode`, opencode's
   interpreter for code mode; the root manifest's `overrides` keeps that package on the catalog's
   Effect until it declares Effect as a peer.
-  `storage-postgresql` implements workspace storage, the workspace directory, accounts, and sign-in
-  storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field, except
-  the kind-specific `details` of a thread activity or a session log entry, stored as JSON. The
+  `storage-postgresql` implements workspace storage, the workspace directory, accounts, sign-in
+  storage, and sync storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record
+  field, except the kind-specific `details` of a thread activity or a session log entry, stored as
+  JSON, and carries core's presence between a host's processes as notices, storing none of it. The
   reference implementation of the same contracts, in process memory, is each contract's
   `layerMemory`, beside it in core and the gateway, which their tests run over. Both follow one
   shape: each store over a workspace binding, merged at the edge.
@@ -106,26 +110,20 @@ runs them, and keeps `console` to tests and scripts.
   Hosts may install their runtime's dependencies and consume shared packages. A host
   implements gateway contracts and serves protocol packages' handlers; its tests act as a
   client through the same package's contract.
-- `apps/*`: user-facing clients, the site, and shared UI. `icons` holds canonical drawings and
+- `apps/*`: what people see and its building blocks. `icons` holds canonical drawings and
   generated Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume
   it. `ui` is the pattern-based design system built from the Lunacy mocks in
   `design-system/Amends Group Exploration.free`, which are its visual reference: foundations,
   components, the six layout patterns, presentational screens, and the site's sections, with a
   standalone Storybook workshop.
-  Introduce and verify one piece at a time. It is UI-only and must not depend on client state,
-  routing, or API contracts. `client` owns headless session lifetime, typed API access, query state,
-  the view hooks screens connect through, and pure route helpers. UI never depends on client. Client
-  takes UI as a development dependency only to type what its hooks return as the screens' own types,
-  through type-only imports, and imports no UI code. `web` and `desktop` consume these libraries and
-  own route trees, page composition, API URL, and persistence configuration; each page connects
-  client hooks to UI screens. `desktop` owns the Tauri shell; platform APIs stay in the entry apps.
-  `site` is amends.dev on Astro and Starlight: static pages composed from UI's site sections without
-  client, and docs whose package guides and API reference are generated from each published
+  Introduce and verify one piece at a time. It is UI-only and must not depend on routing or API
+  contracts. `site` is amends.dev on Astro and Starlight: static pages composed from UI's site
+  sections, and docs whose package guides and API reference are generated from each published
   package's README and source, deployed with [Alchemy](https://alchemy.run) from its
   `alchemy.run.ts`; `stacks/` holds Alchemy stacks for the repository itself, such as its CI
-  secrets. Apps may install UI dependencies and consume shared packages. Run
-  desktop's `check:native` after changing Rust or Tauri configuration; root checks cover its
-  TypeScript only.
+  secrets. `app-v2` is the workspace app being built on Foldkit: a browser app that signs people in
+  over the HTTP API and keeps each workspace they open in sync through `sync`, its replica in
+  IndexedDB. Apps may install UI dependencies and consume shared packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no
@@ -140,9 +138,8 @@ package names for cross-workspace imports, not relative paths into another works
 
 Compose pages and UI declaratively through nested children and named parts. Use props for data,
 options, and callbacks rather than custom slots carrying whole components or JSX trees. Follow
-framework-required render APIs where needed. Pages live in `apps/web`, `apps/desktop`, and
-`apps/site`; UI owns reusable visual pieces, and client owns connected state and actions as hooks.
-Neither shared package owns application pages.
+framework-required render APIs where needed. Pages live in `apps/site`; UI owns reusable visual
+pieces and owns no application pages.
 UI screens are presentational: they take data and callbacks and render a pane or
 the navigation, while the apps own routes, data, and which screen shows.
 Every rail destination follows one navigation pattern
@@ -151,8 +148,8 @@ Create, the main content shows the list or one item with tabs as links, and the 
 only something inside what the main content shows. A page about one item puts its sections in
 `Pane.Column`, one column; never lay details or forms side by side in the main content.
 
-Web, desktop, and site compose UI; they do not define styles, style elements, inline style objects,
-or local stylesheets. Shared UI stylesheet/font imports and component options are allowed. Before
+The site composes UI; it does not define styles, style elements, inline style objects, or local
+stylesheets. Shared UI stylesheet/font imports and component options are allowed. Before
 filling a visual gap, inspect the existing components (including Shell), evaluate whether a reusable
 addition fits the design system, and verify that UI component in its workshop before composing it
 into an app page.

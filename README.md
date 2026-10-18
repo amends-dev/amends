@@ -12,8 +12,8 @@ yet.
 
 ## What is in this repository
 
-- **The app.** A web app and a desktop app over one HTTP API. The [local host](hosts/local) serves
-  the API on Bun and keeps workspaces in PostgreSQL.
+- **The workspace.** One HTTP API, which the [local host](hosts/local) serves on Bun, keeping
+  workspaces in PostgreSQL. The app people work in is being rebuilt.
 - **Developer packages.** The parts that run agents, and the sandboxes they work in, publish to npm
   under `@amends-dev`. They are built on [Effect](https://effect.website) and work in any Effect
   program, not only in amends.
@@ -48,18 +48,11 @@ AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
 
 The host listens on `http://127.0.0.1:8787` and creates its tables when it starts; `bun run dev`
-restarts it as its source changes. In another terminal, start the web app and open
-`http://127.0.0.1:4321/`:
-
-```sh
-bun run --filter @amends-dev/web dev
-```
-
-Sign in with an email address: the local host prints the one-time code in its terminal. To connect
+restarts it as its source changes. Sign in with an email address, through `POST /session/email` and
+`POST /session/code`: the local host prints the one-time code in its terminal. To connect
 model providers, sandboxes, and the other integrations, also set `AMENDS_CREDENTIAL_KEY`, which seals
-their credentials; the [local host guide](hosts/local/README.md#run) lists every setting. The
-[desktop app](apps/desktop/README.md#run-and-verify) needs Rust and Tauri's prerequisites too. The
-API describes itself at `/openapi.json` and `/docs`.
+their credentials; the [local host guide](hosts/local/README.md#run) lists every setting. The API describes itself at
+`/openapi.json` and `/docs`.
 
 The local host has no email provider yet, so whoever reads its terminal can sign in as anyone. Do not
 expose it beyond your machine.
@@ -70,7 +63,7 @@ expose it beyond your machine.
 packages/        shared packages on Effect alone: core, the contracts, and the HTTP API
 adapters/        implementations over one external system each, such as PostgreSQL or Daytona
 hosts/           runtime composition: the local Bun host
-apps/            the design system, the headless client, the web and desktop apps, and the site
+apps/            the design system, its icons, and the site
 docs/            guides, design documents, and known limitations
 design-system/   the visual references the design system is built from
 scripts/         repository tooling

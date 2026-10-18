@@ -23,6 +23,7 @@ import { GroupQuery, GroupFollowStore, GroupMembershipStore, GroupStore } from "
 import { type Actor, Identity, Performer } from "@amends-dev/core/identity"
 import { Checkpoint, Event, Journal, Publication } from "@amends-dev/core/journal"
 import { type Notification, NotificationStore } from "@amends-dev/core/notification"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { TaskStore, TaskTimeline } from "@amends-dev/core/task"
 import {
@@ -120,6 +121,7 @@ export const bind = (
     | WorkspaceStorage.Bindings
     | TurnJobs.TurnJobs
     | DeliveryJobs.DeliveryJobs
+    | PresenceRelay.PresenceRelay
     | Integrations.Integrations
     | Crypto.Crypto
   >
@@ -175,23 +177,25 @@ export const listOldestFirst = (
 ) => Effect.map(notificationStore.listLatestByRecipient(recipient, options), (latest) => latest.toReversed())
 
 /**
- * A workspace's stores and signal hub, with the host's cryptography, no integrations, and jobs
- * that accept requests and run nothing: the suites run turns themselves when they need to.
+ * A workspace's stores, with the host's cryptography, no integrations, jobs that accept requests
+ * and run nothing, as the suites run turns themselves when they need to, and a presence relay in
+ * memory.
  */
 const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>, crypto: Crypto.Crypto) =>
-  Effect.map(Integrations.make([]), (integrations) =>
+  Effect.map(Effect.all([Integrations.make([]), PresenceRelay.makeMemory]), ([integrations, presenceRelay]) =>
     bind(
       context.pipe(
         Context.add(Crypto.Crypto, crypto),
         Context.add(TurnJobs.TurnJobs, TurnJobs.noRunner),
         Context.add(DeliveryJobs.DeliveryJobs, DeliveryJobs.noRunner),
+        Context.add(PresenceRelay.PresenceRelay, presenceRelay),
         Context.add(Integrations.Integrations, integrations)
       )
     )
   )
 
 /**
- * One workspace's bound stores and signal hub on a host, with the host's cryptography, no
+ * One workspace's bound stores on a host, with the host's cryptography, no
  * integrations, and jobs that accept requests and run nothing.
  *
  * @category testing
@@ -203,7 +207,7 @@ export const forWorkspace = (host: Context.Context<Fixture.Host>, id: WorkspaceI
   )
 
 /**
- * One workspace's stores and signals on the host in context, as a gateway's caller has it.
+ * One workspace's stores on the host in context, as a gateway's caller has it.
  *
  * @category testing
  * @since 0.1.0
@@ -253,14 +257,20 @@ export const runHost = <A, E, R>(storage: Fixture.Storage, program: Effect.Effec
 export const core = (bound: Bound) => Core.layer.pipe(Layer.provideMerge(Layer.succeedContext(bound.context)))
 
 /**
- * A gateway over a host, installing what `options` say, and running no jobs.
+ * A gateway over a host, installing what `options` say, running no jobs, and relaying presence in
+ * memory.
  *
  * @category testing
  * @since 0.1.0
  */
 export const gateway = (host: Context.Context<Fixture.Host>, options: Gateway.Options = {}) =>
   Gateway.layer(options).pipe(
-    Layer.provideMerge([Layer.succeedContext(host), TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner])
+    Layer.provideMerge([
+      Layer.succeedContext(host),
+      TurnJobs.layerNoRunner,
+      DeliveryJobs.layerNoRunner,
+      PresenceRelay.layerMemory
+    ])
   )
 
 /**
@@ -436,7 +446,7 @@ export const request = (
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
   roleId: Role.RoleId = BuiltinRoles.MemberId
-): Invitation.IssueInput => ({ recipientId, expiresAt, roleId })
+): Invitation.IssueInput => ({ recipientId, recipientEmail: `${recipientId}@example.com`, expiresAt, roleId })
 
 /**
  * Replace what a store's by-ID reads return for one ID, in both single and batch reads;

@@ -140,6 +140,19 @@ it.effect("resolution expands role and direct assignments at their individual sc
   })
 )
 
+it("grantsOf expands role and direct assignments from records alone, and a role it is not given confers nothing", () => {
+  const assignments = [
+    assigned("workspace-role", roleSource()),
+    assigned("unknown-role", roleSource(workspaceScope, Role.RoleId.make("unknown"))),
+    assigned("direct-workspace", directSource(ManageWorkspace.name, workspaceTargetScope))
+  ]
+  expect(GrantResolver.grantsOf(assignments, (id) => (id === roleId ? role : undefined))).toEqual([
+    { permission: MemberPermissions.Read.name, scope: workspaceScope },
+    { permission: MemberPermissions.Remove.name, scope: workspaceScope },
+    { permission: ManageWorkspace.name, scope: workspaceTargetScope }
+  ])
+})
+
 it.effect("one resolver observes staged journal changes, later role edits, and assignment revocations", () =>
   Effect.gen(function* () {
     const fixture = yield* make()

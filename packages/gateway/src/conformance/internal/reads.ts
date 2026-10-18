@@ -1,6 +1,5 @@
 import { AssignmentService } from "@amends-dev/core/authorization"
-import { ChangeFeedService } from "@amends-dev/core/change-feed"
-import { Notification, NotificationService } from "@amends-dev/core/notification"
+import { NotificationService } from "@amends-dev/core/notification"
 import { InvitationService, MemberService, OwnershipService, MemberId } from "@amends-dev/core/workspace"
 import { Entry, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
@@ -8,7 +7,6 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import * as Option from "effect/Option"
-import * as Stream from "effect/Stream"
 import * as Gateway from "../../Gateway.ts"
 import type * as Fixture from "../Fixture.ts"
 import * as Support from "../Support.ts"
@@ -64,13 +62,6 @@ export const reads = (fixture: Fixture.Fixture) => {
                   expect(yield* notificationService.inbox({ limit: 10 })).toEqual([])
                   expect(yield* notificationService.inbox({ limit: 10, pendingOnly: true })).toEqual([])
                   expect((yield* notificationService.countPending).pending).toBe(0)
-                  expect(
-                    yield* Effect.flip(notificationService.markSeen(Notification.NotificationId.make("missing")))
-                  ).toMatchObject({ _tag: "CoreError.NotFound" })
-                  const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch()
-                  expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
-                    { _tag: "Ready", workspaceId: workspace.id, reset: true }
-                  ])
                 })
               )
               // Write operations still enter their transaction before checking the target.

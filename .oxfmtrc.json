@@ -16,7 +16,6 @@
     "**/coverage/**",
     "bun.lock",
     "**/target/**",
-    "apps/desktop/src-tauri/gen/**",
     "apps/site/.astro/**",
     "**/.alchemy/**",
     "apps/site/src/content/docs/docs/api/**",

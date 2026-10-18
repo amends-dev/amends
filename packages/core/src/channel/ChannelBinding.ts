@@ -24,7 +24,7 @@ export const ChannelBinding = Schema.Struct({
   threadId: ThreadId.ThreadId,
   workspaceId: WorkspaceId.WorkspaceId,
   channelId: ChannelId.ChannelId,
-  /** The thread's group, copied so that the fact's audience follows from its payload. */
+  /** The thread's group, whose members may read the binding. */
   groupId: GroupId.GroupId,
   /**
    * The external conversation, as the channel's transport identifies it and with what the

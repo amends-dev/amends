@@ -1,6 +1,6 @@
 /**
- * The operations on messages an actor calls: publishing a reply, editing and deleting one, and
- * telling a thread's readers that a reply is being written. Only people write through it; an
+ * The operations on messages an actor calls: publishing a reply, and editing and deleting one. Only
+ * people write through it; an
  * agent's replies come from its turns. A reply authorizes its author and the members it mentions,
  * admits them, and records its recipients, all in one commit, and an edit does the same for the
  * members it newly mentions.
@@ -11,7 +11,6 @@
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
-import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -26,10 +25,7 @@ import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as ReadStateCommand from "../read-state/ReadStateCommand.ts"
-import * as Request from "../request/Request.ts"
-import * as Signal from "../signal/Signal.ts"
-import * as SignalHub from "../signal/SignalHub.ts"
+import * as ReadStateFacts from "../read-state/ReadStateFacts.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
@@ -84,14 +80,6 @@ export type DeleteError =
   | CoreError.Uncertain
 
 /**
- * What saying one is typing can fail with.
- *
- * @category errors
- * @since 0.1.0
- */
-export type TypingError = CoreError.NotFound | CoreError.Denied | CoreError.Invalid | CoreError.Unavailable
-
-/**
  * The message operations, one of `Core.Operations`.
  *
  * @category services
@@ -103,10 +91,10 @@ export class ThreadMessageService extends Context.Service<
     /**
      * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
      * Mentioned agents need the author's agent-use authority; agents already taking part do not.
+     * Within a request, a retry returns the message its first attempt published.
      */
     readonly publish: (
-      input: ThreadMessage.PublishInput,
-      options?: Request.Options
+      input: ThreadMessage.PublishInput
     ) => Effect.Effect<ThreadMessage.ThreadMessage, Error, Actor.Actor>
     /**
      * Replace the text and mentions of a message the actor wrote, at its next revision, under
@@ -126,13 +114,6 @@ export class ThreadMessageService extends Context.Service<
     readonly delete: (
       messageId: ThreadMessageId.ThreadMessageId
     ) => Effect.Effect<ThreadMessage.ThreadMessage, DeleteError, Actor.Actor>
-    /**
-     * Tell the thread's readers that the acting member is composing a message there, for the next
-     * few seconds. Requires current group access and `thread.publish`, as publishing does. Repeats
-     * from the same member in the same thread within a moment are dropped, so a client may send it
-     * whenever the member types.
-     */
-    readonly typing: (threadId: ThreadId.ThreadId) => Effect.Effect<void, TypingError, Actor.Actor>
   }
 >()("@amends-dev/core/thread/ThreadMessageService") {}
 
@@ -155,12 +136,6 @@ const selectedFor = (
   return [...byKey.values()]
 }
 
-/** How long readers show a typing indicator without a repeat. */
-const typingFor = Duration.seconds(6)
-
-/** Typing repeats closer than this are dropped. */
-const typingEvery = Duration.seconds(2)
-
 /**
  * Capture bound services; authorize each reply inside its commit.
  *
@@ -171,23 +146,10 @@ export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadCommand = yield* ThreadCommand.ThreadCommand
-  const readStateCommand = yield* ReadStateCommand.ReadStateCommand
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
-  const signalHub = yield* SignalHub.SignalHub
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
-  /**
-   * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
-   * from its author and key, so a retry names the message its first attempt published.
-   */
-  const deriveReplyId = Effect.fnUntraced(function* (key: Request.Key | undefined) {
-    const actor = yield* Actor.Actor
-    return ThreadMessageId.ThreadMessageId.make(
-      yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId])
-    )
-  })
-
   /** The thread, once the actor may read it and publish there. */
   const requirePublishable = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* threadQuery.requireAccess(threadId)
@@ -199,10 +161,6 @@ export const make = Effect.gen(function* () {
     ])
     return thread
   })
-
-  /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
-  const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessageId.ThreadMessageId) =>
-    key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId)
 
   /**
    * A message and its thread, once the actor may act in that thread; to anyone outside its group,
@@ -230,14 +188,15 @@ export const make = Effect.gen(function* () {
   const sameMentions = (left: ReadonlyArray<MemberId.MemberId>, right: ReadonlyArray<MemberId.MemberId>) =>
     left.length === right.length && left.every((memberId) => right.includes(memberId))
   const publish = Effect.fn("ThreadMessageService.publish")(
-    function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
+    function* (input: ThreadMessage.PublishInput) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input)
       const thread = yield* requirePublishable(request.threadId)
       const actor = yield* Actor.Actor
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
-      const messageId = yield* deriveReplyId(options.requestKey)
-      const retried = yield* findRetriedReply(options.requestKey, messageId)
+      // A retry returns the message its first attempt published.
+      const messageId = yield* ThreadMessage.newId(thread.id)
+      const retried = yield* threadMessageStore.get(messageId)
       if (Option.isSome(retried)) return retried.value
       // Without mentions a reply addresses every current participant; with them, only the
       // author and those mentioned are read.
@@ -282,15 +241,14 @@ export const make = Effect.gen(function* () {
         occurredAt: yield* DateTime.now
       })
       // Replying reads the thread through the author's own message.
-      yield* readStateCommand.markThreadRead(
-        {
+      yield* journal
+        .publish(ReadStateFacts.ThreadRead, {
           workspaceId,
           memberId: actor.memberId,
           threadId: thread.id,
           readThrough: published.activity.sequence
-        },
-        published.activity.occurredAt
-      )
+        })
+        .pipe(Publication.withOccurredAt(published.activity.occurredAt))
       return published.message
     },
     Publication.withActor,
@@ -390,36 +348,11 @@ export const make = Effect.gen(function* () {
     Operation.report
   )
 
-  /** When each member last said they were typing in each thread, in this process. */
-  const lastTyping = new Map<string, number>()
-  const typing = Effect.fn("ThreadMessageService.typing")(function* (threadId: ThreadId.ThreadId) {
-    const thread = yield* requirePublishable(threadId)
-    const actor = yield* Actor.Actor
-    const now = yield* DateTime.now
-    const at = DateTime.toEpochMillis(now)
-    const key = JSON.stringify([actor.memberId, thread.id])
-    const last = lastTyping.get(key)
-    if (last !== undefined && at - last < Duration.toMillis(typingEvery)) return
-    // Forget old entries so the map follows only recent typists.
-    if (lastTyping.size > 1024)
-      for (const [entry, time] of lastTyping) if (at - time >= Duration.toMillis(typingFor)) lastTyping.delete(entry)
-    lastTyping.set(key, at)
-    yield* signalHub.publish(
-      Signal.Signal.cases.Typing.make({
-        workspaceId,
-        groupId: thread.groupId,
-        threadId: thread.id,
-        memberId: actor.memberId,
-        until: DateTime.add(now, { milliseconds: Duration.toMillis(typingFor) })
-      })
-    )
-  }, Operation.report)
-  return ThreadMessageService.of({ publish, edit, delete: deleteMessage, typing })
+  return ThreadMessageService.of({ publish, edit, delete: deleteMessage })
 })
 
 /**
- * Provide the message operations over the shared reads and writes, the stores, authorization, and
- * the workspace's signals.
+ * Provide the message operations over the shared reads and writes, the stores, and authorization.
  *
  * @category layers
  * @since 0.1.0

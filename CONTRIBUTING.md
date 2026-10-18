@@ -14,7 +14,6 @@ You need:
 - [Bun](https://bun.com) 1.3.14, the version CI uses.
 - PostgreSQL, with `initdb` and `pg_ctl` on your `PATH`: the PostgreSQL tests start a temporary
   server of their own, or use the server at `AMENDS_POSTGRES_URL` when it is set.
-- Rust and Tauri's prerequisites, only to work on the [desktop app](apps/desktop/README.md).
 
 Then, from the repository root:
 
@@ -71,12 +70,8 @@ bun run lefthook run pre-commit --force
 The hook does not run tests, so run the suites of the packages you touched before committing. CI
 runs the checks, the tests, and the frontend builds on every pull request.
 
-Two changes need more:
-
-- **The host's runtime setup.** Start the host on a temporary database and confirm it listens, as
-  the [local host guide](hosts/local/README.md#verify) describes.
-- **Rust or Tauri configuration.** Run `bun run --filter @amends-dev/desktop check:native`; the root
-  checks cover only the desktop app's TypeScript.
+A change to the host's runtime setup needs more: start the host on a temporary database and
+confirm it listens, as the [local host guide](hosts/local/README.md#verify) describes.
 
 ## Making a change
 

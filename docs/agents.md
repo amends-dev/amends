@@ -56,6 +56,4 @@ agent, and which modal shows.
 
 A rename carries the name it started from; one renamed elsewhere meanwhile conflicts, and the reader
 refreshes, reviews, and saves again with their draft kept. A creation retried after a lost response
-reuses its request key, so it is not created twice. The change feed refreshes agents on each
-`agent.*` commit and on membership, connection, and access changes; see
-[change feed](change-feed.md).
+reuses its request key, so it is not created twice.

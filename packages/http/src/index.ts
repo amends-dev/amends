@@ -71,16 +71,6 @@ export * as BearerAuthentication from "./BearerAuthentication.ts"
 /**
  * @since 0.1.0
  */
-export * as ChangeFeedGroup from "./ChangeFeedGroup.ts"
-
-/**
- * @since 0.1.0
- */
-export * as ChangeFeedHandlers from "./ChangeFeedHandlers.ts"
-
-/**
- * @since 0.1.0
- */
 export * as ChannelsGroup from "./ChannelsGroup.ts"
 
 /**
@@ -152,6 +142,16 @@ export * as NotificationsGroup from "./NotificationsGroup.ts"
  * @since 0.1.0
  */
 export * as NotificationsHandlers from "./NotificationsHandlers.ts"
+
+/**
+ * @since 0.1.0
+ */
+export * as PresenceGroup from "./PresenceGroup.ts"
+
+/**
+ * @since 0.1.0
+ */
+export * as PresenceHandlers from "./PresenceHandlers.ts"
 
 /**
  * @since 0.1.0

@@ -3,6 +3,7 @@ import type { Fixture } from "@amends-dev/gateway/conformance"
 import { Crypto, Effect, Layer } from "effect"
 import * as Accounts from "../src/Accounts.ts"
 import * as SignInStorage from "../src/SignInStorage.ts"
+import * as SyncStorage from "../src/SyncStorage.ts"
 import * as WorkspaceDirectory from "../src/WorkspaceDirectory.ts"
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts"
 
@@ -20,7 +21,8 @@ const layerMemoryStorage = Layer.mergeAll(
   WorkspaceStorage.layerMemory,
   WorkspaceDirectory.layerMemory,
   Accounts.layerMemory,
-  SignInStorage.layerMemory
+  SignInStorage.layerMemory,
+  SyncStorage.layerMemory
 ).pipe(Layer.provide(MemoryDatabase.layerConnection))
 
 /** New memory storage for each test; each connection is another host over it. */
@@ -43,12 +45,7 @@ export const fixture: Fixture = {
             let total = 0
             for (const space of database.spaces.values()) {
               total += space.logs.commits.size + space.logs.appends.size
-              total +=
-                space.threadPositions.size +
-                space.groupTimes.size +
-                space.notificationsSeen.size +
-                space.connectionCredentials.size +
-                space.sessionStates.size
+              total += space.connectionCredentials.size + space.sessionStates.size
               for (const batches of space.logs.batches.values())
                 for (const batch of batches) total += 1 + batch.entries.length
               for (const table of space.records) total += table.size

@@ -47,7 +47,6 @@ import * as ThreadMessageFacts from "./ThreadMessageFacts.ts"
 import * as ThreadMessageId from "./ThreadMessageId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts"
-import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 import * as ThreadQuery from "./ThreadQuery.ts"
 import * as ThreadStore from "./ThreadStore.ts"
 
@@ -452,7 +451,7 @@ export const make = Effect.gen(function* () {
       }
       const participant = yield* participantOf(reference, candidates)
       const admitted: typeof ThreadParticipation.Admission.Type = {
-        id: ThreadParticipationId.ThreadParticipationId.make(yield* crypto.randomUUIDv4()),
+        id: yield* ThreadParticipation.newId(thread.id, reference).pipe(Effect.provideService(Crypto.Crypto, crypto)),
         workspaceId,
         threadId: thread.id,
         participant,
@@ -487,7 +486,9 @@ export const make = Effect.gen(function* () {
     const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details, input.thread.id)
     const activity: ThreadActivity.ThreadActivity = {
       ...prepared,
-      id: ThreadActivity.ThreadActivityId.make(yield* crypto.randomUUIDv4()),
+      id: yield* ThreadActivity.newId(input.thread.id, prepared.kind, prepared.subject).pipe(
+        Effect.provideService(Crypto.Crypto, crypto)
+      ),
       workspaceId,
       threadId: input.thread.id,
       sequence: input.sequence,

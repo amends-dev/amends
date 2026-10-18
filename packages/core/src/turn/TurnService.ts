@@ -17,26 +17,27 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
-import * as Predicate from "effect/Predicate"
 import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
 import type * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
+import * as AssignmentFacts from "../authorization/AssignmentFacts.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as RoleFacts from "../authorization/RoleFacts.ts"
 import * as Target from "../authorization/Target.ts"
-import * as ChangeFeedSource from "../change-feed/ChangeFeedSource.ts"
 import * as CoreError from "../error/CoreError.ts"
+import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
+import * as Subject from "../journal/Subject.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Request from "../request/Request.ts"
-import * as Signal from "../signal/Signal.ts"
-import * as SignalHub from "../signal/SignalHub.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
+import * as MemberFacts from "../workspace/MemberFacts.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as SessionLog from "./SessionLog.ts"
 import * as Turn from "./Turn.ts"
@@ -44,7 +45,6 @@ import * as TurnActivity from "./TurnActivity.ts"
 import * as TurnCommand from "./TurnCommand.ts"
 import * as TurnFacts from "./TurnFacts.ts"
 import * as TurnId from "./TurnId.ts"
-import * as TurnQuery from "./TurnQuery.ts"
 import * as TurnStore from "./TurnStore.ts"
 
 /**
@@ -139,11 +139,10 @@ export class TurnService extends Context.Service<
     readonly listActive: (limit: number) => Effect.Effect<ReadonlyArray<Turn.View>, ActiveError, Actor.Actor>
     /**
      * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
-     * those its session log adds as the turn works, with the step it is writing, until the turn's
-     * end commits and every item is delivered. The caller owns the subscription scope. The stream
+     * those its session log adds as the turn works, until the turn's end commits and every item is delivered. The caller owns the subscription scope. The stream
      * fails with `CoreError.Unavailable`, `LogInterrupted`, when following cannot go on, including
      * once the reader may no longer read the thread, which it checks with each batch and whenever a
-     * commit changes their groups or grants; following again starts from the items as they stand.
+     * commit changes anyone's groups or grants; following again starts from the items as they stand.
      */
     readonly watchLog: (
       turnId: TurnId.TurnId
@@ -176,29 +175,37 @@ const endings: ReadonlySet<string> = new Set([
   TurnFacts.Cancelled.name
 ])
 
-/** Whether a commit ends the turn: it holds a fact ending a turn, whose payload names this one. */
-const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: TurnId.TurnId) =>
-  delivery.events.some(
-    ({ name, payload }) => endings.has(name) && Predicate.hasProperty(payload, "turnId") && payload.turnId === turnId
-  )
+/** Journal batches read at a time while following a turn's log. */
+const commitPage = 100
+
+/**
+ * The facts that change whom a thread is readable to: group memberships, the assignments that give
+ * members their grants, a role's permissions, and leaving the workspace.
+ */
+const accessChanges: ReadonlySet<string> = new Set([
+  GroupMembershipFacts.Added.name,
+  GroupMembershipFacts.Removed.name,
+  AssignmentFacts.Created.name,
+  AssignmentFacts.Revoked.name,
+  RoleFacts.PermissionsChanged.name,
+  MemberFacts.Removed.name
+])
 
 /**
  * The service over the turn and participation stores, the session log store, the thread query,
- * authorization, the turn command, the journal, the signal hub, and the change feed.
+ * authorization, the turn command, and the journal.
  *
  * @category constructors
  * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const turnStore = yield* TurnStore.TurnStore
-  const turnQuery = yield* TurnQuery.TurnQuery
+  const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const authorization = yield* Authorization.Authorization
   const turnCommand = yield* TurnCommand.TurnCommand
   const journal = yield* Journal.Journal
   const sessionLogs = yield* SessionLog.SessionLogs
-  const signalHub = yield* SignalHub.SignalHub
-  const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource
   const crypto = yield* Crypto.Crypto
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
@@ -213,6 +220,20 @@ export const make = Effect.gen(function* () {
     yield* authorization.require([readThreadRequirement(thread.id)])
     return thread
   })
+  /** Where the turn's agent stands on its thread: its active and latest turns there, and whether it takes part. */
+  const readStanding = Effect.fnUntraced(function* (turn: Turn.Turn) {
+    const active = yield* turnStore.findActive(turn.memberId, turn.threadId)
+    const latest = yield* turnStore.findLatest(turn.memberId, turn.threadId)
+    const participation = yield* threadParticipationStore.get(turn.participationId)
+    return {
+      active: Option.isSome(active),
+      latest: Option.getOrUndefined(Option.map(latest, ({ id }) => id)),
+      participating: Option.isSome(participation) && participation.value.status === "active"
+    } satisfies Turn.Standing
+  })
+  /** Why the turn can't run again now, `Turn.whyNotRetryable`; undefined when it can. */
+  const whyNotRetryable = (turn: Turn.Turn) =>
+    Effect.map(readStanding(turn), (standing) => Turn.whyNotRetryable(turn, standing))
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
   const requireReadableTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const found = yield* turnStore.get(turnId)
@@ -227,9 +248,7 @@ export const make = Effect.gen(function* () {
   const toViews = Effect.fnUntraced(function* (list: ReadonlyArray<Turn.Turn>) {
     const directed = yield* authorization.permitted(list.map(Turn.directRequirement))
     return yield* Effect.forEach(list, (turn, index) =>
-      Effect.map(turnQuery.whyNotRetryable(turn), (reason) =>
-        Turn.view(turn, directed[index] === true, reason === undefined)
-      )
+      Effect.map(whyNotRetryable(turn), (reason) => Turn.view(turn, directed[index] === true, reason === undefined))
     )
   })
   const toView = (turn: Turn.Turn) => Effect.map(toViews([turn]), (views) => views[0] as Turn.View)
@@ -265,10 +284,9 @@ export const make = Effect.gen(function* () {
 
   const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: TurnId.TurnId) {
     const id = yield* Schema.decodeEffect(TurnId.TurnId)(turnId)
-    // Register for drafts and commits before reading, so none that follows is missed: the turn's
-    // end, or a change to the reader's access, committed after the reads below is delivered.
-    const live = yield* signalHub.subscribe
-    const committed = yield* changeFeedSource.subscribe(Option.none()).pipe(Effect.mapError(logInterrupted))
+    // Follow commits from the journal's head as it stands before the reads below, so that the turn's
+    // end, or a change to the reader's access, committed after them is not missed.
+    const head = yield* journal.log.head.pipe(Effect.mapError(logInterrupted))
     const turn = yield* requireReadableTurn(id)
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Actor
@@ -313,7 +331,6 @@ export const make = Effect.gen(function* () {
 
     type Input = Data.TaggedEnum<{
       Logged: { readonly batch: Log.Batch<SessionLog.Entry> }
-      Drafted: { readonly draft: Turn.LogMessage }
       AccessChanged: {}
       Ended: {}
     }>
@@ -323,31 +340,23 @@ export const make = Effect.gen(function* () {
       Stream.map((batch) => Input.Logged({ batch })),
       Stream.mapError(logInterrupted)
     )
-    const draftedInputs = live.pipe(
-      Stream.filter(
-        (signal): signal is Extract<Signal.Signal, { readonly _tag: "TurnDraft" }> =>
-          Signal.Signal.isAnyOf(["TurnDraft"])(signal) && signal.turnId === turn.id
-      ),
-      Stream.map((signal): Input =>
-        Input.Drafted({
-          draft: Turn.LogMessage.cases.Drafted.make(signal.draft)
-        })
+    const turnSubject = Subject.make("turn", turn.id)
+    // Commits that end the turn, or change anyone's groups or grants, after which the reader's
+    // access is checked again.
+    const committedInputs = journal.log
+      .tail(
+        Option.match(head, { onNone: () => ({ limit: commitPage }), onSome: (after) => ({ after, limit: commitPage }) })
       )
-    )
-    // Commits that end the turn, or change the reader's groups or grants, or everyone's, as a
-    // role's permissions do.
-    const committedInputs = committed.deliveries.pipe(
-      Stream.map((delivery): ReadonlyArray<Input> => [
-        ...(delivery.events.some(
-          ({ access }) => access !== undefined && (access.memberId === undefined || access.memberId === actor.memberId)
-        )
-          ? [Input.AccessChanged()]
-          : []),
-        ...(endsTurn(delivery, turn.id) ? [Input.Ended()] : [])
-      ]),
-      Stream.flattenIterable,
-      Stream.mapError(logInterrupted)
-    )
+      .pipe(
+        Stream.map((batch): ReadonlyArray<Input> => [
+          ...(batch.entries.some(({ payload }) => accessChanges.has(payload.name)) ? [Input.AccessChanged()] : []),
+          ...(batch.entries.some(({ payload }) => endings.has(payload.name) && payload.subject === turnSubject)
+            ? [Input.Ended()]
+            : [])
+        ]),
+        Stream.flattenIterable,
+        Stream.mapError(logInterrupted)
+      )
     /** The turn as it ended, with what is left of its log: every entry precedes its end. */
     const readEnding = Effect.gen(function* () {
       yield* readLogSoFar
@@ -357,11 +366,10 @@ export const make = Effect.gen(function* () {
     }).pipe(Effect.mapError(logInterrupted))
     /**
      * What each input tells the reader, one at a time, so reads and what was sent agree. Once the
-     * reader's access changes, it is checked before anything more is sent, drafts included.
+     * reader's access changes, it is checked before anything more is sent.
      */
     const messagesFor = (input: Input): Effect.Effect<ReadonlyArray<Turn.LogMessage>, CoreError.Unavailable> =>
       Input.$match(input, {
-        Drafted: ({ draft }) => Effect.succeed([draft]),
         AccessChanged: () => Effect.as(checkStillReadable, []),
         Logged: ({ batch }) =>
           checkStillReadable.pipe(
@@ -372,7 +380,7 @@ export const make = Effect.gen(function* () {
       })
     return Stream.make(openedMessage).pipe(
       Stream.concat(
-        Stream.mergeAll([loggedInputs, draftedInputs, committedInputs], {
+        Stream.mergeAll([loggedInputs, committedInputs], {
           concurrency: "unbounded"
         }).pipe(
           Stream.mapEffect(messagesFor),
@@ -407,9 +415,9 @@ export const make = Effect.gen(function* () {
       yield* authorization.require([Turn.directRequirement(turn)])
       // A turn is retried at most once, since its retry supersedes it, so the retry's ID comes from
       // the turn it retries and asking again returns that retry.
-      const retryId = TurnId.TurnId.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]))
+      const retryId = yield* Turn.retryId(workspaceId, turn.id)
       if (Option.isSome(yield* turnStore.get(retryId))) return yield* toView(yield* requireReadableTurn(retryId))
-      const reason = yield* turnQuery.whyNotRetryable(turn)
+      const reason = yield* whyNotRetryable(turn)
       if (reason !== undefined)
         return yield* new CoreError.Conflict({
           reason: new CoreError.NotRetryable({ turnId: turn.id, reason })

@@ -31,7 +31,7 @@ it.effect.each([5, 50, 1000])("configuration accepts a pool of %i connections", 
 )
 
 // A process that runs jobs holds three connections (the address claim, shard locks, and the notice
-// listener), and requests need two more; three hangs once a change stream opens.
+// listener), and requests need two more; three hangs once a stream that follows the journal opens.
 it.effect.each(["", "0", "1", "3", "4", "1001", "5.5", "many"])("configuration rejects a pool size of %j", (size) =>
   Effect.gen(function* () {
     const error = yield* load({

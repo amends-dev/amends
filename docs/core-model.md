@@ -1241,7 +1241,7 @@ same integrations.
 
 Authentication is a method a connection uses, not a kind of connection: none, a key the person
 connecting supplies, or OAuth. An integration declares the methods it accepts. The key itself
-lives in protected storage outside the journal: no fact, change-feed event, or view carries one,
+lives in protected storage outside the journal: no fact, replica record, or view carries one,
 and replay restores the connection without it. A key is stored in the commit that records its
 connection, so both exist or neither does, and removing a connection deletes it. For OAuth, an
 integration will declare the scopes each part needs, so readiness can differ per part as scopes
@@ -2025,17 +2025,14 @@ Posting a message reads the thread through it for its author, settling their ear
 from it the same way; a message never notifies its own author.
 
 Marking a thread read through a sequence also records `Seen` for the member's pending
-notifications from that thread's activity up to it, in the same operation. A human's `Seen` is
-private state like the position, not a journal fact: reading never takes the workspace's write
-order, and rebuilding projections keeps both. Agents have no read positions: turns track their
-input progress.
+notifications from that thread's activity up to it, in the same commit. Agents have no read
+positions: turns track their input progress.
 
-Read positions and read times are private, per-member state rather than journal facts. They
-change on every view, carry no audit value, and must not compete with conversation writes for the
-workspace's write order. Rebuilding projections from the journal does not restore them. Their
-store contract needs only keyed records, batch reads, and a forward-only update.
-A member's other connected sessions learn of each change as an ephemeral signal on the change
-feed, delivered only to that member and never stored; a session that reconnects rereads them.
+Read positions, read times, and `Seen` are private to their member, and the journal records them
+as facts like any other change: a member's browser keeps them in its replica, which follows the
+journal, and marking something read is an action the server commits as a request anyway.
+Projections keep them, so rebuilding projections restores them. A position or read time that does
+not move forward records nothing.
 
 ### Effect at scale
 

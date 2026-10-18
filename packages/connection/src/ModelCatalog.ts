@@ -18,7 +18,6 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { snapshot } from "./internal/snapshot.ts"
 
 /**
  * A kind of content a model takes or gives.
@@ -242,5 +241,11 @@ export const make = (catalog: Catalog): ModelCatalog["Service"] => {
  */
 export const layer: Layer.Layer<ModelCatalog> = Layer.effect(
   ModelCatalog,
-  Schema.decodeEffect(Schema.fromJsonString(Catalog))(snapshot).pipe(Effect.map(make), Effect.orDie)
+  // Imported as the layer is built, so a bundle that reads only the catalog's schemas, as a
+  // browser's does, leaves the snapshot out.
+  Effect.promise(() => import("./internal/snapshot.ts")).pipe(
+    Effect.flatMap(({ snapshot }) => Schema.decodeEffect(Schema.fromJsonString(Catalog))(snapshot)),
+    Effect.map(make),
+    Effect.orDie
+  )
 )

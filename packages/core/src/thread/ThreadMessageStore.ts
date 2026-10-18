@@ -55,6 +55,10 @@ export class ThreadMessageStore extends Context.Service<
     readonly get: (
       id: ThreadMessageId.ThreadMessageId
     ) => Effect.Effect<Option.Option<ThreadMessage.ThreadMessage>, StoreError.StoreError>
+    /** Every message of a thread, deleted ones included, in binary ID order. */
+    readonly listByThread: (
+      threadId: ThreadId.ThreadId
+    ) => Effect.Effect<ReadonlyArray<ThreadMessage.ThreadMessage>, StoreError.StoreError>
     /**
      * Find several messages in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
@@ -105,6 +109,7 @@ export const make = (
   const write = StoreInput.write("ThreadMessageStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", ThreadMessageId.ThreadMessageId, id), driver.get),
+    listByThread: (threadId) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, threadId), driver.listByThread),
     getMany: (ids) =>
       Effect.flatMap(read("getMany", Schema.Array(ThreadMessageId.ThreadMessageId), ids), driver.getMany),
     countByThread: (ids) =>
@@ -129,6 +134,14 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
         return yield* rows.get((yield* read).records.of("threadMessages"), id)
       },
       Effect.mapError(StoreError.failed("ThreadMessageStore", "get"))
+    ),
+    listByThread: Effect.fn("ThreadMessageStore.memory.listByThread")(
+      function* (threadId) {
+        return (yield* rows.all((yield* read).records.of("threadMessages")))
+          .filter((message) => message.threadId === threadId)
+          .toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))
+      },
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "listByThread"))
     ),
     getMany: Effect.fn("ThreadMessageStore.memory.getMany")(
       function* (ids) {

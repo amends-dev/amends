@@ -13,14 +13,14 @@ import * as LogConformance from "@amends-dev/log/conformance"
 import * as Effect from "effect/Effect"
 import type * as Fixture from "./Fixture.ts"
 import { accounts } from "./internal/accounts.ts"
-import { changeFeed } from "./internal/changeFeed.ts"
 import { contracts } from "./internal/contracts.ts"
 import { factMetadata } from "./internal/factMetadata.ts"
 import { idempotency } from "./internal/idempotency.ts"
 import { journal } from "./internal/journal.ts"
 import { reads } from "./internal/reads.ts"
-import { signals } from "./internal/signals.ts"
+import { replica } from "./internal/replica.ts"
 import { signInStorage } from "./internal/signInStorage.ts"
+import { syncStorage } from "./internal/syncStorage.ts"
 import { transactions } from "./internal/transactions.ts"
 import * as Support from "./Support.ts"
 
@@ -87,12 +87,12 @@ export const run = (fixture: Fixture.Fixture) => {
   })
   journal(fixture)
   transactions(fixture)
-  changeFeed(fixture)
-  signals(fixture)
   idempotency(fixture)
   factMetadata(fixture)
   reads(fixture)
+  replica(fixture)
   contracts(fixture)
   accounts(fixture)
   signInStorage(fixture)
+  syncStorage(fixture)
 }

@@ -9,7 +9,7 @@
 
 import { Contact, ContactStore } from "@amends-dev/core/channel"
 import { StoreError } from "@amends-dev/log"
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -52,6 +52,13 @@ export const make = Effect.gen(function* () {
       },
       Effect.mapError(StoreError.failed("ContactStore", "get"))
     ),
+    list: guard(
+      db
+        .select()
+        .from(contacts)
+        .where(inWorkspace)
+        .orderBy(sql`${contacts.id} COLLATE "C"`)
+    ).pipe(Effect.flatMap(decodeRows), Effect.mapError(StoreError.failed("ContactStore", "list"))),
     getMany: Effect.fn("Contacts.getMany")(
       function* (ids) {
         if (ids.length === 0) return []

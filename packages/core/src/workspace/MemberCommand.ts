@@ -23,9 +23,8 @@ import * as GroupStore from "../group/GroupStore.ts"
 import type * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import type * as Publication from "../journal/Publication.ts"
-import type * as Member from "./Member.ts"
+import * as Member from "./Member.ts"
 import * as MemberFacts from "./MemberFacts.ts"
-import * as MemberId from "./MemberId.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
@@ -96,7 +95,7 @@ export const make = Effect.gen(function* () {
 
   const add = Effect.fn("MemberCommand.add")(function* (member: NewMember) {
     const added: Member.Member = {
-      id: MemberId.MemberId.make(yield* crypto.randomUUIDv4()),
+      id: yield* Member.newId.pipe(Effect.provideService(Crypto.Crypto, crypto)),
       workspaceId,
       identity: member.identity,
       name: member.name,

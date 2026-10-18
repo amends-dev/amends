@@ -1,6 +1,6 @@
 # @amends-dev/storage-postgresql
 
-Workspace storage, each workspace's signal hub, the workspace directory, the host's accounts, and
+Workspace storage, the workspace directory, the host's accounts, and
 sign-in's codes and sessions over PostgreSQL: the storage the [local host](../../hosts/local/README.md) runs on. Statements are
 written with Drizzle and run through `@effect/sql-pg`, so they share the Effect client's transaction
 service: the journal opens each commit on a reserved connection, and every statement inside it lands
@@ -16,8 +16,8 @@ Gateway.layer().pipe(
 )
 ```
 
-`PostgresStorage.layer(options)` provides the storage contract, with its signal hubs, the directory, the
-accounts, and the sign-in storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
+`PostgresStorage.layer(options)` provides the storage contract, the directory, the
+accounts, the sign-in storage, the sync storage, and core's presence relay, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
@@ -35,12 +35,18 @@ a channel binding's conversation, and what a harness's agent returned of its ses
 leads its primary key with `workspace_id`, and each reference between tables carries the workspace,
 so a join that starts scoped stays scoped. Projection tables have no foreign keys to one another:
 each read model rebuilds alone, in any order, and core checks references when it publishes the facts
-they come from. The log's own tables keep theirs. Three tables span workspaces: `accounts`, the
+they come from. The log's own tables keep theirs. Five tables span workspaces: `accounts`, the
 host's people, a human ID for each lowercase address, which is unique; `sign_in_codes`, each
-address's pending code digest with its expiry, failed tries, and sends in the current window; and
-`sign_in_sessions`, each session by its token's digest, with its account's human ID, start, and end.
-`PostgresSignInStorage.modifyCode` reads, decides, and writes an address's code in one transaction
-holding an advisory lock keyed by the address, so changes to it take turns across processes. Tagged
+address's pending code digest with its expiry, failed tries, and sends in the current window;
+`sign_in_sessions`, each session by its token's digest, with its account's human ID, start, and end;
+`sync_server`, one row holding the remote ID browsers know the sync server by; and `sync_keys`, each
+key people registered for their browsers, with its person and the signing key it was first bound
+to. `PostgresSignInStorage.modifyCode` reads, decides, and writes an address's code in one
+transaction holding an advisory lock keyed by the address, so changes to it take turns across
+processes; `PostgresSyncStorage` changes a key in one statement each, and the first host to read the
+remote ID inserts the row. After restoring a backup, delete the `sync_server` row: the backup
+repeats positions browsers already hold, and a new remote ID has them start their stores over
+rather than skip what the repeated positions now carry. Tagged
 unions become a discriminator column plus the columns each case needs, with a check constraint that
 they agree.
 
@@ -96,7 +102,9 @@ Threads keep `latest_sequence` and `latest_activity_at` for their latest message
 newest activity first and `threads_by_start` newest start first, each from an exclusive row cursor;
 a stream page reads its threads' first activities through the `(thread_id, sequence)` index and
 counts their messages in one grouped query. A group or workspace departure ends every participation
-of the admission in one `UPDATE` through `participations_by_admission`.
+of the admission in one `UPDATE` through `participations_by_admission`, through which the replica
+also lists them. A replica's snapshot reads a thread's messages, turns, and deliveries in ID order
+through `thread_messages_by_thread`, `turns_by_thread`, and `channel_deliveries_by_thread`.
 
 ### Notifications and read state
 
@@ -108,19 +116,16 @@ none of the earlier membership's. The row's `state` is the notification's, and `
 checks that each state holds its own columns and no other's; an accepted notification records what
 accepted it, an agent's turn or a delivery to a contact.
 
-A person's `Seen` is private state outside the journal, so it is also kept in `notification_seen`,
-which has no foreign key to `notifications`: rebuilding them keeps it, and inserting a pending human
-notification restores `Seen` from it in the same statement. `markSeen` checks every notification in
-one query, then sets the pending rows to `Seen` and records `notification_seen` in one statement, so
-concurrent calls take turns on the rows' locks and agree on the first time. The pending indexes
-cover only pending rows, so pending reads and counts never visit a reader's seen history.
+`markSeen` checks every notification in one query, then sets the pending rows to `Seen` in one
+statement; `markSeenInThread` sets a reader's pending rows from one thread up to a position in one
+statement. The pending indexes cover only pending rows, so pending reads and counts never visit a
+reader's seen history.
 `notifications_by_thread` serves a reader's notifications from one thread by position, and
 `pending_notifications_by_group` counts them per group and settles a departing member's pending ones
 in one statement per recipient kind.
 
-`thread_read_positions` and `group_read_times` hold private read state, reference no projection
-rows, and survive rebuilds. Their upserts keep the later value with `greatest`, and run on their
-own, without the workspace lock, when the caller has no transaction.
+`thread_read_positions` and `group_read_times` hold read state, which `ReadStateProjection` keeps.
+Their upserts keep the later value with `greatest`.
 
 ### Connections, agents, and turns
 
@@ -213,7 +218,7 @@ transaction see its staged state.
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the workspace
 and log once `COMMIT` succeeds, as a statement of its own on the commit's connection, so a
 notification means a commit; a commit that stores job requests sends a notice for the runners in
-the same statement, as [Effect Cluster's tables](#effect-clusters-tables) describes. Each pool's listener, started by the first waiting reader, signal subscriber, or runner that
+the same statement, as [Effect Cluster's tables](#effect-clusters-tables) describes. Each pool's listener, started by the first waiting reader or runner that
 listens for job requests and stopped 30 seconds after the last, holds one connection on `LISTEN` and wakes that
 log's waiters. A waiter takes its wakeup before checking the log, so an append in between still
 wakes it; the log is the truth, and the notification only says when to look again. When its
@@ -225,17 +230,6 @@ The binding opens transactions with plain `BEGIN` and does not pin isolation, so
 default still controls snapshots. Every failed `COMMIT` returns `Store.CommitUncertain`, including
 errors that could be classified as a definite rollback; see
 [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
-
-## Signals
-
-Each workspace's [signal hub](../../packages/core/README.md#signals) relays signals on the same
-channel: `publish` sends the JSON-encoded signal with its workspace through `pg_notify` outside any
-transaction, and the listener in every pool, the sender's included, decodes it once and offers it to
-that workspace's subscribers through the pool's `LocalSignalHub`. A subscriber more than 256
-behind misses the oldest, and a signal this version cannot decode is skipped. Nothing is stored:
-signals sent while a listener reconnects are lost, a failed publish is logged rather than failing
-its operation, and a payload over PostgreSQL's 8,000-byte notification limit is not delivered.
-Behind a transaction-pooling proxy, signals are unavailable.
 
 ## Effect Cluster's tables
 
@@ -272,10 +266,12 @@ statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a 
 for one workspace (`layerWorkspace`), its private `layerStores` registers each store, and
 `PostgresStorage.ts` is the adapter: every gateway contract it implements, in one layer.
 `PostgresDatabase.ts` prepares the SQL client, `PostgresDirectory.ts` reads across workspaces,
-`internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener
-that `PostgresSignalHub.ts` binds to each workspace, `PostgresTurns.ts` and `PostgresReads.ts` are
-the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`
-and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
+`internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener,
+`PostgresTurns.ts` and `PostgresReads.ts` are
+the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`,
+`PostgresSignInStorage.ts`, and `PostgresSyncStorage.ts` keep the host's accounts, sign-in, and
+sync keys, `PostgresPresenceRelay.ts` carries presence between processes as notices on the
+listener's channel, storing nothing, and
 `PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the
 wakeup for the job requests commits store.
 Follow the [adapter conventions](../README.md).

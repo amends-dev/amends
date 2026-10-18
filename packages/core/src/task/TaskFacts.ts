@@ -1,12 +1,11 @@
 /**
  * The facts recorded about tasks: one created, and one changed. Each carries its thread's group,
- * whose members may learn of it, because an audience is derived from the payload alone. The same
+ * whose members may read it. The same
  * commit records the task's activity in the thread's timeline, `TaskActivity`.
  *
  * @since 0.1.0
  */
 
-import * as Group from "../group/Group.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Task from "./Task.ts"
@@ -21,7 +20,6 @@ export const Created = Fact.make("task.created", {
   version: 1,
   subject: (payload) => Subject.make("task", payload.threadId),
   occurrence: (payload) => [payload.threadId],
-  audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Task.Task
 })
 
@@ -35,6 +33,5 @@ export const Created = Fact.make("task.created", {
 export const Updated = Fact.make("task.updated", {
   version: 1,
   subject: (payload) => Subject.make("task", payload.threadId),
-  audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Task.Updated
 })

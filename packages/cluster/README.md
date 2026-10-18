@@ -125,14 +125,10 @@ call runs, never for the minutes a turn runs. `runNextTurn` runs one turn at a t
 5. Stream the turn with the agent's instructions: a turn the agent kept continues after the steps
    the log has (`continueStream`), and any other starts from its prompt. What the run does with each
    part is one decision, `advance`: from the run's progress so far and the part, the entries to
-   append to the log, the drafts to show, and the progress after it, which the loop keeps for the
-   turn's end. The log notes `Started` once the first part of a run from the prompt arrives, with
+   append to the log and the progress after it, which the loop keeps for the turn's end. The log notes `Started` once the first part of a run from the prompt arrives, with
    what continues the turn when the agent announces its start (`turn-start`). Each step that
    finishes is appended to the log, named by the run's opening position in the log and the step's
-   index, and what a step writes before it finishes is shown to readers as drafts (`showDraft`),
-   each carrying what a text part added since the last at its offset: at once, then at most every
-   100 milliseconds, and when the text ends. Drafts are best effort, and the step's entry in the log
-   replaces them. Recording a part is never cut short: a run stopped meanwhile stops between parts,
+   index. Recording a part is never cut short: a run stopped meanwhile stops between parts,
    so the progress kept matches the log.
 6. End the turn: log the step it left unfinished, release the session (`detach`), and `close` it
    with its answer (`SessionLog.answerOf`), `fail` it, when the agent reported a failure or its
@@ -158,7 +154,7 @@ bun run test packages/cluster
 ```
 
 `test/turns/runner.test.ts` runs turns over a workspace in memory, reached through a fake gateway,
-with a scripted agent: the log a run writes, drafts, closing, failing, stopping, running a turn cut
+with a scripted agent: the log a run writes, closing, failing, stopping, running a turn cut
 short again, and a run another one replaced; it also checks `advance`, part by part, on its own.
 `test/jobs/turn-job.test.ts` runs the entity on Cluster in memory: a commit's run and stop requests,
 runs that fail and run again, giving a turn up, and a workspace never created.

@@ -25,7 +25,6 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
-import * as Request from "../request/Request.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
@@ -99,14 +98,10 @@ export class GroupService extends Context.Service<
     /**
      * Require group.create in this workspace, then create a team group, private unless the input
      * says otherwise, and its explicit initial admissions in one commit. No extra
-     * membership-management grant is required for the initial audience. A keyed request names its
-     * group, so a retry returns the group its first attempt created; an unkeyed one creates a new
-     * group each time.
+     * membership-management grant is required for the initial audience. Within a request, a retry
+     * returns the group its first attempt created; outside one, it creates a new group each time.
      */
-    readonly createTeam: (
-      input: Group.CreateTeamInput,
-      options?: Request.Options
-    ) => Effect.Effect<Group.Group, CreateError, Actor.Actor>
+    readonly createTeam: (input: Group.CreateTeamInput) => Effect.Effect<Group.Group, CreateError, Actor.Actor>
     /**
      * Require group.rename on the group and membership of it, then give a team group a new name. No
      * workspace role reaches a group from outside it: to a non-member, a group is
@@ -169,16 +164,13 @@ export const make = Effect.gen(function* () {
   })
 
   const createTeam = Effect.fn("GroupService.createTeam")(
-    function* (input: Group.CreateTeamInput, options: Request.Options = {}) {
+    function* (input: Group.CreateTeamInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input)
       yield* authorization.require([createGroupRequirement])
       const actor = yield* Actor.Actor
-      const groupId = GroupId.GroupId.make(
-        yield* Request.idFor(options.requestKey, ["group.create", workspaceId, actor.memberId])
-      )
+      const groupId = yield* Group.newId
       // A retry returns the group its first attempt created.
-      if (options.requestKey !== undefined && Option.isSome(yield* groupStore.get(groupId)))
-        return yield* requireGroup(groupId)
+      if (Option.isSome(yield* groupStore.get(groupId))) return yield* requireGroup(groupId)
       const found = new Map(
         (yield* memberStore.getMany(request.memberIds)).map((member) => [member.id, member] as const)
       )

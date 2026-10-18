@@ -7,6 +7,7 @@
 import { ChannelTransport } from "@amends-dev/channel"
 import { Integration, Integrations, type ModelCatalog } from "@amends-dev/connection"
 import { DeliveryJobs } from "@amends-dev/core/channel"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import type { ThreadId } from "@amends-dev/core/thread"
 import { TurnJobs, type TurnId } from "@amends-dev/core/turn"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -237,15 +238,18 @@ export const takeTurnJobs = (id: WorkspaceId.WorkspaceId) =>
  * jobs that record each request, so a test runs the turns and deliveries it expects itself.
  */
 const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>, crypto: Crypto.Crypto) =>
-  Effect.map(Integrations.make(testIntegrations), (integrations) =>
-    bind(
-      context.pipe(
-        Context.add(Crypto.Crypto, crypto),
-        Context.add(TurnJobs.TurnJobs, recordedTurnJobs),
-        Context.add(DeliveryJobs.DeliveryJobs, recordedDeliveryJobs),
-        Context.add(Integrations.Integrations, integrations)
+  Effect.map(
+    Effect.all([Integrations.make(testIntegrations), PresenceRelay.makeMemory]),
+    ([integrations, presenceRelay]) =>
+      bind(
+        context.pipe(
+          Context.add(Crypto.Crypto, crypto),
+          Context.add(TurnJobs.TurnJobs, recordedTurnJobs),
+          Context.add(DeliveryJobs.DeliveryJobs, recordedDeliveryJobs),
+          Context.add(PresenceRelay.PresenceRelay, presenceRelay),
+          Context.add(Integrations.Integrations, integrations)
+        )
       )
-    )
   )
 
 /** One workspace's stores and signals on a host, with the test integrations and recorded jobs. */
@@ -264,7 +268,12 @@ export const boundTo = Effect.fnUntraced(function* (id: WorkspaceId.WorkspaceId)
 /** A gateway over a host, which installs the test integrations, or what `options` say. */
 export const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
   Gateway.layer(options).pipe(
-    Layer.provideMerge([Layer.succeedContext(host), layerRecordedTurnJobs, layerRecordedDeliveryJobs])
+    Layer.provideMerge([
+      Layer.succeedContext(host),
+      layerRecordedTurnJobs,
+      layerRecordedDeliveryJobs,
+      PresenceRelay.layerMemory
+    ])
   )
 
 /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */

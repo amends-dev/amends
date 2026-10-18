@@ -9,7 +9,7 @@ are projections of those facts.
 
 Core is portable: it depends on Effect and on the [harness](../harness/README.md),
 [connection](../connection/README.md), and [channel](../channel/README.md) contracts, and runs
-nothing of its own against the outside world. A host supplies storage, cryptography, signals, the
+nothing of its own against the outside world. A host supplies storage, cryptography, the
 integrations it installs, and what runs jobs; the [gateway](../gateway/README.md) supplies the actor
 for each operation. It is internal to this repository and not published to npm.
 
@@ -20,7 +20,7 @@ The package root composes one workspace's core:
 - `layer` builds the application operations and the services jobs call, over the journal,
   authorization, and the permission catalog.
 - `HostServices` is what a host must provide, derived from `layer`: the workspace's stores, the
-  checkpoint store, cryptography, the signal hub, the integrations, and the job services. Adding a
+  checkpoint store, cryptography, the integrations, and the job services. Adding a
   required store changes it, so an incomplete host fails to type-check.
 - `Operations` is the set of services a gateway runs for an actor. Programs may require only these,
   so they cannot bypass the membership and permission checks each operation performs.
@@ -33,7 +33,7 @@ The package root composes one workspace's core:
 Each domain is a subpath export with the records, facts, stores, projections, and operations it
 implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journal`, `/group`,
 `/thread`, `/task`, `/channel`, `/connection`, `/agent`, `/turn`, `/notification`, `/read-state`,
-`/change-feed`, `/signal`, `/request`, `/operation`, and `/error`.
+`/request`, `/operation`, and `/error`.
 
 ## Domains
 
@@ -52,9 +52,8 @@ implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journ
 | `turn`          | Agents' turns in threads, their session logs, and stopping and retrying. See [turns](#turns).                             |
 | `notification`  | Notifications, the inbox, and marking them seen. See [notifications](#notifications).                                     |
 | `read-state`    | Private read positions in threads and groups. See [read state](#read-state).                                              |
-| `change-feed`   | Live workspace changes for readers who refresh their view. See [change feed](#change-feed).                               |
-| `signal`        | Ephemeral signals, such as typing, never stored. See [signals](#signals).                                                 |
-| `request`       | Request keys, so a retried creation returns what its first attempt created. See [request keys](#request-keys).            |
+| `request`       | Request keys, the IDs of what a request creates, and running a request once. See [request keys](#request-keys).           |
+| `replica`       | What a member's replica holds, and who may see each record. See [replica](#replica).                                      |
 | `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                     |
 
 ## How operations run
@@ -80,7 +79,7 @@ workspace, and what a turn's runner or harness reports.
 
 A host binds the journal store to one workspace, and that binding is the only place a service learns
 which workspace it serves: services that need the workspace ID read it from `Store.Store`.
-Projection stores and signals are bound the same way. Job requests name their workspace, taken from
+Projection stores are bound the same way. Job requests name their workspace, taken from
 the fact that asks for them, since the host runs every workspace's jobs.
 
 ### Publication
@@ -111,13 +110,29 @@ only for the log's other writers; see
 
 ### Request keys
 
-`@amends-dev/core/request` holds `Request.Key`, the `Request.Options` creating operations accept,
-`Request.derivedId`, which derives an ID from an operation, its requester, and a key, and
-`Request.idFor`, a new ID without a key or a derived one with it. Each creating operation names what
-it creates that way, so a retry runs the operation's checks, finds the record by its ID, and returns
-it instead of creating another. The key alone names the request: a retry gets what the key created,
-whatever it asks for. A turn retry derives its turn's ID from the turn it retries. See
+`@amends-dev/core/request` holds `Request.Key`, which names one request of one member, and
+`Request.Current`, the request being run, which a protocol provides around the operation with
+`Request.withKey`. Every record an operation creates takes its ID from its record module's `newId`,
+such as `Thread.newId` or `GroupMembership.newId(groupId, memberId)`, through `Request.newId`: within
+a request, derived from the request, the record's kind, and what tells it apart there; outside one,
+new. A creating operation finds its record by that ID before it creates anything, so a retry runs
+the operation's checks and returns what its first attempt created, whatever it asks for, and a
+browser that wrote the request computes the same IDs with the same functions. A key names one
+request: sent with another, it finds what the first created where their records coincide. A record
+with an identity of its own derives its ID from that with `Request.derivedId`: a direct group from
+its members (`Group.directId`), and a turn's retry from the turn (`Turn.retryId`). See
 [retrying safely](../../docs/thread-workflows.md#retrying-safely).
+
+A protocol that may deliver a request more than once and needs no answer from it, such as a
+browser's outbox resending what it wrote until the server takes it, runs it with
+`RequestService.runOnce(key, operation)`. Unless the request ran before, the operation runs as the
+request in one commit, which also publishes `RequestFacts.Completed`; a `CoreError.Rejection` rolls
+that commit back and is published as `RequestFacts.Rejected`, with the error, in a commit of its
+own. Either fact's occurrence is the member and the key, so asked again, a request that ran does
+nothing, whatever has changed since: a rename another member followed with their own is not
+rejected as changed. It fails only with `Unavailable` or `Uncertain`, which leave the request to be
+asked again. Since it returns nothing, it runs no checks on a retry, unlike a creating operation,
+which returns what it finds.
 
 ### Errors by kind
 
@@ -146,13 +161,14 @@ by the kind of group (`NotRenamable`, `FixedMembership`, `GeneralMembership`, `N
 `ConnectionUnusable`), an agent setup that cannot run (`Incomplete`), or a channel request its
 transport rejects (`Unverified`). `CoreError.Unavailable` says what an operation needs cannot be
 reached or used now: storage another writer held (`Contention`) or read models another host is
-rebuilding (`Reloading`), a change feed or turn log that stopped (`ChangeFeedInterrupted`,
-`LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
-keys (`CredentialsUnavailable`). `CoreError.Uncertain` says storage could not confirm whether a
+rebuilding (`Reloading`), a turn's log or a replica that stopped being followed (`LogInterrupted`),
+a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no keys
+(`CredentialsUnavailable`). `CoreError.Uncertain` says storage could not confirm whether a
 commit took effect, and names it by `commitId`. Operations pass each kind through unchanged, so a
 protocol answers it with one status and a client handles it once, and an operation that reaches a
 resource through another reports the one the caller named: a message whose thread they cannot read
-is the message not found, not the thread. `CoreError.CoreError` is all seven.
+is the message not found, not the thread. `CoreError.CoreError` is all seven, and
+`CoreError.Rejection` the five that reject a request, all but `Unavailable` and `Uncertain`.
 
 An operation's signature lists only these kinds. Each operation passes `Operation.report`, from
 `@amends-dev/core/operation`, to the `Effect.fn` that defines it, which reports what core's internals
@@ -249,7 +265,7 @@ together. Removing a workspace member uses it for every admission. See
 `@amends-dev/core/thread` holds threads, participations, messages, and their timeline activity. Its
 operations are `ThreadService` (`startInGroup`, which also starts a thread as a task, `startDirect`,
 `rename`, `get`, `listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`),
-`ThreadMessageService` (`publish`, `edit`, `delete`, `typing`), and `ThreadParticipationService`
+`ThreadMessageService` (`publish`, `edit`, `delete`), and `ThreadParticipationService`
 (`follow`, `unfollow`). A participant is a member, a contact, or triage: a member's participation
 references the exact group admission, while contacts and triage take part without group access. A
 message author is a member or a contact.
@@ -266,8 +282,7 @@ read through `ThreadQuery`; a query never writes.
 | `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones.                                          |
 | `ThreadQuery.listReadable`                                                | A page of a group's readable threads, from any listing, with tasks, latest activity, and positions.    |
 | `ThreadQuery.readTimeline`, `readTimelineItem`                            | Timeline subjects resolved under access, for timeline pages and notification sources.                  |
-| `ThreadQuery.timelineItemsAbout`                                          | The timeline items about some subjects as they are now, checking no access, for the change feed.       |
-| `ThreadQuery.listedOf`, `previewsOf`                                      | Threads with their tasks and latest activity, and their stream previews, for streams and the feed.     |
+| `ThreadQuery.previewsOf`                                                  | Stream previews of listed threads, for streams and openings.                                           |
 | `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message. |
 | `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients.                                     |
 | `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording.            |
@@ -281,8 +296,7 @@ mentions pages the thread's active participants, the people it notifies. See
 
 An activity has one shape for every kind, `ThreadActivity.ThreadActivity`: its position, a dotted `kind`
 such as `message.published` and the `version` of its details, its `subject`, an `occurrence` key,
-`newActivity`, and the kind's `details` as encoded JSON. Storage, facts, and the change feed carry
-that shape, so a new kind or version changes none of them and needs no migration. Every kind is
+`newActivity`, and the kind's `details` as encoded JSON. Storage and facts carry that shape, so a new kind or version changes none of them and needs no migration. Every kind is
 recorded with `ThreadActivityFacts.Recorded`, carrying the activity and its selected recipients,
 which the activity, thread, group, and notification projections each consume. Domain facts own
 state; activity owns timeline position.
@@ -340,27 +354,70 @@ someone who rejoins under a new member ID starts with an empty one.
 
 `NotificationService` serves the acting member's own `inbox`, newest first with each source they can
 still read as its timeline shows it, its `countPending`, in all and by group, and a person's `markSeen` and
-`markSeenThrough`; contact and triage inboxes are read only through the store. A person's `Seen` is
-private state the store keeps outside the journal. `NotificationProjection` generates notifications
-from each recorded activity's recipients, and settles pending agent input when a participation ends.
+`markSeenThrough`; contact and triage inboxes are read only through the store. A person seeing a
+notification is a `NotificationFacts.Seen` fact. `NotificationProjection` generates notifications
+from each recorded activity's recipients, settles pending agent input when a participation ends,
+and marks a person's notifications seen as they see them or read their thread.
 Notifications never create turns, accept their input, or run work. See
 [reading the inbox](../../docs/thread-workflows.md#reading-the-inbox) and
 [marking a notification seen](../../docs/thread-workflows.md#marking-a-notification-seen).
 
 ## Read state
 
-`@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
-`markGroupRead`, over the `ReadStateStore`, which is kept outside the journal.
-`ReadStateStore.markThreadRead` advances the reader's position and marks their notifications from
-the thread seen in one write. `ReadStateCommand.markThreadRead` is that write with its `ThreadRead`
-signal, published once the caller's commit lands, or at once outside one; marking a thread read,
-starting one, and replying all use it, so an author has read what they posted and their sessions
-know. It is what makes ambient activity visible in the
+`@amends-dev/core/read-state` holds each person's private read state: `ReadStateService.markThreadRead`
+and `markGroupRead` record `ReadStateFacts.ThreadRead` and `GroupRead`, which `ReadStateProjection`
+keeps in the `ReadStateStore`; reading a thread also marks the person's notifications from it seen
+up to the position, through `NotificationProjection`. Starting a thread and replying record the
+author's position in the same commit, so an author has read what they posted. It is what makes
+ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
 notifications. See
 [marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
+
+## Replica
+
+A replica is the copy of a workspace one member's browser keeps, of what that member may see.
+`@amends-dev/core/replica` holds `ReplicaRecord`, every kind of record a replica holds, as core
+keeps it, with the `Key` each is held under: a turn without where its log begins, which only the
+server reads, and a connection or an agent with how ready it is. `placeOf` says where a record
+sits, in the workspace, a group, or a thread, so a replica that drops a group or a thread drops
+what sits in it: a group's admissions, follows, read time, and threads, and everything a thread
+holds. `ReplicaVisibility.canSee` decides,
+from a viewer's grants and the groups they belong to, whether they may see a record, as core's
+operations authorize reading it: the workspace, its roles, and its contacts are every member's;
+members, assignments, invitations, channels, connections, and agents follow their read permission,
+and a member always sees their own record and assignments; a group and its members are its
+members' under `group.read`, a public team's whoever may join it, and a member's own admission and
+follow theirs while they belong to the group; a thread and everything in it are its group's members'
+under `thread.read` on it; and read state and notifications are their member's alone.
+
+`ReplicaQuery` is the replica's reads. `keysChangedBy` names the records one commit changed: each
+fact's subject names the record it changes, and a few facts change more as their projections apply
+them. A thread's activity generates notifications, a member leaving a group ends their
+participations there and settles their notifications from it, reading a thread marks what was
+pending from it seen, and a change to a connection can change whether the agents that use it can
+run. `readRecords` reads the records under keys as a replica holds them, with a connection's
+readiness from `ConnectionReadiness` and an agent's from `AgentReadiness`. `viewerOf` reads a
+member's access, their grants and the groups they belong to, and `placesOf` the groups and threads
+some records belong to, which `canSee` asks for. `snapshot` streams everything a member may see now,
+a group and a thread at a time: the workspace's own records, each group they may see with its
+threads and what each holds, then their notifications. It leaves out what has ended where a replica
+no longer reads it: a revoked assignment, a removed connection or channel, and an ended follow.
+
+`ReplicaService.changes(after)` is a person's replica as the workspace changes, as `ReplicaChange`
+batches, one for each commit at its position. It starts after the position their replica holds, or
+with `Reset` and a snapshot when it holds none, then sends each commit's changes as it lands. Within
+a commit, a changed record reaches them as `Changed` when they may see it as the workspace stands
+after it, so nothing reaches them once they lost access; joining a group sends what it holds,
+leaving one sends `Dropped` for the group, which takes everything in it along, then what of it they
+still see; a change to their grants resets the replica; and their own requests' outcomes arrive as
+`Completed` and `Rejected`, a reset's among its changes, since nothing follows it for its commit. The stream fails with `Denied` once they are no longer a member, and with
+`Unavailable` (`LogInterrupted`) when following stops short. `ReplicaCommits` reads each commit and
+the records it changed once for every member following the workspace: one reader follows the
+journal while anyone does, and a stream that starts later reads the commits before it joined from
+the journal itself.
 
 ## Connections
 
@@ -379,7 +436,7 @@ integration validates its settings and auth method first (`CoreError.Invalid` wi
 `UnknownIntegration` or `IntegrationRefused`). The key goes to `ConnectionCredentialStore`, one
 credential per connection, in the commit that records the connection; replacing it overwrites it,
 and removal deletes it and keeps the record, so a retried create finds the connection and answers
-`NotFound`. No fact, change-feed event, or view carries a key. `check` reads the key and asks the
+`NotFound`. No fact or view carries a key. `check` reads the key and asks the
 integration to check the connection with its system, returning `Health`, and holds no commit open
 while the system answers.
 
@@ -457,7 +514,6 @@ change its own commit attributed to the agent.
   ready again as it was.
 - `joinedConversation` is the conversation the agent joined: the thread's messages before it took
   part (`TurnPrompt.conversationOf`), which a new session log starts with.
-- `showDraft` shows readers more of the step being written, as a `TurnDraft` signal.
 - `close` posts the reply its job gives, the text of the turn's last step (`SessionLog.answerOf`),
   as the agent's own message to the thread's current participants, naming the turn as the message's
   `via`, saves what the session resumes from, and completes the turn, in one commit. A reply of only
@@ -489,7 +545,7 @@ reasoning or tool calls.
 `TurnService` lets a reader who may read a thread `get` its turns as `Turn.View`s, with whether the
 reader may stop (`stoppable`) or retry (`retryable`) them now, and `listActive` the workspace's
 active turns in threads the reader may read. `Turn.view` builds a view from what the reader may
-direct and `TurnQuery.whyNotRetryable`, which the change feed shares. A turn in a thread outside the reader's audience is
+direct and whether the turn can run again. A turn in a thread outside the reader's audience is
 `NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who
 may direct its agent may `cancel` an active turn, a queued one at once and a running one once its
 job confirms it, and `retry` a failed or stopped turn as a new queued turn for the same agent,
@@ -501,13 +557,11 @@ created.
 
 `TurnService.watchLog` follows a turn's session log for a reader who may read its thread, as a
 stream of `Turn.LogMessage`s: `Opened` with the items as they stand, `Changed` with the items each
-append adds or changes, `Drafted` with the turn's draft signals, and `Ended` once the turn's ending
-commit has been read and the reply it names marked. Drafts are not kept: a reader who starts
-following mid-step sees the step from the next draft that starts at its part's beginning, or once
-the step is logged. Its subscriptions register before the turn and log are read, so nothing in
-between is missed. Each append checks that the reader may still read the thread, as does each commit
-that changes the reader's groups, grants, or role; following ends once the commit that took the
-reader's access is delivered. A stream that cannot go on fails with `CoreError.Unavailable`
+append adds or changes, and `Ended` once the turn's ending commit has been read and the reply it
+names marked. It follows the journal from its head as it stood before the turn and log are read, so
+nothing in between is missed. Each append checks that the reader may still read the thread, as does
+each commit that changes anyone's group memberships, assignments, or role permissions, or removes a
+member; following ends once the commit that took the reader's access is read. A stream that cannot go on fails with `CoreError.Unavailable`
 (`LogInterrupted`).
 
 A turn's changes also show in its thread's timeline as `TurnActivity` kinds, recorded in the commits
@@ -556,89 +610,21 @@ which deliver each request to whatever runs the jobs; each one's `layerNoRunner`
 and runs nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
 [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run them, as the local host does.
 
-## Change feed
+## Presence
 
-`@amends-dev/core/change-feed` exports the `ChangeFeed` schemas and `ChangeFeedService.watch`. The
-feed reads the workspace journal, so it carries every commit from any host or process over the same
-storage, including commits whose acknowledgment was lost; nothing is published from the commit path.
-
-`ChangeFeedSource` shares one follower of the journal per workspace runtime, started by the first
-subscriber at the journal's head and stopped when the last leaves. It decodes each commit once,
-reads once what the commit changed in what readers show (`ChangeFeedChanges`), and buffers it for
-every subscriber, waiting for the next with `Store.waitForAppend`. A subscriber
-registers before reading the journal, so no commit falls between the two, and one that falls more
-than 256 commits behind reads what it lost from the journal instead of failing. When reading fails,
-the follower logs it and follows again from the last commit it delivered, backing off up to five
-seconds, so subscribers wait rather than disconnect. A commit it cannot read, holding a fact in a
-version this host does not know or a payload its schema rejects, is logged and ends each
-subscription so the consumer refreshes, and the follower goes on past it.
-
-`watch` checks active membership, then emits `Ready { workspaceId, cursor, reset }` and a
-`Committed { workspaceId, cursor, commitId, changes, stale, notifications }` for each later commit
-with something the reader may see. A cursor is opaque and resumes after the commit that carried it. Given
-`after`, the feed replays the commits after it, up to 500, with `reset: false`; without one, or with
-a cursor it cannot resume from, `Ready` has `reset: true` at the head and the consumer must refresh
-its view. `Ready`'s cursor is null only for an empty journal.
-
-A reader is told of a fact when they hold a scope in its
-[audience](../../docs/journal.md#fact-audiences), the workspace, their membership or identity, or a
-group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts`
-names for it: `invitation.manage` for invitations, `member.read` and `assignment.read` for
-membership and access changes, `group.read` for group facts, and `thread.read` for thread facts. A
-registration can name the member a fact concerns, who sees it without the permission. Their
-membership, admissions, and grants are read after the subscription registers and reloaded before
-filtering a commit that changes them, so a commit that admits the reader delivers what it admits.
-The commit that removes the reader from the workspace is delivered, then the stream ends. Each
-registration also names the reads its fact makes stale, which a commit's `stale` gives the readers
-it reaches, with `pending` for a reader it notified: what its `changes` do not deliver, such as a
-member's rename or a group's creation. Facts whose changes the commit delivers, such as thread
-activity and turns, name none. A core test checks that the registry holds every fact that declares
-an audience, at each version, and no other.
-
-A commit's `changes` are what it changed in what readers show, each as it is now, so a reader puts it
-in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the
-commit's entries name, the items it recorded and those about a message, turn, or task it changed,
-since an item shows its subject's current state; a `Preview` of each thread those items are in, as
-its group's stream shows it to every reader; a `GroupLatest` with the latest activity of each of
-their groups; and a `Turn` for each turn the entries name, and each turn one of those retries, as
-`TurnService.get` gives it to that reader. They are read after the commit, so one may reflect later
-commits too, and the last change to an item follows the last commit that changed it. Each reaches
-the readers its read requires: the thread's group with `thread.read` on the thread, or, for a
-group's latest activity, with `group.read` on the group. `ChangeFeedChanges.Prepared.changeFor`
-gives a change as one reader sees it, from whether their grants cover a permission it shows, such
-as directing a turn's agent.
-
-Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
-same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with
-nothing visible and no notifications for the reader sends nothing. Between commits the stream
-carries `Signal { workspaceId, signal }` messages for the [signals](#signals) the reader may see,
-filtered by the same scopes and grants. Signals have no cursor and are never replayed. The HTTP
-contract reuses these message schemas.
-
-## Signals
-
-`@amends-dev/core/signal` holds what is happening now and is never stored: `Signal.Signal` is
-`Typing`, `ThreadRead`, `GroupRead`, `NotificationsSeen`, or `TurnDraft`. `Signal.changeFeedReachOf`
-gives each its audience on the change feed: typing reaches the thread's group with `thread.read`,
-the three read-state signals only the member whose state changed, so their other sessions stay
-current, and a turn's drafts nobody there, only readers following the turn's log.
-
-`SignalHub.SignalHub` is the workspace's delivery, which storage binds with the stores: `publish`
-offers a signal to the subscribers present at that moment, in every process over the same storage,
-and `subscribe` returns those published until its scope closes. Delivery is best effort: publishing
-never fails the operation, and a subscriber that falls behind or loses its connection misses
-signals. `LocalSignalHub` is one process's hub for every workspace, which storage adapters bind to
-each workspace and relay between processes.
-
-`ThreadMessageService.typing(threadId)` tells the thread's readers that the acting member is
-composing there for the next six seconds. It requires current group access and `thread.publish`, and
-returns `NotFound` for missing and inaccessible threads alike; repeats from the same member in the
-same thread within two seconds are dropped. `ReadStateService` and `NotificationService.markSeen`
-and `markSeenThrough` publish the read-state signals after their writes.
+Who has a workspace open now, and where they are typing, is never recorded. `PresenceService.watch`
+follows it as the actor sees it: everyone present, and the thread each types in where the actor may
+read it, each time it changes; for as long as they follow it, the actor is present on a connection
+of their own, which says so every 15 seconds and says it is gone as it closes, and following ends
+once their membership has. `PresenceService.type` says the actor types in a thread they may read,
+which lapses after six seconds unless said again, or that they stopped. Each process keeps what it
+heard, `Presence.State`, from `PresenceRelay`, a host service shared by every workspace that carries
+each signal to every process; a connection lapses 45 seconds after it was last heard.
+`PresenceRelay.layerMemory` serves a host of one process.
 
 ## Memory
 
-Every store contract, and the signal hub, has a `layerMemory` beside it that implements it in
+Every store contract has a `layerMemory` beside it that implements it in
 process memory: the reference implementation of the storage contracts, which enforces with plain
 maps what the PostgreSQL adapter enforces with keys and indexes, and which core's tests run over.
 Nothing survives the process.
@@ -654,7 +640,8 @@ driver from its constructor, as each `layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
   workspace has one `Space`: its logs, as the log package's `MemoryStore.Space`, projected records by
-  kind, with the live projection versions and rebuild checkpoints, and private read state. Beside
+  kind, with the live projection versions and rebuild checkpoints, and what is kept outside the
+  journal: connections' credentials and sessions' harness state. Beside
   the workspaces sit the session logs, and tables and locks by name, created on first use, for what
   a host stores across its workspaces, such as its accounts. `MemoryDatabase.makeRows` is how a
   store keeps one kind of record.
@@ -662,8 +649,8 @@ driver from its constructor, as each `layerMemory` does.
   one-permit gate, as on one database connection.
 - `MemoryBinding.layer(workspaceId)` binds one workspace over the connection: it provides the
   workspace's log store, the log package's `MemoryStore` over the same transactions, its
-  `WorkspaceId.CurrentWorkspaceId`, and the `MemoryBinding` that every other store's `layerMemory`,
-  and the signal hub's, reads and writes through. The gateway's
+  `WorkspaceId.CurrentWorkspaceId`, and the `MemoryBinding` that every other store's `layerMemory`
+  reads and writes through. The gateway's
   [memory workspace storage](../gateway/README.md#memory) merges them all for each workspace it
   opens.
 
@@ -684,8 +671,7 @@ its log's lock, so it never waits for the workspace. Reads outside a transaction
 state, and inside one its copy; a handle from another connection, workspace, or closed transaction
 fails. Read-state writes outside a transaction apply at once, so a commit keeps the later of its
 own and the committed values. Session logs take part in no transaction: an append is kept at once
-and wakes waiting readers, as a commit's appends do. The signal hub offers each signal to the
-subscribers present, through the `LocalSignalHub` the database holds; nothing is kept.
+and wakes waiting readers, as a commit's appends do.
 
 ## Conventions
 
@@ -783,7 +769,7 @@ implementation exports `make`, which constructs it, and `layer`, which provides 
 Effect's are; it acquires its state and dependencies inside the Effect, so evaluating one twice
 builds two implementations, and returns `Service.of(...)`.
 Actor identity and the active transaction are resolved during each operation, never at construction.
-Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
+Contracts implemented elsewhere, such as stores, `Actor.Actor`,
 `Publication.Publication`, and `Store.Transaction`, have no `layer` here: a store contract's `make`
 checks an adapter's driver, and its `layerMemory` is the reference implementation in process memory.
 `Core.ts` composes the layers and implements nothing itself.

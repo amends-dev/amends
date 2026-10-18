@@ -128,6 +128,7 @@ describe("invitations", () => {
                 ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } })
                 const freshInvite = yield* Operations.invite(workspace.id, alice, {
                   recipientId: bob.id,
+                  recipientEmail: "bob@example.com",
                   expiresAt: yield* future,
                   roleId: BuiltinRoles.MemberId
                 })
@@ -228,6 +229,7 @@ describe("invitations", () => {
             id: Invitation.InvitationId.make(id),
             workspaceId,
             recipientId: bob.id,
+            recipientEmail: "bob@example.com",
             inviterMemberId: workspace.ownerMemberId,
             issuedAt,
             expiresAt: DateTime.add(issuedAt, { hours: 1 }),

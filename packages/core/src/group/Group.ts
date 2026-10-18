@@ -8,8 +8,9 @@
  */
 
 import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import * as Audience from "../journal/Audience.ts"
+import * as Request from "../request/Request.ts"
 import * as Text from "../text/Text.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -390,10 +391,21 @@ export const Summary = Schema.Struct({
 export interface Summary extends Schema.Schema.Type<typeof Summary> {}
 
 /**
- * The readers of one group: its current members. The audience the facts about a group and its
- * threads are published to.
+ * The ID of the team the current request creates, as `Request.newId` derives it.
  *
- * @category getters
+ * @category constructors
  * @since 0.1.0
  */
-export const audienceOf = (groupId: GroupId.GroupId): Audience.Scope => Audience.make("group", groupId)
+export const newId = Effect.map(Request.newId("group", []), (id) => GroupId.GroupId.make(id))
+
+/**
+ * The ID of the direct group of `memberIds` in a workspace: derived from its members, in whatever
+ * order they are given, so whoever starts it first names the same group.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const directId = (workspaceId: WorkspaceId.WorkspaceId, memberIds: ReadonlyArray<MemberId.MemberId>) =>
+  Effect.map(Request.derivedId(["group.direct", workspaceId, ...directMembers(memberIds)]), (id) =>
+    GroupId.GroupId.make(id)
+  )

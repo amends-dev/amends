@@ -34,10 +34,10 @@ import {
   WorkspaceId,
   MemberId
 } from "@amends-dev/core/workspace"
-import { Accounts, SessionTokens, Gateway, SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
+import { Accounts, SessionTokens, Gateway, SignIn, SyncStorage, WorkspaceDirectory } from "@amends-dev/gateway"
 import { Entry } from "@amends-dev/log"
 import { expect, it } from "@effect/vitest"
-import { DateTime, Effect, Layer, Redacted } from "effect"
+import { DateTime, Effect, Layer, Option, Redacted } from "effect"
 import type { Scope } from "effect"
 import { HttpClientRequest, HttpServer } from "effect/http"
 import { HttpApiMiddleware, HttpApiTest, OpenApi } from "effect/http-api"
@@ -62,13 +62,23 @@ const workspace: Workspace.Workspace = {
 }
 
 /** Records every call so encoding can be checked without storage. */
-const calls: Array<{ readonly operation: string; readonly arguments: ReadonlyArray<unknown> }> = []
+const calls: Array<{
+  readonly operation: string
+  readonly arguments: ReadonlyArray<unknown>
+  readonly requestKey?: string
+}> = []
+/** Record each call with its arguments, and the key of the request it runs in, if any. */
 const record =
-  <A extends ReadonlyArray<unknown>, R>(operation: string, respond: (...args: A) => R) =>
-  (...args: A) => {
-    calls.push({ operation, arguments: args })
-    return respond(...args)
-  }
+  <A extends ReadonlyArray<unknown>, X, E, R>(operation: string, respond: (...args: A) => Effect.Effect<X, E, R>) =>
+  (...args: A) =>
+    Effect.flatMap(Effect.serviceOption(Request.Current), (current) => {
+      calls.push({
+        operation,
+        arguments: args,
+        ...(Option.isSome(current) ? { requestKey: current.value.key } : {})
+      })
+      return respond(...args)
+    })
 const denied = new CoreError.Denied({
   reason: new CoreError.NotGranted({
     memberId,
@@ -76,9 +86,10 @@ const denied = new CoreError.Denied({
   })
 })
 const actor = Actor.Actor.of({ workspaceId, memberId, identity: alice })
-const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Invitation.Invitation => ({
+const pending = ({ recipientId, recipientEmail, roleId, expiresAt }: Invitation.IssueInput): Invitation.Invitation => ({
   details: {
     recipientId,
+    recipientEmail,
     roleId,
     expiresAt,
     id: Invitation.InvitationId.make("invitation-one"),
@@ -205,8 +216,7 @@ const conversations = Layer.mergeAll(
       edit: record("thread.edit", (input) =>
         Effect.fail(new CoreError.Changed({ resource: "ThreadMessage", id: input.messageId }))
       ),
-      delete: record("thread.delete", (id) => Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id }))),
-      typing: record("thread.typing", () => Effect.void)
+      delete: record("thread.delete", (id) => Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id })))
     })
   ),
   Layer.succeed(
@@ -280,10 +290,12 @@ const operations = Layer.mergeAll(
   Layer.succeed(
     NotificationService.NotificationService,
     NotificationService.NotificationService.of({
-      markSeen: record("notification.markSeen", (notificationId) =>
-        notificationId === notification.id
-          ? Effect.fail(new CoreError.Conflict({ reason: new CoreError.AlreadyHandled({ notificationId }) }))
-          : Effect.fail(new CoreError.NotFound({ resource: "Notification", id: notificationId }))
+      markSeen: record(
+        "notification.markSeen",
+        (notificationId): Effect.Effect<never, CoreError.Conflict | CoreError.NotFound> =>
+          notificationId === notification.id
+            ? Effect.fail(new CoreError.Conflict({ reason: new CoreError.AlreadyHandled({ notificationId }) }))
+            : Effect.fail(new CoreError.NotFound({ resource: "Notification", id: notificationId }))
       ),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
       markSeenThrough: record("notification.markSeenThrough", () => Effect.succeed(2)),
@@ -320,6 +332,7 @@ const operations = Layer.mergeAll(
       list: Effect.succeed([
         pending({
           recipientId: bob,
+          recipientEmail: "bob@example.com",
           roleId: BuiltinRoles.MemberId,
           expiresAt: DateTime.makeUnsafe("2026-02-01T00:00:00Z")
         })
@@ -431,8 +444,22 @@ const directory = Layer.succeed(
     )
   })
 )
+/** Keys belong to whoever registers them, except one that bob registered. */
+const bobsKey = "5d0c8a4e-2b7f-4e19-8c3a-9f6b1d2e7a40"
+const syncStorage = Layer.succeed(
+  SyncStorage.SyncStorage,
+  SyncStorage.SyncStorage.of({
+    remoteId: Effect.die("unused"),
+    registerKey: record("registerKey", (publicKey) =>
+      publicKey === bobsKey ? Effect.fail(new SyncStorage.KeyTaken()) : Effect.void
+    ),
+    removeKey: record("removeKey", () => Effect.void),
+    personOf: () => Effect.die("unused"),
+    bindSigningKey: () => Effect.die("unused")
+  })
+)
 const services = Layer.mergeAll(
-  Routes.layerHandlers.pipe(Layer.provide([gateway, signIn, credentials, directory, accounts])),
+  Routes.layerHandlers.pipe(Layer.provide([gateway, signIn, credentials, directory, accounts, syncStorage])),
   HttpServer.layerServices
 )
 const run = <A, E>(token: string, program: (client: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>) =>
@@ -634,7 +661,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     expect(calls).toEqual([
       {
         operation: "createWorkspace",
-        arguments: [alice.id, { name: "Test workspace", memberName: member.name }, { requestKey: "create-1" }]
+        arguments: [alice.id, { name: "Test workspace", memberName: member.name }, "create-1"]
       },
       { operation: "inWorkspace", arguments: [workspaceId] },
       { operation: "accept", arguments: ["invitation-one", alice.id, member.name] }
@@ -660,7 +687,8 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
       { operation: "findOrCreate", arguments: ["bob@example.com"] },
       {
         operation: "issue",
-        arguments: [{ recipientId: bob, roleId: BuiltinRoles.MemberId }, { requestKey: "issue-1" }]
+        arguments: [{ recipientId: bob, roleId: BuiltinRoles.MemberId }],
+        requestKey: "issue-1"
       }
     ])
   })
@@ -729,6 +757,40 @@ it.effect("a person reads their account, and signs out with the credential they 
     expect(calls.map(({ operation }) => operation)).toEqual(["findByIds", "findByIds", "revoke"])
     const credential = calls[2]?.arguments[0]
     expect(Redacted.isRedacted(credential) && Redacted.value(credential)).toBe("alice")
+  })
+)
+
+it.effect("a person registers and removes their browser's sync key, and only a person syncs", () =>
+  Effect.gen(function* () {
+    calls.length = 0
+    const publicKey = "0b9f3c1e-6d2a-4f57-9a8e-2c4b6d8f0a13"
+    const registered = yield* run("alice", (client) =>
+      client.me.registerSyncKey({ params: { publicKey }, responseMode: "response-only" })
+    )
+    expect(registered.status).toBe(204)
+    const taken = yield* run("alice", (client) =>
+      client.me.registerSyncKey({ params: { publicKey: bobsKey }, responseMode: "response-only" })
+    )
+    expect(taken.status).toBe(409)
+    expect(yield* taken.json).toEqual({ _tag: "SyncStorage.KeyTaken" })
+    const removed = yield* run("alice", (client) =>
+      client.me.removeSyncKey({ params: { publicKey }, responseMode: "response-only" })
+    )
+    expect(removed.status).toBe(204)
+    expect(calls).toEqual([
+      { operation: "registerKey", arguments: [publicKey, alice.id] },
+      { operation: "registerKey", arguments: [bobsKey, alice.id] },
+      { operation: "removeKey", arguments: [publicKey, alice.id] }
+    ])
+    calls.length = 0
+    const agent = yield* run("agent", (client) => Effect.flip(client.me.registerSyncKey({ params: { publicKey } })))
+    expect(agent).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } })
+    // A key is the public key of an identity eventlog made: a UUID.
+    const malformed = yield* run("alice", (client) =>
+      Effect.flip(client.me.registerSyncKey({ params: { publicKey: "not-a-key" } }))
+    )
+    expect(malformed._tag).toBe("SchemaError")
+    expect(calls).toEqual([])
   })
 )
 
@@ -902,7 +964,8 @@ it.effect("conversation routes pass path parameters, cursors, and request keys i
     expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
       {
         operation: "group.create",
-        arguments: [{ name: "Studio", memberIds: [memberId], visibility: "Public" }, { requestKey: "group-1" }]
+        arguments: [{ name: "Studio", memberIds: [memberId], visibility: "Public" }],
+        requestKey: "group-1"
       },
       { operation: "group.listMine", arguments: [{ limit: 20, after: groupId }] },
       { operation: "group.listPublic", arguments: [{ limit: 20, after: groupId }] },
@@ -919,11 +982,12 @@ it.effect("conversation routes pass path parameters, cursors, and request keys i
       { operation: "thread.openings", arguments: [groupId, { limit: 10, before: opened }] },
       {
         operation: "thread.start",
-        arguments: [{ groupId, text: "  Hello\n", mentions: [memberId] }, { requestKey: key }]
+        arguments: [{ groupId, text: "  Hello\n", mentions: [memberId] }],
+        requestKey: key
       },
       {
         operation: "thread.startDirect",
-        arguments: [{ memberIds: [memberId], text: "Hi", mentions: [] }, {}]
+        arguments: [{ memberIds: [memberId], text: "Hi", mentions: [] }]
       },
       { operation: "thread.get", arguments: [threadId] },
       {
@@ -940,7 +1004,8 @@ it.effect("conversation routes pass path parameters, cursors, and request keys i
       },
       {
         operation: "thread.publish",
-        arguments: [{ threadId, text: "Reply", mentions: [] }, { requestKey: "reply-1" }]
+        arguments: [{ threadId, text: "Reply", mentions: [] }],
+        requestKey: "reply-1"
       },
       {
         operation: "thread.edit",
@@ -1009,7 +1074,8 @@ it.effect(
         { operation: "channel.list", arguments: [] },
         {
           operation: "channel.create",
-          arguments: [{ connectionId, groupId, name: "Support", opensTasks: true }, { requestKey: key }]
+          arguments: [{ connectionId, groupId, name: "Support", opensTasks: true }],
+          requestKey: key
         },
         { operation: "channel.get", arguments: [channelId] },
         { operation: "channel.redirect", arguments: [{ channelId, groupId }] },

@@ -170,6 +170,7 @@ describe("store validation", () => {
                 id: Invitation.InvitationId.make("contract-invitation"),
                 workspaceId,
                 recipientId: Identity.HumanId.make("recipient"),
+                recipientEmail: "recipient@example.com",
                 inviterMemberId: workspace.ownerMemberId,
                 issuedAt,
                 expiresAt: DateTime.add(issuedAt, { hours: 1 }),

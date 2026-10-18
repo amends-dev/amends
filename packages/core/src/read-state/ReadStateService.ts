@@ -1,14 +1,13 @@
 /**
  * The operations on read state an actor calls: a person marking a thread read through a timeline
- * position, or a group read now. Each authorizes the actor itself, writes private state outside the
- * journal through `ReadStateStore`, and publishes a `ThreadRead` or `GroupRead` signal to the
- * person's other sessions. Agents keep no read state.
+ * position, or a group read now. Each authorizes the actor itself and records a `ReadStateFacts`
+ * fact, which only the person sees. Agents keep no read state.
  *
  * @since 0.1.0
  */
 
 import * as Context from "effect/Context"
-import * as DateTime from "effect/DateTime"
+import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -21,15 +20,15 @@ import * as GroupPermissions from "../group/GroupPermissions.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Journal from "../journal/Journal.ts"
+import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Signal from "../signal/Signal.ts"
-import * as SignalHub from "../signal/SignalHub.ts"
 import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ReadState from "./ReadState.ts"
-import * as ReadStateCommand from "./ReadStateCommand.ts"
+import * as ReadStateFacts from "./ReadStateFacts.ts"
 import * as ReadStateStore from "./ReadStateStore.ts"
 
 /**
@@ -44,6 +43,7 @@ export type Error =
   | CoreError.Conflict
   | CoreError.Invalid
   | CoreError.Unavailable
+  | CoreError.Uncertain
 
 /**
  * The read-state operations, one of `Core.Operations`.
@@ -57,8 +57,7 @@ export class ReadStateService extends Context.Service<
     /**
      * Record that the acting person has read a thread through a timeline position, under the
      * thread's current access and `thread.read`. The position only moves forward. Their pending
-     * notifications from that thread up to the position are marked seen with it; both are private
-     * state, written outside the workspace's write order.
+     * notifications from that thread up to the position are marked seen with it.
      */
     readonly markThreadRead: (input: ReadState.MarkThreadReadInput) => Effect.Effect<void, Error, Actor.Actor>
     /** Record that the acting person read a group now, under membership and `group.read`. */
@@ -67,8 +66,8 @@ export class ReadStateService extends Context.Service<
 >()("@amends-dev/core/read-state/ReadStateService") {}
 
 /**
- * Builds the read-state operations over thread and group reads, the shared write, the store, and
- * the signal hub; each operation resolves the actor's authority itself.
+ * Builds the read-state operations over thread and group reads and the store; each operation
+ * resolves the actor's authority itself.
  *
  * @category constructors
  * @since 0.1.0
@@ -79,8 +78,8 @@ export const make = Effect.gen(function* () {
   const groupQuery = yield* GroupQuery.GroupQuery
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore
   const readStateStore = yield* ReadStateStore.ReadStateStore
-  const readStateCommand = yield* ReadStateCommand.ReadStateCommand
-  const signalHub = yield* SignalHub.SignalHub
+  const journal = yield* Journal.Journal
+  const crypto = yield* Crypto.Crypto
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The acting person's membership; agents keep no read state. */
@@ -90,67 +89,68 @@ export const make = Effect.gen(function* () {
       return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
     return actor.memberId
   })
-  const markThreadRead = Effect.fn("ReadStateService.markThreadRead")(function* (input: ReadState.MarkThreadReadInput) {
-    const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input)
-    const memberId = yield* requireHuman()
-    const thread = yield* threadQuery.requireAccess(request.threadId)
-    yield* authorization.require([
-      Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id }))
-    ])
-    const found = yield* threadActivityStore.latest(thread.id)
-    const latest = Option.isNone(found) ? 0 : found.value.sequence
-    if (request.throughSequence > latest)
-      return yield* new CoreError.Conflict({
-        reason: new CoreError.BeyondTimeline({
-          threadId: thread.id,
-          throughSequence: request.throughSequence,
-          latestSequence: latest
+  const markThreadRead = Effect.fn("ReadStateService.markThreadRead")(
+    function* (input: ReadState.MarkThreadReadInput) {
+      const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input)
+      const memberId = yield* requireHuman()
+      const thread = yield* threadQuery.requireAccess(request.threadId)
+      yield* authorization.require([
+        Requirement.make(
+          ThreadPermissions.Read,
+          Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+        )
+      ])
+      const found = yield* threadActivityStore.latest(thread.id)
+      const latest = Option.isNone(found) ? 0 : found.value.sequence
+      if (request.throughSequence > latest)
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.BeyondTimeline({
+            threadId: thread.id,
+            throughSequence: request.throughSequence,
+            latestSequence: latest
+          })
         })
-      })
-    const position: ReadState.ThreadPosition = {
-      workspaceId,
-      memberId,
-      threadId: thread.id,
-      readThrough: request.throughSequence
-    }
-    // Reading settles the inbox up to the position in the same write. Both are private state,
-    // written outside the workspace's write order; the reader's other sessions hear of it as a
-    // signal.
-    yield* readStateCommand.markThreadRead(position, yield* DateTime.now)
-  }, Operation.report)
-
-  const markGroupRead = Effect.fn("ReadStateService.markGroupRead")(function* (input: ReadState.MarkGroupReadInput) {
-    const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input)
-    const memberId = yield* requireHuman()
-    yield* groupQuery.requireAudience(request.groupId)
-    yield* authorization.require([
-      Requirement.make(
-        GroupPermissions.Read,
-        Target.Reference.cases.Group.make({ workspaceId, groupId: request.groupId })
-      )
-    ])
-    const readAt = yield* DateTime.now
-    yield* readStateStore.advanceGroup({
-      workspaceId,
-      memberId,
-      groupId: request.groupId,
-      readAt
-    })
-    yield* signalHub.publish(
-      Signal.Signal.cases.GroupRead.make({
+      // A position at or before the stored one has nothing more to record: what was pending up to
+      // it was seen when the person read that far.
+      const [stored] = yield* readStateStore.getThreadPositions(memberId, [thread.id])
+      if (stored !== undefined && stored.readThrough >= request.throughSequence) return
+      yield* journal.publish(ReadStateFacts.ThreadRead, {
         workspaceId,
         memberId,
-        groupId: request.groupId,
-        readAt
+        threadId: thread.id,
+        readThrough: request.throughSequence
       })
-    )
-  }, Operation.report)
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+    Operation.report
+  )
+
+  const markGroupRead = Effect.fn("ReadStateService.markGroupRead")(
+    function* (input: ReadState.MarkGroupReadInput) {
+      const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input)
+      const memberId = yield* requireHuman()
+      yield* groupQuery.requireAudience(request.groupId)
+      yield* authorization.require([
+        Requirement.make(
+          GroupPermissions.Read,
+          Target.Reference.cases.Group.make({ workspaceId, groupId: request.groupId })
+        )
+      ])
+      yield* journal.publish(ReadStateFacts.GroupRead, { workspaceId, memberId, groupId: request.groupId })
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+    Operation.report
+  )
 
   return ReadStateService.of({ markThreadRead, markGroupRead })
 })
 
 /**
- * Provide the read-state operations over thread and group reads, the shared write, and the store.
+ * Provide the read-state operations over thread and group reads, the store, and the journal.
  *
  * @category layers
  * @since 0.1.0

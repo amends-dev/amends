@@ -1,5 +1,8 @@
 # Workspace entry
 
+> Historical: this describes the web and desktop apps, which have been removed. The UI's screens
+> remain; the app being rebuilt decides its own routes and state.
+
 Sign in → `/workspaces` → choose a workspace, accept an invitation, or open
 `/workspaces/new`. Creation asks for a workspace name and what people there will call the
 creator, creates the caller's owned workspace, refresh## Composition

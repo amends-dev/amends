@@ -28,6 +28,12 @@ signs out with `DELETE /me/session`; the client forgets it either way. `GET /me`
 account a token signs in as, for a client that holds a token alone; a token no account holds
 answers 401.
 
+A browser that keeps a workspace in [sync](../packages/sync/README.md) makes an eventlog identity of
+its own and registers its key with `PUT /me/sync-keys/:publicKey`, signed in; the key, not the
+token, then opens the person's stores. A key outlives the session it was registered in until it is
+removed with `DELETE /me/sync-keys/:publicKey`, which the browser does as it signs out: revoking a
+token, by signing out elsewhere or by its expiry, leaves the keys registered under it.
+
 `GET /session/methods` lists the ways a host signs people in: whether it sends email codes, and
 the identity providers it offers, each with an ID and a name to show. The email-code flow is
 `POST /session/email`, which sends a code to the address, then `POST /session/code`, which
@@ -79,10 +85,6 @@ Designed, not built. Each provider the host is configured with, such as Google, 
 A provider signs in to the account of the address it verified, so email codes and every provider
 reach the same account for one address.
 
-The desktop app signs in through the system browser, since providers such as Google refuse
-embedded webviews: it opens the start address with a return address it listens on, a loopback
-port or its own URL scheme, and exchanges the code it receives there.
-
 ## Sign-in and connection OAuth
 
 Connections to systems such as Slack or an MCP server also use OAuth, and share sign-in's
@@ -93,90 +95,3 @@ its grant, sealed with the connection's credentials and refreshed when it expire
 member allowed to manage the connection may start one. MCP servers also need discovery of their
 authorization server and dynamic client registration, which registers a client for each server
 rather than one from the host's configuration.
-
-## The first slice
-
-Implementation of the [feature development flow](feature-development.md): the first slice
-requested an email code, verified it, and established a session, and workspace selection came
-next. Web and desktop now render the [UI](../apps/ui/README.md) `SignInEmail` and `SignInCode`
-screens, drawn from the Lunacy mocks, and switch between them on the
-[client hook](../apps/client/src/sign-in.ts)'s step. The screens take its error codes and pending
-actions and own the wording, the delivery hint, and focus. The original slice's UI pieces and the
-features `SignIn` parts described below lived in packages that have since been removed; the
-sections that follow are historical.
-
-```text
-Web/desktop sign-in route
-└─ SignInPage (owned by web or desktop, over useSignIn)
-   ├─ UI SignInEmail → Field + Input
-   └─ UI SignInCode → Field + CodeInput
-```
-
-### UI pieces
-
-The original slice reused the previous UI's Input, Field, Button, Text, and layout primitives.
-Existing tokens, field errors, and Button pending behavior cover their basic states.
-
-| New piece         | Location in the old UI  | Responsibility                                                                                                                                                                                                                          |
-| ----------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CodeInput`       | `primitives/code-input` | One native text input with six visual cells, one value, and one tab stop. Supports paste, selection, leading zeros, numeric input mode, and one-time-code autocomplete. Accepts Field associations; owns no verification or submission. |
-| `SignInEmailForm` | `features/sign-in`      | Heading, email field, submit action, and inline request feedback.                                                                                                                                                                       |
-| `SignInCodeForm`  | `features/sign-in`      | Heading, delivery guidance, code field, verify action, resend, change email, and inline feedback.                                                                                                                                       |
-
-The `SignInPage` compositions live in `apps/web/src/pages` and
-`apps/desktop/src/pages`; UI supplies reusable visual pieces. The app's
-`ThemeProvider` wraps `Shell.Root`. Pages use Shell's existing header/main/footer
-parts; `Shell.Content` supplies a named narrow column and optional centering.
-`Shell.Body scroll="page"` keeps enlarged content and chrome in one scrollable flow.
-The custom badge is omitted in favor of reviewed Text. Apps define no styles.
-
-Each form is independently renderable. Values, pending/error state, and action
-callbacks come from its caller; forms own native submission, focus, and accessible
-feedback. Use explicit submit actions, including Enter. Keep headings and feedback
-local to these forms until another consumer needs a shared composition.
-
-CodeInput adapts its six cells to one field at narrow widths so enlarged text
-stays readable; the native input and its value remain mounted.
-
-The original composition:
-
-```text
-Web/desktop sign-in route
-└─ SignInPage (owned by web or desktop)
-   └─ SignIn.Root (shared controller context)
-      ├─ SignIn.EmailForm → UI SignInEmailForm
-      └─ SignIn.CodeForm → UI SignInCodeForm → Field + CodeInput
-```
-
-The connected parts render their active forms; nested children declare their
-structure without passing complete components through custom props. Client owns drafts, the accepted
-email, step transitions, requests, validation, duplicate/stale request protection,
-and session replacement. Features map client outcomes into UI props; UI imports
-no client or HTTP types. App guards validate the resulting session and navigate
-using the existing safe return path.
-
-### Contract and design
-
-The [HTTP contract](../packages/http/src/SessionGroup.ts) already provides
-`POST /session/email` → 202 and `POST /session/code` → session or a 403 rejection
-(`mismatch`, `expired`, `unknown`). Resend uses the email endpoint again. Sign-in
-belongs to the gateway/host; this slice needs no new core operation.
-
-Use the sign-in frames in the [Lunacy mocks](../design-system/) for composition, with the
-reviewed UI tokens and control sizing. Real code entry uses the native control. Passkeys, Google sign-in,
-and workspace screens are outside this slice. The current host logs codes and
-expires them after ten minutes; delivery guidance must describe that behavior.
-The reference's device-binding claim is not implemented.
-
-### Review order
-
-Review CodeInput, the email form, and the code form separately in UI Storybook.
-Cover keyboard/paste/autofill, invalid and pending states, both themes, long email
-addresses, narrow layouts, and enlarged text. Then verify the connected flow:
-success, wrong/expired/unknown code, resend invalidation, request failure/retry,
-duplicate submission, and changing email or unmounting during a request.
-
-Use the [host test-server pattern](../hosts/local/test/http.test.ts) with captured
-codes and temporary PostgreSQL data. Success must also prove the credential works
-against the directory. Finally introduce the page layout and verify both app
-routes, return paths, builds, and a native desktop smoke check.

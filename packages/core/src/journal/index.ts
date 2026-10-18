@@ -14,11 +14,6 @@
 /**
  * @since 0.1.0
  */
-export * as Audience from "./Audience.ts"
-
-/**
- * @since 0.1.0
- */
 export * as Checkpoint from "./Checkpoint.ts"
 
 /**

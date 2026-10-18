@@ -1,8 +1,8 @@
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Journal, Publication } from "@amends-dev/core/journal"
-import { Notification, NotificationService, NotificationStore } from "@amends-dev/core/notification"
+import { Event, Journal, Publication } from "@amends-dev/core/journal"
+import { Notification, NotificationFacts, NotificationService, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
   ThreadMessageService,
@@ -13,7 +13,7 @@ import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/w
 import { Gateway } from "@amends-dev/gateway"
 import { Entry, Store, StoreError } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
-import { Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect"
+import { Context, DateTime, Effect, Exit, Option } from "effect"
 import { TestClock } from "effect/testing"
 import { withStorage } from "./fixture.ts"
 import * as Support from "./support.ts"
@@ -30,8 +30,8 @@ import {
 } from "./support.ts"
 
 /**
- * Marking notifications seen: a human's Seen is private state outside the journal. Ownership,
- * repeats, transactions, concurrency, and survival through rebuilds.
+ * Marking notifications seen: a person's Seen is recorded in the journal as `NotificationFacts.Seen`.
+ * Ownership, repeats, transactions, hosts, and rebuilds.
  */
 
 const { core, initialized, runGateway } = Support
@@ -72,6 +72,17 @@ describe("marking notifications seen", () => {
       limit: 100
     })
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
+  /** The notifications the journal records as seen, in order. */
+  const seenFacts = (bound: Bound) =>
+    facts(
+      bound,
+      Effect.flatMap(Journal.Journal, (journal) =>
+        journal.log.readEntries({ name: NotificationFacts.Seen.name, limit: 100 }).pipe(
+          Effect.flatMap(Effect.forEach((entry) => Event.decode(NotificationFacts.Seen, entry))),
+          Effect.map((events) => events.map(({ payload }) => payload.notificationId))
+        )
+      )
+    )
   const seenAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z")
   const seenState = (seenAt: DateTime.Utc): Notification.State => Notification.State.cases.Seen.make({ seenAt })
   const changed = <A extends object>(record: A, changes: Partial<A>): A => Object.assign({}, record, changes)
@@ -139,27 +150,6 @@ describe("marking notifications seen", () => {
     if (!humanNote || !agentNote || !ownerNote) return yield* Effect.die("Missing generated notifications")
     return { bound, owner, group, first, humanNote, agentNote, ownerNote }
   })
-  /** Storage whose first Seen write lets `first` commit just before it, as a racing request. */
-  const racingSeen = (bound: Bound, first: Effect.Effect<unknown, unknown>): Bound => {
-    let done = false
-    const before: Effect.Effect<void> = Effect.suspend(() =>
-      done
-        ? Effect.void
-        : Effect.orDie(first).pipe(
-            Effect.andThen(
-              Effect.sync(() => {
-                done = true
-              })
-            )
-          )
-    )
-    return Object.assign({}, bound, {
-      context: Context.add(bound.context, NotificationStore.NotificationStore, {
-        ...bound.notifications,
-        markSeen: (ids, at) => Effect.andThen(before, bound.notifications.markSeen(ids, at))
-      })
-    })
-  }
   const snapshot = Effect.fnUntraced(function* (p: Effect.Success<ReturnType<typeof prepare>>) {
     return {
       history: yield* history(p.bound),
@@ -172,7 +162,7 @@ describe("marking notifications seen", () => {
     }
   })
 
-  it.effect("marking seen records Seen privately with a stable time, and writes nothing to the journal", () =>
+  it.effect("marking seen records it in the journal once, with a stable time", () =>
     withStorage((storage) =>
       runHost(
         storage,
@@ -190,8 +180,11 @@ describe("marking notifications seen", () => {
           ).toEqual([])
           expect(yield* notes(p.bound, human)).toEqual([result])
           const after = yield* snapshot(p)
-          expect(after).toEqual(Object.assign({}, before, { human: [result] }))
-          // Seen again later keeps the first time.
+          expect(Object.assign({}, after, { history: before.history })).toEqual(
+            Object.assign({}, before, { human: [result] })
+          )
+          expect(yield* seenFacts(p.bound)).toEqual([result.id])
+          // Seen again later keeps the first time, and records nothing more.
           yield* TestClock.adjust("1 second")
           expect(yield* run(p.bound, human, markSeen(result.id))).toEqual(result)
           expect(yield* snapshot(p)).toEqual(after)
@@ -378,7 +371,7 @@ describe("marking notifications seen", () => {
     )
   )
 
-  it.effect("seeing notifications that leaving their group settles first reports them handled, not a failure", () =>
+  it.effect("seeing what leaving its group settled reports it handled, and marking all passes over it", () =>
     withStorage((storage) =>
       runHost(
         storage,
@@ -408,121 +401,37 @@ describe("marking notifications seen", () => {
           const other = (yield* notes(p.bound, human)).find((note) => note.id !== p.humanNote.id)
           if (other === undefined) return yield* Effect.die("Missing second notification")
           const admission = Option.getOrThrow(yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId))
-          const leave = (membershipId: typeof admission.id) =>
-            run(
-              p.bound,
-              human,
-              Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
-                groupMembershipService.leave({ groupId: p.group.id, membershipId })
-              )
+          yield* run(
+            p.bound,
+            human,
+            Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
+              groupMembershipService.leave({ groupId: p.group.id, membershipId: admission.id })
             )
-          // The human leaves Team after the notification was read as pending, before Seen.
-          const racing = racingSeen(p.bound, leave(admission.id))
-          expect(yield* Effect.flip(run(racing, human, markSeen(p.humanNote.id)))).toMatchObject({
+          )
+          expect(yield* Effect.flip(run(p.bound, human, markSeen(p.humanNote.id)))).toMatchObject({
             _tag: "CoreError.Conflict",
             reason: { _tag: "AlreadyHandled" }
           })
           expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
             value: { state: { _tag: "Discarded", reason: "access-lost" } }
           })
-          // Marking all seen reads the page again without the settled one, and marks the rest.
-          yield* run(
-            p.bound,
-            p.owner,
-            Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
-              groupMembershipService.add({ groupId: p.group.id, memberId: human.memberId })
-            )
-          )
-          yield* run(
-            p.bound,
-            writer,
-            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-              threadMessageService.publish({
-                threadId: p.first.thread.id,
-                mentions: [human.memberId],
-                text: "Again"
-              })
-            )
-          )
-          const pending = yield* p.bound.notifications.listPendingByRecipient(
-            Notification.ofMember(human.memberId, human.identity),
-            { limit: 100 }
-          )
-          expect(pending).toHaveLength(2)
-          const rejoined = Option.getOrThrow(yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId))
-          // Through the last listed, so both are due, whichever sorts first.
-          const through = pending.at(-1)!
+          // Through the later of the two, so both are due; only the one still pending is marked.
+          const through = [p.humanNote, other].toSorted(
+            (left, right) => DateTime.toEpochMillis(left.recordedAt) - DateTime.toEpochMillis(right.recordedAt)
+          )[1]!
           expect(
             yield* run(
-              racingSeen(p.bound, leave(rejoined.id)),
+              p.bound,
               human,
               Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
-                notificationService.markSeenThrough({
-                  recordedAt: through.recordedAt,
-                  id: through.id
-                })
+                notificationService.markSeenThrough({ recordedAt: through.recordedAt, id: through.id })
               )
             )
           ).toBe(1)
           expect(yield* p.bound.notifications.get(other.id)).toMatchObject({
             value: { state: { _tag: "Seen" } }
           })
-          expect(
-            yield* p.bound.notifications.listPendingByRecipient(Notification.ofMember(human.memberId, human.identity), {
-              limit: 100
-            })
-          ).toEqual([])
-        })
-      )
-    )
-  )
-
-  it.effect("a Seen write during a departure's commit agrees with what rebuilding settles", () =>
-    withStorage((storage) =>
-      runHost(
-        storage,
-        Effect.gen(function* () {
-          const p = yield* prepare()
-          const admission = Option.getOrThrow(yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId))
-          const reached = yield* Deferred.make<void>(),
-            release = yield* Deferred.make<void>()
-          // The departure pauses once it has settled the human's notifications, before committing.
-          const pausing = Object.assign({}, p.bound, {
-            context: Context.add(p.bound.context, NotificationStore.NotificationStore, {
-              ...p.bound.notifications,
-              discardPendingForGroup: (memberId, groupId) =>
-                p.bound.notifications
-                  .discardPendingForGroup(memberId, groupId)
-                  .pipe(Effect.andThen(Deferred.succeed(reached, undefined)), Effect.andThen(Deferred.await(release)))
-            })
-          })
-          const leaving = yield* run(
-            pausing,
-            human,
-            Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
-              groupMembershipService.leave({
-                groupId: p.group.id,
-                membershipId: admission.id
-              })
-            )
-          ).pipe(Effect.forkChild)
-          yield* Deferred.await(reached)
-          const seeing = yield* Effect.exit(p.bound.notifications.markSeen([p.humanNote.id], seenAt)).pipe(
-            Effect.forkChild
-          )
-          yield* Effect.repeat(Effect.yieldNow, { times: 10 })
-          yield* Deferred.succeed(release, undefined)
-          yield* Fiber.join(leaving)
-          // Seen lands first or is refused; either way the stored state is the rebuilt one.
-          yield* Fiber.join(seeing)
-          const live = yield* p.bound.notifications.get(p.humanNote.id)
-          expect(live).toMatchObject({ value: { state: { _tag: "Discarded" } } })
-          yield* storage.discardProjections
-          yield* facts(
-            p.bound,
-            Effect.flatMap(Journal.Journal, (journal) => journal.replay)
-          )
-          expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(live)
+          expect(yield* seenFacts(p.bound)).toEqual([other.id])
         })
       )
     )
@@ -597,7 +506,7 @@ describe("marking notifications seen", () => {
     )
   )
 
-  it.effect("Seen survives reopening, rebuilding projections, and departure, and never revives pending work", () =>
+  it.effect("Seen is rebuilt from the journal through reopening and departure, and never revives pending work", () =>
     withStorage((storage) =>
       Effect.gen(function* () {
         const saved = yield* Effect.scoped(
@@ -669,132 +578,114 @@ describe("marking notifications seen", () => {
     )
   )
 
-  it.effect(
-    "direct Seen writes accept only pending human notifications here, keep the first time, and are atomic",
-    () =>
-      withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const p = yield* prepare()
-            const foreign = yield* boundTo(otherWorkspaceId)
-            yield* initialized(foreign)
-            const discarded = changed(p.humanNote, {
-              id: Notification.NotificationId.make("discarded"),
-              source: { logId: Entry.LogId.make("discarded"), entryId: p.humanNote.source.entryId },
-              state: { _tag: "Discarded", reason: "participation-ended" }
-            })
-            yield* p.bound.store.transaction(p.bound.notifications.insert(discarded))
-            // Seen is never inserted; it is recorded only through markSeen.
-            expect(
-              yield* Effect.flip(
-                p.bound.store.transaction(
-                  p.bound.notifications.insert(
-                    changed(p.humanNote, {
-                      id: Notification.NotificationId.make("inserted-seen"),
-                      source: {
-                        logId: Entry.LogId.make("seen"),
-                        entryId: p.humanNote.source.entryId
-                      },
-                      state: seenState(seenAt)
-                    })
-                  )
-                )
-              )
-            ).toMatchObject({
-              _tag: "StoreError",
-              store: "NotificationStore",
-              reason: { _tag: "Rejected" }
-            })
-            const before = yield* snapshot(p)
-            for (const id of [Notification.NotificationId.make("missing"), p.agentNote.id, discarded.id])
-              // A valid ID in the same call is not recorded either.
-              expect(yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id, id], seenAt))).toMatchObject({
-                _tag: "StoreError",
-                store: "NotificationStore",
-                reason: { _tag: "Rejected" }
-              })
-            expect(yield* Effect.flip(foreign.notifications.markSeen([p.humanNote.id], seenAt))).toMatchObject({
-              _tag: "StoreError",
-              store: "NotificationStore",
-              reason: { _tag: "Rejected" }
-            })
-            expect(yield* snapshot(p)).toEqual(before)
-            expect(yield* Effect.flip(run(p.bound, human, markSeen(discarded.id)))).toMatchObject({
-              _tag: "CoreError.Conflict",
-              reason: { _tag: "AlreadyHandled" }
-            })
-            const invalid = { at: seenAt }
-            Reflect.set(invalid, "at", "not-a-date")
-            expect(yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id], invalid.at))).toMatchObject({
-              _tag: "StoreError",
-              store: "NotificationStore",
-              reason: { _tag: "Rejected" }
-            })
-            yield* p.bound.notifications.markSeen([], seenAt)
-            yield* p.bound.notifications.markSeen([p.humanNote.id, p.humanNote.id], seenAt)
-            const result = changed(p.humanNote, { state: seenState(seenAt) })
-            expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(Option.some(result))
-            yield* p.bound.notifications.markSeen([p.humanNote.id], DateTime.add(seenAt, { hours: 1 }))
-            expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(Option.some(result))
-            // Within a transaction it rolls back with it, and an expired handle is refused.
-            const id = p.ownerNote.id
-            expect(
-              yield* Effect.flip(
-                p.bound.store.transaction(
-                  p.bound.notifications.markSeen([id], seenAt).pipe(Effect.andThen(Effect.fail("rollback")))
-                )
-              )
-            ).toBe("rollback")
-            expect(yield* p.bound.notifications.get(id)).toEqual(Option.some(p.ownerNote))
-            const handle = yield* p.bound.store.transaction(Store.Transaction)
-            expect(
-              Exit.isFailure(
-                yield* Effect.exit(
-                  p.bound.notifications.markSeen([id], seenAt).pipe(Effect.provideService(Store.Transaction, handle))
-                )
-              )
-            ).toBe(true)
-            expect(yield* p.bound.notifications.get(id)).toEqual(Option.some(p.ownerNote))
+  it.effect("direct Seen writes accept only pending human notifications here, and are atomic", () =>
+    withStorage((storage) =>
+      runHost(
+        storage,
+        Effect.gen(function* () {
+          const p = yield* prepare()
+          const foreign = yield* boundTo(otherWorkspaceId)
+          yield* initialized(foreign)
+          const discarded = changed(p.humanNote, {
+            id: Notification.NotificationId.make("discarded"),
+            source: { logId: Entry.LogId.make("discarded"), entryId: p.humanNote.source.entryId },
+            state: { _tag: "Discarded", reason: "participation-ended" }
           })
-        )
+          yield* p.bound.store.transaction(p.bound.notifications.insert(discarded))
+          // Seen is never inserted; it is recorded only through markSeen.
+          expect(
+            yield* Effect.flip(
+              p.bound.store.transaction(
+                p.bound.notifications.insert(
+                  changed(p.humanNote, {
+                    id: Notification.NotificationId.make("inserted-seen"),
+                    source: {
+                      logId: Entry.LogId.make("seen"),
+                      entryId: p.humanNote.source.entryId
+                    },
+                    state: seenState(seenAt)
+                  })
+                )
+              )
+            )
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "NotificationStore",
+            reason: { _tag: "Rejected" }
+          })
+          const before = yield* snapshot(p)
+          const write = (bound: Bound, ids: ReadonlyArray<Notification.NotificationId>, at = seenAt) =>
+            bound.store.transaction(bound.notifications.markSeen(ids, at))
+          const rejected = { _tag: "StoreError", store: "NotificationStore", reason: { _tag: "Rejected" } }
+          for (const id of [Notification.NotificationId.make("missing"), p.agentNote.id, discarded.id])
+            // A valid ID in the same call is not recorded either.
+            expect(yield* Effect.flip(write(p.bound, [p.humanNote.id, id]))).toMatchObject(rejected)
+          expect(yield* Effect.flip(write(foreign, [p.humanNote.id]))).toMatchObject(rejected)
+          expect(yield* snapshot(p)).toEqual(before)
+          expect(yield* Effect.flip(run(p.bound, human, markSeen(discarded.id)))).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "AlreadyHandled" }
+          })
+          const invalid = { at: seenAt }
+          Reflect.set(invalid, "at", "not-a-date")
+          expect(yield* Effect.flip(write(p.bound, [p.humanNote.id], invalid.at))).toMatchObject(rejected)
+          yield* write(p.bound, [])
+          yield* write(p.bound, [p.humanNote.id, p.humanNote.id])
+          const result = changed(p.humanNote, { state: seenState(seenAt) })
+          expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(Option.some(result))
+          // One already seen is no longer pending.
+          expect(
+            yield* Effect.flip(write(p.bound, [p.humanNote.id], DateTime.add(seenAt, { hours: 1 })))
+          ).toMatchObject(rejected)
+          expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(Option.some(result))
+          // It rolls back with its transaction, and an expired handle is refused.
+          const id = p.ownerNote.id
+          expect(
+            yield* Effect.flip(
+              p.bound.store.transaction(
+                p.bound.notifications.markSeen([id], seenAt).pipe(Effect.andThen(Effect.fail("rollback")))
+              )
+            )
+          ).toBe("rollback")
+          expect(yield* p.bound.notifications.get(id)).toEqual(Option.some(p.ownerNote))
+          const handle = yield* p.bound.store.transaction(Store.Transaction)
+          expect(
+            Exit.isFailure(
+              yield* Effect.exit(
+                p.bound.notifications.markSeen([id], seenAt).pipe(Effect.provideService(Store.Transaction, handle))
+              )
+            )
+          ).toBe(true)
+          expect(yield* p.bound.notifications.get(id)).toEqual(Option.some(p.ownerNote))
+        })
       )
+    )
   )
 
-  it.effect("marking seen concurrently from two hosts succeeds for both with the one stored time", () =>
+  it.effect("marking seen again from another host returns the one stored time, recorded once", () =>
     withStorage((storage) =>
       Effect.gen(function* () {
         const saved = yield* Effect.scoped(runHost(storage, prepare()))
-        const journal = yield* Effect.scoped(runHost(storage, Effect.flatMap(boundTo(workspaceId), history)))
-        const gate = yield* Deferred.make<void>()
-        const signals = [yield* Deferred.make<void>(), yield* Deferred.make<void>()]
-        const fibers = yield* Effect.forEach(signals, (signal, index) =>
+        const markOn = (adjust: `${number} seconds`) =>
           Effect.scoped(
             runHost(
               storage,
               Effect.gen(function* () {
-                const bound = yield* boundTo(workspaceId)
-                yield* Deferred.succeed(signal, undefined)
-                yield* Deferred.await(gate)
-                yield* TestClock.adjust(`${index + 1} seconds`)
-                return yield* run(bound, human, markSeen(saved.humanNote.id))
+                yield* TestClock.adjust(adjust)
+                return yield* run(yield* boundTo(workspaceId), human, markSeen(saved.humanNote.id))
               })
             )
-          ).pipe(Effect.forkChild)
-        )
-        yield* Effect.forEach(signals, Deferred.await)
-        yield* Deferred.succeed(gate, undefined)
-        const results = yield* Effect.forEach(fibers, Fiber.join)
+          )
+        const first = yield* markOn("1 seconds")
+        const second = yield* markOn("2 seconds")
+        expect(second).toEqual(first)
         yield* Effect.scoped(
           runHost(
             storage,
             Effect.gen(function* () {
               const bound = yield* boundTo(workspaceId)
-              const stored = Option.getOrThrow(yield* bound.notifications.get(saved.humanNote.id))
-              expect(stored.state._tag).toBe("Seen")
-              for (const result of results) expect(result).toEqual(stored)
-              // Seeing takes no journal commit.
-              expect(yield* history(bound)).toEqual(journal)
+              expect(yield* bound.notifications.get(saved.humanNote.id)).toEqual(Option.some(first))
+              expect(yield* seenFacts(bound)).toEqual([saved.humanNote.id])
             })
           )
         )

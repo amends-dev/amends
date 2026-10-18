@@ -7,15 +7,15 @@ import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Checkpoint } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReadStateStore } from "@amends-dev/core/read-state"
-import { SignalHub } from "@amends-dev/core/signal"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadStore, ThreadParticipationStore, ThreadMessageStore, ThreadActivityStore } from "@amends-dev/core/thread"
 import { SessionStateStore, TurnJobs, TurnStore } from "@amends-dev/core/turn"
 import { InvitationStore, Member, MemberStore, WorkspaceStore, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Commit, Entry, Store, StoreError } from "@amends-dev/log"
 import { expect, it } from "@effect/vitest"
-import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope, Stream } from "effect"
+import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope } from "effect"
 import { TestClock } from "effect/testing"
 import * as Gateway from "../src/Gateway.ts"
 import * as WorkspaceRuntime from "../src/internal/workspaceRuntime.ts"
@@ -119,6 +119,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           discardPendingForParticipation: unexpected,
           discardPendingForGroup: unexpected,
           markSeen: unexpected,
+          markSeenInThread: unexpected,
           accept: unexpected,
           get: unexpected,
           listPendingByRecipient: unexpected,
@@ -154,6 +155,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         getMany: unexpected,
         listByThread: unexpected,
+        listByAdmission: unexpected,
         pageActiveByThread: unexpected,
         findActive: unexpected,
         endByAdmission: unexpected,
@@ -162,6 +164,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
       Context.add(ThreadMessageStore.ThreadMessageStore, {
         get: unexpected,
+        listByThread: unexpected,
         getMany: unexpected,
         countByThread: unexpected,
         insert: unexpected,
@@ -173,7 +176,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         listByThread: unexpected,
         getFirst: unexpected,
-        listBySubjects: unexpected,
         readPage: unexpected,
         insert: unexpected
       }),
@@ -210,7 +212,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         ReadStateStore.ReadStateStore,
         ReadStateStore.ReadStateStore.of({
           getThreadPositions: unexpected,
-          markThreadRead: unexpected,
+          advanceThread: unexpected,
           getGroupReads: unexpected,
           advanceGroup: unexpected
         })
@@ -230,6 +232,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         TurnStore.TurnStore,
         TurnStore.TurnStore.of({
           get: unexpected,
+          listByThread: unexpected,
           findActive: unexpected,
           findLatest: unexpected,
           listActive: unexpected,
@@ -242,6 +245,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         RoleStore.RoleStore,
         RoleStore.RoleStore.of({
           get: unexpected,
+          list: unexpected(),
           insert: unexpected,
           rename: unexpected,
           setPermissions: unexpected,
@@ -274,12 +278,14 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
       Context.add(ContactStore.ContactStore, {
         get: unexpected,
+        list: unexpected(),
         getMany: unexpected,
         insert: unexpected,
         update: unexpected
       }),
       Context.add(DeliveryStore.DeliveryStore, {
         get: unexpected,
+        listByThread: unexpected,
         listRequestedByThread: unexpected,
         findByExternalMessage: unexpected,
         insert: unexpected,
@@ -314,14 +320,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           insert: unexpected,
           update: unexpected
         })
-      ),
-      // Signals no test here observes: published into nothing, and no subscriber ever hears one.
-      Context.add(
-        SignalHub.SignalHub,
-        SignalHub.SignalHub.of({
-          publish: () => Effect.void,
-          subscribe: Effect.succeed(Stream.never)
-        })
       )
     )
 }
@@ -330,6 +328,7 @@ const host = (storage: WorkspaceStorage.WorkspaceStorage["Service"]) =>
     Layer.succeed(WorkspaceStorage.WorkspaceStorage, storage),
     TurnJobs.layerNoRunner,
     DeliveryJobs.layerNoRunner,
+    PresenceRelay.layerMemory,
     Layer.succeed(Crypto.Crypto, Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }))
   )
 const run = <A, E>(

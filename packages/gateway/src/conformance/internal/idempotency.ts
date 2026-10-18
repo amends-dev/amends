@@ -1,5 +1,7 @@
 import { Role, RoleFacts } from "@amends-dev/core/authorization"
+import { Actor } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
+import { Request, RequestFacts, RequestService } from "@amends-dev/core/request"
 import { Entry, Log, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -13,7 +15,7 @@ const key = Store.IdempotencyKey.make("occurrence/one")
 const executionId = Entry.LogId.make("execution")
 const options = { idempotencyKey: key }
 
-/** Keyed appends: durable identity, validation, rollback, and concurrent attempts. */
+/** Keyed appends and requests: durable identity, validation, rollback, and concurrent attempts. */
 export const idempotency = (fixture: Fixture.Fixture) => {
   const { core, initialized } = Support
   describe.skipIf(!fixture.available)(`${fixture.name}: idempotency`, () => {
@@ -206,6 +208,41 @@ export const idempotency = (fixture: Fixture.Fixture) => {
           const second = yield* b.store.transaction(append)
           expect(second).toEqual(first)
           expect((yield* a.store.read(executionId, { limit: 10 })).flatMap((batch) => batch.entries)).toHaveLength(1)
+        })
+      )
+    )
+
+    it.effect("independent hosts run a request once under concurrent attempts", () =>
+      fixture.withStorage((storage) =>
+        Effect.gen(function* () {
+          const a = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
+          const b = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
+          const workspace = yield* initialized(a)
+          const owner = Actor.Actor.of({
+            workspaceId: Support.workspaceId,
+            memberId: workspace.ownerMemberId,
+            identity: Support.alice
+          })
+          let runs = 0
+          const request = Effect.flatMap(RequestService.RequestService, (requestService) =>
+            requestService.runOnce(
+              Request.Key.make("request-1"),
+              Effect.sync(() => {
+                runs += 1
+              })
+            )
+          )
+          const [layerA, layerB] = [core(a), core(b)]
+          yield* Effect.forEach(
+            [layerA, layerB, layerA, layerB],
+            (layer) => request.pipe(Effect.provideService(Actor.Actor, owner), Effect.provide(layer)),
+            { concurrency: "unbounded" }
+          )
+          expect(runs).toBe(1)
+          const completions = yield* Effect.flatMap(Journal.Journal, (journal) =>
+            journal.log.readEntries({ name: RequestFacts.Completed.name, limit: 10 })
+          ).pipe(Effect.provide(layerA))
+          expect(completions).toHaveLength(1)
         })
       )
     )

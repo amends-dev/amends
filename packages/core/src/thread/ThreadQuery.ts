@@ -1,8 +1,8 @@
 /**
  * The reads of threads that operations share: whether the actor may reach a thread, who may take
  * part in a group's threads, who takes part in a thread now, a page of a group's threads the actor
- * can read, and a thread's timeline resolved into items. The thread, task, turn, read-state, signal,
- * and notification operations all read through it. It writes nothing and checks no action
+ * can read, and a thread's timeline resolved into items. The thread, task, turn, read-state, and
+ * notification operations all read through it. It writes nothing and checks no action
  * permission but `thread.read`; each operation checks its own, inside its commit when it writes.
  *
  * @since 0.1.0
@@ -24,7 +24,6 @@ import type * as GroupMembership from "../group/GroupMembership.ts"
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
-import type * as Subject from "../journal/Subject.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Member from "../workspace/Member.ts"
@@ -73,17 +72,6 @@ export type AccessError = Authorization.Error | StoreError.StoreError | Schema.S
  * @since 0.1.0
  */
 export type TimelineError = AccessError | StoreError.StoreError
-
-/**
- * A timeline item as it is now, with its thread, whose group is its audience.
- *
- * @category models
- * @since 0.1.0
- */
-export interface AboutItem {
-  readonly thread: Thread.Thread
-  readonly item: Thread.TimelineItem
-}
 
 /**
  * What listing a group's readable threads can fail with, beyond the listing's own failures.
@@ -188,23 +176,8 @@ export class ThreadQuery extends Context.Service<
       activityId: ThreadActivity.ThreadActivityId
     ) => Effect.Effect<Thread.TimelineItem, TimelineError, Actor.Actor>
     /**
-     * Every timeline item about one of these subjects as it is now, with its thread: what a
-     * commit naming them changed in the timelines. It checks no one's access; the change feed
-     * checks each reader's.
-     */
-    readonly timelineItemsAbout: (
-      subjects: ReadonlyArray<Subject.Subject>
-    ) => Effect.Effect<ReadonlyArray<AboutItem>, StoreError.StoreError>
-    /**
-     * Each thread with its task and latest activity, in their order. It checks no one's access;
-     * the lists and the change feed check each reader's.
-     */
-    readonly listedOf: (
-      threads: ReadonlyArray<Thread.Thread>
-    ) => Effect.Effect<ReadonlyArray<Thread.Listed>, StoreError.StoreError>
-    /**
      * What a group's stream shows of these listed threads to everyone who may read them, in their
-     * order. It checks no one's access; the stream and the change feed check each reader's.
+     * order. It checks no one's access; the stream checks each reader's.
      */
     readonly previewsOf: (
       listed: ReadonlyArray<Thread.Listed>
@@ -356,6 +329,7 @@ export const make = Effect.gen(function* () {
     return yield* keepCurrent(yield* threadParticipationStore.findActive(thread.id, references))
   })
 
+  /** Each thread with its task and latest activity, in their order, whoever may read them. */
   const listedOf = Effect.fn("ThreadQuery.listedOf")(function* (threads: ReadonlyArray<Thread.Thread>) {
     if (threads.length === 0) return []
     const ids = threads.map((thread) => thread.id)
@@ -430,28 +404,6 @@ export const make = Effect.gen(function* () {
     return item
   })
 
-  const timelineItemsAbout = Effect.fn("ThreadQuery.timelineItemsAbout")(function* (
-    subjects: ReadonlyArray<Subject.Subject>
-  ) {
-    const activities = yield* threadActivityStore.listBySubjects(subjects)
-    if (activities.length === 0) return []
-    const threads = new Map(
-      (yield* threadStore.getMany([...new Set(activities.map(({ threadId }) => threadId))])).map(
-        (thread) => [thread.id, thread] as const
-      )
-    )
-    const byThread = new Map<ThreadId.ThreadId, Array<ThreadActivity.ThreadActivity>>()
-    for (const activity of activities)
-      byThread.set(activity.threadId, [...(byThread.get(activity.threadId) ?? []), activity])
-    const items: Array<AboutItem> = []
-    for (const [threadId, inThread] of byThread) {
-      const thread = threads.get(threadId)
-      if (thread === undefined) return yield* Effect.die("A thread with activity is missing")
-      for (const item of yield* threadActivityResolvers.resolve(thread, inThread)) items.push({ thread, item })
-    }
-    return items
-  })
-
   const previewsOf = Effect.fn("ThreadQuery.previewsOf")(function* (listed: ReadonlyArray<Thread.Listed>) {
     if (listed.length === 0) return []
     const ids = listed.map(({ thread }) => thread.id)
@@ -490,8 +442,6 @@ export const make = Effect.gen(function* () {
     listReadable,
     readTimeline,
     readTimelineItem,
-    timelineItemsAbout,
-    listedOf,
     previewsOf
   })
 })

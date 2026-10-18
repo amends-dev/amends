@@ -8,6 +8,7 @@
  */
 
 import { AgentService } from "@amends-dev/core/agent"
+import { Request } from "@amends-dev/core/request"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
 import * as Api from "./Api.ts"
 
@@ -21,8 +22,8 @@ export const layer = HttpApiBuilder.group(Api.Api, "agents", (handlers) =>
   handlers.handleAll({
     list: () => AgentService.AgentService.use((agentService) => agentService.list),
     create: ({ headers, payload }) =>
-      AgentService.AgentService.use((agentService) =>
-        agentService.create(payload, { requestKey: headers["idempotency-key"] })
+      AgentService.AgentService.use((agentService) => agentService.create(payload)).pipe(
+        Request.withKey(headers["idempotency-key"])
       ),
     get: ({ params }) => AgentService.AgentService.use((agentService) => agentService.get(params.agentId)),
     configure: ({ params, payload }) =>

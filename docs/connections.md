@@ -52,6 +52,4 @@ the reader refreshes, reviews, and saves again with their draft kept. A creation
 lost response reuses its request key, so it is not created twice; changing the key makes it a new
 request. A key typed into a dialog stays in the client only until it saves or the dialog closes. A
 host without `AMENDS_CREDENTIAL_KEY` refuses a connection that takes a key, keeping the draft, and
-keeps those that take none. The change feed refreshes connections for every reader on each
-`connection.*` commit but a replaced key, and on access changes; see
-[change feed](change-feed.md).
+keeps those that take none.

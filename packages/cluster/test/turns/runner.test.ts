@@ -59,7 +59,7 @@ const stepEnd: StreamPart.FinishStepPart = {
 }
 
 describe("a turn's run", () => {
-  it.effect("logs the conversation joined, the prompt, and each step, shows drafts, and closes with the answer", () =>
+  it.effect("logs the conversation joined, the prompt, and each step, and closes with the answer", () =>
     Effect.gen(function* () {
       const { workspace, scripted, runNextTurn } = yield* runnerFor(
         Stream.fromIterable([...reading, ...writing("The plan ", "is ", "on track."), finish]),
@@ -77,15 +77,10 @@ describe("a turn's run", () => {
       // The turn starts with the agent's first part, as the agent announces no start.
       expect((yield* workspace.log).map(({ _tag }) => _tag)).toEqual(["Joined", "Prompted", "Started", "Step", "Step"])
       expect((yield* workspace.log)[2]).toEqual({ _tag: "Started", turnId: turn.id, agent: "scripted" })
-      // Steps are named after the position of the run's opening batch, as their drafts are.
+      // Steps are named after the position of the run's opening batch.
       expect((yield* workspace.log).filter(SessionLog.Entry.isAnyOf(["Step"])).map((entry) => entry.id)).toEqual([
         "0.0",
         "0.1"
-      ])
-      // The first text arrives at once, and the rest once the text ends.
-      expect(workspace.drafts()).toEqual([
-        { responseId: "0.1", part: 0, offset: 0, text: "The plan " },
-        { responseId: "0.1", part: 0, offset: 9, text: "is on track." }
       ])
       expect(workspace.endings()).toEqual([
         {
@@ -335,8 +330,8 @@ describe("a turn's run", () => {
         )
       )
       const running = yield* Effect.forkChild(runNextTurn)
-      // Waiting for the step's first draft, the run is streaming the turn.
-      while (workspace.drafts().length === 0) yield* Effect.yieldNow
+      // Once the turn's start is logged, with the first part, the run is streaming the turn.
+      while (!(yield* workspace.log).some(SessionLog.Entry.isAnyOf(["Started"]))) yield* Effect.yieldNow
       yield* stopTurn(turn.id)
       expect(yield* Fiber.join(running)).toEqual(Option.some(turn.id))
       expect((yield* workspace.log).at(-1)).toMatchObject({
@@ -472,35 +467,31 @@ describe("a run advancing with each part", () => {
   })
 
   /**
-   * Advance the run `of` with each of `parts`, streamed at its time, from `progress`: where it ends
-   * up, and all it writes and shows on the way.
+   * Advance the run `of` with each of `parts` from `progress`: where it ends up, and all it writes
+   * on the way.
    */
   const advanceAll = (
-    parts: ReadonlyArray<readonly [StreamPart.StreamPart, number]>,
+    parts: ReadonlyArray<StreamPart.StreamPart>,
     progress = TurnRunner.initialProgress,
     of = run
   ): TurnRunner.Advance =>
     parts.reduce<TurnRunner.Advance>(
-      (soFar, [part, now]) => {
-        const advanced = TurnRunner.advance(of, soFar.progress, part, now)
-        return {
-          progress: advanced.progress,
-          entries: [...soFar.entries, ...advanced.entries],
-          drafts: [...soFar.drafts, ...advanced.drafts]
-        }
+      (soFar, part) => {
+        const advanced = TurnRunner.advance(of, soFar.progress, part)
+        return { progress: advanced.progress, entries: [...soFar.entries, ...advanced.entries] }
       },
-      { progress, entries: [], drafts: [] }
+      { progress, entries: [] }
     )
 
-  it("notes the start, shows text at once then every 100ms, and logs the finished step", () => {
-    const { progress, entries, drafts } = advanceAll([
-      [textStart, 0],
-      [text("The "), 0],
-      [text("plan "), 50],
-      [text("is "), 100],
-      [{ type: "text-end", id: "answer" }, 120],
-      [stepEnd, 120],
-      [finish, 120]
+  it("notes the start and logs the finished step", () => {
+    const { progress, entries } = advanceAll([
+      textStart,
+      text("The "),
+      text("plan "),
+      text("is "),
+      { type: "text-end", id: "answer" },
+      stepEnd,
+      finish
     ])
     expect(entries).toEqual([
       SessionLog.Entry.cases.Started.make({ turnId: turn.id, agent: "scripted" }),
@@ -510,24 +501,12 @@ describe("a run advancing with each part", () => {
         step: { parts: [{ type: "text", text: "The plan is " }], finish: stepEnd }
       })
     ])
-    expect(drafts).toEqual([
-      { responseId: "2.0", part: 0, offset: 0, text: "The " },
-      { responseId: "2.0", part: 0, offset: 4, text: "plan is " }
-    ])
-    // The turn's finish is no part of a step, and the step after starts from nothing shown.
-    expect(progress).toEqual({
-      ...TurnRunner.initialProgress,
-      started: true,
-      steps: 1,
-      shownAt: 120
-    })
+    // The turn's finish is no part of a step.
+    expect(progress).toEqual({ ...TurnRunner.initialProgress, started: true, steps: 1 })
   })
 
   it("notes the start the agent announces, with what continues the turn, and no other", () => {
-    const { entries, progress } = advanceAll([
-      [{ type: "turn-start", agentState: { turn: "turn-a" } }, 0],
-      [textStart, 0]
-    ])
+    const { entries, progress } = advanceAll([{ type: "turn-start", agentState: { turn: "turn-a" } }, textStart])
     expect(entries).toEqual([{ _tag: "Started", turnId: turn.id, agent: "scripted", agentState: { turn: "turn-a" } }])
     // The announcement is no part of the step.
     expect(progress.stepParts).toEqual([textStart])
@@ -535,41 +514,16 @@ describe("a run advancing with each part", () => {
 
   it("notes no start for a run that continues the turn, until the agent announces one", () => {
     const continuing = { ...run, continues: true }
-    const quiet = advanceAll([[textStart, 0]], TurnRunner.initialProgress, continuing)
+    const quiet = advanceAll([textStart], TurnRunner.initialProgress, continuing)
     expect(quiet.entries).toEqual([])
-    const announced = advanceAll(
-      [[{ type: "turn-start", agentState: { turn: "turn-b" } }, 0]],
-      quiet.progress,
-      continuing
-    )
+    const announced = advanceAll([{ type: "turn-start", agentState: { turn: "turn-b" } }], quiet.progress, continuing)
     expect(announced.entries.map(({ _tag }) => _tag)).toEqual(["Started"])
   })
 
   it("keeps the error the agent reports in the step, as the turn's failure", () => {
     const error = { message: "The model is overloaded." }
-    const { progress, entries } = advanceAll([
-      [{ type: "error", error }, 0],
-      [stepEnd, 0]
-    ])
+    const { progress, entries } = advanceAll([{ type: "error", error }, stepEnd])
     expect(progress.reported).toEqual(error)
     expect(entries[1]).toMatchObject({ _tag: "Step", step: { parts: [{ type: "error", error }] } })
-  })
-})
-
-describe("drafts of a step", () => {
-  it("hold what each text part wrote past what readers were shown", () => {
-    expect(
-      TurnRunner.newDrafts(
-        "2.1",
-        {
-          parts: [
-            { type: "reasoning", text: "Thinking." },
-            { type: "text", text: "The plan is" },
-            { type: "text", text: "" }
-          ]
-        },
-        new Map([[1, 4]])
-      )
-    ).toEqual([{ responseId: "2.1", part: 1, offset: 4, text: "plan is" }])
   })
 })

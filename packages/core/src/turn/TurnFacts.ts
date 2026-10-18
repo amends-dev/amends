@@ -10,7 +10,6 @@
 
 import * as Schema from "effect/Schema"
 import * as Agent from "../agent/Agent.ts"
-import * as Group from "../group/Group.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
@@ -32,7 +31,6 @@ const Where = {
   threadId: ThreadId.ThreadId,
   memberId: MemberId.MemberId
 }
-const audience = (payload: { readonly groupId: GroupId.GroupId }) => [Group.audienceOf(payload.groupId)]
 const subject = (payload: { readonly turnId: TurnId.TurnId }) => Subject.make("turn", payload.turnId)
 
 /**
@@ -44,7 +42,6 @@ const subject = (payload: { readonly turnId: TurnId.TurnId }) => Subject.make("t
  */
 export const Created = Fact.make("turn.created", {
   version: 1,
-  audience,
   subject: (payload) => Subject.make("turn", payload.id),
   occurrence: (payload) => [payload.id],
   payload: Schema.Struct({
@@ -63,7 +60,6 @@ export const Created = Fact.make("turn.created", {
  */
 export const Retried = Fact.make("turn.retried", {
   version: 1,
-  audience,
   subject: (payload) => Subject.make("turn", payload.id),
   occurrence: (payload) => [payload.id],
   payload: Schema.Struct(Turn.Turn.fields)
@@ -77,7 +73,6 @@ export const Retried = Fact.make("turn.retried", {
  */
 export const Started = Fact.make("turn.started", {
   version: 1,
-  audience,
   subject,
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
@@ -97,7 +92,6 @@ export const Started = Fact.make("turn.started", {
  */
 export const CancelRequested = Fact.make("turn.cancel-requested", {
   version: 1,
-  audience,
   subject,
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
@@ -116,7 +110,6 @@ export const CancelRequested = Fact.make("turn.cancel-requested", {
  */
 export const Completed = Fact.make("turn.completed", {
   version: 1,
-  audience,
   subject,
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
@@ -135,7 +128,6 @@ export const Completed = Fact.make("turn.completed", {
  */
 export const Failed = Fact.make("turn.failed", {
   version: 1,
-  audience,
   subject,
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
@@ -155,7 +147,6 @@ export const Failed = Fact.make("turn.failed", {
  */
 export const Cancelled = Fact.make("turn.cancelled", {
   version: 1,
-  audience,
   subject,
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({

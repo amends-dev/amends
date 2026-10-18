@@ -1,21 +1,18 @@
 /**
- * The PostgreSQL driver for `NotificationStore.NotificationStore`, over `notifications` and
- * `notification_seen`. A row's `state` is the notification's, and a check keeps each state to its
- * own columns; a recipient's inbox is keyed by the membership notified, the contact's ID, or
- * nothing for the workspace's triage. A person's `Seen` is private state outside the journal, so
- * `markSeen` also records it in `notification_seen`, which rebuilds keep, and inserting a pending
- * human notification again restores it in the same statement. `NotificationStore.make` checks
- * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
- * key refuses a reused ID and `notifications_by_source_recipient` a second notification of one
- * source entry for one recipient, each rejected, and `markSeen` and `accept` check
- * every notification first, writing nothing unless each is eligible. Every statement is scoped to
- * the binding's workspace and runs under its `guard`, which lets a read join the caller's
- * transaction and requires one for a write, except `markSeen`, which also runs on its own.
+ * The PostgreSQL driver for `NotificationStore.NotificationStore`, over `notifications`. A row's
+ * `state` is the notification's, and a check keeps each state to its own columns; a recipient's
+ * inbox is keyed by the membership notified, the contact's ID, or nothing for the workspace's
+ * triage. `NotificationStore.make` checks every input before the driver sees it, so the driver
+ * keeps only what storage keeps: the primary key refuses a reused ID and
+ * `notifications_by_source_recipient` a second notification of one source entry for one recipient,
+ * each rejected, and `markSeen` and `accept` check every notification first, writing nothing unless
+ * each is eligible. Every statement is scoped to the binding's workspace and runs under its
+ * `guard`, which lets a read join the caller's transaction and requires one for a write.
  */
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { StoreError } from "@amends-dev/log"
-import { and, asc, desc, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, isNotNull, lte, sql } from "drizzle-orm"
 import type { PgInsertValue } from "drizzle-orm/pg-core"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
@@ -26,7 +23,7 @@ import * as Binding from "./binding.ts"
 import { storeError } from "./errors.ts"
 import { inIds } from "./idList.ts"
 import { insertChunked } from "./parameters.ts"
-import { notificationSeen, notifications } from "./schema.ts"
+import { notifications } from "./schema.ts"
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Notification))
 const decodeRows = Schema.decodeUnknownEffect(
@@ -169,12 +166,6 @@ export const make = Effect.gen(function* () {
   const insert = Effect.fnUntraced(function* (records: ReadonlyArray<Notification.Notification>, operation: string) {
     const rows: Array<PgInsertValue<typeof notifications>> = []
     for (const record of records) {
-      // A rebuild inserts notifications again; the Seen that outlived their rows comes back.
-      const seenAt =
-        Notification.Recipient.isAnyOf(["Human"])(record.recipient) &&
-        Notification.State.isAnyOf(["Pending"])(record.state)
-          ? sql`(SELECT seen_at FROM notification_seen WHERE workspace_id = ${workspaceId} AND notification_id = ${record.id})`
-          : null
       rows.push({
         workspaceId,
         id: record.id,
@@ -191,15 +182,14 @@ export const make = Effect.gen(function* () {
           ? record.recipient.memberId
           : null,
         recordedAt: DateTime.toDate(record.recordedAt),
-        state: seenAt === null ? record.state._tag : sql`CASE WHEN ${seenAt} IS NULL THEN 'Pending' ELSE 'Seen' END`,
-        seenAt
+        state: record.state._tag,
+        // Seen is recorded with markSeen, never inserted.
+        seenAt: null
       })
     }
     if (rows.length === 0) return
     yield* guard(
-      insertChunked(notifications, rows, (chunk) => db.insert(notifications).values(chunk), {
-        extra: 2
-      }),
+      insertChunked(notifications, rows, (chunk) => db.insert(notifications).values(chunk)),
       true
     ).pipe(Effect.mapError(storeError("NotificationStore", operation)))
   })
@@ -313,7 +303,7 @@ export const make = Effect.gen(function* () {
               inWorkspace,
               inIds(notifications.id, unique),
               eq(notifications.recipientKind, "Human"),
-              inArray(notifications.state, ["Pending", "Seen"])
+              eq(notifications.state, "Pending")
             )
           )
       ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")))
@@ -323,21 +313,31 @@ export const make = Effect.gen(function* () {
           "markSeen",
           "Expected a pending notification of a human recipient"
         )
-      // The row keeps the first time, and notification_seen keeps it through rebuilds. Updating
-      // the row first serializes concurrent calls on its lock, and the later one finds it Seen.
-      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt)
       yield* guard(
-        db.execute(sql`
-          WITH seen AS (
-            UPDATE notifications SET state = 'Seen', seen_at = ${seen}::timestamptz
-            WHERE workspace_id = ${workspaceId} AND id = any(${sql.param(unique)}::text[])
-              AND recipient_kind = 'Human' AND state = 'Pending'
-            RETURNING id, seen_at
-          )
-          INSERT INTO notification_seen (workspace_id, notification_id, seen_at)
-          SELECT ${workspaceId}::text, id, seen_at FROM seen
-          ON CONFLICT DO NOTHING`)
+        db
+          .update(notifications)
+          .set({ state: "Seen", seenAt: DateTime.toDate(seenAt) })
+          .where(and(inWorkspace, inIds(notifications.id, unique))),
+        true
       ).pipe(Effect.mapError(storeError("NotificationStore", "markSeen")))
+    }),
+    markSeenInThread: Effect.fn("Notifications.markSeenInThread")(function* (position, seenAt) {
+      yield* guard(
+        db
+          .update(notifications)
+          .set({ state: "Seen", seenAt: DateTime.toDate(seenAt) })
+          .where(
+            and(
+              inWorkspace,
+              eq(notifications.recipientKind, "Human"),
+              eq(notifications.recipientMemberId, position.memberId),
+              eq(notifications.threadId, position.threadId),
+              lte(notifications.threadSequence, position.readThrough),
+              eq(notifications.state, "Pending")
+            )
+          ),
+        true
+      ).pipe(Effect.mapError(storeError("NotificationStore", "markSeenInThread")))
     }),
     accept: Effect.fn("Notifications.accept")(function* (ids, by, acceptedAt) {
       const unique = [...new Set(ids)]

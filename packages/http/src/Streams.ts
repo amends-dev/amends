@@ -1,9 +1,8 @@
 /**
  * What every long-lived SSE response shares: comment heartbeats and cache headers, failures
  * contained to the stream's own reconnect error, an end as the server drains, and a place within
- * the process's limits on open streams for as long as the response lasts. `ChangeFeedHandlers` and
- * `TurnsHandlers` serve their streams through it, and a host changes the limits by providing its
- * own `Limits`.
+ * the process's limits on open streams for as long as the response lasts. `TurnsHandlers` serves
+ * turn logs through it, and a host changes the limits by providing its own `Limits`.
  *
  * @since 0.1.0
  */
@@ -59,7 +58,7 @@ export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)
 
 /**
  * How many live-update streams this process serves at once for one workspace, and for one member
- * of it, counting change streams and turn logs alike. A thousand and twenty by default; a host
+ * of it, counting turn logs and presence alike. A thousand and twenty by default; a host
  * provides its own to change them.
  *
  * @category services
@@ -74,7 +73,7 @@ export const Limits = Context.Reference<{
 
 /**
  * The process's open live-update streams: the place each holds within `Limits`, and how each is
- * served. `layer` provides one per process, which `ChangeFeedHandlers` and `TurnsHandlers` share.
+ * served. `layer` provides one per process, which `TurnsHandlers` uses.
  *
  * @category services
  * @since 0.1.0

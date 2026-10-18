@@ -309,7 +309,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             expect(plan).not.toMatch(/^\s*(->\s*)?Sort\b/m)
           }
           // Seen notifications leave the pending indexes, so pending reads never visit them.
-          yield* bound.notifications.markSeen([inbox[0]!.id], inbox[0]!.recordedAt)
+          yield* bound.store.transaction(bound.notifications.markSeen([inbox[0]!.id], inbox[0]!.recordedAt))
           const pendingPlan = yield* sql.withTransaction(
             Effect.gen(function* () {
               yield* sql`SET LOCAL enable_seqscan = off`

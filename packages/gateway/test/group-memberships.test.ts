@@ -1166,6 +1166,7 @@ describe("group memberships", () => {
               workspaceId,
               inviterMemberId: owner.memberId,
               recipientId: Identity.HumanId.make("new-human"),
+              recipientEmail: "new-human@example.com",
               roleId: BuiltinRoles.MemberId,
               issuedAt,
               expiresAt: DateTime.add(issuedAt, { hours: 1 })

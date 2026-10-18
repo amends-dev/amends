@@ -7,13 +7,11 @@
  * @since 0.1.0
  */
 
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Connection from "./Connection.ts"
 
 /** Connections are workspace configuration: every member may learn of changes to them. */
-const workspace = () => [Audience.workspace]
 
 /**
  * A connection was created, as its record says, without its key, which the same commit stored
@@ -23,7 +21,6 @@ const workspace = () => [Audience.workspace]
  * @since 0.1.0
  */
 export const Created = Fact.make("connection.created", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.id),
   occurrence: (payload) => [payload.id],
@@ -37,7 +34,6 @@ export const Created = Fact.make("connection.created", {
  * @since 0.1.0
  */
 export const Renamed = Fact.make("connection.renamed", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   payload: Connection.Renamed
@@ -50,7 +46,6 @@ export const Renamed = Fact.make("connection.renamed", {
  * @since 0.1.0
  */
 export const Configured = Fact.make("connection.configured", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   payload: Connection.Configured
@@ -64,7 +59,6 @@ export const Configured = Fact.make("connection.configured", {
  * @since 0.1.0
  */
 export const KeyReplaced = Fact.make("connection.key-replaced", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   payload: Connection.Reference
@@ -77,7 +71,6 @@ export const KeyReplaced = Fact.make("connection.key-replaced", {
  * @since 0.1.0
  */
 export const Removed = Fact.make("connection.removed", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   occurrence: (payload) => [payload.connectionId],

@@ -12,7 +12,6 @@ import * as OpenApi from "effect/http-api/OpenApi"
 import * as AccountsGroup from "./AccountsGroup.ts"
 import * as AgentsGroup from "./AgentsGroup.ts"
 import * as AssignmentsGroup from "./AssignmentsGroup.ts"
-import * as ChangeFeedGroup from "./ChangeFeedGroup.ts"
 import * as ChannelsGroup from "./ChannelsGroup.ts"
 import * as ConnectionsGroup from "./ConnectionsGroup.ts"
 import * as GroupsGroup from "./GroupsGroup.ts"
@@ -21,6 +20,7 @@ import * as InvitationsGroup from "./InvitationsGroup.ts"
 import * as MeGroup from "./MeGroup.ts"
 import * as MembersGroup from "./MembersGroup.ts"
 import * as NotificationsGroup from "./NotificationsGroup.ts"
+import * as PresenceGroup from "./PresenceGroup.ts"
 import * as SessionGroup from "./SessionGroup.ts"
 import * as SettingsGroup from "./SettingsGroup.ts"
 import * as TasksGroup from "./TasksGroup.ts"
@@ -45,9 +45,9 @@ const groups = HttpApi.make("amends")
   .add(ConnectionsGroup.ConnectionsGroup)
   .add(AgentsGroup.AgentsGroup)
   .add(TurnsGroup.TurnsGroup)
+  .add(PresenceGroup.PresenceGroup)
   .add(ChannelsGroup.ChannelsGroup)
   .add(ChannelsGroup.ChannelEventsGroup)
-  .add(ChangeFeedGroup.ChangeFeedGroup)
 
 /**
  * The public HTTP contract. Servers implement its groups; clients are generated from it. Its
