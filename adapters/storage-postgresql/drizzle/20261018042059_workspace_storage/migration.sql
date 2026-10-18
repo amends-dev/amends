@@ -256,13 +256,6 @@ CREATE TABLE "members" (
 	CONSTRAINT "members_identity_kind" CHECK ("identity_kind" IN ('Human', 'Agent'))
 );
 --> statement-breakpoint
-CREATE TABLE "notification_seen" (
-	"workspace_id" text,
-	"notification_id" text,
-	"seen_at" timestamp with time zone NOT NULL,
-	CONSTRAINT "notification_seen_pkey" PRIMARY KEY("workspace_id","notification_id")
-);
---> statement-breakpoint
 CREATE TABLE "notifications" (
 	"workspace_id" text,
 	"id" text,

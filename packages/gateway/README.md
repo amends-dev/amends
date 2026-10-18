@@ -157,8 +157,8 @@ store. An adapter's tests call `run` with a `Fixture`, by convention in its `tes
   with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
   would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
-  keeping logs and read state, as rebuilding projections does before replay. No storage contract
-  performs this.
+  keeping logs and what is kept outside the journal, as rebuilding projections does before replay.
+  No storage contract performs this.
 - `footprint` counts every stored record, so a test can show that a rolled-back write left none.
 
 The suites need `@effect/vitest`, an optional peer dependency that only an adapter's tests install.

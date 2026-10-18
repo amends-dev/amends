@@ -31,7 +31,7 @@ import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as ReadStateStore from "../read-state/ReadStateStore.ts"
+import * as ReadStateFacts from "../read-state/ReadStateFacts.ts"
 import * as Task from "../task/Task.ts"
 import * as TaskCommand from "../task/TaskCommand.ts"
 import * as TaskPermissions from "../task/TaskPermissions.ts"
@@ -175,7 +175,6 @@ export const make = Effect.gen(function* () {
   const groupCommand = yield* GroupCommand.GroupCommand
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadStore = yield* ThreadStore.ThreadStore
-  const readStateStore = yield* ReadStateStore.ReadStateStore
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
   const taskCommand = yield* TaskCommand.TaskCommand
   const taskStore = yield* TaskStore.TaskStore
@@ -282,15 +281,14 @@ export const make = Effect.gen(function* () {
       occurredAt
     })
     // Posting reads the thread through the author's own message.
-    yield* readStateStore.markThreadRead(
-      {
+    yield* journal
+      .publish(ReadStateFacts.ThreadRead, {
         workspaceId,
         memberId: authorId,
         threadId: started.thread.id,
         readThrough: started.activity.sequence
-      },
-      occurredAt
-    )
+      })
+      .pipe(Publication.withOccurredAt(occurredAt))
     const task =
       opening.task === undefined
         ? null

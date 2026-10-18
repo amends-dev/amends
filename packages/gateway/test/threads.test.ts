@@ -209,7 +209,8 @@ describe("threads", () => {
           ])
           const after = yield* history(bound)
           expect(after).toHaveLength(before.length + 1)
-          expect(after.at(-1)?.entries).toHaveLength(4)
+          // The thread, its participation and opening activity, and the author's read position.
+          expect(after.at(-1)?.entries).toHaveLength(5)
           expect((yield* run(bound, owner, start(group.id, [humanId]))).thread.id).not.toBe(result.thread.id)
         })
       )

@@ -4,7 +4,7 @@ import { type Group, GroupService, GroupFollowService, GroupMembershipService, G
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationService } from "@amends-dev/core/notification"
-import { type ReadState, ReadStateService } from "@amends-dev/core/read-state"
+import { ReadStateService } from "@amends-dev/core/read-state"
 import {
   type Thread,
   ThreadService,
@@ -16,7 +16,7 @@ import {
 import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Entry } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
-import { DateTime, Deferred, Effect, Fiber, Tracer } from "effect"
+import { DateTime, Effect, Tracer } from "effect"
 import { TestClock } from "effect/testing"
 import { withStorage } from "./fixture.ts"
 import * as Support from "./support.ts"
@@ -218,12 +218,15 @@ describe("read state", () => {
           yield* run(bound, human, markRead(threadId, 2))
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([2])
           expect(yield* pending(bound, humanId)).toEqual([3])
-          // Seen and the position are private state: reading writes nothing to the journal.
-          expect(yield* history(bound)).toEqual(before)
-          // An earlier position changes nothing.
+          // Reading records one fact, in a commit of its own.
+          const marked = yield* history(bound)
+          expect(marked).toHaveLength(before.length + 1)
+          expect(marked.at(-1)?.entries).toHaveLength(1)
+          // An earlier position changes nothing, and records nothing.
           yield* run(bound, human, markRead(threadId, 1))
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([2])
           expect(yield* pending(bound, humanId)).toEqual([3])
+          expect(yield* history(bound)).toEqual(marked)
           expect(yield* Effect.flip(run(bound, human, markRead(threadId, 4)))).toEqual(
             new CoreError.Conflict({
               reason: new CoreError.BeyondTimeline({
@@ -237,10 +240,8 @@ describe("read state", () => {
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([3])
           expect(yield* pending(bound, humanId)).toEqual([])
           // A member reading a thread they take no part in keeps only a position.
-          const read = yield* history(bound)
           yield* run(bound, actorFor(otherId), markRead(threadId, 3))
           expect(yield* positionOf(bound, otherId, threadId)).toEqual([3])
-          expect(yield* history(bound)).toEqual(read)
           // Only people with current read access keep read state.
           expect(yield* Effect.flip(run(bound, actorFor(agentId), markRead(threadId, 1)))).toEqual(
             new CoreError.Denied({ reason: new CoreError.HumanRequired() })
@@ -276,12 +277,14 @@ describe("read state", () => {
           yield* run(bound, human, markGroupRead(team.id))
           const second = yield* DateTime.now
           expect(yield* readTimes).toEqual([second])
-          yield* bound.readStates.advanceGroup({
-            workspaceId,
-            memberId: humanId,
-            groupId: team.id,
-            readAt: first
-          })
+          yield* bound.store.transaction(
+            bound.readStates.advanceGroup({
+              workspaceId,
+              memberId: humanId,
+              groupId: team.id,
+              readAt: first
+            })
+          )
           expect(yield* readTimes).toEqual([second])
           expect(yield* Effect.flip(run(bound, actorFor(agentId), markGroupRead(team.id)))).toEqual(
             new CoreError.Denied({ reason: new CoreError.HumanRequired() })
@@ -294,67 +297,32 @@ describe("read state", () => {
     )
   )
 
-  it.effect("read-state storage keeps the later value, inside or outside a transaction", () =>
+  it.effect("read state is recorded in the journal, so rebuilding projections restores it", () =>
     withStorage((storage) =>
       runHost(
         storage,
         Effect.gen(function* () {
           const { bound, owner, team } = yield* prepare()
+          const human = actorFor(humanId)
           const started = yield* run(bound, owner, start(team.id, []))
           const threadId = started.thread.id
-          const position = (readThrough: number, changes: Partial<ReadState.ThreadPosition> = {}) =>
-            Object.assign({ workspaceId, memberId: humanId, threadId, readThrough }, changes)
-          const seenAt = yield* DateTime.now
-          yield* bound.readStates.markThreadRead(position(2), seenAt)
-          yield* bound.store.transaction(bound.readStates.markThreadRead(position(1), seenAt))
-          expect(yield* positionOf(bound, humanId, threadId)).toEqual([2])
-          yield* bound.store.transaction(bound.readStates.markThreadRead(position(5), seenAt))
-          expect(yield* positionOf(bound, humanId, threadId)).toEqual([5])
-          // A rolled-back transaction takes its write with it.
-          expect(
-            yield* Effect.flip(
-              bound.store.transaction(
-                Effect.andThen(bound.readStates.markThreadRead(position(9), seenAt), Effect.fail("undo"))
-              )
-            )
-          ).toBe("undo")
-          expect(yield* positionOf(bound, humanId, threadId)).toEqual([5])
-          // A write outside a transaction that lands while one is open keeps the later value too.
-          const staged = yield* Deferred.make<void>()
-          const release = yield* Deferred.make<void>()
-          const open = yield* bound.store
-            .transaction(
-              Effect.gen(function* () {
-                yield* bound.readStates.markThreadRead(position(6), seenAt)
-                yield* Deferred.succeed(staged, undefined)
-                yield* Deferred.await(release)
-              })
-            )
-            .pipe(Effect.forkChild)
-          yield* Deferred.await(staged)
-          const outside = yield* bound.readStates.markThreadRead(position(7), seenAt).pipe(Effect.forkChild)
-          // Let the outside write land first where storage allows; a database may make it wait
-          // for the transaction instead. Either order must keep the later value.
-          for (let turn = 0; turn < 5; turn++) yield* Effect.yieldNow
-          yield* Deferred.succeed(release, undefined)
-          yield* Fiber.join(open)
-          yield* Fiber.join(outside)
-          expect(yield* positionOf(bound, humanId, threadId)).toEqual([7])
-          expect(
-            yield* Effect.flip(bound.readStates.markThreadRead(position(1, { workspaceId: otherWorkspaceId }), seenAt))
-          ).toMatchObject({
-            _tag: "StoreError",
-            store: "ReadStateStore",
-            reason: { _tag: "Rejected" }
-          })
-          // Read state references no projection rows, so rebuilding threads from the journal keeps it.
+          yield* run(bound, human, markRead(threadId, 1))
+          yield* run(bound, human, markGroupRead(team.id))
+          const groupTimes = Effect.map(bound.readStates.getGroupReads(humanId, [team.id]), (times) =>
+            times.map((time) => time.readAt)
+          )
+          const readAt = yield* groupTimes
+          expect(readAt).toHaveLength(1)
           yield* storage.discardProjections
+          expect(yield* positionOf(bound, humanId, threadId)).toEqual([])
           yield* trusted(
             bound,
             Effect.flatMap(Journal.Journal, (journal) => journal.replay)
           )
-          expect(yield* bound.threads.getLatest([threadId])).toMatchObject([{ sequence: 1 }])
-          expect(yield* positionOf(bound, humanId, threadId)).toEqual([7])
+          expect(yield* positionOf(bound, humanId, threadId)).toEqual([1])
+          // The author read it through their own message.
+          expect(yield* positionOf(bound, owner.memberId, threadId)).toEqual([1])
+          expect(yield* groupTimes).toEqual(readAt)
           // Positions are per member and per workspace.
           expect(yield* positionOf(bound, otherId, threadId)).toEqual([])
           expect(yield* bound.readStates.getThreadPositions(humanId, [])).toEqual([])

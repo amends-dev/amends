@@ -294,8 +294,8 @@ suite passes. Notification storage and inbox tests seed records; thread workflow
 opening and reply publication, participation admission, recipient selection, concurrent sequencing,
 quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on every adapter.
 Acknowledgment suites verify human ownership, the first time kept on repeats, source-access loss,
-caller transactions, failed writes, concurrent requests from two hosts, and that `Seen` writes
-nothing to the journal and survives rebuilding projections.
+caller transactions, failed writes, repeats from another host, and that `Seen` is recorded once in
+the journal and restored by rebuilding projections.
 
 Subprocess fixtures create each database before starting the host, so passing host
 tests do not prove that startup works against a database you configure. Follow the

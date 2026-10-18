@@ -1,5 +1,5 @@
 import { AssignmentService } from "@amends-dev/core/authorization"
-import { Notification, NotificationService } from "@amends-dev/core/notification"
+import { NotificationService } from "@amends-dev/core/notification"
 import { InvitationService, MemberService, OwnershipService, MemberId } from "@amends-dev/core/workspace"
 import { Entry, Store } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
@@ -62,9 +62,6 @@ export const reads = (fixture: Fixture.Fixture) => {
                   expect(yield* notificationService.inbox({ limit: 10 })).toEqual([])
                   expect(yield* notificationService.inbox({ limit: 10, pendingOnly: true })).toEqual([])
                   expect((yield* notificationService.countPending).pending).toBe(0)
-                  expect(
-                    yield* Effect.flip(notificationService.markSeen(Notification.NotificationId.make("missing")))
-                  ).toMatchObject({ _tag: "CoreError.NotFound" })
                 })
               )
               // Write operations still enter their transaction before checking the target.

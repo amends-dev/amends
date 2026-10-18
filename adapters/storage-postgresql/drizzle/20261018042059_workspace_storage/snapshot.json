@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "d331ce94-48fa-4a5c-bc16-7d573aa40c15",
+  "id": "175921f1-ec2d-46cf-a06f-7540a5b4dfda",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -135,12 +135,6 @@
     {
       "isRlsEnabled": false,
       "name": "members",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "notification_seen",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2288,45 +2282,6 @@
       "entityType": "columns",
       "schema": "public",
       "table": "members"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "workspace_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "notification_seen"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "notification_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "notification_seen"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "seen_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "notification_seen"
     },
     {
       "type": "text",
@@ -5999,17 +5954,6 @@
       "entityType": "pks",
       "schema": "public",
       "table": "members"
-    },
-    {
-      "columns": [
-        "workspace_id",
-        "notification_id"
-      ],
-      "nameExplicit": false,
-      "name": "notification_seen_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "notification_seen"
     },
     {
       "columns": [

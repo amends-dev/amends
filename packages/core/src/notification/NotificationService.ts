@@ -7,8 +7,8 @@
  * @since 0.1.0
  */
 
-import * as StoreError from "@amends-dev/log/StoreError"
 import * as Context from "effect/Context"
+import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -19,11 +19,13 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
+import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
 import type * as Thread from "../thread/Thread.ts"
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as Notification from "./Notification.ts"
+import * as NotificationFacts from "./NotificationFacts.ts"
 import * as NotificationInbox from "./NotificationInbox.ts"
 import * as NotificationStore from "./NotificationStore.ts"
 
@@ -65,15 +67,16 @@ export type MarkSeenError =
   | CoreError.Conflict
   | CoreError.Invalid
   | CoreError.Unavailable
+  | CoreError.Uncertain
 
 /**
  * The notification operations, one of `Core.Operations`.
  *
  * The acting member's inbox, its pending count, and marking what they saw, within one workspace.
  * Active membership is required; owning a role does not grant access to another recipient's inbox.
- * Reads use current state without opening a transaction. Seen is private state outside the
- * journal, without the workspace's write order; an existing caller transaction is honored. Reading
- * a notification neither marks it seen nor grants access to its source.
+ * Reads use current state without opening a transaction. Marking seen records a
+ * `NotificationFacts.Seen` for each notification. Reading a notification neither marks it seen nor
+ * grants access to its source.
  *
  * @category services
  * @since 0.1.0
@@ -121,7 +124,7 @@ const isAtOrBefore = (record: Notification.Notification, cursor: NotificationSto
   const byTime = DateTime.toEpochMillis(record.recordedAt) - DateTime.toEpochMillis(cursor.recordedAt)
   return byTime < 0 || (byTime === 0 && compareIds(record.id, cursor.id) <= 0)
 }
-/** How many seen notifications one write records. */
+/** How many pending notifications one page lists. */
 const seenBatch = 100
 
 /**
@@ -134,12 +137,17 @@ const seenBatch = 100
 export const make: Effect.Effect<
   NotificationService["Service"],
   never,
-  NotificationStore.NotificationStore | Authorization.Authorization | Journal.Journal | ThreadQuery.ThreadQuery
+  | NotificationStore.NotificationStore
+  | Authorization.Authorization
+  | Journal.Journal
+  | ThreadQuery.ThreadQuery
+  | Crypto.Crypto
 > = Effect.gen(function* () {
   const notificationStore = yield* NotificationStore.NotificationStore
   const authorization = yield* Authorization.Authorization
   const journal = yield* Journal.Journal
   const threadQuery = yield* ThreadQuery.ThreadQuery
+  const crypto = yield* Crypto.Crypto
 
   /** The acting member as a recipient, once their membership is checked. */
   const requireRecipient = Effect.fnUntraced(function* () {
@@ -203,65 +211,45 @@ export const make: Effect.Effect<
       )
     )
   }, Operation.report)
-  const markSeen = Effect.fn("NotificationService.markSeen")(function* (notificationId: Notification.NotificationId) {
-    const notification = yield* requireOwn(notificationId)
-    if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient))
-      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
-    if (Notification.State.isAnyOf(["Seen"])(notification.state)) return notification
-    if (!Notification.State.isAnyOf(["Pending"])(notification.state))
-      return yield* new CoreError.Conflict({
-        reason: new CoreError.AlreadyHandled({ notificationId: notification.id })
-      })
-    // Leaving its group may settle it first, and the store then refuses it or records nothing:
-    // what it reads as afterwards decides.
-    yield* notificationStore
-      .markSeen([notification.id], yield* DateTime.now)
-      .pipe(Effect.catchReason("StoreError", "Rejected", () => Effect.void))
-    // Another device may have seen it first; the stored time is the one that holds.
-    const seen = yield* requireOwn(notification.id)
-    if (Notification.State.isAnyOf(["Discarded"])(seen.state))
-      return yield* new CoreError.Conflict({
-        reason: new CoreError.AlreadyHandled({ notificationId: notification.id })
-      })
-    if (!Notification.State.isAnyOf(["Seen"])(seen.state))
-      return yield* Effect.die("A seen notification still reads as unseen")
-    return seen
-  }, Operation.report)
-  const markSeenThrough = Effect.fn("NotificationService.markSeenThrough")(function* (input: NotificationStore.Cursor) {
-    const target = yield* requireRecipient()
-    if (!Notification.Recipient.isAnyOf(["Human"])(target))
-      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
-    const through = yield* decodeCursor(input)
-    /** One page marked: what it listed and how many of them were due. */
-    const markPageSeen = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
-      const page = yield* notificationStore.listPendingByRecipient(
-        target,
-        after === undefined ? { limit: seenBatch } : { limit: seenBatch, after }
-      )
-      const due = page.filter((record) => isAtOrBefore(record, through))
-      const [first, ...rest] = due.map((record) => record.id)
-      if (first !== undefined) {
-        yield* notificationStore.markSeen([first, ...rest], yield* DateTime.now)
-      }
-      return { page, due: due.length }
-    })
-    let after: NotificationStore.Cursor | undefined
-    let marked = 0
-    while (true) {
-      // Leaving a group settles its notifications, which the store then refuses to mark; they are
-      // no longer pending, so reading the page again leaves them out.
-      const { page, due } = yield* markPageSeen(after).pipe(
-        Effect.retry({
-          times: 2,
-          while: (error) => StoreError.isStoreError(error) && StoreError.Reason.isAnyOf(["Rejected"])(error.reason)
+  const markSeen = Effect.fn("NotificationService.markSeen")(
+    function* (notificationId: Notification.NotificationId) {
+      const notification = yield* requireOwn(notificationId)
+      if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient))
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
+      if (Notification.State.isAnyOf(["Seen"])(notification.state)) return notification
+      if (!Notification.State.isAnyOf(["Pending"])(notification.state))
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.AlreadyHandled({ notificationId: notification.id })
         })
-      )
-      marked += due
-      const last = page.at(-1)
-      if (last === undefined || page.length < seenBatch || due < page.length) return marked
-      after = { recordedAt: last.recordedAt, id: last.id }
-    }
-  }, Operation.report)
+      yield* journal.publish(NotificationFacts.Seen, { notificationId: notification.id })
+      return yield* requireOwn(notification.id)
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+    Operation.report
+  )
+  const markSeenThrough = Effect.fn("NotificationService.markSeenThrough")(
+    function* (input: NotificationStore.Cursor) {
+      const target = yield* requireRecipient()
+      if (!Notification.Recipient.isAnyOf(["Human"])(target))
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
+      const through = yield* decodeCursor(input)
+      let marked = 0
+      // What is marked leaves the pending list, so each page starts where the last one ended.
+      while (true) {
+        const page = yield* notificationStore.listPendingByRecipient(target, { limit: seenBatch })
+        const due = page.filter((record) => isAtOrBefore(record, through))
+        for (const record of due) yield* journal.publish(NotificationFacts.Seen, { notificationId: record.id })
+        marked += due.length
+        if (page.length < seenBatch || due.length < page.length) return marked
+      }
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+    Operation.report
+  )
   const countPending = Effect.gen(function* () {
     const target = yield* requireRecipient()
     return {

@@ -57,8 +57,8 @@ export interface Storage {
    */
   readonly connect: (options?: HostOptions) => Effect.Effect<Context.Context<Host>, never, Scope.Scope>
   /**
-   * Discard every projected record and checkpoint, keeping logs and read state, as rebuilding
-   * projections does before replaying the journal. No storage contract performs this.
+   * Discard every projected record and checkpoint, keeping logs and what is kept outside the
+   * journal, as rebuilding projections does before replaying it. No storage contract performs this.
    */
   readonly discardProjections: Effect.Effect<void>
   /** Count every stored record of any kind, so a test can show a rolled-back write left none. */

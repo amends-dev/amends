@@ -49,6 +49,7 @@ import * as Journal from "./journal/Journal.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
+import * as ReadStateProjection from "./read-state/ReadStateProjection.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
 import * as RequestService from "./request/RequestService.ts"
 import * as TaskCommand from "./task/TaskCommand.ts"
@@ -117,6 +118,7 @@ export const projections = [
   ChannelProjection.definition,
   DeliveryProjection.definition,
   NotificationProjection.definition,
+  ReadStateProjection.definition,
   ConnectionProjection.definition,
   AgentProjection.definition,
   TurnProjection.definition

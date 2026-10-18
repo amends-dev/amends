@@ -22,6 +22,7 @@ import * as Schema from "effect/Schema"
 import * as GroupId from "../group/GroupId.ts"
 import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as ReadState from "../read-state/ReadState.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
 import * as MemberId from "../workspace/MemberId.ts"
@@ -123,10 +124,8 @@ export interface ThreadRange extends Schema.Schema.Type<typeof ThreadRange> {}
  * authorize callers; operations must do so.
  *
  * The journal settles notifications as Pending, Discarded, or Informational, an agent's as
- * Accepted when a turn takes them, and a contact's when a delivery does. A human recipient's Seen
- * is private state, written by `markSeen` outside the journal and kept when projections are
- * rebuilt: a notification projected again as Pending reads as Seen, with its first time, once its
- * recipient has seen it.
+ * Accepted when a turn takes them, a contact's when a delivery does, and a person's as Seen when
+ * they see it or read its thread through it.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
@@ -220,15 +219,22 @@ export class NotificationStore extends Context.Service<
       records: ReadonlyArray<Notification.Notification>
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /**
-     * Record that their human recipients have seen these notifications, outside the journal. Each
-     * must be a human's notification in this workspace that is pending or already seen; otherwise
-     * the call is rejected and writes nothing. A notification seen before keeps its first time. The
-     * write joins the caller's transaction when there is one and is atomic on its own otherwise.
+     * Projection write that records their human recipients saw these notifications. Each must be a
+     * human's pending notification in this workspace; otherwise the call is rejected and writes
+     * nothing.
      */
     readonly markSeen: (
       ids: ReadonlyArray<Notification.NotificationId>,
       seenAt: DateTime.Utc
-    ) => Effect.Effect<void, StoreError.StoreError>
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
+    /**
+     * Projection write that records a person saw what was pending for them from a thread's
+     * activity up to the position they read it through. Nothing pending there writes nothing.
+     */
+    readonly markSeenInThread: (
+      position: ReadState.ThreadPosition,
+      seenAt: DateTime.Utc
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /**
      * Record that `by` accepted these pending notifications, in its commit: a turn, which takes
      * pending notifications of one agent in this workspace, or a delivery, which takes pending
@@ -340,6 +346,12 @@ export const make = (
         yield* write("markSeen", Schema.DateTimeUtc, seenAt)
       )
     }),
+    markSeenInThread: Effect.fn("NotificationStore.markSeenInThread")(function* (position, seenAt) {
+      return yield* driver.markSeenInThread(
+        yield* write("markSeenInThread", ReadState.ThreadPosition, position),
+        yield* write("markSeenInThread", Schema.DateTimeUtc, seenAt)
+      )
+    }),
     accept: Effect.fn("NotificationStore.accept")(function* (ids, by, acceptedAt) {
       return yield* driver.accept(
         yield* write("accept", Schema.Array(Notification.NotificationId), ids),
@@ -390,27 +402,30 @@ const isAfter = (record: Notification.Notification, cursor: Cursor) =>
 const isBefore = (record: Notification.Notification, cursor: Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) < 0
 
-/**
- * A record as stored: one projected as Pending reads as Seen, with its first time, once its human
- * recipient has seen it, as when projections are rebuilt after they saw it.
- */
-const withSeen = (space: MemoryDatabase.Space, record: Notification.Notification) => {
-  const seen = space.notificationsSeen.get(record.id)
-  return seen === undefined ||
-    !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
-    !Notification.State.isAnyOf(["Pending"])(record.state)
-    ? record
-    : Object.assign({}, record, {
-        state: Notification.State.cases.Seen.make({ seenAt: DateTime.makeUnsafe(seen) })
-      })
-}
+/** Is this the person's pending notification from the thread's activity up to the position? */
+const isPendingInThread = (record: Notification.Notification, position: ReadState.ThreadPosition) =>
+  Notification.Recipient.isAnyOf(["Human"])(record.recipient) &&
+  record.recipient.memberId === position.memberId &&
+  Notification.State.isAnyOf(["Pending"])(record.state) &&
+  record.thread !== undefined &&
+  record.thread.threadId === position.threadId &&
+  record.thread.sequence <= position.readThrough
 
-/**
- * Notification records and recipient reads over the workspace transaction. Each human
- * recipient's Seen is also kept beside them, where rebuilding projections leaves it.
- */
+/** Store `record` as seen at `seenAt`. */
+const markRecordSeen = Effect.fnUntraced(function* (
+  notifications: Map<string, string>,
+  record: Notification.Notification,
+  seenAt: DateTime.Utc
+) {
+  notifications.set(
+    record.id,
+    yield* rows.encode(Object.assign({}, record, { state: Notification.State.cases.Seen.make({ seenAt }) }))
+  )
+})
+
+/** Notification records and recipient reads over the workspace transaction. */
 const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
-  const { workspaceId, read, write, exclusive } = yield* MemoryBinding.MemoryBinding
+  const { workspaceId, read, write } = yield* MemoryBinding.MemoryBinding
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("notifications")))
 
   const listPending = Effect.fnUntraced(function* (recipient: Notification.Recipient, options: ReadOptions) {
@@ -465,7 +480,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
           )
         ids.add(record.id)
         sources.add(sourceKey(record))
-        written.push([record.id, yield* rows.encode(withSeen(space, record))])
+        written.push([record.id, yield* rows.encode(record)])
       }
       for (const [id, row] of written) space.records.of("notifications").set(id, row)
     },
@@ -562,40 +577,34 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
     ),
     markSeen: Effect.fn("NotificationStore.memory.markSeen")(
       function* (ids, seenAt) {
-        // Checked and recorded without a commit in between, as a row lock orders them on PostgreSQL:
-        // a departure that settles one first has the store reject this, and one after keeps its Seen.
-        yield* exclusive((space) =>
-          Effect.gen(function* () {
-            // Check every notification before recording any of them; one seen before keeps its time.
-            const pending: Array<Notification.Notification> = []
-            for (const id of new Set(ids)) {
-              const found = yield* rows.get(space.records.of("notifications"), id)
-              const record = Option.getOrUndefined(found)
-              if (
-                record === undefined ||
-                !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
-                !Notification.State.isAnyOf(["Pending", "Seen"])(record.state)
-              )
-                return yield* StoreError.rejected(
-                  "NotificationStore",
-                  "markSeen",
-                  "Expected a pending notification of a human recipient"
-                )
-              if (Notification.State.isAnyOf(["Pending"])(record.state)) pending.push(record)
-            }
-            for (const record of pending) {
-              const row = yield* rows.encode(
-                Object.assign({}, record, {
-                  state: Notification.State.cases.Seen.make({ seenAt })
-                })
-              )
-              space.records.of("notifications").set(record.id, row)
-              space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt))
-            }
-          })
-        )
+        const notifications = (yield* write).records.of("notifications")
+        // Check every notification before recording any of them.
+        const pending: Array<Notification.Notification> = []
+        for (const id of new Set(ids)) {
+          const record = Option.getOrUndefined(yield* rows.get(notifications, id))
+          if (
+            record === undefined ||
+            !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
+            !Notification.State.isAnyOf(["Pending"])(record.state)
+          )
+            return yield* StoreError.rejected(
+              "NotificationStore",
+              "markSeen",
+              "Expected a pending notification of a human recipient"
+            )
+          pending.push(record)
+        }
+        for (const record of pending) yield* markRecordSeen(notifications, record, seenAt)
       },
       Effect.mapError(StoreError.failed("NotificationStore", "markSeen"))
+    ),
+    markSeenInThread: Effect.fn("NotificationStore.memory.markSeenInThread")(
+      function* (position, seenAt) {
+        const notifications = (yield* write).records.of("notifications")
+        for (const record of yield* rows.all(notifications))
+          if (isPendingInThread(record, position)) yield* markRecordSeen(notifications, record, seenAt)
+      },
+      Effect.mapError(StoreError.failed("NotificationStore", "markSeenInThread"))
     ),
     accept: Effect.fn("NotificationStore.memory.accept")(
       function* (ids, by, acceptedAt) {
@@ -686,12 +695,9 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
  * Provide `NotificationStore` in process memory, over the workspace's `MemoryBinding.MemoryBinding`. It
  * keeps what the contract leaves to storage: an insert writes every record or none, and a reused
  * ID, or a second notification for one source entry and recipient, is rejected. Marking seen is
- * rejected unless each notification is stored, of a human recipient, and pending or already seen,
- * and it runs through the binding's `exclusive`, so no commit lands between its check and its
- * write. Accepting is rejected unless each notification is pending and of one agent, for a turn, or
- * of contacts, for a delivery. A human recipient's first Seen is also kept beside the records,
- * where rebuilding projections leaves it, and is applied again when the notification is projected
- * anew. `make` checks every input first.
+ * rejected unless each notification is stored, of a human recipient, and pending. Accepting is
+ * rejected unless each notification is pending and of one agent, for a turn, or of contacts, for a
+ * delivery. `make` checks every input first.
  *
  * @category layers
  * @since 0.1.0

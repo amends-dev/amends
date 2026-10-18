@@ -118,6 +118,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           discardPendingForParticipation: unexpected,
           discardPendingForGroup: unexpected,
           markSeen: unexpected,
+          markSeenInThread: unexpected,
           accept: unexpected,
           get: unexpected,
           listPendingByRecipient: unexpected,
@@ -208,7 +209,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         ReadStateStore.ReadStateStore,
         ReadStateStore.ReadStateStore.of({
           getThreadPositions: unexpected,
-          markThreadRead: unexpected,
+          advanceThread: unexpected,
           getGroupReads: unexpected,
           advanceGroup: unexpected
         })

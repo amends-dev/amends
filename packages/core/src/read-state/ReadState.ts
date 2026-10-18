@@ -1,8 +1,8 @@
 /**
  * Read state is how far a person has read: each thread by timeline sequence, and each group by when
- * they last read it. It is private to the member and kept outside the journal, in `ReadStateStore`;
- * what lies past a position is unread, so nothing is recorded per message. `ReadStateService` is
- * the operations that advance it. Agents keep no read state.
+ * they last read it. It is private to the member; the journal records it as `ReadStateFacts`, and
+ * `ReadStateStore` keeps it. What lies past a position is unread, so nothing is recorded per
+ * message. `ReadStateService` is the operations that advance it. Agents keep no read state.
  *
  * @since 0.1.0
  */

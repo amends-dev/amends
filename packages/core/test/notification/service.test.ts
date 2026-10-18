@@ -96,6 +96,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
     discardPendingForParticipation: unexpected,
     discardPendingForGroup: unexpected,
     markSeen: unexpected,
+    markSeenInThread: unexpected,
     accept: unexpected,
     ...overrides
   })
@@ -150,7 +151,11 @@ const inboxOf = (...records: ReadonlyArray<Notification.Notification>) =>
 it.effect("inbox reads require the current actor, need no role grant, and leave the journal unchanged", () =>
   Effect.gen(function* () {
     expectTypeOf<Layer.Services<typeof NotificationService.layer>>().toEqualTypeOf<
-      NotificationStore.NotificationStore | Authorization.Authorization | Journal.Journal | ThreadQuery.ThreadQuery
+      | NotificationStore.NotificationStore
+      | Authorization.Authorization
+      | Journal.Journal
+      | ThreadQuery.ThreadQuery
+      | Crypto.Crypto
     >()
     expectTypeOf<
       Effect.Services<ReturnType<NotificationService.NotificationService["Service"]["inbox"]>>

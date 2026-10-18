@@ -352,20 +352,21 @@ someone who rejoins under a new member ID starts with an empty one.
 
 `NotificationService` serves the acting member's own `inbox`, newest first with each source they can
 still read as its timeline shows it, its `countPending`, in all and by group, and a person's `markSeen` and
-`markSeenThrough`; contact and triage inboxes are read only through the store. A person's `Seen` is
-private state the store keeps outside the journal. `NotificationProjection` generates notifications
-from each recorded activity's recipients, and settles pending agent input when a participation ends.
+`markSeenThrough`; contact and triage inboxes are read only through the store. A person seeing a
+notification is a `NotificationFacts.Seen` fact. `NotificationProjection` generates notifications
+from each recorded activity's recipients, settles pending agent input when a participation ends,
+and marks a person's notifications seen as they see them or read their thread.
 Notifications never create turns, accept their input, or run work. See
 [reading the inbox](../../docs/thread-workflows.md#reading-the-inbox) and
 [marking a notification seen](../../docs/thread-workflows.md#marking-a-notification-seen).
 
 ## Read state
 
-`@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
-`markGroupRead`, over the `ReadStateStore`, which is kept outside the journal.
-`ReadStateStore.markThreadRead` advances the reader's position and marks their notifications from
-the thread seen in one write. Marking a thread read, starting one, and replying all make it, so an
-author has read what they posted. It is what makes ambient activity visible in the
+`@amends-dev/core/read-state` holds each person's private read state: `ReadStateService.markThreadRead`
+and `markGroupRead` record `ReadStateFacts.ThreadRead` and `GroupRead`, which `ReadStateProjection`
+keeps in the `ReadStateStore`; reading a thread also marks the person's notifications from it seen
+up to the position, through `NotificationProjection`. Starting a thread and replying record the
+author's position in the same commit, so an author has read what they posted. It is what makes ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
@@ -581,7 +582,8 @@ driver from its constructor, as each `layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
   workspace has one `Space`: its logs, as the log package's `MemoryStore.Space`, projected records by
-  kind, with the live projection versions and rebuild checkpoints, and private read state. Beside
+  kind, with the live projection versions and rebuild checkpoints, and what is kept outside the
+  journal: connections' credentials and sessions' harness state. Beside
   the workspaces sit the session logs, and tables and locks by name, created on first use, for what
   a host stores across its workspaces, such as its accounts. `MemoryDatabase.makeRows` is how a
   store keeps one kind of record.

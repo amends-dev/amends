@@ -25,7 +25,7 @@ import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as ReadStateStore from "../read-state/ReadStateStore.ts"
+import * as ReadStateFacts from "../read-state/ReadStateFacts.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
@@ -146,7 +146,6 @@ export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadCommand = yield* ThreadCommand.ThreadCommand
-  const readStateStore = yield* ReadStateStore.ReadStateStore
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
@@ -242,15 +241,14 @@ export const make = Effect.gen(function* () {
         occurredAt: yield* DateTime.now
       })
       // Replying reads the thread through the author's own message.
-      yield* readStateStore.markThreadRead(
-        {
+      yield* journal
+        .publish(ReadStateFacts.ThreadRead, {
           workspaceId,
           memberId: actor.memberId,
           threadId: thread.id,
           readThrough: published.activity.sequence
-        },
-        published.activity.occurredAt
-      )
+        })
+        .pipe(Publication.withOccurredAt(published.activity.occurredAt))
       return published.message
     },
     Publication.withActor,

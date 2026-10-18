@@ -47,7 +47,7 @@ export const scopeKinds = ["Workspace", "Target"] as const
 export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection", "Channel"] as const
 export const deliveryStatuses = ["requested", "sent", "failed"] as const
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const
-/** A notification's state; a human recipient's Seen is also kept in notification_seen. */
+/** A notification's state. */
 export const notificationStates = ["Pending", "Seen", "Accepted", "Discarded", "Informational"] as const
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
@@ -295,7 +295,7 @@ export const notifications = pgTable(
     recipientMemberId: text("recipient_member_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
-    // When a human saw it: a copy of notification_seen, which keeps it across rebuilds.
+    // When a human saw it.
     seenAt: instant("seen_at"),
     // The thread, its group, and the timeline position of thread-activity notifications.
     threadId: text("thread_id"),
@@ -519,10 +519,7 @@ export const threads = pgTable(
     )
   ]
 )
-/**
- * Private read state, outside the journal. It references no projection tables, so rebuilding
- * projections from the journal leaves it intact.
- */
+/** Each person's read position in each thread they read, which `ReadStateProjection` keeps. */
 export const threadReadPositions = pgTable(
   "thread_read_positions",
   {
@@ -536,19 +533,7 @@ export const threadReadPositions = pgTable(
     check("thread_read_position", sql`${t.readThrough} > 0`)
   ]
 )
-/**
- * When a human recipient first saw each notification: private state outside the journal, kept
- * when projections are rebuilt, so it references notifications by ID without a foreign key.
- */
-export const notificationSeen = pgTable(
-  "notification_seen",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    notificationId: text("notification_id").notNull(),
-    seenAt: instant("seen_at").notNull()
-  },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.notificationId] })]
-)
+/** When each person last read each group, which `ReadStateProjection` keeps. */
 export const groupReadTimes = pgTable(
   "group_read_times",
   {

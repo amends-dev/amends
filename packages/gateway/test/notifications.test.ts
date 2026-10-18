@@ -132,7 +132,9 @@ describe("notifications", () => {
               record("unthreaded")
             ])
           )
-          yield* bound.notifications.markSeen([Notification.NotificationId.make("red-seen")], recordedAt)
+          yield* bound.store.transaction(
+            bound.notifications.markSeen([Notification.NotificationId.make("red-seen")], recordedAt)
+          )
           // Every group with any, in binary group-ID order.
           expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([
             { groupId: blue, count: 1 },
@@ -141,9 +143,11 @@ describe("notifications", () => {
           ])
           expect(yield* bound.notifications.countPendingByGroup(agent)).toEqual([{ groupId: red, count: 1 }])
           expect(yield* bound.notifications.countPendingByGroup(another)).toEqual([{ groupId: red, count: 1 }])
-          yield* bound.notifications.markSeen(
-            ["red-1", "blue-1", "green-1"].map((id) => Notification.NotificationId.make(id)),
-            recordedAt
+          yield* bound.store.transaction(
+            bound.notifications.markSeen(
+              ["red-1", "blue-1", "green-1"].map((id) => Notification.NotificationId.make(id)),
+              recordedAt
+            )
           )
           expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([{ groupId: red, count: 1 }])
           expect(yield* (yield* boundTo(otherWorkspaceId)).notifications.countPendingByGroup(human)).toEqual([])
@@ -295,7 +299,7 @@ describe("notifications", () => {
           }
           // What the recipient saw stays in their inbox, and leaves what is pending.
           const seenAt = DateTime.add(recordedAt, { minutes: 1 })
-          yield* bound.notifications.markSeen([Notification.NotificationId.make("é")], seenAt)
+          yield* bound.store.transaction(bound.notifications.markSeen([Notification.NotificationId.make("é")], seenAt))
           const seen = record("é", {
             state: { _tag: "Seen", seenAt }
           })
@@ -355,15 +359,19 @@ describe("notifications", () => {
           const many = Array.makeBy(12_000, (index) => record(`many-${index}`, { thread }))
           yield* bound.store.transaction(bound.notifications.insertMany(many))
           expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([{ groupId, count: many.length }])
-          yield* bound.notifications.markSeen(
-            many.map((notification) => notification.id),
-            recordedAt
+          yield* bound.store.transaction(
+            bound.notifications.markSeen(
+              many.map((notification) => notification.id),
+              recordedAt
+            )
           )
           expect(yield* bound.notifications.countPendingByGroup(human)).toEqual([])
           const absent = Array.makeBy(40_000, (index) => Notification.NotificationId.make(`absent-${index}`))
           expect(
             yield* Effect.flip(
-              bound.notifications.markSeen([...absent, Notification.NotificationId.make("many-0")], recordedAt)
+              bound.store.transaction(
+                bound.notifications.markSeen([...absent, Notification.NotificationId.make("many-0")], recordedAt)
+              )
             )
           ).toMatchObject({
             _tag: "StoreError",
@@ -824,7 +832,7 @@ describe("notifications", () => {
               record("no-thread")
             ]
             yield* bound.store.transaction(bound.notifications.insertMany([...settled, seen, ...kept]))
-            yield* bound.notifications.markSeen([seen.id], recordedAt)
+            yield* bound.store.transaction(bound.notifications.markSeen([seen.id], recordedAt))
             const before = yield* bound.notifications.get(seen.id)
             const leave = bound.store.transaction(
               bound.notifications.discardPendingForGroup(

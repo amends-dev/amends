@@ -579,7 +579,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.effect("marking a thread read settles the member's notifications from it in the same write", () =>
+    it.effect("seeing a thread settles only the member's pending notifications from it, up to the position", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
@@ -623,34 +623,70 @@ export const contracts = (fixture: Fixture.Fixture) => {
               return Notification.State.isAnyOf(["Seen"])(state) ? DateTime.toEpochMillis(state.seenAt) : state._tag
             })
           )
-          const positions = Effect.map(bound.readStates.getThreadPositions(reader.memberId, [threadId]), (found) =>
+          const seeThread = (readThrough: number, seenAt: DateTime.Utc) =>
+            bound.store.transaction(bound.notifications.markSeenInThread(position(readThrough), seenAt))
+
+          const firstSeen = DateTime.toEpochMillis(recordedAt)
+          yield* seeThread(2, recordedAt)
+          expect(yield* states).toEqual([firstSeen, firstSeen, "Pending", "Pending", "Pending"])
+
+          // What was seen keeps its time; what was still pending up to the new position is seen now.
+          const later = DateTime.add(recordedAt, { minutes: 1 })
+          yield* seeThread(3, later)
+          expect(yield* states).toEqual([firstSeen, firstSeen, DateTime.toEpochMillis(later), "Pending", "Pending"])
+        })
+      )
+    )
+
+    it.effect("a read position only moves forward, and rolls back with its commit", () =>
+      fixture.withStorage((storage) =>
+        Effect.gen(function* () {
+          const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
+          yield* initialized(bound)
+          const memberId = MemberId.MemberId.make("reader")
+          const threadId = ThreadId.ThreadId.make("thread")
+          const groupId = GroupId.GroupId.make("group")
+          const advance = (readThrough: number) =>
+            bound.store.transaction(
+              bound.readStates.advanceThread({ workspaceId: Support.workspaceId, memberId, threadId, readThrough })
+            )
+          const readGroup = (readAt: DateTime.Utc) =>
+            bound.store.transaction(
+              bound.readStates.advanceGroup({ workspaceId: Support.workspaceId, memberId, groupId, readAt })
+            )
+          const positions = Effect.map(bound.readStates.getThreadPositions(memberId, [threadId]), (found) =>
             found.map(({ readThrough }) => readThrough)
           )
+          const groupTimes = Effect.map(bound.readStates.getGroupReads(memberId, [groupId]), (found) =>
+            found.map(({ readAt }) => DateTime.toEpochMillis(readAt))
+          )
 
-          // A transaction that rolls back takes both parts with it.
           expect(
             yield* Effect.flip(
               bound.store.transaction(
-                Effect.andThen(bound.readStates.markThreadRead(position(2), recordedAt), Effect.fail("undo"))
+                Effect.andThen(
+                  bound.readStates.advanceThread({
+                    workspaceId: Support.workspaceId,
+                    memberId,
+                    threadId,
+                    readThrough: 2
+                  }),
+                  Effect.fail("undo")
+                )
               )
             )
           ).toBe("undo")
-          expect(yield* states).toEqual(["Pending", "Pending", "Pending", "Pending", "Pending"])
           expect(yield* positions).toEqual([])
-
-          // Only the member's pending notifications from the thread, up to the position, are seen.
-          const firstSeen = DateTime.toEpochMillis(recordedAt)
-          yield* bound.readStates.markThreadRead(position(2), recordedAt)
-          expect(yield* states).toEqual([firstSeen, firstSeen, "Pending", "Pending", "Pending"])
+          yield* advance(2)
+          yield* advance(1)
           expect(yield* positions).toEqual([2])
-
-          // An earlier position is kept back, and a notification seen before keeps its time.
-          const later = DateTime.add(recordedAt, { minutes: 1 })
-          yield* bound.store.transaction(bound.readStates.markThreadRead(position(1), later))
-          expect(yield* positions).toEqual([2])
-          yield* bound.readStates.markThreadRead(position(3), later)
-          expect(yield* states).toEqual([firstSeen, firstSeen, DateTime.toEpochMillis(later), "Pending", "Pending"])
+          yield* advance(3)
           expect(yield* positions).toEqual([3])
+
+          const readAt = yield* DateTime.now
+          yield* readGroup(readAt)
+          yield* readGroup(DateTime.subtract(readAt, { minutes: 1 }))
+          expect(yield* groupTimes).toEqual([DateTime.toEpochMillis(readAt)])
         })
       )
     )

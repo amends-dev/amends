@@ -36,8 +36,8 @@ class MemoryTransaction extends Context.Service<
 >()("@amends-dev/core/journal/MemoryBinding/MemoryTransaction") {}
 
 /**
- * One workspace's view of memory storage: what a read, a projection write, and a write outside the
- * journal see. `layer` provides it, and every store's `layerMemory` reads and writes through it.
+ * One workspace's view of memory storage: what a read and a write see. `layer` provides it, and
+ * every store's `layerMemory` reads and writes through it.
  *
  * @category services
  * @since 0.1.0
@@ -54,17 +54,8 @@ export class MemoryBinding extends Context.Service<
      * state outside any transaction. Any other transaction is a foreign or expired handle.
      */
     readonly read: Effect.Effect<MemoryDatabase.Space, StoreError.StoreError>
-    /** What a projection write changes: the caller's transaction, which it requires. */
+    /** What a write changes: the caller's transaction, which it requires. */
     readonly write: Effect.Effect<MemoryDatabase.Space, StoreError.StoreError>
-    /** What a write outside the journal changes: the caller's transaction, or committed state. */
-    readonly join: Effect.Effect<MemoryDatabase.Space, StoreError.StoreError>
-    /**
-     * Run a write outside the journal that reads before it writes: in the caller's transaction, or
-     * else holding the workspace's writer over committed state, so no commit lands in between.
-     */
-    readonly exclusive: <A, E, R>(
-      write: (space: MemoryDatabase.Space) => Effect.Effect<A, E, R>
-    ) => Effect.Effect<A, E | StoreError.StoreError, R>
   }
 >()("@amends-dev/core/journal/MemoryBinding") {}
 
@@ -97,9 +88,6 @@ const makeBindings = Effect.fn("MemoryBinding.make")(function* (workspaceId: Wor
   const write = Effect.flatMap(session, (current) =>
     Option.isSome(current) ? Effect.succeed(current.value.space) : Effect.fail(closed)
   )
-  const join = Effect.map(session, (current) =>
-    Option.isSome(current) ? current.value.space : MemoryDatabase.writable(database, workspaceId)
-  )
   /** Take the workspace's writer, which this host's writers wait for and another host's refuse. */
   const acquire = Effect.fnUntraced(function* (
     restore: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
@@ -115,20 +103,6 @@ const makeBindings = Effect.fn("MemoryBinding.make")(function* (workspaceId: Wor
     database.writers.delete(workspaceId)
     return gate.release(1)
   })
-  const exclusive: MemoryBinding["Service"]["exclusive"] = (write) =>
-    Effect.flatMap(session, (current) =>
-      Option.isSome(current)
-        ? write(current.value.space)
-        : Effect.uninterruptibleMask((restore) =>
-            Effect.gen(function* () {
-              yield* acquire(restore)
-              const exit = yield* Effect.exit(restore(write(MemoryDatabase.writable(database, workspaceId))))
-              yield* release
-              return yield* exit
-            })
-          )
-    )
-
   /**
    * A transaction of the workspace: a snapshot of all its state, which its log appends and store
    * writes change, made committed together. A standalone one takes no writer and commits only the
@@ -193,7 +167,7 @@ const makeBindings = Effect.fn("MemoryBinding.make")(function* (workspaceId: Wor
   })
 
   return {
-    memoryBinding: MemoryBinding.of({ workspaceId, connection: memoryConnection, read, write, join, exclusive }),
+    memoryBinding: MemoryBinding.of({ workspaceId, connection: memoryConnection, read, write }),
     storeBinding: MemoryStore.Binding.of({
       read: Effect.map(read, (space) => space.logs),
       committed: () => MemoryDatabase.committed(database, workspaceId).logs,

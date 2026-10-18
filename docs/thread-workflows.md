@@ -459,8 +459,8 @@ mark it at once. Missing and other recipients' IDs return `CoreError.NotFound`; 
 notification returns `CoreError.Denied` (`HumanRequired`), and a discarded one `CoreError.Conflict`
 (`AlreadyHandled`), including one that leaving its group settles while it is being marked.
 
-`Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
-workspace's write order, and survives rebuilding projections. It creates no activity or
+`Seen` is private to the person, like read positions, and recorded as a `notification.seen` fact,
+which only they are shown; rebuilding projections restores it. It creates no activity or
 notifications. Handing work to an agent's turn, or a message to a
 delivery, is recorded by those workflows as `Accepted`, not by marking it seen.
 
@@ -478,9 +478,9 @@ timeline does not mark it read; clients call this for what they have shown.
 membership and `group.read`, and returns `CoreError.NotFound` otherwise; the read time also only
 moves forward.
 
-Positions and read times are private state, like `Seen`: outside the journal, never waiting
-for the workspace's conversation writes, and kept when projections are rebuilt. Starting a thread
-or replying reads it through the author's message in the same commit. [Thread lists](#reading-conversations) and
+Positions and read times are private to the person, like `Seen`, and recorded as
+`read-state.thread-read` and `read-state.group-read` facts; one that does not move forward records
+nothing. Starting a thread or replying reads it through the author's message in the same commit. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups) report unread state from these records; only
 messages count as new activity, not quiet participation changes.
 

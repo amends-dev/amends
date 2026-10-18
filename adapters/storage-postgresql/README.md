@@ -108,19 +108,16 @@ none of the earlier membership's. The row's `state` is the notification's, and `
 checks that each state holds its own columns and no other's; an accepted notification records what
 accepted it, an agent's turn or a delivery to a contact.
 
-A person's `Seen` is private state outside the journal, so it is also kept in `notification_seen`,
-which has no foreign key to `notifications`: rebuilding them keeps it, and inserting a pending human
-notification restores `Seen` from it in the same statement. `markSeen` checks every notification in
-one query, then sets the pending rows to `Seen` and records `notification_seen` in one statement, so
-concurrent calls take turns on the rows' locks and agree on the first time. The pending indexes
-cover only pending rows, so pending reads and counts never visit a reader's seen history.
+`markSeen` checks every notification in one query, then sets the pending rows to `Seen` in one
+statement; `markSeenInThread` sets a reader's pending rows from one thread up to a position in one
+statement. The pending indexes cover only pending rows, so pending reads and counts never visit a
+reader's seen history.
 `notifications_by_thread` serves a reader's notifications from one thread by position, and
 `pending_notifications_by_group` counts them per group and settles a departing member's pending ones
 in one statement per recipient kind.
 
-`thread_read_positions` and `group_read_times` hold private read state, reference no projection
-rows, and survive rebuilds. Their upserts keep the later value with `greatest`, and run on their
-own, without the workspace lock, when the caller has no transaction.
+`thread_read_positions` and `group_read_times` hold read state, which `ReadStateProjection` keeps.
+Their upserts keep the later value with `greatest`.
 
 ### Connections, agents, and turns
 
