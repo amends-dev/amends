@@ -107,6 +107,7 @@ import {
   UnfollowThread,
   UpdateTask
 } from "./store.ts"
+import * as Drafts from "./sync/Drafts.ts"
 
 export type UpdateReturn = Update.Return<
   Model,
@@ -506,7 +507,7 @@ const settingsIn = (model: Model): Option.Option<{ readonly settings: Settings; 
 const openedGroup = (groupId: OpenGroup["groupId"], thread: Option.Option<OpenThread["threadId"]>): OpenGroup => ({
   groupId,
   threads: [],
-  draft: "",
+  draft: Option.none(),
   thread: Option.map(thread, openedThread),
   renaming: Option.none(),
   adding: Option.none()
@@ -516,7 +517,7 @@ const openedGroup = (groupId: OpenGroup["groupId"], thread: Option.Option<OpenTh
 const openedThread = (threadId: OpenThread["threadId"]): OpenThread => ({
   threadId,
   messages: [],
-  draft: "",
+  draft: Option.none(),
   following: Option.none(),
   latest: 0,
   readThrough: 0,
@@ -818,14 +819,22 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ClickedInbox: () => atOpened(model, (opened) => modifyFields(opened, { pane: () => Option.some(Pane.Inbox()) })),
     // Opening the thread reads it, which settles its notifications.
     ClickedNotification: ({ notificationId }) =>
-      atOpened(model, (opened) => {
-        const source = opened.inbox.find(({ notification }) => notification.id === notificationId)?.notification.thread
-        return source === undefined
-          ? opened
-          : modifyFields(opened, {
-              pane: () => Option.some(Pane.Group({ group: openedGroup(source.groupId, Option.some(source.threadId)) }))
-            })
-      }),
+      Option.match(
+        Option.flatMap(openedIn(model), ({ inbox }) =>
+          Option.fromUndefinedOr(
+            inbox.find(({ notification }) => notification.id === notificationId)?.notification.thread
+          )
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: ({ groupId, threadId }) =>
+            atOpened(model, (opened) =>
+              modifyFields(opened, {
+                pane: () => Option.some(Pane.Group({ group: openedGroup(groupId, Option.some(threadId)) }))
+              })
+            )
+        }
+      ),
     ClickedMarkSeen: ({ notificationId }) => ({ model, commands: [MarkNotificationSeen({ notificationId })] }),
     ClickedMarkAllSeen: () =>
       Option.match(
@@ -1489,28 +1498,37 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       ),
     ClickedThread: ({ threadId }) =>
       atGroup(model, (group) => modifyFields(group, { thread: () => Option.some(openedThread(threadId)) })),
+    // A draft read once its place opened fills it in, unless the person began writing there meanwhile.
+    GotDraft: ({ place, text }) =>
+      Drafts.Place.match(place, {
+        Thread: ({ groupId }) =>
+          atGroup(model, (group) =>
+            group.groupId === groupId ? modifyFields(group, { draft: Option.orElseSome(() => text) }) : group
+          ),
+        Reply: ({ threadId }) =>
+          atThread(model, (thread) =>
+            thread.threadId === threadId ? modifyFields(thread, { draft: Option.orElseSome(() => text) }) : thread
+          )
+      }),
     ClickedAllThreads: () => atGroup(model, (group) => modifyFields(group, { thread: () => Option.none() })),
-    TypedThread: ({ text }) => atGroup(model, (group) => modifyFields(group, { draft: () => text })),
+    TypedThread: ({ text }) => atGroup(model, (group) => modifyFields(group, { draft: () => Option.some(text) })),
     SubmittedThread: () =>
       Option.match(groupIn(model), {
         onNone: () => ({ model }),
         onSome: ({ groupId, draft }) => ({
-          ...atGroup(model, (group) => modifyFields(group, { draft: () => "" })),
-          commands: [StartThread({ groupId, text: draft })]
+          ...atGroup(model, (group) => modifyFields(group, { draft: () => Option.some("") })),
+          commands: [StartThread({ groupId, text: Option.getOrElse(draft, () => "") })]
         })
       }),
-    TypedReply: ({ text }) => atThread(model, (thread) => modifyFields(thread, { draft: () => text })),
+    TypedReply: ({ text }) => atThread(model, (thread) => modifyFields(thread, { draft: () => Option.some(text) })),
     SubmittedReply: () =>
-      Option.match(
-        Option.flatMap(groupIn(model), ({ thread }) => thread),
-        {
-          onNone: () => ({ model }),
-          onSome: ({ threadId, draft }) => ({
-            ...atThread(model, (thread) => modifyFields(thread, { draft: () => "" })),
-            commands: [PostReply({ threadId, text: draft })]
-          })
-        }
-      ),
+      Option.match(threadIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ threadId, draft }) => ({
+          ...atThread(model, (thread) => modifyFields(thread, { draft: () => Option.some("") })),
+          commands: [PostReply({ threadId, text: Option.getOrElse(draft, () => "") })]
+        })
+      }),
     ClickedRename: () =>
       atThread(model, (thread) =>
         modifyFields(thread, {

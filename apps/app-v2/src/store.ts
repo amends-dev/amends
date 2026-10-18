@@ -62,6 +62,7 @@ import {
   Pane,
   StoreState
 } from "./model.ts"
+import * as Drafts from "./sync/Drafts.ts"
 import * as Store from "./sync/Store.ts"
 
 export const StoreResource = ManagedResource.tag<Store.Store["Service"]>()("Store")
@@ -102,6 +103,22 @@ const openGroup = (model: Model): Option.Option<OpenGroup> =>
 
 /** The thread open in the open group, once its store has opened. */
 const openThread = (model: Model): Option.Option<OpenThread> => Option.flatMap(openGroup(model), ({ thread }) => thread)
+
+/**
+ * The drafts of the places open in the workspace once its store opened: a new thread in the open
+ * group, and a reply in the open thread, each with its text, or none until its draft is read.
+ */
+const openDrafts = (model: Model) =>
+  Option.match(openGroup(model), {
+    onNone: () => [],
+    onSome: ({ groupId, draft, thread }) => [
+      { place: Drafts.Place.cases.Thread.make({ groupId }), draft },
+      ...Option.toArray(thread).map(({ threadId, draft }) => ({
+        place: Drafts.Place.cases.Reply.make({ threadId }),
+        draft
+      }))
+    ]
+  })
 
 /**
  * The turn whose log the person follows, and as whom: while it is opening or open, so that following
@@ -399,6 +416,39 @@ export const subscriptions = Subscription.make<
               )
             )
         })
+    }
+  ),
+  // Each open place's draft is read once, and kept as it changes from then on.
+  unreadDrafts: entry(
+    { places: Schema.Array(Drafts.Place) },
+    {
+      modelToDependencies: (model) => ({
+        places: openDrafts(model).flatMap(({ place, draft }) => (Option.isNone(draft) ? [place] : []))
+      }),
+      dependenciesToStream: ({ places }) =>
+        fromStore((store) =>
+          Stream.fromIterable(places).pipe(
+            Stream.mapEffect((place) =>
+              Effect.map(store.draft(place), (text): Message => Message.GotDraft({ place, text }))
+            )
+          )
+        )
+    }
+  ),
+  drafts: entry(
+    { drafts: Schema.Array(Schema.Struct({ place: Drafts.Place, text: Schema.String })) },
+    {
+      modelToDependencies: (model) => ({
+        drafts: openDrafts(model).flatMap(({ place, draft }) =>
+          Option.match(draft, { onNone: () => [], onSome: (text) => [{ place, text }] })
+        )
+      }),
+      dependenciesToStream: ({ drafts }) =>
+        fromStore((store) =>
+          Stream.fromEffectDrain(
+            Effect.forEach(drafts, ({ place, text }) => store.saveDraft(place, text), { discard: true })
+          )
+        )
     }
   ),
   turnLog: entry(

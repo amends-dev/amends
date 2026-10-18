@@ -36,6 +36,7 @@ import {
   ThreadItem,
   TurnItem
 } from "./model.ts"
+import * as Drafts from "./sync/Drafts.ts"
 
 export const Message = defineMessageUnion({
   TypedEmail: { email: Schema.String },
@@ -195,6 +196,7 @@ export const Message = defineMessageUnion({
   ClickedHideLog: {},
   GotTurnLog: { turnId: TurnId.TurnId, message: Turn.LogMessage },
   FailedFollowLog: { turnId: TurnId.TurnId, error: Schema.String },
+  GotDraft: { place: Drafts.Place, text: Schema.String },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String },
   ClickedDismiss: { key: Schema.String },

@@ -702,7 +702,7 @@ const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: Htm
           textarea(h, {
             id: "reply",
             label: "Reply",
-            value: thread.draft,
+            value: Option.getOrElse(thread.draft, () => ""),
             onInput: (text) => Message.TypedReply({ text })
           }),
           submit(h, "Reply")
@@ -772,7 +772,7 @@ const threadsView = (group: OpenGroup, h: HtmlBuilder<Message>): Html =>
           textarea(h, {
             id: "thread",
             label: "Start a thread",
-            value: group.draft,
+            value: Option.getOrElse(group.draft, () => ""),
             onInput: (text) => Message.TypedThread({ text })
           }),
           submit(h, "Start")

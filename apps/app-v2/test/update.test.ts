@@ -62,6 +62,7 @@ import {
   UnfollowThread,
   UpdateTask
 } from "../src/store.ts"
+import * as Drafts from "../src/sync/Drafts.ts"
 import { update } from "../src/update.ts"
 import {
   aliceInDesign,
@@ -214,7 +215,7 @@ describe("a workspace", () => {
         expect(Option.map(group, ({ threads }) => threads.length)).toEqual(Option.some(1))
         expect(
           Option.flatMap(group, ({ thread }) => Option.map(thread, ({ messages, draft }) => ({ messages, draft })))
-        ).toEqual(Option.some({ messages: [{ message: opening, pending: false }], draft: "" }))
+        ).toEqual(Option.some({ messages: [{ message: opening, pending: false }], draft: Option.some("") }))
       }),
       message(Message.ClickedAllWorkspaces()),
       model((model) => {
@@ -876,6 +877,41 @@ describe("a workspace", () => {
       message(Message.ClickedRemoveChannel({ channelId: support.id })),
       Command.expectExact(RemoveChannel({ channelId: support.id })),
       Command.resolve(RemoveChannel, Message.WroteAction())
+    )
+  })
+
+  it("fills a place's draft as it is read, unless the person began writing there, and empties it once sent", () => {
+    const draftsIn = (model: Model) =>
+      Option.map(groupIn(model), ({ draft, thread }) => ({
+        thread: draft,
+        reply: Option.flatMap(thread, ({ draft }) => draft)
+      }))
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedGroup({ groupId: general.id })),
+      message(Message.ClickedThread({ threadId: thread.id })),
+      model((model) => {
+        expect(draftsIn(model)).toEqual(Option.some({ thread: Option.none(), reply: Option.none() }))
+      }),
+      // The person wrote a reply before its draft was read: what they wrote stays.
+      message(Message.TypedReply({ text: "Sounds" })),
+      message(Message.GotDraft({ place: Drafts.Place.cases.Reply.make({ threadId: thread.id }), text: "Earlier" })),
+      message(Message.GotDraft({ place: Drafts.Place.cases.Thread.make({ groupId: general.id }), text: "Plans" })),
+      // A draft of a place no longer open is passed over.
+      message(Message.GotDraft({ place: Drafts.Place.cases.Thread.make({ groupId: design.id }), text: "Elsewhere" })),
+      model((model) => {
+        expect(draftsIn(model)).toEqual(Option.some({ thread: Option.some("Plans"), reply: Option.some("Sounds") }))
+      }),
+      message(Message.SubmittedReply()),
+      Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds" })),
+      Command.resolve(PostReply, Message.WroteAction()),
+      model((model) => {
+        expect(draftsIn(model)).toEqual(Option.some({ thread: Option.some("Plans"), reply: Option.some("") }))
+      })
     )
   })
 

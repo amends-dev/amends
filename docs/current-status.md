@@ -190,7 +190,8 @@ removing a connection, adding, setting up, and renaming an agent, and adding, mo
 a channel. Adding a connection,
 replacing its key, and checking it go over HTTP, since a key never enters an action. Each shows at
 once and is
-sent when the host can be reached, and a control shows only when the person's grants, read from
+sent when the host can be reached; what the person writes and has not sent stays a draft in their
+browser, which no other device sees; and a control shows only when the person's grants, read from
 their replica, allow it. A turn's log is followed over HTTP, so only while the host can be
 reached. The rest of a workspace is still worked in through the HTTP API. Beyond that:
 

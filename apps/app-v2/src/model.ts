@@ -116,14 +116,14 @@ export const Editing = Schema.Struct({ messageId: ThreadMessageId.ThreadMessageI
 export type Editing = typeof Editing.Type
 
 /**
- * The thread open in the group: its messages, the reply being written, the person's part in it, the
+ * The thread open in the group: its messages, the reply being written, once its draft is read, the person's part in it, the
  * sequence of its latest activity, how far they have read it and asked to, the title or message
  * being changed, the task it tracks, its agents' turns, and the turn whose log the person follows.
  */
 export const OpenThread = Schema.Struct({
   threadId: ThreadId.ThreadId,
   messages: Schema.Array(MessageItem),
-  draft: Schema.String,
+  draft: Schema.Option(Schema.String),
   following: Schema.Option(Following),
   latest: Schema.Int,
   readThrough: Schema.Int,
@@ -137,13 +137,13 @@ export const OpenThread = Schema.Struct({
 export type OpenThread = typeof OpenThread.Type
 
 /**
- * The group open in the workspace: its threads, the thread being started, the thread open in it,
+ * The group open in the workspace: its threads, the thread being started, once its draft is read, the thread open in it,
  * the name being given it, and the member chosen to admit to it, or none.
  */
 export const OpenGroup = Schema.Struct({
   groupId: GroupId.GroupId,
   threads: Schema.Array(ThreadItem),
-  draft: Schema.String,
+  draft: Schema.Option(Schema.String),
   thread: Schema.Option(OpenThread),
   renaming: Schema.Option(Schema.String),
   adding: Schema.Option(MemberId.MemberId)

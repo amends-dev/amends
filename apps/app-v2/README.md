@@ -21,7 +21,9 @@ with its system, and remove it; and the workspace's agents, where they add one, 
 starts with and how it is set up, on the harnesses, models, and sandboxes the connections give, and
 rename it or change its setup; and the workspace's channels, where they add one over a connection
 that gives channels, into a group they belong to, move one's conversations to come to another
-group, and remove one, and a channel's contacts are named on their messages. What they do shows at
+group, and remove one, and a channel's contacts are named on their messages. A reply or a new
+thread the person has not sent is kept as a draft in their browser, through a reload and offline,
+until they send it. What they do shows at
 once, marked as sending, even offline, and what the server refuses comes back with why. A control
 shows only when the person may use it.
 
@@ -70,7 +72,8 @@ that decides, and commands that act.
   closed when the person leaves it or signs out; what its replica holds as subscriptions, the
   groups, members, memberships, follows, and actions, the open group's threads, and the open
   thread's messages, task, and turns; the log of the turn the person follows, read over HTTP while
-  online, since no replica holds it; and the commands that write to it, an action each, and
+  online, since no replica holds it; the drafts of the places open, each read once its place opens
+  and kept from then on as it changes; and the commands that write to it, an action each, and
   dismissing a refused action.
 - `view.ts`: markup over `@foldkit/ui`'s headless components, with no styles yet, from the controls
   `controls.ts` shares; `connectionsView.ts` is the connections pane, whose settings fields
@@ -147,6 +150,9 @@ that decides, and commands that act.
   the remote anew: eventlog's remote asks for changes from the position it first asked from for as
   long as it lives, which after a drop the server answers with a reset, and a reset leaves out how
   the actions committed before it ended.
+- `sync/Drafts.ts` is the person's drafts in the store, a reply in a thread or a new thread in a
+  group, in an IndexedDB database of their own beside the replica, which no server or other
+  device sees; saves keep the order they were asked in.
 - `sync/SyncKey.ts` is the eventlog identity the browser syncs a person's stores with on a host,
   made the first time and kept in the browser's storage. `Store.forgetPerson` deletes a person's
   stores and that identity, as signing out does.
@@ -168,7 +174,8 @@ browser's storage:
   and again after it could not be, the connections, from listing the integrations through adding,
   renaming, configuring, replacing a key, checking, and removing one, the agents, adding one on a
   connection's model and changing and renaming one, the channels, adding one into a group the
-  person belongs to, moving, and removing one, and signing out.
+  person belongs to, moving, and removing one, a draft read into a place only while the person has
+  written nothing there and emptied once sent, and signing out.
 - Scene tests drive the view as a person does, from typing their address through a reply and a
   refused action to signing out, from joining a team through creating one, seeing it at once, and
   admitting and removing its members, and an owner managing the workspace's settings, then seeing
@@ -207,6 +214,7 @@ browser's storage:
   and its move shows at once. `Store.viewTurns` is
   tested apart: which turns may run again, and `settingsForm.ts`: the fields an integration's form
   gives, a draft from its defaults or a connection's settings, and the settings a draft makes, and
-  `agentSetup.ts`: an agent's draft, and the configuration a draft makes.
+  `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`' tests keep a
+  draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

@@ -1,6 +1,6 @@
 /**
- * A store open in the browser: one person's of one workspace, as eventlog keeps it, and the replica
- * its changes keep. Its event log journals into an IndexedDB database of its own. The actions the
+ * A store open in the browser: one person's of one workspace, as eventlog keeps it, the replica
+ * its changes keep, and the person's drafts there. Its event log journals into an IndexedDB database of its own. The actions the
  * person writes, `write`, are held in the replica as pending, with what each is expected to create,
  * until the server runs them; each `ReplicaChanged` the server writes back is applied to the
  * replica. The host's sync server is the log's remote, reached in the background once the browser's
@@ -51,6 +51,7 @@ import * as RpcClient from "effect/rpc/RpcClient"
 import * as Schedule from "effect/Schedule"
 import * as Stream from "effect/Stream"
 import * as Api from "../api.ts"
+import * as Drafts from "./Drafts.ts"
 import * as Pending from "./Pending.ts"
 import * as Replica from "./Replica.ts"
 import * as SyncKey from "./SyncKey.ts"
@@ -194,6 +195,10 @@ export class Store extends Context.Service<
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<ActionView>, QueryError>
     readonly dismiss: Replica.Replica["Service"]["dismiss"]
+    /** The person's draft at a place, which stays in this browser. */
+    readonly draft: Drafts.Drafts["Service"]["get"]
+    /** Keep the person's draft at a place, or forget it, given no text. */
+    readonly saveDraft: Drafts.Drafts["Service"]["save"]
   }
 >()("@amends-dev/app-v2/sync/Store") {}
 
@@ -329,6 +334,7 @@ export const layer = (options: Options) =>
         Store,
         Effect.gen(function* () {
           const replica = yield* Replica.Replica
+          const drafts = yield* Drafts.Drafts
           const untilFailed = <A, E>(stream: Stream.Stream<A, E>) =>
             Stream.interruptWhen(stream, Deferred.await(failed))
           const unfinished = Stream.mapEffect(replica.actions, (actions) => Pending.unfinished(actions, options))
@@ -439,13 +445,16 @@ export const layer = (options: Options) =>
                 )
               )
             ),
-            dismiss: replica.dismiss
+            dismiss: replica.dismiss,
+            draft: drafts.get,
+            saveDraft: drafts.save
           })
         })
       )
       return Layer.mergeAll(store, remote).pipe(
         Layer.provide(eventLog),
-        Layer.provide(Replica.layer(`${named}/replica`))
+        Layer.provide(Replica.layer(`${named}/replica`)),
+        Layer.provide(Drafts.layer(`${named}/drafts`))
       )
     })
   )
