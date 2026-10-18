@@ -7,9 +7,16 @@ import { ReplicaChange, ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { Member } from "@amends-dev/core/workspace"
-import { Accounts, Gateway, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway"
+import {
+  Accounts,
+  Gateway,
+  SignInStorage,
+  SyncStorage,
+  WorkspaceDirectory,
+  WorkspaceStorage
+} from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
-import { Context, Crypto, Effect, Layer, Option, Queue, Schema } from "effect"
+import { Context, Crypto, Effect, Layer, Queue, Schema } from "effect"
 import type * as Event from "effect/eventlog/Event"
 import type * as EventGroup from "effect/eventlog/EventGroup"
 import * as EventJournal from "effect/eventlog/EventJournal"
@@ -32,14 +39,15 @@ const decodeBatch = Schema.decodeEffect(replicaChanged.payloadSchemaBinary)
 
 /**
  * A gateway over memory storage with alice's workspace, the sync server over it, and an eventlog
- * client whose identity the host registered for alice.
+ * client whose key alice registered.
  */
 const connect = Effect.gen(function* () {
   const host = Layer.mergeAll(
     WorkspaceStorage.layerMemory,
     WorkspaceDirectory.layerMemory,
     Accounts.layerMemory,
-    SignInStorage.layerMemory
+    SignInStorage.layerMemory,
+    SyncStorage.layerMemory
   ).pipe(
     Layer.provide(MemoryDatabase.layerConnection),
     Layer.provide(MemoryDatabase.layer),
@@ -50,25 +58,14 @@ const connect = Effect.gen(function* () {
   )
   const gateway = Context.get(services, Gateway.Gateway)
   const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
-  const registered = new Map<string, Identity.HumanId>()
-  const signingKeys = new Map<string, Uint8Array<ArrayBuffer>>()
-  const server = SyncServer.layer({
-    remoteId: EventJournal.makeRemoteIdUnsafe(),
-    personOf: (publicKey) => Effect.succeed(Option.fromUndefinedOr(registered.get(publicKey))),
-    bindSigningKey: (publicKey, signingPublicKey) =>
-      Effect.sync(() => {
-        const bound = signingKeys.get(publicKey) ?? signingPublicKey
-        signingKeys.set(publicKey, bound)
-        return bound
-      })
-  }).pipe(Layer.provide(Layer.succeedContext(services)))
+  const server = SyncServer.layer.pipe(Layer.provide(Layer.succeedContext(services)))
   const client = yield* RpcTest.makeClient(EventLogMessage.EventLogRemoteRpcs).pipe(Effect.provide(server))
   const remote = yield* EventLogRemote.makeUnencrypted.pipe(
     Effect.provideService(EventLogRemote.EventLogRemoteClient, client),
     Effect.provide(EventLog.layerRegistry)
   )
   const identity = yield* EventLog.makeIdentity
-  registered.set(identity.publicKey, alice)
+  yield* Context.get(services, SyncStorage.SyncStorage).registerKey(identity.publicKey, alice)
   const storeId = EventLogMessage.StoreId.make(workspace.id)
   /** Write `payload` as the action `tag` of `group`, as alice's browser does. */
   const write = Effect.fnUntraced(function* (group: EventGroup.Any, tag: string, payload: unknown) {
@@ -96,7 +93,9 @@ const connect = Effect.gen(function* () {
       }
     })
   })
-  return { workspace, write, writeAgain, changesFrom }
+  /** Remove alice's key, as signing out does. */
+  const removeKey = Context.get(services, SyncStorage.SyncStorage).removeKey(identity.publicKey, alice)
+  return { workspace, remote, storeId, write, writeAgain, changesFrom, removeKey }
 })
 /** The records a batch carries, by key. */
 const keysIn = (batch: ReplicaChange.Batch) =>
@@ -200,6 +199,29 @@ describe("SyncServer", () => {
         expect(resumed.sequence).toBeGreaterThan(created.sequence)
         expect(resumed.batch.changes.some(ReplicaChange.ReplicaChange.isAnyOf(["Reset"]))).toBe(false)
         expect(reset.sequence).toBeLessThan(created.sequence)
+      })
+    )
+  )
+
+  it.effect("an identity no person registered, or one whose key was removed, opens no store", () =>
+    asBrowser(
+      Effect.gen(function* () {
+        const { workspace, remote, storeId, write, writeAgain, removeKey } = yield* connect
+        const created = yield* write(GroupSync.Actions, "TeamCreated", {
+          name: "Crew",
+          memberIds: [workspace.ownerMemberId]
+        })
+        const stranger = yield* EventLog.makeIdentity
+        // The client tries authenticating again before it gives up on the write.
+        expect(yield* Effect.flip(remote.write({ identity: stranger, storeId, entries: [created] }))).toMatchObject({
+          method: "write",
+          cause: { method: "authenticate", cause: { code: "Forbidden", message: "No person registered this identity" } }
+        })
+        yield* removeKey
+        expect(yield* Effect.flip(writeAgain(created))).toMatchObject({
+          method: "write",
+          cause: { cause: { code: "Forbidden", message: "No person registered this identity" } }
+        })
       })
     )
   )

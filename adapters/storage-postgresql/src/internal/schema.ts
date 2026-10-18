@@ -957,3 +957,26 @@ export const signInSessions = pgTable(
   },
   (table) => [index("sign_in_sessions_by_human").on(table.humanId)]
 )
+
+/**
+ * The remote ID browsers know the sync server over this database by: one row, made the first time
+ * a host reads it; outside every workspace, like the accounts.
+ */
+export const syncServer = pgTable(
+  "sync_server",
+  {
+    singleton: boolean("singleton").primaryKey().default(true),
+    remoteId: bytes("remote_id").notNull()
+  },
+  (table) => [check("sync_server_singleton", sql`${table.singleton}`)]
+)
+
+/**
+ * The keys people registered for their browsers, each with the signing key it first authenticated
+ * with; outside every workspace, like the accounts.
+ */
+export const syncKeys = pgTable("sync_keys", {
+  publicKey: text("public_key").primaryKey(),
+  humanId: text("human_id").notNull(),
+  signingPublicKey: bytes("signing_public_key")
+})

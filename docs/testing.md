@@ -277,8 +277,8 @@ differently. The gateway's own `test/conformance.test.ts` runs the suites over t
 implementation, in the `backend` project.
 
 The suites cover the journal, transactions, and standalone appends
-across hosts, session logs, idempotency keys, fact metadata, reads beside a writer, the direct
-store contracts, accounts, and sign-in storage. Every workflow the stores
+across hosts, session logs, idempotency keys, fact metadata, reads beside a writer, a member's
+replica, the direct store contracts, accounts, sign-in storage, and sync storage. Every workflow the stores
 serve, from workspaces and access to threads, notifications, turns, and channels, is tested in
 the gateway's tests over the memory implementation, as a host runs it.
 

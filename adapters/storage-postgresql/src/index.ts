@@ -55,6 +55,11 @@ export * as PostgresStorage from "./PostgresStorage.ts"
 /**
  * @since 0.1.0
  */
+export * as PostgresSyncStorage from "./PostgresSyncStorage.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as PostgresTurns from "./PostgresTurns.ts"
 
 /**

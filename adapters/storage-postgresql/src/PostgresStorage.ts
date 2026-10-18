@@ -1,7 +1,8 @@
 /**
  * The adapter in one layer: every gateway contract it implements over one connected database.
- * That is workspace storage, the workspace directory, the host's accounts, and sign-in storage. The host provides `PostgresDatabase.layer` and cryptography
- * beneath it, and the gateway above.
+ * That is workspace storage, the workspace directory, the host's accounts, sign-in storage, and sync
+ * storage. The host provides `PostgresDatabase.layer` and cryptography beneath it, and the gateway
+ * above.
  *
  * @since 0.1.0
  */
@@ -10,6 +11,7 @@ import * as Layer from "effect/Layer"
 import * as PostgresAccounts from "./PostgresAccounts.ts"
 import * as PostgresDirectory from "./PostgresDirectory.ts"
 import * as PostgresSignInStorage from "./PostgresSignInStorage.ts"
+import * as PostgresSyncStorage from "./PostgresSyncStorage.ts"
 import * as PostgresWorkspaceStorage from "./PostgresWorkspaceStorage.ts"
 
 /**
@@ -23,7 +25,7 @@ export type Options = PostgresWorkspaceStorage.Options
 
 /**
  * The gateway contracts this adapter implements, over one connected database: workspace
- * storage, the directory, the host's accounts, and sign-in storage.
+ * storage, the directory, the host's accounts, sign-in storage, and sync storage.
  * A host provides `PostgresDatabase.layer(config)` and cryptography beneath, and the gateway above.
  *
  * @category layers
@@ -34,5 +36,6 @@ export const layer = (options: Options = {}) =>
     PostgresWorkspaceStorage.layer(options),
     PostgresDirectory.layer,
     PostgresAccounts.layer,
-    PostgresSignInStorage.layer
+    PostgresSignInStorage.layer,
+    PostgresSyncStorage.layer
   )

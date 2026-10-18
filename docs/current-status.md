@@ -234,9 +234,14 @@ permissions, and custom roles, which a workspace would edit itself, are not impl
 Core follows each member's replica as the workspace changes (`ReplicaService.changes`, see core's
 [replica](../packages/core/README.md#replica)), and [`@amends-dev/sync`](../packages/sync/README.md)'s
 server runs the actions a browser writes and serves its replica as Effect eventlog's RPC handlers,
-but no host serves them yet: there is no WebSocket transport, and nowhere to register a browser's
-eventlog identity. Typing and presence are not implemented. A turn's log still streams over
-HTTP as its session log grows, without drafts of the step being written. Other gaps:
+opening a person's stores to the browser keys the gateway's `SyncStorage` keeps for them, but no
+host serves them yet: there is no WebSocket transport, and no endpoint registers a key. Typing and
+presence are not implemented. A turn's log still streams over HTTP as its session log grows,
+without drafts of the step being written. Other gaps:
+
+- Effect eventlog's server keeps the signing key it looked up for each key for as long as the
+  process runs, and a lookup that failed too: a key whose lookup failed once, as when storage could
+  not be reached, authenticates on that process again only after it restarts.
 
 - PostgreSQL wakes log readers, such as a turn log's, with `LISTEN`/`NOTIFY`, sent just after each
   commit rather than inside it, where the notification queue's lock would serialize every notifying

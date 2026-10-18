@@ -17,7 +17,7 @@ Gateway.layer().pipe(
 ```
 
 `PostgresStorage.layer(options)` provides the storage contract, the directory, the
-accounts, and the sign-in storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
+accounts, the sign-in storage, and the sync storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
@@ -35,12 +35,18 @@ a channel binding's conversation, and what a harness's agent returned of its ses
 leads its primary key with `workspace_id`, and each reference between tables carries the workspace,
 so a join that starts scoped stays scoped. Projection tables have no foreign keys to one another:
 each read model rebuilds alone, in any order, and core checks references when it publishes the facts
-they come from. The log's own tables keep theirs. Three tables span workspaces: `accounts`, the
+they come from. The log's own tables keep theirs. Five tables span workspaces: `accounts`, the
 host's people, a human ID for each lowercase address, which is unique; `sign_in_codes`, each
-address's pending code digest with its expiry, failed tries, and sends in the current window; and
-`sign_in_sessions`, each session by its token's digest, with its account's human ID, start, and end.
-`PostgresSignInStorage.modifyCode` reads, decides, and writes an address's code in one transaction
-holding an advisory lock keyed by the address, so changes to it take turns across processes. Tagged
+address's pending code digest with its expiry, failed tries, and sends in the current window;
+`sign_in_sessions`, each session by its token's digest, with its account's human ID, start, and end;
+`sync_server`, one row holding the remote ID browsers know the sync server by; and `sync_keys`, each
+key people registered for their browsers, with its person and the signing key it was first bound
+to. `PostgresSignInStorage.modifyCode` reads, decides, and writes an address's code in one
+transaction holding an advisory lock keyed by the address, so changes to it take turns across
+processes; `PostgresSyncStorage` changes a key in one statement each, and the first host to read the
+remote ID inserts the row. After restoring a backup, delete the `sync_server` row: the backup
+repeats positions browsers already hold, and a new remote ID has them start their stores over
+rather than skip what the repeated positions now carry. Tagged
 unions become a discriminator column plus the columns each case needs, with a check constraint that
 they agree.
 
@@ -262,8 +268,9 @@ for one workspace (`layerWorkspace`), its private `layerStores` registers each s
 `PostgresDatabase.ts` prepares the SQL client, `PostgresDirectory.ts` reads across workspaces,
 `internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener,
 `PostgresTurns.ts` and `PostgresReads.ts` are
-the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`
-and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
+the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`,
+`PostgresSignInStorage.ts`, and `PostgresSyncStorage.ts` keep the host's accounts, sign-in, and
+sync keys, and
 `PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the
 wakeup for the job requests commits store.
 Follow the [adapter conventions](../README.md).

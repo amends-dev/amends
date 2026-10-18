@@ -322,6 +322,18 @@ CREATE TABLE "sign_in_sessions" (
 	"expires_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "sync_keys" (
+	"public_key" text PRIMARY KEY,
+	"human_id" text NOT NULL,
+	"signing_public_key" bytea
+);
+--> statement-breakpoint
+CREATE TABLE "sync_server" (
+	"singleton" boolean PRIMARY KEY DEFAULT true,
+	"remote_id" bytea NOT NULL,
+	CONSTRAINT "sync_server_singleton" CHECK ("singleton")
+);
+--> statement-breakpoint
 CREATE TABLE "tasks" (
 	"workspace_id" text,
 	"thread_id" text,

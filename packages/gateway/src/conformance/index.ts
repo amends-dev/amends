@@ -20,6 +20,7 @@ import { journal } from "./internal/journal.ts"
 import { reads } from "./internal/reads.ts"
 import { replica } from "./internal/replica.ts"
 import { signInStorage } from "./internal/signInStorage.ts"
+import { syncStorage } from "./internal/syncStorage.ts"
 import { transactions } from "./internal/transactions.ts"
 import * as Support from "./Support.ts"
 
@@ -93,4 +94,5 @@ export const run = (fixture: Fixture.Fixture) => {
   contracts(fixture)
   accounts(fixture)
   signInStorage(fixture)
+  syncStorage(fixture)
 }

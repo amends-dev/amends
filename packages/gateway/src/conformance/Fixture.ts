@@ -13,6 +13,7 @@ import type * as Effect from "effect/Effect"
 import type * as Scope from "effect/Scope"
 import type * as Accounts from "../Accounts.ts"
 import type * as SignInStorage from "../SignInStorage.ts"
+import type * as SyncStorage from "../SyncStorage.ts"
 import type * as WorkspaceDirectory from "../WorkspaceDirectory.ts"
 import type * as WorkspaceStorage from "../WorkspaceStorage.ts"
 
@@ -28,6 +29,7 @@ export type Host =
   | WorkspaceDirectory.WorkspaceDirectory
   | Accounts.Accounts
   | SignInStorage.SignInStorage
+  | SyncStorage.SyncStorage
   | Crypto.Crypto
 
 /**

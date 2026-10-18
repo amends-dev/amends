@@ -32,7 +32,7 @@ provider runs against itself, and the code runtime the [toolkit](../packages/too
 ## Storage adapters
 
 The PostgreSQL adapter implements the gateway's workspace storage, the workspace directory,
-accounts, and sign-in storage, for the local host. It stores one column per record field,
+accounts, sign-in storage, and sync storage, for the local host. It stores one column per record field,
 except the kind-specific details of a thread activity or a session log entry, which it stores as
 JSON. The reference implementation of the same contracts, in process memory, lives beside the
 contracts, in [core](../packages/core/README.md#memory) and the
@@ -46,7 +46,7 @@ module per store, such as `ThreadMessages.ts`, and in memory, each contract's `l
 `PostgresWorkspaceStorage` builds those views on demand as `WorkspaceStorage.WorkspaceStorage`, as
 `WorkspaceStorage.layerMemory` does in memory. Database tables and migrations belong to the adapter;
 domain records and store contracts belong to core. `PostgresStorage.layer` composes workspace
-storage, the directory, the accounts, and sign-in storage, and leaves the database itself to the
+storage, the directory, the accounts, sign-in storage, and sync storage, and leaves the database itself to the
 host. The PostgreSQL
 adapter also keeps up the tables Effect Cluster stores its messages in, as `PostgresClusterStorage`,
 pruning those the host has handled.

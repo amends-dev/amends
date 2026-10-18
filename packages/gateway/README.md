@@ -103,12 +103,18 @@ directory reads projection tables directly.
   decision makes of it, one change to an address at a time, and sessions, each a
   `SignInStorage.Session` named by its token's digest, are inserted, found, extended, and
   deleted. Storage adapters implement it.
+- `SyncStorage.SyncStorage` keeps what the [sync](../sync/README.md) server shares across hosts:
+  the `remoteId` browsers know it by, made the first time it is read and kept for the storage's
+  life, and the keys people register for their browsers' eventlog identities. A key, a
+  `SyncStorage.PublicKey`, belongs to the person who registered it, and `registerKey` fails with
+  `SyncStorage.KeyTaken` for anyone else, until `removeKey` removes it; `bindSigningKey` binds it
+  to the first signing key any host binds. Storage adapters implement it.
 - `EmailSender.EmailSender` hands an `EmailSender.Message` to the host's email provider, failing
   with `EmailSender.Undelivered`.
 
 These span workspaces or issue credentials, which core never does, so hosts implement them, apart
 from sign-in and session tokens, which [email sign-in](#email-sign-in) implements. The `./Accounts`,
-`./SignIn`, and `./WorkspaceDirectory` exports carry their schemas for contracts. On the wire, a
+`./SignIn`, `./SyncStorage`, and `./WorkspaceDirectory` exports carry their schemas for contracts. On the wire, a
 membership's `activeMemberCount` is `people`.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
@@ -118,23 +124,24 @@ Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters
 
 Each host contract for storage has a `layerMemory` that implements it in process memory, over
 core's [memory storage](../core/README.md#memory): `WorkspaceStorage.layerMemory` over a
-`MemoryDatabase.Connection`, and the directory, accounts, and sign-in storage over the
-`MemoryDatabase` itself, with cryptography from the host for new human IDs. Merged over a new
-connection, they are one host; building them again over the same database is another host over the
-same storage, which is how tests of what several hosts do together run. Accounts, sign-in codes,
-and sessions are tables beside the workspaces' state, and a change to an address's code holds the
-address's lock across every host.
+`MemoryDatabase.Connection`, and the directory, accounts, sign-in storage, and sync storage over
+the `MemoryDatabase` itself, with cryptography from the host for new human IDs and the remote ID.
+Merged over a new connection, they are one host; building them again over the same database is
+another host over the same storage, which is how tests of what several hosts do together run.
+Accounts, sign-in codes, sessions, the remote ID, and sync keys are tables beside the workspaces'
+state, and a change to an address's code, or to a key, holds its lock across every host.
 
 ```ts
 import { MemoryDatabase } from "@amends-dev/core/journal"
-import { Accounts, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway"
+import { Accounts, SignInStorage, SyncStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway"
 import { Layer } from "effect"
 
 const storage = Layer.mergeAll(
   WorkspaceStorage.layerMemory,
   WorkspaceDirectory.layerMemory,
   Accounts.layerMemory,
-  SignInStorage.layerMemory
+  SignInStorage.layerMemory,
+  SyncStorage.layerMemory
 ).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provide(MemoryDatabase.layer))
 ```
 
@@ -153,8 +160,8 @@ store. An adapter's tests call `run` with a `Fixture`, by convention in its `tes
 `withStorage` gives the test a `Storage`:
 
 - `connect(options?)` opens another host over the same storage, with its own connection or pool,
-  closed with the test's scope: its storage, directory, accounts, and sign-in storage,
-  with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
+  closed with the test's scope: its storage, directory, accounts, sign-in storage, and sync
+  storage, with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
   would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
   keeping logs and what is kept outside the journal, as rebuilding projections does before replay.

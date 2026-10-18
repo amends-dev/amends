@@ -49,6 +49,11 @@ export * as SignInStorage from "./SignInStorage.ts"
 /**
  * @since 0.1.0
  */
+export * as SyncStorage from "./SyncStorage.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as WorkspaceDirectory from "./WorkspaceDirectory.ts"
 
 /**

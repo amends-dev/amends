@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "80c2fe9e-6008-497b-a0b0-58ad29f890fe",
+  "id": "b3c1a987-ff6a-4d4f-9e0b-65622d1eea19",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -165,6 +165,18 @@
     {
       "isRlsEnabled": false,
       "name": "sign_in_sessions",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "sync_keys",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "sync_server",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2854,6 +2866,71 @@
       "entityType": "columns",
       "schema": "public",
       "table": "sign_in_sessions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "public_key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sync_keys"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "human_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sync_keys"
+    },
+    {
+      "type": "bytea",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "signing_public_key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sync_keys"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "singleton",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sync_server"
+    },
+    {
+      "type": "bytea",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "remote_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "sync_server"
     },
     {
       "type": "text",
@@ -6213,6 +6290,26 @@
     },
     {
       "columns": [
+        "public_key"
+      ],
+      "nameExplicit": false,
+      "name": "sync_keys_pkey",
+      "schema": "public",
+      "table": "sync_keys",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "singleton"
+      ],
+      "nameExplicit": false,
+      "name": "sync_server_pkey",
+      "schema": "public",
+      "table": "sync_server",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
         "workspace_id"
       ],
       "nameExplicit": false,
@@ -6350,6 +6447,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "notifications"
+    },
+    {
+      "value": "\"singleton\"",
+      "name": "sync_server_singleton",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "sync_server"
     },
     {
       "value": "(\"created_by_kind\" = 'Member' AND \"created_by_member_id\" IS NOT NULL AND \"created_by_contact_id\" IS NULL) OR (\"created_by_kind\" = 'Contact' AND \"created_by_member_id\" IS NULL AND \"created_by_contact_id\" IS NOT NULL)",
