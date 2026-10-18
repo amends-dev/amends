@@ -35,6 +35,8 @@ export class ContactStore extends Context.Service<
   ContactStore,
   {
     readonly get: (id: Identity.ContactId) => Effect.Effect<Option.Option<Contact.Contact>, StoreError.StoreError>
+    /** Every contact in this workspace, in binary ID order. */
+    readonly list: Effect.Effect<ReadonlyArray<Contact.Contact>, StoreError.StoreError>
     /**
      * Several contacts in one read. Absent ids are omitted and each contact appears once; order is
      * unspecified, so callers index results by id. An empty request reads nothing.
@@ -64,6 +66,7 @@ export const make = (
   const write = StoreInput.write("ContactStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", Identity.ContactId, id), driver.get),
+    list: driver.list,
     getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Identity.ContactId), ids), driver.getMany),
     insert: (record) => Effect.flatMap(write("insert", Contact.Contact, record), driver.insert),
     update: (record) => Effect.flatMap(write("update", Contact.Contact, record), driver.update)
@@ -83,6 +86,10 @@ const makeMemory = Effect.fn("ContactStore.makeMemory")(function* () {
         return yield* rows.get((yield* read).records.of("contacts"), id)
       },
       Effect.mapError(StoreError.failed("ContactStore", "get"))
+    ),
+    list: Effect.flatMap(read, (space) => rows.all(space.records.of("contacts"))).pipe(
+      Effect.map((contacts) => contacts.toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))),
+      Effect.mapError(StoreError.failed("ContactStore", "list"))
     ),
     getMany: Effect.fn("ContactStore.memory.getMany")(
       function* (ids) {

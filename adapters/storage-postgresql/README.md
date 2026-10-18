@@ -96,7 +96,9 @@ Threads keep `latest_sequence` and `latest_activity_at` for their latest message
 newest activity first and `threads_by_start` newest start first, each from an exclusive row cursor;
 a stream page reads its threads' first activities through the `(thread_id, sequence)` index and
 counts their messages in one grouped query. A group or workspace departure ends every participation
-of the admission in one `UPDATE` through `participations_by_admission`.
+of the admission in one `UPDATE` through `participations_by_admission`, through which the replica
+also lists them. A replica's snapshot reads a thread's messages, turns, and deliveries in ID order
+through `thread_messages_by_thread`, `turns_by_thread`, and `channel_deliveries_by_thread`.
 
 ### Notifications and read state
 

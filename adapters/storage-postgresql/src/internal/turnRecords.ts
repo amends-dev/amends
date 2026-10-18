@@ -117,6 +117,18 @@ export const make = Effect.gen(function* () {
       },
       Effect.mapError(StoreError.failed("TurnStore", "get"))
     ),
+    listByThread: Effect.fn("TurnRecords.listByThread")(
+      function* (threadId) {
+        return yield* guard(
+          db
+            .select()
+            .from(turns)
+            .where(and(inWorkspace, eq(turns.threadId, threadId)))
+            .orderBy(sql`${turns.id} COLLATE "C"`)
+        ).pipe(Effect.flatMap(decode))
+      },
+      Effect.mapError(StoreError.failed("TurnStore", "listByThread"))
+    ),
     findActive: Effect.fn("TurnRecords.findActive")(
       function* (memberId, threadId) {
         return yield* guard(

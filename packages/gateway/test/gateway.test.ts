@@ -163,6 +163,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
       Context.add(ThreadMessageStore.ThreadMessageStore, {
         get: unexpected,
+        listByThread: unexpected,
         getMany: unexpected,
         countByThread: unexpected,
         insert: unexpected,
@@ -230,6 +231,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         TurnStore.TurnStore,
         TurnStore.TurnStore.of({
           get: unexpected,
+          listByThread: unexpected,
           findActive: unexpected,
           findLatest: unexpected,
           listActive: unexpected,
@@ -242,6 +244,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         RoleStore.RoleStore,
         RoleStore.RoleStore.of({
           get: unexpected,
+          list: unexpected(),
           insert: unexpected,
           rename: unexpected,
           setPermissions: unexpected,
@@ -274,12 +277,14 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
       Context.add(ContactStore.ContactStore, {
         get: unexpected,
+        list: unexpected(),
         getMany: unexpected,
         insert: unexpected,
         update: unexpected
       }),
       Context.add(DeliveryStore.DeliveryStore, {
         get: unexpected,
+        listByThread: unexpected,
         listRequestedByThread: unexpected,
         findByExternalMessage: unexpected,
         insert: unexpected,

@@ -182,8 +182,9 @@ describe("ReplicaVisibility", () => {
       expect(ReplicaVisibility.canSee(viewer(grant(GroupPermissions.Read)), places, group(open))).toBe(false)
       expect(ReplicaVisibility.canSee(reader, places, group(closed))).toBe(false)
       expect(ReplicaVisibility.canSee(reader, places, memberOf(closed))).toBe(false)
-      // Their own membership, even of a group they no longer see.
-      expect(ReplicaVisibility.canSee(viewer(), places, memberOf(closed, me))).toBe(true)
+      // Their own admission while they belong to the group, even without group.read; not once they left.
+      expect(ReplicaVisibility.canSee(viewer(), places, memberOf(mine, me))).toBe(true)
+      expect(ReplicaVisibility.canSee(viewer(), places, memberOf(closed, me))).toBe(false)
       // A group the workspace does not have is no one's.
       expect(ReplicaVisibility.canSee(reader, places, memberOf(GroupId.GroupId.make("missing")))).toBe(false)
     })

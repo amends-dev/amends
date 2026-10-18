@@ -40,6 +40,10 @@ export class TurnStore extends Context.Service<
   {
     /** The turn, if stored. */
     readonly get: (id: TurnId.TurnId) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>
+    /** Every turn of a thread, whatever its status, in binary ID order. */
+    readonly listByThread: (
+      threadId: ThreadId.ThreadId
+    ) => Effect.Effect<ReadonlyArray<Turn.Turn>, StoreError.StoreError>
     /** The agent's active turn on the thread: queued, running, or cancelling. */
     readonly findActive: (
       memberId: MemberId.MemberId,
@@ -84,6 +88,7 @@ export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: TurnStore["Se
   const write = StoreInput.write("TurnStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (id) => Effect.flatMap(read("get", TurnId.TurnId, id), driver.get),
+    listByThread: (threadId) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, threadId), driver.listByThread),
     findActive: Effect.fn("TurnStore.findActive")(function* (memberId, threadId) {
       return yield* driver.findActive(
         yield* read("findActive", MemberId.MemberId, memberId),
@@ -149,6 +154,14 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
         return yield* rows.get((yield* read).records.of("turns"), id)
       },
       Effect.mapError(StoreError.failed("TurnStore", "get"))
+    ),
+    listByThread: Effect.fn("TurnStore.memory.listByThread")(
+      function* (threadId) {
+        return (yield* rows.all((yield* read).records.of("turns")))
+          .filter((turn) => turn.threadId === threadId)
+          .toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))
+      },
+      Effect.mapError(StoreError.failed("TurnStore", "listByThread"))
     ),
     findActive: Effect.fn("TurnStore.memory.findActive")(function* (memberId, threadId) {
       const records = yield* ofAgent("findActive", memberId, threadId)

@@ -622,9 +622,11 @@ export const threadMessages = pgTable(
       sql`(${t.contentKind} = 'Text' AND ${t.text} IS NOT NULL AND ${t.mentions} IS NOT NULL AND ${t.revision} > 0 AND ${t.deletedAt} IS NULL) OR (${t.contentKind} = 'Deleted' AND ${t.text} IS NULL AND ${t.mentions} IS NULL AND ${t.revision} IS NULL AND ${t.editedAt} IS NULL AND ${t.deletedAt} IS NOT NULL)`
     ),
     // A thread's messages that still have text, counted per thread for reply counts.
-    index("thread_messages_by_thread")
+    index("text_messages_by_thread")
       .on(t.workspaceId, t.threadId)
-      .where(sql`${t.contentKind} = 'Text'`)
+      .where(sql`${t.contentKind} = 'Text'`),
+    // Every message of a thread, for a replica's snapshot.
+    index("thread_messages_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`)
   ]
 )
 /** A thread's task: its current status, priority, and assignee. A thread has at most one, keyed by it. */
@@ -792,6 +794,8 @@ export const channelDeliveries = pgTable(
     index("channel_deliveries_requested_by_thread")
       .on(t.workspaceId, t.threadId, t.sequence)
       .where(sql`${t.status} = 'requested'`),
+    // Every delivery of a thread, for a replica's snapshot.
+    index("channel_deliveries_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
     // The delivery that posted an external message, so that receiving it again is known as an echo.
     index("channel_deliveries_by_external_message").on(
       t.workspaceId,
@@ -883,6 +887,8 @@ export const turns = pgTable(
       .on(t.workspaceId, t.memberId, t.threadId)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
     index("turns_by_agent_thread").on(t.workspaceId, t.memberId, t.threadId, t.createdAt),
+    // Every turn of a thread, for a replica's snapshot.
+    index("turns_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
     index("active_turns")
       .on(t.workspaceId, t.createdAt)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),

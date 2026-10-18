@@ -172,6 +172,7 @@ by name, and a core or gateway over a host.
 | `idempotency`   | Keyed appends across reopening, content validation, rollback, byte ownership, concurrent attempts, and more keys than one statement binds.                                                |
 | `factMetadata`  | Fact names and subjects indexed and their versions and provenance kept across reopening, paged reads by either, retries that compare them, and publication refused for another workspace. |
 | `reads`         | Workspace reads while another host holds the writer.                                                                                                                                      |
+| `replica`       | A member's snapshot reading every kind of record they see, and a departure naming the participations it ended.                                                                            |
 | `contracts`     | Direct store calls: a conflict rolling back its transaction, IDs never reused, one active record per subject, timelines contiguous, and the live projections.                             |
 | `accounts`      | One account per address, however typed and from any host, concurrent first requests sharing one, and accounts read back by ID.                                                            |
 | `signInStorage` | An address's pending code replaced and removed one change at a time from every host, and sessions found, extended, and deleted.                                                           |

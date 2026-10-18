@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "175921f1-ec2d-46cf-a06f-7540a5b4dfda",
+  "id": "80c2fe9e-6008-497b-a0b0-58ad29f890fe",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -4230,6 +4230,41 @@
           "opclass": null
         },
         {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "channel_deliveries_by_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "channel_id",
           "isExpression": false,
           "asc": true,
@@ -5292,6 +5327,41 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
+      "name": "text_messages_by_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "thread_messages"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
       "name": "thread_messages_by_thread",
       "entityType": "indexes",
       "schema": "public",
@@ -5636,6 +5706,41 @@
       "method": "btree",
       "concurrently": false,
       "name": "turns_by_agent_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "turns"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "turns_by_thread",
       "entityType": "indexes",
       "schema": "public",
       "table": "turns"

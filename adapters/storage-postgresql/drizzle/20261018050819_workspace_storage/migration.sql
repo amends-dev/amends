@@ -464,6 +464,7 @@ CREATE INDEX "assignments_by_member" ON "assignments" ("workspace_id","member_id
 CREATE INDEX "assignments_by_role" ON "assignments" ("workspace_id","role_id","status");--> statement-breakpoint
 CREATE UNIQUE INDEX "channel_bindings_by_conversation" ON "channel_bindings" ("workspace_id","channel_id","conversation_id");--> statement-breakpoint
 CREATE INDEX "channel_deliveries_requested_by_thread" ON "channel_deliveries" ("workspace_id","thread_id","sequence") WHERE "status" = 'requested';--> statement-breakpoint
+CREATE INDEX "channel_deliveries_by_thread" ON "channel_deliveries" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "channel_deliveries_by_external_message" ON "channel_deliveries" ("workspace_id","channel_id","conversation_id","external_message_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_group_follow" ON "group_follows" ("workspace_id","group_membership_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "group_follows_by_group" ON "group_follows" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
@@ -492,7 +493,8 @@ CREATE INDEX "sign_in_sessions_by_human" ON "sign_in_sessions" ("human_id");--> 
 CREATE INDEX "tasks_by_group" ON "tasks" ("workspace_id","group_id","created_at","thread_id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_occurrence" ON "thread_activities" ("workspace_id","occurrence");--> statement-breakpoint
-CREATE INDEX "thread_messages_by_thread" ON "thread_messages" ("workspace_id","thread_id") WHERE "content_kind" = 'Text';--> statement-breakpoint
+CREATE INDEX "text_messages_by_thread" ON "thread_messages" ("workspace_id","thread_id") WHERE "content_kind" = 'Text';--> statement-breakpoint
+CREATE INDEX "thread_messages_by_thread" ON "thread_messages" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","participant_kind",coalesce("member_id", "identity_id", '')) WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "active_participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C") WHERE "status" = 'active';--> statement-breakpoint
@@ -502,6 +504,7 @@ CREATE INDEX "threads_by_start" ON "threads" ("workspace_id","group_id","created
 CREATE INDEX "threads_by_latest" ON "threads" ("workspace_id","group_id","latest_activity_at","id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_turn_by_agent_thread" ON "turns" ("workspace_id","member_id","thread_id") WHERE "status" IN ('queued', 'running', 'cancelling');--> statement-breakpoint
 CREATE INDEX "turns_by_agent_thread" ON "turns" ("workspace_id","member_id","thread_id","created_at");--> statement-breakpoint
+CREATE INDEX "turns_by_thread" ON "turns" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "active_turns" ON "turns" ("workspace_id","created_at") WHERE "status" IN ('queued', 'running', 'cancelling');--> statement-breakpoint
 ALTER TABLE "log_append_keys" ADD CONSTRAINT "log_append_keys_batch" FOREIGN KEY ("workspace_id","log_id","commit_id") REFERENCES "log_batches"("workspace_id","log_id","commit_id");--> statement-breakpoint
 ALTER TABLE "log_batches" ADD CONSTRAINT "log_batches_commit" FOREIGN KEY ("workspace_id","commit_id") REFERENCES "commits"("workspace_id","id");--> statement-breakpoint

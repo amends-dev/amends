@@ -46,6 +46,9 @@ export class RoleStore extends Context.Service<
     /** Find a role in this workspace; None if absent. */
     readonly get: (roleId: Role.RoleId) => Effect.Effect<Option.Option<Role.Role>, StoreError.StoreError>
 
+    /** Every role in this workspace, built in or created, in binary ID order. */
+    readonly list: Effect.Effect<ReadonlyArray<Role.Role>, StoreError.StoreError>
+
     /**
      * Insert a role. Reject a reused role ID. Never upsert.
      */
@@ -91,6 +94,7 @@ export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: RoleStore["Se
   const write = StoreInput.write("RoleStore", WorkspaceId.rejectForeign(workspaceId))
   return {
     get: (roleId) => Effect.flatMap(read("get", Role.RoleId, roleId), driver.get),
+    list: driver.list,
     insert: (record) => Effect.flatMap(write("insert", Role.Role, record), driver.insert),
     rename: Effect.fn("RoleStore.rename")(function* (roleId, name) {
       return yield* driver.rename(
@@ -137,6 +141,10 @@ const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
       Effect.flatMap(read, (space) => rows.get(space.records.of("roles"), id)).pipe(
         Effect.mapError(StoreError.failed("RoleStore", "get"))
       ),
+    list: Effect.flatMap(read, (space) => rows.all(space.records.of("roles"))).pipe(
+      Effect.map((roles) => roles.toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))),
+      Effect.mapError(StoreError.failed("RoleStore", "list"))
+    ),
     insert: Effect.fn("RoleStore.memory.insert")(
       function* (record) {
         const space = yield* write

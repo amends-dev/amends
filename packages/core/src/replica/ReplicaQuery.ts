@@ -19,12 +19,14 @@ import * as Layer from "effect/Layer"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as Stream from "effect/Stream"
 import * as Struct from "effect/Struct"
 import * as AgentReadiness from "../agent/AgentReadiness.ts"
 import * as AgentStore from "../agent/AgentStore.ts"
 import * as Assignment from "../authorization/Assignment.ts"
 import * as AssignmentStore from "../authorization/AssignmentStore.ts"
 import * as BuiltinRoles from "../authorization/BuiltinRoles.ts"
+import * as GrantResolver from "../authorization/GrantResolver.ts"
 import * as Role from "../authorization/Role.ts"
 import * as RoleStore from "../authorization/RoleStore.ts"
 import * as ChannelBindingStore from "../channel/ChannelBindingStore.ts"
@@ -36,6 +38,7 @@ import * as DeliveryStore from "../channel/DeliveryStore.ts"
 import type * as Connection from "../connection/Connection.ts"
 import * as ConnectionReadiness from "../connection/ConnectionReadiness.ts"
 import * as ConnectionStore from "../connection/ConnectionStore.ts"
+import type * as Group from "../group/Group.ts"
 import * as GroupFollow from "../group/GroupFollow.ts"
 import * as GroupFollowStore from "../group/GroupFollowStore.ts"
 import * as GroupId from "../group/GroupId.ts"
@@ -50,6 +53,7 @@ import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as ReadStateFacts from "../read-state/ReadStateFacts.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as TaskStore from "../task/TaskStore.ts"
+import type * as Thread from "../thread/Thread.ts"
 import * as ThreadActivity from "../thread/ThreadActivity.ts"
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"
 import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts"
@@ -68,6 +72,7 @@ import * as MemberStore from "../workspace/MemberStore.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as WorkspaceStore from "../workspace/WorkspaceStore.ts"
 import * as ReplicaRecord from "./ReplicaRecord.ts"
+import * as ReplicaVisibility from "./ReplicaVisibility.ts"
 
 /**
  * What the replica's reads fail with: storage, and a stored value or fact that does not decode.
@@ -94,6 +99,19 @@ export class ReplicaQuery extends Context.Service<
     readonly readRecords: (
       keys: ReadonlyArray<ReplicaRecord.Key>
     ) => Effect.Effect<ReadonlyArray<ReplicaRecord.ReplicaRecord>, Error>
+    /** A member's access now: their grants, and the groups they belong to. */
+    readonly viewerOf: (memberId: MemberId.MemberId) => Effect.Effect<ReplicaVisibility.Viewer, Error>
+    /** The groups and threads `records` belong to, as `ReplicaVisibility.canSee` asks for them. */
+    readonly placesOf: (
+      records: ReadonlyArray<ReplicaRecord.ReplicaRecord>
+    ) => Effect.Effect<ReplicaVisibility.Places, Error>
+    /**
+     * Every record `viewer` may see now, a group and a thread at a time: the workspace's own
+     * records, then each group they may see with what it holds, then their notifications. What has
+     * ended where a replica no longer reads it is left out: a revoked assignment, a removed
+     * connection or channel, and an ended follow.
+     */
+    readonly snapshot: (viewer: ReplicaVisibility.Viewer) => Stream.Stream<ReplicaRecord.ReplicaRecord, Error>
   }
 >()("@amends-dev/core/replica/ReplicaQuery") {}
 
@@ -139,6 +157,8 @@ export const make = Effect.gen(function* () {
   const deliveryStore = yield* DeliveryStore.DeliveryStore
   const contactStore = yield* ContactStore.ContactStore
   const integrations = yield* Integrations.Integrations
+  const grantResolver = yield* GrantResolver.GrantResolver
+  const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** A person's notifications are addressed to their membership; none for an agent or a missing member. */
   const personAsRecipient = Effect.fnUntraced(function* (memberId: MemberId.MemberId) {
@@ -373,11 +393,194 @@ export const make = Effect.gen(function* () {
     return records
   })
 
-  return ReplicaQuery.of({ keysChangedBy, readRecords })
+  const viewerOf = Effect.fn("ReplicaQuery.viewerOf")(function* (memberId: MemberId.MemberId) {
+    const grants = yield* grantResolver.resolve(memberId)
+    const admissions = yield* groupMembershipStore.listActiveByMember(memberId)
+    return { workspaceId, memberId, grants, groupIds: new Set(admissions.map(({ groupId }) => groupId)) }
+  })
+
+  /** Places over groups and threads already read. */
+  const placesFrom = (
+    groups: ReadonlyArray<Group.Group>,
+    threads: ReadonlyArray<{ readonly id: ThreadId.ThreadId; readonly groupId: GroupId.GroupId }>
+  ): ReplicaVisibility.Places => {
+    const groupsById = new Map(groups.map((group) => [group.id, group] as const))
+    const threadGroups = new Map(threads.map((thread) => [thread.id, thread.groupId] as const))
+    return { groupOf: (id) => groupsById.get(id), threadGroupOf: (id) => threadGroups.get(id) }
+  }
+
+  const placesOf = Effect.fn("ReplicaQuery.placesOf")(function* (records: ReadonlyArray<ReplicaRecord.ReplicaRecord>) {
+    const groupIds = new Set<GroupId.GroupId>()
+    const threadIds = new Set<ThreadId.ThreadId>()
+    const { isAnyOf } = ReplicaRecord.ReplicaRecord
+    for (const record of records) {
+      if (isAnyOf(["Group"])(record)) groupIds.add(record.value.id)
+      else if (isAnyOf(["GroupMembership", "GroupFollow"])(record)) groupIds.add(record.value.groupId)
+      else if (isAnyOf(["Thread"])(record)) threadIds.add(record.value.id)
+      else if (
+        isAnyOf([
+          "ThreadActivity",
+          "ThreadMessage",
+          "ThreadParticipation",
+          "Task",
+          "Turn",
+          "ChannelBinding",
+          "Delivery"
+        ])(record)
+      )
+        threadIds.add(record.value.threadId)
+    }
+    return placesFrom(yield* groupStore.getMany([...groupIds]), yield* threadStore.getMany([...threadIds]))
+  })
+
+  /** Connections and agents as a replica holds them, with how ready each is now. */
+  const readConnectionsAndAgents = Effect.gen(function* () {
+    const connections = yield* connectionStore.listActive
+    const agents = yield* agentStore.list
+    return [
+      ...(yield* Effect.forEach(connections, withReadiness)),
+      ...(yield* Effect.forEach(agents, (agent) =>
+        Effect.map(AgentReadiness.issuesOf(agent, connections, integrations), (issues) =>
+          ReplicaRecord.ReplicaRecord.cases.Agent.make({
+            value: Object.assign({}, agent, { readiness: AgentReadiness.readinessOf(issues) })
+          })
+        )
+      ))
+    ]
+  })
+
+  /** The records of the workspace itself, rather than of a group or a thread. */
+  const readWorkspaceRecords = Effect.gen(function* () {
+    const { cases } = ReplicaRecord.ReplicaRecord
+    const members = yield* memberStore.list
+    return [
+      ...Option.toArray(yield* workspaceStore.get).map((value) => cases.Workspace.make({ value })),
+      ...members.map((value) => cases.Member.make({ value })),
+      ...(yield* roleStore.list).map((value) => cases.Role.make({ value })),
+      ...(yield* Effect.forEach(members, ({ id }) => assignmentStore.listActiveByMember(id))).flatMap((assignments) =>
+        assignments.map((value) => cases.Assignment.make({ value }))
+      ),
+      ...(yield* invitationStore.list).map((value) => cases.Invitation.make({ value })),
+      ...(yield* contactStore.list).map((value) => cases.Contact.make({ value })),
+      ...(yield* channelStore.listActive).map((value) => cases.Channel.make({ value })),
+      ...(yield* readConnectionsAndAgents)
+    ]
+  })
+
+  /** The groups `viewer` may see: those they belong to, and the public teams. */
+  const readVisibleGroups = Effect.fnUntraced(function* (viewer: ReplicaVisibility.Viewer) {
+    const publicTeams: Array<Group.Group> = []
+    let after: GroupId.GroupId | undefined
+    while (true) {
+      const page = yield* groupStore.pagePublic(after === undefined ? { limit: 100 } : { after, limit: 100 })
+      publicTeams.push(...page)
+      const last = page.at(-1)
+      if (last === undefined || page.length < 100) break
+      after = last.id
+    }
+    const theirs = yield* groupStore.getMany([...viewer.groupIds])
+    const groups = new Map([...publicTeams, ...theirs].map((group) => [group.id, group] as const))
+    const places = placesFrom([...groups.values()], [])
+    return [...groups.values()].filter((value) =>
+      ReplicaVisibility.canSee(viewer, places, ReplicaRecord.ReplicaRecord.cases.Group.make({ value }))
+    )
+  })
+
+  /** A group the viewer may see: its record, its admissions, and their own follow of it and read time. */
+  const readGroupRecords = Effect.fnUntraced(function* (viewer: ReplicaVisibility.Viewer, group: Group.Group) {
+    const { cases } = ReplicaRecord.ReplicaRecord
+    const memberships = yield* groupMembershipStore.listByGroup(group.id)
+    const own = memberships.find(
+      (membership) => membership.memberId === viewer.memberId && membership.status === "active"
+    )
+    const follow =
+      own === undefined ? Option.none<GroupFollow.GroupFollow>() : yield* groupFollowStore.findActive(own.id)
+    return [
+      cases.Group.make({ value: group }),
+      ...memberships.map((value) => cases.GroupMembership.make({ value })),
+      ...Option.toArray(follow).map((value) => cases.GroupFollow.make({ value })),
+      ...(yield* readStateStore.getGroupReads(viewer.memberId, [group.id])).map((value) =>
+        cases.GroupRead.make({ value })
+      )
+    ]
+  })
+
+  /** A thread the viewer may see, with everything in it and how far they read it. */
+  const readThreadRecords = Effect.fnUntraced(function* (viewer: ReplicaVisibility.Viewer, thread: Thread.Thread) {
+    const { cases } = ReplicaRecord.ReplicaRecord
+    return [
+      cases.Thread.make({ value: thread }),
+      ...(yield* threadActivityStore.listByThread(thread.id)).map((value) => cases.ThreadActivity.make({ value })),
+      ...(yield* threadMessageStore.listByThread(thread.id)).map((value) => cases.ThreadMessage.make({ value })),
+      ...(yield* threadParticipationStore.listByThread(thread.id)).map((value) =>
+        cases.ThreadParticipation.make({ value })
+      ),
+      ...Option.toArray(yield* taskStore.get(thread.id)).map((value) => cases.Task.make({ value })),
+      ...(yield* turnStore.listByThread(thread.id)).map((value) =>
+        cases.Turn.make({ value: Struct.omit(value, ["logAfter"]) })
+      ),
+      ...Option.toArray(yield* channelBindingStore.get(thread.id)).map((value) => cases.ChannelBinding.make({ value })),
+      ...(yield* deliveryStore.listByThread(thread.id)).map((value) => cases.Delivery.make({ value })),
+      ...(yield* readStateStore.getThreadPositions(viewer.memberId, [thread.id])).map((value) =>
+        cases.ThreadPosition.make({ value })
+      )
+    ]
+  })
+
+  /** The viewer's own notifications, newest first, a page at a time. */
+  const readNotifications = (viewer: ReplicaVisibility.Viewer) =>
+    Stream.unwrap(
+      Effect.map(personAsRecipient(viewer.memberId), (recipient) =>
+        Option.isNone(recipient)
+          ? Stream.empty
+          : Stream.paginate(Option.none<NotificationStore.Cursor>(), (before) =>
+              Effect.map(
+                notificationStore.listLatestByRecipient(
+                  recipient.value,
+                  Option.isNone(before) ? { limit: inboxPage } : { limit: inboxPage, before: before.value }
+                ),
+                (page) => {
+                  const last = page.at(-1)
+                  const records = page.map((value) => ReplicaRecord.ReplicaRecord.cases.Notification.make({ value }))
+                  return [
+                    records,
+                    last === undefined || page.length < inboxPage
+                      ? Option.none<Option.Option<NotificationStore.Cursor>>()
+                      : Option.some(Option.some({ recordedAt: last.recordedAt, id: last.id }))
+                  ] as const
+                }
+              )
+            )
+      )
+    )
+
+  const snapshot = (viewer: ReplicaVisibility.Viewer): Stream.Stream<ReplicaRecord.ReplicaRecord, Error> => {
+    const visible = (places: ReplicaVisibility.Places) => (records: ReadonlyArray<ReplicaRecord.ReplicaRecord>) =>
+      records.filter((record) => ReplicaVisibility.canSee(viewer, places, record))
+    const workspaceRecords = Stream.fromIterableEffect(Effect.map(readWorkspaceRecords, visible(placesFrom([], []))))
+    const groupRecords = Stream.fromIterableEffect(readVisibleGroups(viewer)).pipe(
+      Stream.flatMap((group) =>
+        Stream.concat(
+          Stream.fromIterableEffect(Effect.map(readGroupRecords(viewer, group), visible(placesFrom([group], [])))),
+          Stream.fromIterableEffect(threadStore.listByGroup(group.id)).pipe(
+            Stream.flatMap((thread) =>
+              Stream.fromIterableEffect(
+                Effect.map(readThreadRecords(viewer, thread), visible(placesFrom([group], [thread])))
+              )
+            )
+          )
+        )
+      )
+    )
+    return Stream.concat(Stream.concat(workspaceRecords, groupRecords), readNotifications(viewer))
+  }
+
+  return ReplicaQuery.of({ keysChangedBy, readRecords, viewerOf, placesOf, snapshot })
 })
 
 /**
- * Provide the replica's reads over the workspace's stores and the host's integrations.
+ * Provide the replica's reads over the workspace's stores, grant resolution, and the host's
+ * integrations.
  *
  * @category layers
  * @since 0.1.0

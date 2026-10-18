@@ -11,7 +11,7 @@
 
 import { ThreadMessage, ThreadMessageStore, type ThreadMessageId } from "@amends-dev/core/thread"
 import { StoreError } from "@amends-dev/log"
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -167,6 +167,18 @@ export const make = Effect.gen(function* () {
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
       Effect.mapError(StoreError.failed("ThreadMessageStore", "get"))
+    ),
+    listByThread: Effect.fn("ThreadMessages.listByThread")(
+      function* (threadId) {
+        return yield* guard(
+          db
+            .select()
+            .from(threadMessages)
+            .where(and(inWorkspace, eq(threadMessages.threadId, threadId)))
+            .orderBy(sql`${threadMessages.id} COLLATE "C"`)
+        ).pipe(Effect.flatMap(decodeRows))
+      },
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "listByThread"))
     ),
     getMany: Effect.fn("ThreadMessages.getMany")(
       function* (ids) {
