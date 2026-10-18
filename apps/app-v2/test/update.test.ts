@@ -1,16 +1,19 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
+import { Task } from "@amends-dev/core/task"
 import { ThreadParticipationId } from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
 import { Invitation, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
-import { Option } from "effect"
+import { DateTime, Option } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
 import { Message } from "../src/message.ts"
-import { type Model, Page, Pane, SignInForm, StoreState, Workspaces } from "../src/model.ts"
+import { LogState, type Model, Page, Pane, SignInForm, StoreState, Workspaces } from "../src/model.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  CreateTask,
   CreateTeam,
   DeleteMessage,
   EditMessage,
@@ -29,12 +32,15 @@ import {
   RenameSelf,
   RenameThread,
   RenameWorkspace,
+  RetryTurn,
   RevokeInvitation,
   StartDirect,
   StartThread,
+  StopTurn,
   TransferOwnership,
   UnfollowGroup,
-  UnfollowThread
+  UnfollowThread,
+  UpdateTask
 } from "../src/store.ts"
 import { update } from "../src/update.ts"
 import {
@@ -54,7 +60,9 @@ import {
   session,
   signedIn,
   signedOut,
-  thread
+  task,
+  thread,
+  turnOf
 } from "./fixtures.ts"
 
 describe("signing in", () => {
@@ -133,6 +141,9 @@ const groupIn = (model: Model) =>
     )
   )
 
+/** The thread open in it, if any. */
+const threadIn = (model: Model) => Option.flatMap(groupIn(model), ({ thread }) => thread)
+
 describe("a workspace", () => {
   it("opens with its store, then a group, a thread, and a reply written to the store", () => {
     story(
@@ -151,7 +162,7 @@ describe("a workspace", () => {
       message(
         Message.GotThreads({
           groupId: general.id,
-          threads: [{ thread, opening: Option.some(opening), pending: false, unread: 0 }]
+          threads: [{ thread, opening: Option.some(opening), task: Option.none(), pending: false, unread: 0 }]
         })
       ),
       message(Message.ClickedThread({ threadId: thread.id })),
@@ -161,7 +172,9 @@ describe("a workspace", () => {
           messages: [{ message: opening, pending: false }],
           following: Option.none(),
           latest: 0,
-          readThrough: 0
+          readThrough: 0,
+          task: Option.none(),
+          turns: []
         })
       ),
       message(Message.TypedReply({ text: "Sounds good" })),
@@ -195,7 +208,7 @@ describe("a workspace", () => {
       message(
         Message.GotThreads({
           groupId: GroupId.GroupId.make("other"),
-          threads: [{ thread, opening: Option.none(), pending: true, unread: 0 }]
+          threads: [{ thread, opening: Option.none(), task: Option.none(), pending: true, unread: 0 }]
         })
       ),
       message(Message.TypedThread({ text: "Plans for the week" })),
@@ -223,7 +236,9 @@ describe("a workspace", () => {
           messages: [{ message: opening, pending: false }],
           following: Option.some({ participationId, active, pending: false }),
           latest,
-          readThrough
+          readThrough,
+          task: Option.none(),
+          turns: []
         })
       )
     story(
@@ -236,7 +251,7 @@ describe("a workspace", () => {
       message(
         Message.GotThreads({
           groupId: general.id,
-          threads: [{ thread, opening: Option.some(opening), pending: false, unread: 2 }]
+          threads: [{ thread, opening: Option.some(opening), task: Option.none(), pending: false, unread: 2 }]
         })
       ),
       message(Message.ClickedThread({ threadId: thread.id })),
@@ -479,6 +494,127 @@ describe("a workspace", () => {
             thread: Option.map(thread, ({ threadId }) => threadId)
           }))
         ).toEqual(Option.some({ groupId: general.id, thread: Option.some(thread.id) }))
+      })
+    )
+  })
+
+  it("makes a thread a task and changes it from what was seen, and stops and retries its turns", () => {
+    const running = turnOf("turn-1", "running")
+    const failed = turnOf("turn-2", "failed")
+    const got = (taskOf: Option.Option<typeof task>) =>
+      message(
+        Message.GotThread({
+          threadId: thread.id,
+          messages: [{ message: opening, pending: false }],
+          following: Option.none(),
+          latest: 0,
+          readThrough: 0,
+          task: Option.map(taskOf, (value) => ({ task: value, pending: false })),
+          turns: [
+            { turn: running, pending: false, retryOpen: false },
+            { turn: failed, pending: false, retryOpen: true }
+          ]
+        })
+      )
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedGroup({ groupId: general.id })),
+      message(Message.ClickedThread({ threadId: thread.id })),
+      got(Option.none()),
+      message(Message.ClickedMakeTask()),
+      Command.expectExact(CreateTask({ threadId: thread.id })),
+      Command.resolve(CreateTask, Message.WroteAction()),
+      got(Option.some(task)),
+      message(Message.ChoseTaskStatus({ status: "doing" })),
+      Command.expectExact(
+        UpdateTask({ threadId: thread.id, change: Task.Change.cases.Status.make({ from: "triage", to: "doing" }) })
+      ),
+      Command.resolve(UpdateTask, Message.WroteAction()),
+      // Choosing what the task already is changes nothing.
+      message(Message.ChoseTaskPriority({ priority: "none" })),
+      message(Message.ChoseTaskAssignee({ memberId: Option.some(bob.id) })),
+      Command.expectExact(
+        UpdateTask({ threadId: thread.id, change: Task.Change.cases.Assignee.make({ from: null, to: bob.id }) })
+      ),
+      Command.resolve(UpdateTask, Message.WroteAction()),
+      message(Message.ClickedStopTurn({ turnId: running.id })),
+      Command.expectExact(StopTurn({ turnId: running.id })),
+      Command.resolve(StopTurn, Message.WroteAction()),
+      message(Message.ClickedRetryTurn({ turnId: failed.id })),
+      Command.expectExact(RetryTurn({ turnId: failed.id })),
+      Command.resolve(RetryTurn, Message.WroteAction()),
+      model((model) => {
+        expect(Option.flatMap(threadIn(model), ({ task }) => task)).toEqual(Option.some({ task, pending: false }))
+        expect(Option.map(threadIn(model), ({ turns }) => turns.length)).toEqual(Option.some(2))
+      })
+    )
+  })
+
+  it("follows a turn's log as it is written, until the turn ends, and again after it could not be followed", () => {
+    const turnId = turnOf("turn-1", "running").id
+    const taken = Turn.LogItem.cases.InputTaken.make({ at: DateTime.makeUnsafe("2026-10-18T12:02:01Z"), messages: 1 })
+    const writing = (text: string, reply: boolean) =>
+      Turn.LogItem.cases.Responded.make({
+        at: DateTime.makeUnsafe("2026-10-18T12:02:02Z"),
+        responseId: "response-1",
+        text,
+        parts: [0],
+        reply
+      })
+    const logIn = (model: Model) => Option.flatMap(threadIn(model), ({ log }) => log)
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedGroup({ groupId: general.id })),
+      message(Message.ClickedThread({ threadId: thread.id })),
+      message(Message.ClickedShowLog({ turnId })),
+      message(Message.FailedFollowLog({ turnId, error: "The log could not be followed. Check the connection." })),
+      model((model) => {
+        expect(Option.map(logIn(model), ({ state }) => state)).toEqual(
+          Option.some(LogState.Failed({ error: "The log could not be followed. Check the connection." }))
+        )
+      }),
+      // Trying again opens it anew.
+      message(Message.ClickedShowLog({ turnId })),
+      message(Message.GotTurnLog({ turnId, message: Turn.LogMessage.cases.Opened.make({ items: [taken] }) })),
+      message(
+        Message.GotTurnLog({
+          turnId,
+          message: Turn.LogMessage.cases.Changed.make({ changes: [{ index: 1, item: writing("Look", false) }] })
+        })
+      ),
+      message(
+        Message.GotTurnLog({
+          turnId,
+          message: Turn.LogMessage.cases.Changed.make({ changes: [{ index: 1, item: writing("Looks good.", true) }] })
+        })
+      ),
+      // A log the person no longer follows is passed over.
+      message(
+        Message.GotTurnLog({
+          turnId: turnOf("turn-9", "running").id,
+          message: Turn.LogMessage.cases.Ended.make({})
+        })
+      ),
+      model((model) => {
+        expect(logIn(model)).toEqual(
+          Option.some({ turnId, items: [taken, writing("Looks good.", true)], state: LogState.Open() })
+        )
+      }),
+      message(Message.GotTurnLog({ turnId, message: Turn.LogMessage.cases.Ended.make({}) })),
+      model((model) => {
+        expect(Option.map(logIn(model), ({ state }) => state)).toEqual(Option.some(LogState.Ended()))
+      }),
+      message(Message.ClickedHideLog()),
+      model((model) => {
+        expect(logIn(model)).toEqual(Option.none())
       })
     )
   })

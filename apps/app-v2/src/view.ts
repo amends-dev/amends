@@ -1,17 +1,21 @@
 /**
  * What the person sees: signing in, their workspaces, and the open workspace: the groups they
- * belong to and the teams they may join, a group's members and threads, a thread's messages, and
- * the workspace's settings, with what the person started or changed shown at once, marked as
+ * belong to and the teams they may join, a group's members and threads, a thread's messages, the
+ * task it tracks, and its agents' turns with their logs, and the workspace's settings, with what
+ * the person started or changed shown at once, marked as
  * sending until the server has it, and what the server refused, with why. A control shows only
  * when the person may use it. Markup only: the headless components from `@foldkit/ui` give each
  * control its attributes, and no styles yet.
  */
 
+import { AgentPermissions } from "@amends-dev/core/agent"
 import { AssignmentPermissions, BuiltinRoles, type Role, Target } from "@amends-dev/core/authorization"
 import { Group, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
+import { Task, TaskPermissions } from "@amends-dev/core/task"
 import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
 import {
   Invitation,
   InvitationPermissions,
@@ -35,6 +39,7 @@ import {
   type Following,
   type GroupItem,
   type InboxItem,
+  LogState,
   type MessageItem,
   type Model,
   type OpenGroup,
@@ -46,9 +51,11 @@ import {
   SignInForm,
   StoreState,
   type ThreadItem,
+  type TurnItem,
+  type TurnLog,
   Workspaces
 } from "./model.ts"
-import { givableRoles, isOwner, may, mayActOn, workspaceRolesOf } from "./permissions.ts"
+import { givableRoles, isOwner, may, mayActOn, permits, workspaceRolesOf } from "./permissions.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
 
@@ -235,12 +242,13 @@ const actionsView = (actions: ReadonlyArray<ActionItem>, notice: Option.Option<s
 const button = (h: HtmlBuilder<Message>, label: string, onClick: Message) =>
   Button.view({ onClick, toView: (attributes) => h.button(attributes.button, [label]) }, h)
 
-/** A choice of one of `members`, or none. */
+/** A choice of one of `members`, or none, as `none` reads. */
 const memberSelect = (
   h: HtmlBuilder<Message>,
   config: Readonly<{
     id: string
     label: string
+    none: string
     members: ReadonlyArray<Member.Member>
     value: Option.Option<Member.Member["id"]>
     onChange: (memberId: Option.Option<Member.Member["id"]>) => Message
@@ -258,9 +266,40 @@ const memberSelect = (
           [
             h.label(attributes.label, [config.label]),
             h.select(attributes.select, [
-              h.option([h.Value("")], ["Choose a member"]),
+              h.option([h.Value("")], [config.none]),
               ...config.members.map((member) => h.option([h.Value(member.id)], [member.name]))
             ])
+          ]
+        )
+    },
+    h
+  )
+
+/** A choice of one of `choices`, each a value and how the person reads it. */
+const choiceSelect = <A extends string>(
+  h: HtmlBuilder<Message>,
+  config: Readonly<{
+    id: string
+    label: string
+    choices: ReadonlyArray<readonly [A, string]>
+    value: A
+    onChange: (value: A) => Message
+  }>
+) =>
+  Select.view(
+    {
+      id: config.id,
+      value: config.value,
+      onChange: (value) => config.onChange(config.choices.find(([choice]) => choice === value)?.[0] ?? config.value),
+      toView: (attributes) =>
+        h.div(
+          [],
+          [
+            h.label(attributes.label, [config.label]),
+            h.select(
+              attributes.select,
+              config.choices.map(([choice, label]) => h.option([h.Value(choice)], [label]))
+            )
           ]
         )
     },
@@ -279,6 +318,10 @@ const workspaceTarget = (opened: Opened) => Target.Reference.cases.Workspace.mak
 /** The group `groupId` as a target of the permissions that act on it. */
 const groupTarget = (opened: Opened, groupId: Group.Group["id"]) =>
   Target.Reference.cases.Group.make({ workspaceId: opened.workspace.id, groupId })
+
+/** The thread `threadId` as a target of the permissions that act on it. */
+const threadTarget = (opened: Opened, threadId: Thread.Thread["id"]) =>
+  Target.Reference.cases.Thread.make({ workspaceId: opened.workspace.id, threadId })
 
 /** The groups the person belongs to, the teams they may join, and starting a team or a conversation. */
 const groupsView = (opened: Opened, h: HtmlBuilder<Message>): Html => {
@@ -368,6 +411,7 @@ const composingView = (composing: Composing, opened: Opened, h: HtmlBuilder<Mess
           memberSelect(h, {
             id: "direct-member",
             label: "With",
+            none: "Choose a member",
             members: othersIn(opened),
             value: memberId,
             onChange: (memberId) => Message.ChoseDirectMember({ memberId })
@@ -490,6 +534,7 @@ const membersView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>):
               memberSelect(h, {
                 id: "add-member",
                 label: "Add a member",
+                none: "Choose a member",
                 members: admissible,
                 value: group.adding,
                 onChange: (memberId) => Message.ChoseGroupMemberToAdd({ memberId })
@@ -593,6 +638,194 @@ const messageView = (
   )
 }
 
+const statusLabels: Readonly<Record<Task.Status, string>> = {
+  triage: "Triage",
+  todo: "To do",
+  doing: "Doing",
+  held: "On hold",
+  done: "Done",
+  dismissed: "Dismissed"
+}
+
+const priorityLabels: Readonly<Record<Task.Priority, string>> = {
+  none: "No priority",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent"
+}
+
+/**
+ * Whom the person may assign a task in `groupId` to: the group's members, and among them only the
+ * agents the person may direct, since assigning one directs it.
+ */
+const assignableIn = (opened: Opened, groupId: Group.Group["id"]) =>
+  opened.members
+    .map(({ member }) => member)
+    .filter(
+      (member) =>
+        member.status === "active" &&
+        opened.memberships.some(
+          ({ membership }) =>
+            membership.groupId === groupId && membership.memberId === member.id && membership.status === "active"
+        ) &&
+        (Identity.MemberReference.isAnyOf(["Human"])(member.identity) ||
+          may(
+            opened,
+            AgentPermissions.Use,
+            Target.Reference.cases.Member.make({ workspaceId: opened.workspace.id, memberId: member.id })
+          ))
+    )
+
+/**
+ * The task the thread tracks: its status, priority, and assignee, which the person changes when they
+ * may; or, while it tracks none, making it one, when they may create tasks in its group.
+ */
+const taskView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html =>
+  Option.match(thread.task, {
+    onNone: () =>
+      may(opened, TaskPermissions.Create, groupTarget(opened, group.groupId))
+        ? button(h, "Make it a task", Message.ClickedMakeTask())
+        : h.empty,
+    onSome: ({ task, pending }) =>
+      h.section(
+        [h.AriaLabel("Task")],
+        [
+          h.p([], [h.strong([], ["Task"]), sending(pending, h)]),
+          may(opened, TaskPermissions.Update, threadTarget(opened, thread.threadId))
+            ? h.div(
+                [],
+                [
+                  choiceSelect(h, {
+                    id: "task-status",
+                    label: "Status",
+                    choices: Task.Status.literals.map((status) => [status, statusLabels[status]] as const),
+                    value: task.status,
+                    onChange: (status) => Message.ChoseTaskStatus({ status })
+                  }),
+                  choiceSelect(h, {
+                    id: "task-priority",
+                    label: "Priority",
+                    choices: Task.Priority.literals.map((priority) => [priority, priorityLabels[priority]] as const),
+                    value: task.priority,
+                    onChange: (priority) => Message.ChoseTaskPriority({ priority })
+                  }),
+                  memberSelect(h, {
+                    id: "task-assignee",
+                    label: "Assignee",
+                    none: "No one",
+                    members: assignableIn(opened, group.groupId),
+                    value: Option.fromNullOr(task.assignee),
+                    onChange: (memberId) => Message.ChoseTaskAssignee({ memberId })
+                  })
+                ]
+              )
+            : h.p(
+                [],
+                [
+                  [
+                    statusLabels[task.status],
+                    priorityLabels[task.priority],
+                    task.assignee === null ? "Assigned to no one" : `Assigned to ${memberName(task.assignee, opened)}`
+                  ].join(" · ")
+                ]
+              )
+        ]
+      )
+  })
+
+const turnStatusLabels: Readonly<Record<Turn.Status, string>> = {
+  queued: "Queued",
+  running: "Running",
+  cancelling: "Stopping",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Stopped"
+}
+
+/** One item of a turn's log, as the person reads it. */
+const logItemText = (item: Turn.LogItem) =>
+  Turn.LogItem.match(item, {
+    InputTaken: ({ messages }) => `Read ${messages} ${messages === 1 ? "message" : "messages"}`,
+    Responded: ({ text, reply }) => (reply ? `Replied: ${text}` : text),
+    Interrupted: ({ reason }) => `Stopped short: ${reason}`
+  })
+
+/** A turn's log as the person follows it: what its agent was given, what it wrote, and where it stopped short. */
+const logView = (log: TurnLog, h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.AriaLabel("Log")],
+    [
+      h.ol(
+        [],
+        log.items.map((item) => h.li([], [logItemText(item)]))
+      ),
+      LogState.match(log.state, {
+        Opening: () => h.p([], ["Opening the log…"]),
+        Open: () => h.empty,
+        Ended: () => h.p([], ["The turn has ended."]),
+        Failed: ({ error }) =>
+          h.div(
+            [h.Role("alert")],
+            [h.p([], [error]), button(h, "Try again", Message.ClickedShowLog({ turnId: log.turnId }))]
+          )
+      })
+    ]
+  )
+
+/**
+ * A turn: its agent and how it stands, who ran it again, why it failed; for a person who may direct
+ * its agent, stopping it while it runs and running it again once it failed or stopped; and its log.
+ */
+const turnView = (
+  { turn, pending, retryOpen }: TurnItem,
+  thread: OpenThread,
+  opened: Opened,
+  h: HtmlBuilder<Message>
+) => {
+  const directs = permits(opened, Turn.directRequirement(turn))
+  const followed = Option.filter(thread.log, ({ turnId }) => turnId === turn.id)
+  return h.keyed("li")(
+    turn.id,
+    [],
+    [
+      h.p(
+        [],
+        [
+          h.strong([], [memberName(turn.memberId, opened)]),
+          ` · ${turnStatusLabels[turn.status]}`,
+          turn.retry === null ? h.empty : h.span([], [` · run again by ${memberName(turn.retry.by, opened)}`]),
+          sending(pending, h)
+        ]
+      ),
+      turn.failure === null ? h.empty : h.p([], [turn.failure]),
+      directs && Turn.stoppable(turn.status)
+        ? button(h, "Stop", Message.ClickedStopTurn({ turnId: turn.id }))
+        : h.empty,
+      directs && retryOpen ? button(h, "Retry", Message.ClickedRetryTurn({ turnId: turn.id })) : h.empty,
+      Option.match(followed, {
+        onNone: () => button(h, "Show log", Message.ClickedShowLog({ turnId: turn.id })),
+        onSome: (log) => h.div([], [button(h, "Hide log", Message.ClickedHideLog()), logView(log, h)])
+      })
+    ]
+  )
+}
+
+/** The thread's turns, oldest first: each agent's work on what was asked of it there. */
+const turnsView = (thread: OpenThread, opened: Opened, h: HtmlBuilder<Message>): Html =>
+  thread.turns.length === 0
+    ? h.empty
+    : h.section(
+        [h.AriaLabel("Turns")],
+        [
+          h.p([], [h.strong([], ["Turns"])]),
+          h.ol(
+            [],
+            thread.turns.map((item) => turnView(item, thread, opened, h))
+          )
+        ]
+      )
+
 const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
   const item = group.threads.find(({ thread: listed }) => listed.id === thread.threadId)
   return h.section(
@@ -601,10 +834,12 @@ const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: Htm
       button(h, "All threads", Message.ClickedAllThreads()),
       titleView(thread, item === undefined ? "A thread" : threadLabel(item), h),
       followView(thread.following, h),
+      taskView(thread, group, opened, h),
       h.ol(
         [h.AriaLabel("Messages")],
         thread.messages.map((message) => messageView(message, thread, opened, h))
       ),
+      turnsView(thread, opened, h),
       h.form(
         [h.OnSubmit(Message.SubmittedReply())],
         [
@@ -665,6 +900,10 @@ const threadsView = (group: OpenGroup, h: HtmlBuilder<Message>): Html =>
                     },
                     h
                   ),
+                  Option.match(item.task, {
+                    onNone: () => h.empty,
+                    onSome: (task) => h.span([], [` · ${statusLabels[task.status]}`])
+                  }),
                   sending(item.pending, h),
                   item.unread > 0 ? h.span([], [` · ${item.unread} new`]) : h.empty
                 ]

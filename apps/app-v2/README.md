@@ -8,7 +8,9 @@ the public teams they may join, where they create a team, start a conversation w
 member, rename a team, admit and remove its members, follow it, join it, or leave it; a group's
 threads with how much of each is new; a thread's messages, where the person starts a thread,
 replies, renames a thread, edits or deletes their own messages, and follows or stops following a
-thread, which opening reads through its latest activity; the person's inbox, the notifications
+thread, which opening reads through its latest activity; the task a thread tracks, which the
+person makes of it and whose status, priority, and assignee they change, and its agents' turns,
+which they stop or run again and whose logs they follow while online; the person's inbox, the notifications
 waiting for them, each as the message it is about, to open, or to mark seen one at a time or all
 at once; and the workspace's settings, where they
 rename the workspace and themselves, change a member's role, remove a member, hand the workspace
@@ -40,7 +42,8 @@ that decides, and commands that act.
   the person's notifications, group memberships, and the person's group follows, the person's
   unfinished actions, the team or conversation they are starting, and the open pane: a group, with
   its threads, the thread being started, the name being given it, the member chosen to admit, and
-  the open thread, with its messages and the reply; the inbox; or the settings, with the names
+  the open thread, with its messages, the reply, its task, its turns, and the log being followed;
+  the inbox; or the settings, with the names
   being given and the invitation being written.
 - `message.ts`, `update.ts`: what happens and what it changes. A message the page is past, such as
   a code check finishing after the person left the form, changes nothing.
@@ -51,15 +54,18 @@ that decides, and commands that act.
 - `store.ts`: the open workspace's store as a managed resource, open while a workspace is open and
   closed when the person leaves it or signs out; what its replica holds as subscriptions, the
   groups, members, memberships, follows, and actions, the open group's threads, and the open
-  thread's messages; and the commands that write to it, an action each, and dismissing a refused
-  action.
+  thread's messages, task, and turns; the log of the turn the person follows, read over HTTP while
+  online, since no replica holds it; and the commands that write to it, an action each, and
+  dismissing a refused action.
 - `view.ts`: markup over `@foldkit/ui`'s headless components, with no styles yet.
 - `permissions.ts`: what the person may do, as core decides it from the replica's records: the
   grants their own assignments confer through the workspace's roles, from core's
   `GrantResolver.grantsOf`, and whose roles they may change, from `Delegation.recipientDenial`. The
-  view offers a control only when they allow it; the server decides again.
+  view offers a control only when they allow it, such as stopping a turn only to someone who may
+  direct its agent, by core's `Turn.directRequirement`; the server decides again.
 - `flags.ts`, `session.ts`, `browser.ts`, `api.ts`: the address and the session kept from the last
-  visit, the browser's services the runtime gives commands and stores, and the API's client.
+  visit, the browser's services the runtime gives commands, subscriptions, and stores, and the API's
+  client, outside a workspace or as a member of one.
 
 ## Sync
 
@@ -69,18 +75,23 @@ that decides, and commands that act.
   `ReplicaChanged` the server writes to the replica. `write` writes an action, which eventlog sends
   when it can; its local handler holds the action in the replica until the server completes it,
   with the records `sync/Pending.ts` says it creates: a thread started in a group, with its opening
-  message, a conversation's direct group, a reply, a team and its admissions, an admission, and a
-  role assignment, under the IDs core derives from the action's key, the request key the server
-  runs it under. A handler runs before eventlog journals the action, so one that fails
-  fails the write.
+  message and the task it starts as, a conversation's direct group, a reply, a team and its
+  admissions, an admission, a role assignment, a thread's task, and a turn run again, under the IDs
+  core derives from the action's key, the request key the server runs it under, or from what it
+  names, as a retry's from the turn it retries. An action whose payload only names a record it
+  copies from, as a task copies its thread's group, finds that record as the person sees it: the
+  replica's, as their unfinished actions leave it. A handler runs before eventlog journals the
+  action, so one that fails fails the write.
 - `sync/Pending.ts` is what an unfinished action does to what the person sees: the records it
   creates, and how it changes records the replica holds: renaming a thread or a team, editing or
   deleting a message, ending the person's part in a thread or taking up one they ended, moving
   their position in a thread or a group, removing a member from a team, leaving, ending or taking
   up a follow of a group, renaming the workspace or themselves, handing the workspace over,
-  removing a member from it, revoking an invitation, revoking the roles a new one replaces, and
+  removing a member from it, revoking an invitation, revoking the roles a new one replaces,
   marking notifications seen, one, every one up to a point, or those from a thread the person
-  reads, by core's own `NotificationStore.isAtOrBefore` and `isPendingInThread`.
+  reads, by core's own `NotificationStore.isAtOrBefore` and `isPendingInThread`, changing a task
+  from the value they saw, by core's `Task.apply`, which a task changed meanwhile keeps, and
+  stopping a turn, at once while it is queued.
   Following a thread they never took part in, or a group they never followed, waits for the
   server, which gives the participation or the follow their group membership; so does issuing an
   invitation, whose recipient's account only the server finds. `overlay` applies the unfinished actions, in the order they were
@@ -98,8 +109,12 @@ that decides, and commands that act.
   the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
   of a kind at a place, `threads` a group's threads with their messages, and `actions` the person's
   unfinished actions, each again after every change, `every` the records of a kind wherever they
-  sit, and `inbox` the person's notifications with the threads they come from, which the store
-  shows each by the message its activity is about; the store reads each through `overlay`.
+  sit, `inbox` the person's notifications with the threads they come from, which the store
+  shows each by the message its activity is about, and `thread` what a thread holds, with its task
+  and turns; the store reads each through `overlay`, and offers each turn's retry by core's
+  `Turn.whyNotRetryable`, from where its agent stands among the thread's turns, by
+  `TurnStore.latestOf`, and who takes part in it. `get` and `getActions` read a record and the
+  actions once, for an action being written.
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
   a store opens, reads, and takes actions offline. Each time its connection drops, the store builds
@@ -123,19 +138,23 @@ browser's storage:
 - Story tests drive `update`: signing in a step at a time, each failure going back a step with
   why, a workspace opening to a group, a thread, and a reply, a thread started, a write that could
   not be kept, a thread's actions, a team and a conversation started, a team's actions, the
-  workspace's settings, the inbox, and signing out.
+  workspace's settings, the inbox, a thread's task and turns, a turn's log followed until it ends
+  and again after it could not be, and signing out.
 - Scene tests drive the view as a person does, from typing their address through a reply and a
   refused action to signing out, from joining a team through creating one, seeing it at once, and
   admitting and removing its members, and an owner managing the workspace's settings, then seeing
-  only their own name to change once another member owns it, and the inbox's count, its
-  notifications, and opening one's thread.
+  only their own name to change once another member owns it, the inbox's count, its
+  notifications, and opening one's thread, and a thread made a task and changed, its turns stopped
+  and retried, and a turn's log followed, then seen without the grants to change any of it.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and
   deletes, a team renamed, members removed and leaving, a group's follow ended and taken up, the
   workspace renamed and handed over, the person renamed, a member removed, roles replaced, an
-  invitation revoked, notifications marked seen and settled by reading their thread, and refused
-  actions applying nothing.
+  invitation revoked, notifications marked seen and settled by reading their thread, a task made
+  from the thread the person sees or started with its thread, changed from the value seen, turns
+  stopped and run again, and refused actions applying nothing; `find`'s cover a record as the
+  person's actions leave it.
 - The store's tests serve a host in process, the HTTP API and the sync server over memory storage
   on Bun, and open a store against it: the reset arrives, a change made over HTTP follows, and the
   store reads its replica again with the host gone; a thread it starts shows at once and becomes
@@ -144,6 +163,8 @@ browser's storage:
   conversation, started in the browser come back as the server's under the IDs the browser gave
   them; an invitation by address reaches that address's account, and a role change becomes the
   server's under the ID the browser gave it; and another member's reply reaches the person's
-  inbox, which reading the thread settles at once and then on the server.
+  inbox, which reading the thread settles at once and then on the server; and a thread made a task
+  and changed shows at once and becomes the server's, while a change from a stale value comes back
+  refused. `Store.viewTurns` is tested apart: which turns may run again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

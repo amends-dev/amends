@@ -7,7 +7,10 @@
 import { Assignment, Role } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
+import { ReplicaRecord } from "@amends-dev/core/replica"
+import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
+import { Turn, TurnId } from "@amends-dev/core/turn"
 import { Invitation, Member, MemberId, Workspace } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
@@ -43,10 +46,14 @@ export type StoreState = typeof StoreState.Type
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean })
 export type GroupItem = typeof GroupItem.Type
 
-/** A thread of the open group, with its opening message, whether it is still being started, and how much is unread. */
+/**
+ * A thread of the open group, with its opening message, the task it tracks, whether it is still
+ * being started, and how much is unread.
+ */
 export const ThreadItem = Schema.Struct({
   thread: Thread.Thread,
   opening: Schema.Option(ThreadMessage.ThreadMessage),
+  task: Schema.Option(Task.Task),
   pending: Schema.Boolean,
   unread: Schema.Int
 })
@@ -74,14 +81,38 @@ export const Following = Schema.Struct({
 })
 export type Following = typeof Following.Type
 
+/** The task the open thread tracks, and whether a change to it is on its way. */
+export const TaskItem = Schema.Struct({ task: Task.Task, pending: Schema.Boolean })
+export type TaskItem = typeof TaskItem.Type
+
+/**
+ * One of the open thread's turns, whether a change to it is on its way, and whether nothing but who
+ * may direct its agent keeps it from running again.
+ */
+export const TurnItem = Schema.Struct({ turn: ReplicaRecord.Turn, pending: Schema.Boolean, retryOpen: Schema.Boolean })
+export type TurnItem = typeof TurnItem.Type
+
+/** How following a turn's log stands: opening, open as the turn writes it, ended with the turn, or failed, with why. */
+export const LogState = defineTaggedUnion({
+  Opening: {},
+  Open: {},
+  Ended: {},
+  Failed: { error: Schema.String }
+})
+export type LogState = typeof LogState.Type
+
+/** The turn whose log the person follows, the log's items so far, and how following it stands. */
+export const TurnLog = Schema.Struct({ turnId: TurnId.TurnId, items: Schema.Array(Turn.LogItem), state: LogState })
+export type TurnLog = typeof TurnLog.Type
+
 /** A message being edited, and its new text. */
 export const Editing = Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId, draft: Schema.String })
 export type Editing = typeof Editing.Type
 
 /**
  * The thread open in the group: its messages, the reply being written, the person's part in it, the
- * sequence of its latest activity, how far they have read it and asked to, and the title or message
- * being changed.
+ * sequence of its latest activity, how far they have read it and asked to, the title or message
+ * being changed, the task it tracks, its agents' turns, and the turn whose log the person follows.
  */
 export const OpenThread = Schema.Struct({
   threadId: ThreadId.ThreadId,
@@ -92,7 +123,10 @@ export const OpenThread = Schema.Struct({
   readThrough: Schema.Int,
   readRequested: Schema.Int,
   renaming: Schema.Option(Schema.String),
-  editing: Schema.Option(Editing)
+  editing: Schema.Option(Editing),
+  task: Schema.Option(TaskItem),
+  turns: Schema.Array(TurnItem),
+  log: Schema.Option(TurnLog)
 })
 export type OpenThread = typeof OpenThread.Type
 

@@ -1,13 +1,15 @@
 /**
  * How each message changes the app: signing in a step at a time, listing and opening workspaces,
- * following the open store, what the person does in its groups, threads, and settings, and signing
- * out. A message that comes when the page is past it, such as a code check finishing after the
+ * following the open store, what the person does in its groups, threads and their tasks and turns,
+ * and settings, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
  * person signed out, changes nothing.
  */
 
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
+import { Task } from "@amends-dev/core/task"
 import { ThreadMessage } from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
 import type * as SignIn from "@amends-dev/gateway/SignIn"
 import type * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -22,6 +24,7 @@ import {
   Composing,
   type Editing,
   type InboxItem,
+  LogState,
   type Model,
   type OpenGroup,
   type Opened,
@@ -31,12 +34,14 @@ import {
   type Settings,
   SignInForm,
   StoreState,
+  type TurnLog,
   Workspaces
 } from "./model.ts"
 import { workspaceRolesOf } from "./permissions.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  CreateTask,
   CreateTeam,
   DeleteMessage,
   Dismiss,
@@ -56,13 +61,16 @@ import {
   RenameSelf,
   RenameThread,
   RenameWorkspace,
+  RetryTurn,
   RevokeInvitation,
   StartDirect,
   StartThread,
+  StopTurn,
   type StoreResource,
   TransferOwnership,
   UnfollowGroup,
-  UnfollowThread
+  UnfollowThread,
+  UpdateTask
 } from "./store.ts"
 
 export type UpdateReturn = Update.Return<
@@ -173,8 +181,25 @@ const openedThread = (threadId: OpenThread["threadId"]): OpenThread => ({
   readThrough: 0,
   readRequested: 0,
   renaming: Option.none(),
-  editing: Option.none()
+  editing: Option.none(),
+  task: Option.none(),
+  turns: [],
+  log: Option.none()
 })
+
+/** The log as `message` leaves it: its items as they stand once opened, each change in its place, and ended with its turn. */
+const followLog = (log: TurnLog, message: Turn.LogMessage): TurnLog =>
+  Turn.LogMessage.match(message, {
+    Opened: ({ items }) => ({ ...log, items, state: LogState.Open() }),
+    Changed: ({ changes }) => ({
+      ...log,
+      items: changes.reduce(
+        (items, { index, item }) => [...items.slice(0, index), item, ...items.slice(index + 1)],
+        log.items
+      )
+    }),
+    Ended: () => ({ ...log, state: LogState.Ended() })
+  })
 
 /** The newest notification still waiting to be seen, in the inbox order core marks them by. */
 const newestWaiting = (inbox: ReadonlyArray<InboxItem>) =>
@@ -254,6 +279,20 @@ const textOf = (thread: OpenThread, messageId: Editing["messageId"]) =>
         Deleted: () => Option.none()
       })
   )
+
+/** The open thread and the task it tracks, while it tracks one. */
+const taskIn = (model: Model) =>
+  Option.flatMap(threadIn(model), ({ threadId, task }) => Option.map(task, (item) => ({ threadId, task: item.task })))
+
+/** Change the open thread's task in one way, from the value the person sees, unless it already is so. */
+const changeTask = (model: Model, changeOf: (task: Task.Task) => Task.Change): UpdateReturn =>
+  Option.match(taskIn(model), {
+    onNone: () => ({ model }),
+    onSome: ({ threadId, task }) => {
+      const change = changeOf(task)
+      return change.from === change.to ? { model } : { model, commands: [UpdateTask({ threadId, change })] }
+    }
+  })
 
 /** The open group, if one is. */
 const groupIn = (model: Model): Option.Option<OpenGroup> =>
@@ -659,7 +698,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     GotActions: ({ actions }) => atOpened(model, (opened) => modifyFields(opened, { actions: () => actions })),
     GotThreads: ({ groupId, threads }) =>
       atGroup(model, (group) => (group.groupId === groupId ? modifyFields(group, { threads: () => threads }) : group)),
-    GotThread: ({ threadId, messages, following, latest, readThrough }) =>
+    GotThread: ({ threadId, messages, following, latest, readThrough, task, turns }) =>
       Option.match(
         Option.filter(threadIn(model), (thread) => thread.threadId === threadId),
         {
@@ -674,7 +713,9 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                   following: () => following,
                   latest: () => latest,
                   readThrough: () => readThrough,
-                  readRequested: (requested) => (marking ? latest : requested)
+                  readRequested: (requested) => (marking ? latest : requested),
+                  task: () => task,
+                  turns: () => turns
                 })
               ),
               commands: marking ? [MarkThreadRead({ threadId, throughSequence: latest })] : []
@@ -777,6 +818,40 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           onNone: () => ({ model }),
           onSome: (input) => ({ model, commands: [UnfollowThread(input)] })
         }
+      ),
+    ClickedMakeTask: () =>
+      Option.match(threadIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ threadId }) => ({ model, commands: [CreateTask({ threadId })] })
+      }),
+    ChoseTaskStatus: ({ status }) =>
+      changeTask(model, (task) => Task.Change.cases.Status.make({ from: task.status, to: status })),
+    ChoseTaskPriority: ({ priority }) =>
+      changeTask(model, (task) => Task.Change.cases.Priority.make({ from: task.priority, to: priority })),
+    ChoseTaskAssignee: ({ memberId }) =>
+      changeTask(model, (task) =>
+        Task.Change.cases.Assignee.make({ from: task.assignee, to: Option.getOrNull(memberId) })
+      ),
+    ClickedStopTurn: ({ turnId }) => ({ model, commands: [StopTurn({ turnId })] }),
+    ClickedRetryTurn: ({ turnId }) => ({ model, commands: [RetryTurn({ turnId })] }),
+    ClickedShowLog: ({ turnId }) =>
+      atThread(model, (thread) =>
+        modifyFields(thread, { log: () => Option.some({ turnId, items: [], state: LogState.Opening() }) })
+      ),
+    ClickedHideLog: () => atThread(model, (thread) => modifyFields(thread, { log: () => Option.none() })),
+    GotTurnLog: ({ turnId, message }) =>
+      atThread(model, (thread) =>
+        modifyFields(thread, {
+          log: Option.map((log) => (log.turnId === turnId ? followLog(log, message) : log))
+        })
+      ),
+    FailedFollowLog: ({ turnId, error }) =>
+      atThread(model, (thread) =>
+        modifyFields(thread, {
+          log: Option.map((log) =>
+            log.turnId === turnId ? modifyFields(log, { state: () => LogState.Failed({ error }) }) : log
+          )
+        })
       ),
     WroteAction: () => atOpened(model, (opened) => modifyFields(opened, { notice: () => Option.none() })),
     FailedWriteAction: ({ error }) =>

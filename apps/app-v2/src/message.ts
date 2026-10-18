@@ -6,7 +6,9 @@
 import { Role } from "@amends-dev/core/authorization"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
+import { Task } from "@amends-dev/core/task"
 import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
+import { Turn, TurnId } from "@amends-dev/core/turn"
 import { Invitation, MemberId, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
@@ -23,7 +25,9 @@ import {
   MemberItem,
   MembershipItem,
   MessageItem,
-  ThreadItem
+  TaskItem,
+  ThreadItem,
+  TurnItem
 } from "./model.ts"
 
 export const Message = defineMessageUnion({
@@ -80,7 +84,9 @@ export const Message = defineMessageUnion({
     messages: Schema.Array(MessageItem),
     following: Schema.Option(Following),
     latest: Schema.Int,
-    readThrough: Schema.Int
+    readThrough: Schema.Int,
+    task: Schema.Option(TaskItem),
+    turns: Schema.Array(TurnItem)
   },
   ClickedGroup: { groupId: GroupId.GroupId },
   ClickedSettings: {},
@@ -120,6 +126,16 @@ export const Message = defineMessageUnion({
   ClickedDelete: { messageId: ThreadMessageId.ThreadMessageId },
   ClickedFollow: {},
   ClickedUnfollow: {},
+  ClickedMakeTask: {},
+  ChoseTaskStatus: { status: Task.Status },
+  ChoseTaskPriority: { priority: Task.Priority },
+  ChoseTaskAssignee: { memberId: Schema.Option(MemberId.MemberId) },
+  ClickedStopTurn: { turnId: TurnId.TurnId },
+  ClickedRetryTurn: { turnId: TurnId.TurnId },
+  ClickedShowLog: { turnId: TurnId.TurnId },
+  ClickedHideLog: {},
+  GotTurnLog: { turnId: TurnId.TurnId, message: Turn.LogMessage },
+  FailedFollowLog: { turnId: TurnId.TurnId, error: Schema.String },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String },
   ClickedDismiss: { key: Schema.String },

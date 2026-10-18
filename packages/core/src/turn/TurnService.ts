@@ -220,20 +220,20 @@ export const make = Effect.gen(function* () {
     yield* authorization.require([readThreadRequirement(thread.id)])
     return thread
   })
-  /**
-   * Why the turn can't run again now: it is still active, it completed, a later turn of its agent
-   * in its thread superseded it, or its agent no longer takes part there; undefined when it can.
-   */
-  const whyNotRetryable = Effect.fnUntraced(function* (turn: Turn.Turn) {
-    if (Turn.active(turn.status)) return "active" as const
-    if (turn.status === "completed") return "completed" as const
-    if (Option.isSome(yield* turnStore.findActive(turn.memberId, turn.threadId))) return "superseded" as const
+  /** Where the turn's agent stands on its thread: its active and latest turns there, and whether it takes part. */
+  const readStanding = Effect.fnUntraced(function* (turn: Turn.Turn) {
+    const active = yield* turnStore.findActive(turn.memberId, turn.threadId)
     const latest = yield* turnStore.findLatest(turn.memberId, turn.threadId)
-    if (Option.isSome(latest) && latest.value.id !== turn.id) return "superseded" as const
     const participation = yield* threadParticipationStore.get(turn.participationId)
-    if (Option.isNone(participation) || participation.value.status !== "active") return "departed" as const
-    return undefined
+    return {
+      active: Option.isSome(active),
+      latest: Option.getOrUndefined(Option.map(latest, ({ id }) => id)),
+      participating: Option.isSome(participation) && participation.value.status === "active"
+    } satisfies Turn.Standing
   })
+  /** Why the turn can't run again now, `Turn.whyNotRetryable`; undefined when it can. */
+  const whyNotRetryable = (turn: Turn.Turn) =>
+    Effect.map(readStanding(turn), (standing) => Turn.whyNotRetryable(turn, standing))
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
   const requireReadableTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const found = yield* turnStore.get(turnId)

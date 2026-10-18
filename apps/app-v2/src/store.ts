@@ -1,8 +1,9 @@
 /**
  * The open workspace's store, as the app holds it: open while the person has a workspace open, over
  * the browser's services, and closed when they leave it or sign out; what its replica holds, as
- * messages, while it is open, the open group's threads and the open thread's messages among them;
- * and the actions the person writes to it.
+ * messages, while it is open, the open group's threads and the open thread's messages, task, and
+ * turns among them; and the actions the person writes to it. The log of a turn the person follows
+ * is the one thing read from the host apart from the store, while online, since no replica holds it.
  */
 
 import { Assignment, Role } from "@amends-dev/core/authorization"
@@ -12,12 +13,16 @@ import { Identity } from "@amends-dev/core/identity"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ReadState } from "@amends-dev/core/read-state"
 import { ReplicaRecord } from "@amends-dev/core/replica"
+import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
+import { TurnId } from "@amends-dev/core/turn"
 import { Invitation, Member, MemberId, WorkspaceId, WorkspaceSettings } from "@amends-dev/core/workspace"
 import * as Accounts from "@amends-dev/gateway/Accounts"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
+import type * as TaskSync from "@amends-dev/sync/TaskSync"
 import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
+import type * as TurnSync from "@amends-dev/sync/TurnSync"
 import type * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
@@ -35,14 +40,17 @@ import * as Stream from "effect/Stream"
 import * as Command from "foldkit/command"
 import * as ManagedResource from "foldkit/managedResource"
 import * as Subscription from "foldkit/subscription"
+import * as Api from "./api.ts"
 import * as Browser from "./browser.ts"
 import { Message } from "./message.ts"
 import {
   type ActionItem,
   type GroupItem,
+  LogState,
   type Model,
   type OpenGroup,
   type Opened,
+  type OpenThread,
   Page,
   Pane,
   StoreState
@@ -83,6 +91,30 @@ const openGroup = (model: Model): Option.Option<OpenGroup> =>
       pane,
       Pane.matchOrElse({ Group: ({ group }) => Option.some(group) }, () => Option.none())
     )
+  )
+
+/** The thread open in the open group, once its store has opened. */
+const openThread = (model: Model): Option.Option<OpenThread> => Option.flatMap(openGroup(model), ({ thread }) => thread)
+
+/**
+ * The turn whose log the person follows, and as whom: while it is opening or open, so that following
+ * it again after it failed starts anew.
+ */
+const followedLog = (model: Model) =>
+  Page.matchOrElse(
+    model.page,
+    {
+      SignedIn: ({ session }) =>
+        Option.flatMap(openWorkspace(model), ({ workspace }) =>
+          Option.flatMap(openThread(model), ({ log }) =>
+            Option.map(
+              Option.filter(log, ({ state }) => LogState.isAnyOf(["Opening", "Open"])(state)),
+              ({ turnId }) => ({ apiUrl: model.apiUrl, token: session.token, workspaceId: workspace.id, turnId })
+            )
+          )
+        )
+    },
+    () => Option.none()
   )
 
 export const managedResources = ManagedResource.make<Model, Message>()((entry) => ({
@@ -136,11 +168,17 @@ const whatEach: Readonly<
         | typeof GroupSync.Actions
         | typeof WorkspaceSync.Actions
         | typeof NotificationSync.Actions
+        | typeof TaskSync.Actions
+        | typeof TurnSync.Actions
       >
     >,
     string
   >
 > = {
+  TaskCreated: "make a task",
+  TaskUpdated: "change a task",
+  TurnCancelRequested: "stop a turn",
+  TurnRetried: "retry a turn",
   NotificationSeen: "mark a notification seen",
   NotificationsSeenThrough: "mark notifications seen",
   WorkspaceRenamed: "rename the workspace",
@@ -189,133 +227,172 @@ const describe = (action: Store.ActionView): ActionItem => ({
   rejection: Option.map(action.rejection, (error: CoreError.Rejection) => error.message)
 })
 
-export const subscriptions = Subscription.make<Model, Message, ManagedResource.ServiceOf<typeof StoreResource>>()(
-  (entry) => ({
-    workspace: entry(
-      { isOpen: Schema.Boolean },
-      {
-        modelToDependencies: (model) => ({ isOpen: Option.isSome(openWorkspace(model)) }),
-        dependenciesToStream: ({ isOpen }) =>
-          isOpen
-            ? fromStore((store) =>
-                Stream.mergeAll(
-                  [
-                    Stream.filterMap(store.list("Workspace", workspace), ([held]) =>
-                      held === undefined
-                        ? Result.fail(undefined)
-                        : Result.succeed(Message.GotWorkspace({ workspace: held.record.value, pending: held.pending }))
-                    ),
-                    Stream.map(store.list("Group", workspace), (groups): Message =>
-                      Message.GotGroups({
-                        groups: Array.sort(
-                          groups.map(({ record, pending }) => ({ group: record.value, pending })),
-                          byName
-                        )
-                      })
-                    ),
-                    Stream.map(store.list("Member", workspace), (members): Message =>
-                      Message.GotMembers({
-                        members: members.map(({ record, pending }) => ({ member: record.value, pending }))
-                      })
-                    ),
-                    Stream.map(store.list("Role", workspace), (roles): Message =>
-                      Message.GotRoles({ roles: roles.map(({ record }) => record.value) })
-                    ),
-                    Stream.map(store.list("Assignment", workspace), (assignments): Message =>
-                      Message.GotAssignments({
-                        assignments: assignments.map(({ record, pending }) => ({ assignment: record.value, pending }))
-                      })
-                    ),
-                    Stream.map(store.inbox, (entries): Message =>
-                      Message.GotInbox({
-                        items: entries.map(({ notification, thread, opening, message }) => ({
-                          notification: notification.record.value,
-                          pending: notification.pending,
-                          thread,
-                          opening,
-                          message
-                        }))
-                      })
-                    ),
-                    Stream.map(store.list("Invitation", workspace), (invitations): Message =>
-                      Message.GotInvitations({
-                        invitations: invitations.map(({ record, pending }) => ({ invitation: record.value, pending }))
-                      })
-                    ),
-                    Stream.map(store.every("GroupMembership"), (memberships): Message =>
-                      Message.GotMemberships({
-                        memberships: memberships.map(({ record, pending }) => ({ membership: record.value, pending }))
-                      })
-                    ),
-                    Stream.map(store.every("GroupFollow"), (follows): Message =>
-                      Message.GotFollows({
-                        follows: follows.map(({ record, pending }) => ({ follow: record.value, pending }))
-                      })
-                    ),
-                    Stream.map(store.actions, (actions): Message =>
-                      Message.GotActions({ actions: actions.map(describe) })
-                    )
-                  ],
-                  { concurrency: "unbounded" }
+export const subscriptions = Subscription.make<
+  Model,
+  Message,
+  ManagedResource.ServiceOf<typeof StoreResource> | Layer.Success<typeof Browser.layer>
+>()((entry) => ({
+  workspace: entry(
+    { isOpen: Schema.Boolean },
+    {
+      modelToDependencies: (model) => ({ isOpen: Option.isSome(openWorkspace(model)) }),
+      dependenciesToStream: ({ isOpen }) =>
+        isOpen
+          ? fromStore((store) =>
+              Stream.mergeAll(
+                [
+                  Stream.filterMap(store.list("Workspace", workspace), ([held]) =>
+                    held === undefined
+                      ? Result.fail(undefined)
+                      : Result.succeed(Message.GotWorkspace({ workspace: held.record.value, pending: held.pending }))
+                  ),
+                  Stream.map(store.list("Group", workspace), (groups): Message =>
+                    Message.GotGroups({
+                      groups: Array.sort(
+                        groups.map(({ record, pending }) => ({ group: record.value, pending })),
+                        byName
+                      )
+                    })
+                  ),
+                  Stream.map(store.list("Member", workspace), (members): Message =>
+                    Message.GotMembers({
+                      members: members.map(({ record, pending }) => ({ member: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.list("Role", workspace), (roles): Message =>
+                    Message.GotRoles({ roles: roles.map(({ record }) => record.value) })
+                  ),
+                  Stream.map(store.list("Assignment", workspace), (assignments): Message =>
+                    Message.GotAssignments({
+                      assignments: assignments.map(({ record, pending }) => ({ assignment: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.inbox, (entries): Message =>
+                    Message.GotInbox({
+                      items: entries.map(({ notification, thread, opening, message }) => ({
+                        notification: notification.record.value,
+                        pending: notification.pending,
+                        thread,
+                        opening,
+                        message
+                      }))
+                    })
+                  ),
+                  Stream.map(store.list("Invitation", workspace), (invitations): Message =>
+                    Message.GotInvitations({
+                      invitations: invitations.map(({ record, pending }) => ({ invitation: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.every("GroupMembership"), (memberships): Message =>
+                    Message.GotMemberships({
+                      memberships: memberships.map(({ record, pending }) => ({ membership: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.every("GroupFollow"), (follows): Message =>
+                    Message.GotFollows({
+                      follows: follows.map(({ record, pending }) => ({ follow: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.actions, (actions): Message =>
+                    Message.GotActions({ actions: actions.map(describe) })
+                  )
+                ],
+                { concurrency: "unbounded" }
+              )
+            )
+          : Stream.empty
+    }
+  ),
+  group: entry(
+    { groupId: Schema.Option(GroupId.GroupId) },
+    {
+      modelToDependencies: (model) => ({ groupId: Option.map(openGroup(model), ({ groupId }) => groupId) }),
+      dependenciesToStream: ({ groupId }) =>
+        Option.match(groupId, {
+          onNone: () => Stream.empty,
+          onSome: (groupId) =>
+            fromStore((store) =>
+              Stream.map(store.threads(groupId), (threads) =>
+                Message.GotThreads({
+                  groupId,
+                  threads: threads.map(({ thread, opening, task, unread }) => ({
+                    thread: thread.record.value,
+                    opening,
+                    task,
+                    pending: thread.pending,
+                    unread
+                  }))
+                })
+              )
+            )
+        })
+    }
+  ),
+  thread: entry(
+    { threadId: Schema.Option(ThreadId.ThreadId) },
+    {
+      modelToDependencies: (model) => ({ threadId: Option.map(openThread(model), ({ threadId }) => threadId) }),
+      dependenciesToStream: ({ threadId }) =>
+        Option.match(threadId, {
+          onNone: () => Stream.empty,
+          onSome: (threadId) =>
+            fromStore((store) =>
+              Stream.map(store.thread(threadId), ({ messages, participation, latest, readThrough, task, turns }) =>
+                Message.GotThread({
+                  threadId,
+                  messages: messages.map(({ record, pending }) => ({ message: record.value, pending })),
+                  following: Option.map(participation, ({ record, pending }) => ({
+                    participationId: record.value.id,
+                    active: record.value.status === "active",
+                    pending
+                  })),
+                  latest,
+                  readThrough,
+                  task: Option.map(task, ({ record, pending }) => ({ task: record.value, pending })),
+                  turns: turns.map(({ turn, retryOpen }) => ({
+                    turn: turn.record.value,
+                    pending: turn.pending,
+                    retryOpen
+                  }))
+                })
+              )
+            )
+        })
+    }
+  ),
+  turnLog: entry(
+    {
+      log: Schema.Option(
+        Schema.Struct({
+          apiUrl: Schema.String,
+          token: Schema.String,
+          workspaceId: WorkspaceId.WorkspaceId,
+          turnId: TurnId.TurnId
+        })
+      )
+    },
+    {
+      modelToDependencies: (model) => ({ log: followedLog(model) }),
+      dependenciesToStream: ({ log }) =>
+        Option.match(log, {
+          onNone: () => Stream.empty,
+          onSome: ({ apiUrl, token, workspaceId, turnId }) =>
+            Stream.unwrap(
+              Effect.flatMap(Api.memberClient(apiUrl, token, workspaceId), (client) =>
+                client.turns.watchLog({ params: { turnId } })
+              )
+            ).pipe(
+              Stream.map((message): Message => Message.GotTurnLog({ turnId, message })),
+              Stream.catchCause(() =>
+                Stream.make(
+                  Message.FailedFollowLog({ turnId, error: "The log could not be followed. Check the connection." })
                 )
               )
-            : Stream.empty
-      }
-    ),
-    group: entry(
-      { groupId: Schema.Option(GroupId.GroupId) },
-      {
-        modelToDependencies: (model) => ({ groupId: Option.map(openGroup(model), ({ groupId }) => groupId) }),
-        dependenciesToStream: ({ groupId }) =>
-          Option.match(groupId, {
-            onNone: () => Stream.empty,
-            onSome: (groupId) =>
-              fromStore((store) =>
-                Stream.map(store.threads(groupId), (threads) =>
-                  Message.GotThreads({
-                    groupId,
-                    threads: threads.map(({ thread, opening, unread }) => ({
-                      thread: thread.record.value,
-                      opening,
-                      pending: thread.pending,
-                      unread
-                    }))
-                  })
-                )
-              )
-          })
-      }
-    ),
-    thread: entry(
-      { threadId: Schema.Option(ThreadId.ThreadId) },
-      {
-        modelToDependencies: (model) => ({
-          threadId: Option.flatMap(openGroup(model), ({ thread }) => Option.map(thread, ({ threadId }) => threadId))
-        }),
-        dependenciesToStream: ({ threadId }) =>
-          Option.match(threadId, {
-            onNone: () => Stream.empty,
-            onSome: (threadId) =>
-              fromStore((store) =>
-                Stream.map(store.thread(threadId), ({ messages, participation, latest, readThrough }) =>
-                  Message.GotThread({
-                    threadId,
-                    messages: messages.map(({ record, pending }) => ({ message: record.value, pending })),
-                    following: Option.map(participation, ({ record, pending }) => ({
-                      participationId: record.value.id,
-                      active: record.value.status === "active",
-                      pending
-                    })),
-                    latest,
-                    readThrough
-                  })
-                )
-              )
-          })
-      }
-    )
-  })
-)
+            )
+        })
+    }
+  )
+}))
 
 const unwritable = (error: string) => Message.FailedWriteAction({ error })
 
@@ -602,4 +679,32 @@ export const MarkAllNotificationsSeen = Command.define("MarkAllNotificationsSeen
   args: { through: NotificationStore.Cursor },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("NotificationsSeenThrough", input))
+})
+
+/** Make `threadId` a task, starting in triage. */
+export const CreateTask = Command.define("CreateTask", {
+  args: { threadId: ThreadId.ThreadId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("TaskCreated", input))
+})
+
+/** Change the task `threadId` tracks in one way, from the value the person saw. */
+export const UpdateTask = Command.define("UpdateTask", {
+  args: { threadId: ThreadId.ThreadId, change: Task.Change },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("TaskUpdated", input))
+})
+
+/** Ask the turn `turnId` to stop. */
+export const StopTurn = Command.define("StopTurn", {
+  args: { turnId: TurnId.TurnId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("TurnCancelRequested", input))
+})
+
+/** Run the turn `turnId` again. */
+export const RetryTurn = Command.define("RetryTurn", {
+  args: { turnId: TurnId.TurnId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("TurnRetried", input))
 })

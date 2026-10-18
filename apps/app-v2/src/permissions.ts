@@ -25,18 +25,21 @@ const assignmentsOf = (opened: Opened, memberId: Member.Member["id"]) =>
     .filter(({ assignment }) => assignment.memberId === memberId && assignment.status === "active")
     .map(({ assignment }) => assignment)
 
+/** Whether the person's grants cover `requirement`. */
+export const permits = (opened: Opened, requirement: Requirement.Requirement): boolean =>
+  Grant.anyCovers(
+    GrantResolver.grantsOf(assignmentsOf(opened, opened.memberId), (roleId) =>
+      opened.roles.find((role) => role.id === roleId)
+    ),
+    requirement
+  )
+
 /** Whether the person holds `permission` on `target`. */
 export const may = <K extends Target.Kind>(
   opened: Opened,
   permission: Permission.Definition<K>,
   target: Target.Of<NoInfer<K>>
-): boolean =>
-  Grant.anyCovers(
-    GrantResolver.grantsOf(assignmentsOf(opened, opened.memberId), (roleId) =>
-      opened.roles.find((role) => role.id === roleId)
-    ),
-    Requirement.make(permission, target)
-  )
+): boolean => permits(opened, Requirement.make(permission, target))
 
 /** Whether the person is the workspace's owner. */
 export const isOwner = (opened: Opened): boolean => opened.workspace.ownerMemberId === opened.memberId

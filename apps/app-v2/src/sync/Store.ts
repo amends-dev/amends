@@ -14,7 +14,9 @@ import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
+import type { Task } from "@amends-dev/core/task"
 import { type Thread, type ThreadId, type ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
+import { Turn, TurnStore } from "@amends-dev/core/turn"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
 import * as ChannelSync from "@amends-dev/sync/ChannelSync"
@@ -73,23 +75,69 @@ const readThroughOf = (positions: ReadonlyArray<Pending.Held<Replica.RecordOf<"T
 /** Write an action, `write("ThreadMessagePosted", { threadId, text, mentions })`, as eventlog's client does. */
 export type Write = Effect.Success<typeof makeWrite>
 
-/** A thread as its group lists it for the person: its opening message, and how much they have not read. */
+/** A thread as its group lists it for the person: its opening message, its task, and how much they have not read. */
 export interface ThreadView {
   readonly thread: Pending.Held<Replica.RecordOf<"Thread">>
   readonly opening: Option.Option<ThreadMessage.ThreadMessage>
+  readonly task: Option.Option<Task.Task>
   /** Its activities that count as new, past the member's position. */
   readonly unread: number
 }
 
+/** One of a thread's turns, and whether nothing but who may direct its agent keeps it from running again. */
+export interface TurnView {
+  readonly turn: Pending.Held<Replica.RecordOf<"Turn">>
+  readonly retryOpen: boolean
+}
+
 /**
  * A thread as the person sees it open: its messages, oldest first, their own part in it, the
- * sequence of its latest activity, and how far they have read it.
+ * sequence of its latest activity, how far they have read it, the task it tracks, and its agents'
+ * turns, oldest first.
  */
 export interface ThreadDetail {
   readonly messages: ReadonlyArray<Pending.Held<Replica.RecordOf<"ThreadMessage">>>
   readonly participation: Option.Option<Pending.Held<Replica.RecordOf<"ThreadParticipation">>>
   readonly latest: number
   readonly readThrough: number
+  readonly task: Option.Option<Pending.Held<Replica.RecordOf<"Task">>>
+  readonly turns: ReadonlyArray<TurnView>
+}
+
+const byCreated = Order.mapInput(
+  DateTime.Order,
+  ({ record }: Pending.Held<Replica.RecordOf<"Turn">>) => record.value.createdAt
+)
+
+/** Where `turn`'s agent stands on its thread, from the thread's turns and who takes part in it. */
+const standingOf = (
+  turn: Replica.RecordOf<"Turn">["value"],
+  turns: ReadonlyArray<Replica.RecordOf<"Turn">["value"]>,
+  participations: ReadonlyArray<Replica.RecordOf<"ThreadParticipation">["value"]>
+): Turn.Standing => {
+  const agents = turns.filter(({ memberId }) => memberId === turn.memberId)
+  return {
+    active: agents.some(({ status }) => Turn.active(status)),
+    latest: TurnStore.latestOf(agents)?.id,
+    participating: participations.some(({ id, status }) => id === turn.participationId && status === "active")
+  }
+}
+
+/**
+ * A thread's turns as the person sees them, oldest first, each with whether nothing but who may
+ * direct its agent keeps it from running again, by where its agent stands among the thread's turns
+ * and `participations`.
+ */
+export const viewTurns = (
+  turns: ReadonlyArray<Pending.Held<Replica.RecordOf<"Turn">>>,
+  participations: ReadonlyArray<Replica.RecordOf<"ThreadParticipation">["value"]>
+): ReadonlyArray<TurnView> => {
+  const values = turns.map(({ record }) => record.value)
+  return Array.sort(turns, byCreated).map((turn) => ({
+    turn,
+    retryOpen:
+      Turn.whyNotRetryable(turn.record.value, standingOf(turn.record.value, values, participations)) === undefined
+  }))
 }
 
 /**
@@ -165,10 +213,20 @@ const layerReplicaChanges = (failed: Deferred.Deferred<never, QueryError>) =>
     )
   )
 
+/** Find a record as the person sees it: as the replica holds it, and their unfinished actions leave it. */
+const findSeen =
+  (replica: Replica.Replica["Service"], author: Pick<Options, "workspaceId" | "memberId">): Pending.Find =>
+  (key) =>
+    Effect.gen(function* () {
+      const record = yield* replica.get(key)
+      const pending = yield* Effect.flatMap(replica.getActions, (actions) => Pending.unfinished(actions, author))
+      return Pending.find(key, record, pending)
+    })
+
 /**
  * Hold each of `group`'s actions until the server completes it, with the records `Pending` says it
- * creates. A local handler runs before eventlog journals the action, so one that fails fails the
- * write itself.
+ * creates, from its payload and what the person sees. A local handler runs before eventlog journals
+ * the action, so one that fails fails the write itself.
  */
 const layerActions = <Events extends Event.Any>(
   group: EventGroup.EventGroup<Events>,
@@ -192,7 +250,7 @@ const layerActions = <Events extends Event.Any>(
             tag,
             payload: entry.payload,
             writtenAt: action.writtenAt,
-            creates: creates === undefined ? [] : yield* creates(payload, action)
+            creates: creates === undefined ? [] : yield* creates(payload, action, findSeen(replica, author))
           })
         }).pipe(Effect.orDie)
       ) as never
@@ -312,6 +370,10 @@ export const layer = (options: Options) =>
                         byPublished
                       )
                     ),
+                    task: Option.map(
+                      Array.head(Pending.overlay("Task", place, held?.tasks ?? [], pending)),
+                      ({ record }) => record.value
+                    ),
                     unread: (held?.activities ?? []).filter(
                       ({ value }) => value.newActivity && value.sequence > readThrough
                     ).length
@@ -321,6 +383,7 @@ export const layer = (options: Options) =>
             thread: (threadId) =>
               withPending(replica.thread(threadId), (contents, pending): ThreadDetail => {
                 const place = ReplicaRecord.Place.cases.Thread.make({ threadId })
+                const participations = Pending.overlay("ThreadParticipation", place, contents.participations, pending)
                 return {
                   messages: Array.sort(
                     Pending.overlay("ThreadMessage", place, contents.messages, pending),
@@ -329,17 +392,20 @@ export const layer = (options: Options) =>
                       ({ record }: Pending.Held<Replica.RecordOf<"ThreadMessage">>) => record.value
                     )
                   ),
-                  participation: Array.findFirst(
-                    Pending.overlay("ThreadParticipation", place, contents.participations, pending),
-                    ({ record }) =>
-                      ThreadParticipation.Participant.matchOrElse(
-                        record.value.participant,
-                        { Member: ({ memberId }) => memberId === options.memberId },
-                        () => false
-                      )
+                  participation: Array.findFirst(participations, ({ record }) =>
+                    ThreadParticipation.Participant.matchOrElse(
+                      record.value.participant,
+                      { Member: ({ memberId }) => memberId === options.memberId },
+                      () => false
+                    )
                   ),
                   latest: contents.activities.reduce((latest, { value }) => Math.max(latest, value.sequence), 0),
-                  readThrough: readThroughOf(Pending.overlay("ThreadPosition", place, contents.positions, pending))
+                  readThrough: readThroughOf(Pending.overlay("ThreadPosition", place, contents.positions, pending)),
+                  task: Array.head(Pending.overlay("Task", place, contents.tasks, pending)),
+                  turns: viewTurns(
+                    Pending.overlay("Turn", place, contents.turns, pending),
+                    participations.map(({ record }) => record.value)
+                  )
                 }
               }),
             inbox: withPending(replica.inbox, ({ notifications, threads }, pending) =>

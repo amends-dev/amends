@@ -1,8 +1,9 @@
 /**
  * What an action the person writes does to their replica until the server's changes arrive, so they
- * see it at once, even offline. An action may create records, worked out as it is written, under the
- * IDs core derives from its key, the request key the server runs it under, so the server's own
- * records take their place; and it may change records the replica holds, applied on top of the
+ * see it at once, even offline. An action may create records, worked out as it is written from its
+ * payload and the records it names as the person sees them, under the IDs core derives from its key,
+ * the request key the server runs it under, so the server's own records take their place; and it
+ * may change records the replica holds, applied on top of the
  * server's records each time they are read, so whatever the server changes meanwhile shows through
  * what the action leaves alone. Unfinished actions apply in the order they were written, each to what
  * the ones before it left; one the server completed or rejected no longer applies.
@@ -13,13 +14,19 @@ import { Group, type GroupFollow, GroupMembership } from "@amends-dev/core/group
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
+import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
 import { Invitation, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
 import * as SyncSchema from "@amends-dev/sync/SyncSchema"
+import type * as TaskSync from "@amends-dev/sync/TaskSync"
 import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
+import type * as TurnSync from "@amends-dev/sync/TurnSync"
 import type * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
+import type * as IndexedDbQueryBuilder from "@effect/platform-browser/IndexedDbQueryBuilder"
+import * as Array from "effect/Array"
 import type * as Crypto from "effect/Crypto"
 import type * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -28,6 +35,7 @@ import type * as EventGroup from "effect/eventlog/EventGroup"
 import * as Option from "effect/Option"
 import type * as PlatformError from "effect/PlatformError"
 import * as Schema from "effect/Schema"
+import * as Struct from "effect/Struct"
 import type * as Replica from "./Replica.ts"
 
 /** An action the person wrote: who wrote it, in which workspace, under which key, and when. */
@@ -38,13 +46,26 @@ export interface Action {
   readonly writtenAt: DateTime.Utc
 }
 
+/**
+ * The record under `key` as the person sees it while an action is written: what an action creates
+ * records from when its payload only names it, as a task copies its thread's group.
+ */
+export type Find = <Kind extends ReplicaRecord.Kind>(
+  key: Replica.KeyOf<Kind>
+) => Effect.Effect<Option.Option<Replica.RecordOf<Kind>>, IndexedDbQueryBuilder.IndexedDbQueryError>
+
 /** What an action with `Payload` does to the replica until the server's changes arrive. */
 export interface Effects<Payload> {
   /** The records it creates. */
   readonly creates?: (
     payload: Payload,
-    action: Action
-  ) => Effect.Effect<ReadonlyArray<ReplicaRecord.ReplicaRecord>, PlatformError.PlatformError, Crypto.Crypto>
+    action: Action,
+    find: Find
+  ) => Effect.Effect<
+    ReadonlyArray<ReplicaRecord.ReplicaRecord>,
+    PlatformError.PlatformError | IndexedDbQueryBuilder.IndexedDbQueryError,
+    Crypto.Crypto
+  >
   /** `record` as it changes it, or undefined when it leaves `record` alone. */
   readonly changes?: (
     payload: Payload,
@@ -72,6 +93,8 @@ const isMember = ReplicaRecord.ReplicaRecord.isAnyOf(["Member"])
 const isAssignment = ReplicaRecord.ReplicaRecord.isAnyOf(["Assignment"])
 const isInvitation = ReplicaRecord.ReplicaRecord.isAnyOf(["Invitation"])
 const isNotification = ReplicaRecord.ReplicaRecord.isAnyOf(["Notification"])
+const isTask = ReplicaRecord.ReplicaRecord.isAnyOf(["Task"])
+const isTurn = ReplicaRecord.ReplicaRecord.isAnyOf(["Turn"])
 
 /** `record`, a notification, as seen when `action` was written. */
 const seen = (record: Replica.RecordOf<"Notification">, action: Action) =>
@@ -122,8 +145,21 @@ const message = (
     })
   )
 
+/** The task `action` makes of `thread`, as `options` start it. */
+const task = (action: Action, thread: Thread.Thread, options: Task.Options) =>
+  cases.Task.make({
+    value: {
+      threadId: thread.id,
+      workspaceId: action.workspaceId,
+      groupId: thread.groupId,
+      ...Task.initial(options),
+      createdBy: ThreadMessage.Author.cases.Member.make({ memberId: action.memberId }),
+      createdAt: action.writtenAt
+    }
+  })
+
 /**
- * What the person does in threads: starting one, replying, renaming one, editing or deleting a
+ * What the person does in threads: starting one, as a task or not, replying, renaming one, editing or deleting a
  * message, following one again or no longer, and reading one through a position. Following one they
  * never took part in waits for the server, which gives the participation their membership.
  */
@@ -145,7 +181,10 @@ export const threads: EffectsOf<typeof ThreadSync.Actions> = {
               createdAt: action.writtenAt
             }
           })
-          return [thread, yield* message(action, threadId, input)]
+          const opening = yield* message(action, threadId, input)
+          return input.task === undefined
+            ? [thread, opening]
+            : [thread, opening, task(action, thread.value, input.task)]
         })
       )
   },
@@ -458,7 +497,60 @@ export const notifications: EffectsOf<typeof NotificationSync.Actions> = {
   }
 }
 
-const effectsByTag = { ...threads, ...groups, ...workspace, ...notifications } as Readonly<
+/**
+ * What the person does with a thread's task: making the thread a task, from the thread as they see
+ * it, and changing one from the value they saw, which a task changed meanwhile keeps, as the server
+ * refuses it.
+ */
+export const tasks: EffectsOf<typeof TaskSync.Actions> = {
+  TaskCreated: {
+    creates: ({ threadId, ...options }, action, find) =>
+      Effect.map(find(ReplicaRecord.Key.cases.Thread.make({ id: threadId })), (thread) =>
+        Option.match(thread, { onNone: () => [], onSome: ({ value }) => [task(action, value, options)] })
+      )
+  },
+  TaskUpdated: {
+    changes: ({ threadId, change }, record) =>
+      isTask(record) && record.value.threadId === threadId && Task.valueOf(record.value, change) === change.from
+        ? cases.Task.make({ value: Task.apply(record.value, change) })
+        : undefined
+  }
+}
+
+/**
+ * What the person does with agents' turns: asking one to stop, which stops a queued turn at once
+ * and asks a running one to, and running one again, as a queued turn under the ID its retry has.
+ */
+export const turns: EffectsOf<typeof TurnSync.Actions> = {
+  TurnCancelRequested: {
+    changes: ({ turnId }, record, action) =>
+      isTurn(record) && record.value.id === turnId && Turn.stoppable(record.value.status)
+        ? cases.Turn.make({
+            value:
+              record.value.status === "queued"
+                ? { ...record.value, status: "cancelled", cancelReason: "requested", finishedAt: action.writtenAt }
+                : { ...record.value, status: "cancelling", cancelReason: "requested" }
+          })
+        : undefined
+  },
+  TurnRetried: {
+    creates: ({ turnId }, action, find) =>
+      Effect.gen(function* () {
+        const found = yield* find(ReplicaRecord.Key.cases.Turn.make({ id: turnId }))
+        if (Option.isNone(found)) return []
+        const retried = Turn.queued({
+          ...found.value.value,
+          id: yield* Turn.retryId(action.workspaceId, turnId),
+          retry: { of: turnId, by: action.memberId },
+          logAfter: null,
+          createdAt: action.writtenAt
+        })
+        return [cases.Turn.make({ value: Struct.omit(retried, ["logAfter"]) })]
+      })
+  }
+}
+
+const effectsByTag = { ...threads, ...groups, ...workspace, ...notifications, ...tasks, ...turns } as Readonly<
   Record<string, Effects<unknown> | undefined>
 >
 
@@ -544,3 +636,19 @@ export const overlay = <Kind extends ReplicaRecord.Kind>(
   }
   return held
 }
+
+/**
+ * The record under `key` as the person sees it: the server's, `record`, as `pending` leaves it, or
+ * one an unfinished action creates.
+ */
+export const find = <Kind extends ReplicaRecord.Kind>(
+  key: Replica.KeyOf<Kind>,
+  record: Option.Option<Replica.RecordOf<Kind>>,
+  pending: ReadonlyArray<Unfinished>
+): Option.Option<Replica.RecordOf<Kind>> =>
+  Option.map(
+    Array.findFirst(overlay(key._tag as Kind, undefined, Option.toArray(record), pending), (held) =>
+      sameKey(ReplicaRecord.keyOf(held.record), key)
+    ),
+    (held) => held.record
+  )

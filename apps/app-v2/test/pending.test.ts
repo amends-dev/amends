@@ -4,9 +4,12 @@ import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
+import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
 import { Invitation, Member, MemberId, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ThreadSync from "@amends-dev/sync/ThreadSync"
+import * as BrowserCrypto from "@effect/platform-browser/BrowserCrypto"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
 import * as Pending from "../src/sync/Pending.ts"
@@ -417,5 +420,159 @@ describe("Pending.unfinished", () => {
         { value: { ...thread("thread-1").value, title: "Second" }, pending: true }
       ])
     })
+  )
+})
+
+describe("Pending.find", () => {
+  it("finds a record as the person sees it: the server's as their actions leave it, or one an action creates", () => {
+    const started = thread("thread-2")
+    const pending = [
+      unfinished("ThreadRenamed", { threadId: "thread-1", title: "Plans", expectedTitle: null }, 1),
+      unfinished("ThreadStarted", { groupId: "general", text: "Hi", mentions: [] }, 2, [started])
+    ]
+    const key = (id: string) => ReplicaRecord.Key.cases.Thread.make({ id: ThreadId.ThreadId.make(id) })
+    expect(
+      Option.map(Pending.find(key("thread-1"), Option.some(thread("thread-1")), pending), ({ value }) => value)
+    ).toEqual(Option.some({ ...thread("thread-1").value, title: "Plans" }))
+    expect(Pending.find(key("thread-2"), Option.none(), pending)).toEqual(Option.some(started))
+    expect(Pending.find(key("thread-3"), Option.none(), pending)).toEqual(Option.none())
+  })
+})
+
+/** Find among `records`, as the person's browser finds what they see. */
+const findAmong =
+  (records: ReadonlyArray<ReplicaRecord.ReplicaRecord>): Pending.Find =>
+  (key) =>
+    Effect.succeed(
+      Option.fromUndefinedOr(
+        records.find((record) => Schema.toEquivalence(ReplicaRecord.Key)(ReplicaRecord.keyOf(record), key))
+      ) as never
+    )
+
+const taskOf = (fields: Partial<{ status: Task.Status; priority: Task.Priority; assignee: string | null }> = {}) =>
+  cases.Task.make({
+    value: Schema.decodeSync(Task.Task)({
+      threadId: "thread-1",
+      workspaceId: "workspace-1",
+      groupId: "general",
+      status: "triage",
+      priority: "none",
+      assignee: null,
+      createdBy: { _tag: "Member", memberId: "member-1" },
+      createdAt: "2026-10-18T12:01:00Z",
+      ...fields
+    })
+  })
+
+describe("Pending, for a thread's task", () => {
+  const place = ReplicaRecord.Place.cases.Thread.make({ threadId: ThreadId.ThreadId.make("thread-1") })
+  const written = { ...author, key: Request.Key.make("action-1"), writtenAt: at(1) }
+
+  it.effect("makes a thread the person sees a task, copying its group, and nothing of one they don't", () =>
+    Effect.gen(function* () {
+      const { creates } = Pending.effectsOf("TaskCreated")
+      const made = yield* creates!({ threadId: "thread-1" }, written, findAmong([thread("thread-1")]))
+      expect(made).toEqual([taskOf()])
+      const assigned = yield* creates!(
+        { threadId: "thread-1", assignee: "member-2" },
+        written,
+        findAmong([thread("thread-1")])
+      )
+      expect(assigned).toEqual([taskOf({ status: "todo", assignee: "member-2" })])
+      expect(yield* creates!({ threadId: "thread-1" }, written, findAmong([]))).toEqual([])
+    }).pipe(Effect.provide(BrowserCrypto.layer))
+  )
+
+  it.effect("starts a thread as a task when it asks to be one", () =>
+    Effect.gen(function* () {
+      const { creates } = Pending.effectsOf("ThreadStarted")
+      const made = yield* creates!(
+        { groupId: "general", text: "Ship it", mentions: [], task: { priority: "high" } },
+        written,
+        findAmong([])
+      )
+      const started = made.find(ReplicaRecord.ReplicaRecord.isAnyOf(["Thread"]))
+      expect(made.find(ReplicaRecord.ReplicaRecord.isAnyOf(["Task"]))?.value).toEqual({
+        ...taskOf({ priority: "high" }).value,
+        threadId: started?.value.id
+      })
+    }).pipe(Effect.provide(BrowserCrypto.layer))
+  )
+
+  it("changes a task from the value the person saw, and keeps one changed meanwhile, as the server refuses it", () => {
+    const update = (minute: number, change: Task.Change) =>
+      unfinished("TaskUpdated", { threadId: "thread-1", change }, minute)
+    const pending = [
+      update(1, Task.Change.cases.Status.make({ from: "triage", to: "todo" })),
+      update(2, Task.Change.cases.Status.make({ from: "todo", to: "doing" })),
+      update(3, Task.Change.cases.Priority.make({ from: "low", to: "high" }))
+    ]
+    expect(view(Pending.overlay("Task", place, [taskOf()], pending))).toEqual([
+      { value: taskOf({ status: "doing" }).value, pending: true }
+    ])
+  })
+})
+
+const turnOf = (id: string, status: Turn.Status) =>
+  cases.Turn.make({
+    value: Schema.decodeSync(ReplicaRecord.Turn)({
+      id,
+      workspaceId: "workspace-1",
+      groupId: "general",
+      threadId: "thread-1",
+      agentId: "agent-1",
+      memberId: "member-9",
+      participationId: "participation-9",
+      retry: null,
+      status,
+      acceptedThroughSequence: 3,
+      selection: null,
+      messageIds: [],
+      failure: status === "failed" ? "The model was unavailable." : null,
+      cancelReason: null,
+      createdAt: "2026-10-18T12:00:00Z",
+      startedAt: status === "queued" ? null : "2026-10-18T12:00:01Z",
+      finishedAt: Turn.active(status) ? null : "2026-10-18T12:00:02Z"
+    })
+  })
+
+describe("Pending, for agents' turns", () => {
+  const place = ReplicaRecord.Place.cases.Thread.make({ threadId: ThreadId.ThreadId.make("thread-1") })
+
+  it("stops a queued turn at once, asks a running one to stop, and leaves one that ended", () => {
+    const stop = (id: string, minute: number) => unfinished("TurnCancelRequested", { turnId: id }, minute)
+    const turns = [turnOf("turn-1", "queued"), turnOf("turn-2", "running"), turnOf("turn-3", "completed")]
+    expect(
+      view(Pending.overlay("Turn", place, turns, [stop("turn-1", 5), stop("turn-2", 5), stop("turn-3", 5)]))
+    ).toEqual([
+      {
+        value: { ...turns[0]!.value, status: "cancelled", cancelReason: "requested", finishedAt: at(5) },
+        pending: true
+      },
+      { value: { ...turns[1]!.value, status: "cancelling", cancelReason: "requested" }, pending: true },
+      { value: turns[2]!.value, pending: false }
+    ])
+  })
+
+  it.effect("runs a turn again as a queued turn under the ID its retry has", () =>
+    Effect.gen(function* () {
+      const failed = turnOf("turn-1", "failed")
+      const written = { ...author, key: Request.Key.make("action-7"), writtenAt: at(7) }
+      const made = yield* Pending.effectsOf("TurnRetried").creates!({ turnId: "turn-1" }, written, findAmong([failed]))
+      expect(made).toEqual([
+        cases.Turn.make({
+          value: {
+            ...failed.value,
+            id: yield* Turn.retryId(author.workspaceId, failed.value.id),
+            retry: { of: failed.value.id, by: author.memberId },
+            status: "queued",
+            failure: null,
+            createdAt: at(7),
+            startedAt: null,
+            finishedAt: null
+          }
+        })
+      ])
+    }).pipe(Effect.provide(BrowserCrypto.layer))
   )
 })

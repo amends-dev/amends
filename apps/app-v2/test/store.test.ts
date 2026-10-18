@@ -8,8 +8,8 @@ import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
-import { ThreadId, ThreadMessage, ThreadMessageService } from "@amends-dev/core/thread"
-import { TurnJobs } from "@amends-dev/core/turn"
+import { ThreadId, ThreadMessage, ThreadMessageService, ThreadParticipation } from "@amends-dev/core/thread"
+import { type Turn, TurnJobs } from "@amends-dev/core/turn"
 import { Invitation, InvitationService, Member, type Workspace } from "@amends-dev/core/workspace"
 import {
   Accounts,
@@ -26,7 +26,7 @@ import { SyncServer } from "@amends-dev/sync"
 import { IndexedDb } from "@effect/platform-browser"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Context, DateTime, Effect, Exit, Layer, Option, Redacted, Scope, Stream } from "effect"
+import { Context, DateTime, Effect, Exit, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import * as EventLogEncryption from "effect/eventlog/EventLogEncryption"
 import { FetchHttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
@@ -253,6 +253,53 @@ describe("Store", () => {
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
+  it.live("a thread made a task here, and changed, is the task the host keeps, and a stale change is refused", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Ship the release", mentions: [] })
+      const [started] = yield* firstWhere(
+        store.threads(Group.GeneralId),
+        ([thread]) => thread?.thread.pending === false
+      )
+      const threadId = started!.thread.record.value.id
+
+      // Made a task, the thread's task shows at once in its group, then as the host made it.
+      yield* store.write("TaskCreated", { threadId })
+      const made = yield* firstWhere(store.thread(threadId), ({ task }) => Option.isSome(task))
+      expect(made.task).toMatchObject(
+        Option.some({ pending: true, record: { value: { groupId: Group.GeneralId, status: "triage" } } })
+      )
+      yield* firstWhere(store.thread(threadId), ({ task }) => Option.exists(task, ({ pending }) => !pending))
+
+      yield* store.write("TaskUpdated", { threadId, change: { _tag: "Status", from: "triage", to: "doing" } })
+      yield* firstWhere(store.thread(threadId), ({ task }) =>
+        Option.exists(task, ({ record, pending }) => pending && record.value.status === "doing")
+      )
+      yield* firstWhere(store.thread(threadId), ({ task }) =>
+        Option.exists(task, ({ record, pending }) => !pending && record.value.status === "doing")
+      )
+      const [listed] = yield* firstWhere(store.threads(Group.GeneralId), ([thread]) =>
+        Option.exists(thread?.task ?? Option.none(), ({ status }) => status === "doing")
+      )
+      expect(listed!.task).toMatchObject(Option.some({ threadId, status: "doing" }))
+
+      // A change from what the task no longer is shows nothing, and comes back refused.
+      yield* store.write("TaskUpdated", { threadId, change: { _tag: "Status", from: "triage", to: "done" } })
+      const [refused] = yield* firstWhere(store.actions, ([action]) =>
+        Option.isSome(action?.rejection ?? Option.none())
+      )
+      expect(refused!.rejection).toEqual(Option.some(new CoreError.Changed({ resource: "Task", id: threadId })))
+      expect((yield* firstWhere(store.thread(threadId), () => true)).task).toMatchObject(
+        Option.some({ pending: false, record: { value: { status: "doing" } } })
+      )
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
   it.live("a team and a conversation started here are the ones the host makes, under the same IDs", () =>
     Effect.gen(function* () {
       const services = yield* host
@@ -413,3 +460,63 @@ describe("Store", () => {
 /** The port a server listens at, when it listens on one. */
 const port = (address: HttpServer.HttpServer["Service"]["address"]) =>
   "port" in address ? Option.some(address.port) : Option.none()
+
+describe("Store.viewTurns", () => {
+  const turn = (id: string, status: Turn.Status, minute: number, participationId = "participation-3") => ({
+    record: ReplicaRecord.ReplicaRecord.cases.Turn.make({
+      value: Schema.decodeSync(ReplicaRecord.Turn)({
+        id,
+        workspaceId: "workspace-1",
+        groupId: "general",
+        threadId: "thread-1",
+        agentId: "agent-1",
+        memberId: "member-3",
+        participationId,
+        retry: null,
+        status,
+        acceptedThroughSequence: 1,
+        selection: null,
+        messageIds: [],
+        failure: null,
+        cancelReason: null,
+        createdAt: `2026-10-18T12:0${minute}:00Z`,
+        startedAt: null,
+        finishedAt: null
+      })
+    }),
+    pending: false
+  })
+  const participation = (id: string, status: "active" | "ended") =>
+    Schema.decodeSync(ThreadParticipation.ThreadParticipation)({
+      id,
+      workspaceId: "workspace-1",
+      threadId: "thread-1",
+      participant: {
+        _tag: "Member",
+        memberId: "member-3",
+        groupMembershipId: "membership-3",
+        identity: { _tag: "Agent", id: "agent-1" }
+      },
+      joinedAt: "2026-10-18T12:00:00Z",
+      joinedAtSequence: 1,
+      status,
+      endedAt: status === "ended" ? "2026-10-18T12:30:00Z" : null
+    })
+  const retryOpen = (views: ReadonlyArray<Store.TurnView>) =>
+    views.map(({ turn, retryOpen }) => [turn.record.value.id, retryOpen])
+
+  it("lists them oldest first, and opens a retry to the agent's latest that failed or stopped, while it takes part", () => {
+    const active = [participation("participation-3", "active")]
+    expect(retryOpen(Store.viewTurns([turn("turn-2", "failed", 2), turn("turn-1", "failed", 1)], active))).toEqual([
+      ["turn-1", false],
+      ["turn-2", true]
+    ])
+    expect(retryOpen(Store.viewTurns([turn("turn-1", "cancelled", 1), turn("turn-2", "queued", 2)], active))).toEqual([
+      ["turn-1", false],
+      ["turn-2", false]
+    ])
+    expect(
+      retryOpen(Store.viewTurns([turn("turn-1", "failed", 1)], [participation("participation-3", "ended")]))
+    ).toEqual([["turn-1", false]])
+  })
+})

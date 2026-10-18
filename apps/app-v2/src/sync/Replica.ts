@@ -116,23 +116,32 @@ export interface Action {
 /** A record of `Kind`. */
 export type RecordOf<Kind extends ReplicaRecord.Kind> = Extract<ReplicaRecord.ReplicaRecord, { readonly _tag: Kind }>
 
+/** The key of a record of `Kind`. */
+export type KeyOf<Kind extends ReplicaRecord.Kind> = Extract<ReplicaRecord.Key, { readonly _tag: Kind }>
+
 /**
  * A group's thread, with what the replica holds in it that its group's list shows: its messages, its
- * activities, and the member's position in it.
+ * activities, the member's position in it, and the task it tracks.
  */
 export interface ThreadRecords {
   readonly thread: RecordOf<"Thread">
   readonly messages: ReadonlyArray<RecordOf<"ThreadMessage">>
   readonly activities: ReadonlyArray<RecordOf<"ThreadActivity">>
   readonly positions: ReadonlyArray<RecordOf<"ThreadPosition">>
+  readonly tasks: ReadonlyArray<RecordOf<"Task">>
 }
 
-/** What the replica holds in a thread: its messages, its activities, the member's position, and who takes part. */
+/**
+ * What the replica holds in a thread: its messages, its activities, the member's position, who takes
+ * part, the task it tracks, and its agents' turns.
+ */
 export interface ThreadContents {
   readonly messages: ReadonlyArray<RecordOf<"ThreadMessage">>
   readonly activities: ReadonlyArray<RecordOf<"ThreadActivity">>
   readonly positions: ReadonlyArray<RecordOf<"ThreadPosition">>
   readonly participations: ReadonlyArray<RecordOf<"ThreadParticipation">>
+  readonly tasks: ReadonlyArray<RecordOf<"Task">>
+  readonly turns: ReadonlyArray<RecordOf<"Turn">>
 }
 
 /** The person's notifications, with each thread they come from as its group's list holds it. */
@@ -155,6 +164,12 @@ export class Replica extends Context.Service<
     readonly hold: (action: Omit<Action, "rejection">) => Effect.Effect<void, QueryError>
     /** Forget a rejected action, once the person has seen why. */
     readonly dismiss: (key: string) => Effect.Effect<void, QueryError>
+    /** The record under `key`, if the replica holds one. */
+    readonly get: <Kind extends ReplicaRecord.Kind>(
+      key: KeyOf<Kind>
+    ) => Effect.Effect<Option.Option<RecordOf<Kind>>, QueryError>
+    /** The person's actions the server has not completed, as the replica holds them now. */
+    readonly getActions: Effect.Effect<ReadonlyArray<Action>, QueryError>
     /** The records of `kind` that sit at `place`, and again after each change to them. */
     readonly list: <Kind extends ReplicaRecord.Kind>(
       kind: Kind,
@@ -229,20 +244,21 @@ const make = Effect.gen(function* () {
     )
   }
 
-  /** `thread`, with its messages, its activities, and the member's position in it. */
+  /** `thread`, with its messages, its activities, the member's position in it, and its task. */
   const selectContents = (thread: RecordOf<"Thread">) => {
     const place = ReplicaRecord.Place.cases.Thread.make({ threadId: thread.value.id })
     return Effect.map(
       Effect.all({
         messages: select("ThreadMessage", place),
         activities: select("ThreadActivity", place),
-        positions: select("ThreadPosition", place)
+        positions: select("ThreadPosition", place),
+        tasks: select("Task", place)
       }),
       (held): ThreadRecords => ({ thread, ...held })
     )
   }
 
-  /** The threads of `groupId`, each with its messages, its activities, and the member's position in it. */
+  /** The threads of `groupId`, each with what it holds that the group's list shows. */
   const selectThreads = (groupId: GroupId.GroupId) =>
     Effect.flatMap(select("Thread", ReplicaRecord.Place.cases.Group.make({ groupId })), (threads) =>
       Effect.forEach(threads, selectContents)
@@ -269,6 +285,10 @@ const make = Effect.gen(function* () {
     }
   })
 
+  const getActions = Effect.map(actions.select(), (rows) =>
+    rows.map(({ rejection, ...action }): Action => ({ ...action, rejection: Option.fromNullOr(rejection) }))
+  )
+
   const changing = <A, E>(tables: ReadonlyArray<"records" | "actions">, effect: Effect.Effect<A, E>) =>
     query.reactivity.mutation(tables, effect)
 
@@ -281,6 +301,13 @@ const make = Effect.gen(function* () {
     hold: (action) =>
       changing(["actions"], actions.upsert({ ...action, payload: new Uint8Array(action.payload), rejection: null })),
     dismiss: (key) => changing(["actions"], actions.delete().equals(key)),
+    get: <Kind extends ReplicaRecord.Kind>(key: KeyOf<Kind>) => {
+      const isKind = ReplicaRecord.ReplicaRecord.isAnyOf([key._tag as Kind])
+      return Effect.map(records.select().equals(keyText(key)), ([row]) =>
+        Option.filter(Option.fromUndefinedOr(row?.record), isKind)
+      )
+    },
+    getActions,
     list: (kind, place) => query.reactivity.stream(["records"], select(kind, place)),
     every: (kind) => {
       const isKind = ReplicaRecord.ReplicaRecord.isAnyOf([kind])
@@ -300,17 +327,14 @@ const make = Effect.gen(function* () {
           messages: select("ThreadMessage", place),
           activities: select("ThreadActivity", place),
           positions: select("ThreadPosition", place),
-          participations: select("ThreadParticipation", place)
+          participations: select("ThreadParticipation", place),
+          tasks: select("Task", place),
+          turns: select("Turn", place)
         })
       )
     },
     inbox: query.reactivity.stream(["records"], selectInbox),
-    actions: query.reactivity.stream(
-      ["actions"],
-      Effect.map(actions.select(), (rows) =>
-        rows.map(({ rejection, ...action }) => ({ ...action, rejection: Option.fromNullOr(rejection) }))
-      )
-    )
+    actions: query.reactivity.stream(["actions"], getActions)
   })
 })
 

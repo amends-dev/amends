@@ -111,14 +111,25 @@ export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: TurnStore["Se
 
 const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Turn.Turn))
 
+type Ordered = Pick<Turn.Turn, "id" | "createdAt" | "acceptedThroughSequence">
+
 /**
  * Creation time, then how far each accepted input, which a later turn of the same agent on a
  * thread always reaches beyond, then ID in binary order.
  */
-const byCreated = (left: Turn.Turn, right: Turn.Turn) =>
+const byCreated = (left: Ordered, right: Ordered) =>
   DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
   left.acceptedThroughSequence - right.acceptedThroughSequence ||
   MemoryDatabase.compareBinary(left.id, right.id)
+
+/**
+ * The latest of an agent's turns on a thread, as `findLatest` finds it: by creation, then by how
+ * far its accepted input reaches, then by ID in binary order.
+ *
+ * @category getters
+ * @since 0.1.0
+ */
+export const latestOf = <T extends Ordered>(turns: ReadonlyArray<T>): T | undefined => turns.toSorted(byCreated).at(-1)
 
 /**
  * Turn records over the current workspace transaction.
@@ -168,7 +179,7 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
       return Option.fromUndefinedOr(records.find((record) => Turn.active(record.status)))
     }),
     findLatest: Effect.fn("TurnStore.memory.findLatest")(function* (memberId, threadId) {
-      return Option.fromUndefinedOr((yield* ofAgent("findLatest", memberId, threadId)).at(-1))
+      return Option.fromUndefinedOr(latestOf(yield* ofAgent("findLatest", memberId, threadId)))
     }),
     listActive: Effect.fn("TurnStore.memory.listActive")(function* (limit) {
       return (yield* all("listActive"))

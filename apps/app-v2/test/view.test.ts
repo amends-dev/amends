@@ -1,8 +1,10 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
+import { Task } from "@amends-dev/core/task"
+import { Turn } from "@amends-dev/core/turn"
 import { Invitation } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
-import { Option, Schema } from "effect"
+import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   ManagedResource,
@@ -23,6 +25,7 @@ import { Message } from "../src/message.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  CreateTask,
   CreateTeam,
   Dismiss,
   Invite,
@@ -31,7 +34,10 @@ import {
   MarkAllNotificationsSeen,
   PostReply,
   RemoveGroupMember,
-  RevokeInvitation
+  RetryTurn,
+  RevokeInvitation,
+  StopTurn,
+  UpdateTask
 } from "../src/store.ts"
 import { update } from "../src/update.ts"
 import { view } from "../src/view.ts"
@@ -51,10 +57,14 @@ import {
   reply,
   roleOf,
   roles,
+  scout,
+  scoutInGeneral,
   session,
   signedIn,
   signedOut,
-  thread
+  task,
+  thread,
+  turnOf
 } from "./fixtures.ts"
 
 /** A public team alice does not belong to. */
@@ -95,7 +105,7 @@ describe("the app", () => {
       Subscription.emit(
         Message.GotThreads({
           groupId: general.id,
-          threads: [{ thread, opening: Option.some(opening), pending: true, unread: 0 }]
+          threads: [{ thread, opening: Option.some(opening), task: Option.none(), pending: true, unread: 0 }]
         })
       ),
       expect(text(" · Sending…")).toExist(),
@@ -106,7 +116,9 @@ describe("the app", () => {
           messages: [{ message: opening, pending: false }],
           following: Option.none(),
           latest: 0,
-          readThrough: 0
+          readThrough: 0,
+          task: Option.none(),
+          turns: []
         })
       ),
       expect(text("Plans for the week")).toExist(),
@@ -344,6 +356,131 @@ describe("the app", () => {
       expect(role("button", { name: "Remove" })).toBeAbsent(),
       expect(role("button", { name: "Make owner" })).toBeAbsent(),
       expect(role("region", { name: "Invitations" })).toBeAbsent()
+    )
+  })
+
+  it("a person makes a thread a task and changes it, stops and retries its turns, and follows a turn's log", () => {
+    const running = turnOf("turn-1", "running")
+    const failed = turnOf("turn-2", "failed")
+    const got = (taskOf: Option.Option<typeof task>, turns: ReadonlyArray<typeof running>) =>
+      Subscription.emit(
+        Message.GotThread({
+          threadId: thread.id,
+          messages: [{ message: opening, pending: false }],
+          following: Option.none(),
+          latest: 0,
+          readThrough: 0,
+          task: Option.map(taskOf, (value) => ({ task: value, pending: false })),
+          turns: turns.map((turn) => ({ turn, pending: false, retryOpen: turn.status === "failed" }))
+        })
+      )
+    const at = DateTime.makeUnsafe("2026-10-18T12:02:01Z")
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(Message.GotGroups({ groups: [{ group: general, pending: false }] })),
+      Subscription.emit(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false },
+            { member: scout, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(Message.GotRoles({ roles })),
+      Subscription.emit(Message.GotAssignments({ assignments: [{ assignment: aliceOwns, pending: false }] })),
+      Subscription.emit(
+        Message.GotMemberships({
+          memberships: [
+            { membership: aliceInGeneral, pending: false },
+            { membership: scoutInGeneral, pending: false }
+          ]
+        })
+      ),
+      click(role("button", { name: "General" })),
+      Subscription.emit(
+        Message.GotThreads({
+          groupId: general.id,
+          threads: [{ thread, opening: Option.some(opening), task: Option.some(task), pending: false, unread: 0 }]
+        })
+      ),
+      expect(text(" · Triage")).toExist(),
+      click(role("button", { name: "Plans for the week" })),
+      got(Option.none(), [running, failed]),
+      click(role("button", { name: "Make it a task" })),
+      Command.expectExact(CreateTask({ threadId: thread.id })),
+      Command.resolve(CreateTask, Message.WroteAction()),
+      got(Option.some(task), [running, failed]),
+      inside(role("region", { name: "Task" }), change(label("Status"), "doing")),
+      Command.expectExact(
+        UpdateTask({ threadId: thread.id, change: Task.Change.cases.Status.make({ from: "triage", to: "doing" }) })
+      ),
+      Command.resolve(UpdateTask, Message.WroteAction()),
+      inside(role("region", { name: "Task" }), change(label("Assignee"), scout.id)),
+      Command.expectExact(
+        UpdateTask({ threadId: thread.id, change: Task.Change.cases.Assignee.make({ from: null, to: scout.id }) })
+      ),
+      Command.resolve(UpdateTask, Message.WroteAction()),
+      inside(
+        role("region", { name: "Turns" }),
+        expect(text("The model was unavailable.")).toExist(),
+        click(role("button", { name: "Stop" }))
+      ),
+      Command.expectExact(StopTurn({ turnId: running.id })),
+      Command.resolve(StopTurn, Message.WroteAction()),
+      inside(role("region", { name: "Turns" }), click(role("button", { name: "Retry" }))),
+      Command.expectExact(RetryTurn({ turnId: failed.id })),
+      Command.resolve(RetryTurn, Message.WroteAction()),
+      got(Option.some(task), [running]),
+      click(role("button", { name: "Show log" })),
+      inside(role("region", { name: "Log" }), expect(text("Opening the log…")).toExist()),
+      Subscription.emit(
+        Message.GotTurnLog({
+          turnId: running.id,
+          message: Turn.LogMessage.cases.Opened.make({
+            items: [Turn.LogItem.cases.InputTaken.make({ at, messages: 1 })]
+          })
+        })
+      ),
+      Subscription.emit(
+        Message.GotTurnLog({
+          turnId: running.id,
+          message: Turn.LogMessage.cases.Changed.make({
+            changes: [
+              {
+                index: 1,
+                item: Turn.LogItem.cases.Responded.make({
+                  at,
+                  responseId: "response-1",
+                  text: "Looks good.",
+                  parts: [0],
+                  reply: true
+                })
+              }
+            ]
+          })
+        })
+      ),
+      Subscription.emit(Message.GotTurnLog({ turnId: running.id, message: Turn.LogMessage.cases.Ended.make({}) })),
+      inside(
+        role("region", { name: "Log" }),
+        expect(text("Read 1 message")).toExist(),
+        expect(text("Replied: Looks good.")).toExist(),
+        expect(text("The turn has ended.")).toExist()
+      ),
+      click(role("button", { name: "Hide log" })),
+      expect(role("region", { name: "Log" })).toBeAbsent(),
+      // Without the grants to, the person sees the task and the turns, and changes neither.
+      Subscription.emit(Message.GotAssignments({ assignments: [] })),
+      got(Option.some({ ...task, status: "doing", assignee: scout.id }), [running]),
+      inside(role("region", { name: "Task" }), expect(text("Doing · No priority · Assigned to Scout")).toExist()),
+      expect(label("Status")).toBeAbsent(),
+      expect(role("button", { name: "Stop" })).toBeAbsent(),
+      expect(role("button", { name: "Show log" })).toExist()
     )
   })
 

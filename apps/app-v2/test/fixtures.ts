@@ -3,7 +3,10 @@ import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/aut
 import { Group, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
+import { ReplicaRecord } from "@amends-dev/core/replica"
+import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
+import type { Turn } from "@amends-dev/core/turn"
 import { Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { Option, Schema } from "effect"
@@ -141,4 +144,48 @@ export const notificationOf = (id: string, sequence: number, minute: number) =>
     recipient: { _tag: "Human", id: "alice", memberId: "member-1" },
     recordedAt: `2026-10-18T12:${String(minute).padStart(2, "0")}:00Z`,
     state: { _tag: "Pending" }
+  })
+
+/** An agent of the workspace, a member of general. */
+export const scout = Schema.decodeSync(Member.Member)({
+  id: "member-3",
+  workspaceId: "workspace-1",
+  identity: { _tag: "Agent", id: "agent-1" },
+  name: "Scout",
+  status: "active"
+})
+export const scoutInGeneral = admission("membership-4", "general", "member-3")
+
+/** The thread's task, in triage, which alice created. */
+export const task = Schema.decodeSync(Task.Task)({
+  threadId: "thread-1",
+  workspaceId: "workspace-1",
+  groupId: "general",
+  status: "triage",
+  priority: "none",
+  assignee: null,
+  createdBy: { _tag: "Member", memberId: "member-1" },
+  createdAt: "2026-10-18T12:01:00Z"
+})
+
+/** Scout's turn `id` in the thread, in `status`. */
+export const turnOf = (id: string, status: Turn.Status) =>
+  Schema.decodeSync(ReplicaRecord.Turn)({
+    id,
+    workspaceId: "workspace-1",
+    groupId: "general",
+    threadId: "thread-1",
+    agentId: "agent-1",
+    memberId: "member-3",
+    participationId: "participation-3",
+    retry: null,
+    status,
+    acceptedThroughSequence: 1,
+    selection: null,
+    messageIds: [],
+    failure: status === "failed" ? "The model was unavailable." : null,
+    cancelReason: null,
+    createdAt: "2026-10-18T12:02:00Z",
+    startedAt: status === "queued" ? null : "2026-10-18T12:02:01Z",
+    finishedAt: null
   })

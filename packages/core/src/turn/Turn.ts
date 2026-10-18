@@ -51,6 +51,14 @@ export type Status = typeof Status.Type
  */
 export const active = (status: Status) => status === "queued" || status === "running" || status === "cancelling"
 
+/**
+ * Whether a turn in `status` can be asked to stop: while it is active and not already stopping.
+ *
+ * @category predicates
+ * @since 0.1.0
+ */
+export const stoppable = (status: Status) => active(status) && status !== "cancelling"
+
 const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
 /**
@@ -186,6 +194,40 @@ export const NotRetryableReason = Schema.Literals(["active", "completed", "super
 export type NotRetryableReason = typeof NotRetryableReason.Type
 
 /**
+ * Where an agent stands on a thread: what decides whether one of its turns there that failed or
+ * stopped can run again.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export interface Standing {
+  /** Whether the agent has an active turn there. */
+  readonly active: boolean
+  /** The agent's latest turn there, as `TurnStore.findLatest` finds it. */
+  readonly latest: TurnId.TurnId | undefined
+  /** Whether the agent still takes part there, through the participation the turn's input came through. */
+  readonly participating: boolean
+}
+
+/**
+ * Why `turn` can't run again now: it has not ended, it replied, a later or active turn of its agent
+ * on its thread superseded it, or its agent no longer takes part there; undefined when it can.
+ *
+ * @category predicates
+ * @since 0.1.0
+ */
+export const whyNotRetryable = (
+  turn: Pick<Turn, "id" | "status">,
+  standing: Standing
+): NotRetryableReason | undefined => {
+  if (active(turn.status)) return "active"
+  if (turn.status === "completed") return "completed"
+  if (standing.active || (standing.latest !== undefined && standing.latest !== turn.id)) return "superseded"
+  if (!standing.participating) return "departed"
+  return undefined
+}
+
+/**
  * A turn as a reader of its thread sees it, with what they may do with it now: ask it to stop,
  * while it is active and not already stopping, or retry it, once it failed or stopped and nothing
  * followed it. Both require directing its agent. Where its log begins is for following it alone.
@@ -212,7 +254,7 @@ export interface View extends Schema.Schema.Type<typeof View> {}
  * @category constructors
  * @since 0.1.0
  */
-export const directRequirement = (turn: Turn): Requirement.Requirement =>
+export const directRequirement = (turn: Pick<Turn, "workspaceId" | "memberId">): Requirement.Requirement =>
   Requirement.make(
     AgentPermissions.Use,
     Target.Reference.cases.Member.make({ workspaceId: turn.workspaceId, memberId: turn.memberId })
@@ -227,7 +269,7 @@ export const directRequirement = (turn: Turn): Requirement.Requirement =>
  */
 export const view = (turn: Turn, directs: boolean, retryOpen: boolean): View =>
   Object.assign({}, Struct.omit(turn, ["logAfter"]), {
-    stoppable: directs && active(turn.status) && turn.status !== "cancelling",
+    stoppable: directs && stoppable(turn.status),
     retryable: directs && retryOpen
   })
 
