@@ -510,9 +510,18 @@
         "@effect/vitest",
       ],
     },
+    "packages/sync": {
+      "name": "@amends-dev/sync",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "effect": "catalog:",
+      },
+    },
     "packages/toolkit": {
       "name": "@amends-dev/toolkit",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -609,6 +618,8 @@
     "@amends-dev/site": ["@amends-dev/site@workspace:apps/site"],
 
     "@amends-dev/storage-postgresql": ["@amends-dev/storage-postgresql@workspace:adapters/storage-postgresql"],
+
+    "@amends-dev/sync": ["@amends-dev/sync@workspace:packages/sync"],
 
     "@amends-dev/toolkit": ["@amends-dev/toolkit@workspace:packages/toolkit"],
 

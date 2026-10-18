@@ -59,7 +59,9 @@ runs them, and keeps `console` to tests and scripts.
   and it holds the host contracts for storage, accounts, sign-in, session token resolution, and the
   workspace directory. `http` is the HTTP protocol: the contract clients call, which they import by
   module, and the handlers that implement it over the gateway, including its authentication. Another
-  protocol adds its own package over the same gateway rather than new gateway methods. The gateway's
+  protocol adds its own package over the same gateway rather than new gateway methods: `sync` is how a
+  member's browser keeps a workspace in sync, as Effect eventlog events, the actions their browser
+  writes and the changes and rejections the server writes back to their store. The gateway's
   `conformance` module holds the test suites every storage adapter runs against itself through a
   fixture: what the storage contracts promise, from transactions and logs to accounts, across hosts
   over the same storage. The gateway's tests run them over the memory implementation, and test
