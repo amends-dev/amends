@@ -1,5 +1,6 @@
 import { GroupId } from "@amends-dev/core/group"
 import { ThreadParticipationId } from "@amends-dev/core/thread"
+import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
@@ -7,17 +8,39 @@ import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../sr
 import { Message } from "../src/message.ts"
 import { type Model, Page, SignInForm, StoreState, Workspaces } from "../src/model.ts"
 import {
+  AddMember,
+  CreateTeam,
   DeleteMessage,
   EditMessage,
+  FollowGroup,
   FollowThread,
+  JoinGroup,
+  LeaveGroup,
   MarkThreadRead,
   PostReply,
+  RemoveMember,
+  RenameGroup,
   RenameThread,
+  StartDirect,
   StartThread,
+  UnfollowGroup,
   UnfollowThread
 } from "../src/store.ts"
 import { update } from "../src/update.ts"
-import { apiUrl, general, membership, opening, session, signedIn, signedOut, thread } from "./fixtures.ts"
+import {
+  aliceInDesign,
+  apiUrl,
+  bob,
+  bobInDesign,
+  design,
+  general,
+  membership,
+  opening,
+  session,
+  signedIn,
+  signedOut,
+  thread
+} from "./fixtures.ts"
 
 describe("signing in", () => {
   it("an address gets a code, the code a session, and the session the person's workspaces", () => {
@@ -99,7 +122,7 @@ describe("a workspace", () => {
         )
       }),
       message(Message.AcquiredStore()),
-      message(Message.GotGroups({ groups: [general] })),
+      message(Message.GotGroups({ groups: [{ group: general, pending: false }] })),
       message(Message.ClickedGroup({ groupId: general.id })),
       message(
         Message.GotThreads({
@@ -220,6 +243,99 @@ describe("a workspace", () => {
       message(Message.ClickedFollow()),
       Command.expectExact(FollowThread({ threadId: thread.id })),
       Command.resolve(FollowThread, Message.WroteAction())
+    )
+  })
+
+  it("starts a team and a conversation from their forms, and nothing from a form left incomplete", () => {
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedNewTeam()),
+      message(Message.TypedTeamName({ name: "Design" })),
+      message(Message.ToggledTeamPublic({ isPublic: true })),
+      message(Message.SubmittedTeam()),
+      // The person who creates a team belongs to it.
+      Command.expectExact(CreateTeam({ name: "Design", memberIds: [membership.member.id], visibility: "Public" })),
+      Command.resolve(CreateTeam, Message.WroteAction()),
+      model((model) => {
+        expect(Option.flatMap(openedIn(model), ({ composing }) => composing)).toEqual(Option.none())
+      }),
+      message(Message.ClickedNewDirect()),
+      message(Message.TypedDirect({ text: "Got a minute?" })),
+      // No one to talk to yet: the form stays.
+      message(Message.SubmittedDirect()),
+      message(Message.ChoseDirectMember({ memberId: Option.some(bob.id) })),
+      message(Message.SubmittedDirect()),
+      Command.expectExact(StartDirect({ memberId: bob.id, text: "Got a minute?" })),
+      Command.resolve(StartDirect, Message.WroteAction())
+    )
+  })
+
+  it("renames a team, admits and removes its members, follows it, leaves it, and joins another", () => {
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.GotGroups({ groups: [{ group: design, pending: false }] })),
+      message(Message.GotMembers({ members: [membership.member, bob] })),
+      message(
+        Message.GotMemberships({
+          memberships: [
+            { membership: aliceInDesign, pending: false },
+            { membership: bobInDesign, pending: false }
+          ]
+        })
+      ),
+      message(Message.ClickedGroup({ groupId: design.id })),
+      message(Message.ClickedRenameGroup()),
+      // The form starts from the name it has.
+      model((model) => {
+        expect(
+          Option.flatMap(openedIn(model), ({ group }) => Option.flatMap(group, ({ renaming }) => renaming))
+        ).toEqual(Option.some("Design"))
+      }),
+      message(Message.TypedGroupName({ name: "Product" })),
+      message(Message.SubmittedGroupName()),
+      Command.expectExact(RenameGroup({ groupId: design.id, name: "Product", expectedName: "Design" })),
+      Command.resolve(RenameGroup, Message.WroteAction()),
+      message(Message.ClickedRemoveMember({ membershipId: bobInDesign.id })),
+      Command.expectExact(RemoveMember({ groupId: design.id, membershipId: bobInDesign.id })),
+      Command.resolve(RemoveMember, Message.WroteAction()),
+      message(Message.ChoseMemberToAdd({ memberId: Option.some(bob.id) })),
+      message(Message.SubmittedAddMember()),
+      Command.expectExact(AddMember({ groupId: design.id, memberId: bob.id })),
+      Command.resolve(AddMember, Message.WroteAction()),
+      message(Message.ClickedFollowGroup()),
+      Command.expectExact(FollowGroup({ groupId: design.id, memberId: membership.member.id })),
+      Command.resolve(FollowGroup, Message.WroteAction()),
+      message(Message.ClickedUnfollowGroup()),
+      Command.expectExact(UnfollowGroup({ groupId: design.id, memberId: membership.member.id })),
+      Command.resolve(UnfollowGroup, Message.WroteAction()),
+      message(Message.ClickedLeave()),
+      Command.expectExact(LeaveGroup({ groupId: design.id, membershipId: aliceInDesign.id })),
+      Command.resolve(LeaveGroup, Message.WroteAction()),
+      message(Message.ClickedJoin({ groupId: GroupId.GroupId.make("research") })),
+      Command.expectExact(JoinGroup({ groupId: GroupId.GroupId.make("research") })),
+      Command.resolve(JoinGroup, Message.WroteAction()),
+      // Leaving a group the person does not belong to asks nothing of the server.
+      message(Message.GotMemberships({ memberships: [{ membership: bobInDesign, pending: false }] })),
+      message(Message.ClickedLeave()),
+      message(Message.ChoseMemberToAdd({ memberId: Option.some(MemberId.MemberId.make("member-3")) })),
+      model((model) => {
+        expect(Option.flatMap(openedIn(model), ({ group }) => Option.flatMap(group, ({ adding }) => adding))).toEqual(
+          Option.some(MemberId.MemberId.make("member-3"))
+        )
+      }),
+      // A group the person can no longer see closes.
+      message(Message.GotGroups({ groups: [{ group: general, pending: false }] })),
+      model((model) => {
+        expect(Option.flatMap(openedIn(model), ({ group }) => group)).toEqual(Option.none())
+      })
     )
   })
 

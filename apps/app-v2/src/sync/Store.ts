@@ -115,6 +115,10 @@ export class Store extends Context.Service<
       kind: Kind,
       place: ReplicaRecord.Place
     ) => Stream.Stream<ReadonlyArray<Pending.Held<Replica.RecordOf<Kind>>>, QueryError>
+    /** Every record of `kind`, wherever it sits, and again after each change to them or to the person's actions. */
+    readonly every: <Kind extends ReplicaRecord.Kind>(
+      kind: Kind
+    ) => Stream.Stream<ReadonlyArray<Pending.Held<Replica.RecordOf<Kind>>>, QueryError>
     /** The threads of `groupId`, each with its opening message, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
     /** The thread `threadId` as the person sees it open, and again after each change. */
@@ -261,6 +265,10 @@ export const layer = (options: Options) =>
             list: (kind, place) =>
               withPending(replica.list(kind, place), (records, pending) =>
                 Pending.overlay(kind, place, records, pending)
+              ),
+            every: (kind) =>
+              withPending(replica.every(kind), (records, pending) =>
+                Pending.overlay(kind, undefined, records, pending)
               ),
             threads: (groupId) =>
               withPending(replica.threads(groupId), (threads, pending) =>

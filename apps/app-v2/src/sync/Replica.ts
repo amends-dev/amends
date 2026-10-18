@@ -154,6 +154,10 @@ export class Replica extends Context.Service<
       kind: Kind,
       place: ReplicaRecord.Place
     ) => Stream.Stream<ReadonlyArray<RecordOf<Kind>>, QueryError>
+    /** Every record of `kind`, wherever it sits, and again after each change to them. */
+    readonly every: <Kind extends ReplicaRecord.Kind>(
+      kind: Kind
+    ) => Stream.Stream<ReadonlyArray<RecordOf<Kind>>, QueryError>
     /** The threads of `groupId`, each with what it holds that the group's list shows, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadRecords>, QueryError>
     /** What the replica holds in `threadId`, and again after each change. */
@@ -246,6 +250,15 @@ const make = Effect.gen(function* () {
       changing(["actions"], actions.upsert({ ...action, payload: new Uint8Array(action.payload), rejection: null })),
     dismiss: (key) => changing(["actions"], actions.delete().equals(key)),
     list: (kind, place) => query.reactivity.stream(["records"], select(kind, place)),
+    every: (kind) => {
+      const isKind = ReplicaRecord.ReplicaRecord.isAnyOf([kind])
+      return query.reactivity.stream(
+        ["records"],
+        Effect.map(records.select("byKind").equals(kind), (rows) =>
+          rows.flatMap(({ record }) => (isKind(record) ? [record] : []))
+        )
+      )
+    },
     threads: (groupId) => query.reactivity.stream(["records"], selectThreads(groupId)),
     thread: (threadId) => {
       const place = ReplicaRecord.Place.cases.Thread.make({ threadId })

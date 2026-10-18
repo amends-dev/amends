@@ -1,4 +1,5 @@
 import { CoreError } from "@amends-dev/core/error"
+import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Thread, ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
@@ -162,6 +163,82 @@ describe("Pending.overlay, for a member's own part in a thread", () => {
     expect(view(Pending.overlay("ThreadParticipation", place, [participation("ended")], [followed]))).toEqual([
       { value: participation("active").value, pending: true }
     ])
+  })
+})
+
+describe("Pending.overlay, for groups", () => {
+  const workspace = ReplicaRecord.Place.cases.Workspace.make({})
+  const design = cases.Group.make({
+    value: Schema.decodeSync(Group.Group)({
+      id: "design",
+      workspaceId: "workspace-1",
+      kind: "Team",
+      visibility: "Private",
+      name: "Design",
+      createdBy: "member-1",
+      createdAt: "2026-10-18T12:00:00Z"
+    })
+  })
+  const admission = (id: string, memberId: string) =>
+    cases.GroupMembership.make({
+      value: Schema.decodeSync(GroupMembership.GroupMembership)({
+        id,
+        workspaceId: "workspace-1",
+        groupId: "design",
+        memberId,
+        admittedAt: "2026-10-18T12:00:00Z",
+        status: "active"
+      })
+    })
+  const following = (status: "active" | "ended") =>
+    cases.GroupFollow.make({
+      value: Schema.decodeSync(GroupFollow.GroupFollow)({
+        id: "follow-1",
+        workspaceId: "workspace-1",
+        groupId: "design",
+        memberId: "member-1",
+        groupMembershipId: "membership-1",
+        followedAt: "2026-10-18T12:00:00Z",
+        status,
+        endedAt: status === "ended" ? "2026-10-18T12:30:00Z" : null
+      })
+    })
+
+  it("renames a team", () => {
+    const renamed = unfinished("GroupRenamed", { groupId: "design", name: "Product", expectedName: "Design" }, 1)
+    expect(view(Pending.overlay("Group", workspace, [design], [renamed]))).toEqual([
+      { value: { ...design.value, name: "Product" }, pending: true }
+    ])
+  })
+
+  it("removes a member, and the person when they leave, but only the membership each names", () => {
+    const alice = admission("membership-1", "member-1")
+    const bob = admission("membership-2", "member-2")
+    const pending = [
+      unfinished("GroupMemberRemoved", { groupId: "design", membershipId: "membership-2" }, 1),
+      unfinished("GroupLeft", { groupId: "design", membershipId: "membership-1" }, 2)
+    ]
+    expect(view(Pending.overlay("GroupMembership", undefined, [alice, bob], pending.slice(0, 1)))).toEqual([
+      { value: alice.value, pending: false },
+      { value: { ...bob.value, status: "removed" }, pending: true }
+    ])
+    expect(view(Pending.overlay("GroupMembership", undefined, [alice, bob], pending))).toEqual([
+      { value: { ...alice.value, status: "removed" }, pending: true },
+      { value: { ...bob.value, status: "removed" }, pending: true }
+    ])
+  })
+
+  it("ends the person's follow of a group, and takes up one they ended", () => {
+    const unfollowed = unfinished("GroupUnfollowed", { groupId: "design", memberId: "member-1" }, 2)
+    expect(view(Pending.overlay("GroupFollow", undefined, [following("active")], [unfollowed]))).toEqual([
+      { value: { ...following("active").value, status: "ended", endedAt: at(2) }, pending: true }
+    ])
+    const followed = unfinished("GroupFollowed", { groupId: "design", memberId: "member-1" }, 3)
+    expect(view(Pending.overlay("GroupFollow", undefined, [following("ended")], [followed]))).toEqual([
+      { value: following("active").value, pending: true }
+    ])
+    // Following a group they never followed waits for the server.
+    expect(view(Pending.overlay("GroupFollow", undefined, [], [followed]))).toEqual([])
   })
 })
 

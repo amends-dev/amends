@@ -1,3 +1,4 @@
+import { BuiltinRoles } from "@amends-dev/core/authorization"
 // @vitest-environment node
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
 import { DeliveryJobs } from "@amends-dev/core/channel"
@@ -8,7 +9,7 @@ import { MemoryDatabase } from "@amends-dev/core/journal"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { TurnJobs } from "@amends-dev/core/turn"
-import { Member, type Workspace } from "@amends-dev/core/workspace"
+import { InvitationService, Member, type Workspace } from "@amends-dev/core/workspace"
 import {
   Accounts,
   Gateway,
@@ -24,7 +25,7 @@ import { SyncServer } from "@amends-dev/sync"
 import { IndexedDb } from "@effect/platform-browser"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Context, Effect, Exit, Layer, Option, Redacted, Scope, Stream } from "effect"
+import { Context, DateTime, Effect, Exit, Layer, Option, Redacted, Scope, Stream } from "effect"
 import * as EventLogEncryption from "effect/eventlog/EventLogEncryption"
 import { FetchHttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
@@ -114,6 +115,25 @@ const openStore = (apiUrl: string, workspace: Workspace.Workspace, scope: Scope.
     }),
     scope
   ).pipe(Effect.map(Context.get(Store.Store)))
+
+/** Invite `human` to `workspace` as a member, and accept as them: their member. */
+const admit = (gateway: Gateway.Gateway["Service"], workspace: Workspace.Workspace, human: Identity.HumanId) =>
+  Effect.gen(function* () {
+    const expiresAt = DateTime.add(yield* DateTime.now, { days: 1 })
+    const invitation = yield* gateway.asMember(
+      workspace.id,
+      Identity.MemberReference.cases.Human.make({ id: alice }),
+      Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
+        invitationService.issue({ recipientId: human, roleId: BuiltinRoles.MemberId, expiresAt })
+      )
+    )
+    return yield* gateway.inWorkspace(
+      workspace.id,
+      Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
+        invitationService.accept(invitation.details.id, human, Member.Name.make("Bob"))
+      )
+    )
+  }).pipe(Effect.scoped)
 
 /** The first of `stream`'s values that `holds` accepts, within five seconds. */
 const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => boolean) =>
@@ -224,6 +244,52 @@ describe("Store", () => {
       expect(rejected!.rejection).toEqual(Option.some(new CoreError.NotFound({ resource: "Thread", id: nowhere })))
       const place = ReplicaRecord.Place.cases.Thread.make({ threadId: nowhere })
       expect(yield* firstWhere(store.list("ThreadMessage", place), () => true)).toEqual([])
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live("a team and a conversation started here are the ones the host makes, under the same IDs", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const bob = yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)
+
+      yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
+      const team = (yield* firstWhere(store.list("Group", everywhere), (held) =>
+        held.some(({ pending }) => pending)
+      )).find(({ pending }) => pending)
+      const teamId = team!.record.value.id
+      const admission = (yield* firstWhere(store.every("GroupMembership"), (held) =>
+        held.some(({ record }) => record.value.groupId === teamId)
+      )).find(({ record }) => record.value.groupId === teamId)
+      expect(admission).toMatchObject({ pending: true, record: { value: { memberId: workspace.ownerMemberId } } })
+      // The server's own team and admission arrive under the IDs the browser gave them.
+      yield* firstWhere(store.list("Group", everywhere), (held) =>
+        held.some(({ record, pending }) => record.value.id === teamId && !pending)
+      )
+      expect(
+        (yield* firstWhere(store.every("GroupMembership"), (held) =>
+          held.some(({ record, pending }) => record.value.groupId === teamId && !pending)
+        )).filter(({ record }) => record.value.groupId === teamId)
+      ).toMatchObject([{ record: { value: { id: admission!.record.value.id } }, pending: false }])
+
+      yield* store.write("DirectThreadStarted", { memberIds: [bob.id], text: "Got a minute?", mentions: [] })
+      const direct = (yield* firstWhere(store.list("Group", everywhere), (held) =>
+        held.some(({ record, pending }) => record.value.kind === "Direct" && pending)
+      )).find(({ record }) => record.value.kind === "Direct")!.record.value
+      const [opened] = yield* firstWhere(store.threads(direct.id), (threads) => threads.length === 1)
+      yield* firstWhere(store.threads(direct.id), ([thread]) => thread?.thread.pending === false)
+      const [arrived] = yield* firstWhere(store.threads(direct.id), ([thread]) => thread?.thread.pending === false)
+      expect(arrived!.thread.record.value.id).toBe(opened!.thread.record.value.id)
+      expect(
+        (yield* firstWhere(store.list("Group", everywhere), (held) =>
+          held.some(({ record, pending }) => record.value.id === direct.id && !pending)
+        )).filter(({ record }) => record.value.kind === "Direct")
+      ).toHaveLength(1)
+      expect(yield* firstWhere(store.actions, () => true)).toEqual([])
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })

@@ -8,6 +8,7 @@
  * the ones before it left; one the server completed or rejected no longer applies.
  */
 
+import { Group, type GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
@@ -59,6 +60,9 @@ const isMessage = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadMessage"])
 const isGroup = ReplicaRecord.ReplicaRecord.isAnyOf(["Group"])
 const isParticipation = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadParticipation"])
 const isPosition = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadPosition"])
+const isMembership = ReplicaRecord.ReplicaRecord.isAnyOf(["GroupMembership"])
+const isFollow = ReplicaRecord.ReplicaRecord.isAnyOf(["GroupFollow"])
+const isGroupRead = ReplicaRecord.ReplicaRecord.isAnyOf(["GroupRead"])
 
 /** Whether `participation` is `memberId`'s own. */
 const isMemberOf = (memberId: MemberId.MemberId, participation: ThreadParticipation.ThreadParticipation) =>
@@ -117,6 +121,40 @@ export const threads: EffectsOf<typeof ThreadSync.Actions> = {
             }
           })
           return [thread, yield* message(action, threadId, input)]
+        })
+      )
+  },
+  DirectThreadStarted: {
+    // A direct group is named by its members, so starting one with the same people reuses it.
+    creates: (input, action) =>
+      asRequest(
+        action,
+        Effect.gen(function* () {
+          const memberIds = Group.directMembers([action.memberId, ...input.memberIds])
+          const groupId = yield* Group.directId(action.workspaceId, memberIds)
+          const group = cases.Group.make({
+            value: {
+              id: groupId,
+              workspaceId: action.workspaceId,
+              kind: "Direct",
+              memberIds,
+              createdBy: action.memberId,
+              createdAt: action.writtenAt
+            }
+          })
+          const threadId = yield* Thread.newId(groupId)
+          const thread = cases.Thread.make({
+            value: {
+              id: threadId,
+              workspaceId: action.workspaceId,
+              groupId,
+              title: input.title ?? null,
+              origin: null,
+              createdBy: ThreadMessage.Author.cases.Member.make({ memberId: action.memberId }),
+              createdAt: action.writtenAt
+            }
+          })
+          return [group, thread, yield* message(action, threadId, input)]
         })
       )
   },
@@ -193,12 +231,101 @@ export const threads: EffectsOf<typeof ThreadSync.Actions> = {
   }
 }
 
-/** What the person does to groups: renaming a team. */
+/** A membership the server gives `memberId` in `groupId` when it runs `action`. */
+const membership = (action: Action, groupId: Group.Group["id"], memberId: MemberId.MemberId) =>
+  Effect.map(GroupMembership.newId(groupId, memberId), (id) =>
+    cases.GroupMembership.make({
+      value: { id, workspaceId: action.workspaceId, groupId, memberId, admittedAt: action.writtenAt, status: "active" }
+    })
+  )
+
+/** `record`, the membership `membershipId` while it is active, as removed. */
+const endMembership = (record: ReplicaRecord.ReplicaRecord, membershipId: GroupMembership.GroupMembershipId) =>
+  isMembership(record) && record.value.id === membershipId && record.value.status === "active"
+    ? cases.GroupMembership.make({ value: { ...record.value, status: "removed" } })
+    : undefined
+
+/** `record` as `memberId`'s follow of `groupId`, in `status`, or undefined when it is not theirs or already so. */
+const follow = (
+  record: ReplicaRecord.ReplicaRecord,
+  groupId: Group.Group["id"],
+  memberId: MemberId.MemberId,
+  status: GroupFollow.GroupFollow["status"],
+  at: DateTime.Utc
+) =>
+  isFollow(record) &&
+  record.value.groupId === groupId &&
+  record.value.memberId === memberId &&
+  record.value.status !== status
+    ? cases.GroupFollow.make({ value: { ...record.value, status, endedAt: status === "ended" ? at : null } })
+    : undefined
+
+/**
+ * What the person does to groups: creating a team, renaming one, admitting a member or joining
+ * oneself, ending a membership or leaving, following a group again or no longer, and reading one.
+ * Following a group they never followed waits for the server, which gives the follow the admission
+ * it is held through.
+ */
 export const groups: EffectsOf<typeof GroupSync.Actions> = {
+  TeamCreated: {
+    creates: ({ name, memberIds, visibility }, action) =>
+      asRequest(
+        action,
+        Effect.gen(function* () {
+          const id = yield* Group.newId
+          const team = cases.Group.make({
+            value: {
+              id,
+              workspaceId: action.workspaceId,
+              kind: "Team",
+              visibility: visibility ?? "Private",
+              name,
+              createdBy: action.memberId,
+              createdAt: action.writtenAt
+            }
+          })
+          return [team, ...(yield* Effect.forEach(memberIds, (memberId) => membership(action, id, memberId)))]
+        })
+      )
+  },
   GroupRenamed: {
     changes: ({ groupId, name }, record) =>
       isGroup(record) && record.value.id === groupId && "name" in record.value
         ? cases.Group.make({ value: { ...record.value, name } })
+        : undefined
+  },
+  GroupMemberAdded: {
+    creates: ({ groupId, memberId }, action) =>
+      asRequest(
+        action,
+        Effect.map(membership(action, groupId, memberId), (admitted) => [admitted])
+      )
+  },
+  GroupJoined: {
+    creates: ({ groupId }, action) =>
+      asRequest(
+        action,
+        Effect.map(membership(action, groupId, action.memberId), (admitted) => [admitted])
+      )
+  },
+  GroupMemberRemoved: { changes: ({ membershipId }, record) => endMembership(record, membershipId) },
+  GroupLeft: { changes: ({ membershipId }, record) => endMembership(record, membershipId) },
+  GroupFollowed: {
+    changes: ({ groupId, memberId }, record, action) => follow(record, groupId, memberId, "active", action.writtenAt)
+  },
+  GroupUnfollowed: {
+    changes: ({ groupId, memberId }, record, action) => follow(record, groupId, memberId, "ended", action.writtenAt)
+  },
+  GroupMarkedRead: {
+    creates: ({ groupId }, action) =>
+      Effect.succeed([
+        cases.GroupRead.make({
+          value: { workspaceId: action.workspaceId, memberId: action.memberId, groupId, readAt: action.writtenAt }
+        })
+      ]),
+    changes: ({ groupId }, record, action) =>
+      isGroupRead(record) && record.value.groupId === groupId && record.value.memberId === action.memberId
+        ? cases.GroupRead.make({ value: { ...record.value, readAt: action.writtenAt } })
         : undefined
   }
 }
@@ -259,12 +386,13 @@ const samePlace = Schema.toEquivalence(ReplicaRecord.Place)
 const sameKey = Schema.toEquivalence(ReplicaRecord.Key)
 
 /**
- * `records`, the server's of `kind` at `place`, as `pending` leaves them: each action changes what
- * the ones before it left, then adds what it creates there that the server does not hold yet.
+ * `records`, the server's of `kind` at `place`, or anywhere without one, as `pending` leaves them:
+ * each action changes what the ones before it left, then adds what it creates there that the server
+ * does not hold yet.
  */
 export const overlay = <Kind extends ReplicaRecord.Kind>(
   kind: Kind,
-  place: ReplicaRecord.Place,
+  place: ReplicaRecord.Place | undefined,
   records: ReadonlyArray<Replica.RecordOf<Kind>>,
   pending: ReadonlyArray<Unfinished>
 ): ReadonlyArray<Held<Replica.RecordOf<Kind>>> => {
@@ -278,7 +406,7 @@ export const overlay = <Kind extends ReplicaRecord.Kind>(
         return changed !== undefined && isKind(changed) ? { record: changed, pending: true } : current
       })
     for (const created of creates) {
-      if (!isKind(created) || !samePlace(ReplicaRecord.placeOf(created), place)) continue
+      if (!isKind(created) || (place !== undefined && !samePlace(ReplicaRecord.placeOf(created), place))) continue
       const key = ReplicaRecord.keyOf(created)
       if (!held.some(({ record }) => sameKey(ReplicaRecord.keyOf(record), key)))
         held = [...held, { record: created, pending: true }]

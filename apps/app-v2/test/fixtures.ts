@@ -1,6 +1,7 @@
-import { Group } from "@amends-dev/core/group"
+import { Group, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
+import { Member } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { Option, Schema } from "effect"
 import type { Model } from "../src/model.ts"
@@ -40,6 +41,41 @@ export const general = Schema.decodeSync(Group.Group)({
   createdBy: "member-1",
   createdAt: "2026-10-18T12:00:00Z"
 })
+
+/** Another member of the workspace. */
+export const bob = Schema.decodeSync(Member.Member)({
+  id: "member-2",
+  workspaceId: "workspace-1",
+  identity: { _tag: "Human", id: "bob" },
+  name: "Bob",
+  status: "active"
+})
+
+/** A private team alice created. */
+export const design = Schema.decodeSync(Group.Group)({
+  id: "design",
+  workspaceId: "workspace-1",
+  kind: "Team",
+  visibility: "Private",
+  name: "Design",
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
+const admission = (id: string, groupId: string, memberId: string) =>
+  Schema.decodeSync(GroupMembership.GroupMembership)({
+    id,
+    workspaceId: "workspace-1",
+    groupId,
+    memberId,
+    admittedAt: "2026-10-18T12:00:00Z",
+    status: "active"
+  })
+
+/** Alice's admissions to general and to design, and bob's to design. */
+export const aliceInGeneral = admission("membership-1", "general", "member-1")
+export const aliceInDesign = admission("membership-2", "design", "member-1")
+export const bobInDesign = admission("membership-3", "design", "member-2")
 
 export const thread = Schema.decodeSync(Thread.Thread)({
   id: "thread-1",

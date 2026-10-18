@@ -1,22 +1,27 @@
 /**
- * What the person sees: signing in, their workspaces, and the open workspace: its groups, a group's
- * threads, and a thread's messages, with what the person started or posted shown at once, marked
- * as sending until the server has it, and what the server refused, with why. Markup only: the
- * headless components from `@foldkit/ui` give each control its attributes, and no styles yet.
+ * What the person sees: signing in, their workspaces, and the open workspace: the groups they
+ * belong to and the teams they may join, a group's members and threads, and a thread's messages,
+ * with what the person started or changed shown at once, marked as sending until the server has
+ * it, and what the server refused, with why. Markup only: the headless components from
+ * `@foldkit/ui` give each control its attributes, and no styles yet.
  */
 
-import type { Group } from "@amends-dev/core/group"
+import { Group } from "@amends-dev/core/group"
 import { ThreadMessage } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
 import * as Button from "@foldkit/ui/button"
+import * as Checkbox from "@foldkit/ui/checkbox"
 import * as Input from "@foldkit/ui/input"
+import * as Select from "@foldkit/ui/select"
 import * as Textarea from "@foldkit/ui/textarea"
 import * as Option from "effect/Option"
 import type { Document, Html, HtmlBuilder } from "foldkit/html"
 import { Message } from "./message.ts"
 import {
   type ActionItem,
+  Composing,
   type Following,
+  type GroupItem,
   type MessageItem,
   type Model,
   type OpenGroup,
@@ -137,16 +142,39 @@ const textarea = (
     h
   )
 
-/** A group's name: a team's own, or a direct group's members by their names here. */
-const groupName = (group: Group.Group, members: ReadonlyArray<Member.Member>) =>
+/** A member by their name here. */
+const memberName = (memberId: Member.Member["id"], members: ReadonlyArray<Member.Member>) =>
+  members.find((member) => member.id === memberId)?.name ?? "Someone"
+
+/** A group's name: a team's own, or the person's direct group's other members, by their names here. */
+const groupName = (group: Group.Group, opened: Opened) =>
   "name" in group
     ? group.name
-    : group.memberIds.map((id) => members.find((member) => member.id === id)?.name ?? "Someone").join(", ")
+    : group.memberIds
+        .filter((id) => id !== opened.memberId)
+        .map((id) => memberName(id, opened.members))
+        .join(", ")
+
+/**
+ * Whether the person belongs to `groupId`: whether it is a direct group of theirs, whose members are
+ * fixed, or they hold an active membership of it, or are being admitted.
+ */
+const belongsTo = (opened: Opened, groupId: Group.Group["id"]) =>
+  opened.groups.some(
+    ({ group }) => group.id === groupId && group.kind === "Direct" && group.memberIds.includes(opened.memberId)
+  ) ||
+  opened.memberships.some(
+    ({ membership }) =>
+      membership.groupId === groupId && membership.memberId === opened.memberId && membership.status === "active"
+  )
+
+/** Whether anyone in the workspace may join `group`: whether it is a public team. */
+const isJoinable = (group: Group.Group) => group.kind === "Team" && group.visibility === "Public"
 
 /** Who wrote a message, by their name here. */
 const authorName = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>) =>
   ThreadMessage.Author.match(message.author, {
-    Member: ({ memberId }) => members.find((member) => member.id === memberId)?.name ?? "Someone",
+    Member: ({ memberId }) => memberName(memberId, members),
     Contact: () => "A contact"
   })
 
@@ -190,6 +218,256 @@ const actionsView = (actions: ReadonlyArray<ActionItem>, notice: Option.Option<s
 
 const button = (h: HtmlBuilder<Message>, label: string, onClick: Message) =>
   Button.view({ onClick, toView: (attributes) => h.button(attributes.button, [label]) }, h)
+
+/** A choice of one of `members`, or none. */
+const memberSelect = (
+  h: HtmlBuilder<Message>,
+  config: Readonly<{
+    id: string
+    label: string
+    members: ReadonlyArray<Member.Member>
+    value: Option.Option<Member.Member["id"]>
+    onChange: (memberId: Option.Option<Member.Member["id"]>) => Message
+  }>
+) =>
+  Select.view(
+    {
+      id: config.id,
+      value: Option.getOrElse(config.value, () => ""),
+      onChange: (value) =>
+        config.onChange(Option.fromUndefinedOr(config.members.find((member) => member.id === value)?.id)),
+      toView: (attributes) =>
+        h.div(
+          [],
+          [
+            h.label(attributes.label, [config.label]),
+            h.select(attributes.select, [
+              h.option([h.Value("")], ["Choose a member"]),
+              ...config.members.map((member) => h.option([h.Value(member.id)], [member.name]))
+            ])
+          ]
+        )
+    },
+    h
+  )
+
+/** The members of the workspace other than the person, who are still members of it. */
+const othersIn = (opened: Opened) =>
+  opened.members.filter((member) => member.id !== opened.memberId && member.status === "active")
+
+/** The groups the person belongs to, the teams they may join, and starting a team or a conversation. */
+const groupsView = (opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const open = ({ group, pending }: GroupItem) => [
+    button(h, groupName(group, opened), Message.ClickedGroup({ groupId: group.id })),
+    sending(pending, h)
+  ]
+  const others = opened.groups.filter(({ group }) => isJoinable(group) && !belongsTo(opened, group.id))
+  return h.nav(
+    [h.AriaLabel("Groups")],
+    [
+      h.h3([], ["Your groups"]),
+      h.ul(
+        [h.AriaLabel("Your groups")],
+        opened.groups
+          .filter(({ group }) => belongsTo(opened, group.id))
+          .map((item) => h.keyed("li")(item.group.id, [], open(item)))
+      ),
+      others.length === 0
+        ? h.empty
+        : h.div(
+            [],
+            [
+              h.h3([], ["Other teams"]),
+              h.ul(
+                [h.AriaLabel("Other teams")],
+                others.map((item) =>
+                  h.keyed("li")(
+                    item.group.id,
+                    [],
+                    [...open(item), button(h, "Join", Message.ClickedJoin({ groupId: item.group.id }))]
+                  )
+                )
+              )
+            ]
+          ),
+      button(h, "New team", Message.ClickedNewTeam()),
+      button(h, "New conversation", Message.ClickedNewDirect())
+    ]
+  )
+}
+
+/** The form for what the person is starting: a team, or a conversation with another member. */
+const composingView = (composing: Composing, opened: Opened, h: HtmlBuilder<Message>): Html =>
+  Composing.match(composing, {
+    Team: ({ name, isPublic }) =>
+      h.form(
+        [h.OnSubmit(Message.SubmittedTeam()), h.AriaLabel("New team")],
+        [
+          field(
+            h,
+            {
+              id: "team-name",
+              label: "Team name",
+              type: "text",
+              value: name,
+              onInput: (name) => Message.TypedTeamName({ name })
+            },
+            Option.none()
+          ),
+          Checkbox.view(
+            {
+              id: "team-public",
+              isChecked: isPublic,
+              onToggle: (isPublic) => Message.ToggledTeamPublic({ isPublic }),
+              toView: (attributes) =>
+                h.div(
+                  [],
+                  [
+                    h.button(attributes.checkbox, [isPublic ? "✓" : ""]),
+                    h.label(attributes.label, ["Anyone in the workspace can join"])
+                  ]
+                )
+            },
+            h
+          ),
+          submit(h, "Create team"),
+          button(h, "Cancel", Message.ClickedCancelCompose())
+        ]
+      ),
+    Direct: ({ memberId, text }) =>
+      h.form(
+        [h.OnSubmit(Message.SubmittedDirect()), h.AriaLabel("New conversation")],
+        [
+          memberSelect(h, {
+            id: "direct-member",
+            label: "With",
+            members: othersIn(opened),
+            value: memberId,
+            onChange: (memberId) => Message.ChoseDirectMember({ memberId })
+          }),
+          textarea(h, {
+            id: "direct-text",
+            label: "Message",
+            value: text,
+            onInput: (text) => Message.TypedDirect({ text })
+          }),
+          submit(h, "Start conversation"),
+          button(h, "Cancel", Message.ClickedCancelCompose())
+        ]
+      )
+  })
+
+/** The person's follow of the group: following it, or not, and whether a change to that is on its way. */
+const groupFollowView = (groupId: Group.Group["id"], opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const own = opened.follows.filter(({ follow }) => follow.groupId === groupId && follow.memberId === opened.memberId)
+  return own.some(({ pending }) => pending)
+    ? h.span([], ["Updating…"])
+    : own.some(({ follow }) => follow.status === "active")
+      ? button(h, "Unfollow", Message.ClickedUnfollowGroup())
+      : button(h, "Follow", Message.ClickedFollowGroup())
+}
+
+/**
+ * The group's name, the form to change a team's while the person renames it, and their part in it:
+ * following it and leaving it while they belong to it, or joining a team they may join.
+ */
+const groupHeaderView = (group: OpenGroup, found: GroupItem | undefined, opened: Opened, h: HtmlBuilder<Message>) => {
+  const isTeam = found?.group.kind === "Team"
+  const isMember = belongsTo(opened, group.groupId)
+  return h.header(
+    [],
+    [
+      Option.match(group.renaming, {
+        onNone: () =>
+          h.div(
+            [],
+            [
+              h.h3([], [found === undefined ? "A group" : groupName(found.group, opened)]),
+              isTeam && isMember ? button(h, "Rename", Message.ClickedRenameGroup()) : h.empty
+            ]
+          ),
+        onSome: (draft) =>
+          h.form(
+            [h.OnSubmit(Message.SubmittedGroupName())],
+            [
+              field(
+                h,
+                {
+                  id: "group-name",
+                  label: "Name",
+                  type: "text",
+                  value: draft,
+                  onInput: (name) => Message.TypedGroupName({ name })
+                },
+                Option.none()
+              ),
+              submit(h, "Save"),
+              button(h, "Cancel", Message.ClickedCancelGroupName())
+            ]
+          )
+      }),
+      isMember ? groupFollowView(group.groupId, opened, h) : h.empty,
+      isMember
+        ? isTeam && !Group.isGeneral({ id: group.groupId })
+          ? button(h, "Leave", Message.ClickedLeave())
+          : h.empty
+        : found !== undefined && isJoinable(found.group)
+          ? button(h, "Join", Message.ClickedJoin({ groupId: group.groupId }))
+          : h.empty
+    ]
+  )
+}
+
+/**
+ * A team's members, and for a member of it, removing them and admitting another member, except to
+ * general, which every member belongs to.
+ */
+const membersView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const admitted = opened.memberships.filter(
+    ({ membership }) => membership.groupId === group.groupId && membership.status === "active"
+  )
+  const isManaged = belongsTo(opened, group.groupId) && !Group.isGeneral({ id: group.groupId })
+  const admissible = othersIn(opened).filter(
+    (member) => !admitted.some(({ membership }) => membership.memberId === member.id)
+  )
+  return h.section(
+    [h.AriaLabel("Members")],
+    [
+      h.h4([], ["Members"]),
+      h.ul(
+        [],
+        admitted.map(({ membership, pending }) =>
+          h.keyed("li")(
+            membership.id,
+            [],
+            [
+              memberName(membership.memberId, opened.members),
+              sending(pending, h),
+              !isManaged || pending || membership.memberId === opened.memberId
+                ? h.empty
+                : button(h, "Remove", Message.ClickedRemoveMember({ membershipId: membership.id }))
+            ]
+          )
+        )
+      ),
+      !isManaged || admissible.length === 0
+        ? h.empty
+        : h.form(
+            [h.OnSubmit(Message.SubmittedAddMember())],
+            [
+              memberSelect(h, {
+                id: "add-member",
+                label: "Add a member",
+                members: admissible,
+                value: group.adding,
+                onChange: (memberId) => Message.ChoseMemberToAdd({ memberId })
+              }),
+              submit(h, "Add")
+            ]
+          )
+    ]
+  )
+}
 
 /** The person's part in the thread: following it, or not, and whether a change to that is on its way. */
 const followView = (following: Option.Option<Following>, h: HtmlBuilder<Message>): Html =>
@@ -316,57 +594,69 @@ const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: Htm
 }
 
 const groupView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
-  const found = opened.groups.find(({ id }) => id === group.groupId)
+  const found = opened.groups.find((item) => item.group.id === group.groupId)
   return h.section(
     [h.AriaLabel("Group")],
     [
-      h.h3([], [found === undefined ? "A group" : groupName(found, opened.members)]),
+      groupHeaderView(group, found, opened, h),
       Option.match(group.thread, {
         onSome: (thread) => threadView(thread, group, opened, h),
         onNone: () =>
           h.div(
             [],
             [
-              group.threads.length === 0
-                ? h.p([], ["No threads yet."])
-                : h.ul(
-                    [h.AriaLabel("Threads")],
-                    group.threads.map((item) =>
-                      h.keyed("li")(
-                        item.thread.id,
-                        [],
-                        [
-                          Button.view(
-                            {
-                              onClick: Message.ClickedThread({ threadId: item.thread.id }),
-                              toView: (attributes) => h.button(attributes.button, [threadLabel(item)])
-                            },
-                            h
-                          ),
-                          sending(item.pending, h),
-                          item.unread > 0 ? h.span([], [` · ${item.unread} new`]) : h.empty
-                        ]
-                      )
-                    )
-                  ),
-              h.form(
-                [h.OnSubmit(Message.SubmittedThread())],
-                [
-                  textarea(h, {
-                    id: "thread",
-                    label: "Start a thread",
-                    value: group.draft,
-                    onInput: (text) => Message.TypedThread({ text })
-                  }),
-                  submit(h, "Start")
-                ]
-              )
+              found?.group.kind === "Team" ? membersView(group, opened, h) : h.empty,
+              belongsTo(opened, group.groupId)
+                ? threadsView(group, h)
+                : h.p([], ["Join this team to read its threads."])
             ]
           )
       })
     ]
   )
 }
+
+/** The group's threads, and the form to start one. */
+const threadsView = (group: OpenGroup, h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [],
+    [
+      group.threads.length === 0
+        ? h.p([], ["No threads yet."])
+        : h.ul(
+            [h.AriaLabel("Threads")],
+            group.threads.map((item) =>
+              h.keyed("li")(
+                item.thread.id,
+                [],
+                [
+                  Button.view(
+                    {
+                      onClick: Message.ClickedThread({ threadId: item.thread.id }),
+                      toView: (attributes) => h.button(attributes.button, [threadLabel(item)])
+                    },
+                    h
+                  ),
+                  sending(item.pending, h),
+                  item.unread > 0 ? h.span([], [` · ${item.unread} new`]) : h.empty
+                ]
+              )
+            )
+          ),
+      h.form(
+        [h.OnSubmit(Message.SubmittedThread())],
+        [
+          textarea(h, {
+            id: "thread",
+            label: "Start a thread",
+            value: group.draft,
+            onInput: (text) => Message.TypedThread({ text })
+          }),
+          submit(h, "Start")
+        ]
+      )
+    ]
+  )
 
 const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
   h.section(
@@ -388,29 +678,11 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
             [],
             [
               actionsView(opened.actions, opened.notice, h),
-              h.nav(
-                [h.AriaLabel("Groups")],
-                [
-                  h.ul(
-                    [],
-                    opened.groups.map((group) =>
-                      h.keyed("li")(
-                        group.id,
-                        [],
-                        [
-                          Button.view(
-                            {
-                              onClick: Message.ClickedGroup({ groupId: group.id }),
-                              toView: (attributes) => h.button(attributes.button, [groupName(group, opened.members)])
-                            },
-                            h
-                          )
-                        ]
-                      )
-                    )
-                  )
-                ]
-              ),
+              groupsView(opened, h),
+              Option.match(opened.composing, {
+                onNone: () => h.empty,
+                onSome: (composing) => composingView(composing, opened, h)
+              }),
               Option.match(opened.group, { onNone: () => h.empty, onSome: (group) => groupView(group, opened, h) })
             ]
           )

@@ -6,15 +6,19 @@
  */
 
 import type { CoreError } from "@amends-dev/core/error"
-import { Group, GroupId } from "@amends-dev/core/group"
+import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ReadState } from "@amends-dev/core/read-state"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import type * as GroupSync from "@amends-dev/sync/GroupSync"
+import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import type * as Event from "effect/eventlog/Event"
+import type * as EventGroup from "effect/eventlog/EventGroup"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
@@ -26,7 +30,7 @@ import * as ManagedResource from "foldkit/managedResource"
 import * as Subscription from "foldkit/subscription"
 import * as Browser from "./browser.ts"
 import { Message } from "./message.ts"
-import { type ActionItem, type Model, type Opened, Page, StoreState } from "./model.ts"
+import { type ActionItem, type GroupItem, type Model, type Opened, Page, StoreState } from "./model.ts"
 import * as Store from "./sync/Store.ts"
 
 export const StoreResource = ManagedResource.tag<Store.Store["Service"]>()("Store")
@@ -93,21 +97,39 @@ const fromStore = (read: (store: Store.Store["Service"]) => Stream.Stream<Messag
   )
 
 const workspace = ReplicaRecord.Place.cases.Workspace.make({})
-const byName = Order.mapInput(Order.String, (group: Group.Group) => (Group.isGeneral(group) ? "" : nameOf(group)))
+const byName = Order.mapInput(Order.String, ({ group }: GroupItem) => (Group.isGeneral(group) ? "" : nameOf(group)))
 
 /** A group's name: a team's own, or a direct group's members, as their IDs until names are read. */
 const nameOf = (group: Group.Group): string => ("name" in group ? group.name : group.memberIds.join(", "))
 
 /** What each action does, as the person reads it. */
-const whatEach: Readonly<Record<string, string>> = {
+const whatEach: Readonly<
+  Record<Event.Tag<EventGroup.Events<typeof ThreadSync.Actions | typeof GroupSync.Actions>>, string>
+> = {
   ThreadStarted: "start a thread",
-  ThreadMessagePosted: "post a reply"
+  DirectThreadStarted: "start a conversation",
+  ThreadRenamed: "rename a thread",
+  ThreadMessagePosted: "post a reply",
+  ThreadMessageEdited: "edit a message",
+  ThreadMessageDeleted: "delete a message",
+  ThreadFollowed: "follow a thread",
+  ThreadUnfollowed: "unfollow a thread",
+  ThreadMarkedRead: "mark a thread read",
+  TeamCreated: "create a team",
+  GroupRenamed: "rename a team",
+  GroupMemberAdded: "add a member",
+  GroupJoined: "join a team",
+  GroupMemberRemoved: "remove a member",
+  GroupLeft: "leave a team",
+  GroupFollowed: "follow a group",
+  GroupUnfollowed: "unfollow a group",
+  GroupMarkedRead: "mark a group read"
 }
 
 /** An action as the person reads it: what it does, the text it carries, and why it was refused. */
 const describe = (action: Store.ActionView): ActionItem => ({
   key: action.key,
-  what: whatEach[action.tag] ?? action.tag,
+  what: (whatEach as Readonly<Record<string, string | undefined>>)[action.tag] ?? action.tag,
   text:
     Predicate.hasProperty(action.payload, "text") && Predicate.isString(action.payload.text)
       ? Option.some(action.payload.text)
@@ -129,13 +151,23 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
                     Stream.map(store.list("Group", workspace), (groups): Message =>
                       Message.GotGroups({
                         groups: Array.sort(
-                          groups.map(({ record }) => record.value),
+                          groups.map(({ record, pending }) => ({ group: record.value, pending })),
                           byName
                         )
                       })
                     ),
                     Stream.map(store.list("Member", workspace), (members): Message =>
                       Message.GotMembers({ members: members.map(({ record }) => record.value) })
+                    ),
+                    Stream.map(store.every("GroupMembership"), (memberships): Message =>
+                      Message.GotMemberships({
+                        memberships: memberships.map(({ record, pending }) => ({ membership: record.value, pending }))
+                      })
+                    ),
+                    Stream.map(store.every("GroupFollow"), (follows): Message =>
+                      Message.GotFollows({
+                        follows: follows.map(({ record, pending }) => ({ follow: record.value, pending }))
+                      })
                     ),
                     Stream.map(store.actions, (actions): Message =>
                       Message.GotActions({ actions: actions.map(describe) })
@@ -317,4 +349,85 @@ export const MarkThreadRead = Command.define("MarkThreadRead", {
         onSuccess: (input) => toStore((store) => store.write("ThreadMarkedRead", input))
       })
     )
+})
+
+/** Create a team called `name`, with `memberIds` as its members. */
+export const CreateTeam = Command.define("CreateTeam", {
+  args: { name: Schema.String, memberIds: Schema.Array(MemberId.MemberId), visibility: Group.Visibility },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Group.CreateTeamInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A team needs a name.")),
+        onSuccess: (input) => toStore((store) => store.write("TeamCreated", input))
+      })
+    )
+})
+
+/** Start a conversation with `memberId`, `text` its first message. */
+export const StartDirect = Command.define("StartDirect", {
+  args: { memberId: MemberId.MemberId, text: Schema.String },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ memberId, text }) =>
+    Schema.decodeEffect(Thread.StartDirectInput)({ memberIds: [memberId], text, mentions: [] }).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A conversation needs a first message.")),
+        onSuccess: (input) => toStore((store) => store.write("DirectThreadStarted", input))
+      })
+    )
+})
+
+/** Rename the team `groupId` to `name`, from the name the person saw. */
+export const RenameGroup = Command.define("RenameGroup", {
+  args: { groupId: GroupId.GroupId, name: Schema.String, expectedName: Schema.String },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Group.RenameInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A team needs a name.")),
+        onSuccess: (input) => toStore((store) => store.write("GroupRenamed", input))
+      })
+    )
+})
+
+/** Admit `memberId` to `groupId`. */
+export const AddMember = Command.define("AddMember", {
+  args: { groupId: GroupId.GroupId, memberId: MemberId.MemberId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("GroupMemberAdded", input))
+})
+
+/** End the membership `membershipId` of `groupId`. */
+export const RemoveMember = Command.define("RemoveMember", {
+  args: { groupId: GroupId.GroupId, membershipId: GroupMembership.GroupMembershipId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("GroupMemberRemoved", input))
+})
+
+/** Join `groupId`. */
+export const JoinGroup = Command.define("JoinGroup", {
+  args: { groupId: GroupId.GroupId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("GroupJoined", input))
+})
+
+/** Leave `groupId`, ending the person's membership `membershipId`. */
+export const LeaveGroup = Command.define("LeaveGroup", {
+  args: { groupId: GroupId.GroupId, membershipId: GroupMembership.GroupMembershipId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("GroupLeft", input))
+})
+
+/** Follow `groupId` as `memberId`. */
+export const FollowGroup = Command.define("FollowGroup", {
+  args: { groupId: GroupId.GroupId, memberId: MemberId.MemberId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("GroupFollowed", input))
+})
+
+/** Stop following `groupId` as `memberId`. */
+export const UnfollowGroup = Command.define("UnfollowGroup", {
+  args: { groupId: GroupId.GroupId, memberId: MemberId.MemberId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("GroupUnfollowed", input))
 })

@@ -16,6 +16,7 @@ import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "./com
 import type { Flags } from "./flags.ts"
 import { Message } from "./message.ts"
 import {
+  Composing,
   type Editing,
   type Model,
   type OpenGroup,
@@ -27,15 +28,24 @@ import {
   Workspaces
 } from "./model.ts"
 import {
+  AddMember,
+  CreateTeam,
   DeleteMessage,
   Dismiss,
   EditMessage,
+  FollowGroup,
   FollowThread,
+  JoinGroup,
+  LeaveGroup,
   MarkThreadRead,
   PostReply,
+  RemoveMember,
+  RenameGroup,
   RenameThread,
+  StartDirect,
   StartThread,
   type StoreResource,
+  UnfollowGroup,
   UnfollowThread
 } from "./store.ts"
 
@@ -104,6 +114,39 @@ const atGroup = (model: Model, change: (group: OpenGroup) => OpenGroup): UpdateR
 /** The open thread as `change` makes it, while one is open; otherwise nothing. */
 const atThread = (model: Model, change: (thread: OpenThread) => OpenThread): UpdateReturn =>
   atGroup(model, (group) => modifyFields(group, { thread: Option.map(change) }))
+
+/** The open workspace, if one is. */
+const openedIn = (model: Model): Option.Option<Opened> =>
+  Page.matchOrElse(model.page, { SignedIn: ({ opened }) => opened }, () => Option.none())
+
+/** What the person is starting, as `change` makes it, while they start something; otherwise nothing. */
+const atComposing = (model: Model, change: (composing: Composing) => Composing): UpdateReturn =>
+  atOpened(model, (opened) => modifyFields(opened, { composing: Option.map(change) }))
+
+/** The person's active membership of `groupId`, if they have one. */
+const ownMembership = (model: Model, groupId: OpenGroup["groupId"]) =>
+  Option.flatMap(openedIn(model), ({ memberships, memberId }) =>
+    Option.fromUndefinedOr(
+      memberships.find(
+        ({ membership }) =>
+          membership.groupId === groupId && membership.memberId === memberId && membership.status === "active"
+      )?.membership
+    )
+  )
+
+/** The open group and the person's member, as following or no longer following it names them. */
+const ownFollow = (model: Model) =>
+  Option.flatMap(groupIn(model), ({ groupId }) =>
+    Option.map(openedIn(model), ({ memberId }) => ({ groupId, memberId }))
+  )
+
+/** The name of the team `groupId`, while it is a team. */
+const teamNameOf = (model: Model, groupId: OpenGroup["groupId"]): Option.Option<string> =>
+  Option.flatMap(openedIn(model), ({ groups }) =>
+    Option.flatMap(Option.fromUndefinedOr(groups.find(({ group }) => group.id === groupId)), ({ group }) =>
+      "name" in group ? Option.some(group.name) : Option.none()
+    )
+  )
 
 /** The open thread, if one is. */
 const threadIn = (model: Model): Option.Option<OpenThread> => Option.flatMap(groupIn(model), ({ thread }) => thread)
@@ -239,8 +282,11 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                     store: StoreState.Opening(),
                     groups: [],
                     members: [],
+                    memberships: [],
+                    follows: [],
                     actions: [],
                     notice: Option.none(),
+                    composing: Option.none(),
                     group: Option.none()
                   })
               })
@@ -255,8 +301,146 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ReleasedStore: () => ({ model }),
     FailedAcquireStore: ({ error }) => atStore(model, () => StoreState.Failed({ error })),
     FailedReadStore: ({ error }) => atStore(model, () => StoreState.Failed({ error })),
-    GotGroups: ({ groups }) => atOpened(model, (opened) => modifyFields(opened, { groups: () => groups })),
+    GotGroups: ({ groups }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, {
+          groups: () => groups,
+          // A group the person can no longer see, as one they left or one refused, closes.
+          group: Option.filter(({ groupId }) => groups.some(({ group }) => group.id === groupId))
+        })
+      ),
     GotMembers: ({ members }) => atOpened(model, (opened) => modifyFields(opened, { members: () => members })),
+    GotMemberships: ({ memberships }) =>
+      atOpened(model, (opened) => modifyFields(opened, { memberships: () => memberships })),
+    GotFollows: ({ follows }) => atOpened(model, (opened) => modifyFields(opened, { follows: () => follows })),
+    ClickedNewTeam: () =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, { composing: () => Option.some(Composing.Team({ name: "", isPublic: false })) })
+      ),
+    TypedTeamName: ({ name }) =>
+      atComposing(model, (composing) =>
+        Composing.matchOrElse(composing, { Team: (team) => Composing.Team({ ...team, name }) }, () => composing)
+      ),
+    ToggledTeamPublic: ({ isPublic }) =>
+      atComposing(model, (composing) =>
+        Composing.matchOrElse(composing, { Team: (team) => Composing.Team({ ...team, isPublic }) }, () => composing)
+      ),
+    SubmittedTeam: () =>
+      Option.match(openedIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ composing, memberId }) =>
+          Option.match(
+            Option.flatMap(
+              composing,
+              Composing.matchOrElse({ Team: (team) => Option.some(team) }, () => Option.none())
+            ),
+            {
+              onNone: () => ({ model }),
+              onSome: ({ name, isPublic }) => ({
+                ...atOpened(model, (opened) => modifyFields(opened, { composing: () => Option.none() })),
+                commands: [CreateTeam({ name, memberIds: [memberId], visibility: isPublic ? "Public" : "Private" })]
+              })
+            }
+          )
+      }),
+    ClickedNewDirect: () =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, { composing: () => Option.some(Composing.Direct({ memberId: Option.none(), text: "" })) })
+      ),
+    ChoseDirectMember: ({ memberId }) =>
+      atComposing(model, (composing) =>
+        Composing.matchOrElse(
+          composing,
+          { Direct: (direct) => Composing.Direct({ ...direct, memberId }) },
+          () => composing
+        )
+      ),
+    TypedDirect: ({ text }) =>
+      atComposing(model, (composing) =>
+        Composing.matchOrElse(composing, { Direct: (direct) => Composing.Direct({ ...direct, text }) }, () => composing)
+      ),
+    SubmittedDirect: () =>
+      Option.match(
+        Option.flatMap(openedIn(model), ({ composing }) =>
+          Option.flatMap(
+            composing,
+            Composing.matchOrElse(
+              { Direct: ({ memberId, text }) => Option.map(memberId, (memberId) => ({ memberId, text })) },
+              () => Option.none()
+            )
+          )
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: (direct) => ({
+            ...atOpened(model, (opened) => modifyFields(opened, { composing: () => Option.none() })),
+            commands: [StartDirect(direct)]
+          })
+        }
+      ),
+    ClickedCancelCompose: () => atOpened(model, (opened) => modifyFields(opened, { composing: () => Option.none() })),
+    ClickedJoin: ({ groupId }) => ({ model, commands: [JoinGroup({ groupId })] }),
+    ClickedLeave: () =>
+      Option.match(
+        Option.flatMap(groupIn(model), ({ groupId }) =>
+          Option.map(ownMembership(model, groupId), ({ id }) => ({ groupId, membershipId: id }))
+        ),
+        { onNone: () => ({ model }), onSome: (input) => ({ model, commands: [LeaveGroup(input)] }) }
+      ),
+    ClickedFollowGroup: () =>
+      Option.match(ownFollow(model), {
+        onNone: () => ({ model }),
+        onSome: (input) => ({ model, commands: [FollowGroup(input)] })
+      }),
+    ClickedUnfollowGroup: () =>
+      Option.match(ownFollow(model), {
+        onNone: () => ({ model }),
+        onSome: (input) => ({ model, commands: [UnfollowGroup(input)] })
+      }),
+    ClickedRenameGroup: () =>
+      atGroup(model, (group) =>
+        modifyFields(group, {
+          renaming: () => Option.some(Option.getOrElse(teamNameOf(model, group.groupId), () => ""))
+        })
+      ),
+    TypedGroupName: ({ name }) => atGroup(model, (group) => modifyFields(group, { renaming: () => Option.some(name) })),
+    SubmittedGroupName: () =>
+      Option.match(groupIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ groupId, renaming }) =>
+          Option.match(
+            Option.flatMap(renaming, (name) =>
+              Option.map(teamNameOf(model, groupId), (expectedName) => ({ groupId, name, expectedName }))
+            ),
+            {
+              onNone: () => ({ model }),
+              onSome: (input) => ({
+                ...atGroup(model, (group) => modifyFields(group, { renaming: () => Option.none() })),
+                commands: [RenameGroup(input)]
+              })
+            }
+          )
+      }),
+    ClickedCancelGroupName: () => atGroup(model, (group) => modifyFields(group, { renaming: () => Option.none() })),
+    ChoseMemberToAdd: ({ memberId }) => atGroup(model, (group) => modifyFields(group, { adding: () => memberId })),
+    SubmittedAddMember: () =>
+      Option.match(
+        Option.flatMap(groupIn(model), ({ groupId, adding }) =>
+          Option.map(adding, (memberId) => ({ groupId, memberId }))
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: (input) => ({
+            ...atGroup(model, (group) => modifyFields(group, { adding: () => Option.none() })),
+            commands: [AddMember(input)]
+          })
+        }
+      ),
+    ClickedRemoveMember: ({ membershipId }) =>
+      Option.match(groupIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ groupId }) => ({ model, commands: [RemoveMember({ groupId, membershipId })] })
+      }),
     GotActions: ({ actions }) => atOpened(model, (opened) => modifyFields(opened, { actions: () => actions })),
     GotThreads: ({ groupId, threads }) =>
       atGroup(model, (group) => (group.groupId === groupId ? modifyFields(group, { threads: () => threads }) : group)),
@@ -286,7 +470,15 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ClickedGroup: ({ groupId }) =>
       atOpened(model, (opened) =>
         modifyFields(opened, {
-          group: () => Option.some({ groupId, threads: [], draft: "", thread: Option.none() })
+          group: () =>
+            Option.some({
+              groupId,
+              threads: [],
+              draft: "",
+              thread: Option.none(),
+              renaming: Option.none(),
+              adding: Option.none()
+            })
         })
       ),
     ClickedThread: ({ threadId }) =>

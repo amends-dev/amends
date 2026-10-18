@@ -3,11 +3,13 @@
 The workspace app, being built on [Foldkit](https://foldkit.dev): a browser app that signs people
 in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in sync
 through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write, offline.
-For now it signs in, lists the person's workspaces, and opens one: its groups, a group's threads
-with how much of each is new, and a thread's messages, where the person starts a thread, replies,
-renames a thread, edits or deletes their own messages, and follows or stops following a thread,
-which opening reads through its latest activity. What they do shows at once, marked as sending,
-even offline, and what the server refuses comes back with why.
+For now it signs in, lists the person's workspaces, and opens one: the groups they belong to and
+the public teams they may join, where they create a team, start a conversation with another
+member, rename a team, admit and remove its members, follow it, join it, or leave it; a group's
+threads with how much of each is new; and a thread's messages, where the person starts a thread,
+replies, renames a thread, edits or deletes their own messages, and follows or stops following a
+thread, which opening reads through its latest activity. What they do shows at once, marked as
+sending, even offline, and what the server refuses comes back with why.
 
 ## Run
 
@@ -29,8 +31,10 @@ that decides, and commands that act.
 
 - `model.ts`: the host's address and the page. Signed out, the sign-in form, a step at a time;
   signed in, the session, the person's workspaces, and the one open: its store's state, the
-  groups and members its replica holds, the person's unfinished actions, and the open group, with
-  its threads, the thread being started, and the open thread, with its messages and the reply.
+  groups, members, group memberships, and the person's group follows its replica holds, the
+  person's unfinished actions, the team or conversation they are starting, and the open group,
+  with its threads, the thread being started, the name being given it, the member chosen to admit,
+  and the open thread, with its messages and the reply.
 - `message.ts`, `update.ts`: what happens and what it changes. A message the page is past, such as
   a code check finishing after the person left the form, changes nothing.
 - `command.ts`: the sign-in requests, keeping the session, listing workspaces, and signing out, each
@@ -39,8 +43,9 @@ that decides, and commands that act.
   sync key and ends the session as far as the host can be reached.
 - `store.ts`: the open workspace's store as a managed resource, open while a workspace is open and
   closed when the person leaves it or signs out; what its replica holds as subscriptions, the
-  groups, members, and actions, the open group's threads, and the open thread's messages; and the
-  commands that write to it, starting a thread, replying, and dismissing a refused action.
+  groups, members, memberships, follows, and actions, the open group's threads, and the open
+  thread's messages; and the commands that write to it, an action each, and dismissing a refused
+  action.
 - `view.ts`: markup over `@foldkit/ui`'s headless components, with no styles yet.
 - `flags.ts`, `session.ts`, `browser.ts`, `api.ts`: the address and the session kept from the last
   visit, the browser's services the runtime gives commands and stores, and the API's client.
@@ -53,14 +58,15 @@ that decides, and commands that act.
   `ReplicaChanged` the server writes to the replica. `write` writes an action, which eventlog sends
   when it can; its local handler holds the action in the replica until the server completes it,
   with the records `sync/Pending.ts` says it creates: a thread started in a group, with its opening
-  message, and a reply, under the IDs core derives from the action's key, the request key the
-  server runs it under. A handler runs before eventlog journals the action, so one that fails
+  message, a conversation's direct group, a reply, a team and its admissions, and an admission,
+  under the IDs core derives from the action's key, the request key the server runs it under. A handler runs before eventlog journals the action, so one that fails
   fails the write.
 - `sync/Pending.ts` is what an unfinished action does to what the person sees: the records it
   creates, and how it changes records the replica holds: renaming a thread or a team, editing or
-  deleting a message, ending the person's part in a thread or taking up one they ended, and moving
-  their position in a thread. Following a thread they never took part in waits for the server,
-  which gives the participation their group membership. `overlay` applies the unfinished actions, in the order they were
+  deleting a message, ending the person's part in a thread or taking up one they ended, moving
+  their position in a thread or a group, removing a member, leaving, and ending or taking up a
+  follow of a group. Following a thread they never took part in, or a group they never followed,
+  waits for the server, which gives the participation or the follow their group membership. `overlay` applies the unfinished actions, in the order they were
   written, each to what the ones before it left, on top of the server's records each time they are
   read, so whatever the server changes meanwhile shows through what an action leaves alone, and a
   record an action created gives way to the server's own under the same key. A completed or
@@ -74,7 +80,8 @@ that decides, and commands that act.
   the server's records alone, and the person's unfinished actions beside them: `Completed` drops
   the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
   of a kind at a place, `threads` a group's threads with their messages, and `actions` the person's
-  unfinished actions, each again after every change; the store reads each through `overlay`.
+  unfinished actions, each again after every change, and `every` the records of a kind wherever
+  they sit; the store reads each through `overlay`.
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
   a store opens, reads, and takes actions offline. Each time its connection drops, the store builds
@@ -97,17 +104,22 @@ browser's storage:
 
 - Story tests drive `update`: signing in a step at a time, each failure going back a step with
   why, a workspace opening to a group, a thread, and a reply, a thread started, a write that could
-  not be kept, and signing out.
-- A Scene test drives the view as a person does, from typing their address through a reply and a
-  refused action to signing out.
+  not be kept, a thread's actions, a team and a conversation started, a team's actions, and
+  signing out.
+- Scene tests drive the view as a person does, from typing their address through a reply and a
+  refused action to signing out, and from joining a team through creating one, seeing it at once,
+  and admitting and removing its members.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and
-  deletes, and refused actions applying nothing.
+  deletes, a team renamed, members removed and leaving, a group's follow ended and taken up, and
+  refused actions applying nothing.
 - The store's tests serve a host in process, the HTTP API and the sync server over memory storage
   on Bun, and open a store against it: the reset arrives, a change made over HTTP follows, and the
   store reads its replica again with the host gone; a thread it starts shows at once and becomes
   the server's under the same ID, a reply written with the host gone reaches it once it is back,
-  and one to a thread that does not exist comes back rejected.
+  and one to a thread that does not exist comes back rejected; a team and its admission, and a
+  conversation, started in the browser come back as the server's under the IDs the browser gave
+  them.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

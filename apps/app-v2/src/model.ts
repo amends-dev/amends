@@ -4,7 +4,7 @@
  * the one they opened, whose store syncs while it is open.
  */
 
-import { Group, GroupId } from "@amends-dev/core/group"
+import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { Member, MemberId, Workspace } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
@@ -36,6 +36,10 @@ export const StoreState = defineTaggedUnion({
   Failed: { error: Schema.String }
 })
 export type StoreState = typeof StoreState.Type
+
+/** A group the person can see, and whether it is still being created. */
+export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean })
+export type GroupItem = typeof GroupItem.Type
 
 /** A thread of the open group, with its opening message, whether it is still being started, and how much is unread. */
 export const ThreadItem = Schema.Struct({
@@ -89,27 +93,51 @@ export const OpenThread = Schema.Struct({
 })
 export type OpenThread = typeof OpenThread.Type
 
-/** The group open in the workspace, its threads, the thread being started, and the thread open in it. */
+/**
+ * The group open in the workspace: its threads, the thread being started, the thread open in it,
+ * the name being given it, and the member chosen to admit to it, or none.
+ */
 export const OpenGroup = Schema.Struct({
   groupId: GroupId.GroupId,
   threads: Schema.Array(ThreadItem),
   draft: Schema.String,
-  thread: Schema.Option(OpenThread)
+  thread: Schema.Option(OpenThread),
+  renaming: Schema.Option(Schema.String),
+  adding: Schema.Option(MemberId.MemberId)
 })
 export type OpenGroup = typeof OpenGroup.Type
 
+/** A group's membership, and whether a change to it is on its way. */
+export const MembershipItem = Schema.Struct({ membership: GroupMembership.GroupMembership, pending: Schema.Boolean })
+export type MembershipItem = typeof MembershipItem.Type
+
+/** One of the person's follows of a group, and whether a change to it is on its way. */
+export const FollowItem = Schema.Struct({ follow: GroupFollow.GroupFollow, pending: Schema.Boolean })
+export type FollowItem = typeof FollowItem.Type
+
+/** What the person is starting beside the open group: a team, or a conversation with another member. */
+export const Composing = defineTaggedUnion({
+  Team: { name: Schema.String, isPublic: Schema.Boolean },
+  Direct: { memberId: Schema.Option(MemberId.MemberId), text: Schema.String }
+})
+export type Composing = typeof Composing.Type
+
 /**
  * The workspace the person opened, as their member of it: its store, what the replica holds of it,
- * the actions not finished yet, why the last one could not be written, and the group open in it.
+ * its groups' memberships and the person's follows among them, the actions not finished yet, why
+ * the last one could not be written, what the person is starting, and the group open in it.
  */
 export const Opened = Schema.Struct({
   workspace: Workspace.Workspace,
   memberId: MemberId.MemberId,
   store: StoreState,
-  groups: Schema.Array(Group.Group),
+  groups: Schema.Array(GroupItem),
   members: Schema.Array(Member.Member),
+  memberships: Schema.Array(MembershipItem),
+  follows: Schema.Array(FollowItem),
   actions: Schema.Array(ActionItem),
   notice: Schema.Option(Schema.String),
+  composing: Schema.Option(Composing),
   group: Schema.Option(OpenGroup)
 })
 export type Opened = typeof Opened.Type

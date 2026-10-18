@@ -3,14 +3,14 @@
  * subscription report back.
  */
 
-import { Group, GroupId } from "@amends-dev/core/group"
+import { GroupId, GroupMembership } from "@amends-dev/core/group"
 import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
-import { Member, WorkspaceId } from "@amends-dev/core/workspace"
+import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Schema from "effect/Schema"
 import { defineMessageUnion } from "foldkit/message"
-import { ActionItem, Following, MessageItem, ThreadItem } from "./model.ts"
+import { ActionItem, FollowItem, Following, GroupItem, MembershipItem, MessageItem, ThreadItem } from "./model.ts"
 
 export const Message = defineMessageUnion({
   TypedEmail: { email: Schema.String },
@@ -30,8 +30,30 @@ export const Message = defineMessageUnion({
   ReleasedStore: {},
   FailedAcquireStore: { error: Schema.String },
   FailedReadStore: { error: Schema.String },
-  GotGroups: { groups: Schema.Array(Group.Group) },
+  GotGroups: { groups: Schema.Array(GroupItem) },
   GotMembers: { members: Schema.Array(Member.Member) },
+  GotMemberships: { memberships: Schema.Array(MembershipItem) },
+  GotFollows: { follows: Schema.Array(FollowItem) },
+  ClickedNewTeam: {},
+  TypedTeamName: { name: Schema.String },
+  ToggledTeamPublic: { isPublic: Schema.Boolean },
+  SubmittedTeam: {},
+  ClickedNewDirect: {},
+  ChoseDirectMember: { memberId: Schema.Option(MemberId.MemberId) },
+  TypedDirect: { text: Schema.String },
+  SubmittedDirect: {},
+  ClickedCancelCompose: {},
+  ClickedJoin: { groupId: GroupId.GroupId },
+  ClickedLeave: {},
+  ClickedFollowGroup: {},
+  ClickedUnfollowGroup: {},
+  ClickedRenameGroup: {},
+  TypedGroupName: { name: Schema.String },
+  SubmittedGroupName: {},
+  ClickedCancelGroupName: {},
+  ChoseMemberToAdd: { memberId: Schema.Option(MemberId.MemberId) },
+  SubmittedAddMember: {},
+  ClickedRemoveMember: { membershipId: GroupMembership.GroupMembershipId },
   GotActions: { actions: Schema.Array(ActionItem) },
   GotThreads: { groupId: GroupId.GroupId, threads: Schema.Array(ThreadItem) },
   GotThread: {
