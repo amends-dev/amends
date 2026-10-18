@@ -53,11 +53,10 @@ Import from the installed packages, never from `repos/`.
 | `bun run typecheck`      | TypeScript 7 with Effect's diagnostics, across every workspace                  |
 | `bun run check:packages` | Which package may depend on which                                               |
 | `bun run barrels`        | Write every barrel, each `index.ts` marked `// @barrel`, from its folder        |
-| `bun run dist`           | Build or check a package as npm gets it; see [publishing](docs/publishing.md)   |
+| `bun run dist`           | Build or check a package as npm gets it                                         |
 | `bun changeset`          | Describe a change to published packages for their next release                  |
 
 Run `bun run check` after every change and the tests after any change in behavior.
-[Testing](docs/testing.md) covers the test APIs, fixtures, and how CI splits the suites.
 
 Before each commit, [Lefthook](https://lefthook.dev) runs the dependency, generated-barrel,
 generated-icon, type, lint, and formatting checks in parallel over the working tree. They change and stage nothing; a
@@ -76,11 +75,10 @@ confirm it listens, as the [local host guide](hosts/local/README.md#verify) desc
 ## Making a change
 
 1. Branch from `main`, and keep one concern per pull request.
-2. Update every consumer of what you change, and the READMEs and guides that describe it. When a
-   change finishes something [known limitations](docs/current-status.md) lists, remove it there.
+2. Update every consumer of what you change, and the READMEs that describe it.
 3. When a published package's users would see the change, add a changeset with `bun changeset`:
    a patch for a fix, and a minor for a feature or, before 1.0, a breaking change, which moves
-   every published package to the next line. See [releasing](docs/publishing.md#releasing).
+   every published package to the next line.
 4. Write commits that each say, in one sentence, what changed and why: "Move the channel transport
    contract into its own package, as the harness and sandbox contracts are." Explain the reason
    in the body when it needs more than the subject.
@@ -126,7 +124,7 @@ at tag `effect@4.0.5`, commit `7f524e25cfb49a71ac39b0f44278d08d40dda5de`. Upgrad
    APIs the upgrade touches, and verify the host starts as its
    [guide](hosts/local/README.md#verify) describes.
 4. Raise the published packages to a new line with a changeset, since their `effect` range moves
-   with the catalog; see [releasing](docs/publishing.md#releasing).
+   with the catalog.
 
 The weekly [Latest Effect](.github/workflows/latest-effect.yml) workflow checks the repository
 against the newest Effect release the published packages allow, and fails when one breaks them:

@@ -7,8 +7,7 @@ module dependencies, schema names, and construction conventions.
   permissions in its own directory. Add only the modules the feature needs.
 - One module per namespace, named after it (`ThreadStore.ts` exports `ThreadStore`), flat
   in the feature directory, with helpers no consumer imports in `internal/`; a header and
-  `@since` on every module and `@category` and `@since` on every export, as
-  [threads](../../docs/threads.md#code-conventions) states.
+  `@since` on every module and `@category` and `@since` on every export.
 - Keep models independent of services and projections. Separate fact
   declarations from projection handlers and application workflows.
 - Import owning leaf modules inside core, with `import * as`; no module re-exports itself.

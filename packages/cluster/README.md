@@ -163,4 +163,4 @@ and a scripted transport: deliveries posted in order, a system that cannot be re
 and the delivery given up once it keeps failing, one the system refuses failed there and then, and a
 workspace never created. `test/jobs/pruning.test.ts` checks that pruning runs every hour for the
 entity types it is given and its own runs. The [local host](../../hosts/local/README.md)'s tests run
-jobs over PostgreSQL. See [testing](../../docs/testing.md).
+jobs over PostgreSQL.

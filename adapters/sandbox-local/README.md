@@ -90,6 +90,5 @@ nothing stands between the sandbox and the network to enforce a policy or set he
 ## Development
 
 Run the package's tests with `bun run test adapters/sandbox-local`: the conformance suites of
-`@amends-dev/sandbox` over a temporary directory, and what this provider alone does. See
-[testing](../../docs/testing.md). `bun run dist check adapters/sandbox-local` builds the package as
-npm gets it and checks it as a consumer; see [publishing](../../docs/publishing.md).
+`@amends-dev/sandbox` over a temporary directory, and what this provider alone does. `bun run dist check adapters/sandbox-local` builds the package as
+npm gets it and checks it as a consumer.

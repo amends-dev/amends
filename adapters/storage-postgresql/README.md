@@ -64,9 +64,7 @@ append receipts and batch reads by commit. `log_append_keys` stores durable appe
 workspace, log, and key: a matching retry returns the original append, and conflicting content
 fails. `Store.getEntry(logId, entryId)` reads one entry by its key, in the caller's transaction or
 none. `checkpoints` holds the progress of a projection being rebuilt and `live_projections` the
-versions each log's commits apply; live commits write neither. See the
-[storage envelope](../../docs/journal.md#storage-envelope) and
-[live projections](../../docs/journal.md#live-projections).
+versions each log's commits apply; live commits write neither.
 
 ### Members, access, and groups
 
@@ -228,8 +226,7 @@ session connection, so behind a transaction-pooling proxy the adapter falls back
 
 The binding opens transactions with plain `BEGIN` and does not pin isolation, so the database's
 default still controls snapshots. Every failed `COMMIT` returns `Store.CommitUncertain`, including
-errors that could be classified as a definite rollback; see
-[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
+errors that could be classified as a definite rollback.
 
 ## Effect Cluster's tables
 
@@ -305,4 +302,4 @@ fact columns (`fact-metadata.test.ts`), a refused statement still aborting its t
 (`invitations.test.ts`), waiters woken through notifications (`journal.test.ts`), construction,
 concurrent schema application, and the plan test (`database.test.ts`), scope columns
 (`scope.test.ts`), and Cluster's tables (`cluster-storage.test.ts`). `test/postgres.ts` finds or
-starts the server and makes temporary databases. See [testing](../../docs/testing.md).
+starts the server and makes temporary databases.

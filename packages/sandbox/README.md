@@ -151,9 +151,8 @@ lifecycle, network policies, and file and process services.
 ## Development
 
 Run the package's tests with `bun run test packages/sandbox`; each provider runs the conformance
-suites in its own tests. See [testing](../../docs/testing.md). `bun run dist check packages/sandbox`
-builds the package as npm gets it and checks it as a consumer; see
-[publishing](../../docs/publishing.md).
+suites in its own tests. `bun run dist check packages/sandbox`
+builds the package as npm gets it and checks it as a consumer.
 
 ## Inspiration
 

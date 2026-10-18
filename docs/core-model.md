@@ -8,18 +8,14 @@ This document describes design intent. It does not describe or validate the curr
 implementation. The discussion is grounded in the work users want to do and the contracts
 of external systems. Existing implementation choices do not constrain the design.
 
-For current behavior, read [workspace workflows](workspace-workflows.md), the
-[group workflows](group-workflows.md), [agents](agents.md), [connections](connections.md),
-[turns](turns.md), the [core package guide](../packages/core/README.md),
-and [known limitations](current-status.md).
+For current behavior, read the [core package guide](../packages/core/README.md) and the code.
 Workspace management, the generic journal, notification storage and inbox reads,
 and live changes read from the journal are implemented. Core and the storage adapters also implement
 team-group creation, public groups, membership admission/departure, workspace-removal cleanup,
 authorized group reads, and a shared group-audience check. Direct groups (DMs and group DMs) are
 established and reused by member set, with their first thread, through `ThreadService.startDirect`.
 Every thread opens through one internal thread start that creates the thread, admits its starting
-participants, and records its first message activity and pending notifications atomically; see
-[thread workflows](thread-workflows.md). Participants and message authors can be members,
+participants, and records its first message activity and pending notifications atomically. Participants and message authors can be members,
 contacts, or triage. Authorized group-thread discovery,
 metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
 `ThreadMessageService`, admitting the author and eligible mentions in the same commit.
@@ -35,13 +31,11 @@ turns, one active turn per agent per thread. Each agent in each thread has a tur
 its turns there outside any request, one harness turn each, writes its conversation to the
 participation's session log, and closes each turn by posting the agent's answer; see
 [core's turns](../packages/core/README.md#turns) and [cluster](../packages/cluster/README.md).
-Tasks and channels, with their contacts and deliveries, are built as [threads](threads.md) fixes
-them; other participation management, toolkits, and triage's acknowledgment below remain design
-intent.
-[Threads](threads.md) fixes the model that conversations, tasks, and channel conversations
-share: the thread record with its title and origin, messages and their editing, tasks and
-channel bindings as rows keyed by thread, and the recipients of each activity kind. Where it
-differs from the task and channel sections below, it governs.
+Tasks and channels, with their contacts and deliveries, are built on threads; other participation
+management, toolkits, and triage's acknowledgment below remain design intent.
+Conversations, tasks, and channel conversations share one thread model: the thread record with its
+title and origin, messages and their editing, tasks and channel bindings as rows keyed by thread,
+and the recipients of each activity kind.
 “Agreed” records a design decision, not its implementation status.
 
 ## Architecture summary
@@ -1747,7 +1741,6 @@ atomically. Its creation permission covers that requested audience without a sec
 membership-management check. The creator joins only if included in the list. A later
 addition checks management permission, the group's existence, the workspace member's
 eligibility, and absence of an active admission in the same commit as its publication.
-See [group workflows](group-workflows.md) for the implemented contracts and remaining work.
 
 Starting a direct group is a member operation. The initiating member is one of its members and
 selects one or more other active human or agent members in the same workspace. Selecting an
@@ -1833,8 +1826,7 @@ notification's source, which only its recipient's inbox lists. It shows the same
 item without marking anything seen or changing participation. Historical notifications,
 including discarded agent input, keep their source after unfollowing while access permits; group
 departure or a revoked read grant hides it. Subscriptions retain their separate authorization
-contract. See [thread reads](thread-workflows.md#reading-conversations)
-and [notification sources](thread-workflows.md#notification-sources).
+contract.
 
 ### Threads inherit their group's access audience
 
@@ -2090,8 +2082,7 @@ every participation held through that admission together, records nothing in the
 settles the member's pending notifications from the group, so its cost does not grow with how many
 threads the member took part in. Cancelling an agent's active turns on departure will likewise
 find them across the group rather than per participation. A later rejoin has a fresh ID and
-boundary. See [following and unfollowing](thread-workflows.md#following-and-unfollowing) and
-[departure and pending input](thread-workflows.md#departure-and-pending-input).
+boundary.
 
 Muting does not acknowledge notifications, advance input progress, or cancel agent work.
 It is a human presentation preference. Its exact UI and alert settings remain open.
@@ -2282,7 +2273,6 @@ rebuilding projections keeps it. Active membership and ownership are required, w
 thread-access requirement. Acknowledgments that hand off work, a turn accepting input or a channel
 delivery accepting a reply, will be journal facts recorded in the same commit as the turn or
 delivery by the workflows that own them; the notification domain does not orchestrate that work.
-See [marking a notification seen](thread-workflows.md#marking-a-notification-seen).
 
 Other recipients' storage, acknowledgment fields, and retry mechanics remain open. Discarded and
 informational notifications must not remain pending or repeatedly trigger processing. An

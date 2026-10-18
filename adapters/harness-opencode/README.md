@@ -219,6 +219,6 @@ with `test/fake-opencode-server.js` standing in for `opencode serve`; the bridge
 `BridgeClient` in a sandbox on this machine and reached over a WebSocket; and the template with its
 commands answered as a sandbox would answer them. With `AMENDS_TEST_OPENCODE=1`, the live tests run
 `opencode` and `opencode2` from this machine's `PATH` under the agents, whose turns OpenCode Zen's
-free model answers. See [testing](../../docs/testing.md).
+free model answers.
 `bun run dist check adapters/harness-opencode` builds the package as npm gets it and checks it as a
-consumer; see [publishing](../../docs/publishing.md).
+consumer.

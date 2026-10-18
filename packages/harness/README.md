@@ -346,9 +346,8 @@ from code it runs.
 
 Run the package's tests with `bun run test packages/harness`. They run sessions, the bridge's
 handlers, and the relay over fakes, without a transport; the bridge over a real WebSocket, launched
-in a local sandbox, is tested in the opencode adapter. See [testing](../../docs/testing.md).
-`bun run dist check packages/harness` builds the package as npm gets it and checks it as a consumer;
-see [publishing](../../docs/publishing.md).
+in a local sandbox, is tested in the opencode adapter.
+`bun run dist check packages/harness` builds the package as npm gets it and checks it as a consumer.
 
 ## Inspiration
 

@@ -134,7 +134,7 @@ only on a private network.
 
 Every process over one database runs the same version: processes that serve the API and processes
 that run jobs commit to the same workspaces, so they must register the same
-[projections](../../docs/current-status.md#projection-sets-across-hosts), and a job's request one
+projections, and a job's request one
 process stores is read by whichever process runs the job. Deploy them together.
 
 ## Browser access
@@ -214,14 +214,12 @@ also its `SignInStorage.SignInStorage`; development session tokens are built syn
 needs HTTP services or sends codes when built. Database and server resources belong to their layer
 scopes. The gateway boots each workspace on first use and keeps it prepared while requests or
 streams use it and for five idle minutes afterwards; see the
-[gateway](../../packages/gateway/README.md#workspace-runtimes). See
-[known limitations](../../docs/current-status.md) for commit classification, PostgreSQL isolation,
-stream authorization, and reconnecting.
+[gateway](../../packages/gateway/README.md#workspace-runtimes).
 
 ## Development
 
 The host's tests open storage, so they run in the `postgresql` project, each over its own temporary
-database, and are skipped without PostgreSQL, as [testing](../../docs/testing.md) describes:
+database, and are skipped without PostgreSQL:
 
 ```bash
 bun run test --project postgresql hosts/local

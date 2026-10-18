@@ -10,7 +10,6 @@ programs, `it.live` only for integrations that need live clocks, and plain `it`
 for synchronous assertions and Promise-based UI or subprocess tests. Test helpers
 return Effects; do not run them with `Effect.runPromise` or `Effect.runSync`.
 Use `TestClock` and explicit concurrency signals, and scope acquired resources.
-See [docs/testing.md](docs/testing.md) for commands, fixtures, and examples.
 `bun run start` serves the local host on port 8787 and keeps running; it requires
 `AMENDS_DATABASE_URL`, a PostgreSQL database URL. After changing runtime setup,
 create a temporary database, start the host in the background with `AMENDS_PORT=0`
@@ -26,7 +25,7 @@ across the working tree.
 The hook checks files without modifying or staging them. Fix failures before
 committing; `bun run lefthook run pre-commit --force` runs the same checks manually,
 even when no files are staged. CI runs these checks, the tests, and the frontend builds
-as parallel jobs; see [continuous integration](docs/testing.md#continuous-integration).
+as parallel jobs.
 Keep these diagnostics enabled in `tsconfig.base.json`: the pinned Oxlint version is
 newer than the versions supported by the Effect Oxlint patch, so Effect checks
 currently run through TypeScript. Check compatibility before changing this setup.
@@ -142,8 +141,7 @@ framework-required render APIs where needed. Pages live in `apps/site`; UI owns 
 pieces and owns no application pages.
 UI screens are presentational: they take data and callbacks and render a pane or
 the navigation, while the apps own routes, data, and which screen shows.
-Every rail destination follows one navigation pattern
-([workspace shell](docs/workspace-shell.md)): its sidebar lists its items with Browse and
+Every rail destination follows one navigation pattern: its sidebar lists its items with Browse and
 Create, the main content shows the list or one item with tabs as links, and the side panel holds
 only something inside what the main content shows. A page about one item puts its sections in
 `Pane.Column`, one column; never lay details or forms side by side in the main content.
@@ -156,7 +154,7 @@ into an app page.
 
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links, except that a published package links to another with `workspace:^`, which publishes
-as a caret range ([publishing](docs/publishing.md#versions)). Run `bun install` at the repository
+as a caret range. Run `bun install` at the repository
 root after manifest changes.
 `bun run check:packages` checks shared-package dependency declarations. A barrel, an `index.ts`
 marked `// @barrel`, is generated as Effect's are: `bun run barrels` lists every module beside it,
@@ -187,17 +185,14 @@ not reasons to keep it.
 
 ## Documentation
 
-[docs/README.md](docs/README.md) indexes current guides, design intent, and historical
-references. Update affected READMEs and guides when changing commands, configuration,
-contracts, behavior, or test setup. Check claims against implementation and tests;
-an agreed design or a passing round-trip test does not establish an implemented
-feature or compatibility across dependency upgrades.
-
-Keep [known limitations](docs/current-status.md) aligned with the owning source and
-guides. Remove a limitation when its implementation and relevant verification are
-complete. Preserve the status of proposals and historical notes instead of presenting
-them as current behavior. Check relative links and heading anchors after moving or
-renaming documentation. `CLAUDE.md` is a symlink to this file; keep one guidance source.
+The code is the source of truth. Each package's README describes its contract, and
+[docs/core-model.md](docs/core-model.md) is the one design document: it states intent, not
+current behavior. Update affected READMEs when changing commands, configuration, contracts,
+behavior, or test setup. Check claims against implementation and tests; an agreed design or a
+passing round-trip test does not establish an implemented feature or compatibility across
+dependency upgrades. Do not present a proposal as current behavior. Check relative links and
+heading anchors after moving or renaming documentation. `CLAUDE.md` is a symlink to this file;
+keep one guidance source.
 
 ## Effect
 

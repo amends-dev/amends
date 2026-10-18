@@ -120,6 +120,5 @@ approval, which the agent never asks for; `AgentContractError` for state it cann
 Run the package's tests with `bun run test adapters/harness-amends`: the agent over scripted
 models, the tools in a sandbox on this machine, and the models' requests against a client that
 answers as each API does; with `AMENDS_TEST_MODELS=1` and `OPENROUTER_API_KEY`, the live tests
-reach real APIs. See [testing](../../docs/testing.md). `bun run dist check adapters/harness-amends`
-builds the package as npm gets it and checks it as a consumer; see
-[publishing](../../docs/publishing.md).
+reach real APIs. `bun run dist check adapters/harness-amends`
+builds the package as npm gets it and checks it as a consumer.

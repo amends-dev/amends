@@ -142,5 +142,4 @@ bun run --filter @amends-dev/connection update-models
 `test/integration.test.ts` what `Integration.make` does with a connection, and `Integrations`;
 `test/model-integrations.test.ts` the catalog's models through a client that answers as a provider
 would; and `test/tool-integrations.test.ts` an MCP server in the test's process and an HTTP API with
-its document. `test/live.test.ts` checks connections to real providers with `AMENDS_TEST_MODELS=1`,
-as [testing](../../docs/testing.md) describes.
+its document. `test/live.test.ts` checks connections to real providers with `AMENDS_TEST_MODELS=1`.

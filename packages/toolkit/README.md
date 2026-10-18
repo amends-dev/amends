@@ -17,8 +17,7 @@ bun add @amends-dev/toolkit effect
 ```
 
 In amends, [connection](../connection/README.md)'s tool integrations make MCP and HTTP sources for
-the connections a workspace makes; agents do not take toolkits yet, as
-[known limitations](../../docs/current-status.md) records.
+the connections a workspace makes; agents do not take toolkits yet.
 
 ## Quick start
 
@@ -326,8 +325,7 @@ They require of a source that it:
 bun run test packages/toolkit
 ```
 
-`bun run dist check packages/toolkit` builds the package as npm gets it and checks it as a consumer;
-see [publishing](../../docs/publishing.md).
+`bun run dist check packages/toolkit` builds the package as npm gets it and checks it as a consumer.
 
 `test/tool-source.test.ts`, `test/tool-source-error.test.ts`, `test/tool-definition.test.ts`,
 `test/assembly.test.ts`, `test/tool-search.test.ts`, `test/presentation.test.ts`, and
@@ -344,7 +342,7 @@ streams with other messages in them, pagination, and each status and error code;
 `test/http.test.ts` records the requests of a scripted client and sends a few over the wire, and
 `test/openapi.test.ts` reads documents written in each test and takes one through the toolkit to a
 request. These tests need `Request`, `Response`, and `Bun`, which shared packages do not have, so
-the root `tsconfig.json` checks them. See [testing](../../docs/testing.md).
+the root `tsconfig.json` checks them.
 
 ## Inspiration
 

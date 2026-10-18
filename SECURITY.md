@@ -29,8 +29,7 @@ Some behavior is by design, and is not a vulnerability:
 - **Local sandboxes isolate nothing.** A sandbox from `@amends-dev/sandbox-local` is a directory on
   your machine, and its processes run as you, on your network.
 - **Agents use their own tools without asking.** amends's agent reads, writes, edits, and runs
-  commands in its sandbox unasked, and opencode runs with its default permissions; see
-  [known limitations](docs/current-status.md).
+  commands in its sandbox unasked, and opencode runs with its default permissions.
 
 A vulnerability in Effect or another dependency belongs with that project. Tell us too when it
 affects amends in a way of its own.

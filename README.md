@@ -7,8 +7,7 @@ a harness, such as amends's own agent or opencode, with a model and a sandbox to
 the workspace's connections. When a thread needs an agent, it takes a turn there and posts its
 answer.
 
-amends is in early development. [Known limitations](docs/current-status.md) lists what is not built
-yet.
+amends is in early development, and much is not built yet.
 
 ## What is in this repository
 
@@ -64,7 +63,7 @@ packages/        shared packages on Effect alone: core, the contracts, and the H
 adapters/        implementations over one external system each, such as PostgreSQL or Daytona
 hosts/           runtime composition: the local Bun host
 apps/            the design system, its icons, and the site
-docs/            guides, design documents, and known limitations
+docs/            the core model, the design intent
 design-system/   the visual references the design system is built from
 scripts/         repository tooling
 stacks/          Alchemy stacks for the repository itself, such as its CI secrets
@@ -72,8 +71,8 @@ repos/effect/    Effect's source, vendored as read-only reference
 ```
 
 [Packages](packages/README.md), [adapters](adapters/README.md), [hosts](hosts/README.md), and
-[apps](apps/README.md) each describe their part, and the [documentation index](docs/README.md)
-lists every guide.
+[apps](apps/README.md) each describe their part, and the [core model](docs/core-model.md) describes
+the design intent behind them.
 
 ## Contributing
 

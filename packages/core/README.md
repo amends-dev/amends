@@ -89,7 +89,7 @@ performer, immediate cause, correlation ID, and occurrence time. `Publication.wi
 that context when it is absent and reuses it in nested operations; `Publication.make` supports
 explicit context for authenticated identities before membership and for system performers;
 `withCause` continues an event's causal chain, and `withPerformer` and `withOccurredAt` scope
-overrides. See [event provenance](../../docs/journal.md#event-provenance).
+overrides.
 
 Every fact declares `subject: (payload) => Subject.make(kind, id)`, a pure function naming the
 entity it changes as `kind:id`. A fact may also declare `occurrence: (payload) => [stableId]` to
@@ -97,16 +97,14 @@ make publication idempotent: the journal derives a key from the fact name and th
 the workspace and log, and a matching retry returns the original event without running projections
 again, while conflicting content fails. Creation and terminal facts use stable record IDs;
 repeatable changes need a request or occurrence ID, or return `null`. Facts registered under one
-name and version share their payload schema, subject, and occurrence functions. See
-[idempotent publication](../../docs/journal.md#idempotent-publication-and-append).
+name and version share their payload schema, subject, and occurrence functions.
 
 A fact's entry carries its subject and name, which storage indexes, and its version and
 provenance in its bytes beside the encoded payload. Read matching history with
 `journal.log.readEntries({ subject?, name?, after?, limit })`, giving a subject, a name, or both,
 with a `{ position, index }` cursor, and decode payloads with `Event.decode(fact, entry)`. An
 execution-log append outside a commit goes through `Store.append`, a commit of its own that waits
-only for the log's other writers; see
-[commits and positions](../../docs/journal.md#commits-and-positions).
+only for the log's other writers.
 
 ### Request keys
 
@@ -120,8 +118,7 @@ the operation's checks and returns what its first attempt created, whatever it a
 browser that wrote the request computes the same IDs with the same functions. A key names one
 request: sent with another, it finds what the first created where their records coincide. A record
 with an identity of its own derives its ID from that with `Request.derivedId`: a direct group from
-its members (`Group.directId`), and a turn's retry from the turn (`Turn.retryId`). See
-[retrying safely](../../docs/thread-workflows.md#retrying-safely).
+its members (`Group.directId`), and a turn's retry from the turn (`Turn.retryId`).
 
 A protocol that may deliver a request more than once and needs no answer from it, such as a
 browser's outbox resending what it wrote until the server takes it, runs it with
@@ -187,7 +184,7 @@ new outcome fails the build until it is a kind or internal.
 `revoke`, `list`), `OwnershipService` (`get`, `transfer`), and `WorkspaceSettingsService` (`get`,
 `members`, `rename`). `MemberCommand.add` adds a member as accepting an invitation does: the
 membership, its role across the workspace, and its admission to the general group, which every
-member joins. See [workspace workflows](../../docs/workspace-workflows.md).
+member joins.
 
 `Identity.Reference` identifies a human, agent, or contact, and `Identity.MemberReference` the human
 or agent subset that members, actors, and sessions use. External authors use
@@ -223,7 +220,7 @@ channels, directs agents, and uses connections. Administrator adds removing memb
 assigning roles, moderating groups and threads, and creating and configuring agents, connections,
 and channels. Owner adds renaming the workspace and transferring ownership. No role reaches a group
 from outside it: group operations require membership as well as the grant. Custom roles are not
-implemented; see [known limitations](../../docs/current-status.md).
+implemented.
 
 Each workspace records the bundle revision its roles hold, and neither authorization nor replay
 rebuilds them. To change the declarations, raise `BuiltinRoles.revision` and add the new bundles to
@@ -257,8 +254,7 @@ commit for writes. `GroupCommand.admitMember` publishes an admission for team cr
 groups, adding, and joining alike, and for the general group a new workspace starts with and every
 new member joins. `GroupCommand.removeMembership` records a departure as one fact,
 and projections end the member's follow and every thread participation held through the admission
-together. Removing a workspace member uses it for every admission. See
-[group workflows](../../docs/group-workflows.md).
+together. Removing a workspace member uses it for every admission.
 
 ## Threads
 
@@ -289,8 +285,7 @@ read through `ThreadQuery`; a query never writes.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without
-mentions pages the thread's active participants, the people it notifies. See
-[thread workflows](../../docs/thread-workflows.md).
+mentions pages the thread's active participants, the people it notifies.
 
 ### Activity kinds
 
@@ -338,7 +333,7 @@ status, priority, and assignee. `TaskService` (`create`, `update`, `get`, `listI
 operations, and `TaskCommand` the writes that create a task with its thread or in an existing
 conversation and change it one way at a time, at the thread's next position, telling and admitting
 by the change, and asking an agent's turn to stop when a change takes the agent off the task. A
-group's thread lists carry each thread's task. See [tasks](../../docs/thread-workflows.md#tasks).
+group's thread lists carry each thread's task.
 
 ## Notifications
 
@@ -358,9 +353,7 @@ still read as its timeline shows it, its `countPending`, in all and by group, an
 notification is a `NotificationFacts.Seen` fact. `NotificationProjection` generates notifications
 from each recorded activity's recipients, settles pending agent input when a participation ends,
 and marks a person's notifications seen as they see them or read their thread.
-Notifications never create turns, accept their input, or run work. See
-[reading the inbox](../../docs/thread-workflows.md#reading-the-inbox) and
-[marking a notification seen](../../docs/thread-workflows.md#marking-a-notification-seen).
+Notifications never create turns, accept their input, or run work.
 
 ## Read state
 
@@ -373,8 +366,7 @@ ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
-notifications. See
-[marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
+notifications.
 
 ## Replica
 
@@ -572,9 +564,7 @@ no one and are not new activity; the replies are. A client folds a turn's items 
 
 ## Channels
 
-`@amends-dev/core/channel` is a connection's external conversations as threads in one group, as
-[threads](../../docs/threads.md#channels) fixes it and
-[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Channel` names the
+`@amends-dev/core/channel` is a connection's external conversations as threads in one group. `Channel.Channel` names the
 connection, the group new conversations open in, and whether they open tasks;
 `ChannelBinding.ChannelBinding` is a bound thread's conversation, keyed by the thread, as the connection's
 [transport](../channel/README.md) identifies it; `Contact.Contact` is a person heard from through a
@@ -593,7 +583,7 @@ is the reads they share.
 ## Jobs
 
 A job is work a commit asks for that runs outside any request. Core declares which facts request
-which job, as journal [reactions](../../docs/journal.md#reactions), in the commit that publishes the
+which job, as journal reactions, in the commit that publishes the
 fact: the request is stored with the commit and discarded if it rolls back, a request that cannot be
 stored fails the commit, and neither replay nor a retried publication asks again.
 
@@ -714,7 +704,7 @@ error belongs to the module that raises it, and its tag is its name there, as
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as
-`@amends-dev/core/thread/ThreadStore`; see [threads](../../docs/threads.md#code-conventions).
+`@amends-dev/core/thread/ThreadStore`.
 
 ### Dependencies and exports
 
@@ -802,4 +792,4 @@ What storage adapters must promise belongs in the
 [storage conformance suites](../gateway/README.md#conformance), and core's operations are tested
 as a host runs them in the [gateway's tests](../gateway/README.md#development).
 Construction tests exercise transaction ownership, rollback, dependency capture, and lifetimes
-rather than object shape. See [testing](../../docs/testing.md).
+rather than object shape.
