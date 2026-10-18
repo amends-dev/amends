@@ -50,6 +50,7 @@ import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
+import * as RequestService from "./request/RequestService.ts"
 import * as TaskCommand from "./task/TaskCommand.ts"
 import * as TaskPermissions from "./task/TaskPermissions.ts"
 import * as TaskProjection from "./task/TaskProjection.ts"
@@ -232,7 +233,8 @@ const operations = Layer.mergeAll(
   ChannelService.layer,
   ConnectionService.layer,
   AgentService.layer,
-  TurnService.layer
+  TurnService.layer,
+  RequestService.layer
 ).pipe(
   Layer.provide([
     Delegation.layer,

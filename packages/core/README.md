@@ -52,7 +52,7 @@ implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journ
 | `turn`          | Agents' turns in threads, their session logs, and stopping and retrying. See [turns](#turns).                             |
 | `notification`  | Notifications, the inbox, and marking them seen. See [notifications](#notifications).                                     |
 | `read-state`    | Private read positions in threads and groups. See [read state](#read-state).                                              |
-| `request`       | Request keys, so a retried creation returns what its first attempt created. See [request keys](#request-keys).            |
+| `request`       | Request keys, the IDs of what a request creates, and running a request once. See [request keys](#request-keys).           |
 | `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                     |
 
 ## How operations run
@@ -122,6 +122,17 @@ with an identity of its own derives its ID from that with `Request.derivedId`: a
 its members (`Group.directId`), and a turn's retry from the turn (`Turn.retryId`). See
 [retrying safely](../../docs/thread-workflows.md#retrying-safely).
 
+A protocol that may deliver a request more than once and needs no answer from it, such as a
+browser's outbox resending what it wrote until the server takes it, runs it with
+`RequestService.runOnce(key, operation)`. Unless the request ran before, the operation runs as the
+request in one commit, which also publishes `RequestFacts.Completed`; a `CoreError.Rejection` rolls
+that commit back and is published as `RequestFacts.Rejected`, with the error, in a commit of its
+own. Either fact's occurrence is the member and the key, so asked again, a request that ran does
+nothing, whatever has changed since: a rename another member followed with their own is not
+rejected as changed. It fails only with `Unavailable` or `Uncertain`, which leave the request to be
+asked again. Since it returns nothing, it runs no checks on a retry, unlike a creating operation,
+which returns what it finds.
+
 ### Errors by kind
 
 `@amends-dev/core/error` holds `CoreError`, the outcomes every feature reports, each one class
@@ -154,7 +165,8 @@ keys (`CredentialsUnavailable`). `CoreError.Uncertain` says storage could not co
 commit took effect, and names it by `commitId`. Operations pass each kind through unchanged, so a
 protocol answers it with one status and a client handles it once, and an operation that reaches a
 resource through another reports the one the caller named: a message whose thread they cannot read
-is the message not found, not the thread. `CoreError.CoreError` is all seven.
+is the message not found, not the thread. `CoreError.CoreError` is all seven, and
+`CoreError.Rejection` the five that reject a request, all but `Unavailable` and `Uncertain`.
 
 An operation's signature lists only these kinds. Each operation passes `Operation.report`, from
 `@amends-dev/core/operation`, to the `Effect.fn` that defines it, which reports what core's internals

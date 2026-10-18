@@ -1,8 +1,9 @@
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupMembership, GroupService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Request } from "@amends-dev/core/request"
-import { Thread, ThreadMessage, ThreadService, ThreadMessageService } from "@amends-dev/core/thread"
+import { Event, type Fact, Journal } from "@amends-dev/core/journal"
+import { Request, RequestFacts, RequestService } from "@amends-dev/core/request"
+import { Thread, ThreadFacts, ThreadMessage, ThreadService, ThreadMessageService } from "@amends-dev/core/thread"
 import { InvitationService, Member, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import type { Storage } from "@amends-dev/gateway/conformance"
@@ -24,8 +25,9 @@ const key = Request.Key.make("request-1")
 const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 })
 
 /**
- * Request keys: a retry of a creating request returns what its first attempt created, and the IDs
- * of what a request creates are those its sender computes.
+ * Request keys: a retry of a creating request returns what its first attempt created, the IDs of
+ * what a request creates are those its sender computes, and a request run once does nothing when
+ * asked again.
  */
 const { core, initialized, seed, gateway } = Support
 
@@ -279,6 +281,124 @@ describe("request keys", () => {
             gateway.createWorkspace(alice.id, { name: "Studio", memberName: "alice" }, key)
           ).pipe(Effect.provide(gateway(elsewhere)))
         ).toEqual(first)
+      })
+    )
+  )
+})
+
+describe("running a request once", () => {
+  /** The world, with a thread the owner started and what tests run as requests on it. */
+  const withThread = (storage: Storage) =>
+    Effect.gen(function* () {
+      const context = yield* world(storage)
+      const { bound, owner, as, start } = context
+      const started = yield* as(owner, start("Hello", Request.Key.make("request-start")))
+      const rename = (title: string, expectedTitle: string | null) =>
+        Effect.flatMap(ThreadService.ThreadService, (threadService) =>
+          threadService.rename({
+            threadId: started.thread.id,
+            title: Thread.Title.make(title),
+            expectedTitle: expectedTitle === null ? null : Thread.Title.make(expectedTitle)
+          })
+        )
+      const runOnce = <R>(requestKey: Request.Key, operation: Effect.Effect<unknown, CoreError.CoreError, R>) =>
+        Effect.flatMap(RequestService.RequestService, (requestService) => requestService.runOnce(requestKey, operation))
+      const title = Effect.map(bound.threads.get(started.thread.id), (thread) => Option.getOrThrow(thread).title)
+      /** The events of `fact` the journal recorded. */
+      const recorded = <F extends Fact.Definition>(fact: F) =>
+        as(
+          owner,
+          Effect.flatMap(Journal.Journal, (journal) =>
+            journal.log
+              .readEntries({ name: fact.name, limit: 100 })
+              .pipe(Effect.flatMap(Effect.forEach((entry) => Event.decode(fact, entry))))
+          )
+        )
+      return { ...context, started, rename, runOnce, title, recorded }
+    })
+
+  it.effect("a request that ran does nothing when asked again, whatever changed since", () =>
+    withStorage((storage) =>
+      Effect.gen(function* () {
+        const { bound, owner, as, rename, runOnce, title, recorded } = yield* withThread(storage)
+        yield* as(owner, runOnce(key, rename("Plan", null)))
+        const [completed] = yield* recorded(RequestFacts.Completed)
+        expect(completed?.payload).toEqual({ memberId: owner.memberId, key })
+        // It completed in the commit of what it did.
+        const [renamed] = yield* recorded(ThreadFacts.Renamed)
+        expect(renamed?.commitId).toBe(completed?.commitId)
+        yield* as(other, rename("Schedule", "Plan"))
+        const before = yield* history(bound)
+        // Run again, the rename would find the title changed since the owner saw it.
+        yield* as(owner, runOnce(key, rename("Plan", null)))
+        expect(yield* title).toBe("Schedule")
+        expect(yield* history(bound)).toEqual(before)
+        // Another member's request with the same key is theirs.
+        yield* as(other, runOnce(key, rename("Draft", "Schedule")))
+        expect(yield* title).toBe("Draft")
+      })
+    )
+  )
+
+  it.effect("a rejected request is recorded, and not run when asked again", () =>
+    withStorage((storage) =>
+      Effect.gen(function* () {
+        const { bound, owner, started, as, rename, runOnce, title, recorded } = yield* withThread(storage)
+        // What it wrote before it was rejected is rolled back.
+        const conflict = new CoreError.Conflict({ reason: new CoreError.AlreadyTask({ threadId: started.thread.id }) })
+        yield* as(owner, runOnce(key, Effect.andThen(rename("Plan", null), Effect.fail(conflict))))
+        expect(yield* title).toBeNull()
+        expect(yield* recorded(RequestFacts.Completed)).toEqual([])
+        const rejected = yield* recorded(RequestFacts.Rejected)
+        expect(rejected.map(({ payload }) => payload)).toEqual([{ memberId: owner.memberId, key, error: conflict }])
+        const before = yield* history(bound)
+        yield* as(owner, runOnce(key, rename("Plan", null)))
+        expect(yield* title).toBeNull()
+        expect(yield* history(bound)).toEqual(before)
+        // A rejection the operation reports is recorded the same way.
+        const stale = Request.Key.make("request-stale")
+        yield* as(owner, runOnce(stale, rename("Plan", "Draft")))
+        expect((yield* recorded(RequestFacts.Rejected)).map(({ payload }) => payload.error)).toEqual([
+          conflict,
+          new CoreError.Changed({ resource: "Thread", id: started.thread.id })
+        ])
+      })
+    )
+  )
+
+  it.effect("a request that could not run now runs when asked again", () =>
+    withStorage((storage) =>
+      Effect.gen(function* () {
+        const { bound, owner, as, rename, runOnce, title } = yield* withThread(storage)
+        const unavailable = new CoreError.Unavailable({ reason: new CoreError.Reloading() })
+        const before = yield* history(bound)
+        expect(
+          yield* Effect.flip(as(owner, runOnce(key, Effect.andThen(rename("Plan", null), Effect.fail(unavailable)))))
+        ).toEqual(unavailable)
+        expect(yield* title).toBeNull()
+        expect(yield* history(bound)).toEqual(before)
+        yield* as(owner, runOnce(key, rename("Plan", null)))
+        expect(yield* title).toBe("Plan")
+      })
+    )
+  )
+
+  it.effect("concurrent attempts, and another host's, run it once", () =>
+    withStorage((storage) =>
+      Effect.gen(function* () {
+        const { owner, as, rename, runOnce, recorded } = yield* withThread(storage)
+        let runs = 0
+        const counted = Effect.andThen(
+          Effect.sync(() => {
+            runs += 1
+          }),
+          rename("Plan", null)
+        )
+        yield* Effect.forEach([1, 2, 3], () => as(owner, runOnce(key, counted)), { concurrency: "unbounded" })
+        const elsewhere = yield* forWorkspace(yield* storage.connect(), workspaceId)
+        yield* as(owner, runOnce(key, counted), yield* Layer.build(core(elsewhere)))
+        expect(runs).toBe(1)
+        expect(yield* recorded(RequestFacts.Completed)).toHaveLength(1)
       })
     )
   )

@@ -305,7 +305,10 @@ nothing more, including when the first attempt committed but its answer was lost
 names the request: sent again with different text or mentions, it still returns what the first
 attempt created. A retry after an attempt that rolled back runs again. Keys belong to their member,
 so another member's key is a separate request; a key names one request, so sending it with another
-finds what the first created where their records coincide. Without a key, every call creates anew.
+finds what the first created where their records coincide. Without a key, every call creates anew. A
+protocol that needs no answer, such as the browser's outbox, runs a rename or any other request
+once with `RequestService.runOnce`, so a retry changes nothing; see core's
+[request keys](../packages/core/README.md#request-keys).
 
 Within a request, a start's thread and opening message, a reply's message, and every participation
 and activity they record take IDs derived from the author, the key, and what each is

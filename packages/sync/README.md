@@ -12,13 +12,14 @@ may see.
   `<Record>Dropped` its key once it has left the replica, removed or out of the member's reach. A
   change's primary key is its record's kind and key, so compaction keeps each record's latest
   change.
-- **Rejections** end an action the server refused: `ActionRejected` names the action's entry and
-  why, as one of `CoreError`'s final kinds, and the browser undoes what it applied. An action the
-  server could not run now is run again, never rejected.
+- **Rejections** end an action the server could not do: `ActionRejected` names the action's entry
+  and why, as one of core's `Rejection` kinds, and the browser undoes what it applied. The server
+  runs each action once, as a request keyed by its entry's ID, so a resent action is never run
+  again, and one it could not run now is run when resent, never rejected.
 
 Each domain has a module with its `Actions` and `Changes`: `WorkspaceSync`, `GroupSync`,
 `ThreadSync`, `TaskSync`, `TurnSync`, `NotificationSync`, `ConnectionSync`, `AgentSync`, and
-`ChannelSync`. `Rejections` holds the refusals, and `SyncSchema` every group, as the
+`ChannelSync`. `Rejections` holds the rejections, and `SyncSchema` every group, as the
 `EventLog.schema` the server and the browser build their event logs over.
 
 What a browser shows beyond the records, such as a thread's preview, its unread count, or whether

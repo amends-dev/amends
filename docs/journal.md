@@ -244,9 +244,11 @@ ID derived from the acting member, the client's key, and what the record is (`Re
 workspace creation derives its workspace's ID from its creator and key; a turn retry derives its
 turn's ID from the turn it retries.
 Inside the commit, the operation finds those records by ID before generating anything and returns
-them; each creation fact declares the ID as its occurrence, so no second record can take it. No
-separate receipt is recorded. Logs written before this change still hold internal
-`request.completed` facts; nothing reads them.
+them; each creation fact declares the ID as its occurrence, so no second record can take it.
+`RequestService.runOnce` also follows it for any request: it looks up the request's
+`request.completed` and `request.rejected` occurrences, the member and the key, at the start of the
+commit that runs the request and publishes its completion, and in the commit that records its
+rejection.
 
 ## Event provenance
 

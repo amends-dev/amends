@@ -8,7 +8,8 @@
  * the state; `Unavailable`, for what an operation needs that cannot be reached or used now; and
  * `Uncertain`, for a commit storage could not confirm. Denied, Conflict, Invalid, and Unavailable
  * say why in their `reason`, as `NotGranted` or `AlreadyMember`, so a caller recovers from one
- * reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`. `CoreError` is all seven.
+ * reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`. `CoreError` is all seven,
+ * and `Rejection` the five that reject a request.
  *
  * @since 0.1.0
  */
@@ -924,3 +925,17 @@ export const CoreError = Schema.Union([NotFound, Changed, Denied, Conflict, Inva
  * @since 0.1.0
  */
 export type CoreError = typeof CoreError.Type
+
+/**
+ * The kinds that reject a request as it was asked: every kind but `Unavailable` and `Uncertain`,
+ * which leave it to be asked again.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Rejection = Schema.Union([NotFound, Changed, Denied, Conflict, Invalid])
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Rejection = typeof Rejection.Type
