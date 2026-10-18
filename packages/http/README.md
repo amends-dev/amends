@@ -59,6 +59,11 @@ is a member's, and acts in the workspace its `Amends-Workspace` header names.
   gets 403 `CoreError.Denied` (`HumanRequired`), and a session no account holds 401.
   `GET /me/workspaces` lists the principal's memberships and pending invitations.
   `DELETE /me/session` signs out: the host stops honoring the presented token.
+  `PUT /me/sync-keys/:publicKey` registers the public key of the person's browser's eventlog
+  identity, a UUID, so the [sync](../sync/README.md) server opens their stores to it; it is 409
+  `SyncStorage.KeyTaken` when the key is another person's. `DELETE /me/sync-keys/:publicKey`
+  removes the person's own key, as their browser does when it signs out. Both are 204, and an
+  agent is denied.
 - `accounts`: `GET /accounts` returns the accounts of the workspace's human
   members and of its invitations' recipients, to someone who may manage invitations, so settings can
   show addresses beside names.

@@ -4,8 +4,9 @@
  * `/docs`, and `layerHandlers` is the group layers and the server's side of the middleware alone,
  * for tests: `BearerAuthentication`, and `WorkspaceMember` entering through the gateway. A
  * host provides `Gateway.Gateway`, `Accounts.Accounts`, `SignIn.SignIn`,
- * `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and its platform's HTTP
- * services, then serves the routes with `HttpRouter.serve` or `HttpRouter.toWebHandler`.
+ * `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, `SyncStorage.SyncStorage`,
+ * and its platform's HTTP services, then serves the routes with `HttpRouter.serve` or
+ * `HttpRouter.toWebHandler`.
  *
  * @since 0.1.0
  */
@@ -61,8 +62,8 @@ export const layerHandlers = Layer.mergeAll(
 
 /**
  * The API routes and its OpenAPI document. Hosts provide `Gateway.Gateway`, `Accounts.Accounts`,
- * `SignIn.SignIn`, `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and
- * their platform's HTTP services, then serve this through `HttpRouter.serve` or
+ * `SignIn.SignIn`, `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`,
+ * `SyncStorage.SyncStorage`, and their platform's HTTP services, then serve this through `HttpRouter.serve` or
  * `HttpRouter.toWebHandler`.
  *
  * @category layers

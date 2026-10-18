@@ -192,18 +192,18 @@ and core's outcomes keep their tags, such as `CoreError.NotFound` with 404.
 Follow the [host conventions](../README.md). Importing any module but the entry point reads no
 configuration and starts nothing.
 
-| Module                         | Responsibility                                                                                                                                                                                     |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                                   |
-| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                                |
-| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                              |
-| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                           |
-| `LocalConfig.ts`               | `LocalConfig.options`, validating every setting before any resource is acquired, and `deriveSecret`.                                                                                               |
-| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                              |
-| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                                |
-| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning unless `runJobs` is false; `layerDatabase`; and `makeIntegrations`. |
-| `LocalServer.ts`               | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                                       |
-| `index.ts`                     | Loads configuration, builds the host layer for `AMENDS_ROLE`, serves it with the authentication `AMENDS_SIGN_IN` names unless the role is `jobs`, and launches through `BunRuntime.runMain`.       |
+| Module                         | Responsibility                                                                                                                                                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                                                 |
+| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                                              |
+| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                            |
+| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                                         |
+| `LocalConfig.ts`               | `LocalConfig.options`, validating every setting before any resource is acquired, and `deriveSecret`.                                                                                                             |
+| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                                            |
+| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                                              |
+| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, sign-in storage, and sync storage over PostgreSQL, with jobs and pruning unless `runJobs` is false; `layerDatabase`; and `makeIntegrations`. |
+| `LocalServer.ts`               | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                                                     |
+| `index.ts`                     | Loads configuration, builds the host layer for `AMENDS_ROLE`, serves it with the authentication `AMENDS_SIGN_IN` names unless the role is `jobs`, and launches through `BunRuntime.runMain`.                     |
 
 Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Accounts`, and email sign-in
 also its `SignInStorage.SignInStorage`; development session tokens are built synchronously. None

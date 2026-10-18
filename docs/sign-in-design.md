@@ -28,6 +28,12 @@ signs out with `DELETE /me/session`; the client forgets it either way. `GET /me`
 account a token signs in as, for a client that holds a token alone; a token no account holds
 answers 401.
 
+A browser that keeps a workspace in [sync](../packages/sync/README.md) makes an eventlog identity of
+its own and registers its key with `PUT /me/sync-keys/:publicKey`, signed in; the key, not the
+token, then opens the person's stores. A key outlives the session it was registered in until it is
+removed with `DELETE /me/sync-keys/:publicKey`, which the browser does as it signs out: revoking a
+token, by signing out elsewhere or by its expiry, leaves the keys registered under it.
+
 `GET /session/methods` lists the ways a host signs people in: whether it sends email codes, and
 the identity providers it offers, each with an ID and a name to show. The email-code flow is
 `POST /session/email`, which sends a code to the address, then `POST /session/code`, which

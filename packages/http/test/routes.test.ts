@@ -34,7 +34,7 @@ import {
   WorkspaceId,
   MemberId
 } from "@amends-dev/core/workspace"
-import { Accounts, SessionTokens, Gateway, SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
+import { Accounts, SessionTokens, Gateway, SignIn, SyncStorage, WorkspaceDirectory } from "@amends-dev/gateway"
 import { Entry } from "@amends-dev/log"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Redacted } from "effect"
@@ -442,8 +442,22 @@ const directory = Layer.succeed(
     )
   })
 )
+/** Keys belong to whoever registers them, except one that bob registered. */
+const bobsKey = "5d0c8a4e-2b7f-4e19-8c3a-9f6b1d2e7a40"
+const syncStorage = Layer.succeed(
+  SyncStorage.SyncStorage,
+  SyncStorage.SyncStorage.of({
+    remoteId: Effect.die("unused"),
+    registerKey: record("registerKey", (publicKey) =>
+      publicKey === bobsKey ? Effect.fail(new SyncStorage.KeyTaken()) : Effect.void
+    ),
+    removeKey: record("removeKey", () => Effect.void),
+    personOf: () => Effect.die("unused"),
+    bindSigningKey: () => Effect.die("unused")
+  })
+)
 const services = Layer.mergeAll(
-  Routes.layerHandlers.pipe(Layer.provide([gateway, signIn, credentials, directory, accounts])),
+  Routes.layerHandlers.pipe(Layer.provide([gateway, signIn, credentials, directory, accounts, syncStorage])),
   HttpServer.layerServices
 )
 const run = <A, E>(token: string, program: (client: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>) =>
@@ -741,6 +755,40 @@ it.effect("a person reads their account, and signs out with the credential they 
     expect(calls.map(({ operation }) => operation)).toEqual(["findByIds", "findByIds", "revoke"])
     const credential = calls[2]?.arguments[0]
     expect(Redacted.isRedacted(credential) && Redacted.value(credential)).toBe("alice")
+  })
+)
+
+it.effect("a person registers and removes their browser's sync key, and only a person syncs", () =>
+  Effect.gen(function* () {
+    calls.length = 0
+    const publicKey = "0b9f3c1e-6d2a-4f57-9a8e-2c4b6d8f0a13"
+    const registered = yield* run("alice", (client) =>
+      client.me.registerSyncKey({ params: { publicKey }, responseMode: "response-only" })
+    )
+    expect(registered.status).toBe(204)
+    const taken = yield* run("alice", (client) =>
+      client.me.registerSyncKey({ params: { publicKey: bobsKey }, responseMode: "response-only" })
+    )
+    expect(taken.status).toBe(409)
+    expect(yield* taken.json).toEqual({ _tag: "SyncStorage.KeyTaken" })
+    const removed = yield* run("alice", (client) =>
+      client.me.removeSyncKey({ params: { publicKey }, responseMode: "response-only" })
+    )
+    expect(removed.status).toBe(204)
+    expect(calls).toEqual([
+      { operation: "registerKey", arguments: [publicKey, alice.id] },
+      { operation: "registerKey", arguments: [bobsKey, alice.id] },
+      { operation: "removeKey", arguments: [publicKey, alice.id] }
+    ])
+    calls.length = 0
+    const agent = yield* run("agent", (client) => Effect.flip(client.me.registerSyncKey({ params: { publicKey } })))
+    expect(agent).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } })
+    // A key is the public key of an identity eventlog made: a UUID.
+    const malformed = yield* run("alice", (client) =>
+      Effect.flip(client.me.registerSyncKey({ params: { publicKey: "not-a-key" } }))
+    )
+    expect(malformed._tag).toBe("SchemaError")
+    expect(calls).toEqual([])
   })
 )
 
