@@ -151,7 +151,7 @@ A sandbox created with a policy starts under it, as Daytona applies the policy b
 the sandbox. One its template prepares on its own, before the template's snapshot is made, gets the
 policy once prepared, a moment after. `setRequestTransformations` fails with `UnsupportedError`:
 Daytona sets credentials at its edge through its secrets, with placeholders it chooses, which the
-contract does not take; see the [known limitations](../../docs/current-status.md).
+contract does not take.
 
 ## Templates and snapshots
 
@@ -181,6 +181,6 @@ conformance suites of `@amends-dev/sandbox`, which delete the snapshots of their
 end, and what the provider asks of Daytona, such as that sandboxes do not stop on their own, that
 one snapshot is made of a version several hosts create sandboxes from at once, that a failing
 template leaves neither its sandbox nor a snapshot, the network policies Daytona enforces and those
-it cannot, and that a command's environment stays out of Daytona's record of its session. See
-[testing](../../docs/testing.md). `bun run dist check adapters/sandbox-daytona` builds the package
-as npm gets it and checks it as a consumer; see [publishing](../../docs/publishing.md).
+it cannot, and that a command's environment stays out of Daytona's record of its session.
+`bun run dist check adapters/sandbox-daytona` builds the package
+as npm gets it and checks it as a consumer.

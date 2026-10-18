@@ -165,4 +165,4 @@ bun run --filter @amends-dev/ui dev
 
 `generate` writes the generated files, `check:icons` verifies them without writing, and the tests
 cover the compiler's validation, the components' naming and reactivity, and what consumer bundles
-include. The last command opens the UI workshop for review. See [testing](../../docs/testing.md).
+include. The last command opens the UI workshop for review.

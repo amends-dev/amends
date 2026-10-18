@@ -26,7 +26,6 @@ export function Footer() {
     <SiteFooter.Root tagline="Where people and agents work together." legal="Released under the MIT license.">
       <SiteFooter.Column title="Product">
         <SiteFooter.Link href={selfHost}>Self-host</SiteFooter.Link>
-        <SiteFooter.Link href={`${repository}/blob/main/docs/current-status.md`}>Known limitations</SiteFooter.Link>
       </SiteFooter.Column>
       <SiteFooter.Column title="Developers">
         <SiteFooter.Link href="/packages/">Packages</SiteFooter.Link>

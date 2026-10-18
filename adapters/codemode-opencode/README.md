@@ -73,7 +73,7 @@ yields between its steps; one step is bounded in what it may build, so no built-
 ## Development
 
 Run the package's tests with `bun run test adapters/codemode-opencode`: the runtime over fake
-tools, and `execute` as `CodeMode.toolkit` presents it. See [testing](../../docs/testing.md).
+tools, and `execute` as `CodeMode.toolkit` presents it.
 `bun run dist check adapters/codemode-opencode` builds the package as npm gets it and checks it as
-a consumer; see [publishing](../../docs/publishing.md). In this repository, the root manifest's
+a consumer. In this repository, the root manifest's
 `overrides` keeps `@opencode/codemode` on the catalog's Effect.

@@ -224,8 +224,7 @@ another host changed which projection versions are live, and the gateway prepare
 again for the next request.
 
 The storage adapters map every failed `COMMIT` to `CoreError.Uncertain`, including some definite
-failures; see
-[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
+failures.
 
 ## Development
 
@@ -243,4 +242,4 @@ connections, agents, turns, channels, and email sign-in, with hosts over the sam
 several take part. `test/support.ts` installs a test harness, channel transport, and models, and
 jobs that record each request a commit makes, so a test runs the turns and deliveries it expects
 itself. `test/conformance.test.ts` runs the [conformance suites](#conformance) over the same
-storage. See [testing](../../docs/testing.md).
+storage.

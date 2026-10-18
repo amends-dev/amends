@@ -16,8 +16,7 @@ workspace is still worked in through the [HTTP API](../packages/http/README.md).
 
 UI draws: its screens take data and callbacks and render a pane or the navigation, and know nothing
 of the API, the session, or routes. The site composes UI's site sections into static pages; it
-defines no styles of its own. The [workspace shell](../docs/workspace-shell.md) describes the
-navigation every workspace screen shares.
+defines no styles of its own.
 
 `bun run check:packages` enforces these boundaries: UI depends on no router, Effect, or platform
 package, and the icons' runtime depends on Solid alone.

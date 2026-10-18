@@ -532,4 +532,4 @@ The tests run the stories as portable tests in Happy DOM: a render of every foun
 pattern, and screen state, and play functions for their interactions, alongside focused tests of
 the Shell and the palettes' contrast. Happy DOM does not lay out or paint, so compare stories with
 their Lunacy frames in a browser, in both modes and at phone, touch, and desktop widths, before
-relying on them. `build` writes the static workshop to `dist`. See [testing](../../docs/testing.md).
+relying on them. `build` writes the static workshop to `dist`.

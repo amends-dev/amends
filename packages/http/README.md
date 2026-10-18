@@ -132,9 +132,7 @@ Clients generating the typed client pass it in `headers`.
 ### Conversations
 
 Every group and thread operation requires active membership; reads of a group or its threads also require current membership of the group, and a
-group or thread the caller cannot read answers 404 exactly as a missing one does. The
-[group](../../docs/group-workflows.md) and [thread](../../docs/thread-workflows.md) workflows
-describe the rules behind each operation.
+group or thread the caller cannot read answers 404 exactly as a missing one does.
 
 | Endpoint                                            | Operation                                                                                                                                                                         |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -192,8 +190,8 @@ an ended participation or removing an ended admission is a 409.
 ### Tasks
 
 Task operations require active membership of the thread's group.
-A task is the work a thread tracks, keyed by the thread;
-[tasks](../../docs/thread-workflows.md#tasks) describes the rules. A thread without a task, or one
+A task is the work a thread tracks, keyed by the thread.
+A thread without a task, or one
 the caller cannot read, answers 404 as a missing one does.
 
 | Endpoint                                         | Operation                                                                                                                                                                                   |
@@ -299,8 +297,7 @@ most once, so repeating `retry` returns the turn it created.
 
 Channel operations require active membership, except the events route,
 `POST /workspaces/:workspaceId/channels/:channelId/events`, which no member calls and so names its
-workspace in its path. A channel is a connection's external conversations as threads in one group;
-[channels](../../docs/thread-workflows.md#channels) describes the rules.
+workspace in its path. A channel is a connection's external conversations as threads in one group.
 
 | Endpoint                             | Operation                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -417,5 +414,5 @@ reaching core, tags and statuses kept, unauthorized requests refused before any 
 human-only endpoints, JSON round trips, stream limits and containment, and that every error a route
 declares is public in the gateway or raised by HTTP itself. The
 [local host](../../hosts/local/README.md)'s tests run the same routes over PostgreSQL, through its
-spawned server too. See [testing](../../docs/testing.md). A new endpoint goes in its group's module
+spawned server too. A new endpoint goes in its group's module
 and in the matching handler module.

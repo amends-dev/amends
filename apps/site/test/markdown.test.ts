@@ -20,8 +20,8 @@ describe("guides", () => {
   it("leads a README's links to guides, the repository, or where they already point", () => {
     expect(linkTarget("../sandbox/README.md#templates", context)).toBe("/docs/packages/sandbox/#templates")
     expect(linkTarget("../sandbox", context)).toBe("/docs/packages/sandbox/")
-    expect(linkTarget("../../docs/testing.md", context)).toBe(
-      "https://github.com/amends-dev/amends/blob/main/docs/testing.md"
+    expect(linkTarget("../../docs/core-model.md", context)).toBe(
+      "https://github.com/amends-dev/amends/blob/main/docs/core-model.md"
     )
     expect(linkTarget("../connection/", context)).toBe(
       "https://github.com/amends-dev/amends/tree/main/packages/connection"
