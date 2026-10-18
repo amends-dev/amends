@@ -112,6 +112,11 @@ export class ReplicaQuery extends Context.Service<
      * connection or channel, and an ended follow.
      */
     readonly snapshot: (viewer: ReplicaVisibility.Viewer) => Stream.Stream<ReplicaRecord.ReplicaRecord, Error>
+    /** One group as `snapshot` reads it, with its threads and what each holds; nothing for one `viewer` may not see. */
+    readonly snapshotGroup: (
+      viewer: ReplicaVisibility.Viewer,
+      groupId: GroupId.GroupId
+    ) => Stream.Stream<ReplicaRecord.ReplicaRecord, Error>
   }
 >()("@amends-dev/core/replica/ReplicaQuery") {}
 
@@ -554,28 +559,52 @@ export const make = Effect.gen(function* () {
       )
     )
 
-  const snapshot = (viewer: ReplicaVisibility.Viewer): Stream.Stream<ReplicaRecord.ReplicaRecord, Error> => {
-    const visible = (places: ReplicaVisibility.Places) => (records: ReadonlyArray<ReplicaRecord.ReplicaRecord>) =>
+  /** Only what `viewer` may see of `records`, where `places` says what they belong to. */
+  const visibleTo =
+    (viewer: ReplicaVisibility.Viewer, places: ReplicaVisibility.Places) =>
+    (records: ReadonlyArray<ReplicaRecord.ReplicaRecord>) =>
       records.filter((record) => ReplicaVisibility.canSee(viewer, places, record))
-    const workspaceRecords = Stream.fromIterableEffect(Effect.map(readWorkspaceRecords, visible(placesFrom([], []))))
-    const groupRecords = Stream.fromIterableEffect(readVisibleGroups(viewer)).pipe(
-      Stream.flatMap((group) =>
-        Stream.concat(
-          Stream.fromIterableEffect(Effect.map(readGroupRecords(viewer, group), visible(placesFrom([group], [])))),
-          Stream.fromIterableEffect(threadStore.listByGroup(group.id)).pipe(
-            Stream.flatMap((thread) =>
-              Stream.fromIterableEffect(
-                Effect.map(readThreadRecords(viewer, thread), visible(placesFrom([group], [thread])))
-              )
-            )
+
+  /** A group the viewer may see, with its threads and what each holds, a thread at a time. */
+  const readGroupSection = (viewer: ReplicaVisibility.Viewer, group: Group.Group) =>
+    Stream.concat(
+      Stream.fromIterableEffect(
+        Effect.map(readGroupRecords(viewer, group), visibleTo(viewer, placesFrom([group], [])))
+      ),
+      Stream.fromIterableEffect(threadStore.listByGroup(group.id)).pipe(
+        Stream.flatMap((thread) =>
+          Stream.fromIterableEffect(
+            Effect.map(readThreadRecords(viewer, thread), visibleTo(viewer, placesFrom([group], [thread])))
           )
         )
       )
     )
-    return Stream.concat(Stream.concat(workspaceRecords, groupRecords), readNotifications(viewer))
-  }
 
-  return ReplicaQuery.of({ keysChangedBy, readRecords, viewerOf, placesOf, snapshot })
+  const snapshot = (viewer: ReplicaVisibility.Viewer): Stream.Stream<ReplicaRecord.ReplicaRecord, Error> =>
+    Stream.fromIterableEffect(Effect.map(readWorkspaceRecords, visibleTo(viewer, placesFrom([], [])))).pipe(
+      Stream.concat(
+        Stream.fromIterableEffect(readVisibleGroups(viewer)).pipe(
+          Stream.flatMap((group) => readGroupSection(viewer, group))
+        )
+      ),
+      Stream.concat(readNotifications(viewer))
+    )
+
+  const snapshotGroup = (viewer: ReplicaVisibility.Viewer, groupId: GroupId.GroupId) =>
+    Stream.unwrap(
+      Effect.map(groupStore.get(groupId), (group) =>
+        Option.isSome(group) &&
+        ReplicaVisibility.canSee(
+          viewer,
+          placesFrom([group.value], []),
+          ReplicaRecord.ReplicaRecord.cases.Group.make({ value: group.value })
+        )
+          ? readGroupSection(viewer, group.value)
+          : Stream.empty
+      )
+    )
+
+  return ReplicaQuery.of({ keysChangedBy, readRecords, viewerOf, placesOf, snapshot, snapshotGroup })
 })
 
 /**

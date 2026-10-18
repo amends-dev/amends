@@ -1241,7 +1241,7 @@ same integrations.
 
 Authentication is a method a connection uses, not a kind of connection: none, a key the person
 connecting supplies, or OAuth. An integration declares the methods it accepts. The key itself
-lives in protected storage outside the journal: no fact, change-feed event, or view carries one,
+lives in protected storage outside the journal: no fact, replica record, or view carries one,
 and replay restores the connection without it. A key is stored in the commit that records its
 connection, so both exist or neither does, and removing a connection deletes it. For OAuth, an
 integration will declare the scopes each part needs, so readiness can differ per part as scopes

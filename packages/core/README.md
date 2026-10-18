@@ -161,8 +161,9 @@ by the kind of group (`NotRenamable`, `FixedMembership`, `GeneralMembership`, `N
 `ConnectionUnusable`), an agent setup that cannot run (`Incomplete`), or a channel request its
 transport rejects (`Unverified`). `CoreError.Unavailable` says what an operation needs cannot be
 reached or used now: storage another writer held (`Contention`) or read models another host is
-rebuilding (`Reloading`), a turn log that stopped (`LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
-keys (`CredentialsUnavailable`). `CoreError.Uncertain` says storage could not confirm whether a
+rebuilding (`Reloading`), a turn's log or a replica that stopped being followed (`LogInterrupted`),
+a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no keys
+(`CredentialsUnavailable`). `CoreError.Uncertain` says storage could not confirm whether a
 commit took effect, and names it by `commitId`. Operations pass each kind through unchanged, so a
 protocol answers it with one status and a client handles it once, and an operation that reaches a
 resource through another reports the one the caller named: a message whose thread they cannot read
@@ -401,6 +402,19 @@ some records belong to, which `canSee` asks for. `snapshot` streams everything a
 a group and a thread at a time: the workspace's own records, each group they may see with its
 threads and what each holds, then their notifications. It leaves out what has ended where a replica
 no longer reads it: a revoked assignment, a removed connection or channel, and an ended follow.
+
+`ReplicaService.changes(after)` is a person's replica as the workspace changes, as `ReplicaChange`
+batches, one for each commit at its position. It starts after the position their replica holds, or
+with `Reset` and a snapshot when it holds none, then sends each commit's changes as it lands. Within
+a commit, a changed record reaches them as `Changed` when they may see it as the workspace stands
+after it, so nothing reaches them once they lost access; joining a group sends what it holds,
+leaving one sends `Dropped` for the group, which takes everything in it along, then what of it they
+still see; a change to their grants resets the replica; and their own requests' outcomes arrive as
+`Completed` and `Rejected`. The stream fails with `Denied` once they are no longer a member, and with
+`Unavailable` (`LogInterrupted`) when following stops short. `ReplicaCommits` reads each commit and
+the records it changed once for every member following the workspace: one reader follows the
+journal while anyone does, and a stream that starts later reads the commits before it joined from
+the journal itself.
 
 ## Connections
 

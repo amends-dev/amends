@@ -297,14 +297,15 @@ export class Reloading extends Schema.TaggedError<Reloading>()("Reloading", {}) 
 }
 
 /**
- * Following a turn's log stopped short; the reader follows it again from the start.
+ * Following a log stopped short: a turn's, which the reader follows again from the start, or the
+ * workspace's changes, which a replica follows again from the last position it holds.
  *
  * @category errors
  * @since 0.1.0
  */
 export class LogInterrupted extends Schema.TaggedError<LogInterrupted>()("LogInterrupted", {}) {
   override get message(): string {
-    return "Following the turn's log stopped short; follow it again from the start"
+    return "Following stopped short; follow again"
   }
 }
 

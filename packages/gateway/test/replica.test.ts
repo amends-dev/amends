@@ -1,12 +1,14 @@
 import { AgentService } from "@amends-dev/core/agent"
 import { AssignmentService, BuiltinRoles, GrantResolver } from "@amends-dev/core/authorization"
 import { ConnectionService } from "@amends-dev/core/connection"
+import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupFollowService, GroupMembershipService, GroupService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal } from "@amends-dev/core/journal"
 import { Notification, NotificationService } from "@amends-dev/core/notification"
 import { ReadStateService } from "@amends-dev/core/read-state"
-import { ReplicaQuery, ReplicaRecord } from "@amends-dev/core/replica"
+import { ReplicaChange, ReplicaQuery, ReplicaRecord, ReplicaService } from "@amends-dev/core/replica"
+import { Request, RequestService } from "@amends-dev/core/request"
 import { TaskService } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageService, ThreadService } from "@amends-dev/core/thread"
 import {
@@ -17,8 +19,9 @@ import {
   WorkspaceSettingsService
 } from "@amends-dev/core/workspace"
 import type { Storage } from "@amends-dev/gateway/conformance"
+import type { Entry } from "@amends-dev/log"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer, Option, Queue, Redacted, Schema, Stream } from "effect"
 import { withStorage } from "./fixture.ts"
 import * as Support from "./support.ts"
 import { alice, forWorkspace, future, goodKey, request, workspaceId } from "./support.ts"
@@ -472,6 +475,258 @@ describe("ReplicaQuery", () => {
         expect(owners).toContain(ownersPosition)
         expect(others).not.toContain(ownersPosition)
       })
+    )
+  )
+})
+
+describe("ReplicaService", () => {
+  /** What a replica stream sends, in order, as it arrives. */
+  const follow = (
+    as: Effect.Success<ReturnType<typeof world>>["as"],
+    actor: Actor.Actor["Service"],
+    after: Option.Option<Entry.Position>
+  ) =>
+    Effect.gen(function* () {
+      const batches = yield* Queue.unbounded<ReplicaChange.Batch>()
+      const stream = yield* as(
+        actor,
+        Effect.flatMap(ReplicaService.ReplicaService, (replicaService) => replicaService.changes(after))
+      )
+      const ended = yield* stream.pipe(
+        Stream.runForEach((batch) => Queue.offer(batches, batch)),
+        Effect.exit,
+        Effect.forkScoped
+      )
+      return { batches, ended }
+    })
+  const headOf = (as: Effect.Success<ReturnType<typeof world>>["as"]) =>
+    Effect.map(
+      as(
+        other,
+        Effect.flatMap(Journal.Journal, (journal) => journal.log.head)
+      ),
+      Option.getOrThrow
+    )
+  /**
+   * Every batch sent before a marker: a commit every follower sees, the other member renaming
+   * themselves, after which nothing earlier is still on its way.
+   */
+  const takeSettled = (
+    as: Effect.Success<ReturnType<typeof world>>["as"],
+    batches: Queue.Queue<ReplicaChange.Batch>,
+    marker: string
+  ) =>
+    Effect.gen(function* () {
+      yield* as(
+        other,
+        Effect.flatMap(MemberService.MemberService, (memberService) => memberService.rename(Member.Name.make(marker)))
+      )
+      return yield* takeBefore(batches, yield* headOf(as))
+    })
+  /** Every batch sent before the one at `position`, which the follower sees. */
+  const takeBefore = (batches: Queue.Queue<ReplicaChange.Batch>, position: Entry.Position) =>
+    Effect.gen(function* () {
+      const taken: Array<ReplicaChange.Batch> = []
+      while (true) {
+        const batch = yield* Queue.take(batches)
+        if (batch.position === position) return taken
+        taken.push(batch)
+      }
+    })
+  const changesIn = (taken: ReadonlyArray<ReplicaChange.Batch>) => taken.flatMap((batch) => batch.changes)
+  const changedKeysOf = (changes: ReadonlyArray<ReplicaChange.ReplicaChange>) =>
+    changes.flatMap((change) =>
+      ReplicaChange.ReplicaChange.isAnyOf(["Changed"])(change)
+        ? [JSON.stringify(ReplicaRecord.keyOf(change.record))]
+        : []
+    )
+  const changedKeys = (taken: ReadonlyArray<ReplicaChange.Batch>) => changedKeysOf(changesIn(taken))
+  const reply = (threadId: ThreadId.ThreadId, text: string, mentions: ReadonlyArray<MemberId.MemberId> = []) =>
+    Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
+      threadMessageService.publish({ threadId, text, mentions })
+    )
+
+  it.effect("a new replica starts with a reset and everything its member sees, then each commit's changes", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { owner, as, threadId } = yield* world(storage)
+          const start = yield* headOf(as)
+          const { batches } = yield* follow(as, other, Option.none())
+          // What they see as the replica starts, before anything else commits.
+          const snapshot = yield* as(
+            other,
+            Effect.gen(function* () {
+              const replicaQuery = yield* ReplicaQuery.ReplicaQuery
+              return yield* Stream.runCollect(replicaQuery.snapshot(yield* replicaQuery.viewerOf(other.memberId)))
+            })
+          )
+          const message = yield* as(owner, reply(threadId, "Are you there?", [other.memberId]))
+          const taken = yield* takeSettled(as, batches, "settled")
+          const resetting = taken.filter((batch) => batch.position === start)
+          expect(resetting[0]?.changes[0]?._tag).toBe("Reset")
+          expect(changedKeys(resetting).toSorted()).toEqual(
+            snapshot.map((record) => JSON.stringify(ReplicaRecord.keyOf(record))).toSorted()
+          )
+          // The reply then arrives as its own batch.
+          expect(changedKeys(taken.filter((batch) => batch.position > start))).toContain(
+            JSON.stringify(keys.ThreadMessage.make({ id: message.id }))
+          )
+        })
+      )
+    )
+  )
+
+  it.effect("a replica catches up from the position it holds, without a reset", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { owner, as, threadId } = yield* world(storage)
+          const held = yield* headOf(as)
+          const missed = yield* as(owner, reply(threadId, "While you were away"))
+          const { batches } = yield* follow(as, other, Option.some(held))
+          const now = yield* as(owner, reply(threadId, "And now"))
+          const taken = yield* takeSettled(as, batches, "settled")
+          expect(changesIn(taken).some((change) => change._tag === "Reset")).toBe(false)
+          expect(taken.every((batch) => batch.position > held)).toBe(true)
+          for (const message of [missed, now])
+            expect(changedKeys(taken)).toContain(JSON.stringify(keys.ThreadMessage.make({ id: message.id })))
+        })
+      )
+    )
+  )
+
+  it.effect("leaving a group drops it and nothing in it reaches the member after; joining sends it", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { bound, owner, team, as, threadId } = yield* world(storage)
+          const { batches } = yield* follow(as, other, Option.some(yield* headOf(as)))
+          const admission = Option.getOrThrow(yield* bound.groupMemberships.findActive(team.id, other.memberId))
+          yield* as(
+            other,
+            Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
+              groupMembershipService.leave({ groupId: team.id, membershipId: admission.id })
+            )
+          )
+          const left = yield* takeSettled(as, batches, "left")
+          expect(changesIn(left)[0]).toEqual(
+            ReplicaChange.ReplicaChange.cases.Dropped.make({ key: keys.Group.make({ id: team.id }) })
+          )
+          // What the group holds after they left never reaches them.
+          const unseen = yield* as(owner, reply(threadId, "Without them"))
+          yield* as(
+            owner,
+            Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
+              groupMembershipService.add({ groupId: team.id, memberId: other.memberId })
+            )
+          )
+          const joined = yield* takeSettled(as, batches, "joined")
+          expect(joined.every((batch) => batch.position === joined[0]!.position)).toBe(true)
+          // Joining again sends the group as it is now, the message they missed included.
+          for (const key of [
+            keys.Group.make({ id: team.id }),
+            keys.Thread.make({ id: threadId }),
+            keys.ThreadMessage.make({ id: unseen.id })
+          ])
+            expect(changedKeys(joined)).toContain(JSON.stringify(key))
+        })
+      )
+    )
+  )
+
+  it.effect("a change to the member's grants resets their replica", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { owner, as } = yield* world(storage)
+          const { batches } = yield* follow(as, other, Option.some(yield* headOf(as)))
+          yield* as(
+            owner,
+            Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
+              assignmentService.assign({ memberId: other.memberId, roleId: BuiltinRoles.AdministratorId })
+            )
+          )
+          const taken = yield* takeSettled(as, batches, "settled")
+          expect(taken[0]?.changes[0]?._tag).toBe("Reset")
+        })
+      )
+    )
+  )
+
+  it.effect("tells a member how their requests ended, and only them", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { owner, as, threadId } = yield* world(storage)
+          const start = Option.some(yield* headOf(as))
+          const others = yield* follow(as, other, start)
+          const owners = yield* follow(as, owner, start)
+          const runOnce = (key: string, title: string, expectedTitle: string | null) =>
+            as(
+              other,
+              Effect.flatMap(RequestService.RequestService, (requestService) =>
+                requestService.runOnce(
+                  Request.Key.make(key),
+                  Effect.flatMap(ThreadService.ThreadService, (threadService) =>
+                    threadService.rename({
+                      threadId,
+                      title: Thread.Title.make(title),
+                      expectedTitle: expectedTitle === null ? null : Thread.Title.make(expectedTitle)
+                    })
+                  )
+                )
+              )
+            )
+          yield* runOnce("rename", "Plan", null)
+          yield* runOnce("stale", "Other", "Draft")
+          const outcomes = changesIn(yield* takeSettled(as, others.batches, "settled")).filter(
+            ReplicaChange.ReplicaChange.isAnyOf(["Completed", "Rejected"])
+          )
+          expect(outcomes).toEqual([
+            ReplicaChange.ReplicaChange.cases.Completed.make({ key: Request.Key.make("rename") }),
+            ReplicaChange.ReplicaChange.cases.Rejected.make({
+              key: Request.Key.make("stale"),
+              error: new CoreError.Changed({ resource: "Thread", id: threadId })
+            })
+          ])
+          // The owner sees the rename, and not how the other's requests ended.
+          const ownersChanges = changesIn(yield* takeBefore(owners.batches, yield* headOf(as)))
+          expect(ownersChanges.some(ReplicaChange.ReplicaChange.isAnyOf(["Completed", "Rejected"]))).toBe(false)
+          expect(changedKeysOf(ownersChanges)).toContain(JSON.stringify(keys.Thread.make({ id: threadId })))
+        })
+      )
+    )
+  )
+
+  it.effect("ends with Denied once the member is removed, and follows no agent", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { owner, as } = yield* world(storage)
+          const { ended } = yield* follow(as, other, Option.some(yield* headOf(as)))
+          yield* as(
+            owner,
+            Effect.flatMap(MemberService.MemberService, (memberService) => memberService.remove(other.memberId))
+          )
+          const exit = yield* Fiber.join(ended)
+          expect(exit).toMatchObject({ _tag: "Failure" })
+          expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toMatchObject({ _tag: "CoreError.Denied" })
+          const agent = Actor.Actor.of({
+            workspaceId,
+            memberId: other.memberId,
+            identity: { _tag: "Agent", id: Identity.AgentId.make("agent") }
+          })
+          expect(
+            yield* Effect.flip(
+              as(
+                agent,
+                Effect.flatMap(ReplicaService.ReplicaService, (replicaService) => replicaService.changes(Option.none()))
+              )
+            )
+          ).toMatchObject({ _tag: "CoreError.Denied" })
+        })
+      )
     )
   )
 })

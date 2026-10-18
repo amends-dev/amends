@@ -231,9 +231,10 @@ permissions, and custom roles, which a workspace would edit itself, are not impl
 
 ## Live delivery
 
-Nothing delivers a workspace's changes to its readers as they happen: the change feed and signals
-have been removed, and their replacement, [`@amends-dev/sync`](../packages/sync/README.md), has its
-contract but no server yet. Typing and presence are not implemented. A turn's log still streams over
+Core follows each member's replica as the workspace changes (`ReplicaService.changes`, see core's
+[replica](../packages/core/README.md#replica)), but no protocol serves it yet:
+[`@amends-dev/sync`](../packages/sync/README.md) has its contract and no server. Typing and presence
+are not implemented. A turn's log still streams over
 HTTP as its session log grows, without drafts of the step being written. Other gaps:
 
 - PostgreSQL wakes log readers, such as a turn log's, with `LISTEN`/`NOTIFY`, sent just after each

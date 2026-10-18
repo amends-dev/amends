@@ -12,7 +12,8 @@ import * as ChannelSync from "./ChannelSync.ts"
 import * as ConnectionSync from "./ConnectionSync.ts"
 import * as GroupSync from "./GroupSync.ts"
 import * as NotificationSync from "./NotificationSync.ts"
-import * as Rejections from "./Rejections.ts"
+import * as Outcomes from "./Outcomes.ts"
+import * as ReplicaSync from "./ReplicaSync.ts"
 import * as TaskSync from "./TaskSync.ts"
 import * as ThreadSync from "./ThreadSync.ts"
 import * as TurnSync from "./TurnSync.ts"
@@ -43,5 +44,6 @@ export const SyncSchema = EventLog.schema(
   AgentSync.Changes,
   ChannelSync.Actions,
   ChannelSync.Changes,
-  Rejections.Rejections
+  ReplicaSync.Changes,
+  Outcomes.Outcomes
 )

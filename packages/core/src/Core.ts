@@ -51,6 +51,9 @@ import * as NotificationProjection from "./notification/NotificationProjection.t
 import * as NotificationService from "./notification/NotificationService.ts"
 import * as ReadStateProjection from "./read-state/ReadStateProjection.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
+import * as ReplicaCommits from "./replica/ReplicaCommits.ts"
+import * as ReplicaQuery from "./replica/ReplicaQuery.ts"
+import * as ReplicaService from "./replica/ReplicaService.ts"
 import * as RequestService from "./request/RequestService.ts"
 import * as TaskCommand from "./task/TaskCommand.ts"
 import * as TaskPermissions from "./task/TaskPermissions.ts"
@@ -213,6 +216,10 @@ const taskCommand = TaskCommand.layer.pipe(Layer.provide([threadQuery, threadCom
 const channelQuery = ChannelQuery.layer
 const memberCommand = MemberCommand.layer.pipe(Layer.provide([AssignmentCommand.layer, groupCommand]))
 
+/** The replica's reads, and the one reader of the workspace's commits every member's replica shares. */
+const replicaQuery = ReplicaQuery.layer.pipe(Layer.provide(GrantResolver.layer))
+const replicaCommits = ReplicaCommits.layer.pipe(Layer.provide(replicaQuery))
+
 /**
  * Application operations, sharing one journal and one authorization check. These
  * are what hosts and protocols call; stores and the journal stay internal.
@@ -236,7 +243,8 @@ const operations = Layer.mergeAll(
   ConnectionService.layer,
   AgentService.layer,
   TurnService.layer,
-  RequestService.layer
+  RequestService.layer,
+  ReplicaService.layer
 ).pipe(
   Layer.provide([
     Delegation.layer,
@@ -248,7 +256,9 @@ const operations = Layer.mergeAll(
     threadCommand,
     turnCommand,
     taskCommand,
-    channelQuery
+    channelQuery,
+    replicaQuery,
+    replicaCommits
   ])
 )
 
