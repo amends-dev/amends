@@ -18,7 +18,6 @@ import * as AgentsHandlers from "./AgentsHandlers.ts"
 import * as Api from "./Api.ts"
 import * as AssignmentsHandlers from "./AssignmentsHandlers.ts"
 import * as BearerAuthentication from "./BearerAuthentication.ts"
-import * as ChangeFeedHandlers from "./ChangeFeedHandlers.ts"
 import * as ChannelsHandlers from "./ChannelsHandlers.ts"
 import * as ConnectionsHandlers from "./ConnectionsHandlers.ts"
 import * as GroupsHandlers from "./GroupsHandlers.ts"
@@ -57,8 +56,7 @@ export const layerHandlers = Layer.mergeAll(
   ConnectionsHandlers.layer,
   AgentsHandlers.layer,
   TurnsHandlers.layer,
-  ChannelsHandlers.layer,
-  ChangeFeedHandlers.layer
+  ChannelsHandlers.layer
 ).pipe(Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)))
 
 /**

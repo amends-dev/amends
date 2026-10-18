@@ -38,7 +38,6 @@ const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => Effect.
             accept: () => ran(workspaceId).pipe(Effect.as(Option.none())),
             start: unexpected,
             joinedConversation: unexpected,
-            showDraft: unexpected,
             close: unexpected,
             fail: unexpected,
             confirmStopped: unexpected

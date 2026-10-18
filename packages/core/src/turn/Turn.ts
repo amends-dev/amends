@@ -1,7 +1,7 @@
 /**
  * A turn's record: one harness turn of one agent in one thread, with where it stands, the work it
- * accepted, what it runs on, and how it ended; the view a reader sees of it; the drafts a running
- * turn shows; and the items and messages by which a reader follows its session log. `TurnStore`
+ * accepted, what it runs on, and how it ended; the view a reader sees of it; and the items and
+ * messages by which a reader follows its session log. `TurnStore`
  * keeps the record, `TurnExecution` and `TurnCommand` change it, and `TurnService` serves the
  * views and the log.
  *
@@ -230,28 +230,6 @@ export const view = (turn: Turn, directs: boolean, retryOpen: boolean): View =>
   })
 
 /**
- * More of a response a turn is writing, before it completes: `text` continues the response's part
- * at `offset` characters. The turn's job shows drafts to those following the turn's log, and the
- * completed response in the log replaces them.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Draft = Schema.Struct({
-  responseId: Schema.NonEmptyString,
-  /** The part's position among the step's parts, as the session log records the step. */
-  part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  text: Schema.String
-})
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export interface Draft extends Schema.Schema.Type<typeof Draft> {}
-
-/**
  * One entry of a turn's log as its thread's readers see it: the facts of its work, never private
  * reasoning. The agent was prompted with the thread's messages; a step of the turn wrote text,
  * verbatim, and is the reply when it answered the prompt rather than calling tools; or the turn's
@@ -304,8 +282,7 @@ export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
 /**
  * What following a turn's log delivers, as the log grows. `Opened` starts every subscription with
  * the items as they stand. `Changed` carries the items later entries added, each at its index.
- * `Drafted` carries more of the step being written before it finishes, at `offset` characters
- * into its part; a reader that misses some waits for the step. `Ended` follows the turn's end,
+ * `Ended` follows the turn's end,
  * once every item is delivered, and the stream closes.
  *
  * @category schemas
@@ -314,7 +291,6 @@ export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
 export const LogMessage = Schema.TaggedUnion({
   Opened: { items: Schema.Array(LogItem) },
   Changed: { changes: Schema.Array(LogChange) },
-  Drafted: Draft.fields,
   Ended: {}
 }).annotate({ identifier: "TurnLogMessage" })
 

@@ -8,14 +8,13 @@ import { Actor, Identity } from "@amends-dev/core/identity"
 import { Checkpoint } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
 import { ReadStateStore } from "@amends-dev/core/read-state"
-import { SignalHub } from "@amends-dev/core/signal"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadStore, ThreadParticipationStore, ThreadMessageStore, ThreadActivityStore } from "@amends-dev/core/thread"
 import { SessionStateStore, TurnJobs, TurnStore } from "@amends-dev/core/turn"
 import { InvitationStore, Member, MemberStore, WorkspaceStore, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Commit, Entry, Store, StoreError } from "@amends-dev/log"
 import { expect, it } from "@effect/vitest"
-import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope, Stream } from "effect"
+import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope } from "effect"
 import { TestClock } from "effect/testing"
 import * as Gateway from "../src/Gateway.ts"
 import * as WorkspaceRuntime from "../src/internal/workspaceRuntime.ts"
@@ -173,7 +172,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         listByThread: unexpected,
         getFirst: unexpected,
-        listBySubjects: unexpected,
         readPage: unexpected,
         insert: unexpected
       }),
@@ -313,14 +311,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           list: unexpected(),
           insert: unexpected,
           update: unexpected
-        })
-      ),
-      // Signals no test here observes: published into nothing, and no subscriber ever hears one.
-      Context.add(
-        SignalHub.SignalHub,
-        SignalHub.SignalHub.of({
-          publish: () => Effect.void,
-          subscribe: Effect.succeed(Stream.never)
         })
       )
     )

@@ -296,18 +296,6 @@ export class Reloading extends Schema.TaggedError<Reloading>()("Reloading", {}) 
 }
 
 /**
- * The change feed stopped; the reader subscribes again and refreshes what it shows.
- *
- * @category errors
- * @since 0.1.0
- */
-export class ChangeFeedInterrupted extends Schema.TaggedError<ChangeFeedInterrupted>()("ChangeFeedInterrupted", {}) {
-  override get message(): string {
-    return "The change feed stopped; subscribe again and refresh"
-  }
-}
-
-/**
  * Following a turn's log stopped short; the reader follows it again from the start.
  *
  * @category errors
@@ -359,7 +347,6 @@ export class CredentialsUnavailable extends Schema.TaggedError<CredentialsUnavai
 export const UnavailableReason = Schema.Union([
   Contention,
   Reloading,
-  ChangeFeedInterrupted,
   LogInterrupted,
   ChannelUnreachable,
   CredentialsUnavailable

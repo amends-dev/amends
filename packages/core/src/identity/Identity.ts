@@ -7,7 +7,6 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Audience from "../journal/Audience.ts"
 
 /**
  * A person's identity, as the host's accounts name them.
@@ -80,13 +79,3 @@ export const Reference = Schema.TaggedUnion({
  * @since 0.1.0
  */
 export type Reference = typeof Reference.Type
-
-/**
- * A human or agent in person, across their memberships: the audience scope their own sessions
- * read.
- *
- * @category getters
- * @since 0.1.0
- */
-export const audienceOf = (identity: MemberReference): Audience.Scope =>
-  Audience.make(MemberReference.isAnyOf(["Human"])(identity) ? "human" : "agent", identity.id)

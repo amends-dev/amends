@@ -694,8 +694,6 @@ export const threadActivities = pgTable(
     uniqueIndex("thread_activity_sequence").on(t.workspaceId, t.threadId, t.sequence),
     // At most one activity per occurrence key; activities without one are repeatable.
     uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
-    // What a commit changed in the timelines: the activities about the subjects it names.
-    index("thread_activity_subject").on(t.workspaceId, t.subject),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
     check("thread_activity_positive_version", sql`${t.version} > 0`)
   ]

@@ -44,7 +44,7 @@ until the client disconnects, or one the caller closes. Identities must come fro
 never from client input.
 
 A host provides `WorkspaceStorage.WorkspaceStorage`, whose `forWorkspace` returns one workspace's
-stores and signal hub (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It
+stores (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It
 also provides core's job services, which take every workspace's job requests, each naming its
 workspace; a host that runs no jobs provides each one's `layerNoRunner`, so requests are accepted
 and work waits.
@@ -64,9 +64,8 @@ is prepared first, and membership is then resolved from what its boot restores.
 
 Each request and each open stream holds a lease on its workspace's runtime. A runtime stays prepared
 while a lease is open and for the idle time-to-live after the last one closes, then is released with
-its services, including its change-feed follower; the next request boots it again. Memory therefore
-follows the workspaces in recent use. Each process follows the journal itself, so subscribers on
-different hosts see the same commits.
+its services; the next request boots it again. Memory therefore follows the workspaces in recent
+use.
 
 A failed boot closes what it acquired and fails its waiting requests as a defect, and a later
 acquisition can retry; a request's cancellation does not cancel a shared boot. After replay, boot
@@ -83,9 +82,7 @@ directory reads projection tables directly.
 
 ## Host contracts
 
-- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores and its `SignalHub.SignalHub`,
-  which delivers [signals](../core/README.md#signals) between every process over the same storage,
-  best effort.
+- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores.
 - `Accounts.Accounts` holds the people a host knows across its workspaces: `findOrCreate` gives an
   address's `Accounts.Account`, its `id`, the human ID core names the person by, and its `email`,
   creating it the first time the address comes up; `findByIds` reads accounts back by ID. The ID is
@@ -156,7 +153,7 @@ store. An adapter's tests call `run` with a `Fixture`, by convention in its `tes
 `withStorage` gives the test a `Storage`:
 
 - `connect(options?)` opens another host over the same storage, with its own connection or pool,
-  closed with the test's scope: its storage, directory, accounts, sign-in storage, and signal hub,
+  closed with the test's scope: its storage, directory, accounts, and sign-in storage,
   with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
   would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
@@ -172,11 +169,9 @@ by name, and a core or gateway over a host.
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `journal`       | Appends seen across hosts, log heads, isolation of identical log IDs, projections going live and rebuilding, and commits refused meanwhile.                                               |
 | `transactions`  | Competing initialization, rollback without leftovers, interruption, foreign and expired handles, and contention from another host.                                                        |
-| `changeFeed`    | Commits from another host, and resuming from a cursor on another host.                                                                                                                    |
-| `signals`       | Delivery between hosts in order, only to subscribers present and in their workspace, and the audiences of typing and read state.                                                          |
 | `idempotency`   | Keyed appends across reopening, content validation, rollback, byte ownership, concurrent attempts, and more keys than one statement binds.                                                |
 | `factMetadata`  | Fact names and subjects indexed and their versions and provenance kept across reopening, paged reads by either, retries that compare them, and publication refused for another workspace. |
-| `reads`         | Workspace reads and change-feed opening while another host holds the writer.                                                                                                              |
+| `reads`         | Workspace reads while another host holds the writer.                                                                                                                                      |
 | `contracts`     | Direct store calls: a conflict rolling back its transaction, IDs never reused, one active record per subject, timelines contiguous, and the live projections.                             |
 | `accounts`      | One account per address, however typed and from any host, concurrent first requests sharing one, and accounts read back by ID.                                                            |
 | `signInStorage` | An address's pending code replaced and removed one change at a time from every host, and sessions found, extended, and deleted.                                                           |

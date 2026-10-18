@@ -1,7 +1,7 @@
 /**
  * One item of a thread's timeline, in the shape every kind shares: its position, a dotted kind
- * name, what it is about, and the kind's details as JSON. Storage, facts, and the change feed carry
- * this shape and nothing more, so adding a kind changes none of them; `ThreadActivityKind` defines
+ * name, what it is about, and the kind's details as JSON. Storage and facts carry this shape and
+ * nothing more, so adding a kind changes none of them; `ThreadActivityKind` defines
  * a kind and reads its details.
  *
  * @since 0.1.0

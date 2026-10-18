@@ -6,7 +6,6 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as MemberId from "../workspace/MemberId.ts"
@@ -20,7 +19,6 @@ import * as Assignment from "./Assignment.ts"
  * @since 0.1.0
  */
 export const Created = Fact.make("workspace.assignment.created", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("assignment", payload.assignmentId),
   version: 1,
   payload: Schema.Struct({
@@ -39,7 +37,6 @@ export const Created = Fact.make("workspace.assignment.created", {
  * @since 0.1.0
  */
 export const Revoked = Fact.make("workspace.assignment.revoked", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("assignment", payload.assignmentId),
   version: 1,
   payload: Schema.Struct({

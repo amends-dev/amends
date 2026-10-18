@@ -67,8 +67,7 @@ every built-in role holds, and membership of the group. To anyone outside it, th
 any recorded name. Renaming records `group.renamed` with the new name and returns the group; the
 same name again records nothing. Otherwise `expectedName`, the name the renamer last saw, must still
 be the group's name: one renamed meanwhile is `CoreError.Changed`, so a rename is never silently
-replaced, and nothing is recorded. Members read the new name through their groups list, and the
-change feed delivers the fact to the group's readers. Each listed group says whether the reader may
+replaced, and nothing is recorded. Members read the new name through their groups list. Each listed group says whether the reader may
 rename it (`renamable`), from the same grant resolution as reading it.
 
 ## Public groups
@@ -115,10 +114,7 @@ never have. What is addressed to the caller there is counted apart, by
 notification; reading a thread settles its notifications and so lowers the count. `manageable` holds for a team group where the caller has
 `group.membership.manage`, from the same grant resolution, so clients offer adding people there;
 `membersRemovable` holds where they may also remove others: a private group they may manage, or a
-public one they moderate. Direct groups are never manageable. The change feed delivers new
-notifications to their recipient, and
-[signals](../packages/core/README.md#signals) carry the reader's read-state changes to their other
-sessions, so a client can keep both current.
+public one they moderate. Direct groups are never manageable.
 
 A roster returns `GroupMembership.GroupMembership` values: admission IDs, workspace-member references,
 and admission times, for active admissions whose workspace member is still active. It needs no
@@ -220,6 +216,4 @@ original, but calling `createTeam` again creates another group unless both calls
 same `{ requestKey }`: then the retry returns the first group, whatever the second call asks for;
 its ID is derived from the creator and key. See [retrying safely](thread-workflows.md#retrying-safely).
 
-Group, admission, and departure facts reach the group's members with `group.read` over the
-[change feed](../packages/core/README.md#change-feed); admissions and departures also reach the
-member concerned, and follows only the follower. Group creation generates no notifications.
+Group creation generates no notifications.

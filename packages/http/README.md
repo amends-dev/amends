@@ -119,81 +119,6 @@ Clients generating the typed client pass it in `headers`.
   the notification; marking it again returns the first time, a missing record or another recipient's
   notification is the same 404, an agent's notification is a 403, and one already settled otherwise
   is a 409.
-- `changeFeed`: `GET /changes` opens a live SSE stream of the commits and
-  signals the caller may see, resumable from a cursor. Authentication and active membership are
-  checked on entry.
-
-### Live changes
-
-`ChangeFeedGroup.watch` reuses core's `ChangeFeed.Message` through `StreamSse`. The generated client
-returns a typed Effect stream. Raw clients send the bearer credential and the workspace, for example:
-
-```sh
-curl -N -H "Authorization: Bearer $TOKEN" -H "Amends-Workspace: $WORKSPACE_ID" "$API/changes"
-```
-
-Resume with the cursor of the last commit received: `GET /changes?after=<cursor>`. Native
-`EventSource` cannot send a bearer token, so clients use fetch-based SSE and pass the cursor
-explicitly; an invalid cursor is a 400.
-
-The first SSE `message` is Ready, such as
-`{ "_tag": "Ready", "workspaceId": "workspace-one", "cursor": "41", "reset": false }`, sent after
-the subscription registers. With `reset: false`, the commits after the given cursor follow, then
-live ones. With `reset: true` (no cursor, an unknown one, one more than 500 commits behind, or one
-before a commit the server cannot read) delivery starts at the head and the client must refresh the
-views it keeps; `cursor` is null only for an empty workspace. Later messages contain
-`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, a `changes` array, a `stale` array, and a
-`notifications` array; at least one of the three is nonempty. `changes` holds what the
-commit changed in what the caller may see, each as it is now, which clients put in place of what
-they show: a `TimelineItem` with an `item` exactly as the timeline returns it, and a `Preview` with
-a `preview` of the thread as the group's stream shows it to every reader, an opening without the
-caller's `readThrough` and `unread`, a `GroupLatest` with the `latest` activity of a group, as
-`groupId` and `occurredAt`, from which the groups list derives `latestActivityAt` and
-`newActivity`, and a `Turn` with a `turn` exactly as `GET /turns/:turnId` returns it to the caller.
-`stale` names the reads the commit changed for the caller that `changes` does not carry, which
-clients read again, each `{ read, id? }`: `read` is a workspace read, `directory` (`GET
-/me/workspaces`), `settings`, `ownership`, `members`, `invitations`, `permissions`, `groups`,
-`public-groups`, `inbox`, `pending` (`GET /notifications/count`), `connections`, `agents`, or
-`active-turns`, or a read of one group, thread, or turn, `streams` and `rosters` (a group's openings
-and members), `threads`, `timelines`, and `participants` (a thread, its timeline, and its
-participants), or `turns`, with `id` naming which one, or without it every one.
-`notifications` holds the notifications the commit created for the caller, with the same fields the
-inbox list returns, so clients can update an inbox without a refetch, and makes `pending` stale.
-
-What a commit tells reaches the readers in its facts' audiences with the matching read permission:
-workspace metadata, ownership, and role facts reach every member; invitations only holders of
-`invitation.manage`; member and access changes holders of `member.read` or `assignment.read` on that
-member, and always the member concerned; group and thread facts the group's members with
-`group.read` or `thread.read`; and follows only the follower. A commit with nothing the caller may
-see and no notification for them sends no message. The
-commit that removes the caller from the workspace is delivered, then the stream ends; reconnecting
-returns 403.
-
-Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
-`Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
-readers, and `ThreadRead` (`threadId`, `readThrough`, and `readAt`), `GroupRead` (`groupId` and
-`readAt`), and `NotificationsSeen` (`notificationIds` and `seenAt`) reach only the caller's own
-sessions, the one that wrote included, after one of them records read state or marks a notification
-seen. Reading a thread through a position marks the caller's pending notifications from it up to
-there seen at `readAt`. Starting a thread or replying reads it, so the author's sessions also get a `ThreadRead` once
-the commit lands. A response an agent's turn is writing reaches only those following its log (see
-[Turns](#turns)). Signals have no cursor, are never replayed, and may be missed; after reconnecting,
-refresh read state with the rest of the view. Show a typing indicator until `until` unless another
-`Typing` extends it, and hide the caller's own. Send `POST /threads/:threadId/typing` while the
-user types; repeats within two seconds are dropped, so clients need not throttle. It requires access
-to the thread and `thread.publish`; a missing or inaccessible thread returns 404 and a missing
-permission 403.
-
-The feed follows the journal, so commits from every host over the same database arrive. Five-second
-SSE comments keep idle connections open without producing application messages, and messages carry
-no SSE event IDs. Responses use `Cache-Control: no-store` and disable proxy buffering where
-supported. Missing/rejected credentials return 401; absent active membership returns 403; a caller
-at the server's limit of open streams for the workspace, or for itself within it, gets 429
-`ApiErrors.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE
-failure encoding with `CoreError.Unavailable` (`ChangeFeedInterrupted`) and no other detail;
-reconnect with the last cursor to continue. A commit the server cannot read, such as a fact version
-a newer server wrote during a deployment, also ends the stream, and reconnecting then resets. See
-[known limitations](../../docs/current-status.md) for delivery and edge controls.
 
 ### Conversations
 
@@ -227,7 +152,6 @@ describe the rules behind each operation.
 | `POST /threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                                            |
 | `PUT /messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `CoreError.Denied` (`NotAuthor`); a deleted one or a stale revision is 409.      |
 | `DELETE /messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                                       |
-| `POST /threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                                       |
 | `POST /threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                                      |
 | `POST /threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                                      |
 | `POST /threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                                 |
@@ -254,9 +178,7 @@ the group; a mentioned member who cannot take part is a 409 `CoreError.Conflict`
 gets 403. A read position past the thread's latest activity is a 409 `CoreError.Conflict`
 (`BeyondTimeline`) carrying the latest sequence. A direct group's members are fixed and it has
 nothing to follow, so adding, removing, and following there are 422 `CoreError.Invalid`; unfollowing
-an ended participation or removing an ended admission is a 409. Positions, read times, and what they
-saw reach the caller's sessions as signals on the change feed, and the conversation's facts reach
-the group's readers as commits.
+an ended participation or removing an ended admission is a 409.
 
 ### Tasks
 
@@ -351,13 +273,11 @@ turn of an agent on the work asked of it in a thread; the
 Following a turn's log streams `Turn.LogMessage`s as the log grows, for a caller who may open the
 thread. `Opened` starts every subscription with the log's `items` as they stand: the messages the
 agent was prompted with, each step that wrote text, its reply marked once the turn ends, and runs
-that stopped short. `Changed` carries `changes`, each an `index` and the `item` now there. `Drafted`
-(`responseId`, `part`, `offset`, `text`) carries more of the step being written before it finishes,
-continuing its part at `offset` characters; it may be missed, and the step replaces it. `Ended`
+that stopped short. `Changed` carries `changes`, each an `index` and the `item` now there. `Ended`
 follows the turn's end once every item is delivered, and the stream closes. A stream that cannot go
 on, including once the caller can no longer open the thread, ends with `CoreError.Unavailable`
 (`LogInterrupted`), and following again opens with the items as they stand. Log streams count within
-the same limits as change streams.
+the process's [limits on open streams](#streams).
 
 A turn reads as `Turn.View`: its status, how far into the thread its input reaches
 (`acceptedThroughSequence`), the harness, model, and sandbox it started on (`selection`), the turn
@@ -435,19 +355,17 @@ channel's transport says to give.
 
 ## Streams
 
-`ChangeFeedHandlers.watch` serves `ChangeFeedService.watch`, and `TurnsHandlers.watchLog` serves
-`TurnService.watchLog`, both as server-sent events. Effect's HTTP server moves the request's scope
-to the response stream, so the workspace and the subscription stay open until the stream completes
-or the client disconnects. HTTP owns the SSE encoding, cache headers, and comment heartbeats every
+`TurnsHandlers.watchLog` serves `TurnService.watchLog` as server-sent events. Effect's HTTP server
+moves the request's scope to the response stream, so the workspace and the subscription stay open
+until the stream completes or the client disconnects. HTTP owns the SSE encoding, cache headers, and comment heartbeats every
 five seconds; core owns the messages and who may see each one. The handlers send no frontend query
 keys.
 
-Both streams share `Streams`, which also contains unexpected failures: Effect's SSE encoder would
-send a stream's whole failure cause to the client, so the handler logs it and ends the change feed
-with `CoreError.Unavailable` (`ChangeFeedInterrupted`), or a turn log with `CoreError.Unavailable`
-(`LogInterrupted`), alone.
+It is served through `Streams`, which also contains unexpected failures: Effect's SSE encoder would
+send a stream's whole failure cause to the client, so the handler logs it and ends the turn log with
+`CoreError.Unavailable` (`LogInterrupted`) alone.
 
-Each process serves a limited number of streams at once, change feeds and turn logs together.
+Each process serves a limited number of streams at once.
 `Streams.Limits`, a context reference, allows a thousand per workspace and twenty per member of it
 by default, and a host provides its own to change them. A stream holds its place from before the
 gateway admits it until its response ends, and a stream beyond either limit fails with

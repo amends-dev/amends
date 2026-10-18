@@ -167,8 +167,8 @@ revealed or sent.
 HTTP exposes sign-in and signing out, accounts, workspace creation and the directory, workspace
 settings, members, invitations, assignments, ownership, the notification inbox, its sources and
 marking them seen, groups, threads, replies, following, read state, tasks, connections and the
-integrations they use, agents, turns and their logs, channels and the events their systems send,
-the change feed, and typing. No operation reaches a group from outside it, so there is no
+integrations they use, agents, turns and their logs, and channels and the events their systems
+send. No operation reaches a group from outside it, so there is no
 workspace-wide oversight of private groups or direct groups by design.
 
 ## The workspace app
@@ -229,16 +229,18 @@ releases: first add the new shape and stop using the old one, then drop it.
 Built-in roles are managed by the product: a later bundle revision replaces their names and
 permissions, and custom roles, which a workspace would edit itself, are not implemented.
 
-## Live delivery and authorization
+## Live delivery
 
-The [change feed](../packages/core/README.md#change-feed) reads the journal, so it carries
-commits from every host over the same storage and resumes from a cursor. Its remaining gaps:
+Nothing delivers a workspace's changes to its readers as they happen: the change feed and signals
+have been removed, and their replacement, [`@amends-dev/sync`](../packages/sync/README.md), has its
+contract but no server yet. Typing and presence are not implemented. A turn's log still streams over
+HTTP as its session log grows, without drafts of the step being written. Other gaps:
 
-- PostgreSQL wakes followers with `LISTEN`/`NOTIFY`, sent just after each commit rather than
-  inside it, where the notification queue's lock would serialize every notifying commit on the
-  server through its WAL flush. A process that stops between its commit and the notice leaves
-  followers to find the commit at their next poll, within five seconds. Behind a
-  transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
+- PostgreSQL wakes log readers, such as a turn log's, with `LISTEN`/`NOTIFY`, sent just after each
+  commit rather than inside it, where the notification queue's lock would serialize every notifying
+  commit on the server through its WAL flush. A process that stops between its commit and the
+  notice leaves readers to find the commit at their next poll, within five seconds. Behind a
+  transaction-pooling proxy, `LISTEN` is unavailable and readers re-check every five seconds.
 - One host process is limited by its own CPU before PostgreSQL: on a laptop with durable writes,
   a thread start takes about 18 ms (40 ms at the 99th percentile) and a member list about 1 ms,
   and thread starts across 16 workspaces reach about 110 a second, about 9 ms of host CPU each,
@@ -246,43 +248,11 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   notices sent after the commit matter once several processes write to one database; one process
   saturates first. PostgreSQL alone, with 32 clients of tiny commits, reached about 36,600 a
   second with the notice after the commit against 22,100 with it inside.
-- New notifications reach their recipients over the feed, and a human's `Seen` and read positions
-  reach their other sessions as signals. An agent's pending notifications discarded when its
-  participation ends show only through the inbox, beside an unfollow's participation-ended
-  activity or the group departure.
-- While a newer host records a fact version an older host does not know, as during a deployment
-  that changes a fact, each such commit ends every subscription on the older host, which
-  reconnects with a reset and refreshes its view. A commit whose payload a known version cannot
-  decode does the same, and the feed goes on past it.
+- An agent's pending notifications discarded when its participation ends show only through the
+  inbox, beside an unfollow's participation-ended activity or the group departure.
 - An older host that reads a timeline holding an activity kind it has no resolver for, recorded by
   a newer host during a deployment that adds the kind, fails the read with an invalid response
   rather than skipping the item.
-- A reader's cursor advances only with commits that carry something they may see. A reader
-  who sees little of a busy workspace can fall more than 500 commits behind while
-  disconnected and then reset instead of resuming.
-- Scopes and grants reload from current state when a commit changes them, and that state
-  may already include later changes. Access to a group or thread extends to its history, so
-  this can deliver events from just before a grant, or withhold events from just before a
-  revocation, but never delivers after the revocation reaches the reader.
-- Access is rechecked only when the feed itself carries a change to it. The reader's
-  removal from the workspace ends their stream.
-
-[Signals](../packages/core/README.md#signals) carry typing and read-state changes between
-commits on the same stream. They are best effort by design, with these consequences:
-
-- A signal published while a PostgreSQL listener reconnects, or to a subscriber more than 256
-  signals behind, is lost; a client that reconnects refreshes read state rather than replaying.
-  A typing indicator simply expires.
-- The two-second typing throttle is per process, so a member's typing through several hosts can
-  send one signal per host in that window.
-- PostgreSQL relays each signal as one `NOTIFY`, sharing the notification queue lock with
-  commits and limited to 8000 bytes per payload. Behind a transaction-pooling proxy, signals are
-  unavailable.
-- Presence, such as who is online or viewing a thread, is not implemented; it would be another
-  signal with an expiry, like typing, and a stream's start would need who is online, since signals
-  are not replayed. Typing over HTTP is the only signal clients send. The UI's status marks
-  already have online and offline shapes, but only agents carry a status today: people's avatars,
-  rows under Direct messages, and profile cards show none until presence exists.
 
 ## Projection sets across hosts
 

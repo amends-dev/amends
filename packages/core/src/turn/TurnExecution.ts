@@ -1,7 +1,6 @@
 /**
  * What a turn's job asks of the workspace, as no actor: accepting an agent's waiting work into a
- * turn, starting the turn with what the agent runs on and is told, showing readers drafts of the
- * step being written, and ending the turn by closing, failing, or confirming it stopped. It is
+ * turn, starting the turn with what the agent runs on and is told, and ending the turn by closing, failing, or confirming it stopped. It is
  * one of core's `JobServices`, which Cluster's `TurnRunner` calls through the gateway for each
  * turn job. It holds nothing in memory and runs no harness: the job runs the agent and writes the
  * participation's session log (`SessionLog.SessionLogs`), and each change here is its own commit,
@@ -35,8 +34,6 @@ import * as Publication from "../journal/Publication.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Signal from "../signal/Signal.ts"
-import * as SignalHub from "../signal/SignalHub.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Thread from "../thread/Thread.ts"
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
@@ -224,12 +221,6 @@ export class TurnExecution extends Context.Service<
       turnId: TurnId.TurnId
     ) => Effect.Effect<ReadonlyArray<Prompt.Message>, JoinedConversationError>
     /**
-     * Show the turn's readers more of a step before it finishes, as a signal: nothing is recorded,
-     * and a turn no longer running shows nothing. A reader who starts following midway sees the step
-     * from the next draft that starts at its beginning.
-     */
-    readonly showDraft: (turnId: TurnId.TurnId, draft: Turn.Draft) => Effect.Effect<void, Error>
-    /**
      * Close a turn whose harness turn finished: post `reply`, the text of its last step, as the
      * agent's message to the thread's current participants, keep what its session resumes from, and
      * record completion, in one commit. A turn asked to stop meanwhile stops instead, keeping the
@@ -259,8 +250,8 @@ export class TurnExecution extends Context.Service<
 const pageSize = 100
 
 /**
- * The execution over the workspace's stores, the turn and thread commands, `AgentQuery`, the
- * journal, and the signal hub.
+ * The execution over the workspace's stores, the turn and thread commands, `AgentQuery`, and the
+ * journal.
  *
  * @category constructors
  * @since 0.1.0
@@ -283,7 +274,6 @@ export const make = Effect.gen(function* () {
   const agentQuery = yield* AgentQuery.AgentQuery
   const authorization = yield* Authorization.Authorization
   const journal = yield* Journal.Journal
-  const signalHub = yield* SignalHub.SignalHub
   const crypto = yield* Crypto.Crypto
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
@@ -680,23 +670,6 @@ export const make = Effect.gen(function* () {
     )
   }, Operation.report)
 
-  const showDraft: TurnExecution["Service"]["showDraft"] = Effect.fn("TurnExecution.showDraft")(function* (
-    turnId,
-    draft
-  ) {
-    const turn = yield* requireTurn(turnId)
-    if (turn.status !== "running" || draft.text === "") return
-    yield* signalHub.publish(
-      Signal.Signal.cases.TurnDraft.make({
-        workspaceId,
-        groupId: turn.groupId,
-        threadId: turn.threadId,
-        turnId: turn.id,
-        draft
-      })
-    )
-  }, Operation.report)
-
   /**
    * The participants the agent's reply in the turn's thread goes to, or why it cannot post there
    * now.
@@ -803,7 +776,6 @@ export const make = Effect.gen(function* () {
     accept,
     start,
     joinedConversation,
-    showDraft,
     close,
     fail,
     confirmStopped

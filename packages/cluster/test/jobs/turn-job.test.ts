@@ -1,4 +1,4 @@
-import { TurnJobs } from "@amends-dev/core/turn"
+import { SessionLog, TurnJobs } from "@amends-dev/core/turn"
 import { Gateway } from "@amends-dev/gateway"
 import type { StreamPart } from "@amends-dev/harness"
 import { Commit, Store } from "@amends-dev/log"
@@ -64,13 +64,16 @@ const inCommit = <E>(
   })
 
 /** Move the test clock on a second at a time until `done`, for at most `limit`. */
-const until = (done: () => boolean, limit: Duration.Input = "1 minute") =>
+const until = (done: Effect.Effect<boolean>, limit: Duration.Input = "1 minute") =>
   Effect.gen(function* () {
     const seconds = Duration.toSeconds(Duration.fromInputUnsafe(limit))
-    for (let second = 0; second < seconds && !done(); second++) yield* TestClock.adjust("1 second")
+    for (let second = 0; second < seconds && !(yield* done); second++) yield* TestClock.adjust("1 second")
   })
 
-const hasEnded = (workspace: FakeWorkspace) => () => workspace.endings().length > 0
+const hasEnded = (workspace: FakeWorkspace) => Effect.sync(() => workspace.endings().length > 0)
+/** The turn's start is logged, with the agent's first part: the run is streaming the turn. */
+const hasStarted = (workspace: FakeWorkspace) =>
+  Effect.map(workspace.log, (log) => log.some(SessionLog.Entry.isAnyOf(["Started"])))
 
 describe("a turn job", () => {
   it.effect("runs the agent's turn when a commit asks it to", () =>
@@ -97,7 +100,7 @@ describe("a turn job", () => {
       )
       yield* Effect.gen(function* () {
         yield* inCommit("commit-1", (turnJobs) => turnJobs.requestRun(job))
-        yield* until(() => workspace.drafts().length > 0)
+        yield* until(hasStarted(workspace))
         yield* inCommit("commit-2", (turnJobs) => turnJobs.requestStop(Object.assign({ turnId: turn.id }, job)))
         yield* until(hasEnded(workspace))
       }).pipe(Effect.provide(layer), Effect.scoped)
@@ -136,7 +139,10 @@ describe("a turn job", () => {
       const { workspace, layer } = yield* turnJobsFor(Stream.empty, { created: false })
       yield* Effect.gen(function* () {
         yield* inCommit("commit-1", (turnJobs) => turnJobs.requestRun(job))
-        yield* until(() => workspace.entered() > 1, "10 seconds")
+        yield* until(
+          Effect.sync(() => workspace.entered() > 1),
+          "10 seconds"
+        )
       }).pipe(Effect.provide(layer), Effect.scoped)
       expect(workspace.entered()).toBe(1)
       expect(workspace.endings()).toEqual([])

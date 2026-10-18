@@ -1,6 +1,6 @@
 # @amends-dev/storage-postgresql
 
-Workspace storage, each workspace's signal hub, the workspace directory, the host's accounts, and
+Workspace storage, the workspace directory, the host's accounts, and
 sign-in's codes and sessions over PostgreSQL: the storage the [local host](../../hosts/local/README.md) runs on. Statements are
 written with Drizzle and run through `@effect/sql-pg`, so they share the Effect client's transaction
 service: the journal opens each commit on a reserved connection, and every statement inside it lands
@@ -16,7 +16,7 @@ Gateway.layer().pipe(
 )
 ```
 
-`PostgresStorage.layer(options)` provides the storage contract, with its signal hubs, the directory, the
+`PostgresStorage.layer(options)` provides the storage contract, the directory, the
 accounts, and the sign-in storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
@@ -213,7 +213,7 @@ transaction see its staged state.
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the workspace
 and log once `COMMIT` succeeds, as a statement of its own on the commit's connection, so a
 notification means a commit; a commit that stores job requests sends a notice for the runners in
-the same statement, as [Effect Cluster's tables](#effect-clusters-tables) describes. Each pool's listener, started by the first waiting reader, signal subscriber, or runner that
+the same statement, as [Effect Cluster's tables](#effect-clusters-tables) describes. Each pool's listener, started by the first waiting reader or runner that
 listens for job requests and stopped 30 seconds after the last, holds one connection on `LISTEN` and wakes that
 log's waiters. A waiter takes its wakeup before checking the log, so an append in between still
 wakes it; the log is the truth, and the notification only says when to look again. When its
@@ -225,17 +225,6 @@ The binding opens transactions with plain `BEGIN` and does not pin isolation, so
 default still controls snapshots. Every failed `COMMIT` returns `Store.CommitUncertain`, including
 errors that could be classified as a definite rollback; see
 [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
-
-## Signals
-
-Each workspace's [signal hub](../../packages/core/README.md#signals) relays signals on the same
-channel: `publish` sends the JSON-encoded signal with its workspace through `pg_notify` outside any
-transaction, and the listener in every pool, the sender's included, decodes it once and offers it to
-that workspace's subscribers through the pool's `LocalSignalHub`. A subscriber more than 256
-behind misses the oldest, and a signal this version cannot decode is skipped. Nothing is stored:
-signals sent while a listener reconnects are lost, a failed publish is logged rather than failing
-its operation, and a payload over PostgreSQL's 8,000-byte notification limit is not delivered.
-Behind a transaction-pooling proxy, signals are unavailable.
 
 ## Effect Cluster's tables
 
@@ -272,8 +261,8 @@ statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a 
 for one workspace (`layerWorkspace`), its private `layerStores` registers each store, and
 `PostgresStorage.ts` is the adapter: every gateway contract it implements, in one layer.
 `PostgresDatabase.ts` prepares the SQL client, `PostgresDirectory.ts` reads across workspaces,
-`internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener
-that `PostgresSignalHub.ts` binds to each workspace, `PostgresTurns.ts` and `PostgresReads.ts` are
+`internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener,
+`PostgresTurns.ts` and `PostgresReads.ts` are
 the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`
 and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
 `PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the

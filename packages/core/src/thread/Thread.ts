@@ -212,8 +212,8 @@ export interface OpeningOptions extends Schema.Schema.Type<typeof OpeningOptions
 
 /**
  * A thread as its group's stream shows it to everyone who may read it: the task it tracks, if any,
- * the message that opened it, how many replies followed, and its latest message. The change feed
- * delivers it as a commit changes it; a reader's stream adds how far they read it, as `Opening`.
+ * the message that opened it, how many replies followed, and its latest message. A reader's stream
+ * adds how far they read it, as `Opening`.
  *
  * @category schemas
  * @since 0.1.0
@@ -287,7 +287,7 @@ export const RenameInput = Schema.Struct({
 export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 
 /**
- * What renaming a thread records: its new title. The group is the fact's audience.
+ * What renaming a thread records: its new title, with the thread's group.
  *
  * @category schemas
  * @since 0.1.0

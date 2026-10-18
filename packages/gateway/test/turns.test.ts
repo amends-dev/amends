@@ -1,7 +1,6 @@
 import type { Core } from "@amends-dev/core"
 import { AgentService } from "@amends-dev/core/agent"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
-import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel"
 import { ConnectionService } from "@amends-dev/core/connection"
 import { Group, GroupService, GroupMembershipService, type GroupId } from "@amends-dev/core/group"
@@ -111,7 +110,6 @@ const brief = (message: Turn.LogMessage | "done" | "unavailable") => {
             : `${index}:${item._tag}`
         )
         .join(",")}`,
-    Drafted: (message) => `drafted ${message.text}`,
     Ended: () => "ended"
   })
 }
@@ -537,7 +535,7 @@ describe("turns", () => {
   )
 
   it.effect(
-    "a reader follows a turn's log: its prompt, drafts, each step that wrote text, and its end",
+    "a reader follows a turn's log: its prompt, each step that wrote text, and its end",
     () =>
       withStorage((storage) =>
         runGateway(
@@ -553,27 +551,11 @@ describe("turns", () => {
               yield* logPrompt(workspace.id, ready)
               const next = yield* followLog(workspace.id, turn.id)
               expect(brief(yield* next)).toBe("opened InputTaken")
-              // A step being written reaches the reader before it finishes.
-              const draft = (text: string, offset: number) =>
-                execute(workspace.id, (turnExecution) =>
-                  turnExecution.showDraft(turn.id, {
-                    responseId: "step-2",
-                    part: 0,
-                    offset,
-                    text
-                  })
-                )
               yield* logStep(workspace.id, turn, "step-1", reading)
-              yield* draft("The ", 0)
-              expect(brief(yield* next)).toBe("drafted The ")
-              // A reader who starts following mid-step catches up from a draft of all the step's
-              // part has so far.
+              // A reader who starts following midway opens with the items the log holds so far.
               yield* Effect.yieldNow
               const late = yield* followLog(workspace.id, turn.id)
               expect(brief(yield* late)).toBe("opened InputTaken")
-              yield* draft("The plan", 0)
-              expect(brief(yield* next)).toBe("drafted The plan")
-              expect(brief(yield* late)).toBe("drafted The plan")
               yield* logStep(workspace.id, turn, "step-2", answering("The plan is on track."))
               expect(brief(yield* next)).toBe("changed 1:The plan is on track.")
               expect(brief(yield* late)).toBe("changed 1:The plan is on track.")
@@ -781,59 +763,6 @@ describe("turns", () => {
         })
       )
     )
-  )
-
-  it.effect(
-    "the change feed delivers each turn a commit changes as the reader sees it, and the turn a retry supersedes",
-    () =>
-      withStorage((storage) =>
-        runGateway(
-          storage,
-          Effect.gen(function* () {
-            const { workspace, agent } = yield* workspaceWithAgent
-            const started = yield* start(workspace.id, "Planner, draft the notes.", [agent.memberId])
-            const { turn } = yield* startReady(workspace.id, agent.memberId, started.thread.id)
-            const messages = yield* Queue.unbounded<ChangeFeed.Message>()
-            const gateway = yield* Gateway.Gateway
-            const feed = yield* gateway.asMember(
-              workspace.id,
-              alice,
-              Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) => changeFeedService.watch())
-            )
-            yield* feed.pipe(
-              Stream.runForEach((message) => Queue.offer(messages, message)),
-              Effect.forkScoped
-            )
-            /** The turns the next commit that changes any delivers, as id, status, and what alice may do. */
-            const nextTurns = Effect.gen(function* () {
-              while (true) {
-                const message = yield* Queue.take(messages).pipe(Effect.timeout("10 seconds"))
-                if (!ChangeFeed.Message.isAnyOf(["Committed"])(message)) continue
-                const turns = message.changes.flatMap((change) =>
-                  ChangeFeed.Change.isAnyOf(["Turn"])(change)
-                    ? [[change.turn.id, change.turn.status, change.turn.stoppable, change.turn.retryable]]
-                    : []
-                )
-                if (turns.length > 0) return turns
-              }
-            })
-            yield* execute(workspace.id, (turnExecution) =>
-              turnExecution.fail(turn.id, { reason: "The model provider is unavailable." })
-            )
-            expect(yield* nextTurns).toEqual([[turn.id, "failed", false, true]])
-            const retried = yield* as(
-              workspace.id,
-              alice,
-              Effect.flatMap(TurnService.TurnService, (turnService) => turnService.retry(turn.id))
-            )
-            // The retry runs, and the turn it retries may run again no more.
-            expect(yield* nextTurns).toEqual([
-              [retried.id, "queued", true, false],
-              [turn.id, "failed", false, false]
-            ])
-          })
-        )
-      )
   )
 
   it.effect("a turn the agent cannot run as it is set up fails before it starts", () =>
@@ -1326,19 +1255,10 @@ describe("turns", () => {
               yield* logPrompt(workspace.id, ready)
               const next = yield* followLog(workspace.id, turn.id, bob)
               expect(brief(yield* next)).toBe("opened InputTaken")
-              yield* execute(workspace.id, (turnExecution) =>
-                turnExecution.showDraft(turn.id, {
-                  responseId: "step-1",
-                  part: 0,
-                  offset: 0,
-                  text: "The "
-                })
-              )
-              expect(brief(yield* next)).toBe("drafted The ")
               return next
             })
 
-            // Leaving the thread's group ends following, with nothing more of the step.
+            // Leaving the thread's group ends following.
             const left = yield* following(team.id)
             const membership = (yield* as(
               workspace.id,

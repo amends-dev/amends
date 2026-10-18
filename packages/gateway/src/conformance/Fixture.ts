@@ -18,8 +18,7 @@ import type * as WorkspaceStorage from "../WorkspaceStorage.ts"
 
 /**
  * The gateway contracts a storage adapter implements, with the cryptography it was built over;
- * one host holds them all. Hosts over the same storage share each workspace's signals, as
- * processes over one system do.
+ * one host holds them all.
  *
  * @category testing
  * @since 0.1.0

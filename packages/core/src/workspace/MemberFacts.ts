@@ -8,7 +8,6 @@
 
 import * as Schema from "effect/Schema"
 import * as Identity from "../identity/Identity.ts"
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Member from "./Member.ts"
@@ -23,7 +22,6 @@ import * as WorkspaceId from "./WorkspaceId.ts"
  * @since 0.1.0
  */
 export const Added = Fact.make("workspace.member.added", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
@@ -43,7 +41,6 @@ export const Added = Fact.make("workspace.member.added", {
  * @since 0.1.0
  */
 export const Renamed = Fact.make("workspace.member.renamed", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
@@ -62,7 +59,6 @@ export const Renamed = Fact.make("workspace.member.renamed", {
  * @since 0.1.0
  */
 export const Removed = Fact.make("workspace.member.removed", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({

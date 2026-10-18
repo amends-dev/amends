@@ -7,7 +7,6 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Invitation from "./Invitation.ts"
@@ -20,7 +19,6 @@ import * as WorkspaceId from "./WorkspaceId.ts"
  * @since 0.1.0
  */
 export const Issued = Fact.make("workspace.invitation.issued", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("invitation", payload.id),
   version: 1,
   payload: Invitation.Issuance,
@@ -35,7 +33,6 @@ export const Issued = Fact.make("workspace.invitation.issued", {
  * @since 0.1.0
  */
 export const Accepted = Fact.make("workspace.invitation.accepted", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
@@ -54,7 +51,6 @@ export const Accepted = Fact.make("workspace.invitation.accepted", {
  * @since 0.1.0
  */
 export const Revoked = Fact.make("workspace.invitation.revoked", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({

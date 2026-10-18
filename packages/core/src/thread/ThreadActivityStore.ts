@@ -18,7 +18,6 @@ import type * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as MemoryBinding from "../journal/MemoryBinding.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
-import * as Subject from "../journal/Subject.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadId from "./ThreadId.ts"
@@ -90,13 +89,6 @@ export class ThreadActivityStore extends Context.Service<
       ids: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>
     /**
-     * Every activity about one of these subjects, across threads, by thread and then sequence:
-     * what a commit that names the subjects changed in the timelines.
-     */
-    readonly listBySubjects: (
-      subjects: ReadonlyArray<Subject.Subject>
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>
-    /**
      * At most limit activities of the requested range, from its requested end, in ascending
      * sequence order. No shared snapshot across pages.
      */
@@ -133,8 +125,6 @@ export const make = (
     listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, id), driver.listByThread),
     latest: (id) => Effect.flatMap(read("latest", ThreadId.ThreadId, id), driver.latest),
     getFirst: (ids) => Effect.flatMap(read("getFirst", Schema.Array(ThreadId.ThreadId), ids), driver.getFirst),
-    listBySubjects: (subjects) =>
-      Effect.flatMap(read("listBySubjects", Schema.Array(Subject.Subject), subjects), driver.listBySubjects),
     readPage: Effect.fn("ThreadActivityStore.readPage")(function* (id, options) {
       return yield* driver.readPage(
         yield* read("readPage", ThreadId.ThreadId, id),
@@ -148,8 +138,6 @@ export const make = (
 const rows = MemoryDatabase.makeRows(Schema.fromJsonString(ThreadActivity.ThreadActivity))
 const bySequence = (left: ThreadActivity.ThreadActivity, right: ThreadActivity.ThreadActivity) =>
   left.sequence - right.sequence
-const byThreadThenSequence = (left: ThreadActivity.ThreadActivity, right: ThreadActivity.ThreadActivity) =>
-  MemoryDatabase.compareBinary(left.threadId, right.threadId) || bySequence(left, right)
 
 /**
  * Each thread's activity over the current workspace transaction, which
@@ -190,16 +178,6 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
         )
       },
       Effect.mapError(StoreError.failed("ThreadActivityStore", "getFirst"))
-    ),
-    listBySubjects: Effect.fn("ThreadActivityStore.memory.listBySubjects")(
-      function* (input) {
-        const subjects = new Set<string>(input)
-        if (subjects.size === 0) return []
-        return (yield* rows.all((yield* read).records.of("threadActivities")))
-          .filter((record) => subjects.has(record.subject))
-          .toSorted(byThreadThenSequence)
-      },
-      Effect.mapError(StoreError.failed("ThreadActivityStore", "listBySubjects"))
     ),
     readPage: Effect.fn("ThreadActivityStore.memory.readPage")(
       function* (id, request) {

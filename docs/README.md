@@ -14,7 +14,7 @@ remaining gaps with links to their owning code.
 | [Security policy](../SECURITY.md)                                    | Reporting a vulnerability, supported versions, and what is not a vulnerability by design.                                       |
 | [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                              |
 | [Group workflows](group-workflows.md)                                | Team groups: creation, public groups and joining, reads, membership, and following.                                             |
-| [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, read state, and typing.                                  |
+| [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, and read state.                                          |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers.             |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                                         |
 | [Examples](../examples/README.md)                                    | One-file programs that run the published packages: sandboxes, agents, your own tools, and tool sources.                         |
@@ -64,7 +64,6 @@ drawings, generation, and visual review in the UI workshop.
   [Agents](agents.md) covers agents on connections: their harness, model, and sandbox, and
   why one can't run.
   [Turns](turns.md) covers agents' turns in threads, where agents are at work, and turn logs.
-  [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
   [Threads](threads.md) fixes the thread model that conversations, tasks, and channel

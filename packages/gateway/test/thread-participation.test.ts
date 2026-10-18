@@ -8,9 +8,9 @@ import {
   type Target
 } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
-import { Group, GroupService, GroupMembershipService, GroupMembershipFacts, type GroupId } from "@amends-dev/core/group"
+import { GroupService, GroupMembershipService, GroupMembershipFacts, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Event, Fact, Journal, Publication } from "@amends-dev/core/journal"
+import { Event, type Fact, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
   ThreadService,
@@ -221,12 +221,7 @@ describe("thread participation", () => {
                   Effect.gen(function* () {
                     const { payload } = yield* Event.decode(fact, entry)
                     const { threadId, groupId } = locate(payload)
-                    return {
-                      name: fact.name,
-                      threadId,
-                      groupId,
-                      audience: yield* Fact.makeAudience(fact, payload)
-                    }
+                    return { name: fact.name, threadId, groupId }
                   })
                 )
               )
@@ -260,7 +255,6 @@ describe("thread participation", () => {
               name: fact.name,
               groupId
             })
-            expect(fact.audience).toEqual([Group.audienceOf(fact.groupId)])
           }
         })
       )

@@ -2,7 +2,7 @@
  * Implements `TurnsGroup`. Each handler runs in the workspace `WorkspaceMember` entered as the
  * principal's membership, and calls one `TurnService` operation. Following a turn's log holds a
  * place within the `Streams` limits and serves `TurnService.watchLog`'s stream through
- * `Streams.serve`, with heartbeats, so a log and the change feed share one count of open streams.
+ * `Streams.serve`, with heartbeats, counting within the process's open streams.
  *
  * @since 0.1.0
  */

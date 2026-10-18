@@ -44,7 +44,7 @@ export const Delivery = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   channelId: ChannelId.ChannelId,
   threadId: ThreadId.ThreadId,
-  /** The thread's group, copied so that the facts' audience follows from their payloads. */
+  /** The thread's group, whose members may read the delivery. */
   groupId: GroupId.GroupId,
   /** The external conversation the message goes to, as the thread's binding names it. */
   conversationId: ChannelTransport.ExternalId,

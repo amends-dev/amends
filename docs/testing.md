@@ -276,7 +276,7 @@ with `run(fixture)`, and its other test files cover only what that adapter store
 differently. The gateway's own `test/conformance.test.ts` runs the suites over the memory
 implementation, in the `backend` project.
 
-The suites cover the journal, transactions, and standalone appends, the change feed and signals
+The suites cover the journal, transactions, and standalone appends
 across hosts, session logs, idempotency keys, fact metadata, reads beside a writer, the direct
 store contracts, accounts, and sign-in storage. Every workflow the stores
 serve, from workspaces and access to threads, notifications, turns, and channels, is tested in
@@ -295,8 +295,7 @@ opening and reply publication, participation admission, recipient selection, con
 quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on every adapter.
 Acknowledgment suites verify human ownership, the first time kept on repeats, source-access loss,
 caller transactions, failed writes, concurrent requests from two hosts, and that `Seen` writes
-nothing to the journal and survives rebuilding projections. The `changeFeed` conformance suite runs the feed on each adapter: commits from another host,
-resuming on another host, and thread activity reaching only the group's readers.
+nothing to the journal and survives rebuilding projections.
 
 Subprocess fixtures create each database before starting the host, so passing host
 tests do not prove that startup works against a database you configure. Follow the

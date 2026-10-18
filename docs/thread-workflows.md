@@ -87,7 +87,7 @@ title: one renamed meanwhile is `CoreError.Changed`, so a rename is never silent
 and nothing is recorded. The activity notifies no one and makes nothing unread, and the title
 never derives from a message: editing the opening message leaves the title as it is, and renaming
 leaves every message as it is. Readers see the new title through the thread and its group's
-stream, and the change feed delivers the fact to the group's readers. The [thread model](threads.md)
+stream. The [thread model](threads.md)
 sets these rules.
 
 ## Tasks
@@ -421,8 +421,8 @@ read, and from each group's threads, for each group with any: a sidebar badge be
 `NotificationService.markSeenThrough({ recordedAt, id })` records `Seen` for every
 notification still pending for the acting human up to and including that position in inbox
 order, typically the newest one they are shown, so a notification that arrives meanwhile stays
-pending. It marks them in batches of 100, each written as `markSeen` writes one and heard by
-the person's other sessions as one `NotificationsSeen` signal, and returns how many it marked;
+pending. It marks them in batches of 100, each written as `markSeen` writes one, and returns how
+many it marked;
 nothing left to mark returns zero. Batches are not one transaction: a failure keeps what earlier
 batches marked, and a retry continues. A batch that a departure settles part of meanwhile is read
 again without those, up to twice. Agents receive `CoreError.Denied` (`HumanRequired`).
@@ -456,8 +456,7 @@ notification returns `CoreError.Denied` (`HumanRequired`), and a discarded one `
 
 `Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
 workspace's write order, and survives rebuilding projections. It creates no activity or
-notifications. The person's other connected sessions hear of it as a `NotificationsSeen`
-[signal](../packages/core/README.md#signals). Handing work to an agent's turn, or a message to a
+notifications. Handing work to an agent's turn, or a message to a
 delivery, is recorded by those workflows as `Accepted`, not by marking it seen.
 
 ## Marking conversations read
@@ -475,21 +474,10 @@ membership and `group.read`, and returns `CoreError.NotFound` otherwise; the rea
 moves forward.
 
 Positions and read times are private state, like `Seen`: outside the journal, never waiting
-for the workspace's conversation writes, and kept when projections are rebuilt. The person's other
-sessions hear of each change as a `ThreadRead` or `GroupRead`
-[signal](../packages/core/README.md#signals). Starting a thread or replying reads it through the
-author's message in the same commit, and the `ThreadRead` signal follows once that commit lands. [Thread lists](#reading-conversations) and
+for the workspace's conversation writes, and kept when projections are rebuilt. Starting a thread
+or replying reads it through the author's message in the same commit. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups) report unread state from these records; only
 messages count as new activity, not quiet participation changes.
-
-## Typing
-
-`ThreadMessageService.typing(threadId)`, and `POST /threads/:threadId/typing`
-over HTTP, tells the thread's readers that the acting member is composing there. It needs the same
-current group access and `thread.publish` as publishing, and returns `CoreError.NotFound`
-for missing and inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's
-members with `thread.read` for the thread, on every host, and lasts six seconds unless repeated;
-repeats within two seconds are dropped. It is never stored.
 
 ## Departure and pending input
 
@@ -511,7 +499,7 @@ the pending count and pending lists, kept in the full inbox as history. Ones alr
 Seen. All of it shares the departure's commit, and rebuilding from the journal settles them the same
 way, since the projections derive it from the recorded departure.
 
-## Recorded history and delivery
+## Recorded history
 
 A start records the thread, its initial participations, the message, and one `message.published`
 activity at sequence 1, in one commit; each later message, follow, and departure adds activity at
@@ -520,11 +508,3 @@ derived from the activity and participation, never recomputed from today's group
 therefore reproduces the same timeline, recipients, and departures after permissions and
 membership change. Recording the same fact again reuses the original, and a keyed start or reply
 returns its first result on a retry ([retrying safely](#retrying-safely)).
-
-Thread, participation, message, and activity facts reach the group's members with `thread.read`
-for that thread over the [change feed](../packages/core/README.md#change-feed). Messages carry their
-full text, so clients render them without a refetch. Activity events omit their recipients, and
-participation events omit routing identities and admissions. Each notification an activity creates
-reaches its human or agent recipient's membership in the same commit message, as their inbox
-lists it, whether or not they may read the thread. Notifications carry source references, not continuing authority to
-read the source.

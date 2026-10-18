@@ -1,29 +1,24 @@
 /**
  * Notices between pools over one channel: commits that append to a log, so waiting readers look
- * again; commits that store job requests, so runners read them; and signals, published to
- * subscribers in every process. A commit notifies right after COMMIT succeeds, on its own
+ * again, and commits that store job requests, so runners read them. A commit notifies right after COMMIT succeeds, on its own
  * connection, rather than inside its transaction, where the notification lock would serialize
  * every notifying commit on the server; a notice lost between the two leaves readers to their
  * poll. One listener per pool, on one connection, routes them all. `PostgresDatabase` makes one
- * for each pool; `Journal`, the log store, waits on its append notices,
- * `PostgresClusterStorage` on its job request notices, and `PostgresSignalHub` relays each
- * workspace's signals through it.
+ * for each pool; `Journal`, the log store, waits on its append notices, and
+ * `PostgresClusterStorage` on its job request notices.
  *
  * @since 0.1.0
  */
 
-import { LocalSignalHub, Signal } from "@amends-dev/core/signal"
 import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as PgClient from "@effect/sql-pg/PgClient"
 import * as Deferred from "effect/Deferred"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
 import * as Queue from "effect/Queue"
 import * as RcRef from "effect/RcRef"
 import * as Schema from "effect/Schema"
 import type * as Scope from "effect/Scope"
-import type * as Stream from "effect/Stream"
 
 /**
  * The channel every notice uses.
@@ -34,18 +29,16 @@ import type * as Stream from "effect/Stream"
 export const channel = "amends_notices"
 
 /**
- * A notice on the channel, as a JSON array: an append to a log in a workspace, a signal in one,
- * encoded, or a commit that stored job requests.
+ * A notice on the channel, as a JSON array: an append to a log in a workspace, or a commit that
+ * stored job requests. A notice is its own key: it wakes whoever waits on the same text.
  */
 const Notice = Schema.fromJsonString(
   Schema.Union([
     Schema.Tuple([Schema.Literal("append"), Schema.String, Schema.String]),
-    Schema.Tuple([Schema.Literal("signal"), Schema.String, Schema.Json]),
     Schema.Tuple([Schema.Literal("job-requests")])
   ])
 )
 const encodeNotice = Schema.encodeSync(Notice)
-const decodeNotice = Schema.decodeUnknownOption(Notice)
 
 /**
  * The notice an append sends for each log it appended to, by its id.
@@ -65,13 +58,8 @@ export const appendNotice = (workspaceId: WorkspaceId.WorkspaceId, logId: string
  */
 export const jobRequestsNotice = encodeNotice(["job-requests"])
 
-const signalCodec = Schema.toCodecJson(Signal.Signal)
-const encodeSignal = Schema.encodeEffect(signalCodec)
-const decodeSignal = Schema.decodeUnknownEffect(signalCodec)
-
 /**
- * One pool's notices: waiting for appends and job requests, telling other pools of appends, and
- * relaying signals.
+ * One pool's notices: waiting for appends and job requests, and telling other pools of appends.
  *
  * @category models
  * @since 0.1.0
@@ -102,15 +90,6 @@ export interface PostgresNotices {
    * a notice lost leaves them to their poll.
    */
   readonly notifyAppend: (workspaceId: WorkspaceId.WorkspaceId, logId: string) => Effect.Effect<void>
-  /** Publish a signal to its workspace's subscribers in every pool, best effort. */
-  readonly publishSignal: (signal: Signal.Signal) => Effect.Effect<void>
-  /**
-   * A workspace's signals from every pool, from now until the scope closes; a subscriber that
-   * falls behind misses the oldest. Keeps the pool listening.
-   */
-  readonly subscribeSignals: (
-    workspaceId: WorkspaceId.WorkspaceId
-  ) => Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>
 }
 
 /**
@@ -135,7 +114,6 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const client = yield* PgClient.PgClient
   const retry = Duration.fromInputUnsafe(options.retry ?? "1 second")
   const waiting = new Map<string, Deferred.Deferred<void>>()
-  const signals = yield* LocalSignalHub.make
   const wake = (key: string) => {
     const appended = waiting.get(key)
     if (appended === undefined) return
@@ -145,21 +123,6 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const wakeAll = () => {
     for (const key of waiting.keys()) wake(key)
   }
-  const route = (payload: string) => {
-    // A notice this version does not know, or cannot read, wakes nobody.
-    const notice = decodeNotice(payload)
-    if (Option.isNone(notice)) return Effect.void
-    const [kind, , signal] = notice.value
-    if (kind !== "signal") {
-      wake(payload)
-      return Effect.void
-    }
-    // A signal this version cannot read is skipped.
-    return decodeSignal(signal).pipe(
-      Effect.option,
-      Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: signals.publish }))
-    )
-  }
 
   const listen = (ready: Deferred.Deferred<void>) =>
     Effect.gen(function* () {
@@ -167,7 +130,8 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
       // Appends made while not listening sent notices nobody received.
       wakeAll()
       yield* Deferred.succeed(ready, undefined)
-      while (true) yield* route((yield* Queue.take(notices)).payload)
+      // A notice nobody waits on, such as one this version does not know, wakes nobody.
+      while (true) wake((yield* Queue.take(notices)).payload)
     }).pipe(
       Effect.scoped,
       Effect.exit,
@@ -203,26 +167,15 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const nextAppend = (workspaceId: WorkspaceId.WorkspaceId, logId: string) => next(appendNotice(workspaceId, logId))
   const nextJobRequests = () => next(jobRequestsNotice)
 
-  const publishSignal = (signal: Signal.Signal) =>
-    encodeSignal(signal).pipe(
-      Effect.flatMap((encoded) => client.notify(channel, encodeNotice(["signal", signal.workspaceId, encoded]))),
-      Effect.catchCause((cause) => Effect.logWarning("Signal not published", cause))
-    )
-
   const notifyAppend = (workspaceId: WorkspaceId.WorkspaceId, logId: string) =>
     client
       .notify(channel, appendNotice(workspaceId, logId))
       .pipe(Effect.catchCause((cause) => Effect.logWarning("Append notice not sent", cause)))
 
-  const subscribeSignals = (workspaceId: WorkspaceId.WorkspaceId) =>
-    Effect.andThen(listening, signals.subscribe(workspaceId))
-
   return {
     listening,
     nextAppend,
     nextJobRequests,
-    notifyAppend,
-    publishSignal,
-    subscribeSignals
+    notifyAppend
   } satisfies PostgresNotices
 })

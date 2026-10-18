@@ -1,31 +1,21 @@
 /**
  * The turn runner runs one agent's turns in one thread, for its turn job, one at a time: it takes
  * the work that waits into a turn and starts it through the workspace, runs it on the agent's
- * harness while it writes the participation's session log and shows readers what each step is
- * writing, and ends it through the workspace. A turn asked to stop is stopped where it runs.
+ * harness while it writes the participation's session log, and ends it through the workspace. A turn asked to stop is stopped where it runs.
  *
  * What a run does with each part the agent streams is one decision, `advance`: from the run's
- * `Progress` so far and the part, the progress after it, the entries to append to the log, and the
- * drafts to show. The run's loop performs it, part by part, and keeps the latest progress for the
+ * `Progress` so far and the part, the progress after it and the entries to append to the log. The
+ * run's loop performs it, part by part, and keeps the latest progress for the
  * turn's end to read. `TurnJob`'s worker makes a runner for each job with `make`.
  *
  * @since 0.1.0
  */
 
 import type { Core } from "@amends-dev/core"
-import {
-  SessionLog,
-  type SessionStateStore,
-  type Turn,
-  type TurnJobs,
-  TurnExecution,
-  type TurnId
-} from "@amends-dev/core/turn"
+import { SessionLog, type SessionStateStore, type TurnJobs, TurnExecution, type TurnId } from "@amends-dev/core/turn"
 import { Gateway } from "@amends-dev/gateway"
 import { Agent, type Session, StreamPart } from "@amends-dev/harness"
 import * as Array from "effect/Array"
-import * as Cause from "effect/Cause"
-import * as Clock from "effect/Clock"
 import * as Data from "effect/Data"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -37,9 +27,6 @@ import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
 import * as SessionLogWriter from "./internal/sessionLogWriter.ts"
 import * as TurnAgent from "./internal/turnAgent.ts"
-
-/** The least time between two drafts of a step's text, in milliseconds. */
-const draftInterval = 100
 
 /**
  * How a run of a turn came out, which decides how the turn ends: closed with its answer, failed, or
@@ -77,24 +64,6 @@ export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
   readonly turnId: TurnId.TurnId | undefined
   readonly cause: unknown
 }> {}
-
-/**
- * The drafts of the response `responseId`: the text each text part of `step` has past what
- * `shown` holds, by the part's position. `advance` shows them as the step grows.
- *
- * @category constructors
- * @since 0.1.0
- */
-export const newDrafts = (
-  responseId: string,
-  step: StreamPart.Step,
-  shown: ReadonlyMap<number, number>
-): ReadonlyArray<Turn.Draft> =>
-  step.parts.flatMap((part, index) => {
-    if (part.type !== "text") return []
-    const offset = shown.get(index) ?? 0
-    return part.text.length > offset ? [{ responseId, part: index, offset, text: part.text.slice(offset) }] : []
-  })
 
 /** An error an agent reported, as the reason its turn failed. */
 const describeError = (error: unknown): string => {
@@ -137,10 +106,6 @@ export interface Progress {
   readonly stepParts: ReadonlyArray<StreamPart.StreamPart>
   /** How many steps finished. */
   readonly steps: number
-  /** How much of each text part of the step being written readers were shown, by its position. */
-  readonly shown: ReadonlyMap<number, number>
-  /** When readers were last shown drafts, in milliseconds. */
-  readonly shownAt: number
   /** The failure the agent reported, if it did. */
   readonly reported: unknown
 }
@@ -155,14 +120,12 @@ export const initialProgress: Progress = {
   started: false,
   stepParts: [],
   steps: 0,
-  shown: new Map(),
-  shownAt: Number.NEGATIVE_INFINITY,
   reported: undefined
 }
 
 /**
- * What a run does with a part the agent streamed: its progress after it, what it appends to the
- * log, and what it shows readers.
+ * What a run does with a part the agent streamed: its progress after it, and what it appends to the
+ * log.
  *
  * @category models
  * @since 0.1.0
@@ -170,25 +133,22 @@ export const initialProgress: Progress = {
 export interface Advance {
   readonly progress: Progress
   readonly entries: ReadonlyArray<SessionLog.Entry>
-  readonly drafts: ReadonlyArray<Turn.Draft>
 }
 
 /** The id of the step at `index` of a run whose opening sits at `openedAt` in the log. */
 const stepId = (openedAt: number, index: number) => `${openedAt}.${index}`
 
 /**
- * What `run` does with `part`, streamed at `now`, given its `progress`. A run that starts the turn
+ * What `run` does with `part`, given its `progress`. A run that starts the turn
  * from its prompt notes that with its first part, and an agent whose turn runs apart from the run
  * announces one it starts from the prompt (`turn-start`), with what continues it; a run that
- * continues the turn notes no start of its own. A step that finishes is appended to the log, added
- * up, with the id its drafts carried, and the step after starts from nothing shown. Any other part
- * joins the step being written, whose text is shown as drafts when it ends, and at most every
- * `draftInterval` milliseconds as it grows; an error the agent reports fails the turn.
+ * continues the turn notes no start of its own. A step that finishes is appended to the log and
+ * added up. Any other part joins the step being written; an error the agent reports fails the turn.
  *
  * @category folding
  * @since 0.1.0
  */
-export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPart, now: number): Advance => {
+export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPart): Advance => {
   const notesStart = part.type === "turn-start" || (!run.continues && !progress.started)
   const noted: Progress = { ...progress, started: progress.started || notesStart }
   const entries: Array<SessionLog.Entry> = notesStart
@@ -203,30 +163,18 @@ export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPar
   switch (part.type) {
     case "turn-start":
     case "finish":
-      return { progress: noted, entries, drafts: [] }
+      return { progress: noted, entries }
     case "finish-step": {
       const [step] = StreamPart.stepsOf([...progress.stepParts, part])
       if (step !== undefined)
         entries.push(
           SessionLog.Entry.cases.Step.make({ turnId: run.turnId, id: stepId(run.openedAt, progress.steps), step })
         )
-      return {
-        progress: { ...noted, stepParts: [], steps: progress.steps + 1, shown: new Map() },
-        entries,
-        drafts: []
-      }
+      return { progress: { ...noted, stepParts: [], steps: progress.steps + 1 }, entries }
     }
     default: {
-      const stepParts = [...progress.stepParts, part]
       const reported = part.type === "error" ? part.error : progress.reported
-      const showsDrafts =
-        part.type === "text-end" || (part.type === "text-delta" && now - progress.shownAt >= draftInterval)
-      if (!showsDrafts) return { progress: { ...noted, stepParts, reported }, entries, drafts: [] }
-      const [step] = StreamPart.stepsOf(stepParts)
-      const drafts = step === undefined ? [] : newDrafts(stepId(run.openedAt, progress.steps), step, progress.shown)
-      const shown = new Map(progress.shown)
-      for (const draft of drafts) shown.set(draft.part, draft.offset + draft.text.length)
-      return { progress: { ...noted, stepParts, reported, shown, shownAt: now }, entries, drafts }
+      return { progress: { ...noted, stepParts: [...progress.stepParts, part], reported }, entries }
     }
   }
 }
@@ -255,27 +203,9 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
     Effect.scoped(gateway.inWorkspace(job.workspaceId, program))
 
   /**
-   * Show readers `drafts` of the turn's step, best effort: the step's entry in the log shows what
-   * a missed one held.
-   */
-  const showDrafts = (turnId: TurnId.TurnId, drafts: ReadonlyArray<Turn.Draft>) =>
-    Effect.forEach(
-      drafts,
-      (draft) =>
-        inWorkspace(TurnExecution.TurnExecution.use((turnExecution) => turnExecution.showDraft(turnId, draft))),
-      { discard: true }
-    ).pipe(
-      Effect.catchCauseIf(
-        (cause) => !Cause.hasInterruptsOnly(cause),
-        (cause) => Effect.logWarning("Drafts of a turn's step were not shown", cause)
-      )
-    )
-
-  /**
    * Run the turn on the agent's harness until it ends or is stopped: start its session, kept in
    * `startedSession` for the run's end to release, then advance `progress` with each part the
-   * agent streams, appending each step it finishes to the log and showing drafts of the step it is
-   * writing. A turn the agent kept from a run that stopped short continues after the steps the log
+   * agent streams, appending each step it finishes to the log. A turn the agent kept from a run that stopped short continues after the steps the log
    * has; any other starts from its prompt.
    */
   const runAgent = Effect.fnUntraced(function* (
@@ -305,11 +235,8 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
     // Recording a part is never cut short: a run stopped meanwhile stops between parts, so that
     // the progress kept matches the log.
     const recordPart = Effect.fnUntraced(function* (part: StreamPart.StreamPart) {
-      const now = yield* Clock.currentTimeMillis
-      const before = yield* Ref.get(progress)
-      const { progress: after, entries, drafts } = advance(run, before, part, now)
+      const { progress: after, entries } = advance(run, yield* Ref.get(progress), part)
       if (Array.isReadonlyArrayNonEmpty(entries)) yield* inWorkspace(writer.append(entries))
-      yield* showDrafts(turnId, drafts)
       yield* Ref.set(progress, after)
     }, Effect.uninterruptible)
     yield* Stream.runForEach(turn, recordPart)

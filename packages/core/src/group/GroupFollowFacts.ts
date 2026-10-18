@@ -9,7 +9,6 @@
 import * as Schema from "effect/Schema"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
-import * as Member from "../workspace/Member.ts"
 import * as GroupFollow from "./GroupFollow.ts"
 
 /**
@@ -20,7 +19,6 @@ import * as GroupFollow from "./GroupFollow.ts"
  * @since 0.1.0
  */
 export const Started = Fact.make("group.follow.started", {
-  audience: (payload) => [Member.audienceOf(payload.memberId)],
   version: 1,
   subject: (payload) => Subject.make("group-follow", payload.id),
   occurrence: (payload) => [payload.id],
@@ -38,7 +36,6 @@ export const Started = Fact.make("group.follow.started", {
  * @since 0.1.0
  */
 export const Ended = Fact.make("group.follow.ended", {
-  audience: (payload) => [Member.audienceOf(payload.memberId)],
   version: 1,
   subject: (payload) => Subject.make("group-follow", payload.followId),
   occurrence: (payload) => [payload.followId],

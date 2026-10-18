@@ -1,8 +1,7 @@
 /**
  * The operations on read state an actor calls: a person marking a thread read through a timeline
- * position, or a group read now. Each authorizes the actor itself, writes private state outside the
- * journal through `ReadStateStore`, and publishes a `ThreadRead` or `GroupRead` signal to the
- * person's other sessions. Agents keep no read state.
+ * position, or a group read now. Each authorizes the actor itself and writes private state outside
+ * the journal through `ReadStateStore`. Agents keep no read state.
  *
  * @since 0.1.0
  */
@@ -22,14 +21,11 @@ import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Signal from "../signal/Signal.ts"
-import * as SignalHub from "../signal/SignalHub.ts"
 import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ReadState from "./ReadState.ts"
-import * as ReadStateCommand from "./ReadStateCommand.ts"
 import * as ReadStateStore from "./ReadStateStore.ts"
 
 /**
@@ -67,8 +63,8 @@ export class ReadStateService extends Context.Service<
 >()("@amends-dev/core/read-state/ReadStateService") {}
 
 /**
- * Builds the read-state operations over thread and group reads, the shared write, the store, and
- * the signal hub; each operation resolves the actor's authority itself.
+ * Builds the read-state operations over thread and group reads and the store; each operation
+ * resolves the actor's authority itself.
  *
  * @category constructors
  * @since 0.1.0
@@ -79,8 +75,6 @@ export const make = Effect.gen(function* () {
   const groupQuery = yield* GroupQuery.GroupQuery
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore
   const readStateStore = yield* ReadStateStore.ReadStateStore
-  const readStateCommand = yield* ReadStateCommand.ReadStateCommand
-  const signalHub = yield* SignalHub.SignalHub
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   /** The acting person's membership; agents keep no read state. */
@@ -114,9 +108,8 @@ export const make = Effect.gen(function* () {
       readThrough: request.throughSequence
     }
     // Reading settles the inbox up to the position in the same write. Both are private state,
-    // written outside the workspace's write order; the reader's other sessions hear of it as a
-    // signal.
-    yield* readStateCommand.markThreadRead(position, yield* DateTime.now)
+    // written outside the workspace's write order.
+    yield* readStateStore.markThreadRead(position, yield* DateTime.now)
   }, Operation.report)
 
   const markGroupRead = Effect.fn("ReadStateService.markGroupRead")(function* (input: ReadState.MarkGroupReadInput) {
@@ -129,21 +122,12 @@ export const make = Effect.gen(function* () {
         Target.Reference.cases.Group.make({ workspaceId, groupId: request.groupId })
       )
     ])
-    const readAt = yield* DateTime.now
     yield* readStateStore.advanceGroup({
       workspaceId,
       memberId,
       groupId: request.groupId,
-      readAt
+      readAt: yield* DateTime.now
     })
-    yield* signalHub.publish(
-      Signal.Signal.cases.GroupRead.make({
-        workspaceId,
-        memberId,
-        groupId: request.groupId,
-        readAt
-      })
-    )
   }, Operation.report)
 
   return ReadStateService.of({ markThreadRead, markGroupRead })

@@ -45,47 +45,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
   )
 
   it.live(
-    "the smallest pool serves writes and reads while change streams are open",
-    () =>
-      temporary(async (url) =>
-        withServer(
-          url,
-          async (call, base) => {
-            const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
-              (await call(alice.id, "POST", "/workspaces", { name: "Pool", memberName: "alice" })).body
-            )
-            // Streams hold the change feed's listener; the claim and shard locks hold two more.
-            const streams = Array.from({ length: 2 }, () => new AbortController())
-            for (const stream of streams) {
-              const response = await fetch(`${base}/changes`, {
-                headers: { authorization: `Bearer ${alice.id}`, "amends-workspace": workspace.id },
-                signal: stream.signal
-              })
-              expect(response.status).toBe(200)
-              void response.body
-                ?.getReader()
-                .read()
-                .catch(() => {})
-            }
-            const results = await Promise.all([
-              ...Array.from({ length: 10 }, (_, index) =>
-                call(alice.id, "POST", "/groups", { name: `pool-${index}`, memberIds: [] }, workspace.id)
-              ),
-              ...Array.from({ length: 20 }, () => call(alice.id, "GET", "/groups?limit=10", undefined, workspace.id))
-            ])
-            for (const stream of streams) stream.abort()
-            expect(results.map((result) => result.status).toSorted((a, b) => a - b)).toEqual([
-              ...Array.from({ length: 20 }, () => 200),
-              ...Array.from({ length: 10 }, () => 201)
-            ])
-          },
-          { env: { AMENDS_DATABASE_POOL_SIZE: "5" } }
-        )
-      ),
-    20_000
-  )
-
-  it.live(
     "ownership endpoints transfer to an active human, update directory state, and reject the previous owner's authority",
     () =>
       temporary(async (url) =>
@@ -414,37 +373,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           readonly memberships: ReadonlyArray<unknown>
         }
         expect(me.memberships).toHaveLength(1)
-      })
-    )
-  )
-
-  it.live("stopping the host ends open change streams at once, telling them to reconnect", () =>
-    temporary(async (url) =>
-      withServer(url, async (call, base, stop) => {
-        const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
-          (await call(alice.id, "POST", "/workspaces", { name: "Streams", memberName: "alice" })).body
-        )
-        const response = await fetch(`${base}/changes`, {
-          headers: { authorization: `Bearer ${alice.id}`, "amends-workspace": workspace.id }
-        })
-        const reader = response.body?.getReader()
-        if (reader === undefined) throw new Error("Expected a stream")
-        const decoder = new TextDecoder()
-        let received = ""
-        while (!received.includes("Ready")) {
-          const chunk = await reader.read()
-          if (chunk.done) throw new Error("The stream ended before it was ready")
-          received += decoder.decode(chunk.value, { stream: true })
-        }
-        const elapsed = await stop()
-        // The server's graceful stop would otherwise wait twenty seconds for the open stream.
-        expect(elapsed).toBeLessThan(5_000)
-        while (true) {
-          const chunk = await reader.read().catch(() => ({ done: true, value: undefined }))
-          if (chunk.done) break
-          received += decoder.decode(chunk.value, { stream: true })
-        }
-        expect(received).toContain("CoreError.Unavailable")
       })
     )
   )

@@ -24,8 +24,7 @@ Each domain has a module with its `Actions` and `Changes`: `WorkspaceSync`, `Gro
 What a browser shows beyond the records, such as a thread's preview, its unread count, or whether
 the member may rename it, it derives from the records and the member's own grants. Some writes
 stay requests to the [HTTP API](../http/README.md): signing in, creating a workspace, accepting an
-invitation, and anything that carries a secret, such as a connection's API key. Signals, such as
-typing, are never stored.
+invitation, and anything that carries a secret, such as a connection's API key.
 
 ## Encoding
 

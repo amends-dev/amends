@@ -175,7 +175,7 @@ export const listOldestFirst = (
 ) => Effect.map(notificationStore.listLatestByRecipient(recipient, options), (latest) => latest.toReversed())
 
 /**
- * A workspace's stores and signal hub, with the host's cryptography, no integrations, and jobs
+ * A workspace's stores, with the host's cryptography, no integrations, and jobs
  * that accept requests and run nothing: the suites run turns themselves when they need to.
  */
 const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>, crypto: Crypto.Crypto) =>
@@ -191,7 +191,7 @@ const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>, c
   )
 
 /**
- * One workspace's bound stores and signal hub on a host, with the host's cryptography, no
+ * One workspace's bound stores on a host, with the host's cryptography, no
  * integrations, and jobs that accept requests and run nothing.
  *
  * @category testing
@@ -203,7 +203,7 @@ export const forWorkspace = (host: Context.Context<Fixture.Host>, id: WorkspaceI
   )
 
 /**
- * One workspace's stores and signals on the host in context, as a gateway's caller has it.
+ * One workspace's stores on the host in context, as a gateway's caller has it.
  *
  * @category testing
  * @since 0.1.0

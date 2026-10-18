@@ -183,13 +183,6 @@ export const messageEdit = [NotFound, Denied, Conflict, Changed] as const
  */
 export const messageDelete = [NotFound, Denied] as const
 /**
- * Saying one is typing: a thread missing or outside the caller's groups is 404.
- *
- * @category errors
- * @since 0.1.0
- */
-export const typing = [NotFound] as const
-/**
  * Following a thread: a missing thread, or a participation missing or not the caller's, is 404; a
  * participation ended already is 409; and a direct conversation, where everyone takes part, 422.
  *

@@ -199,7 +199,7 @@ export interface Notification extends Schema.Schema.Type<typeof Notification> {}
 /**
  * The notification that recorded thread activity generates for one selected recipient: pending,
  * or informational for an agent the activity asks no work of. Everything comes from the
- * activity's journal entry, so replay and the change feed reproduce the record exactly: its ID is
+ * activity's journal entry, so replay reproduces the record exactly: its ID is
  * the entry and the recipient's participation.
  *
  * @category constructors

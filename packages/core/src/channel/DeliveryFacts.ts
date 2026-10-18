@@ -1,6 +1,6 @@
 /**
- * The facts recorded about deliveries. Each carries its thread's group, whose members may learn of
- * it, because an audience is derived from the payload alone. Creating a delivery settles the
+ * The facts recorded about deliveries. Each carries its thread's group, whose members may read it.
+ * Creating a delivery settles the
  * contact notifications it carries, as creating a turn settles an agent's: the notification
  * projection accepts them into it in the same commit.
  *
@@ -8,14 +8,10 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Group from "../group/Group.ts"
-import type * as GroupId from "../group/GroupId.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Delivery from "./Delivery.ts"
-
-const audience = (payload: { readonly groupId: GroupId.GroupId }) => [Group.audienceOf(payload.groupId)]
 
 /**
  * The delivery job accepted contact notifications of one message into a new delivery, as its
@@ -28,7 +24,6 @@ export const Created = Fact.make("channel.delivery.created", {
   version: 1,
   subject: (payload) => Subject.make("channel-delivery", payload.id),
   occurrence: (payload) => [payload.id],
-  audience,
   payload: Schema.Struct({
     ...Delivery.Delivery.fields,
     notificationIds: Schema.NonEmptyArray(Notification.NotificationId)
@@ -45,7 +40,6 @@ export const Sent = Fact.make("channel.delivery.sent", {
   version: 1,
   subject: (payload) => Subject.make("channel-delivery", payload.deliveryId),
   occurrence: (payload) => [payload.deliveryId],
-  audience,
   payload: Delivery.Sent
 })
 
@@ -59,6 +53,5 @@ export const Failed = Fact.make("channel.delivery.failed", {
   version: 1,
   subject: (payload) => Subject.make("channel-delivery", payload.deliveryId),
   occurrence: (payload) => [payload.deliveryId],
-  audience,
   payload: Delivery.Failed
 })

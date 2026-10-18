@@ -15,7 +15,7 @@ entries, codecs, and errors, is the published package
 adapter runs. The journal builds facts, projections, checkpoints, and reactions over it in core.
 
 - **Fact** defines a domain statement's name, version, payload schema, required
-  subject rule, optional occurrence identity, and optional audience.
+  subject rule, and optional occurrence identity.
 - **Log** (the log package) provides typed appends, lookup, paged reads, entry reads by
   name or subject, finite streams, and live tails for a log ID.
   Opening a handle performs no storage operation; the first append creates the
@@ -115,30 +115,6 @@ Filtered entry pages do not replace complete-batch replay or its checkpoints.
 A fact subject also does not establish thread activity, participant access, or a
 thread-specific sequence; those remain responsibilities of the thread domain.
 
-## Fact audiences
-
-A fact may declare a pure `audience(payload)` function: the delivery scopes whose readers may
-learn of the fact beyond the projections that apply it. `Audience.workspace` reaches every
-member; `Audience.make(kind, id)` builds a `kind:id` scope with the same rules as subjects.
-Owning domains name their kinds once, through `Group.audienceOf`, `Member.audienceOf`, and
-`Identity.audienceOf`, so facts and the consumers that grant scopes use the same keys.
-`Fact.makeAudience(fact, payload)` validates the payload and returns the scopes, which must be
-distinct. A fact that declares no audience is internal: nothing outside its projections
-learns of it. One that declares an audience must be registered with the
-[change feed](../packages/core/README.md#change-feed), which a core test checks.
-
-Audiences are derived when a consumer decodes an event, not stored with the entry, so
-correcting a rule also corrects delivery of earlier history. The declaration must therefore
-depend only on the payload. Thread message, activity, and participation facts carry their
-thread's `groupId` for this reason, since a thread belongs to exactly one group.
-
-| Facts                                                                  | Audience                          |
-| ---------------------------------------------------------------------- | --------------------------------- |
-| Workspace, member, invitation, role, assignment, and ownership facts   | The workspace                     |
-| Group creation; thread creation, messages, activity, and participation | The group                         |
-| Group admission and removal                                            | The group and the admitted member |
-| Group follow started and ended                                         | The following member              |
-
 ## Idempotent publication and append
 
 Declare a fact's natural occurrence identity beside its payload schema. The journal
@@ -221,8 +197,8 @@ domain payload. Attempt provenance is not part of the comparison: a retry can
 have a fresh correlation, performer, cause, or occurrence time, but it returns
 the first event's recorded provenance. The invocation still needs valid provenance
 for the bound workspace. Reuse runs no projections, advances no checkpoints
-or log positions, and appends no new batch. The change feed reads the journal, so a first
-commit whose acknowledgment was lost still reaches subscribers once.
+or log positions, and appends no new batch. Readers that tail the journal therefore see a first
+commit whose acknowledgment was lost once.
 
 `log.getAppend(key)` and `journal.log.getAppend(key)` return `None` or the original
 append's decoded entries. For facts with an occurrence rule,
@@ -269,7 +245,7 @@ creation derives its workspace's ID; a turn retry derives its turn's ID from the
 Inside the commit, the operation finds those records by ID before generating anything and returns
 them; each creation fact declares the ID as its occurrence, so no second record can take it. No
 separate receipt is recorded. Logs written before this change still hold internal
-`request.completed` facts; no projection or change feed reads them.
+`request.completed` facts; nothing reads them.
 
 ## Event provenance
 
@@ -277,7 +253,7 @@ Every new `journal.publish(fact, payload)` requires `Publication.Publication` in
 Effect context. This service holds the operation's `Event.Provenance`. The journal
 reads it at publication time, validates and snapshots it, then persists it as
 structured event metadata and exposes it on decoded
-events, projections, and change-feed events. `Fact` continues
+events and projections. `Fact` continues
 to define only the domain statement. Generic `Log` entries retain their existing
 metadata and do not acquire domain attribution.
 
@@ -357,8 +333,7 @@ and indexes, not occurrence times. Correlation IDs group work; they are not
 idempotency keys and do not make retries safe. Domain explanations such as a rejection
 reason remain in the fact payload.
 
-All fact events require provenance, including stored entries, replayed events,
-and change-feed messages. `event.provenance.causedBy === null` identifies a root
+All fact events require provenance, including stored entries and replayed events. `event.provenance.causedBy === null` identifies a root
 action; provenance itself cannot be missing or null.
 
 ## Commits and positions

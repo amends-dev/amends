@@ -19,7 +19,6 @@ import * as Publication from "../../src/journal/Publication.ts"
 import * as Notification from "../../src/notification/Notification.ts"
 import * as NotificationService from "../../src/notification/NotificationService.ts"
 import * as NotificationStore from "../../src/notification/NotificationStore.ts"
-import type * as SignalHub from "../../src/signal/SignalHub.ts"
 import * as ThreadQuery from "../../src/thread/ThreadQuery.ts"
 import * as Member from "../../src/workspace/Member.ts"
 import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
@@ -27,7 +26,6 @@ import * as MemberProjection from "../../src/workspace/MemberProjection.ts"
 import * as MemberStore from "../../src/workspace/MemberStore.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
-import * as TestSignalHub from "../signal-hub.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
 const otherWorkspaceId = WorkspaceId.WorkspaceId.make("other-workspace")
@@ -119,8 +117,6 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
       Layer.succeed(ThreadQuery.ThreadQuery, {
         requireAccess: unexpected,
         requireReadable: unexpected,
-        timelineItemsAbout: unexpected,
-        listedOf: unexpected,
         previewsOf: unexpected,
         eligibleMembers: unexpected,
         followers: unexpected,
@@ -132,7 +128,6 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
         readTimelineItem: unexpected
       })
     ),
-    Layer.provide(TestSignalHub.layer),
     Layer.provide(
       Layer.succeed(Crypto.Crypto, Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }))
     )
@@ -155,12 +150,7 @@ const inboxOf = (...records: ReadonlyArray<Notification.Notification>) =>
 it.effect("inbox reads require the current actor, need no role grant, and leave the journal unchanged", () =>
   Effect.gen(function* () {
     expectTypeOf<Layer.Services<typeof NotificationService.layer>>().toEqualTypeOf<
-      | NotificationStore.NotificationStore
-      | Authorization.Authorization
-      | Journal.Journal
-      | ThreadQuery.ThreadQuery
-      | SignalHub.SignalHub
-      | WorkspaceId.CurrentWorkspaceId
+      NotificationStore.NotificationStore | Authorization.Authorization | Journal.Journal | ThreadQuery.ThreadQuery
     >()
     expectTypeOf<
       Effect.Services<ReturnType<NotificationService.NotificationService["Service"]["inbox"]>>

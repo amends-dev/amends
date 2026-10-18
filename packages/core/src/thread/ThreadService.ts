@@ -31,7 +31,7 @@ import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as ReadStateCommand from "../read-state/ReadStateCommand.ts"
+import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as Request from "../request/Request.ts"
 import * as Task from "../task/Task.ts"
 import * as TaskCommand from "../task/TaskCommand.ts"
@@ -182,7 +182,7 @@ export const make = Effect.gen(function* () {
   const groupCommand = yield* GroupCommand.GroupCommand
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadStore = yield* ThreadStore.ThreadStore
-  const readStateCommand = yield* ReadStateCommand.ReadStateCommand
+  const readStateStore = yield* ReadStateStore.ReadStateStore
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
   const taskCommand = yield* TaskCommand.TaskCommand
   const taskStore = yield* TaskStore.TaskStore
@@ -294,7 +294,7 @@ export const make = Effect.gen(function* () {
       occurredAt
     })
     // Posting reads the thread through the author's own message.
-    yield* readStateCommand.markThreadRead(
+    yield* readStateStore.markThreadRead(
       {
         workspaceId,
         memberId: authorId,

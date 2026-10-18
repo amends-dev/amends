@@ -64,7 +64,7 @@ export const bind = (
   readStates: Context.get(context, ReadStateStore.ReadStateStore)
 })
 export type Bound = ReturnType<typeof bind>
-/** Workspace views over the database in context, each with its signals. */
+/** Workspace views over the database in context. */
 export const views = (options: PostgresWorkspaceStorage.Options = {}) =>
   Effect.gen(function* () {
     const service = yield* PostgresWorkspaceStorage.make(options)

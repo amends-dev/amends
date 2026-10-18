@@ -1,8 +1,8 @@
 /**
  * Implements `ThreadsGroup`. Each handler runs in the workspace `WorkspaceMember` entered as the
  * principal's membership, and calls one core operation: `ThreadService` for listing, starting,
- * reading, and renaming threads, `ThreadMessageService` for replying, editing, deleting, and
- * typing, `ThreadParticipationService` for following, and `ReadStateService.markThreadRead`. It
+ * reading, and renaming threads, `ThreadMessageService` for replying, editing, and deleting,
+ * `ThreadParticipationService` for following, and `ReadStateService.markThreadRead`. It
  * merges the path's IDs, the body, and the `Idempotency-Key` header into the operation's input.
  *
  * @since 0.1.0
@@ -71,10 +71,6 @@ export const layer = HttpApiBuilder.group(Api.Api, "threads", (handlers) =>
           threadId: params.threadId,
           participationId: payload.participationId
         })
-      ),
-    typing: ({ params }) =>
-      ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
-        threadMessageService.typing(params.threadId)
       ),
     markRead: ({ params, payload }) =>
       ReadStateService.ReadStateService.use((readStateService) =>

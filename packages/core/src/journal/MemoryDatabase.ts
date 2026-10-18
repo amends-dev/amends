@@ -17,7 +17,6 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
-import * as LocalSignalHub from "../signal/LocalSignalHub.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
@@ -115,8 +114,6 @@ export class MemoryDatabase extends Context.Service<
     readonly locks: Map<string, Semaphore.Semaphore>
     /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
     appended: Deferred.Deferred<void>
-    /** Every workspace's signals, across every host; signals themselves are never kept. */
-    readonly signals: LocalSignalHub.LocalSignalHub
     /** Issue an identifier unique within this storage, for commits and entries. */
     readonly nextId: (prefix: string) => string
   }
@@ -303,7 +300,6 @@ export const make = Effect.gen(function* () {
     tables: new Map(),
     locks: new Map(),
     appended: yield* Deferred.make<void>(),
-    signals: yield* LocalSignalHub.make,
     nextId: (prefix) => `${prefix}-${++issued}`
   })
 })

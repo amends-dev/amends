@@ -9,7 +9,6 @@
 
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
-import * as Audience from "../journal/Audience.ts"
 import * as Text from "../text/Text.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -388,12 +387,3 @@ export const Summary = Schema.Struct({
  * @since 0.1.0
  */
 export interface Summary extends Schema.Schema.Type<typeof Summary> {}
-
-/**
- * The readers of one group: its current members. The audience the facts about a group and its
- * threads are published to.
- *
- * @category getters
- * @since 0.1.0
- */
-export const audienceOf = (groupId: GroupId.GroupId): Audience.Scope => Audience.make("group", groupId)

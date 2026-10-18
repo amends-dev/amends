@@ -221,8 +221,8 @@ export const EditInput = Schema.Struct({
 export interface EditInput extends Schema.Schema.Type<typeof EditInput> {}
 
 /**
- * What editing a message records: its next revision, the new text and mentions, and when. The
- * group is the fact's audience.
+ * What editing a message records: its next revision, the new text and mentions, and when, with
+ * the thread's group.
  *
  * @category schemas
  * @since 0.1.0
@@ -245,7 +245,7 @@ export const Edited = Schema.Struct({
 export interface Edited extends Schema.Schema.Type<typeof Edited> {}
 
 /**
- * What deleting a message records: which, and when. The group is the fact's audience.
+ * What deleting a message records: which, and when, with the thread's group.
  *
  * @category schemas
  * @since 0.1.0

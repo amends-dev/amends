@@ -69,8 +69,7 @@ export interface Interface {
 
 /**
  * Lazily prepare each workspace in the host scope. Concurrent callers await the same preparation,
- * and a successful runtime keeps its services, including its change-feed follower, while leases
- * are open and for the idle time-to-live after the last one closes; then it is released, and the
+ * and a successful runtime keeps its services while leases are open and for the idle time-to-live after the last one closes; then it is released, and the
  * next request prepares it again. Request identity and transaction context must never enter
  * service construction.
  */

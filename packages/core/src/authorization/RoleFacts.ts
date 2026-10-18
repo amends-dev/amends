@@ -8,7 +8,6 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -22,7 +21,6 @@ import * as Role from "./Role.ts"
  * @since 0.1.0
  */
 export const Created = Fact.make("workspace.role.created", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("role", payload.roleId),
   version: 1,
   payload: Schema.Struct({
@@ -41,7 +39,6 @@ export const Created = Fact.make("workspace.role.created", {
  * @since 0.1.0
  */
 export const Renamed = Fact.make("workspace.role.renamed", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("role", payload.roleId),
   version: 1,
   payload: Schema.Struct({
@@ -58,7 +55,6 @@ export const Renamed = Fact.make("workspace.role.renamed", {
  * @since 0.1.0
  */
 export const PermissionsChanged = Fact.make("workspace.role.permissions-changed", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("role", payload.roleId),
   version: 1,
   payload: Schema.Struct({
@@ -76,7 +72,6 @@ export const PermissionsChanged = Fact.make("workspace.role.permissions-changed"
  * @since 0.1.0
  */
 export const BuiltinsRevised = Fact.make("workspace.role.builtins-revised", {
-  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("builtin-roles", payload.workspaceId),
   version: 1,
   payload: Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, revision: BuiltinRoles.Revision }),

@@ -1,7 +1,7 @@
 /**
  * The actions on assignments that need a grant: reading a member's, and managing them across the
- * workspace. `AssignmentService` checks them, as do `WorkspaceSettingsService` and the change feed
- * for what they show of access, and `Delegation` requires `Manage` of whoever gives a role.
+ * workspace. `AssignmentService` checks them, as does `WorkspaceSettingsService` for what it shows
+ * of access, and `Delegation` requires `Manage` of whoever gives a role.
  *
  * @since 0.1.0
  */

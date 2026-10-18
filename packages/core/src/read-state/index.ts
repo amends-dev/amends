@@ -17,11 +17,6 @@ export * as ReadState from "./ReadState.ts"
 /**
  * @since 0.1.0
  */
-export * as ReadStateCommand from "./ReadStateCommand.ts"
-
-/**
- * @since 0.1.0
- */
 export * as ReadStateService from "./ReadStateService.ts"
 
 /**

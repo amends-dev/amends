@@ -205,8 +205,7 @@ const conversations = Layer.mergeAll(
       edit: record("thread.edit", (input) =>
         Effect.fail(new CoreError.Changed({ resource: "ThreadMessage", id: input.messageId }))
       ),
-      delete: record("thread.delete", (id) => Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id }))),
-      typing: record("thread.typing", () => Effect.void)
+      delete: record("thread.delete", (id) => Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id })))
     })
   ),
   Layer.succeed(

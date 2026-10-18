@@ -1,6 +1,6 @@
 /**
  * The gateway's `WorkspaceStorage.WorkspaceStorage` over one pool. `forWorkspace` builds a
- * workspace's views on demand: every store core requires and the workspace's signal hub, merged by
+ * workspace's views on demand: every store core requires, merged by
  * `layerWorkspace` over one `Binding.Binding`. The views acquire nothing of their own, so building
  * them is inexpensive, and adding a store adds a line to the private register beside
  * `layerWorkspace`. `make` checks the host's options and imports its credential key once, so
@@ -45,7 +45,6 @@ import * as Threads from "./internal/threads.ts"
 import * as TurnRecords from "./internal/turnRecords.ts"
 import * as Workspaces from "./internal/workspaces.ts"
 import * as PostgresDatabase from "./PostgresDatabase.ts"
-import * as PostgresSignalHub from "./PostgresSignalHub.ts"
 
 /**
  * The binding's limits, and the host's credential key.
@@ -62,7 +61,7 @@ export interface Options extends Binding.Options {
 }
 
 /**
- * Provide every store core requires, and the signal hub, over the same workspace binding.
+ * Provide every store core requires over the same workspace binding.
  * Adding a store adds a line here.
  */
 const layerStores = Layer.mergeAll(
@@ -91,12 +90,11 @@ const layerStores = Layer.mergeAll(
   ConnectionCredentials.layer,
   SessionStates.layer,
   Agents.layer,
-  TurnRecords.layer,
-  PostgresSignalHub.layer
+  TurnRecords.layer
 )
 
 /**
- * Provide the stores bound to one workspace, and its signal hub, over the caller's database, with
+ * Provide the stores bound to one workspace over the caller's database, with
  * the credential key `make` imported, or none.
  *
  * @category layers

@@ -1,7 +1,7 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupMembership, GroupService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { type Checkpoint, Subject } from "@amends-dev/core/journal"
+import type { Checkpoint } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import {
   ThreadActivity,
@@ -518,18 +518,6 @@ export const contracts = (fixture: Fixture.Fixture) => {
               reason: { _tag: "Rejected" }
             })
           yield* write(bound.activities.insert(published("next", message.id, 2)))
-          // Activities about a subject are found across threads, by thread and then sequence.
-          const about = (subjects: ReadonlyArray<Subject.Subject>) =>
-            Effect.map(bound.activities.listBySubjects(subjects), (found) => found.map(({ id }) => id))
-          expect(yield* about([Subject.make("thread-message", message.id)])).toEqual(["next"])
-          expect(
-            yield* about([
-              Subject.make("thread-message", started.message.id),
-              Subject.make("thread-message", message.id)
-            ])
-          ).toEqual([started.activity.id, "next"])
-          expect(yield* about([Subject.make("thread-message", "absent")])).toEqual([])
-          expect(yield* about([])).toEqual([])
           expect((yield* bound.activities.listByThread(started.thread.id)).map(({ sequence }) => sequence)).toEqual([
             1, 2
           ])

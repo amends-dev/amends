@@ -7,13 +7,11 @@
  * @since 0.1.0
  */
 
-import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Agent from "./Agent.ts"
 
 /** Agents are workspace configuration: every member may learn of changes to them. */
-const workspace = () => [Audience.workspace]
 
 /**
  * An agent was created, as its record says, in the commit that adds its membership.
@@ -22,7 +20,6 @@ const workspace = () => [Audience.workspace]
  * @since 0.1.0
  */
 export const Created = Fact.make("agent.created", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("agent", payload.id),
   occurrence: (payload) => [payload.id],
@@ -37,7 +34,6 @@ export const Created = Fact.make("agent.created", {
  * @since 0.1.0
  */
 export const Configured = Fact.make("agent.configured", {
-  audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("agent", payload.agentId),
   payload: Agent.Configured

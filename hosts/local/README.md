@@ -51,8 +51,8 @@ without it, a code works only on the process that sent it.
 
 The pool size is the most connections the host opens. A process that runs jobs holds three: its
 runner-address claim, the cluster's shard locks, and the notice listener, which wakes it to job
-requests and serves the change feed's streams too. One that only serves the API holds just the
-listener, once a stream opens. The minimum of five leaves two for requests, so one long commit does
+requests and serves turn logs' streams too. One that only serves the API holds just the listener,
+once a stream opens. The minimum of five leaves two for requests, so one long commit does
 not stall every read. A busy workspace's writers
 wait for each other in memory rather than each holding a connection, and its reads use at most three
 at once; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
@@ -224,7 +224,7 @@ bun run test --project postgresql hosts/local
 ```
 
 They cover authentication and configuration, the HTTP routes over PostgreSQL for workspaces,
-conversations, notifications, connections, agents, and the change feed, the installed integrations,
+conversations, notifications, connections, and agents, the installed integrations,
 jobs stored with the commits that request them and run at once by whichever process runs them,
 whether that process serves the API too or not, over the database or over sockets, the
 runner-address claim, and agents' turns over HTTP with a model provider of the test's own, in one

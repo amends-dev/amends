@@ -197,41 +197,41 @@ only the groups they belong to; see [who may do what](group-workflows.md#who-may
 Bundles are recorded with the workspace at the current bundle revision, and authorization and
 replay use what is recorded. A change to the declarations raises the revision; when a host loads a
 workspace recorded at an earlier one, it records the new bundles as role facts attributed to the
-`builtin-roles` system, which open change feeds deliver like any role change. A host never reverts
+`builtin-roles` system, like any role change. A host never reverts
 a later revision, so hosts on different versions during a deployment agree. If the upgrade cannot
 run, such as while another host writes, the workspace serves its recorded roles and a later load
 finishes it. A permission the code does not declare, retired or added by a newer host's bundles,
 grants nothing, leaving its holders' other grants intact, and roles that record it can still be
 listed, assigned, and offered in invitations.
 
-| Permission                     | Lowest role   | Target    | Authorizes                                                                                                     |
-| ------------------------------ | ------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| `member.read`                  | Member        | Member    | Reading memberships                                                                                            |
-| `member.remove`                | Administrator | Member    | Removing a member                                                                                              |
-| `invitation.manage`            | Administrator | Workspace | Listing invitations; with `assignment.manage`, issuing and revoking them                                       |
-| `assignment.read`              | Member        | Member    | Reading a member's access                                                                                      |
-| `assignment.manage`            | Administrator | Workspace | Adding, replacing, and revoking roles, within delegation limits                                                |
-| `workspace.rename`             | Owner         | Workspace | Renaming workspace metadata                                                                                    |
-| `workspace.transfer-ownership` | Owner         | Workspace | Transferring ownership                                                                                         |
-| `group.create`                 | Member        | Workspace | [Creating a team group](group-workflows.md#creating-a-group), private or public                                |
-| `group.read`                   | Member        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                                             |
-| `group.follow`                 | Member        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself                                          |
-| `group.rename`                 | Member        | Group     | [Renaming a team group](group-workflows.md#renaming-a-group) you belong to                                     |
-| `group.moderate`               | Administrator | Group     | Removing people from a public group you belong to                                                              |
-| `group.membership.manage`      | Member        | Group     | Adding people to a group you belong to; removing them from a private one                                       |
-| `group.join`                   | Member        | Group     | [Finding and joining public groups](group-workflows.md#public-groups)                                          |
-| `thread.start`                 | Member        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                                               |
-| `thread.read`                  | Member        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read                              |
-| `thread.rename`                | Member        | Thread    | [Renaming a thread](thread-workflows.md#renaming-a-thread) of a group you belong to                            |
-| `thread.publish`               | Member        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation), typing, and editing or deleting one's own messages |
-| `thread.moderate`              | Administrator | Group     | [Deleting others' messages](thread-workflows.md#editing-and-deleting-a-message) in a group you belong to       |
-| `thread.follow`                | Member        | Thread    | Following a thread for oneself                                                                                 |
-| `task.create`                  | Member        | Group     | [Creating a task](thread-workflows.md#tasks), with its thread or in a conversation of a group you belong to    |
-| `task.update`                  | Member        | Thread    | [Changing a task](thread-workflows.md#tasks): its status, assignee, or priority                                |
-| `channel.create`               | Administrator | Workspace | [Creating a channel](thread-workflows.md#channels) over a connection you may use, into a group you belong to   |
-| `channel.read`                 | Member        | Channel   | [Reading a channel](thread-workflows.md#channels)                                                              |
-| `channel.manage`               | Administrator | Channel   | [Redirecting or removing a channel](thread-workflows.md#channels)                                              |
-| `agent.use`                    | Member        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group                              |
+| Permission                     | Lowest role   | Target    | Authorizes                                                                                                   |
+| ------------------------------ | ------------- | --------- | ------------------------------------------------------------------------------------------------------------ |
+| `member.read`                  | Member        | Member    | Reading memberships                                                                                          |
+| `member.remove`                | Administrator | Member    | Removing a member                                                                                            |
+| `invitation.manage`            | Administrator | Workspace | Listing invitations; with `assignment.manage`, issuing and revoking them                                     |
+| `assignment.read`              | Member        | Member    | Reading a member's access                                                                                    |
+| `assignment.manage`            | Administrator | Workspace | Adding, replacing, and revoking roles, within delegation limits                                              |
+| `workspace.rename`             | Owner         | Workspace | Renaming workspace metadata                                                                                  |
+| `workspace.transfer-ownership` | Owner         | Workspace | Transferring ownership                                                                                       |
+| `group.create`                 | Member        | Workspace | [Creating a team group](group-workflows.md#creating-a-group), private or public                              |
+| `group.read`                   | Member        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                                           |
+| `group.follow`                 | Member        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself                                        |
+| `group.rename`                 | Member        | Group     | [Renaming a team group](group-workflows.md#renaming-a-group) you belong to                                   |
+| `group.moderate`               | Administrator | Group     | Removing people from a public group you belong to                                                            |
+| `group.membership.manage`      | Member        | Group     | Adding people to a group you belong to; removing them from a private one                                     |
+| `group.join`                   | Member        | Group     | [Finding and joining public groups](group-workflows.md#public-groups)                                        |
+| `thread.start`                 | Member        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                                             |
+| `thread.read`                  | Member        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read                            |
+| `thread.rename`                | Member        | Thread    | [Renaming a thread](thread-workflows.md#renaming-a-thread) of a group you belong to                          |
+| `thread.publish`               | Member        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation) and editing or deleting one's own messages        |
+| `thread.moderate`              | Administrator | Group     | [Deleting others' messages](thread-workflows.md#editing-and-deleting-a-message) in a group you belong to     |
+| `thread.follow`                | Member        | Thread    | Following a thread for oneself                                                                               |
+| `task.create`                  | Member        | Group     | [Creating a task](thread-workflows.md#tasks), with its thread or in a conversation of a group you belong to  |
+| `task.update`                  | Member        | Thread    | [Changing a task](thread-workflows.md#tasks): its status, assignee, or priority                              |
+| `channel.create`               | Administrator | Workspace | [Creating a channel](thread-workflows.md#channels) over a connection you may use, into a group you belong to |
+| `channel.read`                 | Member        | Channel   | [Reading a channel](thread-workflows.md#channels)                                                            |
+| `channel.manage`               | Administrator | Channel   | [Redirecting or removing a channel](thread-workflows.md#channels)                                            |
+| `agent.use`                    | Member        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group                            |
 
 Group and thread permissions also need current membership in the group; see each guide.
 
@@ -249,5 +249,5 @@ returns 409 `CoreError.Changed`; retrying an already-applied name succeeds
 without another fact. This compares names, not a version: a rename away and back
 is not detected. Creation attribution and ownership remain unchanged. The built-in
 Owner bundle includes rename permission. The directory reads the updated
-name. The change feed delivers `workspace.renamed` to every member. See the
+name. See the
 [Settings UI guide](workspace-settings.md) for connected behavior.

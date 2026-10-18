@@ -1,8 +1,8 @@
 /**
  * The `threads` endpoint group: conversations in a workspace's groups. Its endpoints call
  * `ThreadService` (`listInGroup`, `listOpenings`, `startInGroup`, `startDirect`, `get`, `rename`,
- * `readTimeline`, `listParticipants`), `ThreadMessageService` (`publish`, `edit`, `delete`,
- * `typing`), `ThreadParticipationService` (`follow`, `unfollow`), and
+ * `readTimeline`, `listParticipants`), `ThreadMessageService` (`publish`, `edit`, `delete`),
+ * `ThreadParticipationService` (`follow`, `unfollow`), and
  * `ReadStateService.markThreadRead`. Every endpoint needs active membership, and reading a thread
  * needs current membership of its group; only people write messages and keep read positions, so an
  * agent principal gets 403 there. `ThreadsHandlers` implements it.
@@ -54,8 +54,8 @@ const reading = ThreadActivityStore.ReadOptions.fields
 
 /**
  * Conversations: a group's threads, starting them, as tasks or not, and renaming them, their
- * timelines and participants, replying, editing and deleting messages, saying one is typing,
- * following, and read positions.
+ * timelines and participants, replying, editing and deleting messages, following, and read
+ * positions.
  * Reading a thread requires current membership of its group and creates no participation; missing
  * and unreadable threads answer alike.
  *
@@ -158,11 +158,6 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       params: message,
       success: messageRecord,
       error: [...ApiErrors.workspace, ...ApiErrors.messageDelete]
-    }),
-    HttpApiEndpoint.post("typing", "/threads/:threadId/typing", {
-      params: thread,
-      success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.workspace, ...ApiErrors.typing]
     }),
     HttpApiEndpoint.post("follow", "/threads/:threadId/follow", {
       params: thread,

@@ -141,8 +141,8 @@ Mode persists under `amends.appearance` and palette under `amends.palette` in lo
 and synchronize same-origin windows. Web and desktop origins remain independent. Blocked storage
 retains the choice in memory.
 
-When workspace changes stop arriving for two seconds, a note at the bottom of the screen says
-"Connecting…" or "Reconnecting…" until they resume; see [change feed](change-feed.md).
+When workspace changes stopped arriving for two seconds, a note at the bottom of the screen said
+"Connecting…" or "Reconnecting…" until they resumed.
 
 ## Verification
 
