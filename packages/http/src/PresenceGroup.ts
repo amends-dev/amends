@@ -2,8 +2,8 @@
  * The `presence` endpoint group: who has the workspace open, and where they are typing. Its
  * endpoints call `PresenceService`: `watch` and `type`. Every endpoint needs active membership.
  * Following presence is a server-sent event stream of who is present, each time it changes, which
- * counts within the same limits as other streams and makes the caller present for as long as it is
- * open; typing is said by a request, and lapses unless said again. `PresenceHandlers` implements it.
+ * counts within the process's limits on open streams and makes the caller present for as long as it
+ * is open; typing is said by a request, and lapses unless said again. `PresenceHandlers` implements it.
  *
  * @since 0.1.0
  */

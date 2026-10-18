@@ -19,8 +19,8 @@ import * as Streams from "./Streams.ts"
 
 /**
  * Register turn handlers, reading the principal per request. Following a turn's log is a stream
- * held in the HTTP response scope, as change streams are: it counts within the same limits, and
- * ends with `CoreError.Unavailable` when it cannot go on.
+ * held in the HTTP response scope: it counts within the `Streams` limits, and ends with
+ * `CoreError.Unavailable` when it cannot go on.
  *
  * @category layers
  * @since 0.1.0

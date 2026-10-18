@@ -1,5 +1,5 @@
 /**
- * The HTTP server beginning to shut down. Long-lived responses, such as change streams, end as it
+ * The HTTP server beginning to shut down. Long-lived responses, such as turn logs and presence, end as it
  * begins, telling their clients to reconnect, so a shutdown waits only for ordinary requests to
  * finish. A host provides it and completes it before its HTTP server stops, which otherwise waits
  * for every open response.

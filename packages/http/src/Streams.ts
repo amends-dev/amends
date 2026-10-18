@@ -58,7 +58,7 @@ export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)
 
 /**
  * How many live-update streams this process serves at once for one workspace, and for one member
- * of it, counting change streams and turn logs alike. A thousand and twenty by default; a host
+ * of it, counting turn logs and presence alike. A thousand and twenty by default; a host
  * provides its own to change them.
  *
  * @category services
