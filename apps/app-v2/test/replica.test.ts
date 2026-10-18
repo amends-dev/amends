@@ -32,24 +32,21 @@ const withReplica = <A, E>(test: Effect.Effect<A, E, Replica.Replica>) =>
 /** What a read gives now. */
 const now = <A, E>(stream: Stream.Stream<A, E>) => Effect.map(Stream.runHead(stream), Option.getOrThrow)
 
-/** The IDs of the records of `kind` at `place`, and whether each is still expected. */
+/** The keys of the records of `kind` at `place`. */
 const held = (kind: ReplicaRecord.Kind, place: ReplicaRecord.Place) =>
   Effect.flatMap(Replica.Replica, (replica) =>
     now(replica.list(kind, place)).pipe(
-      Effect.map((list) =>
-        list
-          .map(({ record, pending }) => [JSON.stringify(ReplicaRecord.keyOf(record)), pending] as const)
-          .toSorted(([left], [right]) => left.localeCompare(right))
-      )
+      Effect.map((list) => list.map((record) => JSON.stringify(ReplicaRecord.keyOf(record))).toSorted())
     )
   )
 const keyOf = (record: ReplicaRecord.ReplicaRecord) => JSON.stringify(ReplicaRecord.keyOf(record))
 
-const action = (key: string) => ({
+const action = (key: string, creates: ReadonlyArray<ReplicaRecord.ReplicaRecord> = []) => ({
   key,
   tag: "ThreadMessagePosted",
   payload: new Uint8Array([1, 2, 3]),
-  writtenAt: DateTime.makeUnsafe(Date.UTC(2026, 9, 18))
+  writtenAt: DateTime.makeUnsafe(Date.UTC(2026, 9, 18)),
+  creates
 })
 
 describe("Replica", () => {
@@ -71,13 +68,11 @@ describe("Replica", () => {
           ])
         )
         yield* replica.apply(batch(2, [cases.Dropped.make({ key: ReplicaRecord.keyOf(group) })]))
-        expect(yield* held("Group", Workspace.make({}))).toEqual([[keyOf(other), false]])
+        expect(yield* held("Group", Workspace.make({}))).toEqual([keyOf(other)])
         expect(yield* held("GroupMembership", Group.make({ groupId: "group-1" as never }))).toEqual([])
         expect(yield* held("Thread", Group.make({ groupId: "group-1" as never }))).toEqual([])
         expect(yield* held("ThreadMessage", Thread.make({ threadId: "thread-1" as never }))).toEqual([])
-        expect(yield* held("ThreadMessage", Thread.make({ threadId: "thread-2" as never }))).toEqual([
-          [keyOf(reply), false]
-        ])
+        expect(yield* held("ThreadMessage", Thread.make({ threadId: "thread-2" as never }))).toEqual([keyOf(reply)])
         yield* replica.apply(batch(3, [cases.Dropped.make({ key: ReplicaRecord.keyOf(kept) })]))
         expect(yield* held("Thread", Group.make({ groupId: "group-2" as never }))).toEqual([])
         expect(yield* held("ThreadMessage", Thread.make({ threadId: "thread-2" as never }))).toEqual([])
@@ -96,40 +91,30 @@ describe("Replica", () => {
         // Sent again after a stop, or a commit it is past: neither applies.
         yield* replica.apply(batch(5, [cases.Changed.make({ record: contact })]))
         yield* replica.apply(batch(3, [cases.Dropped.make({ key: ReplicaRecord.keyOf(member) })]))
-        expect(yield* held("Member", Workspace.make({}))).toEqual([[keyOf(member), false]])
+        expect(yield* held("Member", Workspace.make({}))).toEqual([keyOf(member)])
         expect(yield* held("Contact", Workspace.make({}))).toEqual([])
         // Storage made anew starts over at an earlier position.
         yield* replica.apply(batch(2, [cases.Reset.make({}), cases.Changed.make({ record: role })]))
         expect(yield* held("Member", Workspace.make({}))).toEqual([])
-        expect(yield* held("Role", Workspace.make({}))).toEqual([[keyOf(role), false]])
+        expect(yield* held("Role", Workspace.make({}))).toEqual([keyOf(role)])
       })
     )
   )
 
-  it.effect("an action is held with what it expects until its commit completes it, or rejects it with why", () =>
+  it.effect("an action is held until its commit completes it, or rejects it with why until it is dismissed", () =>
     withReplica(
       Effect.gen(function* () {
         const replica = yield* Replica.Replica
         const expected = yield* sample("ThreadMessage", { id: "message-1", threadId: "thread-1" })
-        const place = Thread.make({ threadId: "thread-1" as never })
-        yield* replica.hold(action("posted"), [expected])
-        expect(yield* held("ThreadMessage", place)).toEqual([[keyOf(expected), true]])
-        // The commit that ran it brings the server's message under the same ID, and completes it.
-        const published = { ...expected, value: { ...expected.value, publishedAt: DateTime.makeUnsafe(0) } }
-        yield* replica.apply(
-          batch(1, [
-            cases.Changed.make({ record: published as ReplicaRecord.ReplicaRecord }),
-            cases.Completed.make({ key: "posted" as never })
-          ])
-        )
-        expect(yield* held("ThreadMessage", place)).toEqual([[keyOf(expected), false]])
+        yield* replica.hold(action("posted", [expected]))
+        expect(yield* now(replica.actions)).toEqual([{ ...action("posted", [expected]), rejection: Option.none() }])
+        // What it creates is read on top of the replica, not written to it.
+        expect(yield* held("ThreadMessage", Thread.make({ threadId: "thread-1" as never }))).toEqual([])
+        yield* replica.apply(batch(1, [cases.Completed.make({ key: "posted" as never })]))
         expect(yield* now(replica.actions)).toEqual([])
-        // A rejected one leaves nothing it expected, and keeps why until it is dismissed.
-        const refused = yield* sample("ThreadMessage", { id: "message-2", threadId: "thread-1" })
-        yield* replica.hold(action("refused"), [refused])
+        yield* replica.hold(action("refused"))
         const error = new CoreError.NotFound({ resource: "Thread", id: "thread-1" })
         yield* replica.apply(batch(2, [cases.Rejected.make({ key: "refused" as never, error })]))
-        expect(yield* held("ThreadMessage", place)).toEqual([[keyOf(expected), false]])
         expect(yield* now(replica.actions)).toEqual([{ ...action("refused"), rejection: Option.some(error) }])
         yield* replica.dismiss("refused")
         expect(yield* now(replica.actions)).toEqual([])
@@ -137,18 +122,15 @@ describe("Replica", () => {
     )
   )
 
-  it.effect("a reset keeps what the person's actions still expect", () =>
+  it.effect("a reset leaves the person's actions as they are", () =>
     withReplica(
       Effect.gen(function* () {
         const replica = yield* Replica.Replica
-        const expected = yield* sample("ThreadMessage", { id: "message-1", threadId: "thread-1" })
         const member = yield* sample("Member")
-        yield* replica.hold(action("offline"), [expected])
+        yield* replica.hold(action("offline"))
         yield* replica.apply(batch(1, [cases.Reset.make({}), cases.Changed.make({ record: member })]))
-        expect(yield* held("ThreadMessage", Thread.make({ threadId: "thread-1" as never }))).toEqual([
-          [keyOf(expected), true]
-        ])
-        expect(yield* held("Member", Workspace.make({}))).toEqual([[keyOf(member), false]])
+        expect((yield* now(replica.actions)).map(({ key }) => key)).toEqual(["offline"])
+        expect(yield* held("Member", Workspace.make({}))).toEqual([keyOf(member)])
       })
     )
   )

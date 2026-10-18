@@ -11,13 +11,10 @@ import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
-import * as SyncSchema from "@amends-dev/sync/SyncSchema"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
-import type * as Event from "effect/eventlog/Event"
-import type * as EventGroup from "effect/eventlog/EventGroup"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
@@ -30,7 +27,6 @@ import * as Subscription from "foldkit/subscription"
 import * as Browser from "./browser.ts"
 import { Message } from "./message.ts"
 import { type ActionItem, type Model, type Opened, Page, StoreState } from "./model.ts"
-import type * as Replica from "./sync/Replica.ts"
 import * as Store from "./sync/Store.ts"
 
 export const StoreResource = ManagedResource.tag<Store.Store["Service"]>()("Store")
@@ -109,31 +105,16 @@ const whatEach: Readonly<Record<string, string>> = {
   ThreadMessagePosted: "post a reply"
 }
 
-const events = SyncSchema.SyncSchema.groups.flatMap((group) =>
-  Object.values((group as EventGroup.EventGroup<Event.Any>).events)
-)
-
 /** An action as the person reads it: what it does, the text it carries, and why it was refused. */
-const describe = (action: Replica.Action) =>
-  Effect.gen(function* () {
-    const event = events.find(({ tag }) => tag === action.tag)
-    const payload =
-      event === undefined
-        ? undefined
-        : yield* Effect.orElseSucceed(
-            Schema.decodeEffect(event.payloadSchemaBinary as Schema.Codec<unknown, Uint8Array>)(action.payload),
-            () => undefined
-          )
-    return {
-      key: action.key,
-      what: whatEach[action.tag] ?? action.tag,
-      text:
-        Predicate.hasProperty(payload, "text") && Predicate.isString(payload.text)
-          ? Option.some(payload.text)
-          : Option.none(),
-      rejection: Option.map(action.rejection, (error: CoreError.Rejection) => error.message)
-    } satisfies ActionItem
-  })
+const describe = (action: Store.ActionView): ActionItem => ({
+  key: action.key,
+  what: whatEach[action.tag] ?? action.tag,
+  text:
+    Predicate.hasProperty(action.payload, "text") && Predicate.isString(action.payload.text)
+      ? Option.some(action.payload.text)
+      : Option.none(),
+  rejection: Option.map(action.rejection, (error: CoreError.Rejection) => error.message)
+})
 
 export const subscriptions = Subscription.make<Model, Message, ManagedResource.ServiceOf<typeof StoreResource>>()(
   (entry) => ({
@@ -157,10 +138,8 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
                     Stream.map(store.list("Member", workspace), (members): Message =>
                       Message.GotMembers({ members: members.map(({ record }) => record.value) })
                     ),
-                    Stream.mapEffect(store.actions, (actions) =>
-                      Effect.map(Effect.forEach(actions, describe), (described): Message =>
-                        Message.GotActions({ actions: described })
-                      )
+                    Stream.map(store.actions, (actions): Message =>
+                      Message.GotActions({ actions: actions.map(describe) })
                     )
                   ],
                   { concurrency: "unbounded" }

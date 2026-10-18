@@ -9,8 +9,12 @@
  * the host, the person, and the workspace, since positions and entry IDs are only unique within one.
  */
 
+import type { CoreError } from "@amends-dev/core/error"
+import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
+import type { ThreadMessage } from "@amends-dev/core/thread"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
 import * as ChannelSync from "@amends-dev/sync/ChannelSync"
@@ -26,6 +30,7 @@ import * as TurnSync from "@amends-dev/sync/TurnSync"
 import * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
 import * as IndexedDb from "@effect/platform-browser/IndexedDb"
 import type * as IndexedDbQueryBuilder from "@effect/platform-browser/IndexedDbQueryBuilder"
+import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import type * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
@@ -37,11 +42,13 @@ import * as EventJournal from "effect/eventlog/EventJournal"
 import * as EventLog from "effect/eventlog/EventLog"
 import * as EventLogMessage from "effect/eventlog/EventLogMessage"
 import * as Layer from "effect/Layer"
+import type * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import * as RpcClient from "effect/rpc/RpcClient"
 import * as Schedule from "effect/Schedule"
 import * as Stream from "effect/Stream"
 import * as Api from "../api.ts"
-import * as Expected from "./Expected.ts"
+import * as Pending from "./Pending.ts"
 import * as Replica from "./Replica.ts"
 import * as SyncKey from "./SyncKey.ts"
 
@@ -56,28 +63,51 @@ export interface Options {
 
 const makeWrite = EventLog.makeClient(SyncSchema.SyncSchema)
 
+const byPublished = Order.mapInput(DateTime.Order, (message: ThreadMessage.ThreadMessage) => message.publishedAt)
+
 /** Write an action, `write("ThreadMessagePosted", { threadId, text, mentions })`, as eventlog's client does. */
 export type Write = Effect.Success<typeof makeWrite>
 
+/** A thread as the person sees it, with its opening message. */
+export interface ThreadView {
+  readonly thread: Pending.Held<Replica.RecordOf<"Thread">>
+  readonly opening: Option.Option<ThreadMessage.ThreadMessage>
+}
+
+/** An action of the person's the server has not completed, its payload decoded, and why it was refused. */
+export interface ActionView {
+  readonly key: string
+  readonly tag: string
+  readonly payload: unknown
+  readonly rejection: Option.Option<CoreError.Rejection>
+}
+
+type QueryError = IndexedDbQueryBuilder.IndexedDbQueryError
+
 /**
- * A store, open for as long as the scope that opened it. Its reads fail when the replica cannot be
- * read, or a commit cannot be written to it.
+ * A store, open for as long as the scope that opened it. Its reads are the replica as the person's
+ * unfinished actions leave it, and fail when the replica cannot be read, or a commit cannot be
+ * written to it.
  */
 export class Store extends Context.Service<
   Store,
   {
     readonly write: Write
-    readonly list: Replica.Replica["Service"]["list"]
-    readonly threads: Replica.Replica["Service"]["threads"]
-    readonly actions: Replica.Replica["Service"]["actions"]
+    /** The records of `kind` at `place`, and again after each change to them or to the person's actions. */
+    readonly list: <Kind extends ReplicaRecord.Kind>(
+      kind: Kind,
+      place: ReplicaRecord.Place
+    ) => Stream.Stream<ReadonlyArray<Pending.Held<Replica.RecordOf<Kind>>>, QueryError>
+    /** The threads of `groupId`, each with its opening message, and again after each change. */
+    readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
+    /** The person's actions the server has not completed, and again after each change to them. */
+    readonly actions: Stream.Stream<ReadonlyArray<ActionView>, QueryError>
     readonly dismiss: Replica.Replica["Service"]["dismiss"]
   }
 >()("@amends-dev/app-v2/sync/Store") {}
 
 /** The prefix of every database the person's stores keep on the host at `apiUrl`. */
 const databasePrefix = (apiUrl: string, humanId: Identity.HumanId) => `amends/${apiUrl}/${humanId}/`
-
-type QueryError = IndexedDbQueryBuilder.IndexedDbQueryError
 
 /**
  * Apply each `ReplicaChanged` to the replica. Eventlog logs a handler's failure and records the
@@ -93,21 +123,19 @@ const layerReplicaChanges = (failed: Deferred.Deferred<never, QueryError>) =>
   )
 
 /**
- * Hold each of `group`'s actions as pending, with what `expected` says it creates. A local handler
- * runs before eventlog journals the action, so one that fails fails the write itself.
+ * Hold each of `group`'s actions until the server completes it, with the records `Pending` says it
+ * creates. A local handler runs before eventlog journals the action, so one that fails fails the
+ * write itself.
  */
 const layerActions = <Events extends Event.Any>(
   group: EventGroup.EventGroup<Events>,
-  author: Pick<Options, "workspaceId" | "memberId">,
-  expected: {
-    readonly [Tag in Event.Tag<Events>]?: Expected.Expectation<Event.PayloadWithTag<Events, Tag>>
-  } = {}
+  author: Pick<Options, "workspaceId" | "memberId">
 ): Layer.Layer<Event.ToService<Events>, never, Replica.Replica | Crypto.Crypto | EventLog.Registry> =>
   EventLog.group(group, (handlers) => {
     // Every action is held alike, so its handler is built from the group's own events.
     let built: EventLog.Handlers<unknown, Event.Any> = handlers as never
     for (const tag of Object.keys(group.events)) {
-      const expectation = (expected as Record<string, Expected.Expectation<unknown> | undefined>)[tag]
+      const { creates } = Pending.effectsOf(tag)
       built = built.handle(tag, ({ payload, entry }) =>
         Effect.gen(function* () {
           const action = {
@@ -115,9 +143,14 @@ const layerActions = <Events extends Event.Any>(
             key: Request.Key.make(entry.idString),
             writtenAt: DateTime.makeUnsafe(EventJournal.entryIdMillis(entry.id))
           }
-          const records = expectation === undefined ? [] : yield* expectation(payload, action)
           const replica = yield* Replica.Replica
-          yield* replica.hold({ key: action.key, tag, payload: entry.payload, writtenAt: action.writtenAt }, records)
+          yield* replica.hold({
+            key: action.key,
+            tag,
+            payload: entry.payload,
+            writtenAt: action.writtenAt,
+            creates: creates === undefined ? [] : yield* creates(payload, action)
+          })
         }).pipe(Effect.orDie)
       ) as never
     }
@@ -176,10 +209,7 @@ export const layer = (options: Options) =>
       const handlers = Layer.mergeAll(
         layerActions(WorkspaceSync.Actions, options),
         layerActions(GroupSync.Actions, options),
-        layerActions(ThreadSync.Actions, options, {
-          ThreadStarted: Expected.threadStarted,
-          ThreadMessagePosted: Expected.messagePosted
-        }),
+        layerActions(ThreadSync.Actions, options),
         layerActions(TaskSync.Actions, options),
         layerActions(TurnSync.Actions, options),
         layerActions(NotificationSync.Actions, options),
@@ -200,11 +230,57 @@ export const layer = (options: Options) =>
           const replica = yield* Replica.Replica
           const untilFailed = <A, E>(stream: Stream.Stream<A, E>) =>
             Stream.interruptWhen(stream, Deferred.await(failed))
+          const unfinished = Stream.mapEffect(replica.actions, (actions) => Pending.unfinished(actions, options))
+          /** What `read` gives, as the person's unfinished actions leave it. */
+          const withPending = <A, B>(
+            read: Stream.Stream<A, QueryError>,
+            view: (records: A, pending: ReadonlyArray<Pending.Unfinished>) => B
+          ) =>
+            untilFailed(Stream.map(Stream.zipLatest(read, unfinished), ([records, pending]) => view(records, pending)))
           return Store.of({
             write: yield* makeWrite,
-            list: (kind, place) => untilFailed(replica.list(kind, place)),
-            threads: (groupId) => untilFailed(replica.threads(groupId)),
-            actions: untilFailed(replica.actions),
+            list: (kind, place) =>
+              withPending(replica.list(kind, place), (records, pending) =>
+                Pending.overlay(kind, place, records, pending)
+              ),
+            threads: (groupId) =>
+              withPending(replica.threads(groupId), (threads, pending) =>
+                Pending.overlay(
+                  "Thread",
+                  ReplicaRecord.Place.cases.Group.make({ groupId }),
+                  threads.map(({ thread }) => thread),
+                  pending
+                ).map((thread): ThreadView => {
+                  const threadId = thread.record.value.id
+                  const messages = Pending.overlay(
+                    "ThreadMessage",
+                    ReplicaRecord.Place.cases.Thread.make({ threadId }),
+                    threads.find((held) => held.thread.value.id === threadId)?.messages ?? [],
+                    pending
+                  )
+                  return {
+                    thread,
+                    opening: Array.head(
+                      Array.sort(
+                        messages.map(({ record }) => record.value),
+                        byPublished
+                      )
+                    )
+                  }
+                })
+              ),
+            actions: untilFailed(
+              Stream.mapEffect(replica.actions, (actions) =>
+                Effect.forEach(actions, ({ key, tag, payload, rejection }) =>
+                  Effect.map(Pending.decodePayload(tag, payload), (decoded): ActionView => ({
+                    key,
+                    tag,
+                    payload: decoded,
+                    rejection
+                  }))
+                )
+              )
+            ),
             dismiss: replica.dismiss
           })
         })

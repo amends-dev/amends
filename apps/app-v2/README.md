@@ -49,21 +49,28 @@ that decides, and commands that act.
 
 - Its event log, Effect eventlog's, journals into an IndexedDB database of its own and applies each
   `ReplicaChanged` the server writes to the replica. `write` writes an action, which eventlog sends
-  when it can; its local handler holds the action in the replica as pending, with what
-  `sync/Expected.ts` says it creates: a thread started in a group, with its opening message, and a
-  reply, under the IDs core derives from the action's key, the request key the server runs it
-  under. A handler runs before eventlog journals the action, so one that fails fails the write.
+  when it can; its local handler holds the action in the replica until the server completes it,
+  with the records `sync/Pending.ts` says it creates: a thread started in a group, with its opening
+  message, and a reply, under the IDs core derives from the action's key, the request key the
+  server runs it under. A handler runs before eventlog journals the action, so one that fails
+  fails the write.
+- `sync/Pending.ts` is what an unfinished action does to what the person sees: the records it
+  creates, and how it changes records the replica holds, such as renaming a thread or a team, or
+  editing or deleting a message. `overlay` applies the unfinished actions, in the order they were
+  written, each to what the ones before it left, on top of the server's records each time they are
+  read, so whatever the server changes meanwhile shows through what an action leaves alone, and a
+  record an action created gives way to the server's own under the same key. A completed or
+  rejected action no longer applies.
 - `sync/Replica.ts` is the replica: the records the person may see, in another IndexedDB database,
   each under its key with its kind and the place it sits, from core's `ReplicaRecord.placeOf`.
   `apply` writes a commit's batch in one transaction, and dropping a group or a thread drops what
   sits in it. The replica keeps the position of the last commit it applied and passes over a batch
   it already holds, since eventlog runs a remote entry's handler before its journal records the
-  entry and sends it again after a stop between the two; a reset applies at any position. The
-  records an action expects are held marked with its key: the server's own, under the same IDs,
-  unmark them; `Completed` drops the action and anything still marked with it; `Rejected` drops
-  what it expected and keeps the action, with why, until `dismiss`; and a reset keeps what is still
-  marked. `list` reads the records of a kind at a place, `threads` a group's threads with their
-  opening messages, and `actions` the person's unfinished actions, each again after every change.
+  entry and sends it again after a stop between the two; a reset applies at any position. It holds
+  the server's records alone, and the person's unfinished actions beside them: `Completed` drops
+  the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
+  of a kind at a place, `threads` a group's threads with their messages, and `actions` the person's
+  unfinished actions, each again after every change; the store reads each through `overlay`.
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
   a store opens, reads, and takes actions offline. Each time its connection drops, the store builds
@@ -90,7 +97,9 @@ browser's storage:
 - A Scene test drives the view as a person does, from typing their address through a reply and a
   refused action to signing out.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
-  rejected, dismissed, and kept through a reset.
+  rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
+  to the server's, its changes over the server's records, actions applied in order, edits and
+  deletes, and refused actions applying nothing.
 - The store's tests serve a host in process, the HTTP API and the sync server over memory storage
   on Bun, and open a store against it: the reset arrives, a change made over HTTP follows, and the
   store reads its replica again with the host gone; a thread it starts shows at once and becomes
