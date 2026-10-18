@@ -10,11 +10,13 @@
 
 import { Assignment, type Role, Scope } from "@amends-dev/core/authorization"
 import { Group, type GroupFollow, GroupMembership } from "@amends-dev/core/group"
+import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import { Invitation, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
+import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
 import * as SyncSchema from "@amends-dev/sync/SyncSchema"
 import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
 import type * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
@@ -69,6 +71,23 @@ const isWorkspace = ReplicaRecord.ReplicaRecord.isAnyOf(["Workspace"])
 const isMember = ReplicaRecord.ReplicaRecord.isAnyOf(["Member"])
 const isAssignment = ReplicaRecord.ReplicaRecord.isAnyOf(["Assignment"])
 const isInvitation = ReplicaRecord.ReplicaRecord.isAnyOf(["Invitation"])
+const isNotification = ReplicaRecord.ReplicaRecord.isAnyOf(["Notification"])
+
+/** `record`, a notification, as seen when `action` was written. */
+const seen = (record: Replica.RecordOf<"Notification">, action: Action) =>
+  cases.Notification.make({
+    value: { ...record.value, state: Notification.State.cases.Seen.make({ seenAt: action.writtenAt }) }
+  })
+
+/** Whether `record` is a notification still waiting for `action`'s author to see it. */
+const isOwnPending = (
+  record: ReplicaRecord.ReplicaRecord,
+  action: Action
+): record is Replica.RecordOf<"Notification"> =>
+  isNotification(record) &&
+  Notification.Recipient.isAnyOf(["Human"])(record.value.recipient) &&
+  record.value.recipient.memberId === action.memberId &&
+  Notification.State.isAnyOf(["Pending"])(record.value.state)
 
 /** Whether `participation` is `memberId`'s own. */
 const isMemberOf = (memberId: MemberId.MemberId, participation: ThreadParticipation.ThreadParticipation) =>
@@ -227,13 +246,22 @@ export const threads: EffectsOf<typeof ThreadSync.Actions> = {
           value: { workspaceId: action.workspaceId, memberId: action.memberId, threadId, readThrough: throughSequence }
         })
       ]),
+    // Reading a thread also settles the member's notifications from it, up to the position.
     changes: ({ threadId, throughSequence }, record, action) =>
       isPosition(record) &&
       record.value.threadId === threadId &&
       record.value.memberId === action.memberId &&
       record.value.readThrough < throughSequence
         ? cases.ThreadPosition.make({ value: { ...record.value, readThrough: throughSequence } })
-        : undefined
+        : isNotification(record) &&
+            NotificationStore.isPendingInThread(record.value, {
+              workspaceId: action.workspaceId,
+              memberId: action.memberId,
+              threadId,
+              readThrough: throughSequence
+            })
+          ? seen(record, action)
+          : undefined
   }
 }
 
@@ -416,7 +444,23 @@ export const workspace: EffectsOf<typeof WorkspaceSync.Actions> = {
   AssignmentRevoked: { changes: ({ assignmentId }, record) => revokeAssignment(record, assignmentId) }
 }
 
-const effectsByTag = { ...threads, ...groups, ...workspace } as Readonly<Record<string, Effects<unknown> | undefined>>
+/** What the person does with their notifications: seeing one, or every one up to a point. */
+export const notifications: EffectsOf<typeof NotificationSync.Actions> = {
+  NotificationSeen: {
+    changes: ({ notificationId }, record, action) =>
+      isOwnPending(record, action) && record.value.id === notificationId ? seen(record, action) : undefined
+  },
+  NotificationsSeenThrough: {
+    changes: ({ through }, record, action) =>
+      isOwnPending(record, action) && NotificationStore.isAtOrBefore(record.value, through)
+        ? seen(record, action)
+        : undefined
+  }
+}
+
+const effectsByTag = { ...threads, ...groups, ...workspace, ...notifications } as Readonly<
+  Record<string, Effects<unknown> | undefined>
+>
 
 /** What the action `tag` does, if anything, before the server's changes arrive. */
 export const effectsOf = (tag: string): Effects<unknown> => effectsByTag[tag] ?? {}

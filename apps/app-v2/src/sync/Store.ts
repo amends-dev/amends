@@ -14,7 +14,7 @@ import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
-import { type ThreadId, type ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
+import { type Thread, type ThreadId, type ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
 import * as ChannelSync from "@amends-dev/sync/ChannelSync"
@@ -42,8 +42,9 @@ import * as EventJournal from "effect/eventlog/EventJournal"
 import * as EventLog from "effect/eventlog/EventLog"
 import * as EventLogMessage from "effect/eventlog/EventLogMessage"
 import * as Layer from "effect/Layer"
-import type * as Option from "effect/Option"
+import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as Predicate from "effect/Predicate"
 import * as RpcClient from "effect/rpc/RpcClient"
 import * as Schedule from "effect/Schedule"
 import * as Stream from "effect/Stream"
@@ -91,6 +92,23 @@ export interface ThreadDetail {
   readonly readThrough: number
 }
 
+/**
+ * A notification as the person's inbox shows it: the thread it comes from, with its opening
+ * message, and the message its activity is about, when the replica holds them.
+ */
+export interface InboxEntry {
+  readonly notification: Pending.Held<Replica.RecordOf<"Notification">>
+  readonly thread: Option.Option<Thread.Thread>
+  readonly opening: Option.Option<ThreadMessage.ThreadMessage>
+  readonly message: Option.Option<ThreadMessage.ThreadMessage>
+}
+
+/** The message an activity is about, when it names one. */
+const messageIdOf = (activity: Replica.RecordOf<"ThreadActivity"> | undefined): unknown =>
+  activity !== undefined && Predicate.hasProperty(activity.value.details, "messageId")
+    ? activity.value.details.messageId
+    : undefined
+
 /** An action of the person's the server has not completed, its payload decoded, and why it was refused. */
 export interface ActionView {
   readonly key: string
@@ -123,6 +141,8 @@ export class Store extends Context.Service<
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
     /** The thread `threadId` as the person sees it open, and again after each change. */
     readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadDetail, QueryError>
+    /** The person's notifications as their inbox shows them, and again after each change. */
+    readonly inbox: Stream.Stream<ReadonlyArray<InboxEntry>, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<ActionView>, QueryError>
     readonly dismiss: Replica.Replica["Service"]["dismiss"]
@@ -322,6 +342,25 @@ export const layer = (options: Options) =>
                   readThrough: readThroughOf(Pending.overlay("ThreadPosition", place, contents.positions, pending))
                 }
               }),
+            inbox: withPending(replica.inbox, ({ notifications, threads }, pending) =>
+              Pending.overlay("Notification", undefined, notifications, pending).map((notification): InboxEntry => {
+                const source = notification.record.value.thread
+                const held =
+                  source === undefined ? undefined : threads.find(({ thread }) => thread.value.id === source.threadId)
+                const messageId = messageIdOf(held?.activities.find(({ value }) => value.sequence === source?.sequence))
+                return {
+                  notification,
+                  thread: Option.fromUndefinedOr(held?.thread.value),
+                  opening: Array.head(
+                    Array.sort(
+                      (held?.messages ?? []).map(({ value }) => value),
+                      byPublished
+                    )
+                  ),
+                  message: Option.fromUndefinedOr(held?.messages.find(({ value }) => value.id === messageId)?.value)
+                }
+              })
+            ),
             actions: untilFailed(
               Stream.mapEffect(replica.actions, (actions) =>
                 Effect.forEach(actions, ({ key, tag, payload, rejection }) =>

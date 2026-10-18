@@ -10,7 +10,8 @@
 import { AssignmentPermissions, BuiltinRoles, type Role, Target } from "@amends-dev/core/authorization"
 import { Group, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import { ThreadMessage } from "@amends-dev/core/thread"
+import { Notification } from "@amends-dev/core/notification"
+import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import {
   Invitation,
   InvitationPermissions,
@@ -33,6 +34,7 @@ import {
   Composing,
   type Following,
   type GroupItem,
+  type InboxItem,
   type MessageItem,
   type Model,
   type OpenGroup,
@@ -196,7 +198,7 @@ const textOf = (message: ThreadMessage.ThreadMessage) =>
   ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => "This message was deleted." })
 
 /** A thread as its group lists it: its title, or its opening message. */
-const threadLabel = ({ thread, opening }: ThreadItem) =>
+const threadLabel = ({ thread, opening }: Pick<ThreadItem, "thread" | "opening">) =>
   thread.title ?? Option.match(opening, { onNone: () => "A thread", onSome: textOf })
 
 const sending = (pending: boolean, h: HtmlBuilder<Message>): Html => (pending ? h.span([], [" · Sending…"]) : h.empty)
@@ -878,6 +880,60 @@ const invitationsView = (settings: Settings, opened: Opened, h: HtmlBuilder<Mess
   )
 }
 
+/** Whether a notification still waits for the person to see it. */
+const isWaiting = ({ notification }: InboxItem) => Notification.State.isAnyOf(["Pending"])(notification.state)
+
+/** What a notification tells the person: who wrote the message it is about, and in which thread, as its group lists it. */
+const inboxLabel = (item: InboxItem, opened: Opened) => {
+  const where = (thread: Thread.Thread) => {
+    const group = opened.groups.find(({ group }) => group.id === thread.groupId)
+    const label = threadLabel({ thread, opening: item.opening })
+    return `${label}${group === undefined ? "" : ` in ${groupName(group.group, opened)}`}`
+  }
+  const what = Option.match(item.message, {
+    onNone: () => "New activity",
+    onSome: (message) => `${authorName(message, opened)}: ${textOf(message)}`
+  })
+  return Option.match(item.thread, { onNone: () => what, onSome: (thread) => `${what} · ${where(thread)}` })
+}
+
+/** The notifications still waiting for the person, newest first, to open, or to mark seen one or all at once. */
+const inboxView = (opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const waiting = opened.inbox
+    .filter(isWaiting)
+    .toSorted((left, right) => DateTime.Order(right.notification.recordedAt, left.notification.recordedAt))
+  return h.section(
+    [h.AriaLabel("Inbox")],
+    [
+      h.h3([], ["Inbox"]),
+      waiting.length === 0
+        ? h.p([], ["Nothing new."])
+        : h.div(
+            [],
+            [
+              button(h, "Mark all seen", Message.ClickedMarkAllSeen()),
+              h.ul(
+                [h.AriaLabel("Notifications")],
+                waiting.map((item) =>
+                  h.keyed("li")(
+                    item.notification.id,
+                    [],
+                    [
+                      h.p([], [inboxLabel(item, opened)]),
+                      item.notification.thread === undefined
+                        ? h.empty
+                        : button(h, "Open", Message.ClickedNotification({ notificationId: item.notification.id })),
+                      button(h, "Mark seen", Message.ClickedMarkSeen({ notificationId: item.notification.id }))
+                    ]
+                  )
+                )
+              )
+            ]
+          )
+    ]
+  )
+}
+
 /** The workspace's settings: its name, the person's own, its members and their roles, and its invitations. */
 const settingsView = (settings: Settings, opened: Opened, h: HtmlBuilder<Message>): Html => {
   const self = opened.members.find(({ member }) => member.id === opened.memberId)
@@ -927,6 +983,11 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
     [
       h.h2([], [opened.workspace.name, sending(opened.workspacePending, h)]),
       button(h, "All workspaces", Message.ClickedAllWorkspaces()),
+      button(
+        h,
+        opened.inbox.some(isWaiting) ? `Inbox (${opened.inbox.filter(isWaiting).length})` : "Inbox",
+        Message.ClickedInbox()
+      ),
       button(h, "Settings", Message.ClickedSettings()),
       StoreState.match(opened.store, {
         Opening: () => h.p([], ["Opening…"]),
@@ -945,6 +1006,7 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
                 onNone: () => h.empty,
                 onSome: Pane.match({
                   Group: ({ group }) => groupView(group, opened, h),
+                  Inbox: () => inboxView(opened, h),
                   Settings: ({ settings }) => settingsView(settings, opened, h)
                 })
               })

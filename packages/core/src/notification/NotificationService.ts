@@ -9,7 +9,6 @@
 
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
-import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -111,19 +110,6 @@ export class NotificationService extends Context.Service<
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options))
 const sameRecipient = Schema.toEquivalence(Notification.Recipient)
 const decodeCursor = Schema.decodeEffect(Schema.toType(NotificationStore.Cursor))
-/** IDs in binary lexical order, as stores order them: by code point. */
-const compareIds = (left: string, right: string) => {
-  const a = Array.from(left, (char) => char.codePointAt(0) ?? 0),
-    b = Array.from(right, (char) => char.codePointAt(0) ?? 0)
-  for (let index = 0; index < Math.min(a.length, b.length); index++)
-    if (a[index] !== b[index]) return a[index]! - b[index]!
-  return a.length - b.length
-}
-/** Whether a notification comes at or before a cursor in inbox order. */
-const isAtOrBefore = (record: Notification.Notification, cursor: NotificationStore.Cursor) => {
-  const byTime = DateTime.toEpochMillis(record.recordedAt) - DateTime.toEpochMillis(cursor.recordedAt)
-  return byTime < 0 || (byTime === 0 && compareIds(record.id, cursor.id) <= 0)
-}
 /** How many pending notifications one page lists. */
 const seenBatch = 100
 
@@ -239,7 +225,7 @@ export const make: Effect.Effect<
       // What is marked leaves the pending list, so each page starts where the last one ended.
       while (true) {
         const page = yield* notificationStore.listPendingByRecipient(target, { limit: seenBatch })
-        const due = page.filter((record) => isAtOrBefore(record, through))
+        const due = page.filter((record) => NotificationStore.isAtOrBefore(record, through))
         for (const record of due) yield* journal.publish(NotificationFacts.Seen, { notificationId: record.id })
         marked += due.length
         if (page.length < seenBatch || due.length < page.length) return marked

@@ -6,6 +6,7 @@
  */
 
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
+import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ThreadMessage } from "@amends-dev/core/thread"
 import type * as SignIn from "@amends-dev/gateway/SignIn"
 import type * as Layer from "effect/Layer"
@@ -20,6 +21,7 @@ import { Message } from "./message.ts"
 import {
   Composing,
   type Editing,
+  type InboxItem,
   type Model,
   type OpenGroup,
   type Opened,
@@ -44,6 +46,8 @@ import {
   Invite,
   JoinGroup,
   LeaveGroup,
+  MarkAllNotificationsSeen,
+  MarkNotificationSeen,
   MarkThreadRead,
   PostReply,
   RemoveGroupMember,
@@ -148,6 +152,42 @@ const settingsIn = (model: Model): Option.Option<{ readonly settings: Settings; 
       Pane.matchOrElse({ Settings: ({ settings }) => Option.some({ settings, opened }) }, () => Option.none())
     )
   )
+
+/** The group `groupId` as it opens, listing its threads, or with `thread` open. */
+const openedGroup = (groupId: OpenGroup["groupId"], thread: Option.Option<OpenThread["threadId"]>): OpenGroup => ({
+  groupId,
+  threads: [],
+  draft: "",
+  thread: Option.map(thread, openedThread),
+  renaming: Option.none(),
+  adding: Option.none()
+})
+
+/** The thread `threadId` as it opens, before its messages are read. */
+const openedThread = (threadId: OpenThread["threadId"]): OpenThread => ({
+  threadId,
+  messages: [],
+  draft: "",
+  following: Option.none(),
+  latest: 0,
+  readThrough: 0,
+  readRequested: 0,
+  renaming: Option.none(),
+  editing: Option.none()
+})
+
+/** The newest notification still waiting to be seen, in the inbox order core marks them by. */
+const newestWaiting = (inbox: ReadonlyArray<InboxItem>) =>
+  inbox
+    .map(({ notification }) => notification)
+    .filter(({ state }) => Notification.State.isAnyOf(["Pending"])(state))
+    .reduce<Option.Option<Notification.Notification>>(
+      (newest, notification) =>
+        Option.isSome(newest) && !NotificationStore.isAtOrBefore(newest.value, notification)
+          ? newest
+          : Option.some(notification),
+      Option.none()
+    )
 
 /** The settings form with nothing being changed, inviting as a member. */
 const freshSettings: Settings = {
@@ -346,6 +386,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                     roles: [],
                     assignments: [],
                     invitations: [],
+                    inbox: [],
                     memberships: [],
                     follows: [],
                     actions: [],
@@ -388,6 +429,30 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       atOpened(model, (opened) => modifyFields(opened, { assignments: () => assignments })),
     GotInvitations: ({ invitations }) =>
       atOpened(model, (opened) => modifyFields(opened, { invitations: () => invitations })),
+    GotInbox: ({ items }) => atOpened(model, (opened) => modifyFields(opened, { inbox: () => items })),
+    ClickedInbox: () => atOpened(model, (opened) => modifyFields(opened, { pane: () => Option.some(Pane.Inbox()) })),
+    // Opening the thread reads it, which settles its notifications.
+    ClickedNotification: ({ notificationId }) =>
+      atOpened(model, (opened) => {
+        const source = opened.inbox.find(({ notification }) => notification.id === notificationId)?.notification.thread
+        return source === undefined
+          ? opened
+          : modifyFields(opened, {
+              pane: () => Option.some(Pane.Group({ group: openedGroup(source.groupId, Option.some(source.threadId)) }))
+            })
+      }),
+    ClickedMarkSeen: ({ notificationId }) => ({ model, commands: [MarkNotificationSeen({ notificationId })] }),
+    ClickedMarkAllSeen: () =>
+      Option.match(
+        Option.flatMap(openedIn(model), ({ inbox }) => newestWaiting(inbox)),
+        {
+          onNone: () => ({ model }),
+          onSome: ({ recordedAt, id }) => ({
+            model,
+            commands: [MarkAllNotificationsSeen({ through: { recordedAt, id } })]
+          })
+        }
+      ),
     ClickedSettings: () =>
       atOpened(model, (opened) =>
         modifyFields(opened, { pane: () => Option.some(Pane.Settings({ settings: freshSettings })) })
@@ -620,38 +685,11 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ClickedGroup: ({ groupId }) =>
       atOpened(model, (opened) =>
         modifyFields(opened, {
-          pane: () =>
-            Option.some(
-              Pane.Group({
-                group: {
-                  groupId,
-                  threads: [],
-                  draft: "",
-                  thread: Option.none(),
-                  renaming: Option.none(),
-                  adding: Option.none()
-                }
-              })
-            )
+          pane: () => Option.some(Pane.Group({ group: openedGroup(groupId, Option.none()) }))
         })
       ),
     ClickedThread: ({ threadId }) =>
-      atGroup(model, (group) =>
-        modifyFields(group, {
-          thread: () =>
-            Option.some({
-              threadId,
-              messages: [],
-              draft: "",
-              following: Option.none(),
-              latest: 0,
-              readThrough: 0,
-              readRequested: 0,
-              renaming: Option.none(),
-              editing: Option.none()
-            })
-        })
-      ),
+      atGroup(model, (group) => modifyFields(group, { thread: () => Option.some(openedThread(threadId)) })),
     ClickedAllThreads: () => atGroup(model, (group) => modifyFields(group, { thread: () => Option.none() })),
     TypedThread: ({ text }) => atGroup(model, (group) => modifyFields(group, { draft: () => text })),
     SubmittedThread: () =>

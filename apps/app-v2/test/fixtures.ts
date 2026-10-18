@@ -2,6 +2,7 @@ import { Core } from "@amends-dev/core"
 import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
+import { Notification } from "@amends-dev/core/notification"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import { Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
@@ -118,3 +119,26 @@ export const opening = Schema.decodeSync(ThreadMessage.ThreadMessage)({
   publishedAt: "2026-10-18T12:00:00Z",
   content: { _tag: "Text", text: "Plans for the week", mentions: [], revision: 1, editedAt: null }
 })
+
+/** Bob's reply in the thread. */
+export const reply = Schema.decodeSync(ThreadMessage.ThreadMessage)({
+  id: "message-2",
+  workspaceId: "workspace-1",
+  threadId: "thread-1",
+  author: { _tag: "Member", memberId: "member-2" },
+  via: null,
+  publishedAt: "2026-10-18T12:05:00Z",
+  content: { _tag: "Text", text: "Sounds good", mentions: [], revision: 1, editedAt: null }
+})
+
+/** Alice's notification of activity in the thread at `sequence`, recorded at `minute` past noon. */
+export const notificationOf = (id: string, sequence: number, minute: number) =>
+  Schema.decodeSync(Notification.Notification)({
+    id,
+    workspaceId: "workspace-1",
+    source: { logId: "thread-log", entryId: `entry-${id}` },
+    thread: { threadId: "thread-1", groupId: "general", sequence },
+    recipient: { _tag: "Human", id: "alice", memberId: "member-1" },
+    recordedAt: `2026-10-18T12:${String(minute).padStart(2, "0")}:00Z`,
+    state: { _tag: "Pending" }
+  })

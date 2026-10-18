@@ -6,8 +6,9 @@ import { CoreError } from "@amends-dev/core/error"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
+import { Notification } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
-import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage, ThreadMessageService } from "@amends-dev/core/thread"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { Invitation, InvitationService, Member, type Workspace } from "@amends-dev/core/workspace"
 import {
@@ -354,6 +355,58 @@ describe("Store", () => {
             ?.record.value.id
         ).toBe(given.record.value.id)
       }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live("a reply to the person's thread reaches their inbox, and reading the thread settles it", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const bob = Identity.HumanId.make("bob")
+      yield* admit(gateway, workspace, bob)
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+
+      yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plans", mentions: [] })
+      const [started] = yield* firstWhere(
+        store.threads(Group.GeneralId),
+        ([thread]) => thread !== undefined && !thread.thread.pending
+      )
+      const threadId = started!.thread.record.value.id
+      yield* gateway
+        .asMember(
+          workspace.id,
+          Identity.MemberReference.cases.Human.make({ id: bob }),
+          Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
+            threadMessageService.publish({ threadId, text: "Sounds good", mentions: [] })
+          )
+        )
+        .pipe(Effect.scoped)
+      const isWaiting = ({ notification }: Store.InboxEntry) =>
+        Notification.State.isAnyOf(["Pending"])(notification.record.value.state)
+      const entry = (yield* firstWhere(store.inbox, (entries) => entries.some(isWaiting))).find(isWaiting)
+      expect(Option.map(entry!.message, (message) => message.content)).toMatchObject(
+        Option.some({ _tag: "Text", text: "Sounds good" })
+      )
+      expect(Option.map(entry!.thread, ({ id }) => id)).toEqual(Option.some(threadId))
+      expect(Option.map(entry!.opening, (message) => message.content)).toMatchObject(
+        Option.some({ _tag: "Text", text: "Plans" })
+      )
+
+      // Reading the thread through the reply settles its notification at once, then on the server.
+      yield* store.write("ThreadMarkedRead", {
+        threadId,
+        throughSequence: entry!.notification.record.value.thread!.sequence
+      })
+      const isSeen = ({ notification }: Store.InboxEntry) =>
+        Notification.State.isAnyOf(["Seen"])(notification.record.value.state)
+      yield* firstWhere(
+        store.inbox,
+        (entries) => entries.every(isSeen) && entries.some(({ notification }) => notification.pending)
+      )
+      yield* firstWhere(store.inbox, (entries) => entries.every((item) => isSeen(item) && !item.notification.pending))
+    }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })
 

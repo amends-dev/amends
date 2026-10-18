@@ -402,8 +402,24 @@ const isAfter = (record: Notification.Notification, cursor: Cursor) =>
 const isBefore = (record: Notification.Notification, cursor: Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) < 0
 
-/** Is this the person's pending notification from the thread's activity up to the position? */
-const isPendingInThread = (record: Notification.Notification, position: ReadState.ThreadPosition) =>
+/**
+ * Whether `record` comes at or before `cursor` in inbox order, by recorded time and then ID in
+ * binary order: what marking a recipient's notifications seen through a point marks.
+ *
+ * @category predicates
+ * @since 0.1.0
+ */
+export const isAtOrBefore = (record: Notification.Notification, cursor: Cursor): boolean =>
+  byRecorded(record, Object.assign({}, record, cursor)) <= 0
+
+/**
+ * Whether `record` is the person's pending notification from a thread's activity up to their
+ * position in it: what reading the thread through that position marks seen.
+ *
+ * @category predicates
+ * @since 0.1.0
+ */
+export const isPendingInThread = (record: Notification.Notification, position: ReadState.ThreadPosition): boolean =>
   Notification.Recipient.isAnyOf(["Human"])(record.recipient) &&
   record.recipient.memberId === position.memberId &&
   Notification.State.isAnyOf(["Pending"])(record.state) &&

@@ -8,7 +8,9 @@ the public teams they may join, where they create a team, start a conversation w
 member, rename a team, admit and remove its members, follow it, join it, or leave it; a group's
 threads with how much of each is new; a thread's messages, where the person starts a thread,
 replies, renames a thread, edits or deletes their own messages, and follows or stops following a
-thread, which opening reads through its latest activity; and the workspace's settings, where they
+thread, which opening reads through its latest activity; the person's inbox, the notifications
+waiting for them, each as the message it is about, to open, or to mark seen one at a time or all
+at once; and the workspace's settings, where they
 rename the workspace and themselves, change a member's role, remove a member, hand the workspace
 to another person, and invite someone by address or revoke an invitation. What they do shows at
 once, marked as sending, even offline, and what the server refuses comes back with why. A control
@@ -35,11 +37,11 @@ that decides, and commands that act.
 - `model.ts`: the host's address and the page. Signed out, the sign-in form, a step at a time;
   signed in, the session, the person's workspaces, and the one open: its store's state, what its
   replica holds of the workspace, its groups, members, roles and their assignments, invitations,
-  group memberships, and the person's group follows, the person's unfinished actions, the team or
-  conversation they are starting, and the open pane: a group, with its threads, the thread being
-  started, the name being given it, the member chosen to admit, and the open thread, with its
-  messages and the reply; or the settings, with the names being given and the invitation being
-  written.
+  the person's notifications, group memberships, and the person's group follows, the person's
+  unfinished actions, the team or conversation they are starting, and the open pane: a group, with
+  its threads, the thread being started, the name being given it, the member chosen to admit, and
+  the open thread, with its messages and the reply; the inbox; or the settings, with the names
+  being given and the invitation being written.
 - `message.ts`, `update.ts`: what happens and what it changes. A message the page is past, such as
   a code check finishing after the person left the form, changes nothing.
 - `command.ts`: the sign-in requests, keeping the session, listing workspaces, and signing out, each
@@ -76,7 +78,9 @@ that decides, and commands that act.
   deleting a message, ending the person's part in a thread or taking up one they ended, moving
   their position in a thread or a group, removing a member from a team, leaving, ending or taking
   up a follow of a group, renaming the workspace or themselves, handing the workspace over,
-  removing a member from it, revoking an invitation, and revoking the roles a new one replaces.
+  removing a member from it, revoking an invitation, revoking the roles a new one replaces, and
+  marking notifications seen, one, every one up to a point, or those from a thread the person
+  reads, by core's own `NotificationStore.isAtOrBefore` and `isPendingInThread`.
   Following a thread they never took part in, or a group they never followed, waits for the
   server, which gives the participation or the follow their group membership; so does issuing an
   invitation, whose recipient's account only the server finds. `overlay` applies the unfinished actions, in the order they were
@@ -93,8 +97,9 @@ that decides, and commands that act.
   the server's records alone, and the person's unfinished actions beside them: `Completed` drops
   the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
   of a kind at a place, `threads` a group's threads with their messages, and `actions` the person's
-  unfinished actions, each again after every change, and `every` the records of a kind wherever
-  they sit; the store reads each through `overlay`.
+  unfinished actions, each again after every change, `every` the records of a kind wherever they
+  sit, and `inbox` the person's notifications with the threads they come from, which the store
+  shows each by the message its activity is about; the store reads each through `overlay`.
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
   a store opens, reads, and takes actions offline. Each time its connection drops, the store builds
@@ -118,17 +123,19 @@ browser's storage:
 - Story tests drive `update`: signing in a step at a time, each failure going back a step with
   why, a workspace opening to a group, a thread, and a reply, a thread started, a write that could
   not be kept, a thread's actions, a team and a conversation started, a team's actions, the
-  workspace's settings, and signing out.
+  workspace's settings, the inbox, and signing out.
 - Scene tests drive the view as a person does, from typing their address through a reply and a
   refused action to signing out, from joining a team through creating one, seeing it at once, and
   admitting and removing its members, and an owner managing the workspace's settings, then seeing
-  only their own name to change once another member owns it.
+  only their own name to change once another member owns it, and the inbox's count, its
+  notifications, and opening one's thread.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and
   deletes, a team renamed, members removed and leaving, a group's follow ended and taken up, the
   workspace renamed and handed over, the person renamed, a member removed, roles replaced, an
-  invitation revoked, and refused actions applying nothing.
+  invitation revoked, notifications marked seen and settled by reading their thread, and refused
+  actions applying nothing.
 - The store's tests serve a host in process, the HTTP API and the sync server over memory storage
   on Bun, and open a store against it: the reset arrives, a change made over HTTP follows, and the
   store reads its replica again with the host gone; a thread it starts shows at once and becomes
@@ -136,6 +143,7 @@ browser's storage:
   and one to a thread that does not exist comes back rejected; a team and its admission, and a
   conversation, started in the browser come back as the server's under the IDs the browser gave
   them; an invitation by address reaches that address's account, and a role change becomes the
-  server's under the ID the browser gave it.
+  server's under the ID the browser gave it; and another member's reply reaches the person's
+  inbox, which reading the thread settles at once and then on the server.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

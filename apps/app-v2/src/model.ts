@@ -6,6 +6,7 @@
 
 import { Assignment, Role } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Notification } from "@amends-dev/core/notification"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { Invitation, Member, MemberId, Workspace } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
@@ -140,9 +141,23 @@ export const Settings = Schema.Struct({
 })
 export type Settings = typeof Settings.Type
 
-/** What the open workspace shows beside its groups: a group, or its settings. */
+/**
+ * A notification in the person's inbox, the thread it comes from with its opening message and the
+ * message it is about when the replica holds them, and whether a change to it is on its way.
+ */
+export const InboxItem = Schema.Struct({
+  notification: Notification.Notification,
+  pending: Schema.Boolean,
+  thread: Schema.Option(Thread.Thread),
+  opening: Schema.Option(ThreadMessage.ThreadMessage),
+  message: Schema.Option(ThreadMessage.ThreadMessage)
+})
+export type InboxItem = typeof InboxItem.Type
+
+/** What the open workspace shows beside its groups: a group, the person's inbox, or its settings. */
 export const Pane = defineTaggedUnion({
   Group: { group: OpenGroup },
+  Inbox: {},
   Settings: { settings: Settings }
 })
 export type Pane = typeof Pane.Type
@@ -157,7 +172,8 @@ export type Composing = typeof Composing.Type
 /**
  * The workspace the person opened, as their member of it: the workspace, and whether a change to
  * it is on its way; its store; what the replica holds of it: its groups, members, roles and their
- * assignments, invitations, groups' memberships, and the person's follows among them; the actions
+ * assignments, invitations, the person's notifications, groups' memberships, and the person's
+ * follows among them; the actions
  * not finished yet, why the last one could not be written, what the person is starting, and the
  * pane open in it.
  */
@@ -171,6 +187,7 @@ export const Opened = Schema.Struct({
   roles: Schema.Array(Role.Role),
   assignments: Schema.Array(AssignmentItem),
   invitations: Schema.Array(InvitationItem),
+  inbox: Schema.Array(InboxItem),
   memberships: Schema.Array(MembershipItem),
   follows: Schema.Array(FollowItem),
   actions: Schema.Array(ActionItem),

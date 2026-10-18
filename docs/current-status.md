@@ -177,12 +177,12 @@ The web and desktop apps have been removed, and their replacement,
 [`app-v2`](../apps/app-v2/README.md), is being built on Foldkit. It signs a person in, lists their
 workspaces, and keeps the one they open in sync through
 [`@amends-dev/sync`](../packages/sync/README.md), its replica in IndexedDB. It shows a workspace's
-groups, a group's threads, a thread's messages, and the workspace's settings, and takes what a
-person does to them as actions: creating a team or starting a conversation, renaming a team,
+groups, a group's threads, a thread's messages, the person's inbox, and the workspace's settings,
+and takes what a person does to them as actions: creating a team or starting a conversation, renaming a team,
 admitting and removing its members, joining, leaving, and following it; starting and renaming a
 thread, replying, editing and deleting their messages, following it, and reading it; and renaming
 the workspace and themselves, changing a member's role, removing a member, handing the workspace
-to another person, and inviting by address and revoking an invitation. Each shows at once and is
+to another person, inviting by address and revoking an invitation, and marking notifications seen. Each shows at once and is
 sent when the host can be reached, and a control shows only when the person's grants, read from
 their replica, allow it. The rest of a workspace is still worked in through the HTTP API. Beyond
 that:

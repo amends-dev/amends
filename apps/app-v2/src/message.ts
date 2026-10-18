@@ -5,6 +5,7 @@
 
 import { Role } from "@amends-dev/core/authorization"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Notification } from "@amends-dev/core/notification"
 import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
 import { Invitation, MemberId, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
@@ -17,6 +18,7 @@ import {
   FollowItem,
   Following,
   GroupItem,
+  InboxItem,
   InvitationItem,
   MemberItem,
   MembershipItem,
@@ -48,6 +50,7 @@ export const Message = defineMessageUnion({
   GotRoles: { roles: Schema.Array(Role.Role) },
   GotAssignments: { assignments: Schema.Array(AssignmentItem) },
   GotInvitations: { invitations: Schema.Array(InvitationItem) },
+  GotInbox: { items: Schema.Array(InboxItem) },
   GotMemberships: { memberships: Schema.Array(MembershipItem) },
   GotFollows: { follows: Schema.Array(FollowItem) },
   ClickedNewTeam: {},
@@ -81,6 +84,10 @@ export const Message = defineMessageUnion({
   },
   ClickedGroup: { groupId: GroupId.GroupId },
   ClickedSettings: {},
+  ClickedInbox: {},
+  ClickedNotification: { notificationId: Notification.NotificationId },
+  ClickedMarkSeen: { notificationId: Notification.NotificationId },
+  ClickedMarkAllSeen: {},
   ClickedRenameWorkspace: {},
   TypedWorkspaceName: { name: Schema.String },
   SubmittedWorkspaceName: {},

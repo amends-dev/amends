@@ -19,6 +19,8 @@ import {
   Invite,
   JoinGroup,
   LeaveGroup,
+  MarkAllNotificationsSeen,
+  MarkNotificationSeen,
   MarkThreadRead,
   PostReply,
   RemoveGroupMember,
@@ -45,7 +47,9 @@ import {
   design,
   general,
   membership,
+  notificationOf,
   opening,
+  reply,
   roles,
   session,
   signedIn,
@@ -439,6 +443,43 @@ describe("a workspace", () => {
       message(Message.ClickedRevokeInvitation({ invitationId })),
       Command.expectExact(RevokeInvitation({ invitationId })),
       Command.resolve(RevokeInvitation, Message.WroteAction())
+    )
+  })
+
+  it("opens the inbox, marks one notification seen or all of them through the newest, and opens one's thread", () => {
+    const older = notificationOf("notification-1", 2, 5)
+    const newer = notificationOf("notification-2", 3, 6)
+    const item = (notification: typeof older) => ({
+      notification,
+      pending: false,
+      thread: Option.some(thread),
+      opening: Option.some(opening),
+      message: Option.some(reply)
+    })
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedInbox()),
+      message(Message.GotInbox({ items: [item(newer), item(older)] })),
+      message(Message.ClickedMarkSeen({ notificationId: older.id })),
+      Command.expectExact(MarkNotificationSeen({ notificationId: older.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      message(Message.ClickedMarkAllSeen()),
+      Command.expectExact(MarkAllNotificationsSeen({ through: { recordedAt: newer.recordedAt, id: newer.id } })),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
+      // Opening one opens its thread, whose reading settles it.
+      message(Message.ClickedNotification({ notificationId: older.id })),
+      model((model) => {
+        expect(
+          Option.map(groupIn(model), ({ groupId, thread }) => ({
+            groupId,
+            thread: Option.map(thread, ({ threadId }) => threadId)
+          }))
+        ).toEqual(Option.some({ groupId: general.id, thread: Option.some(thread.id) }))
+      })
     )
   })
 

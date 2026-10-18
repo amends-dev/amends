@@ -9,12 +9,14 @@ import { Assignment, Role } from "@amends-dev/core/authorization"
 import type { CoreError } from "@amends-dev/core/error"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
+import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ReadState } from "@amends-dev/core/read-state"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { Invitation, Member, MemberId, WorkspaceId, WorkspaceSettings } from "@amends-dev/core/workspace"
 import * as Accounts from "@amends-dev/gateway/Accounts"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
+import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
 import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
 import type * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
 import * as Array from "effect/Array"
@@ -128,10 +130,19 @@ const nameOf = (group: Group.Group): string => ("name" in group ? group.name : g
 /** What each action does, as the person reads it. */
 const whatEach: Readonly<
   Record<
-    Event.Tag<EventGroup.Events<typeof ThreadSync.Actions | typeof GroupSync.Actions | typeof WorkspaceSync.Actions>>,
+    Event.Tag<
+      EventGroup.Events<
+        | typeof ThreadSync.Actions
+        | typeof GroupSync.Actions
+        | typeof WorkspaceSync.Actions
+        | typeof NotificationSync.Actions
+      >
+    >,
     string
   >
 > = {
+  NotificationSeen: "mark a notification seen",
+  NotificationsSeenThrough: "mark notifications seen",
   WorkspaceRenamed: "rename the workspace",
   OwnershipTransferred: "transfer ownership",
   MemberRenamed: "change your name",
@@ -213,6 +224,17 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
                     Stream.map(store.list("Assignment", workspace), (assignments): Message =>
                       Message.GotAssignments({
                         assignments: assignments.map(({ record, pending }) => ({ assignment: record.value, pending }))
+                      })
+                    ),
+                    Stream.map(store.inbox, (entries): Message =>
+                      Message.GotInbox({
+                        items: entries.map(({ notification, thread, opening, message }) => ({
+                          notification: notification.record.value,
+                          pending: notification.pending,
+                          thread,
+                          opening,
+                          message
+                        }))
                       })
                     ),
                     Stream.map(store.list("Invitation", workspace), (invitations): Message =>
@@ -566,4 +588,18 @@ export const RevokeInvitation = Command.define("RevokeInvitation", {
   args: { invitationId: Invitation.InvitationId },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("InvitationRevoked", input))
+})
+
+/** Mark the notification `notificationId` seen. */
+export const MarkNotificationSeen = Command.define("MarkNotificationSeen", {
+  args: { notificationId: Notification.NotificationId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("NotificationSeen", input))
+})
+
+/** Mark every notification seen, up to and including the one `through` names. */
+export const MarkAllNotificationsSeen = Command.define("MarkAllNotificationsSeen", {
+  args: { through: NotificationStore.Cursor },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("NotificationsSeenThrough", input))
 })

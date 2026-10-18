@@ -28,6 +28,7 @@ import {
   Invite,
   JoinGroup,
   managedResources,
+  MarkAllNotificationsSeen,
   PostReply,
   RemoveGroupMember,
   RevokeInvitation
@@ -45,7 +46,9 @@ import {
   design,
   general,
   membership,
+  notificationOf,
   opening,
+  reply,
   roleOf,
   roles,
   session,
@@ -341,6 +344,52 @@ describe("the app", () => {
       expect(role("button", { name: "Remove" })).toBeAbsent(),
       expect(role("button", { name: "Make owner" })).toBeAbsent(),
       expect(role("region", { name: "Invitations" })).toBeAbsent()
+    )
+  })
+
+  it("a person sees how many notifications wait, reads them in the inbox, and opens one's thread", () => {
+    const notification = notificationOf("notification-1", 2, 5)
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(Message.GotGroups({ groups: [{ group: general, pending: false }] })),
+      Subscription.emit(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(
+        Message.GotInbox({
+          items: [
+            {
+              notification,
+              pending: false,
+              thread: Option.some(thread),
+              opening: Option.some(opening),
+              message: Option.some(reply)
+            }
+          ]
+        })
+      ),
+      click(role("button", { name: "Inbox (1)" })),
+      expect(text("Bob: Sounds good · Plans for the week in General")).toExist(),
+      click(role("button", { name: "Mark all seen" })),
+      Command.expectExact(
+        MarkAllNotificationsSeen({ through: { recordedAt: notification.recordedAt, id: notification.id } })
+      ),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
+      click(role("button", { name: "Open" })),
+      expect(role("region", { name: "Thread" })).toExist(),
+      // Once nothing waits, the inbox says so.
+      Subscription.emit(Message.GotInbox({ items: [] })),
+      click(role("button", { name: "Inbox" })),
+      expect(text("Nothing new.")).toExist()
     )
   })
 })

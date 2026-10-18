@@ -135,6 +135,12 @@ export interface ThreadContents {
   readonly participations: ReadonlyArray<RecordOf<"ThreadParticipation">>
 }
 
+/** The person's notifications, with each thread they come from as its group's list holds it. */
+export interface InboxRecords {
+  readonly notifications: ReadonlyArray<RecordOf<"Notification">>
+  readonly threads: ReadonlyArray<ThreadRecords>
+}
+
 type QueryError = IndexedDbQueryBuilder.IndexedDbQueryError
 
 /**
@@ -162,6 +168,8 @@ export class Replica extends Context.Service<
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadRecords>, QueryError>
     /** What the replica holds in `threadId`, and again after each change. */
     readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadContents, QueryError>
+    /** The person's notifications and the threads they come from, and again after each change. */
+    readonly inbox: Stream.Stream<InboxRecords, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<Action>, QueryError>
   }
@@ -221,21 +229,45 @@ const make = Effect.gen(function* () {
     )
   }
 
+  /** `thread`, with its messages, its activities, and the member's position in it. */
+  const selectContents = (thread: RecordOf<"Thread">) => {
+    const place = ReplicaRecord.Place.cases.Thread.make({ threadId: thread.value.id })
+    return Effect.map(
+      Effect.all({
+        messages: select("ThreadMessage", place),
+        activities: select("ThreadActivity", place),
+        positions: select("ThreadPosition", place)
+      }),
+      (held): ThreadRecords => ({ thread, ...held })
+    )
+  }
+
   /** The threads of `groupId`, each with its messages, its activities, and the member's position in it. */
   const selectThreads = (groupId: GroupId.GroupId) =>
     Effect.flatMap(select("Thread", ReplicaRecord.Place.cases.Group.make({ groupId })), (threads) =>
-      Effect.forEach(threads, (thread) => {
-        const place = ReplicaRecord.Place.cases.Thread.make({ threadId: thread.value.id })
-        return Effect.map(
-          Effect.all({
-            messages: select("ThreadMessage", place),
-            activities: select("ThreadActivity", place),
-            positions: select("ThreadPosition", place)
-          }),
-          (held): ThreadRecords => ({ thread, ...held })
-        )
-      })
+      Effect.forEach(threads, selectContents)
     )
+
+  /** The person's notifications, and the threads they come from, by the groups the notifications name. */
+  const selectInbox = Effect.gen(function* () {
+    const notifications = (yield* records.select("byKind").equals("Notification")).flatMap(({ record }) =>
+      ReplicaRecord.ReplicaRecord.isAnyOf(["Notification"])(record) ? [record] : []
+    )
+    const sources = new Map(
+      notifications.flatMap(({ value }) => (value.thread === undefined ? [] : [[value.thread.threadId, value.thread]]))
+    )
+    const groupIds = new Set(Array.from(sources.values(), ({ groupId }) => groupId))
+    const threads = (yield* Effect.forEach(groupIds, (groupId) =>
+      select("Thread", ReplicaRecord.Place.cases.Group.make({ groupId }))
+    )).flat()
+    return {
+      notifications,
+      threads: yield* Effect.forEach(
+        threads.filter((thread) => sources.has(thread.value.id)),
+        selectContents
+      )
+    }
+  })
 
   const changing = <A, E>(tables: ReadonlyArray<"records" | "actions">, effect: Effect.Effect<A, E>) =>
     query.reactivity.mutation(tables, effect)
@@ -272,6 +304,7 @@ const make = Effect.gen(function* () {
         })
       )
     },
+    inbox: query.reactivity.stream(["records"], selectInbox),
     actions: query.reactivity.stream(
       ["actions"],
       Effect.map(actions.select(), (rows) =>

@@ -1,6 +1,7 @@
 import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
+import { Notification } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Thread, ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
@@ -337,6 +338,51 @@ describe("Pending.overlay, for the workspace", () => {
         },
         pending: true
       }
+    ])
+  })
+})
+
+describe("Pending.overlay, for notifications", () => {
+  const place = ReplicaRecord.Place.cases.Workspace.make({})
+  const notification = (id: string, minute: number, sequence: number, memberId = "member-1") =>
+    cases.Notification.make({
+      value: Schema.decodeSync(Notification.Notification)({
+        id,
+        workspaceId: "workspace-1",
+        source: { logId: "thread-log", entryId: `entry-${id}` },
+        thread: { threadId: "thread-1", groupId: "general", sequence },
+        recipient: { _tag: "Human", id: memberId, memberId },
+        recordedAt: `2026-10-18T12:${String(minute).padStart(2, "0")}:00Z`,
+        state: { _tag: "Pending" }
+      })
+    })
+  const seenAt = (record: ReturnType<typeof notification>, minute: number) => ({
+    value: { ...record.value, state: Notification.State.cases.Seen.make({ seenAt: at(minute) }) },
+    pending: true
+  })
+  const first = notification("n-1", 1, 2)
+  const second = notification("n-2", 2, 3)
+  const third = notification("n-3", 3, 4)
+  const someoneElses = notification("n-4", 1, 2, "member-2")
+
+  it("marks one seen, and every one of the person's up to a point, in the order core marks them", () => {
+    const seenOne = unfinished("NotificationSeen", { notificationId: "n-3" }, 10)
+    const seenThrough = unfinished(
+      "NotificationsSeenThrough",
+      { through: { recordedAt: "2026-10-18T12:02:00Z", id: "n-2" } },
+      11
+    )
+    expect(
+      view(Pending.overlay("Notification", place, [first, second, third, someoneElses], [seenOne, seenThrough]))
+    ).toEqual([seenAt(first, 11), seenAt(second, 11), seenAt(third, 10), { value: someoneElses.value, pending: false }])
+  })
+
+  it("settles the person's notifications from a thread up to where they read it", () => {
+    const read = unfinished("ThreadMarkedRead", { threadId: "thread-1", throughSequence: 3 }, 12)
+    expect(view(Pending.overlay("Notification", place, [first, second, third], [read]))).toEqual([
+      seenAt(first, 12),
+      seenAt(second, 12),
+      { value: third.value, pending: false }
     ])
   })
 })
