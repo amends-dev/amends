@@ -48,6 +48,11 @@ export * as SyncSchema from "./SyncSchema.ts"
 /**
  * @since 0.1.0
  */
+export * as SyncServer from "./SyncServer.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as TaskSync from "./TaskSync.ts"
 
 /**

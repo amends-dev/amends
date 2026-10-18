@@ -11,7 +11,7 @@ the user interface in [apps](../apps/README.md).
 | [`core`](core/README.md)             | One workspace's domain: its journal, authorization, and operations.                  |
 | [`gateway`](gateway/README.md)       | How a host enters core, and what a host implements: storage, sign-in, the directory. |
 | [`http`](http/README.md)             | The HTTP API: the contract clients call and its server, over the gateway.            |
-| [`sync`](sync/README.md)             | Keeps a browser's workspace in sync: actions, changes, rejections, eventlog events.  |
+| [`sync`](sync/README.md)             | Keeps a browser's workspace in sync over eventlog: its contract, and the server.     |
 | [`cluster`](cluster/README.md)       | Jobs, the work outside requests, on Effect Cluster: agents' turns and deliveries.    |
 | [`connection`](connection/README.md) | The integrations a host installs, a workspace's connections, and the model catalog.  |
 | [`toolkit`](toolkit/README.md)       | Tool sources, such as MCP servers and HTTP APIs, in one shape. Published to npm.     |

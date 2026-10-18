@@ -452,6 +452,8 @@
       "dependencies": {
         "@amends-dev/connection": "workspace:*",
         "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
+        "@amends-dev/log": "workspace:*",
         "effect": "catalog:",
       },
     },

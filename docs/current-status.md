@@ -232,9 +232,10 @@ permissions, and custom roles, which a workspace would edit itself, are not impl
 ## Live delivery
 
 Core follows each member's replica as the workspace changes (`ReplicaService.changes`, see core's
-[replica](../packages/core/README.md#replica)), but no protocol serves it yet:
-[`@amends-dev/sync`](../packages/sync/README.md) has its contract and no server. Typing and presence
-are not implemented. A turn's log still streams over
+[replica](../packages/core/README.md#replica)), and [`@amends-dev/sync`](../packages/sync/README.md)'s
+server runs the actions a browser writes and serves its replica as Effect eventlog's RPC handlers,
+but no host serves them yet: there is no WebSocket transport, and nowhere to register a browser's
+eventlog identity. Typing and presence are not implemented. A turn's log still streams over
 HTTP as its session log grows, without drafts of the step being written. Other gaps:
 
 - PostgreSQL wakes log readers, such as a turn log's, with `LISTEN`/`NOTIFY`, sent just after each
