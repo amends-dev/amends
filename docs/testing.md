@@ -16,9 +16,6 @@ bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends-dev/icons
 bun run test --project @amends-dev/ui
-bun run test --project @amends-dev/client
-bun run test --project @amends-dev/web
-bun run test --project @amends-dev/desktop
 bun run test --project @amends-dev/site
 bun run test --watch packages/core/test
 bun run check
@@ -28,10 +25,8 @@ The root configuration discovers only application tests. The `backend` project
 covers shared packages, whose tests run over the memory implementation in core and the gateway, and
 the sandbox and harness adapters, whose live tests run only when an `AMENDS_TEST_*` flag asks, as
 [integration resources](#integration-resources) describes. The `postgresql` project covers the
-PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
-headless state; web and desktop test their own route/UI integration, and web's bundle test builds the app and fails when
-core's implementation reaches the browser bundle; verify both frontend builds and desktop
-startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). The site's
+PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI uses
+Solid/Vite transforms and Happy DOM. The site's
 tests cover its documentation generator's Markdown transforms, in Node. Vendored repositories are
 outside test discovery.
 
@@ -54,7 +49,10 @@ content, driven through `test/viewport.ts`, which evaluates the width queries ag
 the test sets. `test/browser-defaults.ts` supplies the browser's initial `animation-name: none`,
 which Happy DOM omits, so Kobalte popups can finish unmounting. Happy DOM does not lay out or
 paint: compare stories with their Lunacy frames in a browser, in both modes and at phone, touch,
-and desktop widths, before relying on them.
+and desktop widths, before relying on them. Shell's Content stories verify centering, narrow widths,
+both overflow edges, RTL, and enlarged text, and whole-page scrolling beside the independent
+regions. Theme stories verify nested CSS scopes, font/color-scheme inheritance, and retained input
+state.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin
@@ -77,7 +75,7 @@ bun run test --maxWorkers=2
 ```
 
 The UI project runs the workshop's stories and focused component tests. Excluding it leaves
-the client and app tests, browser bundle check, and all backend integrations enabled.
+the icons, site, and backend tests enabled.
 It does not remove the cost of creating and migrating PostgreSQL databases for individual
 tests. The two-worker command limits concurrent test processes for lower CPU pressure;
 the default is four, and fewer workers can take longer.
@@ -108,7 +106,7 @@ pushes to it, as parallel jobs, so a run takes as long as its slowest job:
 | Static             | Lint, format, package boundaries, generated icons, and the PostgreSQL migration          |
 | Types              | `bun run typecheck`                                                                      |
 | Tests              | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
-| Frontend build     | The web and desktop bundles, the UI workshop, and the site                               |
+| Frontend build     | The UI workshop and the site                                                             |
 | Published packages | `bun run dist check`: each published package as npm gets it, its dependencies from npm   |
 | Check              | Succeeds only when every job above does; main's ruleset requires it for merging          |
 
@@ -121,10 +119,6 @@ outgrow their job, give it its own matrix entry or more shards; `--shard` splits
 The `backend` and `postgresql` projects allow each test 20 seconds rather than Vitest's 5: on the
 two-CPU runners, sharing the machine with PostgreSQL, their heaviest tests (such as a commit
 binding more parameters than one statement can) run about three times slower than on a laptop.
-
-[`.github/workflows/native.yml`](../.github/workflows/native.yml) runs desktop's `cargo fmt` and
-`cargo check` only when `apps/desktop/src-tauri` or the workflow changes, with Tauri's Linux
-libraries and a Rust build cache.
 
 [`.github/workflows/site.yml`](../.github/workflows/site.yml) deploys the site with Alchemy: main to
 amends.dev, and each pull request opened from this repository to a preview that it links in a
@@ -308,41 +302,9 @@ Subprocess fixtures create each database before starting the host, so passing ho
 tests do not prove that startup works against a database you configure. Follow the
 [setup guide](../hosts/local/README.md#run) to create it first.
 
-## Application foundation
+## Host integrations
 
-Web and desktop declare their router trees as children of `Application`. Each
-owns a sign-in page over client hooks and UI screens.
-Their tests exercise real form submission through the generated client, directory
-validation before navigation, persistence, safe return destinations, and explicit
-recovery. Web also verifies disposal when navigation interrupts verification.
-Live backend behavior is verified against a local host in the browser; browser
-and native review verify the actual app origins and layouts.
-
-Client's session and directory suites verify headless storage, scope lifetime, query
-state, authorization failure, and retry with isolated transports. They require no UI
-package or router. Web's application suite verifies safe redirects, route guards,
-workspace changes, and credential/request cleanup. Desktop's application suite tests
-its independent composition with the real hash router. Each app composes its screens
-from UI, whose workshop at port 6010 covers the patterns, components, and screens;
-client has no Storybook dependency or workshop.
-
-Client's [sign-in suite](../apps/client/test/sign-in.test.tsx) exercises the generated
-HTTP client through isolated fetch transports, including one that resolves after
-abort. It covers contract validation, payloads, rejection reasons, malformed session
-responses, explicit retry/resend, duplicate guards, and session installation. Explicit
-response resolvers and observable abort signals verify email changes, form disposal,
-credential replacement, and concurrent controllers without sleeps. These headless
-tests complement the app route tests.
-
-Client's settings suite exercises `useWorkspaceSettings` over a scripted transport: how it
-shapes the roster and invitations, a stale role change kept through a refresh, an invitation
-retried with the same request key, and an invitation whose list refresh failed and completes
-once a refresh succeeds. UI's settings stories play the flows over a local fixture, and the
-apps' tests cover the settings routes, inviting, and removing.
-
-The local host's HTTP tests exercise desktop CORS preflights, including the generated
-client's `b3` tracing header, and 401 response headers. Its sandbox integrations are tested
-everywhere, Daytona's against a fake of Daytona's API in the test's process; with
+The local host's sandbox integrations are tested everywhere, Daytona's against a fake of Daytona's API in the test's process; with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, they also check a real organization's key and
 create a sandbox through a connection. Its harness integrations are tested everywhere, amends's
 agent over scripted models and opencode as far as its bundled bridge. With `OPENROUTER_API_KEY`
@@ -351,10 +313,3 @@ OpenRouter's free model: with `AMENDS_TEST_MODELS=1`, amends's agent runs a turn
 of an MCP connection to a server on this machine; with `AMENDS_TEST_OPENCODE=1`, opencode runs a
 turn under each of its integrations in this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, Daytona's.
 After changing host runtime setup, also perform the temporary-port startup check.
-Verify both app builds and native hash navigation after changing app composition.
-
-Shell's Content stories verify centering, narrow widths, both overflow edges, RTL,
-and enlarged text. Whole-page scrolling is tested alongside the existing independent
-regions. Theme stories verify nested CSS scopes, font/color-scheme inheritance,
-and retained input state. App route tests also check that the skip link focuses
-Main without changing the browser route or desktop hash.

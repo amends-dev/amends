@@ -73,8 +73,6 @@ jobs:
           - suite: apps
             args: >-
               --project @amends-dev/icons --project @amends-dev/ui
-              --project @amends-dev/client
-              --project @amends-dev/web --project @amends-dev/desktop
               --project @amends-dev/site
     env:
       # Each PostgreSQL shard starts its own cluster from the runner's installation.
@@ -94,12 +92,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       # Type checking has its own job, so these run the bundlers alone.
-      - name: Web
-        working-directory: apps/web
-        run: bun run --bun vite build
-      - name: Desktop frontend
-        working-directory: apps/desktop
-        run: bun run --bun vite build
       - name: UI workshop
         working-directory: apps/ui
         run: bun run --bun storybook build --output-dir dist --disable-telemetry

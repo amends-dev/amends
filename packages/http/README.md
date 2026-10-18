@@ -3,9 +3,9 @@
 The HTTP protocol of amends: its public API, declared with Effect's `HttpApi`, and the server that
 implements it over the [gateway](../gateway/README.md). The contract gives every endpoint's path,
 request and response schemas, status codes, and the bearer authentication it requires, and one
-handler module per endpoint group implements it with Effect's `HttpApiBuilder`. The
-[client](../../apps/client/README.md) calls the contract through a typed client derived from it,
-and the [local host](../../hosts/local/README.md) serves the handlers on Bun. Responses and domain
+handler module per endpoint group implements it with Effect's `HttpApiBuilder`. A client calls the
+contract through a typed client derived from it, and the [local host](../../hosts/local/README.md)
+serves the handlers on Bun. Responses and domain
 errors reuse core's and the gateway's schemas. It is internal to this repository and not published
 to npm.
 
@@ -16,12 +16,11 @@ documentation at `/docs`.
 
 `Api` is the whole contract, and each group, such as `MembersGroup`, one set of endpoints, built
 with Effect's `HttpApi.make` and `HttpApiGroup.make`. A typed client derives from `Api`, as the
-client app's does through Effect's `AtomHttpApi` and the local host's tests' through
-`HttpApiClient`, and a server registers handlers for each group with `HttpApiBuilder`.
+local host's tests' does through `HttpApiClient`, and a server registers handlers for each group with `HttpApiBuilder`.
 
 A client imports the contract's modules by their subpaths, such as `@amends-dev/http/Api` and
-`@amends-dev/http/ThreadsGroup`, and never the package's root or a handler module, so the browser
-bundle carries no server code; the web app's bundle test checks it. It decodes with the schemas core
+`@amends-dev/http/ThreadsGroup`, and never the package's root or a handler module, so a browser
+bundle carries no server code. It decodes with the schemas core
 and the gateway declare, imported from those packages.
 
 `Authentication` is bearer middleware that provides `Principal`, the authenticated human or agent

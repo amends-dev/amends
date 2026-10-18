@@ -1,8 +1,7 @@
 /**
- * The local host's HTTP server: the routes and OpenAPI documentation of `@amends-dev/http`, with
- * the CORS policy the desktop app needs, served by Bun on the loopback interface over a host layer
- * and an authentication. As the server stops, open change streams end first, so it waits only for
- * ordinary requests.
+ * The local host's HTTP server: the routes and OpenAPI documentation of `@amends-dev/http`, served
+ * by Bun on the loopback interface over a host layer and an authentication. As the server stops,
+ * open streams end first, so it waits only for ordinary requests.
  *
  * @since 0.1.0
  */
@@ -17,31 +16,13 @@ import * as Layer from "effect/Layer"
 import type * as LocalHost from "./LocalHost.ts"
 
 /**
- * Register the HTTP API, its OpenAPI document, and docs over the required host services, with a
- * CORS policy that admits the desktop app's origins and the headers clients send. Tests serve it
- * without the Bun server.
+ * Register the HTTP API, its OpenAPI document, and docs over the required host services. Tests
+ * serve it without the Bun server.
  *
  * @category layers
  * @since 0.1.0
  */
-export const layerRoutes = Layer.mergeAll(
-  Routes.layer,
-  Routes.layerDocs,
-  HttpRouter.cors({
-    allowedOrigins: ["http://127.0.0.1:1420", "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"],
-    allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Authorization",
-      "Content-Type",
-      "Idempotency-Key",
-      "Amends-Workspace",
-      "traceparent",
-      "tracestate",
-      "b3"
-    ],
-    credentials: false
-  })
-)
+export const layerRoutes = Layer.mergeAll(Routes.layer, Routes.layerDocs)
 
 /**
  * The largest request body the server reads, in bytes: one mebibyte. Bun answers 413 beyond it.

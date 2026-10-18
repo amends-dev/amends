@@ -37,8 +37,7 @@ Every package declares `"sideEffects": false`: importing a module runs nothing b
 declarations, so a bundler drops what a client does not use. A protocol contract reaches core's
 records, inputs, and errors, never its operations: the errors a protocol exposes are
 `CoreError`'s kinds, schemas alone in `error/CoreError.ts`. A browser bundle then carries core's
-schemas without their implementation; the web app's bundle test fails when an implementation
-reaches it.
+schemas without their implementation.
 
 ## Features and module names
 

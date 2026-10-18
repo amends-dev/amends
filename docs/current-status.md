@@ -171,115 +171,17 @@ integrations they use, agents, turns and their logs, channels and the events the
 the change feed, and typing. No operation reaches a group from outside it, so there is no
 workspace-wide oversight of private groups or direct groups by design.
 
-## Conversations in the apps
+## The workspace app
 
-Web and desktop run the workspace on the UI Shell: they list the reader's groups in the
-sidebar, show a group's stream of threads by their opening messages, and open a thread's messages
-in the side panel, all live over the change feed. A message under the pointer, or holding focus, is
-lit and floats its actions at its top right: Reply in thread on a thread's opening message, and
-View turn log on an agent's reply, with reactions and more to follow. Nothing is noted under a
-message for these. On touch screens a tap on the message shows its actions, and a message with no
-replies also offers "Reply in thread" under it. Elsewhere, a thread with no replies notes under its message only who is typing or which
-agent is at work, such as "Yumi working", which opens the thread. The page composer starts a thread and the thread composer replies, keeping drafts per group
-and thread within the session, and both mention group members picked after `@`. A name typed
-without picking it addresses no one. A member's name, avatar, or mention opens their profile card
-on hover, focus, or a tap, offering Message, Open agent for an agent, or Change name on the
-reader's own; cards show no photo, status, role, or local time, which the workspace does not hold. A member's messages within five minutes of each other stack
-under one avatar and name, as in Slack, unless a thread's replies summary comes between. Messages render as markdown, with mentions naming members
-as they are called now, in the timeline, the inbox's one-line previews, and a turn log's reply and
-streaming draft. The composer formats the draft as it is written, from its toolbar, Slack's
-shortcuts, or markdown typed or pasted as text (` ``` ` then Shift+Enter opens a code block),
-and sends it as markdown; a mention is chosen after
-`@` and deletes whole. It edits paragraphs, emphasis, strikethrough, code and code blocks, lists,
-quotes, headings, rules, and links: tables and task lists render in messages but pasted markdown
-loses them. Typing "/" as the whole draft lists commands that act rather than post: a group's page
-offers `/follow` or `/unfollow` and, to those who may rename it, `/rename`, which opens its
-settings with the name selected; a thread's composer offers `/follow` or `/unfollow` for the thread,
-confirmed by a toast as the bell's changes are. There are no other commands yet. Its formatting toolbar starts hidden on phones.
-Links open in a new browser tab on the web; the desktop shell has no handler that opens them in
-the system browser. Code blocks have no syntax highlighting. Messages written before mention
-links, which held a plain `@name`, no longer highlight their mentions. An open thread is read through the newest activity it
-shows, and a visible group's stream catches the reader up with the group, clearing the stream's
-unread dots, the sidebar's new-activity dot, and the pending counts of what was read, but only
-while the page is visible. A thread counts as read when it opens, however far back the reader has
-scrolled. Someone writing a reply shows as typing in the thread panel and on the thread's row in
-the stream until their signal runs out or their message arrives; starting a thread sends no
-typing, since there is no thread yet. In a team group, the thread panel's bell follows and
-unfollows its thread, and the header bell follows the group so that threads started there
-afterwards include the reader, filled while following and confirmed by a toast; direct
-conversations have neither, since everyone takes part in all of them. Following agents on someone's
-behalf has no control. The thread panel notes someone following the thread or stopping, between its
-messages; joining by writing or being mentioned shows only in the message. Leaving or being removed
-from a group shows in its members, not in its threads or stream, though threads keep the notes
-recorded before departures stopped writing to them.
+There is no app to work in a workspace: the web and desktop apps have been removed, and their
+replacement, a browser app that keeps a replica of the workspace in sync through
+[`@amends-dev/sync`](../packages/sync/README.md), is being built. Until it lands, a workspace is
+reached only through the HTTP API.
 
-Every workspace starts with a general group that every member joins with the workspace and leaves
-only by leaving the workspace; workspaces created before it existed have none. Agents created on the
-Agents page join it as every member does. The sidebar lists teammates the reader has
-not messaged under Direct messages, capped at six, and opens a first message to them. There is no
-conversation with oneself, since a direct group needs another member.
-
-People are shown by the name they chose in the workspace, which every member has. The apps ask
-for it when creating a workspace or accepting an invitation, suggesting one from an email address,
-and the account menu changes it later. Each
-member names only themselves: nobody renames another member, and agents are named by whoever adds
-or configures them on the Agents page. There are no profile photos.
-
-Everyone gets "Create group" on the sidebar's Groups heading and the Groups page (every role holds
-`group.create`): a modal names a team group, picks its people and agents
-as chips, with the reader always included, and makes it private or public, then opens the new
-group with a "Group created" note. The Groups heading links to the Groups page: Your groups, and
-Discover, the public groups the reader may join, with their member counts; joining one opens it.
-Private groups show no member count there, since the groups list does not carry one.
-New public groups appear on it live, while renames and member counts of groups the reader is not
-in update when it next loads. The apps read what the reader may do from
-`GET /permissions`, which lists workspace-wide permissions only.
-
-A group's header shows its member stack, which opens Group settings on Members: the reader first as
-"You", then everyone by name. Any member of a team group adds people and agents with the member
-picker (`manageable` on each item of their groups list); in a private group any member also
-removes others, while in a public one only administrators and the owner do
-(`membersRemovable`). Anyone may leave a team group from its General tab, which returns them to
-the workspace's Inbox. Removing and leaving act on the first click, as the mocks show, where the
-previous UI asked for a second confirming click. Direct groups list their members without changes. Nobody manages a group they are
-not in: administrators moderate a public group by joining it. Leaving settles the reader's pending
-notifications from the group: they leave the Inbox count and its Unread filter at once and stay in
-All as history, noting the thread is no longer visible. A stream or thread open when the reader loses
-access, from any session, turns into an unavailable state rather than showing what it last read,
-and comes back if access returns.
-
-A team group's settings rename it for its members (every role holds `group.rename`), starting from
-the current name. The new name shows in the header, sidebar, and composer, and reaches other
-members over the change feed. A rename made elsewhere while settings are open refuses the save
-and says so; saving again replaces it knowingly. Visibility shows there but cannot change.
-
-Direct groups have their own Direct messages section in the sidebar, whose "+" offers everyone a
-New message modal. Choosing people opens the conversation the reader already has with exactly them, or a
-draft page at `/direct?to=…` whose first message starts it, creating their direct group; the group
-then replaces the draft in history. A draft keeps its text per set of people within the session.
-A direct group's member stack lists its members without changes, since its membership is fixed;
-including someone else means a new conversation.
-
-The Inbox destination lists the reader's notifications newest first under day seams, live, with
-the sidebar counting everything still pending for them: why each came (a mention, a reply in a
-followed thread, or a new thread in a followed group), from where, what was said, and how long
-ago. Opening one marks it seen at once and opens its thread beside the inbox at the message that
-notified the reader, reading back as far as it takes and setting that message apart; the panel
-says why it came, such as "Mention · #general". Reading the thread settles its notifications too.
-Unread keeps the open notification in place after it is seen, until another opens or its thread
-closes, and shows "You're all caught up" only once nothing unread and nothing open remains.
-"Mark all seen" marks everything through the newest one listed so that later arrivals stay
-unread. There is no way to mark one seen without opening it. The inbox reads each listed
-notification's source under current access, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
-placeholder: tasks admit and tell it, but nothing evaluates a policy for it yet.
-
-Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
-its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
-the workspace or one item; which item is not shown. Search is Jump to, over what the app already
-reads: pages, groups, conversations, people, agents, and connections, by name.
-Searching messages has no backend. A group shows its Threads tab alone: tasks have a backend, but
-the mocks' Tasks tab is not connected to it, and a thread's task shows nowhere yet; Files, reactions,
-and task references have no backend and are not shown.
+Some of what an app would show has no backend: searching messages, files, reactions, and task
+references. Triage, which routes tasks, stays a placeholder: tasks admit and tell it, but nothing
+evaluates a policy for it yet. There is no conversation with oneself, since a direct group needs
+another member.
 
 ## Storage cost
 
@@ -313,51 +215,6 @@ draw Workspace in two columns. Status marks and the status color tones follow "S
 mode / v01", which draws the Agents screens only; the connection tiles, the Direct messages rows,
 the tooltip, and the dark status values follow its rules without frames of their own, and the
 older frames still draw "Ready" and "Configured" labels.
-
-## Shared client foundation
-
-UI's `Theme` supplies the chosen mode and palette's variables and body typography, and its Shell and
-Centered patterns lay out pages inside and outside a workspace. Web and desktop compose those
-parts without local styles. Appearance preferences
-are persisted per app origin; System follows operating-system appearance. The account menu offers
-the original Neutral palette and experimental Linen, Sage, and Slate palettes, each in both modes.
-
-[Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
-compose headless session/API state from [client](../apps/client/README.md) and
-presentation from [UI](../apps/ui/README.md). Each app owns its route tree and
-maps query state to pages, errors, and navigation. Web uses browser routing and
-an API proxy; Tauri uses hash routing and connects to the existing local host. Its content
-security policy allows connections only to `http://127.0.0.1:8787`, so the desktop app cannot
-reach a host at any other address until that is configurable.
-UI has no dependency on client. Client depends on UI only for the screens' types, as a
-development dependency with type-only imports.
-Stored credentials are scoped by API URL and validated before protected content mounts.
-Changing credentials disposes the previous registry and requests. Session rejection,
-host failures, missing workspace access, and unknown routes have separate states.
-
-The headless [sign-in hook](../apps/client/src/sign-in.ts) owns email/code
-drafts, shared-schema validation, typed HTTP requests, explicit retry/resend, and
-signing in. Each mounted hook owns its requests; changing email,
-unmounting, and credential replacement cancel old work and ignore late responses.
-Web and desktop wire it to the UI sign-in screens, which map its codes to wording.
-
-Workspace picker and creation are implemented in both apps over client hooks and UI
-screens. [Workspace entry](workspace-entry.md) records composition and recovery.
-The picker lists active memberships and total members; creation refreshes the directory
-before navigation and retries uncertain submissions with the same key while mounted.
-[Workspace settings](workspace-settings.md) now supports rename, role editing, removal,
-ownership transfer, invitation creation/revocation, and recipient acceptance from the picker.
-Recipient decline, direct/scoped grant editing, richer directory metadata, remembered-workspace
-navigation, and work/activity pages remain unimplemented. The app-owned
-[workspace shell](workspace-shell.md) now provides persistent navigation, nested
-page boundaries, and an account popup with appearance and sign-out controls.
-The [change feed](change-feed.md) keeps workspace views current. Invitations
-from other workspaces appear only when the page wakes or reloads, since no identity-level feed
-exists.
-Signing out revokes the credential on the host as well as forgetting it locally; token refresh,
-native credential storage, and web/desktop login synchronization are future work.
-Route focus management, Tauri signing/updates,
-and cross-platform installer verification are pending.
 
 ## Development data
 
@@ -488,7 +345,7 @@ clients that reconnect repeatedly.
 
 ## Payload-format compatibility
 
-[Codec.makeForSchema](../packages/core/src/journal/Codec.ts) persists payloads through
+[Codec.makeForSchema](../packages/log/src/Codec.ts) persists payloads through
 `SchemaBinary.toCodec` and copies output buffers. The [codec tests](../packages/core/test/journal/codec.test.ts)
 freeze representative workspace and message bytes captured with Effect 4.0.0-rc.115, and a turn
 step's bytes captured with 4.0.0, checking both decoding and identical encoding on 4.0.0. They cover dates,

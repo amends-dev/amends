@@ -43,10 +43,7 @@ $ cd amends && bun install
 $ createdb amends
 $ AMENDS_DATABASE_URL=postgresql://localhost/amends \\
     bun run start
-Listening on http://127.0.0.1:8787
-
-# In another terminal, start the web app
-$ bun run --filter @amends-dev/web dev`
+Listening on http://127.0.0.1:8787`
 
 export function Home() {
   return (

@@ -43,10 +43,7 @@ export default defineConfig({
         }
       },
       "apps/icons/vite.config.ts",
-      "apps/ui/vite.config.ts",
-      "apps/client/vite.config.ts",
-      "apps/web/vite.config.ts",
-      "apps/desktop/vite.config.ts"
+      "apps/ui/vite.config.ts"
     ]
   }
 })

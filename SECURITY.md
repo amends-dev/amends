@@ -18,7 +18,7 @@ amends is in early development. Fixes go into `main` and the next release of eac
 ## Scope
 
 Reports are welcome for the published `@amends-dev` packages and for the app: the host, the HTTP
-API, workspace authorization, and the web and desktop apps.
+API, and workspace authorization.
 
 Some behavior is by design, and is not a vulnerability:
 

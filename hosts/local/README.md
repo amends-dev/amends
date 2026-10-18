@@ -24,8 +24,7 @@ AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
 
 The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at `/openapi.json` and
-interactive documentation at `/docs`. `bun run dev` restarts it when its source changes. The web
-app's development server proxies `/api` here, and the desktop app connects to it directly.
+interactive documentation at `/docs`. `bun run dev` restarts it when its source changes.
 
 | Setting                     | Default           | Accepted value                                                                  |
 | --------------------------- | ----------------- | ------------------------------------------------------------------------------- |
@@ -134,16 +133,10 @@ that run jobs commit to the same workspaces, so they must register the same
 [projections](../../docs/current-status.md#projection-sets-across-hosts), and a job's request one
 process stores is read by whichever process runs the job. Deploy them together.
 
-## Browser and desktop access
+## Browser access
 
-The web development server proxies `/api` to this host. Desktop connects directly to
-`http://127.0.0.1:8787`; it does not start a host process. The server's CORS layer allows
-`http://127.0.0.1:1420`, `tauri://localhost`, `http://tauri.localhost`, and
-`https://tauri.localhost`, with the authorization, content-type, idempotency-key,
-`Amends-Workspace`, and tracing headers (`traceparent`, `tracestate`, and the Effect client's compact `b3` header). It applies to
-authentication failures too, so clients can handle a 401. Other origins receive no allow-origin
-header. Requests carry bearer tokens, not cookies, so a different web origin needs a same-origin
-proxy or a change to the host's CORS layer.
+The host sends no CORS headers, so a browser reaches it from the same origin, such as through a
+development server's proxy. Requests carry bearer tokens, not cookies.
 
 ## Sign-in
 

@@ -43,9 +43,8 @@ remaining gaps with links to their owning code.
 | [Memory storage](../packages/core/README.md#memory)                  | The in-memory reference implementation of the storage contracts, in core and the gateway.                                       |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                                    |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                                          |
-| [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                                        |
-| [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                                  |
-| [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, view hooks, and route helpers.                                                     |
+| [Apps](../apps/README.md)                                            | The design system, its icons, and the site; the workspace app is being rebuilt.                                                 |
+| [Sync](../packages/sync/README.md)                                   | How a browser keeps a workspace in sync: actions, changes, and rejections, as Effect eventlog events.                           |
 | [UI](../apps/ui/README.md)                                           | Pattern-based design system from the Lunacy mocks, with every app screen.                                                       |
 | [Site](../apps/site/README.md)                                       | amends.dev on Astro and Starlight, with docs generated from the packages' READMEs and sources.                                  |
 
@@ -54,9 +53,9 @@ drawings, generation, and visual review in the UI workshop.
 
 ## Design and historical references
 
-- [Feature development](feature-development.md) records the agreed workflow and
-  connected-feature boundary. [Sign-in](sign-in-design.md) covers accounts, sessions, email
-  sign-in, and the designed identity providers, and records the first slice.
+- Guides that describe screens and pages describe the web and desktop apps, which have been
+  removed; the UI's screens remain. [Sign-in](sign-in-design.md) covers accounts, sessions, email
+  sign-in, and the designed identity providers.
   [Workspace entry](workspace-entry.md) describes picker/creation ownership and recovery.
   [Workspace shell](workspace-shell.md) covers nested routes, account controls, and appearance.
   [Workspace settings](workspace-settings.md) covers workspace, member, and invitation management.
@@ -80,8 +79,7 @@ drawings, generation, and visual review in the UI workshop.
 
 Start with [contributing](../CONTRIBUTING.md). [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
 lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md),
-[UI](../apps/ui/AGENTS.md), [client](../apps/client/AGENTS.md),
-[adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
+[UI](../apps/ui/AGENTS.md), [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
 the root guidance rather than maintaining a second copy.
 
 When implementation changes, update the owning guide and any affected setup examples,

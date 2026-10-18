@@ -74,7 +74,7 @@ for (const { path, manifest } of published) {
   }
 }
 
-// UI stays presentational and client stays headless, whatever either declares.
+// UI stays presentational, whatever it declares.
 for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })) {
   const manifest: PackageManifest = await Bun.file(`${root}/${path}`).json()
   for (const section of sections) {
@@ -87,39 +87,20 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
           name === "@solidjs/router" ||
           name.startsWith("@tauri-apps/"))
       )
-        errors.push(
-          `${path}: UI must remain presentation-only; ${section}.${name} belongs in client or a platform app.`
-        )
-      // Client names what it returns by the screens' types, so it takes UI to type-check only.
-      const screenTypes = name === "@amends-dev/ui" && section === "devDependencies"
-      if (
-        path === "apps/client/package.json" &&
-        ((name.startsWith("@amends-dev/") &&
-          !["@amends-dev/connection", "@amends-dev/core", "@amends-dev/gateway", "@amends-dev/http"].includes(name) &&
-          !screenTypes) ||
-          name.startsWith("@tauri-apps/") ||
-          name === "@solidjs/router" ||
-          name.startsWith("@vanilla-extract/") ||
-          name === "storybook" ||
-          name.startsWith("@storybook/") ||
-          name.startsWith("storybook-"))
-      )
-        errors.push(
-          `${path}: client must remain headless and take UI only as a development dependency for its types, independent of routing presentation and platform/backend implementations (${section}.${name}).`
-        )
+        errors.push(`${path}: UI must remain presentation-only; ${section}.${name} belongs in an app.`)
     }
   }
 }
 
-// Platform apps and the site compose shared UI without defining styles of their own.
-for await (const path of new Bun.Glob(
-  "apps/{web,desktop,site}/src/**/*.{css,scss,sass,less,css.ts,style.ts,styles.ts}"
-).scan({ cwd: root })) {
+// The site composes shared UI without defining styles of its own.
+for await (const path of new Bun.Glob("apps/site/src/**/*.{css,scss,sass,less,css.ts,style.ts,styles.ts}").scan({
+  cwd: root
+})) {
   errors.push(`${path}: styles belong in UI; evaluate and verify a shared component before composing it in an app.`)
 }
 
-// Nor do their pages carry style elements, style props, or style objects.
-for await (const path of new Bun.Glob("apps/{web,desktop,site}/src/**/*.{astro,ts,tsx}").scan({
+// Nor do its pages carry style elements, style props, or style objects.
+for await (const path of new Bun.Glob("apps/site/src/**/*.{astro,ts,tsx}").scan({
   cwd: root
 })) {
   const source = await Bun.file(`${root}/${path}`).text()
@@ -128,8 +109,8 @@ for await (const path of new Bun.Glob("apps/{web,desktop,site}/src/**/*.{astro,t
   }
 }
 
-// UI owns presentation; client's API modules own its contract imports.
-for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/{src,test,.storybook}/**/*.{ts,tsx}").scan({
+// UI owns presentation, and icons are drawings alone.
+for await (const path of new Bun.Glob("apps/{icons,ui}/{src,test,.storybook}/**/*.{ts,tsx}").scan({
   cwd: root
 })) {
   const source = await Bun.file(`${root}/${path}`).text()
@@ -140,7 +121,6 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/{src,t
   )
   // Bun's JSX scanner includes synthetic React require calls, even with JSX auto-import
   // disabled. Exclude those, then recover literal require calls from the actual source.
-  const runtime = new Set(imports.map((dependency) => dependency.path))
   const dependencies = new Set(
     imports
       .filter(
@@ -168,21 +148,6 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/{src,t
     )
       errors.push(`${path}: icon runtime must depend only on Solid and its own source (${dependency}).`)
     const uiImport = dependency === "@amends-dev/ui" || dependency.startsWith("@amends-dev/ui/")
-    const clientImport = dependency === "@amends-dev/client" || dependency.startsWith("@amends-dev/client/")
-    // Shared API plumbing and each feature's api.ts reach the HTTP contract, never its handlers,
-    // and the schemas it carries: core's features, the gateway's, and a connection's ID.
-    // Client may name the screens' types, never import UI code.
-    const screenTypeImport = uiImport && !runtime.has(dependency)
-    const contractImport =
-      (path.startsWith("apps/client/src/api/") || /^apps\/client\/src\/[^/]+\/api\.ts$/.test(path)) &&
-      (/^@amends-dev\/http\/(Api|ApiErrors|Authentication|WorkspaceMember|\w+Group)$/.test(dependency) ||
-        /^@amends-dev\/core\/[a-z-]+$/.test(dependency) ||
-        [
-          "@amends-dev/connection/Connection",
-          "@amends-dev/gateway/Accounts",
-          "@amends-dev/gateway/SignIn",
-          "@amends-dev/gateway/WorkspaceDirectory"
-        ].includes(dependency))
     if (
       path.startsWith("apps/ui/") &&
       ((dependency.startsWith("@amends-dev/") && !uiImport && !iconImport) ||
@@ -197,30 +162,7 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/{src,t
         target.startsWith(resolve(root, "adapters") + "/") ||
         target.startsWith(resolve(root, "hosts") + "/"))
     )
-      errors.push(
-        `${path}: UI must remain presentation-only and must not import client, API, or platform code (${dependency}).`
-      )
-    if (
-      path.startsWith("apps/client/") &&
-      ((dependency.startsWith("@amends-dev/") && !clientImport && !contractImport && !screenTypeImport) ||
-        dependency.startsWith("@tauri-apps/") ||
-        dependency === "@solidjs/router" ||
-        dependency.startsWith("@solidjs/router/") ||
-        dependency.startsWith("@vanilla-extract/") ||
-        dependency.endsWith(".css") ||
-        dependency.endsWith(".css.ts") ||
-        dependency === "storybook" ||
-        dependency.startsWith("storybook/") ||
-        dependency.startsWith("@storybook/") ||
-        dependency.startsWith("storybook-") ||
-        (target.startsWith(resolve(root, "apps") + "/") && !target.startsWith(resolve(root, "apps/client") + "/")) ||
-        target.startsWith(resolve(root, "packages") + "/") ||
-        target.startsWith(resolve(root, "adapters") + "/") ||
-        target.startsWith(resolve(root, "hosts") + "/"))
-    )
-      errors.push(
-        `${path}: client must remain headless; it may import UI types only, and styles, route rendering, and platform/backend implementations belong outside client (${dependency}).`
-      )
+      errors.push(`${path}: UI must remain presentation-only and must not import API or platform code (${dependency}).`)
   }
 }
 
@@ -229,6 +171,6 @@ if (errors.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui/client/web/desktop import boundaries, and app styles.`
+    `Checked ${packages.length} shared packages, ${published.length} published packages' lines, icons/ui import boundaries, and site styles.`
   )
 }

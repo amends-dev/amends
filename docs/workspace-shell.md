@@ -1,5 +1,8 @@
 # Workspace shell
 
+> Historical: this describes the web and desktop apps, which have been removed. The UI's screens
+> remain; the app being rebuilt decides its own routes and state.
+
 Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout, built on the
 [UI](../apps/ui/README.md) Shell pattern from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: a rail, a sidebar, the main content, and a side
