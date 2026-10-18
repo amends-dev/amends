@@ -23,10 +23,7 @@ export const layer = HttpApiBuilder.group(Api.Api, "notifications", (handlers) =
   handlers.handleAll({
     inbox: ({ query }) =>
       NotificationService.NotificationService.use((notificationService) => notificationService.inbox(query)),
-    count: () =>
-      NotificationService.NotificationService.use((notificationService) =>
-        Effect.map(notificationService.countPending, (pending) => ({ pending }))
-      ),
+    count: () => NotificationService.NotificationService.use((notificationService) => notificationService.countPending),
     markSeenThrough: ({ payload }) =>
       NotificationService.NotificationService.use((notificationService) =>
         Effect.map(notificationService.markSeenThrough(payload.through), (marked) => ({

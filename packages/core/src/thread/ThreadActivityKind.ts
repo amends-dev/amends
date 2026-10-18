@@ -95,8 +95,9 @@ export interface Definition<
 export type Activity<K extends Definition> = K["Activity"]["Type"]
 
 /**
- * Define an activity kind. Without a subject rule, the activity is about its thread, as a rename
- * is. Without an occurrence rule, each subject holds at most one activity of the kind, as a message
+ * Define an activity kind. Its subject names the record it is about as that record's facts name it,
+ * so a commit that changes the record names the activities about it; without a subject rule, the
+ * activity is about its thread, as a rename is. Without an occurrence rule, each subject holds at most one activity of the kind, as a message
  * has one publication.
  *
  * @category constructors
@@ -107,7 +108,7 @@ export const make = <const Name extends string, const Version extends number, D 
   options: {
     readonly version: Version
     readonly details: D
-    readonly subject?: (details: NoInfer<D["Type"]>) => Subject.Subject
+    readonly subject?: (details: NoInfer<D["Type"]>, threadId: ThreadId.ThreadId) => Subject.Subject
     readonly occurrence?: (details: NoInfer<D["Type"]>) => ReadonlyArray<string> | null
     readonly newActivity: boolean
   }

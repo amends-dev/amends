@@ -5,7 +5,7 @@ import { useWorkspaceMutation } from "../api/mutation.ts"
 import { markSeen, markSeenThrough, type Notification } from "./api.ts"
 
 export interface SeenController {
-  /** The reader marked it seen here; the inbox shows it once it refreshes. */
+  /** The reader marked it seen here; the inbox shows it once its signal arrives. */
   readonly seen: Accessor<boolean>
   readonly pending: Accessor<boolean>
   /** Why the last attempt failed. */

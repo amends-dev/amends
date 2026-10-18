@@ -112,8 +112,9 @@ Clients generating the typed client pass it in `headers`.
   authenticated human or agent's membership newest first, each notification with its `source`
   timeline item where the caller can still read it; it takes `limit` from 1 to 50, `pendingOnly`,
   and `before`, the last item's `{ recordedAt, id }` as URL-encoded JSON. Active membership is
-  required, and the caller cannot select a different recipient. `GET /notifications/count` returns `{ pending }`,
-  how many notifications are still pending for the caller, and `POST /notifications/seen` with
+  required, and the caller cannot select a different recipient. `GET /notifications/count` returns `{ pending, groups }`,
+  how many notifications are still pending for the caller, and how many from each group's threads,
+  as `{ groupId, count }` for each group with any, in group-ID order; and `POST /notifications/seen` with
   `{ through: { recordedAt, id } }` marks a person's pending notifications seen up to that one,
   returning `{ marked }`. `POST /notifications/:notificationId/seen` records that the person saw it and returns
   the notification; marking it again returns the first time, a missing record or another recipient's
@@ -142,30 +143,41 @@ the subscription registers. With `reset: false`, the commits after the given cur
 live ones. With `reset: true` (no cursor, an unknown one, one more than 500 commits behind, or one
 before a commit the server cannot read) delivery starts at the head and the client must refresh the
 views it keeps; `cursor` is null only for an empty workspace. Later messages contain
-`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, and a
-`notifications` array; at least one of the two is nonempty. `notifications` holds the notifications
-the commit created for the caller, with the same fields the inbox list returns, so clients can
-update an inbox or badge without a refetch. Each event contains `id`, `name`, `version`,
-`recordedAt` (UTC ISO string), `provenance`, and its JSON-encoded `payload`. Provenance includes the
-workspace, performer, immediate cause, correlation ID, and occurrence time; public request bodies
-cannot choose that attribution. The server sends no query keys; clients choose which queries to
-update or invalidate for each commit.
+`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, a `changes` array, a `stale` array, and a
+`notifications` array; at least one of the three is nonempty. `changes` holds what the
+commit changed in what the caller may see, each as it is now, which clients put in place of what
+they show: a `TimelineItem` with an `item` exactly as the timeline returns it, and a `Preview` with
+a `preview` of the thread as the group's stream shows it to every reader, an opening without the
+caller's `readThrough` and `unread`, a `GroupLatest` with the `latest` activity of a group, as
+`groupId` and `occurredAt`, from which the groups list derives `latestActivityAt` and
+`newActivity`, and a `Turn` with a `turn` exactly as `GET /turns/:turnId` returns it to the caller.
+`stale` names the reads the commit changed for the caller that `changes` does not carry, which
+clients read again, each `{ read, id? }`: `read` is a workspace read, `directory` (`GET
+/me/workspaces`), `settings`, `ownership`, `members`, `invitations`, `permissions`, `groups`,
+`public-groups`, `inbox`, `pending` (`GET /notifications/count`), `connections`, `agents`, or
+`active-turns`, or a read of one group, thread, or turn, `streams` and `rosters` (a group's openings
+and members), `threads`, `timelines`, and `participants` (a thread, its timeline, and its
+participants), or `turns`, with `id` naming which one, or without it every one.
+`notifications` holds the notifications the commit created for the caller, with the same fields the
+inbox list returns, so clients can update an inbox without a refetch, and makes `pending` stale.
 
-Events reach the readers in their fact's audience with the matching read permission: workspace
-metadata, ownership, and role facts reach every member; invitations only holders of
+What a commit tells reaches the readers in its facts' audiences with the matching read permission:
+workspace metadata, ownership, and role facts reach every member; invitations only holders of
 `invitation.manage`; member and access changes holders of `member.read` or `assignment.read` on that
 member, and always the member concerned; group and thread facts the group's members with
-`group.read` or `thread.read`; and follows only the follower. Message events carry the full message,
-so clients can render it without a refetch; activity and participation events carry their public
-views. A commit with nothing the caller may see and no notification for them sends no message. The
+`group.read` or `thread.read`; and follows only the follower. A commit with nothing the caller may
+see and no notification for them sends no message. The
 commit that removes the caller from the workspace is delivered, then the stream ends; reconnecting
 returns 403.
 
 Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
 `Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
-readers, and `ThreadRead`, `GroupRead`, and `NotificationsSeen` reach only the caller's own
+readers, and `ThreadRead` (`threadId`, `readThrough`, and `readAt`), `GroupRead` (`groupId` and
+`readAt`), and `NotificationsSeen` (`notificationIds` and `seenAt`) reach only the caller's own
 sessions, the one that wrote included, after one of them records read state or marks a notification
-seen. A response an agent's turn is writing reaches only those following its log (see
+seen. Reading a thread through a position marks the caller's pending notifications from it up to
+there seen at `readAt`. Starting a thread or replying reads it, so the author's sessions also get a `ThreadRead` once
+the commit lands. A response an agent's turn is writing reaches only those following its log (see
 [Turns](#turns)). Signals have no cursor, are never replayed, and may be missed; after reconnecting,
 refresh read state with the rest of the view. Show a typing indicator until `until` unless another
 `Typing` extends it, and hide the caller's own. Send `POST /threads/:threadId/typing` while the

@@ -1,6 +1,7 @@
 import type { Core } from "@amends-dev/core"
 import { AgentService } from "@amends-dev/core/agent"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
+import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel"
 import { ConnectionService } from "@amends-dev/core/connection"
 import { Group, GroupService, GroupMembershipService, type GroupId } from "@amends-dev/core/group"
@@ -780,6 +781,59 @@ describe("turns", () => {
         })
       )
     )
+  )
+
+  it.effect(
+    "the change feed delivers each turn a commit changes as the reader sees it, and the turn a retry supersedes",
+    () =>
+      withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const { workspace, agent } = yield* workspaceWithAgent
+            const started = yield* start(workspace.id, "Planner, draft the notes.", [agent.memberId])
+            const { turn } = yield* startReady(workspace.id, agent.memberId, started.thread.id)
+            const messages = yield* Queue.unbounded<ChangeFeed.Message>()
+            const gateway = yield* Gateway.Gateway
+            const feed = yield* gateway.asMember(
+              workspace.id,
+              alice,
+              Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) => changeFeedService.watch())
+            )
+            yield* feed.pipe(
+              Stream.runForEach((message) => Queue.offer(messages, message)),
+              Effect.forkScoped
+            )
+            /** The turns the next commit that changes any delivers, as id, status, and what alice may do. */
+            const nextTurns = Effect.gen(function* () {
+              while (true) {
+                const message = yield* Queue.take(messages).pipe(Effect.timeout("10 seconds"))
+                if (!ChangeFeed.Message.isAnyOf(["Committed"])(message)) continue
+                const turns = message.changes.flatMap((change) =>
+                  ChangeFeed.Change.isAnyOf(["Turn"])(change)
+                    ? [[change.turn.id, change.turn.status, change.turn.stoppable, change.turn.retryable]]
+                    : []
+                )
+                if (turns.length > 0) return turns
+              }
+            })
+            yield* execute(workspace.id, (turnExecution) =>
+              turnExecution.fail(turn.id, { reason: "The model provider is unavailable." })
+            )
+            expect(yield* nextTurns).toEqual([[turn.id, "failed", false, true]])
+            const retried = yield* as(
+              workspace.id,
+              alice,
+              Effect.flatMap(TurnService.TurnService, (turnService) => turnService.retry(turn.id))
+            )
+            // The retry runs, and the turn it retries may run again no more.
+            expect(yield* nextTurns).toEqual([
+              [retried.id, "queued", true, false],
+              [turn.id, "failed", false, false]
+            ])
+          })
+        )
+      )
   )
 
   it.effect("a turn the agent cannot run as it is set up fails before it starts", () =>

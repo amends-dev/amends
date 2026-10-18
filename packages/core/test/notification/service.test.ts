@@ -92,7 +92,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
     listPendingByThread: unexpected,
     countPendingByRecipient: (recipient) =>
       Effect.succeed(records.filter((value) => sameRecipient(value.recipient, recipient)).length),
-    countPendingByGroup: unexpected,
+    countPendingByGroup: () => Effect.succeed([]),
     insert: unexpected,
     insertMany: unexpected,
     discardPendingForParticipation: unexpected,
@@ -119,6 +119,9 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Notif
       Layer.succeed(ThreadQuery.ThreadQuery, {
         requireAccess: unexpected,
         requireReadable: unexpected,
+        timelineItemsAbout: unexpected,
+        listedOf: unexpected,
+        previewsOf: unexpected,
         eligibleMembers: unexpected,
         followers: unexpected,
         currentParticipants: unexpected,
@@ -171,7 +174,7 @@ it.effect("inbox reads require the current actor, need no role grant, and leave 
         const notificationService = yield* NotificationService.NotificationService
         expect(yield* notificationService.inbox(page)).toEqual(inboxOf(mine))
         expect(yield* notificationService.inbox({ ...page, pendingOnly: true })).toEqual(inboxOf(mine))
-        expect(yield* notificationService.countPending).toBe(1)
+        expect((yield* notificationService.countPending).pending).toBe(1)
         expect(yield* (yield* Journal.Journal).log.read({ limit: 10 })).toEqual([])
       })
     )
@@ -278,7 +281,7 @@ it.effect("inbox reads join an outer commit and observe staged membership remova
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
                 .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)))
-              return yield* notificationService.countPending
+              return (yield* notificationService.countPending).pending
             })
           )
         )
@@ -286,7 +289,7 @@ it.effect("inbox reads join an outer commit and observe staged membership remova
           _tag: "CoreError.Denied",
           reason: { _tag: "InvalidActor", reason: "membership-removed" }
         })
-        expect(yield* notificationService.countPending).toBe(1)
+        expect((yield* notificationService.countPending).pending).toBe(1)
         expect(yield* journal.log.read({ limit: 10 })).toEqual([])
       }),
       alice,

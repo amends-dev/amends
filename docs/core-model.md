@@ -2018,8 +2018,8 @@ with many older threads does not mark them all unread. Each thread keeps the seq
 its latest message, and each group the time of its latest message in any thread; quiet participation
 changes do not count. A member's read time for a group, set when they view or mark the group
 read, shows whether the group has newer activity. Thread lists order by latest activity. Beside
-that, a group counts the member's pending notifications from its threads: activity addressed to
-them rather than merely unseen, as a badge beside a bold group in a sidebar.
+that, the member's pending notifications are counted by group: activity addressed to them rather
+than merely unseen, as a badge beside a bold group in a sidebar.
 
 Posting a message reads the thread through it for its author, settling their earlier notifications
 from it the same way; a message never notifies its own author.

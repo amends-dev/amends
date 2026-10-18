@@ -11,7 +11,6 @@ import {
   type AgentsDone,
   type SessionStore
 } from "../src/index.ts"
-import { affectedKeys } from "../src/live/api.ts"
 
 afterEach(cleanup)
 const json = (body: unknown, status = 200) =>
@@ -105,7 +104,6 @@ const group = (id: string, name: string) => ({
   readAt: null,
   newActivity: false,
   following: false,
-  pending: 0,
   manageable: true,
   membersRemovable: true,
   renamable: true
@@ -282,20 +280,6 @@ function fixture() {
     done
   }
 }
-
-it("refreshes agents on their facts, their memberships, their connections, and access", () => {
-  const keys = (name: string) => affectedKeys("one", [{ name }])
-  for (const name of [
-    "agent.created",
-    "agent.configured",
-    "workspace.member.renamed",
-    "workspace.member.removed",
-    "connection.removed",
-    "workspace.assignment.created"
-  ])
-    expect(keys(name)).toContain("workspace/one/agents")
-  expect(keys("connection.key-replaced")).not.toContain("workspace/one/agents")
-})
 
 it("shapes agents with the connections they name, their model's name, and why they can't run", async () => {
   const f = fixture()

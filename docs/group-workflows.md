@@ -100,19 +100,19 @@ Ordinary reads require active workspace membership, an active admission to the g
 `group.read` on it. Neither a grant alone nor membership alone suffices: creator attribution,
 workspace ownership, and management grants do not make the caller part of the audience.
 
-| Operation                                                        | Result and authority                                                                                                                                                                                                     |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GroupService.listMine({ limit, after? })`                       | A page of `Group.ListItem` values for the caller's current readable groups, ordered by group ID, with latest activity, read time, `newActivity`, `following`, and `pending`. Unreadable and unjoined groups are omitted. |
-| `GroupService.get(groupId)`                                      | Group metadata, requiring audience membership and `group.read`.                                                                                                                                                          |
-| `GroupMembershipService.listCurrent(groupId, { limit, after? })` | A page of current admissions under the same read policy, ordered by admission ID.                                                                                                                                        |
+| Operation                                                        | Result and authority                                                                                                                                                                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GroupService.listMine({ limit, after? })`                       | A page of `Group.ListItem` values for the caller's current readable groups, ordered by group ID, with latest activity, read time, `newActivity`, and `following`. Unreadable and unjoined groups are omitted. |
+| `GroupService.get(groupId)`                                      | Group metadata, requiring audience membership and `group.read`.                                                                                                                                               |
+| `GroupMembershipService.listCurrent(groupId, { limit, after? })` | A page of current admissions under the same read policy, ordered by admission ID.                                                                                                                             |
 
 Group lists and rosters take an exclusive `after` ID cursor and a `limit`, and keep reading until
 the page is full: groups outside the caller's `group.read` grants, and admissions whose workspace
 member left, are skipped. A group has `newActivity` when its latest message came after the caller
 last read it through `ReadStateService.markGroupRead`, or after they joined when they
-never have. `pending` counts the caller's pending notifications from the group's threads: the
-activity addressed to them, as a sidebar badge shows it. Reading a thread settles its notifications
-and so lowers the count. `manageable` holds for a team group where the caller has
+never have. What is addressed to the caller there is counted apart, by
+[`countPending`](thread-workflows.md#reading-the-inbox), so the list does not change with every
+notification; reading a thread settles its notifications and so lowers the count. `manageable` holds for a team group where the caller has
 `group.membership.manage`, from the same grant resolution, so clients offer adding people there;
 `membersRemovable` holds where they may also remove others: a private group they may manage, or a
 public one they moderate. Direct groups are never manageable. The change feed delivers new

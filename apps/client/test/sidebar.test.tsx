@@ -58,7 +58,6 @@ const item = (group: Record<string, unknown>, latest?: number) => ({
   readAt: null,
   newActivity: false,
   following: false,
-  pending: 0,
   manageable: true,
   membersRemovable: true,
   renamable: true

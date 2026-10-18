@@ -499,6 +499,7 @@ CREATE INDEX "sign_in_sessions_by_human" ON "sign_in_sessions" ("human_id");--> 
 CREATE INDEX "tasks_by_group" ON "tasks" ("workspace_id","group_id","created_at","thread_id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_occurrence" ON "thread_activities" ("workspace_id","occurrence");--> statement-breakpoint
+CREATE INDEX "thread_activity_subject" ON "thread_activities" ("workspace_id","subject");--> statement-breakpoint
 CREATE INDEX "thread_messages_by_thread" ON "thread_messages" ("workspace_id","thread_id") WHERE "content_kind" = 'Text';--> statement-breakpoint
 CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","participant_kind",coalesce("member_id", "identity_id", '')) WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint

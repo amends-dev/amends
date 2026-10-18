@@ -12,7 +12,7 @@ import * as ThreadMessage from "./ThreadMessage.ts"
 import * as ThreadMessageId from "./ThreadMessageId.ts"
 
 const subject = ({ messageId }: { readonly messageId: ThreadMessageId.ThreadMessageId }) =>
-  Subject.make("message", messageId)
+  Subject.make("thread-message", messageId)
 
 /**
  * A message was published to the thread. It is the thread's latest activity for its readers, and

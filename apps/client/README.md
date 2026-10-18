@@ -16,8 +16,8 @@ src/
   provider.tsx    ClientProvider: the credential, and the API clients and atom registry made for it
   configuration.ts  resolveApiBaseUrl: the API URL an app resolves once at startup
   sign-in.ts      useSignIn
-  api/            shared plumbing: the clients, failures, invalidation keys, useMutation,
-                  useWorkspaceMutation, useChanges, refreshResult, the directory read
+  api/            shared plumbing: the clients, failures, how live streams back off, invalidation
+                  keys, useMutation, useWorkspaceMutation, useChanges, refreshResult, the directory read
   session/        the browser session store; DirectoryProvider, useDirectory, useWorkspace
   live/           the change feed: its stream (api.ts), provider, status, and wake detection
   workspaces/  conversations/  agents/  connections/  settings/  turns/
@@ -49,10 +49,21 @@ a member's endpoint through the session's client fails to compile.
 Reads are atoms over a generated client, `client.query` or `client.runtime.atom`, shared by every
 consumer of that client and live while mounted; a workspace's reads go through its client. Each registers an invalidation key
 from `api/keys.ts`: the directory, a workspace resource such as `members` or `agents`, or one
-group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, and the
-[change feed](../../docs/change-feed.md) invalidates the keys each commit affects, so whatever is
-mounted refreshes. Paged reads (group streams, timelines, the inbox) keep their pages in one atom
-and read on from its previous value, so a refresh never drops what is on screen.
+group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, except
+that a post waits for the commit that delivers its message (`awaitMessage`), and the
+[change feed](../../docs/change-feed.md) invalidates the keys of the reads each commit made stale, so whatever is
+mounted refreshes, or delivers what the commit changed, which shows in place: a timeline shows each
+delivered item in place of the one it read, and those that follow it after (`withDeliveredItems`),
+a stream each delivered preview in place of the thread it shows, threads that started since
+after the newest, and the positions `ThreadRead` signals carry (`withDeliveredPreviews`), and the
+groups list each group's delivered latest activity and the read times `GroupRead` signals carry
+(`withDeliveredGroupActivity`), and the inbox the notifications delivered after its page was read,
+the timeline items delivered at their sources, and what `ThreadRead` and `NotificationsSeen`
+signals settled (`withDeliveredNotifications`), and the active turns and a turn the turns
+delivered after they were read (`withDeliveredTurns`, `turnWith`).
+Paged reads (group streams, timelines, the inbox) keep their pages in one atom and read on from its
+previous value, so a refresh never drops what is on screen; a timeline's refresh reads every item it
+shows again.
 
 ## Writes
 

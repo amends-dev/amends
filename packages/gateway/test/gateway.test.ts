@@ -173,6 +173,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         listByThread: unexpected,
         getFirst: unexpected,
+        listBySubjects: unexpected,
         readPage: unexpected,
         insert: unexpected
       }),

@@ -1,7 +1,7 @@
 /**
  * The operation a reader watches a workspace through: one stream that opens with `Ready`, then
- * carries each commit the reader may see with the notifications it created for them, and the
- * signals happening meanwhile. It subscribes to the runtime's shared `ChangeFeedSource` and the
+ * carries each commit the reader may see, with what it changed and made stale for them and the
+ * notifications it created for them, and the signals happening meanwhile. It subscribes to the runtime's shared `ChangeFeedSource` and the
  * workspace's `SignalHub`, works out what the actor may see from their group admissions and
  * grants, reloads that whenever a delivered fact changes it, and ends the stream after the fact
  * that removes them from the workspace.
@@ -87,6 +87,20 @@ const reaches = (
 
 const isVisibleTo = (access: Access) => (prepared: ChangeFeedEvents.Prepared) => reaches(access, prepared)
 
+/**
+ * The reads a commit made stale for a reader, each once: those the events they may see name, and
+ * their pending counts when it notified them.
+ */
+const staleFor = (visible: ReadonlyArray<ChangeFeedEvents.Prepared>, notified: boolean) => {
+  const named = new Map<string, ChangeFeed.Stale>()
+  for (const stale of [
+    ...visible.flatMap((prepared) => prepared.stale),
+    ...(notified ? [{ read: "pending" as const }] : [])
+  ])
+    named.set(`${stale.read}\u0000${stale.id ?? ""}`, stale)
+  return [...named.values()]
+}
+
 /** Whether a fact changes this reader's access, so it must be reloaded before filtering. */
 const changesAccessOf = (actor: Actor.Actor["Service"]) => (prepared: ChangeFeedEvents.Prepared) =>
   prepared.access !== undefined &&
@@ -147,18 +161,21 @@ export const make = Effect.gen(function* () {
           Effect.gen(function* () {
             // Reload first, so a commit that admits the reader also delivers what it admits.
             if (delivery.events.some(changesAccessOf(actor))) access = yield* resolveAccess(actor)
-            const events = delivery.events.filter(isVisibleTo(access)).map((p) => p.event)
+            const covers = (requirement: Requirement.Requirement) => Grant.anyCovers(access.grants, requirement)
+            const changes = delivery.changes.filter((p) => reaches(access, p)).map((p) => p.changeFor(covers))
             const notifications = delivery.events.flatMap((p) =>
               p.notifications.flatMap((n) => (access.scopes.has(n.scope) ? [n.record] : []))
             )
+            const stale = staleFor(delivery.events.filter(isVisibleTo(access)), notifications.length > 0)
             const message =
-              events.length + notifications.length > 0
+              changes.length + stale.length + notifications.length > 0
                 ? Stream.make(
                     ChangeFeed.Message.cases.Committed.make({
                       workspaceId,
                       cursor: ChangeFeed.cursorOf(delivery.position),
                       commitId: delivery.commitId,
-                      events,
+                      changes,
+                      stale,
                       notifications
                     })
                   )

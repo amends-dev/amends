@@ -104,8 +104,8 @@ export class NotificationService extends Context.Service<
     readonly markSeenThrough: (
       through: NotificationStore.Cursor
     ) => Effect.Effect<number, Exclude<MarkSeenError, CoreError.NotFound | CoreError.Conflict>, Actor.Actor>
-    /** How many notifications are still pending for the acting member, from anywhere. */
-    readonly countPending: Effect.Effect<number, Error, Actor.Actor>
+    /** How many notifications are still pending for the acting member, in all and by group. */
+    readonly countPending: Effect.Effect<NotificationInbox.Counts, Error, Actor.Actor>
   }
 >()("@amends-dev/core/notification/NotificationService") {}
 
@@ -236,12 +236,13 @@ export const make: Effect.Effect<
       })
     if (!Notification.State.isAnyOf(["Seen"])(seen.state))
       return yield* Effect.die("A seen notification still reads as unseen")
-    // The recipient's other sessions hear of it as a signal.
+    // The recipient's other sessions hear of it as a signal, with the time that holds.
     yield* signalHub.publish(
       Signal.Signal.cases.NotificationsSeen.make({
         workspaceId,
         memberId: (yield* Actor.Actor).memberId,
-        notificationIds: [notification.id]
+        notificationIds: [notification.id],
+        seenAt: seen.state.seenAt
       })
     )
     return seen
@@ -262,8 +263,11 @@ export const make: Effect.Effect<
       const [first, ...rest] = due.map((record) => record.id)
       if (first !== undefined) {
         const notificationIds = [first, ...rest] as const
-        yield* notificationStore.markSeen(notificationIds, yield* DateTime.now)
-        yield* signalHub.publish(Signal.Signal.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds }))
+        const seenAt = yield* DateTime.now
+        yield* notificationStore.markSeen(notificationIds, seenAt)
+        yield* signalHub.publish(
+          Signal.Signal.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds, seenAt })
+        )
       }
       return { page, due: due.length }
     })
@@ -286,7 +290,10 @@ export const make: Effect.Effect<
   }, Operation.report)
   const countPending = Effect.gen(function* () {
     const target = yield* requireRecipient()
-    return yield* notificationStore.countPendingByRecipient(target)
+    return {
+      pending: yield* notificationStore.countPendingByRecipient(target),
+      groups: yield* notificationStore.countPendingByGroup(target)
+    }
   }).pipe(Effect.withSpan("NotificationService.countPending"), Operation.report)
   return NotificationService.of({ inbox, markSeen, markSeenThrough, countPending })
 })

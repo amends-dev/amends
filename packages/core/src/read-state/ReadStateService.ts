@@ -29,6 +29,7 @@ import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ReadState from "./ReadState.ts"
+import * as ReadStateCommand from "./ReadStateCommand.ts"
 import * as ReadStateStore from "./ReadStateStore.ts"
 
 /**
@@ -78,6 +79,7 @@ export const make = Effect.gen(function* () {
   const groupQuery = yield* GroupQuery.GroupQuery
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore
   const readStateStore = yield* ReadStateStore.ReadStateStore
+  const readStateCommand = yield* ReadStateCommand.ReadStateCommand
   const signalHub = yield* SignalHub.SignalHub
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
@@ -114,15 +116,7 @@ export const make = Effect.gen(function* () {
     // Reading settles the inbox up to the position in the same write. Both are private state,
     // written outside the workspace's write order; the reader's other sessions hear of it as a
     // signal.
-    yield* readStateStore.markThreadRead(position, yield* DateTime.now)
-    yield* signalHub.publish(
-      Signal.Signal.cases.ThreadRead.make({
-        workspaceId,
-        memberId,
-        threadId: thread.id,
-        readThrough: position.readThrough
-      })
-    )
+    yield* readStateCommand.markThreadRead(position, yield* DateTime.now)
   }, Operation.report)
 
   const markGroupRead = Effect.fn("ReadStateService.markGroupRead")(function* (input: ReadState.MarkGroupReadInput) {

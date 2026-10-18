@@ -18,6 +18,11 @@ export * as ChangeFeed from "./ChangeFeed.ts"
 /**
  * @since 0.1.0
  */
+export * as ChangeFeedChanges from "./ChangeFeedChanges.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
 
 /**

@@ -24,6 +24,7 @@ import type * as GroupMembership from "../group/GroupMembership.ts"
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as Actor from "../identity/Actor.ts"
+import type * as Subject from "../journal/Subject.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Member from "../workspace/Member.ts"
@@ -32,9 +33,14 @@ import * as MemberStore from "../workspace/MemberStore.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
+import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts"
 import * as ThreadActivityStore from "./ThreadActivityStore.ts"
 import * as ThreadId from "./ThreadId.ts"
+import * as ThreadMessage from "./ThreadMessage.ts"
+import * as ThreadMessageActivity from "./ThreadMessageActivity.ts"
+import type * as ThreadMessageId from "./ThreadMessageId.ts"
+import * as ThreadMessageStore from "./ThreadMessageStore.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import type * as ThreadParticipationId from "./ThreadParticipationId.ts"
 import * as ThreadParticipationStore from "./ThreadParticipationStore.ts"
@@ -67,6 +73,17 @@ export type AccessError = Authorization.Error | StoreError.StoreError | Schema.S
  * @since 0.1.0
  */
 export type TimelineError = AccessError | StoreError.StoreError
+
+/**
+ * A timeline item as it is now, with its thread, whose group is its audience.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export interface AboutItem {
+  readonly thread: Thread.Thread
+  readonly item: Thread.TimelineItem
+}
 
 /**
  * What listing a group's readable threads can fail with, beyond the listing's own failures.
@@ -170,6 +187,28 @@ export class ThreadQuery extends Context.Service<
     readonly readTimelineItem: (
       activityId: ThreadActivity.ThreadActivityId
     ) => Effect.Effect<Thread.TimelineItem, TimelineError, Actor.Actor>
+    /**
+     * Every timeline item about one of these subjects as it is now, with its thread: what a
+     * commit naming them changed in the timelines. It checks no one's access; the change feed
+     * checks each reader's.
+     */
+    readonly timelineItemsAbout: (
+      subjects: ReadonlyArray<Subject.Subject>
+    ) => Effect.Effect<ReadonlyArray<AboutItem>, StoreError.StoreError>
+    /**
+     * Each thread with its task and latest activity, in their order. It checks no one's access;
+     * the lists and the change feed check each reader's.
+     */
+    readonly listedOf: (
+      threads: ReadonlyArray<Thread.Thread>
+    ) => Effect.Effect<ReadonlyArray<Thread.Listed>, StoreError.StoreError>
+    /**
+     * What a group's stream shows of these listed threads to everyone who may read them, in their
+     * order. It checks no one's access; the stream and the change feed check each reader's.
+     */
+    readonly previewsOf: (
+      listed: ReadonlyArray<Thread.Listed>
+    ) => Effect.Effect<ReadonlyArray<Thread.Preview>, StoreError.StoreError>
   }
 >()("@amends-dev/core/thread/ThreadQuery") {}
 
@@ -191,6 +230,7 @@ export const make = Effect.gen(function* () {
   const threadActivityResolvers = yield* ThreadActivityResolvers.ThreadActivityResolvers
   const readStateStore = yield* ReadStateStore.ReadStateStore
   const taskStore = yield* TaskStore.TaskStore
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
 
   const requireAccess = Effect.fn("ThreadQuery.requireAccess")(function* (threadId: ThreadId.ThreadId) {
@@ -316,6 +356,20 @@ export const make = Effect.gen(function* () {
     return yield* keepCurrent(yield* threadParticipationStore.findActive(thread.id, references))
   })
 
+  const listedOf = Effect.fn("ThreadQuery.listedOf")(function* (threads: ReadonlyArray<Thread.Thread>) {
+    if (threads.length === 0) return []
+    const ids = threads.map((thread) => thread.id)
+    const latest = new Map((yield* threadStore.getLatest(ids)).map((value) => [value.threadId, value] as const))
+    const tasks = new Map((yield* taskStore.getMany(ids)).map((task) => [task.threadId, task] as const))
+    const listed: Array<Thread.Listed> = []
+    for (const thread of threads) {
+      const current = latest.get(thread.id)
+      if (current === undefined) return yield* Effect.die("A listed thread has no recorded activity")
+      listed.push({ thread, task: tasks.get(thread.id) ?? null, latest: current })
+    }
+    return listed
+  })
+
   const listReadable = Effect.fn("ThreadQuery.listReadable")(function* <R, Cursor, E>(
     groupId: GroupId.GroupId,
     options: ListOptions<R, Cursor, E>
@@ -328,9 +382,8 @@ export const make = Effect.gen(function* () {
     while (items.length < options.limit) {
       const page = yield* options.list(before)
       if (page.length === 0) break
-      const ids = page.map((row) => options.threadOf(row).id)
-      const latest = new Map((yield* threadStore.getLatest(ids)).map((value) => [value.threadId, value] as const))
-      const tasks = new Map((yield* taskStore.getMany(ids)).map((task) => [task.threadId, task] as const))
+      const listed = yield* listedOf(page.map(options.threadOf))
+      const ids = listed.map(({ thread }) => thread.id)
       const allowed = yield* authorization.permitted(
         ids.map((threadId) =>
           Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
@@ -343,14 +396,12 @@ export const make = Effect.gen(function* () {
         )
       )
       for (const [index, row] of page.entries()) {
-        const thread = options.threadOf(row)
-        const current = latest.get(thread.id)
-        if (current === undefined) return yield* Effect.die("A listed thread has no recorded activity")
+        const thread = listed[index]!
         // The next page starts after the last row seen, readable or not.
-        before = options.cursorOf(row, current)
+        before = options.cursorOf(row, thread.latest)
         if (allowed[index] !== true || items.length === options.limit) continue
-        const readThrough = positions.get(thread.id) ?? null
-        items.push(Thread.listItem(thread, tasks.get(thread.id) ?? null, current, readThrough, admission.admittedAt))
+        const readThrough = positions.get(thread.thread.id) ?? null
+        items.push(Thread.listItem(thread, readThrough, admission.admittedAt))
       }
       if (page.length < options.limit) break
     }
@@ -379,6 +430,55 @@ export const make = Effect.gen(function* () {
     return item
   })
 
+  const timelineItemsAbout = Effect.fn("ThreadQuery.timelineItemsAbout")(function* (
+    subjects: ReadonlyArray<Subject.Subject>
+  ) {
+    const activities = yield* threadActivityStore.listBySubjects(subjects)
+    if (activities.length === 0) return []
+    const threads = new Map(
+      (yield* threadStore.getMany([...new Set(activities.map(({ threadId }) => threadId))])).map(
+        (thread) => [thread.id, thread] as const
+      )
+    )
+    const byThread = new Map<ThreadId.ThreadId, Array<ThreadActivity.ThreadActivity>>()
+    for (const activity of activities)
+      byThread.set(activity.threadId, [...(byThread.get(activity.threadId) ?? []), activity])
+    const items: Array<AboutItem> = []
+    for (const [threadId, inThread] of byThread) {
+      const thread = threads.get(threadId)
+      if (thread === undefined) return yield* Effect.die("A thread with activity is missing")
+      for (const item of yield* threadActivityResolvers.resolve(thread, inThread)) items.push({ thread, item })
+    }
+    return items
+  })
+
+  const previewsOf = Effect.fn("ThreadQuery.previewsOf")(function* (listed: ReadonlyArray<Thread.Listed>) {
+    if (listed.length === 0) return []
+    const ids = listed.map(({ thread }) => thread.id)
+    // A start publishes its opening message as the thread's first activity.
+    const openings = new Map<ThreadId.ThreadId, ThreadMessageId.ThreadMessageId>()
+    for (const activity of yield* threadActivityStore.getFirst(ids)) {
+      const opening = yield* Effect.orDie(ThreadActivityKind.decode(ThreadMessageActivity.Published, activity))
+      openings.set(activity.threadId, opening.details.messageId)
+    }
+    const messages = new Map(
+      (yield* threadMessageStore.getMany([...openings.values()])).map((message) => [message.id, message] as const)
+    )
+    // Replies are the thread's messages after its opening one that still have text.
+    const counts = new Map(
+      (yield* threadMessageStore.countByThread(ids)).map((value) => [value.threadId, value.count] as const)
+    )
+    const previews: Array<Thread.Preview> = []
+    for (const { thread, task, latest } of listed) {
+      const messageId = openings.get(thread.id)
+      const message = messageId === undefined ? undefined : messages.get(messageId)
+      if (message === undefined) return yield* Effect.die("A thread's opening is missing")
+      const opened = ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? 1 : 0
+      previews.push({ thread, task, message, replies: (counts.get(thread.id) ?? 0) - opened, latest })
+    }
+    return previews
+  })
+
   return ThreadQuery.of({
     requireAccess,
     requireReadable,
@@ -389,7 +489,10 @@ export const make = Effect.gen(function* () {
     findParticipants,
     listReadable,
     readTimeline,
-    readTimelineItem
+    readTimelineItem,
+    timelineItemsAbout,
+    listedOf,
+    previewsOf
   })
 })
 

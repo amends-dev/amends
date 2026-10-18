@@ -57,7 +57,6 @@ const listItem = (group: Record<string, unknown>, extra: Record<string, unknown>
   readAt: null,
   newActivity: false,
   following: false,
-  pending: 0,
   manageable: true,
   membersRemovable: true,
   renamable: true,
@@ -74,7 +73,7 @@ const groups = [
       createdBy: "owner",
       createdAt: at(0)
     },
-    { pending: 2, following: true }
+    { following: true }
   ),
   listItem({
     id: "g2",
@@ -182,6 +181,8 @@ function fixture(
     if (path === "/me/workspaces") return Promise.resolve(json(listing))
     if (path === "/members") return Promise.resolve(json(members))
     if (path === "/groups") return Promise.resolve(json(groups))
+    if (path === "/notifications/count")
+      return Promise.resolve(json({ pending: 3, groups: [{ groupId: "g1", count: 2 }] }))
     if (path === "/groups/g1/members") return Promise.resolve(json(roster))
     if (path === "/groups/g1/openings") return Promise.resolve(options.stream?.() ?? json(openings))
     if (path === "/threads/t1/timeline")

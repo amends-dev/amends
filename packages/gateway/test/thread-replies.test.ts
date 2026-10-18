@@ -1188,7 +1188,7 @@ describe("thread replies", () => {
               sequence: 3,
               kind: ThreadMessageActivity.Edited.name,
               newActivity: false,
-              occurrence: JSON.stringify(["message.edited", `message:${messageId}`, "2"]),
+              occurrence: JSON.stringify(["message.edited", `thread-message:${messageId}`, "2"]),
               details: { messageId, revision: 2 }
             })
             // Quiet: the reply stays the thread's latest activity, and only the newly mentioned

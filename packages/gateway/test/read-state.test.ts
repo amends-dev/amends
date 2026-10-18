@@ -3,7 +3,7 @@ import { CoreError } from "@amends-dev/core/error"
 import { type Group, GroupService, GroupFollowService, GroupMembershipService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
-import { Notification } from "@amends-dev/core/notification"
+import { Notification, NotificationService } from "@amends-dev/core/notification"
 import { type ReadState, ReadStateService } from "@amends-dev/core/read-state"
 import {
   type Thread,
@@ -607,82 +607,94 @@ describe("read state", () => {
     )
   )
 
-  it.effect("group lists report latest activity, catching up, following, and pending counts", () =>
-    withStorage((storage) =>
-      runHost(
-        storage,
-        Effect.gen(function* () {
-          const { bound, owner, team } = yield* prepare()
-          const human = actorFor(humanId)
-          const mine = (actor: Actor.Actor["Service"]) =>
-            run(
+  it.effect(
+    "group lists report latest activity, catching up, and following; counts report what is pending in each",
+    () =>
+      withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, team } = yield* prepare()
+            const human = actorFor(humanId)
+            const mine = (actor: Actor.Actor["Service"]) =>
+              run(
+                bound,
+                actor,
+                Effect.flatMap(GroupService.GroupService, (groupService) => groupService.listMine({ limit: 100 }))
+              )
+            const quiet = yield* run(
               bound,
-              actor,
-              Effect.flatMap(GroupService.GroupService, (groupService) => groupService.listMine({ limit: 100 }))
+              owner,
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
+                groupService.createTeam({
+                  name: "Quiet",
+                  memberIds: [owner.memberId, humanId]
+                })
+              )
             )
-          const quiet = yield* run(
-            bound,
-            owner,
-            Effect.flatMap(GroupService.GroupService, (groupService) =>
-              groupService.createTeam({
-                name: "Quiet",
-                memberIds: [owner.memberId, humanId]
-              })
+            const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: GroupId.GroupId) =>
+              items.find((item) => item.group.id === groupId)
+            const pendingOf = (actor: Actor.Actor["Service"]) =>
+              run(
+                bound,
+                actor,
+                Effect.map(
+                  Effect.flatMap(
+                    NotificationService.NotificationService,
+                    (notificationService) => notificationService.countPending
+                  ),
+                  (counts) => Object.fromEntries(counts.groups.map(({ groupId, count }) => [groupId, count]))
+                )
+              )
+            yield* TestClock.adjust("1 minute")
+            yield* run(bound, owner, start(team.id, []))
+            const posted = yield* DateTime.now
+            const listed = yield* mine(human)
+            expect(listed.map((item) => item.group.id)).toEqual(
+              [team.id, quiet.id].toSorted((a, b) => (a < b ? -1 : 1))
             )
-          )
-          const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: GroupId.GroupId) =>
-            items.find((item) => item.group.id === groupId)
-          yield* TestClock.adjust("1 minute")
-          yield* run(bound, owner, start(team.id, []))
-          const posted = yield* DateTime.now
-          const listed = yield* mine(human)
-          expect(listed.map((item) => item.group.id)).toEqual([team.id, quiet.id].toSorted((a, b) => (a < b ? -1 : 1)))
-          // Unread activity that addressed nobody leaves nothing pending.
-          expect(itemOf(listed, team.id)).toMatchObject({
-            latestActivityAt: posted,
-            readAt: null,
-            newActivity: true,
-            following: false,
-            pending: 0
-          })
-          expect(itemOf(listed, quiet.id)).toMatchObject({
-            latestActivityAt: null,
-            newActivity: false
-          })
-          yield* TestClock.adjust("1 minute")
-          yield* run(bound, human, markGroupRead(team.id))
-          yield* run(
-            bound,
-            human,
-            Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
-              groupFollowService.follow({ groupId: team.id, memberId: humanId })
+            // Unread activity that addressed nobody leaves nothing pending.
+            expect(itemOf(listed, team.id)).toMatchObject({
+              latestActivityAt: posted,
+              readAt: null,
+              newActivity: true,
+              following: false
+            })
+            expect(yield* pendingOf(human)).toEqual({})
+            expect(itemOf(listed, quiet.id)).toMatchObject({
+              latestActivityAt: null,
+              newActivity: false
+            })
+            yield* TestClock.adjust("1 minute")
+            yield* run(bound, human, markGroupRead(team.id))
+            yield* run(
+              bound,
+              human,
+              Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
+                groupFollowService.follow({ groupId: team.id, memberId: humanId })
+              )
             )
-          )
-          expect(itemOf(yield* mine(human), team.id)).toMatchObject({
-            readAt: yield* DateTime.now,
-            newActivity: false,
-            following: true
+            expect(itemOf(yield* mine(human), team.id)).toMatchObject({
+              readAt: yield* DateTime.now,
+              newActivity: false,
+              following: true
+            })
+            yield* TestClock.adjust("1 minute")
+            // Following joins the new thread, so its opening and a reply notify the reader.
+            const followed = yield* run(bound, owner, start(team.id, []))
+            yield* run(bound, owner, reply(followed.thread.id, []))
+            yield* run(bound, owner, start(quiet.id, [humanId]))
+            expect(itemOf(yield* mine(human), team.id)).toMatchObject({ newActivity: true })
+            expect(yield* pendingOf(human)).toEqual({ [team.id]: 2, [quiet.id]: 1 })
+            // Reading the thread settles its notifications; the other group's stay pending.
+            yield* run(bound, human, markRead(followed.thread.id, 2))
+            expect(yield* pendingOf(human)).toEqual({ [quiet.id]: 1 })
+            expect(yield* pendingOf(owner)).toEqual({})
+            // Groups outside the reader's group.read grants are left out.
+            expect(yield* mine(actorFor(plainId))).toEqual([])
           })
-          yield* TestClock.adjust("1 minute")
-          // Following joins the new thread, so its opening and a reply notify the reader.
-          const followed = yield* run(bound, owner, start(team.id, []))
-          yield* run(bound, owner, reply(followed.thread.id, []))
-          yield* run(bound, owner, start(quiet.id, [humanId]))
-          expect(itemOf(yield* mine(human), team.id)).toMatchObject({
-            newActivity: true,
-            pending: 2
-          })
-          expect(itemOf(yield* mine(human), quiet.id)).toMatchObject({ pending: 1 })
-          // Reading the thread settles its notifications; the other group's stay pending.
-          yield* run(bound, human, markRead(followed.thread.id, 2))
-          expect(itemOf(yield* mine(human), team.id)).toMatchObject({ pending: 0 })
-          expect(itemOf(yield* mine(human), quiet.id)).toMatchObject({ pending: 1 })
-          expect(itemOf(yield* mine(owner), team.id)).toMatchObject({ pending: 0 })
-          // Groups outside the reader's group.read grants are left out.
-          expect(yield* mine(actorFor(plainId))).toEqual([])
-        })
+        )
       )
-    )
   )
 
   it.effect("posting reads the thread through the author's message and settles their earlier notifications", () =>

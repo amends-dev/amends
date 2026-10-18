@@ -324,11 +324,7 @@ it("keeps a workspace current through its change feed over the desktop host conn
   expect(stream?.request.headers.get("amends-workspace")).toBe("one")
   expect(stream?.request.headers.get("authorization")).toBe("Bearer jo")
   name = "Atelier"
-  stream?.send(
-    committed("one", "2", [
-      { name: "workspace.renamed", payload: { workspaceId: "one", previousName: "Studio", name } }
-    ])
-  )
+  stream?.send(committed("one", "2", [{ read: "settings" }, { read: "ownership" }, { read: "directory" }]))
   await waitFor(() => expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Atelier"))
   expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue("Atelier")
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace")
@@ -638,10 +634,12 @@ it("browses public groups from the sidebar, and joining one opens it", async () 
   expect(joins).toHaveLength(1)
 })
 it("drafts a first direct message at its hash route and opens the conversation", async () => {
+  let posted = false
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init)
     const path = new URL(request.url).pathname
-    if (request.method === "POST" && path === "/threads")
+    if (request.method === "POST" && path === "/threads") {
+      posted = true
       return response(
         {
           thread: {
@@ -659,6 +657,7 @@ it("drafts a first direct message at its hash route and opens the conversation",
         },
         201
       )
+    }
     if (path.endsWith("/groups/g9/openings")) return response([])
     return response({
       memberships: [
@@ -682,6 +681,20 @@ it("drafts a first direct message at its hash route and opens the conversation",
   const composer = await screen.findByRole("combobox", { name: /^Message / })
   await userEvent.setup().type(composer, "Are you free?")
   fireEvent.click(screen.getByRole("button", { name: "Send" }))
+  // The message shows, and the conversation opens, once the commit that delivers it arrives.
+  await waitFor(() => expect(posted).toBe(true))
+  feed.streams[0]!.send({
+    ...committed("one", "2", []),
+    changes: [
+      {
+        _tag: "TimelineItem",
+        item: {
+          ...item(1, "m9", "Are you free?"),
+          activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" }
+        }
+      }
+    ]
+  })
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g9"))
 })
 

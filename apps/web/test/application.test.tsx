@@ -688,14 +688,7 @@ it("shows a rename committed elsewhere without a reload, keeping the draft being
   expect(input).toHaveValue("Studio")
   fireEvent.input(input, { target: { value: "My draft" } })
   name = "Atelier"
-  feed.streams[0]?.send(
-    committed("one", "2", [
-      {
-        name: "workspace.renamed",
-        payload: { workspaceId: "one", previousName: "Studio", name: "Atelier" }
-      }
-    ])
-  )
+  feed.streams[0]?.send(committed("one", "2", [{ read: "settings" }, { read: "ownership" }, { read: "directory" }]))
   await waitFor(() => expect(sidebar).toHaveTextContent("Atelier"))
   expect(screen.getByRole("textbox", { name: "Workspace name" })).toBe(input)
   expect(input).toHaveValue("My draft")
@@ -710,11 +703,7 @@ it("leaves a workspace once a commit removes the member, without signing out", a
   )
   await screen.findByRole("heading", { name: "Inbox" })
   status = "removed"
-  feed.streams[0]?.send(
-    committed("one", "2", [
-      { name: "workspace.member.removed", payload: { workspaceId: "one", memberId: "owner-one" } }
-    ])
-  )
+  feed.streams[0]?.send(committed("one", "2", [{ read: "members" }, { read: "directory" }]))
   feed.streams[0]?.unavailable()
   await screen.findByRole("heading", { name: "That workspace is closed to you" })
   expect(fixture.store.read()?.token).toBe("alice")
@@ -1044,7 +1033,6 @@ const managed = {
   readAt: null,
   newActivity: false,
   following: false,
-  pending: 0,
   manageable: true,
   membersRemovable: true,
   renamable: true
@@ -1132,6 +1120,20 @@ it("drafts a first message to someone new and opens the conversation it starts",
   const composer = await screen.findByRole("combobox", { name: /^Message / })
   await userEvent.setup().type(composer, "Are you free?")
   fireEvent.click(screen.getByRole("button", { name: "Send" }))
+  // The message shows, and the conversation opens, once the commit that delivers it arrives.
+  await waitFor(() => expect(started).toHaveLength(1))
+  feed.streams[0]!.send({
+    ...committed("one", "2", []),
+    changes: [
+      {
+        _tag: "TimelineItem",
+        item: {
+          ...item(1, "m9", "Are you free?"),
+          activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" }
+        }
+      }
+    ]
+  })
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g9"))
   expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }])
 })

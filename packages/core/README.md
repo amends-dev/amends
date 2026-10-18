@@ -266,6 +266,8 @@ read through `ThreadQuery`; a query never writes.
 | `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones.                                          |
 | `ThreadQuery.listReadable`                                                | A page of a group's readable threads, from any listing, with tasks, latest activity, and positions.    |
 | `ThreadQuery.readTimeline`, `readTimelineItem`                            | Timeline subjects resolved under access, for timeline pages and notification sources.                  |
+| `ThreadQuery.timelineItemsAbout`                                          | The timeline items about some subjects as they are now, checking no access, for the change feed.       |
+| `ThreadQuery.listedOf`, `previewsOf`                                      | Threads with their tasks and latest activity, and their stream previews, for streams and the feed.     |
 | `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message. |
 | `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients.                                     |
 | `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording.            |
@@ -337,7 +339,7 @@ notified as well as the identity (`Notification.ofMember`), so an inbox belongs 
 someone who rejoins under a new member ID starts with an empty one.
 
 `NotificationService` serves the acting member's own `inbox`, newest first with each source they can
-still read as its timeline shows it, its `countPending`, and a person's `markSeen` and
+still read as its timeline shows it, its `countPending`, in all and by group, and a person's `markSeen` and
 `markSeenThrough`; contact and triage inboxes are read only through the store. A person's `Seen` is
 private state the store keeps outside the journal. `NotificationProjection` generates notifications
 from each recorded activity's recipients, and settles pending agent input when a participation ends.
@@ -350,8 +352,10 @@ Notifications never create turns, accept their input, or run work. See
 `@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the `ReadStateStore`, which is kept outside the journal.
 `ReadStateStore.markThreadRead` advances the reader's position and marks their notifications from
-the thread seen in one write; marking a thread read, starting one, and replying all use it, so an
-author has read what they posted. It is what makes ambient activity visible in the
+the thread seen in one write. `ReadStateCommand.markThreadRead` is that write with its `ThreadRead`
+signal, published once the caller's commit lands, or at once outside one; marking a thread read,
+starting one, and replying all use it, so an author has read what they posted and their sessions
+know. It is what makes ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
@@ -484,7 +488,8 @@ reasoning or tool calls.
 
 `TurnService` lets a reader who may read a thread `get` its turns as `Turn.View`s, with whether the
 reader may stop (`stoppable`) or retry (`retryable`) them now, and `listActive` the workspace's
-active turns in threads the reader may read. A turn in a thread outside the reader's audience is
+active turns in threads the reader may read. `Turn.view` builds a view from what the reader may
+direct and `TurnQuery.whyNotRetryable`, which the change feed shares. A turn in a thread outside the reader's audience is
 `NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who
 may direct its agent may `cancel` an active turn, a queued one at once and a running one once its
 job confirms it, and `retry` a failed or stopped turn as a new queued turn for the same agent,
@@ -558,8 +563,9 @@ feed reads the workspace journal, so it carries every commit from any host or pr
 storage, including commits whose acknowledgment was lost; nothing is published from the commit path.
 
 `ChangeFeedSource` shares one follower of the journal per workspace runtime, started by the first
-subscriber at the journal's head and stopped when the last leaves. It decodes each commit once and
-buffers it for every subscriber, waiting for the next with `Store.waitForAppend`. A subscriber
+subscriber at the journal's head and stopped when the last leaves. It decodes each commit once,
+reads once what the commit changed in what readers show (`ChangeFeedChanges`), and buffers it for
+every subscriber, waiting for the next with `Store.waitForAppend`. A subscriber
 registers before reading the journal, so no commit falls between the two, and one that falls more
 than 256 commits behind reads what it lost from the journal instead of failing. When reading fails,
 the follower logs it and follows again from the last commit it delivered, backing off up to five
@@ -568,13 +574,13 @@ version this host does not know or a payload its schema rejects, is logged and e
 subscription so the consumer refreshes, and the follower goes on past it.
 
 `watch` checks active membership, then emits `Ready { workspaceId, cursor, reset }` and a
-`Committed { workspaceId, cursor, commitId, events, notifications }` for each later commit with
-something the reader may see. A cursor is opaque and resumes after the commit that carried it. Given
+`Committed { workspaceId, cursor, commitId, changes, stale, notifications }` for each later commit
+with something the reader may see. A cursor is opaque and resumes after the commit that carried it. Given
 `after`, the feed replays the commits after it, up to 500, with `reset: false`; without one, or with
 a cursor it cannot resume from, `Ready` has `reset: true` at the head and the consumer must refresh
 its view. `Ready`'s cursor is null only for an empty journal.
 
-A reader sees an event when they hold a scope in its fact's
+A reader is told of a fact when they hold a scope in its
 [audience](../../docs/journal.md#fact-audiences), the workspace, their membership or identity, or a
 group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts`
 names for it: `invitation.manage` for invitations, `member.read` and `assignment.read` for
@@ -582,10 +588,25 @@ membership and access changes, `group.read` for group facts, and `thread.read` f
 registration can name the member a fact concerns, who sees it without the permission. Their
 membership, admissions, and grants are read after the subscription registers and reloaded before
 filtering a commit that changes them, so a commit that admits the reader delivers what it admits.
-The commit that removes the reader from the workspace is delivered, then the stream ends. Registry
-views give some facts their public shape: activity omits its recipients, and participation omits
-routing identities and admissions. A core test checks that the registry holds every fact that
-declares an audience, at each version, and no other.
+The commit that removes the reader from the workspace is delivered, then the stream ends. Each
+registration also names the reads its fact makes stale, which a commit's `stale` gives the readers
+it reaches, with `pending` for a reader it notified: what its `changes` do not deliver, such as a
+member's rename or a group's creation. Facts whose changes the commit delivers, such as thread
+activity and turns, name none. A core test checks that the registry holds every fact that declares
+an audience, at each version, and no other.
+
+A commit's `changes` are what it changed in what readers show, each as it is now, so a reader puts it
+in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the
+commit's entries name, the items it recorded and those about a message, turn, or task it changed,
+since an item shows its subject's current state; a `Preview` of each thread those items are in, as
+its group's stream shows it to every reader; a `GroupLatest` with the latest activity of each of
+their groups; and a `Turn` for each turn the entries name, and each turn one of those retries, as
+`TurnService.get` gives it to that reader. They are read after the commit, so one may reflect later
+commits too, and the last change to an item follows the last commit that changed it. Each reaches
+the readers its read requires: the thread's group with `thread.read` on the thread, or, for a
+group's latest activity, with `group.read` on the group. `ChangeFeedChanges.Prepared.changeFor`
+gives a change as one reader sees it, from whether their grants cover a permission it shows, such
+as directing a turn's agent.
 
 Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
 same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with

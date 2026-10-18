@@ -10,6 +10,7 @@ export type WorkspaceResource =
   | "groups"
   | "public-groups"
   | "inbox"
+  | "pending"
   | "permissions"
   | "connections"
   | "agents"
@@ -22,6 +23,7 @@ export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "groups",
   "public-groups",
   "inbox",
+  "pending",
   "permissions",
   "connections",
   "agents",

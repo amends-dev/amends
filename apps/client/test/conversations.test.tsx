@@ -40,7 +40,7 @@ import {
   type Thread,
   type ThreadTimeline
 } from "../src/index.ts"
-import { Signal, affectedKeys, signalKeys } from "../src/live/api.ts"
+import { Signal, signalKeys, staleKeys } from "../src/live/api.ts"
 
 afterEach(cleanup)
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })
@@ -138,76 +138,27 @@ function mount<A>(fetch: typeof globalThis.fetch, use: () => PagedView<A>) {
   return () => view
 }
 
-it("maps conversation facts and signals to the reads of their groups and threads", () => {
-  const keys = (names: Array<{ name: string; payload?: unknown }>) => affectedKeys("one", names).toSorted()
+it("reads again what a commit made stale and what signals settle, each once", () => {
+  const keys = (stale: Parameters<typeof staleKeys>[1]) => staleKeys("one", stale).toSorted()
+  // A workspace read, the reader's directory, and one group's or thread's read.
   expect(
     keys([
-      {
-        name: "thread.activity.recorded",
-        payload: { groupId: "group", activity: { threadId: "thread" } }
-      }
+      { read: "groups" },
+      { read: "directory" },
+      { read: "streams", id: "group" },
+      { read: "threads", id: "thread" }
     ])
-  ).toEqual(["workspace/one/groups", "workspace/one/streams:group", "workspace/one/timelines:thread"])
-  // Leaving a group also changes which notification sources the reader can still read.
-  // Every open thread checks its access again, since the fact names no threads.
-  // Public groups show who belongs, so their listing refreshes too.
-  expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
-    "workspace/one/active-turns",
-    "workspace/one/groups",
-    "workspace/one/inbox",
-    "workspace/one/participants",
-    "workspace/one/public-groups",
-    "workspace/one/rosters:group",
-    "workspace/one/streams:group",
-    "workspace/one/timelines"
-  ])
-  // A payload without the expected field refreshes the whole collection rather than none.
-  expect(keys([{ name: "thread.activity.recorded", payload: {} }])).toEqual([
-    "workspace/one/groups",
-    "workspace/one/streams",
-    "workspace/one/timelines"
-  ])
-  expect(keys([{ name: "workspace.assignment.revoked" }])).toContain("workspace/one/streams")
-  // A new name shows wherever the groups list names the group, and among public groups.
-  expect(keys([{ name: "group.renamed", payload: { groupId: "group" } }])).toEqual([
-    "workspace/one/groups",
-    "workspace/one/public-groups"
-  ])
-  // A public group's creation reaches everyone who might join it.
-  expect(keys([{ name: "group.created", payload: { id: "group" } }])).toEqual([
-    "workspace/one/groups",
-    "workspace/one/public-groups"
-  ])
-  // Each read refreshes once: a notification repeats no key, and a collection covers its items.
+  ).toEqual(["directory", "workspace/one/groups", "workspace/one/streams:group", "workspace/one/threads:thread"])
+  // A stale collection covers its items, and each read refreshes once.
   expect(
-    affectedKeys(
-      "one",
-      [
-        {
-          name: "thread.activity.recorded",
-          payload: { groupId: "group", activity: { threadId: "thread" } }
-        },
-        { name: "workspace.assignment.created" }
-      ],
-      true
-    ).toSorted()
-  ).toEqual([
-    "workspace/one/active-turns",
-    "workspace/one/agents",
-    "workspace/one/connections",
-    "workspace/one/groups",
-    "workspace/one/inbox",
-    "workspace/one/members",
-    "workspace/one/ownership",
-    "workspace/one/participants",
-    "workspace/one/permissions",
-    "workspace/one/rosters",
-    "workspace/one/settings",
-    "workspace/one/streams",
-    "workspace/one/threads",
-    "workspace/one/timelines",
-    "workspace/one/turns"
-  ])
+    keys([
+      { read: "timelines", id: "thread" },
+      { read: "timelines" },
+      { read: "pending" },
+      { read: "pending" },
+      { read: "rosters", id: "group" }
+    ])
+  ).toEqual(["workspace/one/pending", "workspace/one/rosters:group", "workspace/one/timelines"])
   // Reading a thread settles notifications from it.
   const signal = Schema.decodeSync(Signal.Signal)
   const recipient = { workspaceId: "one", memberId: "alice" }
@@ -219,20 +170,22 @@ it("maps conversation facts and signals to the reads of their groups and threads
         _tag: "ThreadRead",
         ...recipient,
         threadId: "thread-one",
-        readThrough: 1
+        readThrough: 1,
+        readAt: at
       })
     )
-  ).toEqual(["workspace/one/groups", "workspace/one/streams", "workspace/one/inbox"])
+  ).toEqual(["workspace/one/pending"])
   expect(
     signalKeys(
       "one",
       signal({
         _tag: "NotificationsSeen",
         ...recipient,
-        notificationIds: ["notification-one"]
+        notificationIds: ["notification-one"],
+        seenAt: at
       })
     )
-  ).toEqual(["workspace/one/groups", "workspace/one/inbox"])
+  ).toEqual(["workspace/one/pending"])
   expect(
     signalKeys(
       "one",
@@ -243,7 +196,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         readAt: at
       })
     )
-  ).toEqual(["workspace/one/groups"])
+  ).toEqual([])
   expect(
     signalKeys(
       "one",
@@ -328,7 +281,7 @@ it("an older page that fails says so, and loading again tries it once more", asy
   expect(view().earlierFailed()).toBe(false)
 })
 
-it("a timeline opens at its newest activity, pages back once, and a change reads only what followed", async () => {
+it("a timeline opens at its newest activity, pages back once, and a refresh reads again what it shows", async () => {
   const timeline = Array.from({ length: 70 }, (_, index) => item(index + 1))
   const { fetch, requests } = host([], timeline)
   const view = mount(fetch, () => useThreadTimeline("one", "thread"))
@@ -338,23 +291,19 @@ it("a timeline opens at its newest activity, pages back once, and a change reads
       ?.map((entry: ThreadTimeline.Item) => entry.activity.sequence) ?? []
   await waitFor(() => expect(sequences()).toHaveLength(50))
   expect([sequences()[0], sequences().at(-1)]).toEqual([21, 70])
-  // The first read and its catch-up are the only reads so far.
   expect(requests.map((url) => url.search)).toEqual(["?limit=50&from=newest"])
   requests.length = 0
+  // A refresh reads every item shown again, down to the oldest, and shows no more than that.
   timeline.push(item(71), item(72))
   view().retry()
   await waitFor(() => expect(sequences().at(-1)).toBe(72))
-  expect(requests.map((url) => url.searchParams.get("afterSequence"))).toEqual(["70"])
+  expect([sequences()[0], view().complete()]).toEqual([21, false])
+  expect(requests.map((url) => url.searchParams.get("beforeSequence"))).toEqual([null, "23"])
   requests.length = 0
   view().loadEarlier()
   await waitFor(() => expect(view().complete()).toBe(true))
   expect(sequences()).toEqual(Array.from({ length: 72 }, (_, index) => index + 1))
-  expect(
-    requests.map((url) => [url.searchParams.get("beforeSequence"), url.searchParams.get("afterSequence")])
-  ).toEqual([
-    ["21", null],
-    [null, "72"]
-  ])
+  expect(requests.map((url) => url.searchParams.get("beforeSequence"))).toEqual([null, "23"])
 })
 
 /** A notification for Alice recorded at the given minute, from the given thread position. */
@@ -486,7 +435,7 @@ it("a pending inbox asks for pending notifications, and no longer lists one the 
 it("the inbox's pending count is the inbox's own, from groups left too", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const path = new URL(new Request(input, init).url).pathname
-    return Promise.resolve(json(path.endsWith("/notifications/count") ? { pending: 5 } : []))
+    return Promise.resolve(json(path.endsWith("/notifications/count") ? { pending: 5, groups: [] } : []))
   })
   let pending!: () => number | undefined
   function Consumer() {
@@ -737,7 +686,6 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -947,7 +895,6 @@ it("renames a group it may rename, from the name it started from, saving only a 
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -1256,7 +1203,6 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
           readAt: null,
           newActivity: false,
           following,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -1374,7 +1320,6 @@ it("a follow the read does not show settles on what the read says, and one that 
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: true,
           membersRemovable: true,
           renamable: true
@@ -1467,7 +1412,6 @@ it("offers no following in a direct conversation, where everyone takes part in e
           readAt: null,
           newActivity: false,
           following: false,
-          pending: 0,
           manageable: false,
           membersRemovable: false,
           renamable: false

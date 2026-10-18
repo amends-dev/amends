@@ -15,7 +15,7 @@
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { StoreError } from "@amends-dev/log"
-import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm"
 import type { PgInsertValue } from "drizzle-orm/pg-core"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
@@ -229,8 +229,7 @@ export const make = Effect.gen(function* () {
       Effect.mapError(StoreError.failed("NotificationStore", "countPendingByRecipient"))
     ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
-      function* (target, groupIds) {
-        if (groupIds.length === 0) return []
+      function* (target) {
         const rows = yield* guard(
           db
             .select({ groupId: notifications.threadGroupId, count: sql<number>`count(*)::int` })
@@ -241,10 +240,11 @@ export const make = Effect.gen(function* () {
                 eq(notifications.recipientKind, target._tag),
                 eq(inbox, inboxOf(target)),
                 pendingOnly,
-                inIds(notifications.threadGroupId, groupIds)
+                isNotNull(notifications.threadGroupId)
               )
             )
             .groupBy(notifications.threadGroupId)
+            .orderBy(sql`${notifications.threadGroupId} COLLATE "C"`)
         )
         return yield* Schema.decodeUnknownEffect(Schema.Array(NotificationStore.PendingCount))(rows)
       },

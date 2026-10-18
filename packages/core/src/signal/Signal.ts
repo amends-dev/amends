@@ -39,14 +39,16 @@ export const Signal = Schema.TaggedUnion({
     until: Schema.DateTimeUtcFromString
   },
   /**
-   * A member read a thread through a position, for their sessions. Their notifications from the
-   * thread at or before it are now seen, as each notification carries its thread and sequence.
+   * A member read a thread through a position at `readAt`, for their sessions. Their notifications
+   * from the thread at or before it that were still pending are now seen at `readAt`, as each
+   * notification carries its thread and sequence.
    */
   ThreadRead: {
     workspaceId: WorkspaceId.WorkspaceId,
     memberId: MemberId.MemberId,
     threadId: ThreadId.ThreadId,
-    readThrough: Schema.Int.check(Schema.isGreaterThan(0))
+    readThrough: Schema.Int.check(Schema.isGreaterThan(0)),
+    readAt: Schema.DateTimeUtcFromString
   },
   /** A member read a group: for their sessions. */
   GroupRead: {
@@ -55,11 +57,12 @@ export const Signal = Schema.TaggedUnion({
     groupId: GroupId.GroupId,
     readAt: Schema.DateTimeUtcFromString
   },
-  /** A member saw notifications: for their sessions. */
+  /** A member saw notifications, which were pending until `seenAt`: for their sessions. */
   NotificationsSeen: {
     workspaceId: WorkspaceId.WorkspaceId,
     memberId: MemberId.MemberId,
-    notificationIds: Schema.NonEmptyArray(Notification.NotificationId)
+    notificationIds: Schema.NonEmptyArray(Notification.NotificationId),
+    seenAt: Schema.DateTimeUtcFromString
   },
   /**
    * More of a response an agent's turn is writing, before it completes: `text` continues the

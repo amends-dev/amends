@@ -11,7 +11,7 @@ import * as CoreError from "../../src/error/CoreError.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Journal from "../../src/journal/Journal.ts"
-import * as ReadStateStore from "../../src/read-state/ReadStateStore.ts"
+import * as ReadStateCommand from "../../src/read-state/ReadStateCommand.ts"
 import * as Signal from "../../src/signal/Signal.ts"
 import * as SignalHub from "../../src/signal/SignalHub.ts"
 import type * as Thread from "../../src/thread/Thread.ts"
@@ -67,7 +67,10 @@ const run = <A, E>(
       findParticipants: unexpected,
       listReadable: unexpected,
       readTimeline: unexpected,
-      readTimelineItem: unexpected
+      readTimelineItem: unexpected,
+      timelineItemsAbout: unexpected,
+      listedOf: unexpected,
+      previewsOf: unexpected
     })
     const authorization = Authorization.Authorization.of({
       require: (needed) =>
@@ -103,7 +106,7 @@ const run = <A, E>(
             Layer.succeed(Store.Store, (yield* make(workspaceId)).store),
             Layer.succeed(WorkspaceId.CurrentWorkspaceId, workspaceId),
             unused(ThreadCommand.ThreadCommand),
-            unused(ReadStateStore.ReadStateStore),
+            unused(ReadStateCommand.ReadStateCommand),
             unused(ThreadMessageStore.ThreadMessageStore),
             unused(Journal.Journal),
             unused(Crypto.Crypto)

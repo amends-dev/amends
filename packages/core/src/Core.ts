@@ -24,6 +24,7 @@ import * as Delegation from "./authorization/Delegation.ts"
 import * as GrantResolver from "./authorization/GrantResolver.ts"
 import * as PermissionCatalog from "./authorization/PermissionCatalog.ts"
 import * as RoleProjection from "./authorization/RoleProjection.ts"
+import * as ChangeFeedChanges from "./change-feed/ChangeFeedChanges.ts"
 import * as ChangeFeedService from "./change-feed/ChangeFeedService.ts"
 import * as ChangeFeedSource from "./change-feed/ChangeFeedSource.ts"
 import * as ChannelIntake from "./channel/ChannelIntake.ts"
@@ -51,6 +52,7 @@ import * as Journal from "./journal/Journal.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
+import * as ReadStateCommand from "./read-state/ReadStateCommand.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
 import * as TaskCommand from "./task/TaskCommand.ts"
 import * as TaskPermissions from "./task/TaskPermissions.ts"
@@ -78,6 +80,7 @@ import * as TurnCommand from "./turn/TurnCommand.ts"
 import * as TurnExecution from "./turn/TurnExecution.ts"
 import * as TurnJobs from "./turn/TurnJobs.ts"
 import * as TurnProjection from "./turn/TurnProjection.ts"
+import * as TurnQuery from "./turn/TurnQuery.ts"
 import * as TurnService from "./turn/TurnService.ts"
 import type * as TurnStore from "./turn/TurnStore.ts"
 import * as TurnTimeline from "./turn/TurnTimeline.ts"
@@ -207,6 +210,7 @@ const threadQuery = ThreadQuery.layer.pipe(
   Layer.provide([groupQuery, ThreadActivityResolvers.layer(activityResolvers)])
 )
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery))
+const turnQuery = TurnQuery.layer
 const turnCommand = TurnCommand.layer.pipe(Layer.provide([threadQuery, threadCommand]))
 const taskCommand = TaskCommand.layer.pipe(Layer.provide([threadQuery, threadCommand, turnCommand]))
 const channelQuery = ChannelQuery.layer
@@ -215,7 +219,9 @@ const memberCommand = MemberCommand.layer.pipe(Layer.provide([AssignmentCommand.
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
  */
-const changeFeedSource = ChangeFeedSource.layer()
+const changeFeedSource = ChangeFeedSource.layer().pipe(
+  Layer.provide(ChangeFeedChanges.layer.pipe(Layer.provide([threadQuery, turnQuery])))
+)
 const changeFeedService = ChangeFeedService.layer.pipe(Layer.provide([changeFeedSource, GrantResolver.layer]))
 
 /**
@@ -251,10 +257,12 @@ const operations = Layer.mergeAll(
     groupCommand,
     threadQuery,
     threadCommand,
+    turnQuery,
     turnCommand,
     taskCommand,
     channelQuery,
-    changeFeedSource
+    changeFeedSource,
+    ReadStateCommand.layer
   ])
 )
 

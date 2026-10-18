@@ -9,7 +9,7 @@ import {
   groupsRead,
   inboxRead,
   membersRead,
-  pendingCountRead,
+  pendingCountsRead,
   permissionsRead,
   publicGroupsRead,
   rosterRead,
@@ -108,14 +108,18 @@ export function useWorkspacePermission(workspaceId: string, permission: string):
 }
 
 /**
- * How many notifications are still pending for the reader, live while mounted: the inbox's own
- * count, including those from groups they have left.
+ * How many notifications are still pending for the reader, live while mounted: in all, the inbox's
+ * own count, including those from groups they have left, and from each group's threads.
  */
+export function usePendingCounts(workspaceId: string): Read<NotificationInbox.Counts> {
+  const read = pendingCountsRead(useWorkspaceClient(workspaceId), workspaceId)
+  return read ? connect(read) : unread
+}
+
+/** How many notifications are still pending for the reader in all, live while mounted. */
 export function useInboxPending(workspaceId: string): Accessor<number | undefined> {
-  const read = pendingCountRead(useWorkspaceClient(workspaceId), workspaceId)
-  if (!read) return () => undefined
-  const count = connect(read)
-  return () => count.value()?.pending
+  const counts = usePendingCounts(workspaceId)
+  return () => counts.value()?.pending
 }
 
 /** A view that opens at its newest items and pages back on request. */

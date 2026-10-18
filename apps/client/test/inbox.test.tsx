@@ -65,7 +65,6 @@ const groups = [
     readAt: null,
     newActivity: false,
     following: true,
-    pending: 1,
     manageable: true,
     membersRemovable: true,
     renamable: true
@@ -117,13 +116,14 @@ function fixture(options: { readonly fail?: boolean } = {}) {
   ]
   const markedSeen: Array<string> = []
   const through: Array<unknown> = []
+  let inboxReads = 0
   const streams: Array<ReturnType<typeof eventStream>> = []
   /** The server tells the reader's sessions what they saw, as it does after marking it. */
   const announceSeen = (notificationIds: ReadonlyArray<string>) =>
     streams.at(-1)?.send({
       _tag: "Signal",
       workspaceId: "one",
-      signal: { _tag: "NotificationsSeen", workspaceId: "one", memberId: "owner", notificationIds }
+      signal: { _tag: "NotificationsSeen", workspaceId: "one", memberId: "owner", notificationIds, seenAt: at(9) }
     })
   const settle = (id: string) => {
     const entry = inbox.find((item) => item.notification.id === id)
@@ -143,12 +143,14 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     if (path === "/members") return json(members)
     if (path === "/groups") return json(groups)
     if (path === "/notifications/inbox") {
+      inboxReads++
       const pendingOnly = url.searchParams.get("pendingOnly") === "true"
       return json(inbox.filter((item) => !pendingOnly || item.notification.state._tag === "Pending"))
     }
     if (path === "/notifications/count")
       return json({
-        pending: inbox.filter((item) => item.notification.state._tag === "Pending").length
+        pending: inbox.filter((item) => item.notification.state._tag === "Pending").length,
+        groups: []
       })
     if (request.method === "POST" && options.fail) return json({}, 503)
     const markSeen = /\/notifications\/([^/]+)\/seen$/.exec(path)
@@ -195,7 +197,9 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     setRetain,
     markedSeen,
     through,
-    failed
+    failed,
+    inboxReads: () => inboxReads,
+    send: (message: unknown) => streams.at(-1)?.send(message)
   }
 }
 
@@ -257,4 +261,38 @@ it("shows a notification unread again when marking it seen fails, and says so", 
   f.view.markAllSeen()
   await waitFor(() => expect(f.failed).toEqual(["seen", "all-seen"]))
   expect(f.view.entries().every((entry) => entry.unread)).toBe(true)
+})
+
+it("shows the notifications a commit delivers, the sources it changes, and what the reader saw, without reading again", async () => {
+  const f = fixture()
+  await waitFor(() => expect(f.view.entries()).toHaveLength(3))
+  const reads = f.inboxReads()
+  const committed = (cursor: string, notifications: Array<unknown>, items: Array<unknown>) => ({
+    _tag: "Committed",
+    workspaceId: "one",
+    cursor,
+    commitId: `commit-${cursor}`,
+    changes: items.map((item) => ({ _tag: "TimelineItem", item })),
+    stale: notifications.length > 0 ? [{ read: "pending" }] : [],
+    notifications
+  })
+  // A new notification shows first, with the timeline item the same commit delivered.
+  const arrived = notification("n4", 4, 4, "One more thing.")
+  f.send(committed("1", [arrived.notification], [arrived.source]))
+  await waitFor(() => expect(f.view.entries().map((entry) => entry.id)).toEqual(["n4", "n3", "n2", "n1"]))
+  expect(f.view.entries()[0]).toMatchObject({ unread: true, text: "One more thing.", author: { name: "Ada" } })
+  // An edit shows in place.
+  f.send(committed("2", [], [notification("n3", 3, 3, "Can you approve it?").source]))
+  await waitFor(() => expect(f.view.entries()[1]?.text).toBe("Can you approve it?"))
+  // Reading the thread, here or in another session, settles what it read through.
+  f.send({
+    _tag: "Signal",
+    workspaceId: "one",
+    signal: { _tag: "ThreadRead", workspaceId: "one", memberId: "owner", threadId: "t1", readThrough: 3, readAt: at(5) }
+  })
+  await waitFor(() => expect(f.view.entries().map((entry) => entry.unread)).toEqual([true, false, false, false]))
+  f.setFilter("pending")
+  await waitFor(() => expect(f.view.entries().map((entry) => entry.id)).toEqual(["n4"]))
+  // Neither inbox read again.
+  expect(f.inboxReads()).toBe(reads)
 })

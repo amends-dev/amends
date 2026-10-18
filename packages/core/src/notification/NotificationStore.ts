@@ -195,12 +195,11 @@ export class NotificationStore extends Context.Service<
     ) => Effect.Effect<number, StoreError.StoreError>
 
     /**
-     * How many pending notifications the recipient has from thread activity in each of these
-     * groups, for groups with any. Read one page of groups at a time.
+     * How many pending notifications the recipient has from thread activity in each group, for
+     * groups with any, in binary group-ID order.
      */
     readonly countPendingByGroup: (
-      recipient: Notification.Recipient,
-      groupIds: ReadonlyArray<GroupId.GroupId>
+      recipient: Notification.Recipient
     ) => Effect.Effect<ReadonlyArray<PendingCount>, StoreError.StoreError>
 
     /**
@@ -323,12 +322,8 @@ export const make = (
         read("countPendingByRecipient", Notification.Recipient, recipient),
         driver.countPendingByRecipient
       ),
-    countPendingByGroup: Effect.fn("NotificationStore.countPendingByGroup")(function* (recipient, groupIds) {
-      return yield* driver.countPendingByGroup(
-        yield* read("countPendingByGroup", Notification.Recipient, recipient),
-        yield* read("countPendingByGroup", Schema.Array(GroupId.GroupId), groupIds)
-      )
-    }),
+    countPendingByGroup: (recipient) =>
+      Effect.flatMap(read("countPendingByGroup", Notification.Recipient, recipient), driver.countPendingByGroup),
     insert: (record) =>
       write("insert", Notification.Notification, record).pipe(
         Effect.filterOrFail(unsettled, settled("insert")),
@@ -549,19 +544,19 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
       Effect.mapError(StoreError.failed("NotificationStore", "countPendingByRecipient"))
     ),
     countPendingByGroup: Effect.fn("NotificationStore.memory.countPendingByGroup")(
-      function* (recipient, groupInput) {
+      function* (recipient) {
         const target = inboxKey(recipient)
-        const groupIds = new Set(groupInput)
         const counts = new Map<GroupId.GroupId, number>()
         for (const record of yield* all)
           if (
             inboxKey(record.recipient) === target &&
             Notification.State.isAnyOf(["Pending"])(record.state) &&
-            record.thread !== undefined &&
-            groupIds.has(record.thread.groupId)
+            record.thread !== undefined
           )
             counts.set(record.thread.groupId, (counts.get(record.thread.groupId) ?? 0) + 1)
-        return [...counts].map(([groupId, count]) => ({ groupId, count }))
+        return [...counts]
+          .map(([groupId, count]) => ({ groupId, count }))
+          .toSorted((left, right) => MemoryDatabase.compareBinary(left.groupId, right.groupId))
       },
       Effect.mapError(StoreError.failed("NotificationStore", "countPendingByGroup"))
     ),

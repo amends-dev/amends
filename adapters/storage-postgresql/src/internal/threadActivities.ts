@@ -90,6 +90,19 @@ export const make = Effect.gen(function* () {
       },
       Effect.mapError(StoreError.failed("ThreadActivityStore", "getFirst"))
     ),
+    listBySubjects: Effect.fn("ThreadActivities.listBySubjects")(
+      function* (subjects) {
+        if (subjects.length === 0) return []
+        return yield* guard(
+          db
+            .select()
+            .from(threadActivities)
+            .where(and(inWorkspace, inIds(threadActivities.subject, subjects)))
+            .orderBy(sql`${threadActivities.threadId} COLLATE "C"`, threadActivities.sequence)
+        ).pipe(Effect.flatMap(decodeRows))
+      },
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "listBySubjects"))
+    ),
     readPage: Effect.fn("ThreadActivities.readPage")(
       function* (id, request) {
         const newest = request.from === "newest"

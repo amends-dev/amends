@@ -7,14 +7,19 @@
  */
 
 import * as Schema from "effect/Schema"
+import * as Subject from "../journal/Subject.ts"
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
+import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessage from "../thread/ThreadMessage.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as Task from "./Task.ts"
 
+/** A task is named by its thread, which has one task, as its facts name it. */
+const subject = (_: unknown, threadId: ThreadId.ThreadId) => Subject.make("task", threadId)
+
 /**
- * The thread became a task, with these initial values. It is about its thread, which has one task,
- * so it is recorded once there.
+ * The thread became a task, with these initial values. It is about its thread's one task, so it is
+ * recorded once there.
  *
  * @category kinds
  * @since 0.1.0
@@ -27,6 +32,7 @@ export const Created = ThreadActivityKind.make("task.created", {
     assignee: Schema.NullOr(MemberId.MemberId),
     createdBy: ThreadMessage.Author
   }),
+  subject,
   newActivity: false
 })
 
@@ -46,6 +52,7 @@ export type Created = ThreadActivityKind.Activity<typeof Created>
 export const Updated = ThreadActivityKind.make("task.updated", {
   version: 1,
   details: Task.Change,
+  subject,
   occurrence: () => null,
   newActivity: false
 })

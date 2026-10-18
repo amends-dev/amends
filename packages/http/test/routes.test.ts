@@ -287,7 +287,7 @@ const operations = Layer.mergeAll(
       ),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
       markSeenThrough: record("notification.markSeenThrough", () => Effect.succeed(2)),
-      countPending: Effect.succeed(3)
+      countPending: Effect.succeed({ pending: 3, groups: [] })
     })
   ),
   Layer.succeed(

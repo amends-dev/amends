@@ -1,7 +1,7 @@
 /**
  * What `NotificationService.inbox` takes and returns: a page of the acting member's notifications,
- * newest first, each with the timeline item it tells of while they may still read it. Protocols
- * carry `Item` to clients as it is.
+ * newest first, each with the timeline item it tells of while they may still read it, and what
+ * `countPending` counts of them. Protocols carry `Item` and `Counts` to clients as they are.
  *
  * @since 0.1.0
  */
@@ -46,3 +46,21 @@ export const Item = Schema.Struct({
  * @since 0.1.0
  */
 export interface Item extends Schema.Schema.Type<typeof Item> {}
+
+/**
+ * How many of the acting member's notifications are still pending: from anywhere, and from each
+ * group's threads, for groups with any.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Counts = Schema.Struct({
+  pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  groups: Schema.Array(NotificationStore.PendingCount)
+})
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Counts extends Schema.Schema.Type<typeof Counts> {}

@@ -1,7 +1,8 @@
 /**
  * One follower of the workspace journal for a runtime, shared by every reader: it tails the
- * journal from its head, prepares each commit once through `ChangeFeedEvents`, and fans the
- * deliveries out to its subscribers. A subscriber resuming from a cursor replays the commits
+ * journal from its head, prepares each commit once, its events through `ChangeFeedEvents` and what
+ * it changed in what readers show through `ChangeFeedChanges`, and fans the deliveries out to its
+ * subscribers. A subscriber resuming from a cursor replays the commits
  * after it when they are few enough, and otherwise starts again at the head with a reset.
  * `ChangeFeedService` subscribes for each reader of the change feed, and readers following a
  * turn's log share the follower too.
@@ -29,10 +30,12 @@ import * as Stream from "effect/Stream"
 import * as CoreError from "../error/CoreError.ts"
 import type * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
+import * as ChangeFeedChanges from "./ChangeFeedChanges.ts"
 import * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
 
 /**
- * One committed batch of the journal, with the events the feed may deliver from it.
+ * One committed batch of the journal, with the events the feed tells readers of from it and what
+ * it changed in what readers show.
  *
  * @category models
  * @since 0.1.0
@@ -42,6 +45,7 @@ export interface Delivery {
   readonly commitId: Commit.CommitId
   /** Possibly empty: a commit of internal facts still advances the journal. */
   readonly events: ReadonlyArray<ChangeFeedEvents.Prepared>
+  readonly changes: ReadonlyArray<ChangeFeedChanges.Prepared>
 }
 
 /**
@@ -161,6 +165,7 @@ const isReadable = (delivery: Prepared) => delivery.unreadable.length === 0
 export const make = Effect.fnUntraced(function* (input: Options = { capacity: 256, replayLimit: 500, pageSize: 100 }) {
   const { capacity, replayLimit, pageSize } = yield* Schema.decodeEffect(Options)(input)
   const log = (yield* Journal.Journal).log
+  const changeFeedChanges = yield* ChangeFeedChanges.ChangeFeedChanges
 
   const prepareBatch = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
     const events: Array<ChangeFeedEvents.Prepared> = []
@@ -185,6 +190,7 @@ export const make = Effect.fnUntraced(function* (input: Options = { capacity: 25
       position: batch.position,
       commitId: batch.commit.id,
       events,
+      changes: yield* changeFeedChanges.changesOf(batch),
       unreadable
     } satisfies Prepared
   })

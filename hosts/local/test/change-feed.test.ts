@@ -1,9 +1,8 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { ChangeFeed } from "@amends-dev/core/change-feed"
-import { GroupFacts } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ThreadService, ThreadId } from "@amends-dev/core/thread"
-import { InvitationFacts, Member, MemberFacts, type WorkspaceId } from "@amends-dev/core/workspace"
+import { Member, type WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { ApiErrors, Streams } from "@amends-dev/http"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
@@ -97,14 +96,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const received = yield* first.next
           expect(yield* second.next).toEqual(received)
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(received)) return yield* Effect.die("Expected commit")
-          expect(received.events).toHaveLength(1)
+          expect(received.stale).toEqual([{ read: "invitations" }])
           expect(received.notifications).toEqual([])
-          const issued = received.events[0]
-          if (issued === undefined) return yield* Effect.die("Expected an event")
-          expect(issued.name).toBe(InvitationFacts.Issued.name)
-          expect(DateTime.isDateTime(issued.recordedAt)).toBe(true)
-          const payload = yield* Schema.decodeUnknownEffect(InvitationFacts.Issued.payload)(issued.payload)
-          expect(payload).toEqual(invitation.details)
           yield* issue(other.id, "carol")
           expect(yield* foreign.next).toMatchObject({ _tag: "Committed", workspaceId: other.id })
           const member = yield* bob.workspaces.acceptInvitation({
@@ -115,9 +108,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* second.next).toEqual(accepted)
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(accepted)) return yield* Effect.die("Expected commit")
           expect(accepted.workspaceId).toBe(workspace.id)
-          expect(accepted.events.map((event) => event.name)).toContain(MemberFacts.Added.name)
-          expect(accepted.events.map((event) => event.name)).toContain(InvitationFacts.Accepted.name)
-          expect(new Set(accepted.events.map((event) => event.id)).size).toBe(accepted.events.length)
+          expect(accepted.stale).toEqual(expect.arrayContaining([{ read: "invitations" }, { read: "members" }]))
           expect(accepted.commitId).not.toBe(received.commitId)
           // Projection state is readable by the time the commit is delivered.
           expect(
@@ -129,10 +120,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* first.close
           const missed = yield* issue(workspace.id, "dave")
           const missedEvent = yield* second.next
-          expect(missedEvent).toMatchObject({
-            _tag: "Committed",
-            events: [{ payload: { id: missed.details.id } }]
-          })
+          expect(missedEvent).toMatchObject({ _tag: "Committed", stale: [{ read: "invitations" }] })
+          expect(missed.details.id).toBeDefined()
           // Resuming from the last commit it saw, the closed subscriber replays what it missed.
           const resumed = yield* listen(alice, workspace.id, accepted.cursor)
           expect(resumed.ready.cursor).toBe(accepted.cursor)
@@ -143,10 +132,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           )
           const after = yield* issue(workspace.id, "eve")
           const afterEvent = yield* reconnected.next
-          expect(afterEvent).toMatchObject({
-            _tag: "Committed",
-            events: [{ payload: { id: after.details.id } }]
-          })
+          expect(afterEvent).toMatchObject({ _tag: "Committed", stale: [{ read: "invitations" }] })
           expect(yield* second.next).toEqual(afterEvent)
           expect(yield* resumed.next).toEqual(afterEvent)
           // A viewer never sees invitations, which only invitation managers may list, but sees
@@ -158,16 +144,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
           })
           const joined = yield* second.next
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(joined)) return yield* Effect.die("Expected commit")
-          expect(joined.events.map((event) => event.name)).toContain(InvitationFacts.Accepted.name)
+          const reads = (message: typeof joined) =>
+            message.stale.map((stale) => (stale.id === undefined ? stale.read : `${stale.read}:${stale.id}`)).toSorted()
+          expect(reads(joined)).toContain("invitations")
           const seenByBob = yield* asBob.next
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(seenByBob)) return yield* Effect.die("Expected commit")
           expect(seenByBob.cursor).toBe(joined.cursor)
-          expect(seenByBob.events.map((event) => event.name).toSorted()).toEqual(
-            joined.events
-              .map((event) => event.name)
-              .filter((name) => !name.startsWith("workspace.invitation."))
-              .toSorted()
-          )
+          expect(reads(seenByBob)).toEqual(reads(joined).filter((read) => read !== "invitations"))
           // A member naming themselves reaches everyone who may read the members.
           yield* eve.members.rename({
             payload: { name: Member.Name.make("Eve Moss") }
@@ -175,17 +158,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const renamed = yield* second.next
           expect(renamed).toMatchObject({
             _tag: "Committed",
-            events: [{ name: MemberFacts.Renamed.name, payload: { name: "Eve Moss" } }]
+            stale: [{ read: "members" }, { read: "agents" }, { read: "directory" }]
           })
           expect(yield* asBob.next).toEqual(renamed)
           // A public group's creation reaches everyone who might join it, not only its members.
-          const lobby = yield* alice.groups.create({
+          yield* alice.groups.create({
             headers: {},
             payload: { name: "Lobby", memberIds: [], visibility: "Public" }
           })
           expect(yield* asBob.next).toMatchObject({
             _tag: "Committed",
-            events: [{ name: GroupFacts.Created.name, payload: { id: lobby.id } }]
+            stale: [{ read: "groups" }, { read: "public-groups" }]
           })
           yield* second.next
           yield* asBob.close

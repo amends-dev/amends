@@ -237,14 +237,14 @@ describe("marking notifications seen", () => {
           const [older, newer] = yield* pending()
           if (!older || !newer) return yield* Effect.die("Expected two pending notifications")
           expect(older.id).toBe(p.humanNote.id)
-          expect(yield* asHuman((s) => s.countPending)).toBe(2)
+          expect((yield* asHuman((s) => s.countPending)).pending).toBe(2)
           // Through the older one: the newer, which the reader had not seen, stays pending.
           expect(yield* asHuman((s) => s.markSeenThrough({ recordedAt: older.recordedAt, id: older.id }))).toBe(1)
           expect(yield* pending()).toEqual([newer])
-          expect(yield* asHuman((s) => s.countPending)).toBe(1)
+          expect((yield* asHuman((s) => s.countPending)).pending).toBe(1)
           const through = { recordedAt: newer.recordedAt, id: newer.id }
           expect(yield* asHuman((s) => s.markSeenThrough(through))).toBe(1)
-          expect(yield* asHuman((s) => s.countPending)).toBe(0)
+          expect((yield* asHuman((s) => s.countPending)).pending).toBe(0)
           // Nothing left to see marks nothing.
           expect(yield* asHuman((s) => s.markSeenThrough(through))).toBe(0)
           // Agents accept work rather than seeing it, and everyone counts only their own.
@@ -252,7 +252,7 @@ describe("marking notifications seen", () => {
             _tag: "CoreError.Denied",
             reason: { _tag: "HumanRequired" }
           })
-          expect(yield* service(p.owner)((s) => s.countPending)).toBe(2)
+          expect((yield* service(p.owner)((s) => s.countPending)).pending).toBe(2)
           expect(
             yield* p.bound.notifications.countPendingByRecipient(
               Notification.ofMember(p.owner.memberId, p.owner.identity)

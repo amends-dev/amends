@@ -11,46 +11,62 @@ and cache invalidation; apps mount it once per workspace view; features show its
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
    each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`,
-   `public-groups`, `inbox`, `permissions`, `connections`, and `agents`, and one key
+   `public-groups`, `inbox`, `pending`, `permissions`, `connections`, and `agents`, and one key
    per group stream, group roster, thread timeline, thread participants, and turn within their
    collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
    follows it by its own stream (see the [turn guide](turns.md)).
-3. Each `Committed` message maps its events to the keys they affect
-   (`apps/client/src/live/api.ts`) and invalidates each once, so every affected read
-   refreshes once. A member's rename refreshes the members and the directory. Group creation,
-   renames, and membership changes also refresh the public groups, and a public group's creation
-   reaches the whole workspace. Thread activity
-   names its thread and group in its payload, so it refreshes
-   that thread's timeline and that group's stream, and the groups list; a group's rename refreshes
-   the groups list; group membership
-   refreshes the groups and that group's stream and roster, and every open timeline and participant
-   list, since the fact names no threads and each must check its access again; joining or leaving a
-   thread refreshes its participants, workspace membership every roster, and grant changes every
-   stream, roster, timeline, and participant list. Group membership and grant changes also refresh the
-   inbox, since they decide which notification sources the reader can still read, and grant and
-   ownership changes refresh what the reader may do. Every `connection.*` fact but a replaced
-   key refreshes connections and the integrations they name, which share one key, as do grant
-   and ownership changes, which decide who may manage them. Agents follow every `agent.*`
-   fact, and the `connection.*` facts, but a replaced key, and the membership and grant facts
-   their readiness, names, and access follow; a connection's models refresh with connections.
-   Every `turn.*` fact names its turn, so
-   it refreshes that turn and the active turns; a thread's turns show in its timeline, which the
-   turn activity recorded there refreshes. Group membership and grant changes refresh the active
-   turns. A commit that
-   carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
-   refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
-   value, so the stream and thread panel replace what they show with an unavailable state once a
-   refresh answers gone or denied, until a later refresh succeeds. Facts with no mapping refresh nothing. Add
-   a mapping when a read starts depending on a fact.
-4. `Ready` with `reset` invalidates every key for the workspace and the directory. A first
-   connection always resets, because reads loaded before it may have missed commits.
+3. Each `Committed` message carries what the commit changed in what the reader may see, each as it
+   is now, which shows in place without a read: a `TimelineItem` goes in its thread's timeline, in
+   place of the item it read at that position, or after the last while it follows on, and a
+   `Preview` goes in its group's stream, in place of the thread it shows, or after the newest one
+   for a thread that started since, and a `GroupLatest` gives the groups list a group's latest
+   activity, which is new to the reader when it follows their last read of the group. A `Turn`
+   is a turn as the reader sees it, with whether they may stop or retry it, which the active turns
+   and the turn show in place of what they read; a read shows only what was delivered after it
+   began, so a refresh after a grant changes what the reader may do. The server
+   reads each change once, after the commit, for every reader of what changed, so a change may
+   reflect later commits too, and the last change to an item follows the last commit that changed
+   it. An edit therefore updates the message's item where it already shows, and a reply the
+   thread's preview, with its reply count and latest activity.
+4. Each `Committed` message names the reads the commit made stale for the reader, those its
+   changes do not cover, and the client invalidates each once (`staleKeys` in
+   `apps/client/src/live/api.ts`), a whole collection covering its items. Core's
+   `ChangeFeedEvents` declares them per fact. A member's rename makes the members, agents, and
+   directory stale; a group's creation or rename the groups and public groups, and a public
+   group's creation reaches the whole workspace; group membership the groups, public groups,
+   inbox, pending counts, active turns, that group's stream and roster, and every timeline and
+   participant list, since the fact names no threads and each must check its access again;
+   joining or leaving a thread its participants; workspace membership every roster; grant changes
+   every read but the invitations, public groups, and directory; every `connection.*` fact but a
+   replaced key the connections and agents; agent facts the agents; and a thread's rename the
+   thread. Thread activity, messages, tasks, and turns make nothing stale: the commit delivers
+   what they changed. A notification for the reader shows at the top of their inbox, with the
+   timeline item it tells of when the same commit delivers it, and makes their pending counts
+   stale. Mounted reads refetch; unmounted reads refetch when next mounted. A read that loses
+   access keeps its last value, so the stream and thread panel replace what they show with an
+   unavailable state once a refresh answers gone or denied, until a later refresh succeeds. A fact
+   that names no read refreshes nothing; declare its reads when a read starts depending on it.
+5. `Ready` with `reset` invalidates every key for the workspace and the directory, and forgets the
+   timeline items and previews delivered so far, since what was missed may have changed them. A first
+   connection always resets, because reads loaded before it may have missed commits. A timeline's
+   refresh reads again every item it shows, and the inbox, the active turns, and a turn show only
+   what was delivered after their read began. A `Ready` that resumes without a reset refreshes the reader's read state, the
+   groups, streams, inbox, and pending counts, since the signals missed meanwhile are never
+   replayed.
 
-A write that commits still refreshes the reads it changed before reporting success, so its result
-appears at once; the feed then delivers the same commit and refreshes those reads again. Read
+A post waits for the commit that delivers its message before reporting success, so it shows once
+the post completes without reading anything again; while the feed is not live, or when the commit
+does not arrive within three seconds, it refreshes the reads it changed instead. Other writes that
+commit still refresh the reads they changed before reporting success, so their result appears at
+once, and the feed then delivers the same commit. Read
 marks and marking notifications seen write private state rather than a commit, and refresh nothing
 themselves: the signal the server publishes for them reaches every session of the reader, the one
-that wrote included, and refreshes what it changed, once. While the feed is down, what they change
-catches up when it reconnects, with the rest of the view.
+that wrote included, and refreshes what it changed, once. A `ThreadRead` signal carries the
+position, which the group's streams show without a read; it also follows a start or a reply, once
+it commits, since the author has read what they posted. A `GroupRead` signal carries the read
+time, which the groups list shows without a read. `ThreadRead` and `NotificationsSeen` carry when
+the notifications they settle were seen, which the inbox shows in place; the pending counts read
+again. While the feed is down, what they change catches up when it resumes.
 
 ## Connection
 
@@ -80,9 +96,9 @@ it against the values then shown. Background refreshes never mark settings pendi
 - Invitations addressed to the signed-in identity from other workspaces reach no workspace
   feed. The directory refreshes when the page wakes instead; an identity-level feed would be
   a backend addition.
-- Read-state signals refresh the groups and streams, since they change unread state and pending
-  counts; reading a thread and seeing notifications also refresh the inbox and its count, since
-  both settle notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
+- Read-state signals carry what streams, the groups list, and the inbox show of them; reading a
+  thread and seeing notifications also refresh the pending counts, since both settle
+  notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
   moment each names, or until that member's message is published, and never show the reader. They
   are not replayed, so a reconnect starts with nobody typing. The notifications a commit carries
   refresh the inbox by refetching it rather than being added to it from the message.
