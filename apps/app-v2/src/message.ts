@@ -3,7 +3,9 @@
  * subscription report back.
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Role } from "@amends-dev/core/authorization"
+import { Connection } from "@amends-dev/core/connection"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
 import { Task } from "@amends-dev/core/task"
@@ -17,6 +19,7 @@ import { defineMessageUnion } from "foldkit/message"
 import {
   ActionItem,
   AssignmentItem,
+  ConnectionItem,
   FollowItem,
   Following,
   GroupItem,
@@ -57,6 +60,29 @@ export const Message = defineMessageUnion({
   GotInbox: { items: Schema.Array(InboxItem) },
   GotMemberships: { memberships: Schema.Array(MembershipItem) },
   GotFollows: { follows: Schema.Array(FollowItem) },
+  GotConnections: { connections: Schema.Array(ConnectionItem) },
+  ClickedConnections: {},
+  GotIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
+  FailedLoadIntegrations: { error: Schema.String },
+  ClickedAddConnection: {},
+  ChoseIntegration: { integrationId: Schema.String },
+  TypedConnectionName: { name: Schema.String },
+  ChoseConnectionAuth: { auth: ConnectionContract.AuthMethod },
+  TypedApiKey: { apiKey: Schema.String },
+  ChangedSetting: { name: Schema.String, value: Schema.Union([Schema.String, Schema.Boolean]) },
+  SubmittedConnectionForm: {},
+  ClickedCancelConnectionForm: {},
+  AddedConnection: {},
+  FailedAddConnection: { error: Schema.String },
+  ClickedRenameConnection: { connectionId: ConnectionContract.ConnectionId },
+  ClickedConfigureConnection: { connectionId: ConnectionContract.ConnectionId },
+  ClickedReplaceKey: { connectionId: ConnectionContract.ConnectionId },
+  ReplacedKey: {},
+  FailedReplaceKey: { error: Schema.String },
+  ClickedCheckConnection: { connectionId: ConnectionContract.ConnectionId },
+  CheckedConnection: { connectionId: ConnectionContract.ConnectionId, health: ConnectionContract.Health },
+  FailedCheckConnection: { connectionId: ConnectionContract.ConnectionId, error: Schema.String },
+  ClickedRemoveConnection: { connectionId: ConnectionContract.ConnectionId },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
   ToggledTeamPublic: { isPublic: Schema.Boolean },

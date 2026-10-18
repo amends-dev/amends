@@ -25,13 +25,12 @@ import {
   WorkspaceSettingsPermissions
 } from "@amends-dev/core/workspace"
 import * as Button from "@foldkit/ui/button"
-import * as Checkbox from "@foldkit/ui/checkbox"
-import * as Input from "@foldkit/ui/input"
 import * as Select from "@foldkit/ui/select"
-import * as Textarea from "@foldkit/ui/textarea"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Document, Html, HtmlBuilder } from "foldkit/html"
+import { connectionsView } from "./connectionsView.ts"
+import { button, choiceSelect, field, memberSelect, sending, submit, textarea, toggle } from "./controls.ts"
 import { Message } from "./message.ts"
 import {
   type ActionItem,
@@ -58,31 +57,6 @@ import {
 import { givableRoles, isOwner, may, mayActOn, permits, workspaceRolesOf } from "./permissions.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
-
-const errorView = (error: Option.Option<string>, h: HtmlBuilder<Message>): Html =>
-  Option.match(error, { onNone: () => h.empty, onSome: (text) => h.p([h.Role("alert")], [text]) })
-
-const field = (
-  h: HtmlBuilder<Message>,
-  config: Readonly<{ id: string; label: string; type: string; value: string; onInput: (value: string) => Message }>,
-  error: Option.Option<string>
-) =>
-  Input.view(
-    {
-      id: config.id,
-      type: config.type,
-      value: config.value,
-      onInput: config.onInput,
-      isInvalid: Option.isSome(error),
-      isAutofocus: true,
-      toView: (attributes) =>
-        h.div([], [h.label(attributes.label, [config.label]), h.input(attributes.input), errorView(error, h)])
-    },
-    h
-  )
-
-const submit = (h: HtmlBuilder<Message>, label: string) =>
-  Button.view({ type: "submit", toView: (attributes) => h.button(attributes.button, [label]) }, h)
 
 const signInView = (form: SignInForm, h: HtmlBuilder<Message>): Html =>
   SignInForm.match(form, {
@@ -150,21 +124,6 @@ const workspacesView = (workspaces: Workspaces, h: HtmlBuilder<Message>): Html =
           )
   })
 
-const textarea = (
-  h: HtmlBuilder<Message>,
-  config: Readonly<{ id: string; label: string; value: string; onInput: (value: string) => Message }>
-) =>
-  Textarea.view(
-    {
-      id: config.id,
-      value: config.value,
-      rows: 3,
-      onInput: config.onInput,
-      toView: (attributes) => h.div([], [h.label(attributes.label, [config.label]), h.textarea(attributes.textarea)])
-    },
-    h
-  )
-
 /** A member by their name here. */
 const memberName = (memberId: Member.Member["id"], opened: Opened) =>
   opened.members.find(({ member }) => member.id === memberId)?.member.name ?? "Someone"
@@ -208,8 +167,6 @@ const textOf = (message: ThreadMessage.ThreadMessage) =>
 const threadLabel = ({ thread, opening }: Pick<ThreadItem, "thread" | "opening">) =>
   thread.title ?? Option.match(opening, { onNone: () => "A thread", onSome: textOf })
 
-const sending = (pending: boolean, h: HtmlBuilder<Message>): Html => (pending ? h.span([], [" · Sending…"]) : h.empty)
-
 const actionsView = (actions: ReadonlyArray<ActionItem>, notice: Option.Option<string>, h: HtmlBuilder<Message>) => {
   const refused = actions.flatMap((action) =>
     Option.match(action.rejection, { onNone: () => [], onSome: (why) => [{ ...action, why }] })
@@ -238,73 +195,6 @@ const actionsView = (actions: ReadonlyArray<ActionItem>, notice: Option.Option<s
     ]
   )
 }
-
-const button = (h: HtmlBuilder<Message>, label: string, onClick: Message) =>
-  Button.view({ onClick, toView: (attributes) => h.button(attributes.button, [label]) }, h)
-
-/** A choice of one of `members`, or none, as `none` reads. */
-const memberSelect = (
-  h: HtmlBuilder<Message>,
-  config: Readonly<{
-    id: string
-    label: string
-    none: string
-    members: ReadonlyArray<Member.Member>
-    value: Option.Option<Member.Member["id"]>
-    onChange: (memberId: Option.Option<Member.Member["id"]>) => Message
-  }>
-) =>
-  Select.view(
-    {
-      id: config.id,
-      value: Option.getOrElse(config.value, () => ""),
-      onChange: (value) =>
-        config.onChange(Option.fromUndefinedOr(config.members.find((member) => member.id === value)?.id)),
-      toView: (attributes) =>
-        h.div(
-          [],
-          [
-            h.label(attributes.label, [config.label]),
-            h.select(attributes.select, [
-              h.option([h.Value("")], [config.none]),
-              ...config.members.map((member) => h.option([h.Value(member.id)], [member.name]))
-            ])
-          ]
-        )
-    },
-    h
-  )
-
-/** A choice of one of `choices`, each a value and how the person reads it. */
-const choiceSelect = <A extends string>(
-  h: HtmlBuilder<Message>,
-  config: Readonly<{
-    id: string
-    label: string
-    choices: ReadonlyArray<readonly [A, string]>
-    value: A
-    onChange: (value: A) => Message
-  }>
-) =>
-  Select.view(
-    {
-      id: config.id,
-      value: config.value,
-      onChange: (value) => config.onChange(config.choices.find(([choice]) => choice === value)?.[0] ?? config.value),
-      toView: (attributes) =>
-        h.div(
-          [],
-          [
-            h.label(attributes.label, [config.label]),
-            h.select(
-              attributes.select,
-              config.choices.map(([choice, label]) => h.option([h.Value(choice)], [label]))
-            )
-          ]
-        )
-    },
-    h
-  )
 
 /** The members of the workspace other than the person, who are still members of it. */
 const othersIn = (opened: Opened) =>
@@ -384,22 +274,12 @@ const composingView = (composing: Composing, opened: Opened, h: HtmlBuilder<Mess
             },
             Option.none()
           ),
-          Checkbox.view(
-            {
-              id: "team-public",
-              isChecked: isPublic,
-              onToggle: (isPublic) => Message.ToggledTeamPublic({ isPublic }),
-              toView: (attributes) =>
-                h.div(
-                  [],
-                  [
-                    h.button(attributes.checkbox, [isPublic ? "✓" : ""]),
-                    h.label(attributes.label, ["Anyone in the workspace can join"])
-                  ]
-                )
-            },
-            h
-          ),
+          toggle(h, {
+            id: "team-public",
+            label: "Anyone in the workspace can join",
+            isOn: isPublic,
+            onToggle: (isPublic) => Message.ToggledTeamPublic({ isPublic })
+          }),
           submit(h, "Create team"),
           button(h, "Cancel", Message.ClickedCancelCompose())
         ]
@@ -1228,6 +1108,7 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
         Message.ClickedInbox()
       ),
       button(h, "Settings", Message.ClickedSettings()),
+      button(h, "Connections", Message.ClickedConnections()),
       StoreState.match(opened.store, {
         Opening: () => h.p([], ["Opening…"]),
         Failed: ({ error }) => h.p([h.Role("alert")], [error]),
@@ -1246,7 +1127,8 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
                 onSome: Pane.match({
                   Group: ({ group }) => groupView(group, opened, h),
                   Inbox: () => inboxView(opened, h),
-                  Settings: ({ settings }) => settingsView(settings, opened, h)
+                  Settings: ({ settings }) => settingsView(settings, opened, h),
+                  Connections: ({ connections }) => connectionsView(connections, opened, h)
                 })
               })
             ]

@@ -6,7 +6,9 @@
  * is the one thing read from the host apart from the store, while online, since no replica holds it.
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, Role } from "@amends-dev/core/authorization"
+import { Connection } from "@amends-dev/core/connection"
 import type { CoreError } from "@amends-dev/core/error"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
@@ -18,6 +20,9 @@ import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId
 import { TurnId } from "@amends-dev/core/turn"
 import { Invitation, Member, MemberId, WorkspaceId, WorkspaceSettings } from "@amends-dev/core/workspace"
 import * as Accounts from "@amends-dev/gateway/Accounts"
+import type * as AgentSync from "@amends-dev/sync/AgentSync"
+import type * as ChannelSync from "@amends-dev/sync/ChannelSync"
+import type * as ConnectionSync from "@amends-dev/sync/ConnectionSync"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
 import type * as TaskSync from "@amends-dev/sync/TaskSync"
@@ -170,11 +175,23 @@ const whatEach: Readonly<
         | typeof NotificationSync.Actions
         | typeof TaskSync.Actions
         | typeof TurnSync.Actions
+        | typeof ConnectionSync.Actions
+        | typeof AgentSync.Actions
+        | typeof ChannelSync.Actions
       >
     >,
     string
   >
 > = {
+  ConnectionRenamed: "rename a connection",
+  ConnectionConfigured: "change a connection's settings",
+  ConnectionRemoved: "remove a connection",
+  AgentCreated: "add an agent",
+  AgentConfigured: "change how an agent is set up",
+  AgentRenamed: "rename an agent",
+  ChannelCreated: "add a channel",
+  ChannelRedirected: "move a channel",
+  ChannelRemoved: "remove a channel",
   TaskCreated: "make a task",
   TaskUpdated: "change a task",
   TurnCancelRequested: "stop a turn",
@@ -286,6 +303,13 @@ export const subscriptions = Subscription.make<
                   Stream.map(store.every("GroupMembership"), (memberships): Message =>
                     Message.GotMemberships({
                       memberships: memberships.map(({ record, pending }) => ({ membership: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.list("Connection", workspace), (connections): Message =>
+                    Message.GotConnections({
+                      connections: connections
+                        .filter(({ record }) => record.value.status === "active")
+                        .map(({ record, pending }) => ({ connection: record.value, pending }))
                     })
                   ),
                   Stream.map(store.every("GroupFollow"), (follows): Message =>
@@ -707,4 +731,37 @@ export const RetryTurn = Command.define("RetryTurn", {
   args: { turnId: TurnId.TurnId },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("TurnRetried", input))
+})
+
+/** Rename `connectionId` to `name`, from the name the person saw. */
+export const RenameConnection = Command.define("RenameConnection", {
+  args: { connectionId: ConnectionContract.ConnectionId, name: Schema.String, expectedName: Schema.String },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Connection.RenameInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A connection needs a name.")),
+        onSuccess: (input) => toStore((store) => store.write("ConnectionRenamed", input))
+      })
+    )
+})
+
+/** Replace the settings of `connectionId` with `settings`. */
+export const ConfigureConnection = Command.define("ConfigureConnection", {
+  args: { connectionId: ConnectionContract.ConnectionId, settings: Connection.Settings },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Connection.ConfigureInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A setting is too long, or holds what can't be stored.")),
+        onSuccess: (input) => toStore((store) => store.write("ConnectionConfigured", input))
+      })
+    )
+})
+
+/** Remove `connectionId` from the workspace. */
+export const RemoveConnection = Command.define("RemoveConnection", {
+  args: { connectionId: ConnectionContract.ConnectionId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("ConnectionRemoved", input))
 })

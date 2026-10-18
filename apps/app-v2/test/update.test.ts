@@ -7,12 +7,23 @@ import { Invitation, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Option } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
-import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
+import {
+  AddConnection,
+  CheckCode,
+  CheckConnection,
+  LoadIntegrations,
+  LoadWorkspaces,
+  ReplaceConnectionKey,
+  SaveSession,
+  SendCode,
+  SignOut
+} from "../src/command.ts"
 import { Message } from "../src/message.ts"
 import { LogState, type Model, Page, Pane, SignInForm, StoreState, Workspaces } from "../src/model.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  ConfigureConnection,
   CreateTask,
   CreateTeam,
   DeleteMessage,
@@ -26,8 +37,10 @@ import {
   MarkNotificationSeen,
   MarkThreadRead,
   PostReply,
+  RemoveConnection,
   RemoveGroupMember,
   RemoveMember,
+  RenameConnection,
   RenameGroup,
   RenameSelf,
   RenameThread,
@@ -50,6 +63,7 @@ import {
   bob,
   bobInDesign,
   bobIsMember,
+  connectionOf,
   design,
   general,
   membership,
@@ -61,6 +75,7 @@ import {
   signedIn,
   signedOut,
   task,
+  testApi,
   thread,
   turnOf
 } from "./fixtures.ts"
@@ -615,6 +630,103 @@ describe("a workspace", () => {
       message(Message.ClickedHideLog()),
       model((model) => {
         expect(logIn(model)).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("lists the host's integrations, adds a connection over HTTP, and renames, configures, checks, and removes one", () => {
+    const models = connectionOf("connection-1", "Models")
+    const member = { apiUrl, token: session.token, workspaceId: membership.workspace.id }
+    const formIn = (model: Model) =>
+      Option.flatMap(openedIn(model), ({ pane }) =>
+        Option.flatMap(
+          pane,
+          Pane.matchOrElse({ Connections: ({ connections }) => connections.form }, () => Option.none())
+        )
+      )
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedConnections()),
+      Command.expectExact(LoadIntegrations(member)),
+      Command.resolve(LoadIntegrations, Message.GotIntegrations({ integrations: [testApi] })),
+      // Opened again, the integrations are not asked for again.
+      message(Message.ClickedConnections()),
+      message(Message.ClickedAddConnection()),
+      message(Message.ChoseIntegration({ integrationId: testApi.id })),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(
+          Option.some({ _tag: "Adding", name: "Test API", auth: "apiKey", settings: { url: "" } })
+        )
+      }),
+      // A required setting left empty says so, and sends nothing.
+      message(Message.SubmittedConnectionForm()),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(Option.some({ error: Option.some("Base URL is required.") }))
+      }),
+      message(Message.ChangedSetting({ name: "url", value: "http://127.0.0.1:9999" })),
+      message(Message.ChoseConnectionAuth({ auth: "none" })),
+      message(Message.SubmittedConnectionForm()),
+      Command.expectExact(
+        AddConnection({
+          ...member,
+          integration: testApi.id,
+          name: "Test API",
+          auth: "none",
+          apiKey: "",
+          settings: { url: "http://127.0.0.1:9999" }
+        })
+      ),
+      Command.resolve(AddConnection, Message.FailedAddConnection({ error: "A connection needs a name." })),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(
+          Option.some({ sending: false, error: Option.some("A connection needs a name.") })
+        )
+      }),
+      message(Message.ClickedCancelConnectionForm()),
+      message(Message.GotConnections({ connections: [{ connection: models, pending: false }] })),
+      message(Message.ClickedRenameConnection({ connectionId: models.id })),
+      message(Message.TypedConnectionName({ name: "Local models" })),
+      message(Message.SubmittedConnectionForm()),
+      Command.expectExact(RenameConnection({ connectionId: models.id, name: "Local models", expectedName: "Models" })),
+      Command.resolve(RenameConnection, Message.WroteAction()),
+      message(Message.ClickedConfigureConnection({ connectionId: models.id })),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(
+          Option.some({ _tag: "Configuring", settings: { url: "https://api.example" } })
+        )
+      }),
+      message(Message.ChangedSetting({ name: "url", value: "https://api.example/v2" })),
+      message(Message.SubmittedConnectionForm()),
+      Command.expectExact(
+        ConfigureConnection({ connectionId: models.id, settings: { url: "https://api.example/v2" } })
+      ),
+      Command.resolve(ConfigureConnection, Message.WroteAction()),
+      message(Message.ClickedReplaceKey({ connectionId: models.id })),
+      message(Message.TypedApiKey({ apiKey: "test-key" })),
+      message(Message.SubmittedConnectionForm()),
+      Command.expectExact(ReplaceConnectionKey({ ...member, connectionId: models.id, apiKey: "test-key" })),
+      Command.resolve(ReplaceConnectionKey, Message.ReplacedKey()),
+      model((model) => {
+        expect(formIn(model)).toEqual(Option.none())
+      }),
+      message(Message.ClickedCheckConnection({ connectionId: models.id })),
+      Command.expectExact(CheckConnection({ ...member, connectionId: models.id })),
+      Command.resolve(
+        CheckConnection,
+        Message.CheckedConnection({ connectionId: models.id, health: { status: "healthy" } })
+      ),
+      message(Message.ClickedRemoveConnection({ connectionId: models.id })),
+      Command.expectExact(RemoveConnection({ connectionId: models.id })),
+      Command.resolve(RemoveConnection, Message.WroteAction()),
+      // A form about a connection that is gone closes.
+      message(Message.ClickedRenameConnection({ connectionId: models.id })),
+      message(Message.GotConnections({ connections: [] })),
+      model((model) => {
+        expect(formIn(model)).toEqual(Option.none())
       })
     )
   })

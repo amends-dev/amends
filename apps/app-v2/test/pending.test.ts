@@ -576,3 +576,37 @@ describe("Pending, for agents' turns", () => {
     }).pipe(Effect.provide(BrowserCrypto.layer))
   )
 })
+
+describe("Pending, for the workspace's connections", () => {
+  const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
+  const connection = cases.Connection.make({
+    value: Schema.decodeSync(ReplicaRecord.Connection)({
+      id: "connection-1",
+      workspaceId: "workspace-1",
+      integration: "test-api",
+      name: "Models",
+      settings: { url: "https://api.example" },
+      auth: "none",
+      status: "active",
+      createdBy: "member-1",
+      createdAt: "2026-10-18T12:00:00Z",
+      readiness: { _tag: "Ready" }
+    })
+  })
+
+  it("renames one from the name the person saw, replaces its settings, and removes it", () => {
+    const pending = [
+      unfinished("ConnectionRenamed", { connectionId: "connection-1", name: "Local", expectedName: "Models" }, 1),
+      // Renamed from a name it no longer has, the server refuses it, and it shows nothing.
+      unfinished("ConnectionRenamed", { connectionId: "connection-1", name: "Stale", expectedName: "Models" }, 2),
+      unfinished("ConnectionConfigured", { connectionId: "connection-1", settings: { url: "http://127.0.0.1" } }, 3)
+    ]
+    expect(view(Pending.overlay("Connection", everywhere, [connection], pending))).toEqual([
+      { value: { ...connection.value, name: "Local", settings: { url: "http://127.0.0.1" } }, pending: true }
+    ])
+    const removed = unfinished("ConnectionRemoved", { connectionId: "connection-1" }, 4)
+    expect(view(Pending.overlay("Connection", everywhere, [connection], [removed]))).toEqual([
+      { value: { ...connection.value, status: "removed" }, pending: true }
+    ])
+  })
+})

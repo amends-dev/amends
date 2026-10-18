@@ -4,7 +4,9 @@
  * the one they opened, whose store syncs while it is open.
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, Role } from "@amends-dev/core/authorization"
+import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
@@ -16,6 +18,7 @@ import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Schema from "effect/Schema"
 import { defineTaggedUnion } from "foldkit/schema"
+import * as SettingsForm from "./settingsForm.ts"
 
 /** Where signing in has got to: an address to send a code to, then the code it was sent. */
 export const SignInForm = defineTaggedUnion({
@@ -188,11 +191,69 @@ export const InboxItem = Schema.Struct({
 })
 export type InboxItem = typeof InboxItem.Type
 
-/** What the open workspace shows beside its groups: a group, the person's inbox, or its settings. */
+/** A connection of the workspace, and whether a change to it is on its way. */
+export const ConnectionItem = Schema.Struct({ connection: ReplicaRecord.Connection, pending: Schema.Boolean })
+export type ConnectionItem = typeof ConnectionItem.Type
+
+/** The integrations the host installs, as it lists them: loading, loaded, or not reached, with why. */
+export const Integrations = defineTaggedUnion({
+  Loading: {},
+  Loaded: { integrations: Schema.Array(Connection.IntegrationView) },
+  Failed: { error: Schema.String }
+})
+export type Integrations = typeof Integrations.Type
+
+/**
+ * The form open among the workspace's connections: adding one, to an integration, with how it
+ * authenticates, its key, and its settings; renaming one; changing one's settings; or replacing
+ * one's key. A form sent over HTTP is sending until the host answers, and keeps why it refused.
+ */
+export const ConnectionForm = defineTaggedUnion({
+  Adding: {
+    integrationId: Schema.String,
+    name: Schema.String,
+    auth: ConnectionContract.AuthMethod,
+    apiKey: Schema.String,
+    settings: SettingsForm.Draft,
+    sending: Schema.Boolean,
+    error: Schema.Option(Schema.String)
+  },
+  Renaming: { connectionId: ConnectionContract.ConnectionId, name: Schema.String },
+  Configuring: {
+    connectionId: ConnectionContract.ConnectionId,
+    settings: SettingsForm.Draft,
+    error: Schema.Option(Schema.String)
+  },
+  ReplacingKey: {
+    connectionId: ConnectionContract.ConnectionId,
+    apiKey: Schema.String,
+    sending: Schema.Boolean,
+    error: Schema.Option(Schema.String)
+  }
+})
+export type ConnectionForm = typeof ConnectionForm.Type
+
+/** Checking a connection with its system: under way, done with what it found, or not reached, with why. */
+export const Check = defineTaggedUnion({
+  Checking: {},
+  Checked: { health: ConnectionContract.Health },
+  Failed: { error: Schema.String }
+})
+export type Check = typeof Check.Type
+
+/** The workspace's connections as the person manages them: the form open among them, and the last check. */
+export const Connections = Schema.Struct({
+  form: Schema.Option(ConnectionForm),
+  check: Schema.Option(Schema.Struct({ connectionId: ConnectionContract.ConnectionId, check: Check }))
+})
+export type Connections = typeof Connections.Type
+
+/** What the open workspace shows beside its groups: a group, the person's inbox, its settings, or its connections. */
 export const Pane = defineTaggedUnion({
   Group: { group: OpenGroup },
   Inbox: {},
-  Settings: { settings: Settings }
+  Settings: { settings: Settings },
+  Connections: { connections: Connections }
 })
 export type Pane = typeof Pane.Type
 
@@ -206,10 +267,10 @@ export type Composing = typeof Composing.Type
 /**
  * The workspace the person opened, as their member of it: the workspace, and whether a change to
  * it is on its way; its store; what the replica holds of it: its groups, members, roles and their
- * assignments, invitations, the person's notifications, groups' memberships, and the person's
- * follows among them; the actions
- * not finished yet, why the last one could not be written, what the person is starting, and the
- * pane open in it.
+ * assignments, invitations, the person's notifications, groups' memberships, the person's
+ * follows among them, and its connections; the integrations the host installs, once asked for; the
+ * actions not finished yet, why the last one could not be written, what the person is starting,
+ * and the pane open in it.
  */
 export const Opened = Schema.Struct({
   workspace: Workspace.Workspace,
@@ -224,6 +285,8 @@ export const Opened = Schema.Struct({
   inbox: Schema.Array(InboxItem),
   memberships: Schema.Array(MembershipItem),
   follows: Schema.Array(FollowItem),
+  connections: Schema.Array(ConnectionItem),
+  integrations: Schema.Option(Integrations),
   actions: Schema.Array(ActionItem),
   notice: Schema.Option(Schema.String),
   composing: Schema.Option(Composing),

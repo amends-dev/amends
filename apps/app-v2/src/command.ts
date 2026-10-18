@@ -1,13 +1,20 @@
 /**
- * The app's side effects, each a named command that ends in a message: the sign-in requests,
- * keeping the session, listing the person's workspaces, and signing out. A command's failures are
- * messages too, worded for the person.
+ * The app's side effects over HTTP, each a named command that ends in a message: the sign-in
+ * requests, keeping the session, listing the person's workspaces, and signing out; and, as a
+ * member of a workspace, what no replica holds or no action may carry: the integrations the host
+ * installs, and adding a connection, replacing its key, and checking it, since a key never enters an
+ * action. A command's failures are messages too, worded for the person.
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
+import { Connection } from "@amends-dev/core/connection"
+import { CoreError } from "@amends-dev/core/error"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Accounts from "@amends-dev/gateway/Accounts"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
 import * as Command from "foldkit/command"
 import * as Api from "./api.ts"
@@ -17,6 +24,12 @@ import * as Store from "./sync/Store.ts"
 import * as SyncKey from "./sync/SyncKey.ts"
 
 const unreachable = "The host could not be reached. Try again."
+
+/** Why the host refused a request, as core words it, or that it could not be reached. */
+const refusalOf = (error: unknown) => (Schema.is(CoreError.Rejection)(error) ? error.message : unreachable)
+
+/** Whom a member's request acts as: the host, the session, and the workspace. */
+const asMember = { apiUrl: Schema.String, token: Schema.String, workspaceId: WorkspaceId.WorkspaceId }
 
 /** Send a sign-in code to `email`. */
 export const SendCode = Command.define("SendCode", {
@@ -110,5 +123,76 @@ export const SignOut = Command.define("SignOut", {
       Effect.tapCause((cause) => Effect.logWarning("Signing out left something behind", cause)),
       Effect.ignore,
       Effect.as(Message.CompletedSignOut())
+    )
+})
+
+/** List the integrations the host installs, which the workspace's connections link to. */
+export const LoadIntegrations = Command.define("LoadIntegrations", {
+  args: asMember,
+  messages: [Message.GotIntegrations, Message.FailedLoadIntegrations],
+  execute: ({ apiUrl, token, workspaceId }) =>
+    Effect.gen(function* () {
+      const client = yield* Api.memberClient(apiUrl, token, workspaceId)
+      return Message.GotIntegrations({ integrations: yield* client.connections.integrations() })
+    }).pipe(Effect.orElseSucceed(() => Message.FailedLoadIntegrations({ error: unreachable })))
+})
+
+/** Add a connection to `integration` called `name`, with its settings, and its key when it authenticates with one. */
+export const AddConnection = Command.define("AddConnection", {
+  args: {
+    ...asMember,
+    integration: Schema.String,
+    name: Schema.String,
+    auth: ConnectionContract.AuthMethod,
+    apiKey: Schema.String,
+    settings: Connection.Settings
+  },
+  messages: [Message.AddedConnection, Message.FailedAddConnection],
+  execute: ({ apiUrl, token, workspaceId, apiKey, ...connection }) =>
+    Effect.gen(function* () {
+      const payload = yield* Schema.decodeEffect(Schema.toType(Connection.CreateInput))({
+        ...connection,
+        ...(connection.auth === "apiKey" ? { apiKey: Redacted.make(apiKey.trim()) } : {})
+      }).pipe(
+        Effect.mapError(() =>
+          Message.FailedAddConnection({ error: "A connection needs a name, and its key when it takes one." })
+        )
+      )
+      const client = yield* Api.memberClient(apiUrl, token, workspaceId)
+      yield* client.connections
+        .create({ headers: {}, payload })
+        .pipe(Effect.mapError((error) => Message.FailedAddConnection({ error: refusalOf(error) })))
+      return Message.AddedConnection()
+    }).pipe(Effect.catch(Effect.succeed))
+})
+
+/** Replace the key of `connectionId` with `apiKey`. */
+export const ReplaceConnectionKey = Command.define("ReplaceConnectionKey", {
+  args: { ...asMember, connectionId: ConnectionContract.ConnectionId, apiKey: Schema.String },
+  messages: [Message.ReplacedKey, Message.FailedReplaceKey],
+  execute: ({ apiUrl, token, workspaceId, connectionId, apiKey }) =>
+    Effect.gen(function* () {
+      const key = yield* Schema.decodeEffect(Schema.toType(Connection.ApiKey))(Redacted.make(apiKey.trim())).pipe(
+        Effect.mapError(() => Message.FailedReplaceKey({ error: "Enter the new key." }))
+      )
+      const client = yield* Api.memberClient(apiUrl, token, workspaceId)
+      yield* client.connections
+        .replaceKey({ params: { connectionId }, payload: { apiKey: key } })
+        .pipe(Effect.mapError((error) => Message.FailedReplaceKey({ error: refusalOf(error) })))
+      return Message.ReplacedKey()
+    }).pipe(Effect.catch(Effect.succeed))
+})
+
+/** Check `connectionId` with its system: whether it answers, and accepts the connection's key. */
+export const CheckConnection = Command.define("CheckConnection", {
+  args: { ...asMember, connectionId: ConnectionContract.ConnectionId },
+  messages: [Message.CheckedConnection, Message.FailedCheckConnection],
+  execute: ({ apiUrl, token, workspaceId, connectionId }) =>
+    Effect.gen(function* () {
+      const client = yield* Api.memberClient(apiUrl, token, workspaceId)
+      const health = yield* client.connections.check({ params: { connectionId } })
+      return Message.CheckedConnection({ connectionId, health })
+    }).pipe(
+      Effect.catch((error) => Effect.succeed(Message.FailedCheckConnection({ connectionId, error: refusalOf(error) })))
     )
 })

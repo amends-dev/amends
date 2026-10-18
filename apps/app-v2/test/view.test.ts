@@ -20,7 +20,16 @@ import {
   text,
   type
 } from "foldkit/scene"
-import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
+import {
+  AddConnection,
+  CheckCode,
+  CheckConnection,
+  LoadIntegrations,
+  LoadWorkspaces,
+  SaveSession,
+  SendCode,
+  SignOut
+} from "../src/command.ts"
 import { Message } from "../src/message.ts"
 import {
   AddGroupMember,
@@ -49,6 +58,7 @@ import {
   bob,
   bobInDesign,
   bobIsMember,
+  connectionOf,
   design,
   general,
   membership,
@@ -63,6 +73,7 @@ import {
   signedIn,
   signedOut,
   task,
+  testApi,
   thread,
   turnOf
 } from "./fixtures.ts"
@@ -481,6 +492,78 @@ describe("the app", () => {
       expect(label("Status")).toBeAbsent(),
       expect(role("button", { name: "Stop" })).toBeAbsent(),
       expect(role("button", { name: "Show log" })).toExist()
+    )
+  })
+
+  it("an owner adds and manages connections, and a member sees them without the controls", () => {
+    const models = connectionOf("connection-1", "Models")
+    const member = { apiUrl, token: session.token, workspaceId: membership.workspace.id }
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(Message.GotRoles({ roles })),
+      Subscription.emit(Message.GotAssignments({ assignments: [{ assignment: aliceOwns, pending: false }] })),
+      click(role("button", { name: "Connections" })),
+      Command.expectExact(LoadIntegrations(member)),
+      expect(text("Loading the integrations…")).toExist(),
+      Command.resolve(LoadIntegrations, Message.GotIntegrations({ integrations: [testApi] })),
+      expect(text("No connections yet.")).toExist(),
+      click(role("button", { name: "Add a connection" })),
+      inside(
+        role("form", { name: "Add a connection" }),
+        change(label("Integration"), testApi.id),
+        expect(label("API key")).toExist(),
+        change(label("Authentication"), "none"),
+        expect(label("API key")).toBeAbsent(),
+        type(label("Base URL"), "http://127.0.0.1:9999"),
+        click(role("button", { name: "Add" }))
+      ),
+      Command.expectExact(
+        AddConnection({
+          ...member,
+          integration: testApi.id,
+          name: "Test API",
+          auth: "none",
+          apiKey: "",
+          settings: { url: "http://127.0.0.1:9999" }
+        })
+      ),
+      expect(text("Adding…")).toExist(),
+      Command.resolve(AddConnection, Message.AddedConnection()),
+      expect(role("form", { name: "Add a connection" })).toBeAbsent(),
+      Subscription.emit(Message.GotConnections({ connections: [{ connection: models, pending: false }] })),
+      inside(
+        role("region", { name: "Connections" }),
+        expect(text(" · Test API · Ready")).toExist(),
+        click(role("button", { name: "Check" }))
+      ),
+      Command.expectExact(CheckConnection({ ...member, connectionId: models.id })),
+      Command.resolve(
+        CheckConnection,
+        Message.CheckedConnection({
+          connectionId: models.id,
+          health: { status: "unauthorized", description: "The key was refused" }
+        })
+      ),
+      expect(text("It refused the key: The key was refused")).toExist(),
+      click(role("button", { name: "Change settings" })),
+      inside(role("form", { name: "Change the connection's settings" }), expect(label("Base URL")).toExist()),
+      click(role("button", { name: "Cancel" })),
+      // An ordinary member reads the connections, and manages none of them.
+      Subscription.emit(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: roleOf("assignment-3", membership.member.id, BuiltinRoles.MemberId), pending: false }
+          ]
+        })
+      ),
+      expect(text(" · Test API · Ready")).toExist(),
+      expect(role("button", { name: "Check" })).toBeAbsent(),
+      expect(role("button", { name: "Remove" })).toBeAbsent(),
+      expect(role("button", { name: "Add a connection" })).toBeAbsent()
     )
   })
 

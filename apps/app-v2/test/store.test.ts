@@ -1,3 +1,4 @@
+import { Integration } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 // @vitest-environment node
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
@@ -32,6 +33,7 @@ import { FetchHttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effe
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
 import { KeyValueStore } from "effect/persistence"
 import { Socket } from "effect/socket"
+import { memberClient } from "../src/api.ts"
 import * as Store from "../src/sync/Store.ts"
 
 const alice = Identity.HumanId.make("alice")
@@ -54,7 +56,19 @@ const signIn = Layer.succeed(
   })
 )
 
-/** A host over memory storage: the gateway, its storage, and the HTTP API and sync server it serves. */
+/** An integration the host installs: an API at a base URL, reached with a key or none, which always answers. */
+const testApi = Integration.make({
+  id: "test-api",
+  name: "Test API",
+  settings: Schema.Struct({ url: Schema.NonEmptyString.annotate({ title: "Base URL" }) }),
+  auth: ["apiKey", "none"],
+  check: () => Effect.succeed({ status: "healthy" })
+})
+
+/**
+ * A host over memory storage, which installs the test API: the gateway, its storage, and the HTTP
+ * API and sync server it serves.
+ */
 const host = Effect.gen(function* () {
   const storage = Layer.mergeAll(
     WorkspaceStorage.layerMemory,
@@ -64,7 +78,7 @@ const host = Effect.gen(function* () {
     SyncStorage.layerMemory
   ).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provideMerge(BunCrypto.layer))
   return yield* Layer.build(
-    Gateway.layer().pipe(
+    Gateway.layer({ integrations: [testApi] }).pipe(
       Layer.provideMerge([storage, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner]),
       Layer.provide(MemoryDatabase.layer)
     )
@@ -460,6 +474,42 @@ describe("Store", () => {
 /** The port a server listens at, when it listens on one. */
 const port = (address: HttpServer.HttpServer["Service"]["address"]) =>
   "port" in address ? Option.some(address.port) : Option.none()
+
+describe("Store, for the workspace's connections", () => {
+  it.live("a connection added over HTTP reaches the store, and its rename and removal show at once", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      const client = yield* memberClient(apiUrl, alice, workspace.id)
+      const added = yield* client.connections.create({
+        headers: {},
+        payload: { integration: "test-api", name: "Models", settings: { url: "http://127.0.0.1:9" }, auth: "none" }
+      })
+      const [arrived] = yield* firstWhere(store.list("Connection", everywhere), (held) => held.length === 1)
+      expect(arrived).toMatchObject({
+        pending: false,
+        record: { value: { id: added.id, name: "Models", readiness: { _tag: "Ready" } } }
+      })
+      expect(yield* client.connections.check({ params: { connectionId: added.id } })).toEqual({ status: "healthy" })
+
+      yield* store.write("ConnectionRenamed", { connectionId: added.id, name: "Local", expectedName: "Models" })
+      yield* firstWhere(store.list("Connection", everywhere), ([held]) => held?.pending === true)
+      yield* firstWhere(
+        store.list("Connection", everywhere),
+        ([held]) => held?.pending === false && held.record.value.name === "Local"
+      )
+      yield* store.write("ConnectionRemoved", { connectionId: added.id })
+      yield* firstWhere(
+        store.list("Connection", everywhere),
+        ([held]) => held?.pending === false && held.record.value.status === "removed"
+      )
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+})
 
 describe("Store.viewTurns", () => {
   const turn = (id: string, status: Turn.Status, minute: number, participationId = "participation-3") => ({

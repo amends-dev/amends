@@ -1,5 +1,7 @@
+import { Integration } from "@amends-dev/connection"
 import { Core } from "@amends-dev/core"
 import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
+import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
@@ -9,7 +11,7 @@ import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import { Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
-import { Option, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import type { Model } from "../src/model.ts"
 import { init } from "../src/update.ts"
 
@@ -188,4 +190,30 @@ export const turnOf = (id: string, status: Turn.Status) =>
     createdAt: "2026-10-18T12:02:00Z",
     startedAt: status === "queued" ? null : "2026-10-18T12:02:01Z",
     finishedAt: null
+  })
+
+/** An integration the host installs, which takes a base URL and a key or none, as its readers see it. */
+export const testApi = Connection.integrationView(
+  Integration.make({
+    id: "test-api",
+    name: "Test API",
+    settings: Schema.Struct({ url: Schema.NonEmptyString.annotate({ title: "Base URL" }) }),
+    auth: ["apiKey", "none"],
+    check: () => Effect.succeed({ status: "healthy" })
+  })
+)
+
+/** A connection to the test API called `name`, ready, which alice added. */
+export const connectionOf = (id: string, name: string) =>
+  Schema.decodeSync(ReplicaRecord.Connection)({
+    id,
+    workspaceId: "workspace-1",
+    integration: "test-api",
+    name,
+    settings: { url: "https://api.example" },
+    auth: "apiKey",
+    status: "active",
+    createdBy: "member-1",
+    createdAt: "2026-10-18T12:00:00Z",
+    readiness: { _tag: "Ready" }
   })

@@ -18,6 +18,7 @@ import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import { Turn } from "@amends-dev/core/turn"
 import { Invitation, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
+import type * as ConnectionSync from "@amends-dev/sync/ConnectionSync"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
 import * as SyncSchema from "@amends-dev/sync/SyncSchema"
@@ -95,6 +96,7 @@ const isInvitation = ReplicaRecord.ReplicaRecord.isAnyOf(["Invitation"])
 const isNotification = ReplicaRecord.ReplicaRecord.isAnyOf(["Notification"])
 const isTask = ReplicaRecord.ReplicaRecord.isAnyOf(["Task"])
 const isTurn = ReplicaRecord.ReplicaRecord.isAnyOf(["Turn"])
+const isConnection = ReplicaRecord.ReplicaRecord.isAnyOf(["Connection"])
 
 /** `record`, a notification, as seen when `action` was written. */
 const seen = (record: Replica.RecordOf<"Notification">, action: Action) =>
@@ -550,9 +552,41 @@ export const turns: EffectsOf<typeof TurnSync.Actions> = {
   }
 }
 
-const effectsByTag = { ...threads, ...groups, ...workspace, ...notifications, ...tasks, ...turns } as Readonly<
-  Record<string, Effects<unknown> | undefined>
->
+/**
+ * What the person does with the workspace's connections: renaming one from the name they saw, which
+ * a rename made meanwhile keeps, as the server refuses it; replacing its settings; and removing it.
+ * How ready a connection is stays as the server last found it, since only the server can tell.
+ */
+export const connections: EffectsOf<typeof ConnectionSync.Actions> = {
+  ConnectionRenamed: {
+    changes: ({ connectionId, name, expectedName }, record) =>
+      isConnection(record) && record.value.id === connectionId && record.value.name === expectedName
+        ? cases.Connection.make({ value: { ...record.value, name } })
+        : undefined
+  },
+  ConnectionConfigured: {
+    changes: ({ connectionId, settings }, record) =>
+      isConnection(record) && record.value.id === connectionId
+        ? cases.Connection.make({ value: { ...record.value, settings } })
+        : undefined
+  },
+  ConnectionRemoved: {
+    changes: ({ connectionId }, record) =>
+      isConnection(record) && record.value.id === connectionId && record.value.status === "active"
+        ? cases.Connection.make({ value: { ...record.value, status: "removed" } })
+        : undefined
+  }
+}
+
+const effectsByTag = {
+  ...threads,
+  ...groups,
+  ...workspace,
+  ...notifications,
+  ...tasks,
+  ...turns,
+  ...connections
+} as Readonly<Record<string, Effects<unknown> | undefined>>
 
 /** What the action `tag` does, if anything, before the server's changes arrive. */
 export const effectsOf = (tag: string): Effects<unknown> => effectsByTag[tag] ?? {}

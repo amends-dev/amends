@@ -1,10 +1,11 @@
 /**
  * How each message changes the app: signing in a step at a time, listing and opening workspaces,
  * following the open store, what the person does in its groups, threads and their tasks and turns,
- * and settings, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
+ * settings, and connections, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
  * person signed out, changes nothing.
  */
 
+import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Task } from "@amends-dev/core/task"
@@ -13,17 +14,32 @@ import { Turn } from "@amends-dev/core/turn"
 import type * as SignIn from "@amends-dev/gateway/SignIn"
 import type * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import * as Result from "effect/Result"
 import type { Update } from "foldkit"
 import type * as ManagedResource from "foldkit/managedResource"
 import { modifyFields } from "foldkit/struct"
 import type * as Browser from "./browser.ts"
-import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "./command.ts"
+import {
+  AddConnection,
+  CheckCode,
+  CheckConnection,
+  LoadIntegrations,
+  LoadWorkspaces,
+  ReplaceConnectionKey,
+  SaveSession,
+  SendCode,
+  SignOut
+} from "./command.ts"
 import type { Flags } from "./flags.ts"
 import { Message } from "./message.ts"
 import {
+  Check,
+  ConnectionForm,
+  type Connections,
   Composing,
   type Editing,
   type InboxItem,
+  Integrations,
   LogState,
   type Model,
   type OpenGroup,
@@ -38,9 +54,11 @@ import {
   Workspaces
 } from "./model.ts"
 import { workspaceRolesOf } from "./permissions.ts"
+import * as SettingsForm from "./settingsForm.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  ConfigureConnection,
   CreateTask,
   CreateTeam,
   DeleteMessage,
@@ -55,8 +73,10 @@ import {
   MarkNotificationSeen,
   MarkThreadRead,
   PostReply,
+  RemoveConnection,
   RemoveGroupMember,
   RemoveMember,
+  RenameConnection,
   RenameGroup,
   RenameSelf,
   RenameThread,
@@ -151,6 +171,139 @@ const atSettings = (model: Model, change: (settings: Settings, opened: Opened) =
       )
     })
   )
+
+/** The open connections pane as `change` makes it from the workspace, while it is open; otherwise nothing. */
+const atConnections = (model: Model, change: (connections: Connections, opened: Opened) => Connections): UpdateReturn =>
+  atOpened(model, (opened) =>
+    modifyFields(opened, {
+      pane: Option.map(
+        Pane.matchOrElse(
+          { Connections: ({ connections }) => Pane.Connections({ connections: change(connections, opened) }) },
+          (pane) => pane
+        )
+      )
+    })
+  )
+
+/** The form open among the connections as `change` makes it, while one is open; otherwise nothing. */
+const atConnectionForm = (model: Model, change: (form: ConnectionForm, opened: Opened) => ConnectionForm) =>
+  atConnections(model, (connections, opened) =>
+    modifyFields(connections, { form: Option.map((form) => change(form, opened)) })
+  )
+
+/** The open connections pane, and the workspace it is of, while it is open. */
+const connectionsIn = (model: Model): Option.Option<{ readonly connections: Connections; readonly opened: Opened }> =>
+  Option.flatMap(openedIn(model), (opened) =>
+    Option.flatMap(
+      opened.pane,
+      Pane.matchOrElse({ Connections: ({ connections }) => Option.some({ connections, opened }) }, () => Option.none())
+    )
+  )
+
+/** Whom a request acts as in the open workspace: the host, the person's session, and the workspace. */
+const asMemberIn = (model: Model) =>
+  Page.matchOrElse(
+    model.page,
+    {
+      SignedIn: ({ session, opened }) =>
+        Option.map(opened, ({ workspace }) => ({
+          apiUrl: model.apiUrl,
+          token: session.token,
+          workspaceId: workspace.id
+        }))
+    },
+    () => Option.none()
+  )
+
+/** The integration `integrationId`, once the host listed its integrations. */
+const integrationOf = (opened: Opened, integrationId: string) =>
+  Option.flatMap(
+    opened.integrations,
+    Integrations.matchOrElse(
+      { Loaded: ({ integrations }) => Option.fromUndefinedOr(integrations.find(({ id }) => id === integrationId)) },
+      () => Option.none()
+    )
+  )
+
+/** The connection `connectionId`, and the integration it links to, once the host listed them. */
+const connectionOf = (opened: Opened, connectionId: ConnectionContract.ConnectionId) =>
+  Option.flatMap(
+    Option.fromUndefinedOr(opened.connections.find(({ connection }) => connection.id === connectionId)),
+    ({ connection }) =>
+      Option.map(integrationOf(opened, connection.integration), (integration) => ({ connection, integration }))
+  )
+
+/** `form` with why it was refused, no longer sending. */
+const refused = (form: ConnectionForm, error: string): ConnectionForm =>
+  ConnectionForm.match(form, {
+    Adding: (adding) => ConnectionForm.Adding({ ...adding, sending: false, error: Option.some(error) }),
+    Renaming: (renaming) => ConnectionForm.Renaming(renaming),
+    Configuring: (configuring) => ConnectionForm.Configuring({ ...configuring, error: Option.some(error) }),
+    ReplacingKey: (replacing) =>
+      ConnectionForm.ReplacingKey({ ...replacing, sending: false, error: Option.some(error) })
+  })
+
+/** Send the form open among the connections: over HTTP for what carries a key or makes a connection, as an action otherwise. */
+const submitConnectionForm = (
+  model: Model,
+  form: ConnectionForm,
+  opened: Opened,
+  member: { readonly apiUrl: string; readonly token: string; readonly workspaceId: Opened["workspace"]["id"] }
+): UpdateReturn => {
+  const leaving = (next: Option.Option<ConnectionForm>) =>
+    atConnections(model, (connections) => modifyFields(connections, { form: () => next }))
+  const refusing = (error: string) => leaving(Option.some(refused(form, error)))
+  return ConnectionForm.match(form, {
+    Adding: (adding) =>
+      Option.match(integrationOf(opened, adding.integrationId), {
+        onNone: () => refusing("Choose an integration."),
+        onSome: (integration) =>
+          Result.match(SettingsForm.settingsOf(integration.settings, adding.settings), {
+            onFailure: refusing,
+            onSuccess: (settings) => ({
+              ...leaving(Option.some(ConnectionForm.Adding({ ...adding, sending: true, error: Option.none() }))),
+              commands: [
+                AddConnection({
+                  ...member,
+                  integration: integration.id,
+                  name: adding.name,
+                  auth: adding.auth,
+                  apiKey: adding.apiKey,
+                  settings
+                })
+              ]
+            })
+          })
+      }),
+    Renaming: ({ connectionId, name }) =>
+      Option.match(
+        Option.fromUndefinedOr(opened.connections.find(({ connection }) => connection.id === connectionId)),
+        {
+          onNone: () => leaving(Option.none()),
+          onSome: ({ connection }) => ({
+            ...leaving(Option.none()),
+            commands: [RenameConnection({ connectionId, name, expectedName: connection.name })]
+          })
+        }
+      ),
+    Configuring: (configuring) =>
+      Option.match(connectionOf(opened, configuring.connectionId), {
+        onNone: () => leaving(Option.none()),
+        onSome: ({ integration }) =>
+          Result.match(SettingsForm.settingsOf(integration.settings, configuring.settings), {
+            onFailure: refusing,
+            onSuccess: (settings) => ({
+              ...leaving(Option.none()),
+              commands: [ConfigureConnection({ connectionId: configuring.connectionId, settings })]
+            })
+          })
+      }),
+    ReplacingKey: (replacing) => ({
+      ...leaving(Option.some(ConnectionForm.ReplacingKey({ ...replacing, sending: true, error: Option.none() }))),
+      commands: [ReplaceConnectionKey({ ...member, connectionId: replacing.connectionId, apiKey: replacing.apiKey })]
+    })
+  })
+}
 
 /** The open settings, and the workspace they are of, while they are open. */
 const settingsIn = (model: Model): Option.Option<{ readonly settings: Settings; readonly opened: Opened }> =>
@@ -428,6 +581,8 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                     inbox: [],
                     memberships: [],
                     follows: [],
+                    connections: [],
+                    integrations: Option.none(),
                     actions: [],
                     notice: Option.none(),
                     composing: Option.none(),
@@ -492,6 +647,228 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           })
         }
       ),
+    GotConnections: ({ connections }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, {
+          connections: () => connections,
+          // A form about a connection no longer there, as one removed, closes.
+          pane: Option.map(
+            Pane.matchOrElse(
+              {
+                Connections: ({ connections: pane }) =>
+                  Pane.Connections({
+                    connections: modifyFields(pane, {
+                      form: Option.filter((form) =>
+                        ConnectionForm.matchOrElse(
+                          form,
+                          {
+                            Renaming: ({ connectionId }) =>
+                              connections.some(({ connection }) => connection.id === connectionId),
+                            Configuring: ({ connectionId }) =>
+                              connections.some(({ connection }) => connection.id === connectionId),
+                            ReplacingKey: ({ connectionId }) =>
+                              connections.some(({ connection }) => connection.id === connectionId)
+                          },
+                          () => true
+                        )
+                      )
+                    })
+                  })
+              },
+              (pane) => pane
+            )
+          )
+        })
+      ),
+    // The host's integrations are asked for once the person opens the connections, and again after it could not be reached.
+    ClickedConnections: () => {
+      const loading = Option.exists(
+        Option.flatMap(openedIn(model), ({ integrations }) => integrations),
+        Integrations.isAnyOf(["Loading", "Loaded"])
+      )
+      const opening = atOpened(model, (opened) =>
+        modifyFields(opened, {
+          pane: () => Option.some(Pane.Connections({ connections: { form: Option.none(), check: Option.none() } })),
+          integrations: (integrations) => (loading ? integrations : Option.some(Integrations.Loading()))
+        })
+      )
+      return Option.match(asMemberIn(model), {
+        onNone: () => opening,
+        onSome: (member) => (loading ? opening : { ...opening, commands: [LoadIntegrations(member)] })
+      })
+    },
+    GotIntegrations: ({ integrations }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, { integrations: () => Option.some(Integrations.Loaded({ integrations })) })
+      ),
+    FailedLoadIntegrations: ({ error }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, { integrations: () => Option.some(Integrations.Failed({ error })) })
+      ),
+    ClickedAddConnection: () =>
+      atConnections(model, (connections) =>
+        modifyFields(connections, {
+          form: () =>
+            Option.some(
+              ConnectionForm.Adding({
+                integrationId: "",
+                name: "",
+                auth: "none",
+                apiKey: "",
+                settings: {},
+                sending: false,
+                error: Option.none()
+              })
+            )
+        })
+      ),
+    ChoseIntegration: ({ integrationId }) =>
+      atConnectionForm(model, (form, opened) =>
+        ConnectionForm.matchOrElse(
+          form,
+          {
+            Adding: (adding) =>
+              Option.match(integrationOf(opened, integrationId), {
+                onNone: () => ConnectionForm.Adding({ ...adding, integrationId }),
+                onSome: (integration) =>
+                  ConnectionForm.Adding({
+                    ...adding,
+                    integrationId,
+                    name: adding.name === "" ? integration.name : adding.name,
+                    auth: integration.auth[0],
+                    settings: SettingsForm.draftOf(integration.settings),
+                    error: Option.none()
+                  })
+              })
+          },
+          () => form
+        )
+      ),
+    TypedConnectionName: ({ name }) =>
+      atConnectionForm(model, (form) =>
+        ConnectionForm.matchOrElse(
+          form,
+          {
+            Adding: (adding) => ConnectionForm.Adding({ ...adding, name }),
+            Renaming: (renaming) => ConnectionForm.Renaming({ ...renaming, name })
+          },
+          () => form
+        )
+      ),
+    ChoseConnectionAuth: ({ auth }) =>
+      atConnectionForm(model, (form) =>
+        ConnectionForm.matchOrElse(form, { Adding: (adding) => ConnectionForm.Adding({ ...adding, auth }) }, () => form)
+      ),
+    TypedApiKey: ({ apiKey }) =>
+      atConnectionForm(model, (form) =>
+        ConnectionForm.matchOrElse(
+          form,
+          {
+            Adding: (adding) => ConnectionForm.Adding({ ...adding, apiKey }),
+            ReplacingKey: (replacing) => ConnectionForm.ReplacingKey({ ...replacing, apiKey })
+          },
+          () => form
+        )
+      ),
+    ChangedSetting: ({ name, value }) =>
+      atConnectionForm(model, (form) =>
+        ConnectionForm.matchOrElse(
+          form,
+          {
+            Adding: (adding) => ConnectionForm.Adding({ ...adding, settings: { ...adding.settings, [name]: value } }),
+            Configuring: (configuring) =>
+              ConnectionForm.Configuring({ ...configuring, settings: { ...configuring.settings, [name]: value } })
+          },
+          () => form
+        )
+      ),
+    SubmittedConnectionForm: () =>
+      Option.match(
+        Option.flatMap(connectionsIn(model), ({ connections, opened }) =>
+          Option.flatMap(connections.form, (form) =>
+            Option.map(asMemberIn(model), (member) => ({ form, opened, member }))
+          )
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: ({ form, opened, member }) => submitConnectionForm(model, form, opened, member)
+        }
+      ),
+    ClickedCancelConnectionForm: () =>
+      atConnections(model, (connections) => modifyFields(connections, { form: () => Option.none() })),
+    AddedConnection: () =>
+      atConnections(model, (connections) =>
+        modifyFields(connections, {
+          form: Option.filter((form) => !ConnectionForm.isAnyOf(["Adding"])(form))
+        })
+      ),
+    FailedAddConnection: ({ error }) =>
+      atConnectionForm(model, (form) => (ConnectionForm.isAnyOf(["Adding"])(form) ? refused(form, error) : form)),
+    ClickedRenameConnection: ({ connectionId }) =>
+      atConnections(model, (connections, opened) =>
+        modifyFields(connections, {
+          form: () =>
+            Option.map(
+              Option.fromUndefinedOr(opened.connections.find(({ connection }) => connection.id === connectionId)),
+              ({ connection }) => ConnectionForm.Renaming({ connectionId, name: connection.name })
+            )
+        })
+      ),
+    ClickedConfigureConnection: ({ connectionId }) =>
+      atConnections(model, (connections, opened) =>
+        modifyFields(connections, {
+          form: () =>
+            Option.map(connectionOf(opened, connectionId), ({ connection, integration }) =>
+              ConnectionForm.Configuring({
+                connectionId,
+                settings: SettingsForm.draftOf(integration.settings, connection.settings),
+                error: Option.none()
+              })
+            )
+        })
+      ),
+    ClickedReplaceKey: ({ connectionId }) =>
+      atConnections(model, (connections) =>
+        modifyFields(connections, {
+          form: () =>
+            Option.some(ConnectionForm.ReplacingKey({ connectionId, apiKey: "", sending: false, error: Option.none() }))
+        })
+      ),
+    ReplacedKey: () =>
+      atConnections(model, (connections) =>
+        modifyFields(connections, {
+          form: Option.filter((form) => !ConnectionForm.isAnyOf(["ReplacingKey"])(form))
+        })
+      ),
+    FailedReplaceKey: ({ error }) =>
+      atConnectionForm(model, (form) => (ConnectionForm.isAnyOf(["ReplacingKey"])(form) ? refused(form, error) : form)),
+    ClickedCheckConnection: ({ connectionId }) =>
+      Option.match(asMemberIn(model), {
+        onNone: () => ({ model }),
+        onSome: (member) => ({
+          ...atConnections(model, (connections) =>
+            modifyFields(connections, { check: () => Option.some({ connectionId, check: Check.Checking() }) })
+          ),
+          commands: [CheckConnection({ ...member, connectionId })]
+        })
+      }),
+    CheckedConnection: ({ connectionId, health }) =>
+      atConnections(model, (connections) =>
+        modifyFields(connections, {
+          check: Option.map((check) =>
+            check.connectionId === connectionId ? { connectionId, check: Check.Checked({ health }) } : check
+          )
+        })
+      ),
+    FailedCheckConnection: ({ connectionId, error }) =>
+      atConnections(model, (connections) =>
+        modifyFields(connections, {
+          check: Option.map((check) =>
+            check.connectionId === connectionId ? { connectionId, check: Check.Failed({ error }) } : check
+          )
+        })
+      ),
+    ClickedRemoveConnection: ({ connectionId }) => ({ model, commands: [RemoveConnection({ connectionId })] }),
     ClickedSettings: () =>
       atOpened(model, (opened) =>
         modifyFields(opened, { pane: () => Option.some(Pane.Settings({ settings: freshSettings })) })
