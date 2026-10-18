@@ -32,7 +32,8 @@ import {
   ReplaceConnectionKey,
   SaveSession,
   SendCode,
-  SignOut
+  SignOut,
+  TellTyping
 } from "./command.ts"
 import type { Flags } from "./flags.ts"
 import { Message } from "./message.ts"
@@ -524,6 +525,7 @@ const openedThread = (threadId: OpenThread["threadId"]): OpenThread => ({
   readRequested: 0,
   renaming: Option.none(),
   editing: Option.none(),
+  typingTold: false,
   task: Option.none(),
   turns: [],
   log: Option.none()
@@ -774,6 +776,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                     agents: [],
                     channels: [],
                     contacts: [],
+                    present: [],
                     integrations: Option.none(),
                     actions: [],
                     notice: Option.none(),
@@ -1520,13 +1523,37 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           commands: [StartThread({ groupId, text: Option.getOrElse(draft, () => "") })]
         })
       }),
-    TypedReply: ({ text }) => atThread(model, (thread) => modifyFields(thread, { draft: () => Option.some(text) })),
+    // Typing is said at once, then at most as often as it lasts.
+    TypedReply: ({ text }) =>
+      Option.match(
+        Option.flatMap(threadIn(model), (thread) => Option.map(asMemberIn(model), (member) => ({ thread, member }))),
+        {
+          onNone: () => ({ model }),
+          onSome: ({ thread, member }) => {
+            const telling = text !== "" && !thread.typingTold
+            return {
+              ...atThread(model, (open) =>
+                modifyFields(open, { draft: () => Option.some(text), typingTold: (told) => told || telling })
+              ),
+              commands: telling ? [TellTyping({ ...member, threadId: thread.threadId })] : []
+            }
+          }
+        }
+      ),
+    ToldTyping: () => atThread(model, (thread) => modifyFields(thread, { typingTold: () => false })),
+    GotPresence: ({ present }) => atOpened(model, (opened) => modifyFields(opened, { present: () => present })),
     SubmittedReply: () =>
       Option.match(threadIn(model), {
         onNone: () => ({ model }),
         onSome: ({ threadId, draft }) => ({
           ...atThread(model, (thread) => modifyFields(thread, { draft: () => Option.some("") })),
-          commands: [PostReply({ threadId, text: Option.getOrElse(draft, () => "") })]
+          commands: [
+            PostReply({ threadId, text: Option.getOrElse(draft, () => "") }),
+            ...Option.match(asMemberIn(model), {
+              onNone: () => [],
+              onSome: (member) => [TellTyping({ ...member, threadId: null })]
+            })
+          ]
         })
       }),
     ClickedRename: () =>

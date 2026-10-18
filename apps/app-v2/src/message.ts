@@ -10,6 +10,7 @@ import { Connection } from "@amends-dev/core/connection"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
+import { Presence } from "@amends-dev/core/presence"
 import { Task } from "@amends-dev/core/task"
 import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
 import { Turn, TurnId } from "@amends-dev/core/turn"
@@ -197,6 +198,8 @@ export const Message = defineMessageUnion({
   GotTurnLog: { turnId: TurnId.TurnId, message: Turn.LogMessage },
   FailedFollowLog: { turnId: TurnId.TurnId, error: Schema.String },
   GotDraft: { place: Drafts.Place, text: Schema.String },
+  GotPresence: { present: Schema.Array(Presence.Present) },
+  ToldTyping: {},
   WroteAction: {},
   FailedWriteAction: { error: Schema.String },
   ClickedDismiss: { key: Schema.String },

@@ -192,8 +192,8 @@ replacing its key, and checking it go over HTTP, since a key never enters an act
 once and is
 sent when the host can be reached; what the person writes and has not sent stays a draft in their
 browser, which no other device sees; and a control shows only when the person's grants, read from
-their replica, allow it. A turn's log is followed over HTTP, so only while the host can be
-reached. The rest of a workspace is still worked in through the HTTP API. Beyond that:
+their replica, allow it. A turn's log, and who has the workspace open and where they type, are
+followed over HTTP, so only while the host can be reached. The rest of a workspace is still worked in through the HTTP API. Beyond that:
 
 - The list of workspaces comes from the host each time: a store opens and reads offline, but the
   app lists no workspace to open while the host cannot be reached.
@@ -207,6 +207,8 @@ reached. The rest of a workspace is still worked in through the HTTP API. Beyond
 - What the server refused is worded as core words its errors, such as a group's ID not found, not
   yet for the person reading it.
 - The app has no styles yet: its markup uses `@foldkit/ui`'s headless components alone.
+- Presence is never stored, so a process that begins following a workspace hears who else is
+  present only as their connections next say so, up to 15 seconds later.
 
 Some of what an app would show has no backend: searching messages, files, reactions, and task
 references. Triage, which routes tasks, stays a placeholder: tasks admit and tell it, but nothing

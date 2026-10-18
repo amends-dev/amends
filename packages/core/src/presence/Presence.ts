@@ -42,6 +42,14 @@ export const connectionRepeats = Duration.seconds(15)
 export const typingLasts = Duration.seconds(6)
 
 /**
+ * How often a member still typing says so, well within how long their typing lasts.
+ *
+ * @category constants
+ * @since 0.1.0
+ */
+export const typingRepeats = Duration.seconds(3)
+
+/**
  * What a process tells every process of the host about a member of a workspace: a connection of
  * theirs is open, or closed; they are typing in a thread, or stopped.
  *

@@ -1,9 +1,10 @@
 /**
- * What the open workspace's records tell its views: what a member and a group are called, and
- * whether the person belongs to a group.
+ * What the open workspace's records tell its views: what a member and a group are called, whether
+ * the person belongs to a group, and who is present and where they type.
  */
 
 import type { Group } from "@amends-dev/core/group"
+import type { Thread } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
 import type { Opened } from "./model.ts"
 
@@ -32,3 +33,13 @@ export const belongsTo = (opened: Opened, groupId: Group.Group["id"]) =>
     ({ membership }) =>
       membership.groupId === groupId && membership.memberId === opened.memberId && membership.status === "active"
   )
+
+/** Whether `memberId` has the workspace open now. */
+export const isPresent = (opened: Opened, memberId: Member.Member["id"]) =>
+  opened.present.some((present) => present.memberId === memberId)
+
+/** Who other than the person types in `threadId` now, by their names here. */
+export const typingIn = (opened: Opened, threadId: Thread.Thread["id"]) =>
+  opened.present
+    .filter((present) => present.typingIn === threadId && present.memberId !== opened.memberId)
+    .map(({ memberId }) => memberName(memberId, opened))

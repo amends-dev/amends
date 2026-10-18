@@ -17,7 +17,8 @@ import {
   ReplaceConnectionKey,
   SaveSession,
   SendCode,
-  SignOut
+  SignOut,
+  TellTyping
 } from "../src/command.ts"
 import { Message } from "../src/message.ts"
 import { LogState, type Model, Page, Pane, SignInForm, StoreState, Workspaces } from "../src/model.ts"
@@ -157,6 +158,9 @@ describe("signing in", () => {
   })
 })
 
+/** Whom alice's requests act as in her workspace. */
+const member = { apiUrl, token: session.token, workspaceId: membership.workspace.id }
+
 /** The workspace the person opened, if any. */
 const openedIn = (model: Model) =>
   Page.matchOrElse(model.page, { SignedIn: ({ opened }) => opened }, () => Option.none())
@@ -175,6 +179,7 @@ const threadIn = (model: Model) => Option.flatMap(groupIn(model), ({ thread }) =
 
 describe("a workspace", () => {
   it("opens with its store, then a group, a thread, and a reply written to the store", () => {
+    let typing: Model | undefined
     story(
       update,
       given(signedIn),
@@ -206,10 +211,22 @@ describe("a workspace", () => {
           turns: []
         })
       ),
+      message(Message.TypedReply({ text: "Sounds" })),
+      Command.expectExact(TellTyping({ ...member, threadId: thread.id })),
+      model((model) => {
+        typing = model
+      }),
+      Command.resolve(TellTyping, Message.ToldTyping()),
       message(Message.TypedReply({ text: "Sounds good" })),
+      // Once told, typing is said again.
+      Command.resolve(TellTyping, Message.ToldTyping()),
       message(Message.SubmittedReply()),
-      Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds good" })),
+      Command.expectExact(
+        PostReply({ threadId: thread.id, text: "Sounds good" }),
+        TellTyping({ ...member, threadId: null })
+      ),
       Command.resolve(PostReply, Message.WroteAction()),
+      Command.resolve(TellTyping, Message.ToldTyping()),
       model((model) => {
         const group = groupIn(model)
         expect(Option.map(group, ({ threads }) => threads.length)).toEqual(Option.some(1))
@@ -223,6 +240,8 @@ describe("a workspace", () => {
         expect(openedIn(model)).toEqual(Option.none())
       })
     )
+    // While typing is being told, more typing says nothing.
+    expect(update(typing!, Message.TypedReply({ text: "Sounds good" })).commands ?? []).toEqual([])
   })
 
   it("starts a thread with the draft, and says why a write could not be kept", () => {
@@ -899,6 +918,7 @@ describe("a workspace", () => {
       }),
       // The person wrote a reply before its draft was read: what they wrote stays.
       message(Message.TypedReply({ text: "Sounds" })),
+      Command.resolve(TellTyping, Message.ToldTyping()),
       message(Message.GotDraft({ place: Drafts.Place.cases.Reply.make({ threadId: thread.id }), text: "Earlier" })),
       message(Message.GotDraft({ place: Drafts.Place.cases.Thread.make({ groupId: general.id }), text: "Plans" })),
       // A draft of a place no longer open is passed over.
@@ -907,8 +927,12 @@ describe("a workspace", () => {
         expect(draftsIn(model)).toEqual(Option.some({ thread: Option.some("Plans"), reply: Option.some("Sounds") }))
       }),
       message(Message.SubmittedReply()),
-      Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds" })),
+      Command.expectExact(
+        PostReply({ threadId: thread.id, text: "Sounds" }),
+        TellTyping({ ...member, threadId: null })
+      ),
       Command.resolve(PostReply, Message.WroteAction()),
+      Command.resolve(TellTyping, Message.ToldTyping()),
       model((model) => {
         expect(draftsIn(model)).toEqual(Option.some({ thread: Option.some("Plans"), reply: Option.some("") }))
       })

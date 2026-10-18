@@ -30,7 +30,8 @@ import {
   LoadWorkspaces,
   SaveSession,
   SendCode,
-  SignOut
+  SignOut,
+  TellTyping
 } from "../src/command.ts"
 import { Message } from "../src/message.ts"
 import {
@@ -145,9 +146,14 @@ describe("the app", () => {
       ),
       expect(text("Plans for the week")).toExist(),
       type(label("Reply"), "Sounds good"),
+      Command.resolve(TellTyping, Message.ToldTyping()),
       click(role("button", { name: "Reply" })),
-      Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds good" })),
+      Command.expectExact(
+        PostReply({ threadId: thread.id, text: "Sounds good" }),
+        TellTyping({ apiUrl, token: session.token, workspaceId: membership.workspace.id, threadId: null })
+      ),
       Command.resolve(PostReply, Message.WroteAction()),
+      Command.resolve(TellTyping, Message.ToldTyping()),
       // One the server refused says why, until it is dismissed.
       Subscription.emit(
         Message.GotActions({
@@ -745,6 +751,63 @@ describe("the app", () => {
         })
       ),
       inside(role("region", { name: "Thread" }), expect(text("Dana")).toExist())
+    )
+  })
+
+  it("a person sees who has the workspace open among a team's members, and who types in the open thread", () => {
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(
+        Message.GotGroups({
+          groups: [
+            { group: general, pending: false },
+            { group: design, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(
+        Message.GotMemberships({
+          memberships: [
+            { membership: aliceInGeneral, pending: false },
+            { membership: aliceInDesign, pending: false },
+            { membership: bobInDesign, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(
+        Message.GotPresence({
+          present: [
+            { memberId: membership.member.id, typingIn: null },
+            { memberId: bob.id, typingIn: thread.id }
+          ]
+        })
+      ),
+      click(role("button", { name: "Design" })),
+      inside(role("region", { name: "Members" }), expect(text(" · online")).toExist()),
+      // Bob types in general's thread: whoever opens it sees him typing.
+      click(role("button", { name: "General" })),
+      Subscription.emit(
+        Message.GotThreads({
+          groupId: general.id,
+          threads: [{ thread, opening: Option.some(opening), task: Option.none(), pending: false, unread: 0 }]
+        })
+      ),
+      click(role("button", { name: "Plans for the week" })),
+      expect(text("Bob is typing…")).toExist(),
+      Subscription.emit(Message.GotPresence({ present: [{ memberId: bob.id, typingIn: null }] })),
+      expect(text("Bob is typing…")).toBeAbsent()
     )
   })
 

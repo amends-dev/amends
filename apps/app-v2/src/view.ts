@@ -55,7 +55,7 @@ import {
   type TurnLog,
   Workspaces
 } from "./model.ts"
-import { belongsTo, groupName, memberName } from "./opened.ts"
+import { belongsTo, groupName, isPresent, memberName, typingIn } from "./opened.ts"
 import { givableRoles, isOwner, may, mayActOn, permits, workspaceRolesOf } from "./permissions.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
@@ -374,6 +374,7 @@ const membersView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>):
             [],
             [
               memberName(membership.memberId, opened),
+              isPresent(opened, membership.memberId) ? " · online" : "",
               sending(pending, h),
               !isManaged || pending || membership.memberId === opened.memberId
                 ? h.empty
@@ -682,6 +683,12 @@ const turnsView = (thread: OpenThread, opened: Opened, h: HtmlBuilder<Message>):
         ]
       )
 
+/** Who types in the thread now, besides the person. */
+const typingView = (names: ReadonlyArray<string>, h: HtmlBuilder<Message>): Html =>
+  names.length === 0
+    ? h.empty
+    : h.p([h.AriaLive("polite")], [`${names.join(" and ")} ${names.length === 1 ? "is" : "are"} typing…`])
+
 const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
   const item = group.threads.find(({ thread: listed }) => listed.id === thread.threadId)
   return h.section(
@@ -695,6 +702,7 @@ const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: Htm
         [h.AriaLabel("Messages")],
         thread.messages.map((message) => messageView(message, thread, opened, h))
       ),
+      typingView(typingIn(opened, thread.threadId), h),
       turnsView(thread, opened, h),
       h.form(
         [h.OnSubmit(Message.SubmittedReply())],
@@ -882,7 +890,7 @@ const workspaceMembersView = (opened: Opened, h: HtmlBuilder<Message>): Html => 
               member.id,
               [],
               [
-                h.span([], [member.name]),
+                h.span([], [member.name, isPresent(opened, member.id) ? " · online" : ""]),
                 h.span(
                   [],
                   held.map(

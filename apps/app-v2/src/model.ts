@@ -11,6 +11,7 @@ import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
+import { Presence } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
@@ -118,7 +119,8 @@ export type Editing = typeof Editing.Type
 /**
  * The thread open in the group: its messages, the reply being written, once its draft is read, the person's part in it, the
  * sequence of its latest activity, how far they have read it and asked to, the title or message
- * being changed, the task it tracks, its agents' turns, and the turn whose log the person follows.
+ * being changed, whether the person said lately that they type there, the task it tracks, its
+ * agents' turns, and the turn whose log the person follows.
  */
 export const OpenThread = Schema.Struct({
   threadId: ThreadId.ThreadId,
@@ -130,6 +132,7 @@ export const OpenThread = Schema.Struct({
   readRequested: Schema.Int,
   renaming: Schema.Option(Schema.String),
   editing: Schema.Option(Editing),
+  typingTold: Schema.Boolean,
   task: Schema.Option(TaskItem),
   turns: Schema.Array(TurnItem),
   log: Schema.Option(TurnLog)
@@ -332,7 +335,8 @@ export type Composing = typeof Composing.Type
  * The workspace the person opened, as their member of it: the workspace, and whether a change to
  * it is on its way; its store; what the replica holds of it: its groups, members, roles and their
  * assignments, invitations, the person's notifications, groups' memberships, the person's
- * follows among them, its connections, agents, channels, and the contacts its channels brought; the
+ * follows among them, its connections, agents, channels, and the contacts its channels brought;
+ * who is present in it, while the host can be reached; the
  * integrations the host installs, once asked for; the
  * actions not finished yet, why the last one could not be written, what the person is starting,
  * and the pane open in it.
@@ -354,6 +358,7 @@ export const Opened = Schema.Struct({
   agents: Schema.Array(AgentItem),
   channels: Schema.Array(ChannelItem),
   contacts: Schema.Array(Contact.Contact),
+  present: Schema.Array(Presence.Present),
   integrations: Schema.Option(Integrations),
   actions: Schema.Array(ActionItem),
   notice: Schema.Option(Schema.String),

@@ -23,7 +23,8 @@ rename it or change its setup; and the workspace's channels, where they add one 
 that gives channels, into a group they belong to, move one's conversations to come to another
 group, and remove one, and a channel's contacts are named on their messages. A reply or a new
 thread the person has not sent is kept as a draft in their browser, through a reload and offline,
-until they send it. What they do shows at
+until they send it. While the host can be reached, a team's members and the workspace's show who
+has the workspace open, and a thread shows who else is typing in it. What they do shows at
 once, marked as sending, even offline, and what the server refuses comes back with why. A control
 shows only when the person may use it.
 
@@ -67,12 +68,15 @@ that decides, and commands that act.
   sync key and ends the session as far as the host can be reached. As a member of the open
   workspace: listing the integrations the host installs and the models a connection offers, and
   adding a connection, replacing its key, and checking it, over HTTP, since a key never enters an
-  action and no replica holds what a check finds.
+  action and no replica holds what a check finds; and saying the person types in a thread, at once,
+  then at most as often as typing lasts, by core's `Presence.typingRepeats`, and that they stopped
+  once they send their reply.
 - `store.ts`: the open workspace's store as a managed resource, open while a workspace is open and
   closed when the person leaves it or signs out; what its replica holds as subscriptions, the
   groups, members, memberships, follows, and actions, the open group's threads, and the open
   thread's messages, task, and turns; the log of the turn the person follows, read over HTTP while
-  online, since no replica holds it; the drafts of the places open, each read once its place opens
+  online, since no replica holds it; who is present in the workspace, followed over HTTP while it is
+  open, and no one while the host can't be reached; the drafts of the places open, each read once its place opens
   and kept from then on as it changes; and the commands that write to it, an action each, and
   dismissing a refused action.
 - `view.ts`: markup over `@foldkit/ui`'s headless components, with no styles yet, from the controls
@@ -175,7 +179,8 @@ browser's storage:
   renaming, configuring, replacing a key, checking, and removing one, the agents, adding one on a
   connection's model and changing and renaming one, the channels, adding one into a group the
   person belongs to, moving, and removing one, a draft read into a place only while the person has
-  written nothing there and emptied once sent, and signing out.
+  written nothing there and emptied once sent, typing said once while it is being told and stopped
+  once the reply is sent, and signing out.
 - Scene tests drive the view as a person does, from typing their address through a reply and a
   refused action to signing out, from joining a team through creating one, seeing it at once, and
   admitting and removing its members, and an owner managing the workspace's settings, then seeing
@@ -183,7 +188,8 @@ browser's storage:
   integration's form, checking it and opening its settings, then seeing it without the controls as
   a member, an owner adding an agent on a connection's model and opening its setup, then reading
   how it runs as a member, an owner adding and moving a channel, then reading where it opens as a
-  member, and a contact named on their message, the inbox's count, its
+  member, and a contact named on their message, who is online among a team's members and who types
+  in the open thread, the inbox's count, its
   notifications, and opening one's thread, and a thread made a task and changed, its turns stopped
   and retried, and a turn's log followed, then seen without the grants to change any of it.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,

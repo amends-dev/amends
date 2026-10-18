@@ -2,13 +2,16 @@
  * The app's side effects over HTTP, each a named command that ends in a message: the sign-in
  * requests, keeping the session, listing the person's workspaces, and signing out; and, as a
  * member of a workspace, what no replica holds or no action may carry: the integrations the host
- * installs and the models a connection offers, and adding a connection, replacing its key, and
- * checking it, since a key never enters an action. A command's failures are messages too, worded for the person.
+ * installs and the models a connection offers, adding a connection, replacing its key, and
+ * checking it, since a key never enters an action, and saying the person types in a thread, which
+ * no replica holds. A command's failures are messages too, worded for the person.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
+import { Presence } from "@amends-dev/core/presence"
+import { ThreadId } from "@amends-dev/core/thread"
 import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Accounts from "@amends-dev/gateway/Accounts"
 import * as SignIn from "@amends-dev/gateway/SignIn"
@@ -209,4 +212,20 @@ export const LoadModels = Command.define("LoadModels", {
     }).pipe(
       Effect.catch((error) => Effect.succeed(Message.FailedLoadModels({ connectionId, error: refusalOf(error) })))
     )
+})
+
+/**
+ * Say the person types in `threadId`, or, given none, that they stopped; then, while they type, wait
+ * as long as typing goes without being said again, so it is said at most that often.
+ */
+export const TellTyping = Command.define("TellTyping", {
+  args: { ...asMember, threadId: Schema.NullOr(ThreadId.ThreadId) },
+  messages: [Message.ToldTyping],
+  execute: ({ apiUrl, token, workspaceId, threadId }) =>
+    Effect.gen(function* () {
+      const client = yield* Api.memberClient(apiUrl, token, workspaceId)
+      yield* client.presence.type({ payload: { threadId } }).pipe(Effect.ignore)
+      if (threadId !== null) yield* Effect.sleep(Presence.typingRepeats)
+      return Message.ToldTyping()
+    }).pipe(Effect.orElseSucceed(() => Message.ToldTyping()))
 })

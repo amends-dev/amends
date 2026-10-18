@@ -2,8 +2,9 @@
  * The open workspace's store, as the app holds it: open while the person has a workspace open, over
  * the browser's services, and closed when they leave it or sign out; what its replica holds, as
  * messages, while it is open, the open group's threads and the open thread's messages, task, and
- * turns among them; and the actions the person writes to it. The log of a turn the person follows
- * is the one thing read from the host apart from the store, while online, since no replica holds it.
+ * turns among them; and the actions the person writes to it. The log of a turn the person follows,
+ * and who is present in the workspace, are read from the host apart from the store, while online,
+ * since no replica holds them.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -42,6 +43,7 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
+import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Command from "foldkit/command"
@@ -103,6 +105,24 @@ const openGroup = (model: Model): Option.Option<OpenGroup> =>
 
 /** The thread open in the open group, once its store has opened. */
 const openThread = (model: Model): Option.Option<OpenThread> => Option.flatMap(openGroup(model), ({ thread }) => thread)
+
+/** Whom the person follows presence in the open workspace as: the host, their session, and the workspace. */
+const presenceOf = (model: Model) =>
+  Page.matchOrElse(
+    model.page,
+    {
+      SignedIn: ({ session }) =>
+        Option.map(openWorkspace(model), ({ workspace }) => ({
+          apiUrl: model.apiUrl,
+          token: session.token,
+          workspaceId: workspace.id
+        }))
+    },
+    () => Option.none()
+  )
+
+/** How long to wait before following presence again after the host could not be reached. */
+const presenceRetry = Schedule.spaced("5 seconds")
 
 /**
  * The drafts of the places open in the workspace once its store opened: a new thread in the open
@@ -414,6 +434,31 @@ export const subscriptions = Subscription.make<
                   }))
                 })
               )
+            )
+        })
+    }
+  ),
+  // Who is present, followed while the workspace is open: no one, while the host can't be reached.
+  presence: entry(
+    {
+      member: Schema.Option(
+        Schema.Struct({ apiUrl: Schema.String, token: Schema.String, workspaceId: WorkspaceId.WorkspaceId })
+      )
+    },
+    {
+      modelToDependencies: (model) => ({ member: presenceOf(model) }),
+      dependenciesToStream: ({ member }) =>
+        Option.match(member, {
+          onNone: () => Stream.empty,
+          onSome: ({ apiUrl, token, workspaceId }) =>
+            Stream.unwrap(
+              Effect.map(Api.memberClient(apiUrl, token, workspaceId), (client) =>
+                Stream.unwrap(client.presence.watch())
+              )
+            ).pipe(
+              Stream.map((present): Message => Message.GotPresence({ present })),
+              Stream.catchCause(() => Stream.make(Message.GotPresence({ present: [] }))),
+              Stream.repeat(presenceRetry)
             )
         })
     }
