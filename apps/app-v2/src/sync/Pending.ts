@@ -10,7 +10,7 @@
 
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
-import { Thread, ThreadMessage } from "@amends-dev/core/thread"
+import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import * as SyncSchema from "@amends-dev/sync/SyncSchema"
@@ -57,6 +57,16 @@ const { cases } = ReplicaRecord.ReplicaRecord
 const isThread = ReplicaRecord.ReplicaRecord.isAnyOf(["Thread"])
 const isMessage = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadMessage"])
 const isGroup = ReplicaRecord.ReplicaRecord.isAnyOf(["Group"])
+const isParticipation = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadParticipation"])
+const isPosition = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadPosition"])
+
+/** Whether `participation` is `memberId`'s own. */
+const isMemberOf = (memberId: MemberId.MemberId, participation: ThreadParticipation.ThreadParticipation) =>
+  ThreadParticipation.Participant.matchOrElse(
+    participation.participant,
+    { Member: (participant) => participant.memberId === memberId },
+    () => false
+  )
 const isText = ThreadMessage.Content.isAnyOf(["Text"])
 
 /** Derive IDs as the server does when it runs `action`. */
@@ -83,7 +93,11 @@ const message = (
     })
   )
 
-/** What the person does in threads: starting one, replying, renaming one, and editing or deleting a message. */
+/**
+ * What the person does in threads: starting one, replying, renaming one, editing or deleting a
+ * message, following one again or no longer, and reading one through a position. Following one they
+ * never took part in waits for the server, which gives the participation their membership.
+ */
 export const threads: EffectsOf<typeof ThreadSync.Actions> = {
   ThreadStarted: {
     creates: (input, action) =>
@@ -144,6 +158,37 @@ export const threads: EffectsOf<typeof ThreadSync.Actions> = {
               content: ThreadMessage.Content.cases.Deleted.make({ deletedAt: action.writtenAt })
             }
           })
+        : undefined
+  },
+  ThreadFollowed: {
+    changes: ({ threadId }, record, action) =>
+      isParticipation(record) &&
+      record.value.threadId === threadId &&
+      record.value.status === "ended" &&
+      isMemberOf(action.memberId, record.value)
+        ? cases.ThreadParticipation.make({ value: { ...record.value, status: "active", endedAt: null } })
+        : undefined
+  },
+  ThreadUnfollowed: {
+    changes: ({ participationId }, record, action) =>
+      isParticipation(record) && record.value.id === participationId && record.value.status === "active"
+        ? cases.ThreadParticipation.make({ value: { ...record.value, status: "ended", endedAt: action.writtenAt } })
+        : undefined
+  },
+  ThreadMarkedRead: {
+    // Read through a position: the furthest the member read stays.
+    creates: ({ threadId, throughSequence }, action) =>
+      Effect.succeed([
+        cases.ThreadPosition.make({
+          value: { workspaceId: action.workspaceId, memberId: action.memberId, threadId, readThrough: throughSequence }
+        })
+      ]),
+    changes: ({ threadId, throughSequence }, record, action) =>
+      isPosition(record) &&
+      record.value.threadId === threadId &&
+      record.value.memberId === action.memberId &&
+      record.value.readThrough < throughSequence
+        ? cases.ThreadPosition.make({ value: { ...record.value, readThrough: throughSequence } })
         : undefined
   }
 }

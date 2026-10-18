@@ -16,6 +16,7 @@
 import { CoreError } from "@amends-dev/core/error"
 import type { GroupId } from "@amends-dev/core/group"
 import { ReplicaChange, ReplicaRecord } from "@amends-dev/core/replica"
+import type { ThreadId } from "@amends-dev/core/thread"
 import type * as IndexedDb from "@effect/platform-browser/IndexedDb"
 import * as IndexedDbDatabase from "@effect/platform-browser/IndexedDbDatabase"
 import type * as IndexedDbQueryBuilder from "@effect/platform-browser/IndexedDbQueryBuilder"
@@ -115,10 +116,23 @@ export interface Action {
 /** A record of `Kind`. */
 export type RecordOf<Kind extends ReplicaRecord.Kind> = Extract<ReplicaRecord.ReplicaRecord, { readonly _tag: Kind }>
 
-/** A group's thread, with the messages the replica holds of it. */
+/**
+ * A group's thread, with what the replica holds in it that its group's list shows: its messages, its
+ * activities, and the member's position in it.
+ */
 export interface ThreadRecords {
   readonly thread: RecordOf<"Thread">
   readonly messages: ReadonlyArray<RecordOf<"ThreadMessage">>
+  readonly activities: ReadonlyArray<RecordOf<"ThreadActivity">>
+  readonly positions: ReadonlyArray<RecordOf<"ThreadPosition">>
+}
+
+/** What the replica holds in a thread: its messages, its activities, the member's position, and who takes part. */
+export interface ThreadContents {
+  readonly messages: ReadonlyArray<RecordOf<"ThreadMessage">>
+  readonly activities: ReadonlyArray<RecordOf<"ThreadActivity">>
+  readonly positions: ReadonlyArray<RecordOf<"ThreadPosition">>
+  readonly participations: ReadonlyArray<RecordOf<"ThreadParticipation">>
 }
 
 type QueryError = IndexedDbQueryBuilder.IndexedDbQueryError
@@ -140,8 +154,10 @@ export class Replica extends Context.Service<
       kind: Kind,
       place: ReplicaRecord.Place
     ) => Stream.Stream<ReadonlyArray<RecordOf<Kind>>, QueryError>
-    /** The threads of `groupId`, each with the messages it holds, and again after each change. */
+    /** The threads of `groupId`, each with what it holds that the group's list shows, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadRecords>, QueryError>
+    /** What the replica holds in `threadId`, and again after each change. */
+    readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadContents, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<Action>, QueryError>
   }
@@ -201,15 +217,20 @@ const make = Effect.gen(function* () {
     )
   }
 
-  /** The threads of `groupId`, each with the messages the replica holds of it. */
+  /** The threads of `groupId`, each with its messages, its activities, and the member's position in it. */
   const selectThreads = (groupId: GroupId.GroupId) =>
     Effect.flatMap(select("Thread", ReplicaRecord.Place.cases.Group.make({ groupId })), (threads) =>
-      Effect.forEach(threads, (thread) =>
-        Effect.map(
-          select("ThreadMessage", ReplicaRecord.Place.cases.Thread.make({ threadId: thread.value.id })),
-          (messages): ThreadRecords => ({ thread, messages })
+      Effect.forEach(threads, (thread) => {
+        const place = ReplicaRecord.Place.cases.Thread.make({ threadId: thread.value.id })
+        return Effect.map(
+          Effect.all({
+            messages: select("ThreadMessage", place),
+            activities: select("ThreadActivity", place),
+            positions: select("ThreadPosition", place)
+          }),
+          (held): ThreadRecords => ({ thread, ...held })
         )
-      )
+      })
     )
 
   const changing = <A, E>(tables: ReadonlyArray<"records" | "actions">, effect: Effect.Effect<A, E>) =>
@@ -226,6 +247,18 @@ const make = Effect.gen(function* () {
     dismiss: (key) => changing(["actions"], actions.delete().equals(key)),
     list: (kind, place) => query.reactivity.stream(["records"], select(kind, place)),
     threads: (groupId) => query.reactivity.stream(["records"], selectThreads(groupId)),
+    thread: (threadId) => {
+      const place = ReplicaRecord.Place.cases.Thread.make({ threadId })
+      return query.reactivity.stream(
+        ["records"],
+        Effect.all({
+          messages: select("ThreadMessage", place),
+          activities: select("ThreadActivity", place),
+          positions: select("ThreadPosition", place),
+          participations: select("ThreadParticipation", place)
+        })
+      )
+    },
     actions: query.reactivity.stream(
       ["actions"],
       Effect.map(actions.select(), (rows) =>

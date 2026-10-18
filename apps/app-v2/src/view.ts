@@ -16,6 +16,8 @@ import type { Document, Html, HtmlBuilder } from "foldkit/html"
 import { Message } from "./message.ts"
 import {
   type ActionItem,
+  type Following,
+  type MessageItem,
   type Model,
   type OpenGroup,
   type Opened,
@@ -186,23 +188,116 @@ const actionsView = (actions: ReadonlyArray<ActionItem>, notice: Option.Option<s
   )
 }
 
-const threadView = (thread: OpenThread, members: ReadonlyArray<Member.Member>, h: HtmlBuilder<Message>): Html =>
-  h.section(
+const button = (h: HtmlBuilder<Message>, label: string, onClick: Message) =>
+  Button.view({ onClick, toView: (attributes) => h.button(attributes.button, [label]) }, h)
+
+/** The person's part in the thread: following it, or not, and whether a change to that is on its way. */
+const followView = (following: Option.Option<Following>, h: HtmlBuilder<Message>): Html =>
+  Option.match(following, {
+    onNone: () => button(h, "Follow", Message.ClickedFollow()),
+    onSome: ({ active, pending }) =>
+      pending
+        ? h.span([], ["Updating…"])
+        : active
+          ? button(h, "Unfollow", Message.ClickedUnfollow())
+          : button(h, "Follow", Message.ClickedFollow())
+  })
+
+/** The thread's title, and the form to change it while the person renames it. */
+const titleView = (thread: OpenThread, title: string, h: HtmlBuilder<Message>): Html =>
+  Option.match(thread.renaming, {
+    onNone: () => h.div([], [h.h4([], [title]), button(h, "Rename", Message.ClickedRename())]),
+    onSome: (draft) =>
+      h.form(
+        [h.OnSubmit(Message.SubmittedRename())],
+        [
+          field(
+            h,
+            {
+              id: "title",
+              label: "Title",
+              type: "text",
+              value: draft,
+              onInput: (title) => Message.TypedTitle({ title })
+            },
+            Option.none()
+          ),
+          submit(h, "Save"),
+          button(h, "Cancel", Message.ClickedCancelRename())
+        ]
+      )
+  })
+
+/** A message, with editing and deleting for the person's own, and the form to change it while they edit it. */
+const messageView = (
+  { message, pending }: MessageItem,
+  thread: OpenThread,
+  opened: Opened,
+  h: HtmlBuilder<Message>
+): Html => {
+  const own =
+    ThreadMessage.Author.matchOrElse(
+      message.author,
+      { Member: ({ memberId }) => memberId === opened.memberId },
+      () => false
+    ) && ThreadMessage.Content.matchOrElse(message.content, { Text: () => true }, () => false)
+  const editing = Option.filter(thread.editing, ({ messageId }) => messageId === message.id)
+  const edited = ThreadMessage.Content.matchOrElse(
+    message.content,
+    { Text: ({ editedAt }) => editedAt !== null },
+    () => false
+  )
+  return h.keyed("li")(
+    message.id,
+    [],
+    [
+      h.p(
+        [],
+        [
+          h.strong([], [authorName(message, opened.members)]),
+          sending(pending, h),
+          edited ? h.span([], [" · edited"]) : h.empty
+        ]
+      ),
+      Option.match(editing, {
+        onSome: ({ draft }) =>
+          h.form(
+            [h.OnSubmit(Message.SubmittedEdit())],
+            [
+              textarea(h, { id: "edit", label: "Edit", value: draft, onInput: (text) => Message.TypedEdit({ text }) }),
+              submit(h, "Save"),
+              button(h, "Cancel", Message.ClickedCancelEdit())
+            ]
+          ),
+        onNone: () =>
+          h.div(
+            [],
+            [
+              h.p([], [textOf(message)]),
+              ...(own && !pending
+                ? [
+                    button(h, "Edit", Message.ClickedEdit({ messageId: message.id })),
+                    button(h, "Delete", Message.ClickedDelete({ messageId: message.id }))
+                  ]
+                : [])
+            ]
+          )
+      })
+    ]
+  )
+}
+
+const threadView = (thread: OpenThread, group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const item = group.threads.find(({ thread: listed }) => listed.id === thread.threadId)
+  return h.section(
     [h.AriaLabel("Thread")],
     [
-      Button.view(
-        { onClick: Message.ClickedAllThreads(), toView: (attributes) => h.button(attributes.button, ["All threads"]) },
-        h
-      ),
+      button(h, "All threads", Message.ClickedAllThreads()),
+      titleView(thread, item === undefined ? "A thread" : threadLabel(item), h),
+      followView(thread.following, h),
       h.ol(
         [h.AriaLabel("Messages")],
-        thread.messages.map(({ message, pending }) =>
-          h.keyed("li")(
-            message.id,
-            [],
-            [h.p([], [h.strong([], [authorName(message, members)]), sending(pending, h)]), h.p([], [textOf(message)])]
-          )
-        )
+        thread.messages.map((message) => messageView(message, thread, opened, h))
       ),
       h.form(
         [h.OnSubmit(Message.SubmittedReply())],
@@ -218,6 +313,7 @@ const threadView = (thread: OpenThread, members: ReadonlyArray<Member.Member>, h
       )
     ]
   )
+}
 
 const groupView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
   const found = opened.groups.find(({ id }) => id === group.groupId)
@@ -226,7 +322,7 @@ const groupView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): H
     [
       h.h3([], [found === undefined ? "A group" : groupName(found, opened.members)]),
       Option.match(group.thread, {
-        onSome: (thread) => threadView(thread, opened.members, h),
+        onSome: (thread) => threadView(thread, group, opened, h),
         onNone: () =>
           h.div(
             [],
@@ -247,7 +343,8 @@ const groupView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): H
                             },
                             h
                           ),
-                          sending(item.pending, h)
+                          sending(item.pending, h),
+                          item.unread > 0 ? h.span([], [` · ${item.unread} new`]) : h.empty
                         ]
                       )
                     )

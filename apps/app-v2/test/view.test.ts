@@ -44,11 +44,22 @@ describe("the app", () => {
       expect(text("No threads yet.")).toExist(),
       // A thread the person started shows at once, marked as sending.
       Subscription.emit(
-        Message.GotThreads({ groupId: general.id, threads: [{ thread, opening: Option.some(opening), pending: true }] })
+        Message.GotThreads({
+          groupId: general.id,
+          threads: [{ thread, opening: Option.some(opening), pending: true, unread: 0 }]
+        })
       ),
       expect(text(" · Sending…")).toExist(),
       click(role("button", { name: "Plans for the week" })),
-      Subscription.emit(Message.GotMessages({ threadId: thread.id, messages: [{ message: opening, pending: false }] })),
+      Subscription.emit(
+        Message.GotThread({
+          threadId: thread.id,
+          messages: [{ message: opening, pending: false }],
+          following: Option.none(),
+          latest: 0,
+          readThrough: 0
+        })
+      ),
       expect(text("Plans for the week")).toExist(),
       type(label("Reply"), "Sounds good"),
       click(role("button", { name: "Reply" })),

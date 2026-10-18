@@ -14,7 +14,7 @@ import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
-import type { ThreadMessage } from "@amends-dev/core/thread"
+import { type ThreadId, type ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
 import * as ChannelSync from "@amends-dev/sync/ChannelSync"
@@ -65,13 +65,30 @@ const makeWrite = EventLog.makeClient(SyncSchema.SyncSchema)
 
 const byPublished = Order.mapInput(DateTime.Order, (message: ThreadMessage.ThreadMessage) => message.publishedAt)
 
+/** How far the member has read a thread, from their positions in it; nothing read is 0. */
+const readThroughOf = (positions: ReadonlyArray<Pending.Held<Replica.RecordOf<"ThreadPosition">>>) =>
+  positions.reduce((through, { record }) => Math.max(through, record.value.readThrough), 0)
+
 /** Write an action, `write("ThreadMessagePosted", { threadId, text, mentions })`, as eventlog's client does. */
 export type Write = Effect.Success<typeof makeWrite>
 
-/** A thread as the person sees it, with its opening message. */
+/** A thread as its group lists it for the person: its opening message, and how much they have not read. */
 export interface ThreadView {
   readonly thread: Pending.Held<Replica.RecordOf<"Thread">>
   readonly opening: Option.Option<ThreadMessage.ThreadMessage>
+  /** Its activities that count as new, past the member's position. */
+  readonly unread: number
+}
+
+/**
+ * A thread as the person sees it open: its messages, oldest first, their own part in it, the
+ * sequence of its latest activity, and how far they have read it.
+ */
+export interface ThreadDetail {
+  readonly messages: ReadonlyArray<Pending.Held<Replica.RecordOf<"ThreadMessage">>>
+  readonly participation: Option.Option<Pending.Held<Replica.RecordOf<"ThreadParticipation">>>
+  readonly latest: number
+  readonly readThrough: number
 }
 
 /** An action of the person's the server has not completed, its payload decoded, and why it was refused. */
@@ -100,6 +117,8 @@ export class Store extends Context.Service<
     ) => Stream.Stream<ReadonlyArray<Pending.Held<Replica.RecordOf<Kind>>>, QueryError>
     /** The threads of `groupId`, each with its opening message, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
+    /** The thread `threadId` as the person sees it open, and again after each change. */
+    readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadDetail, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<ActionView>, QueryError>
     readonly dismiss: Replica.Replica["Service"]["dismiss"]
@@ -252,12 +271,11 @@ export const layer = (options: Options) =>
                   pending
                 ).map((thread): ThreadView => {
                   const threadId = thread.record.value.id
-                  const messages = Pending.overlay(
-                    "ThreadMessage",
-                    ReplicaRecord.Place.cases.Thread.make({ threadId }),
-                    threads.find((held) => held.thread.value.id === threadId)?.messages ?? [],
-                    pending
-                  )
+                  const place = ReplicaRecord.Place.cases.Thread.make({ threadId })
+                  const held = threads.find((records) => records.thread.value.id === threadId)
+                  const messages = Pending.overlay("ThreadMessage", place, held?.messages ?? [], pending)
+                  const positions = Pending.overlay("ThreadPosition", place, held?.positions ?? [], pending)
+                  const readThrough = readThroughOf(positions)
                   return {
                     thread,
                     opening: Array.head(
@@ -265,10 +283,37 @@ export const layer = (options: Options) =>
                         messages.map(({ record }) => record.value),
                         byPublished
                       )
-                    )
+                    ),
+                    unread: (held?.activities ?? []).filter(
+                      ({ value }) => value.newActivity && value.sequence > readThrough
+                    ).length
                   }
                 })
               ),
+            thread: (threadId) =>
+              withPending(replica.thread(threadId), (contents, pending): ThreadDetail => {
+                const place = ReplicaRecord.Place.cases.Thread.make({ threadId })
+                return {
+                  messages: Array.sort(
+                    Pending.overlay("ThreadMessage", place, contents.messages, pending),
+                    Order.mapInput(
+                      byPublished,
+                      ({ record }: Pending.Held<Replica.RecordOf<"ThreadMessage">>) => record.value
+                    )
+                  ),
+                  participation: Array.findFirst(
+                    Pending.overlay("ThreadParticipation", place, contents.participations, pending),
+                    ({ record }) =>
+                      ThreadParticipation.Participant.matchOrElse(
+                        record.value.participant,
+                        { Member: ({ memberId }) => memberId === options.memberId },
+                        () => false
+                      )
+                  ),
+                  latest: contents.activities.reduce((latest, { value }) => Math.max(latest, value.sequence), 0),
+                  readThrough: readThroughOf(Pending.overlay("ThreadPosition", place, contents.positions, pending))
+                }
+              }),
             actions: untilFailed(
               Stream.mapEffect(replica.actions, (actions) =>
                 Effect.forEach(actions, ({ key, tag, payload, rejection }) =>

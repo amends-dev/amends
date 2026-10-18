@@ -3,9 +3,11 @@
 The workspace app, being built on [Foldkit](https://foldkit.dev): a browser app that signs people
 in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in sync
 through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write, offline.
-For now it signs in, lists the person's workspaces, and opens one: its groups, a group's threads,
-and a thread's messages, where the person starts a thread or replies. What they write shows at
-once, marked as sending, even offline, and what the server refuses comes back with why.
+For now it signs in, lists the person's workspaces, and opens one: its groups, a group's threads
+with how much of each is new, and a thread's messages, where the person starts a thread, replies,
+renames a thread, edits or deletes their own messages, and follows or stops following a thread,
+which opening reads through its latest activity. What they do shows at once, marked as sending,
+even offline, and what the server refuses comes back with why.
 
 ## Run
 
@@ -55,8 +57,10 @@ that decides, and commands that act.
   server runs it under. A handler runs before eventlog journals the action, so one that fails
   fails the write.
 - `sync/Pending.ts` is what an unfinished action does to what the person sees: the records it
-  creates, and how it changes records the replica holds, such as renaming a thread or a team, or
-  editing or deleting a message. `overlay` applies the unfinished actions, in the order they were
+  creates, and how it changes records the replica holds: renaming a thread or a team, editing or
+  deleting a message, ending the person's part in a thread or taking up one they ended, and moving
+  their position in a thread. Following a thread they never took part in waits for the server,
+  which gives the participation their group membership. `overlay` applies the unfinished actions, in the order they were
   written, each to what the ones before it left, on top of the server's records each time they are
   read, so whatever the server changes meanwhile shows through what an action leaves alone, and a
   record an action created gives way to the server's own under the same key. A completed or

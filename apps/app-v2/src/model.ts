@@ -5,7 +5,7 @@
  */
 
 import { Group, GroupId } from "@amends-dev/core/group"
-import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { Member, MemberId, Workspace } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
@@ -37,11 +37,12 @@ export const StoreState = defineTaggedUnion({
 })
 export type StoreState = typeof StoreState.Type
 
-/** A thread of the open group, with its opening message, and whether it is still being started. */
+/** A thread of the open group, with its opening message, whether it is still being started, and how much is unread. */
 export const ThreadItem = Schema.Struct({
   thread: Thread.Thread,
   opening: Schema.Option(ThreadMessage.ThreadMessage),
-  pending: Schema.Boolean
+  pending: Schema.Boolean,
+  unread: Schema.Int
 })
 export type ThreadItem = typeof ThreadItem.Type
 
@@ -58,11 +59,33 @@ export const ActionItem = Schema.Struct({
 })
 export type ActionItem = typeof ActionItem.Type
 
-/** The thread open in the group, its messages, and the reply being written. */
+/** The person's part in a thread: their participation, whether it is active, and whether a change to it is on its way. */
+export const Following = Schema.Struct({
+  participationId: ThreadParticipationId.ThreadParticipationId,
+  active: Schema.Boolean,
+  pending: Schema.Boolean
+})
+export type Following = typeof Following.Type
+
+/** A message being edited, and its new text. */
+export const Editing = Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId, draft: Schema.String })
+export type Editing = typeof Editing.Type
+
+/**
+ * The thread open in the group: its messages, the reply being written, the person's part in it, the
+ * sequence of its latest activity, how far they have read it and asked to, and the title or message
+ * being changed.
+ */
 export const OpenThread = Schema.Struct({
   threadId: ThreadId.ThreadId,
   messages: Schema.Array(MessageItem),
-  draft: Schema.String
+  draft: Schema.String,
+  following: Schema.Option(Following),
+  latest: Schema.Int,
+  readThrough: Schema.Int,
+  readRequested: Schema.Int,
+  renaming: Schema.Option(Schema.String),
+  editing: Schema.Option(Editing)
 })
 export type OpenThread = typeof OpenThread.Type
 

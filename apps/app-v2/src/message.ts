@@ -4,13 +4,13 @@
  */
 
 import { Group, GroupId } from "@amends-dev/core/group"
-import { ThreadId } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
 import { Member, WorkspaceId } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Schema from "effect/Schema"
 import { defineMessageUnion } from "foldkit/message"
-import { ActionItem, MessageItem, ThreadItem } from "./model.ts"
+import { ActionItem, Following, MessageItem, ThreadItem } from "./model.ts"
 
 export const Message = defineMessageUnion({
   TypedEmail: { email: Schema.String },
@@ -34,7 +34,13 @@ export const Message = defineMessageUnion({
   GotMembers: { members: Schema.Array(Member.Member) },
   GotActions: { actions: Schema.Array(ActionItem) },
   GotThreads: { groupId: GroupId.GroupId, threads: Schema.Array(ThreadItem) },
-  GotMessages: { threadId: ThreadId.ThreadId, messages: Schema.Array(MessageItem) },
+  GotThread: {
+    threadId: ThreadId.ThreadId,
+    messages: Schema.Array(MessageItem),
+    following: Schema.Option(Following),
+    latest: Schema.Int,
+    readThrough: Schema.Int
+  },
   ClickedGroup: { groupId: GroupId.GroupId },
   ClickedThread: { threadId: ThreadId.ThreadId },
   ClickedAllThreads: {},
@@ -42,6 +48,17 @@ export const Message = defineMessageUnion({
   SubmittedThread: {},
   TypedReply: { text: Schema.String },
   SubmittedReply: {},
+  ClickedRename: {},
+  TypedTitle: { title: Schema.String },
+  SubmittedRename: {},
+  ClickedCancelRename: {},
+  ClickedEdit: { messageId: ThreadMessageId.ThreadMessageId },
+  TypedEdit: { text: Schema.String },
+  SubmittedEdit: {},
+  ClickedCancelEdit: {},
+  ClickedDelete: { messageId: ThreadMessageId.ThreadMessageId },
+  ClickedFollow: {},
+  ClickedUnfollow: {},
   WroteAction: {},
   FailedWriteAction: { error: Schema.String },
   ClickedDismiss: { key: Schema.String },

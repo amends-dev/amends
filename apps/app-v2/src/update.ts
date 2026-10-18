@@ -4,6 +4,7 @@
  * as a code check finishing after the person signed out, changes nothing.
  */
 
+import { ThreadMessage } from "@amends-dev/core/thread"
 import type * as SignIn from "@amends-dev/gateway/SignIn"
 import type * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -15,6 +16,7 @@ import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "./com
 import type { Flags } from "./flags.ts"
 import { Message } from "./message.ts"
 import {
+  type Editing,
   type Model,
   type OpenGroup,
   type Opened,
@@ -24,7 +26,18 @@ import {
   StoreState,
   Workspaces
 } from "./model.ts"
-import { Dismiss, PostReply, StartThread, type StoreResource } from "./store.ts"
+import {
+  DeleteMessage,
+  Dismiss,
+  EditMessage,
+  FollowThread,
+  MarkThreadRead,
+  PostReply,
+  RenameThread,
+  StartThread,
+  type StoreResource,
+  UnfollowThread
+} from "./store.ts"
 
 export type UpdateReturn = Update.Return<
   Model,
@@ -91,6 +104,28 @@ const atGroup = (model: Model, change: (group: OpenGroup) => OpenGroup): UpdateR
 /** The open thread as `change` makes it, while one is open; otherwise nothing. */
 const atThread = (model: Model, change: (thread: OpenThread) => OpenThread): UpdateReturn =>
   atGroup(model, (group) => modifyFields(group, { thread: Option.map(change) }))
+
+/** The open thread, if one is. */
+const threadIn = (model: Model): Option.Option<OpenThread> => Option.flatMap(groupIn(model), ({ thread }) => thread)
+
+/** The title the open group lists `threadId` with, if it has one. */
+const titleOf = (model: Model, threadId: OpenThread["threadId"]): Option.Option<string> =>
+  Option.flatMap(groupIn(model), ({ threads }) =>
+    Option.flatMap(Option.fromUndefinedOr(threads.find(({ thread }) => thread.id === threadId)), ({ thread }) =>
+      Option.fromNullOr(thread.title)
+    )
+  )
+
+/** The text and revision of `messageId` in the open thread, while it has text. */
+const textOf = (thread: OpenThread, messageId: Editing["messageId"]) =>
+  Option.flatMap(
+    Option.fromUndefinedOr(thread.messages.find(({ message }) => message.id === messageId)),
+    ({ message }) =>
+      ThreadMessage.Content.match(message.content, {
+        Text: ({ text, revision }) => Option.some({ text, revision }),
+        Deleted: () => Option.none()
+      })
+  )
 
 /** The open group, if one is. */
 const groupIn = (model: Model): Option.Option<OpenGroup> =>
@@ -225,9 +260,28 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     GotActions: ({ actions }) => atOpened(model, (opened) => modifyFields(opened, { actions: () => actions })),
     GotThreads: ({ groupId, threads }) =>
       atGroup(model, (group) => (group.groupId === groupId ? modifyFields(group, { threads: () => threads }) : group)),
-    GotMessages: ({ threadId, messages }) =>
-      atThread(model, (thread) =>
-        thread.threadId === threadId ? modifyFields(thread, { messages: () => messages }) : thread
+    GotThread: ({ threadId, messages, following, latest, readThrough }) =>
+      Option.match(
+        Option.filter(threadIn(model), (thread) => thread.threadId === threadId),
+        {
+          onNone: () => ({ model }),
+          onSome: (thread) => {
+            // Reading it open marks it read through its latest activity, once for each.
+            const marking = latest > Math.max(readThrough, thread.readRequested)
+            return {
+              ...atThread(model, (open) =>
+                modifyFields(open, {
+                  messages: () => messages,
+                  following: () => following,
+                  latest: () => latest,
+                  readThrough: () => readThrough,
+                  readRequested: (requested) => (marking ? latest : requested)
+                })
+              ),
+              commands: marking ? [MarkThreadRead({ threadId, throughSequence: latest })] : []
+            }
+          }
+        }
       ),
     ClickedGroup: ({ groupId }) =>
       atOpened(model, (opened) =>
@@ -237,7 +291,20 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       ),
     ClickedThread: ({ threadId }) =>
       atGroup(model, (group) =>
-        modifyFields(group, { thread: () => Option.some({ threadId, messages: [], draft: "" }) })
+        modifyFields(group, {
+          thread: () =>
+            Option.some({
+              threadId,
+              messages: [],
+              draft: "",
+              following: Option.none(),
+              latest: 0,
+              readThrough: 0,
+              readRequested: 0,
+              renaming: Option.none(),
+              editing: Option.none()
+            })
+        })
       ),
     ClickedAllThreads: () => atGroup(model, (group) => modifyFields(group, { thread: () => Option.none() })),
     TypedThread: ({ text }) => atGroup(model, (group) => modifyFields(group, { draft: () => text })),
@@ -259,6 +326,72 @@ export const update = (model: Model, message: Message): UpdateReturn =>
             ...atThread(model, (thread) => modifyFields(thread, { draft: () => "" })),
             commands: [PostReply({ threadId, text: draft })]
           })
+        }
+      ),
+    ClickedRename: () =>
+      atThread(model, (thread) =>
+        modifyFields(thread, {
+          renaming: () =>
+            Option.some(Option.match(titleOf(model, thread.threadId), { onNone: () => "", onSome: (title) => title }))
+        })
+      ),
+    TypedTitle: ({ title }) =>
+      atThread(model, (thread) => modifyFields(thread, { renaming: () => Option.some(title) })),
+    SubmittedRename: () =>
+      Option.match(threadIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ threadId, renaming }) =>
+          Option.match(renaming, {
+            onNone: () => ({ model }),
+            onSome: (title) => ({
+              ...atThread(model, (thread) => modifyFields(thread, { renaming: () => Option.none() })),
+              commands: [RenameThread({ threadId, title, expectedTitle: Option.getOrNull(titleOf(model, threadId)) })]
+            })
+          })
+      }),
+    ClickedCancelRename: () => atThread(model, (thread) => modifyFields(thread, { renaming: () => Option.none() })),
+    ClickedEdit: ({ messageId }) =>
+      atThread(model, (thread) =>
+        modifyFields(thread, {
+          editing: () => Option.map(textOf(thread, messageId), ({ text }) => ({ messageId, draft: text }))
+        })
+      ),
+    TypedEdit: ({ text }) =>
+      atThread(model, (thread) =>
+        modifyFields(thread, { editing: Option.map((editing) => modifyFields(editing, { draft: () => text })) })
+      ),
+    SubmittedEdit: () =>
+      Option.match(threadIn(model), {
+        onNone: () => ({ model }),
+        onSome: (thread) =>
+          Option.match(
+            Option.flatMap(thread.editing, (editing) =>
+              Option.map(textOf(thread, editing.messageId), ({ revision }) => ({ ...editing, revision }))
+            ),
+            {
+              onNone: () => ({ model }),
+              onSome: ({ messageId, draft, revision }) => ({
+                ...atThread(model, (open) => modifyFields(open, { editing: () => Option.none() })),
+                commands: [EditMessage({ messageId, text: draft, expectedRevision: revision })]
+              })
+            }
+          )
+      }),
+    ClickedCancelEdit: () => atThread(model, (thread) => modifyFields(thread, { editing: () => Option.none() })),
+    ClickedDelete: ({ messageId }) => ({ model, commands: [DeleteMessage({ messageId })] }),
+    ClickedFollow: () =>
+      Option.match(threadIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ threadId }) => ({ model, commands: [FollowThread({ threadId })] })
+      }),
+    ClickedUnfollow: () =>
+      Option.match(
+        Option.flatMap(threadIn(model), ({ threadId, following }) =>
+          Option.map(following, ({ participationId }) => ({ threadId, participationId }))
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: (input) => ({ model, commands: [UnfollowThread(input)] })
         }
       ),
     WroteAction: () => atOpened(model, (opened) => modifyFields(opened, { notice: () => Option.none() })),

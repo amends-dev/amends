@@ -8,12 +8,12 @@
 import type { CoreError } from "@amends-dev/core/error"
 import { Group, GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
+import { ReadState } from "@amends-dev/core/read-state"
 import { ReplicaRecord } from "@amends-dev/core/replica"
-import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
-import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -93,7 +93,6 @@ const fromStore = (read: (store: Store.Store["Service"]) => Stream.Stream<Messag
   )
 
 const workspace = ReplicaRecord.Place.cases.Workspace.make({})
-const byPublished = Order.mapInput(DateTime.Order, (message: ThreadMessage.ThreadMessage) => message.publishedAt)
 const byName = Order.mapInput(Order.String, (group: Group.Group) => (Group.isGeneral(group) ? "" : nameOf(group)))
 
 /** A group's name: a team's own, or a direct group's members, as their IDs until names are read. */
@@ -162,10 +161,11 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
                 Stream.map(store.threads(groupId), (threads) =>
                   Message.GotThreads({
                     groupId,
-                    threads: threads.map(({ thread, opening }) => ({
+                    threads: threads.map(({ thread, opening, unread }) => ({
                       thread: thread.record.value,
                       opening,
-                      pending: thread.pending
+                      pending: thread.pending,
+                      unread
                     }))
                   })
                 )
@@ -186,19 +186,18 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
             onNone: () => Stream.empty,
             onSome: (threadId) =>
               fromStore((store) =>
-                Stream.map(
-                  store.list("ThreadMessage", ReplicaRecord.Place.cases.Thread.make({ threadId })),
-                  (messages) =>
-                    Message.GotMessages({
-                      threadId,
-                      messages: Array.sort(
-                        messages.map(({ record, pending }) => ({ message: record.value, pending })),
-                        Order.mapInput(
-                          byPublished,
-                          ({ message }: { readonly message: ThreadMessage.ThreadMessage }) => message
-                        )
-                      )
-                    })
+                Stream.map(store.thread(threadId), ({ messages, participation, latest, readThrough }) =>
+                  Message.GotThread({
+                    threadId,
+                    messages: messages.map(({ record, pending }) => ({ message: record.value, pending })),
+                    following: Option.map(participation, ({ record, pending }) => ({
+                      participationId: record.value.id,
+                      active: record.value.status === "active",
+                      pending
+                    })),
+                    latest,
+                    readThrough
+                  })
                 )
               )
           })
@@ -257,5 +256,65 @@ export const Dismiss = Command.define("Dismiss", {
       Effect.flatMap((store) => store.dismiss(key)),
       Effect.ignore,
       Effect.as(Message.CompletedDismiss())
+    )
+})
+
+/** Rename `threadId` to `title`, from the title the person saw. */
+export const RenameThread = Command.define("RenameThread", {
+  args: { threadId: ThreadId.ThreadId, title: Schema.String, expectedTitle: Schema.NullOr(Schema.String) },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Thread.RenameInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A thread's title needs some text.")),
+        onSuccess: (input) => toStore((store) => store.write("ThreadRenamed", input))
+      })
+    )
+})
+
+/** Change the text of `messageId`, from the revision the person saw. */
+export const EditMessage = Command.define("EditMessage", {
+  args: { messageId: ThreadMessageId.ThreadMessageId, text: Schema.String, expectedRevision: Schema.Int },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ messageId, text, expectedRevision }) =>
+    Schema.decodeEffect(ThreadMessage.EditInput)({ messageId, text, mentions: [], expectedRevision }).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A message needs some text.")),
+        onSuccess: (input) => toStore((store) => store.write("ThreadMessageEdited", input))
+      })
+    )
+})
+
+/** Delete `messageId`. */
+export const DeleteMessage = Command.define("DeleteMessage", {
+  args: { messageId: ThreadMessageId.ThreadMessageId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ messageId }) => toStore((store) => store.write("ThreadMessageDeleted", { messageId }))
+})
+
+/** Follow `threadId`. */
+export const FollowThread = Command.define("FollowThread", {
+  args: { threadId: ThreadId.ThreadId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ threadId }) => toStore((store) => store.write("ThreadFollowed", { threadId }))
+})
+
+/** Stop following `threadId`, ending the person's participation in it. */
+export const UnfollowThread = Command.define("UnfollowThread", {
+  args: { threadId: ThreadId.ThreadId, participationId: ThreadParticipationId.ThreadParticipationId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("ThreadUnfollowed", input))
+})
+
+/** Note that the person read `threadId` through `throughSequence`. */
+export const MarkThreadRead = Command.define("MarkThreadRead", {
+  args: { threadId: ThreadId.ThreadId, throughSequence: Schema.Int },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(ReadState.MarkThreadReadInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(Message.WroteAction()),
+        onSuccess: (input) => toStore((store) => store.write("ThreadMarkedRead", input))
+      })
     )
 })

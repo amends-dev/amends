@@ -6,7 +6,7 @@ import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
 import { ReplicaRecord } from "@amends-dev/core/replica"
-import { ThreadId } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { Member, type Workspace } from "@amends-dev/core/workspace"
 import {
@@ -178,6 +178,33 @@ describe("Store", () => {
       yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.thread.pending === false)
       const thread = ReplicaRecord.Place.cases.Thread.make({ threadId })
       expect(yield* firstWhere(store.actions, () => true)).toEqual([])
+
+      // A rename and an edit show at once, then as the server made them.
+      yield* store.write("ThreadRenamed", { threadId, title: "Hello thread", expectedTitle: null })
+      yield* firstWhere(
+        store.threads(Group.GeneralId),
+        ([thread]) => thread?.thread.record.value.title === "Hello thread" && thread.thread.pending
+      )
+      yield* firstWhere(
+        store.threads(Group.GeneralId),
+        ([thread]) => thread?.thread.record.value.title === "Hello thread" && !thread.thread.pending
+      )
+      const opening = Option.getOrThrow(started!.opening)
+      yield* store.write("ThreadMessageEdited", {
+        messageId: opening.id,
+        text: "Hello again",
+        mentions: [],
+        expectedRevision: 1
+      })
+      const edited = yield* firstWhere(store.thread(threadId), ({ messages }) =>
+        messages.some(
+          ({ record, pending }) =>
+            !pending &&
+            ThreadMessage.Content.isAnyOf(["Text"])(record.value.content) &&
+            record.value.content.text === "Hello again"
+        )
+      )
+      expect(edited.readThrough).toBeGreaterThan(0)
 
       // Written with the host gone, a reply waits, then reaches it when it is back.
       yield* Scope.close(serving, Exit.void)

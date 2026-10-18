@@ -1,7 +1,7 @@
 import { CoreError } from "@amends-dev/core/error"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
-import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { Thread, ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ThreadSync from "@amends-dev/sync/ThreadSync"
 import { describe, expect, it } from "@effect/vitest"
@@ -111,6 +111,56 @@ describe("Pending.overlay", () => {
         value: { ...second.value, content: ThreadMessage.Content.cases.Deleted.make({ deletedAt: at(4) }) },
         pending: true
       }
+    ])
+  })
+})
+
+describe("Pending.overlay, for a member's own part in a thread", () => {
+  const place = ReplicaRecord.Place.cases.Thread.make({ threadId: ThreadId.ThreadId.make("thread-1") })
+  const position = (readThrough: number) =>
+    cases.ThreadPosition.make({ value: { ...author, threadId: ThreadId.ThreadId.make("thread-1"), readThrough } })
+  const participation = (status: "active" | "ended") =>
+    cases.ThreadParticipation.make({
+      value: Schema.decodeSync(ThreadParticipation.ThreadParticipation)({
+        id: "participation-1",
+        workspaceId: "workspace-1",
+        threadId: "thread-1",
+        participant: {
+          _tag: "Member",
+          memberId: "member-1",
+          groupMembershipId: "membership-1",
+          identity: { _tag: "Human", id: "alice" }
+        },
+        joinedAt: "2026-10-18T12:00:00Z",
+        joinedAtSequence: 1,
+        status,
+        endedAt: status === "ended" ? "2026-10-18T12:30:00Z" : null
+      })
+    })
+
+  it("reads a thread through the furthest position, from none or from one the server holds", () => {
+    const marked = (through: number, minute: number) =>
+      unfinished("ThreadMarkedRead", { threadId: "thread-1", throughSequence: through }, minute, [position(through)])
+    expect(view(Pending.overlay("ThreadPosition", place, [], [marked(3, 1)]))).toEqual([
+      { value: position(3).value, pending: true }
+    ])
+    expect(view(Pending.overlay("ThreadPosition", place, [position(2)], [marked(5, 1)]))).toEqual([
+      { value: position(5).value, pending: true }
+    ])
+    // A position behind the one the server holds leaves it as it is.
+    expect(view(Pending.overlay("ThreadPosition", place, [position(6)], [marked(5, 1)]))).toEqual([
+      { value: position(6).value, pending: false }
+    ])
+  })
+
+  it("ends the member's participation, and takes up one they ended", () => {
+    const unfollowed = unfinished("ThreadUnfollowed", { threadId: "thread-1", participationId: "participation-1" }, 2)
+    expect(view(Pending.overlay("ThreadParticipation", place, [participation("active")], [unfollowed]))).toEqual([
+      { value: { ...participation("active").value, status: "ended", endedAt: at(2) }, pending: true }
+    ])
+    const followed = unfinished("ThreadFollowed", { threadId: "thread-1" }, 3)
+    expect(view(Pending.overlay("ThreadParticipation", place, [participation("ended")], [followed]))).toEqual([
+      { value: participation("active").value, pending: true }
     ])
   })
 })

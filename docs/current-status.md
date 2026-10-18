@@ -177,9 +177,10 @@ The web and desktop apps have been removed, and their replacement,
 [`app-v2`](../apps/app-v2/README.md), is being built on Foldkit. It signs a person in, lists their
 workspaces, and keeps the one they open in sync through
 [`@amends-dev/sync`](../packages/sync/README.md), its replica in IndexedDB. It shows a workspace's
-groups, a group's threads, and a thread's messages, and starts threads and replies as actions,
-shown at once and sent when the host can be reached; the rest of a workspace is still worked in
-through the HTTP API. Beyond that:
+groups, a group's threads, and a thread's messages, and takes what a person does in a thread as
+actions, starting and renaming it, replying, editing and deleting their messages, following it, and
+reading it, shown at once and sent when the host can be reached; the rest of a workspace is still
+worked in through the HTTP API. Beyond that:
 
 - The list of workspaces comes from the host each time: a store opens and reads offline, but the
   app lists no workspace to open while the host cannot be reached.

@@ -1,11 +1,21 @@
 import { GroupId } from "@amends-dev/core/group"
+import { ThreadParticipationId } from "@amends-dev/core/thread"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
 import { Message } from "../src/message.ts"
 import { type Model, Page, SignInForm, StoreState, Workspaces } from "../src/model.ts"
-import { PostReply, StartThread } from "../src/store.ts"
+import {
+  DeleteMessage,
+  EditMessage,
+  FollowThread,
+  MarkThreadRead,
+  PostReply,
+  RenameThread,
+  StartThread,
+  UnfollowThread
+} from "../src/store.ts"
 import { update } from "../src/update.ts"
 import { apiUrl, general, membership, opening, session, signedIn, signedOut, thread } from "./fixtures.ts"
 
@@ -94,11 +104,19 @@ describe("a workspace", () => {
       message(
         Message.GotThreads({
           groupId: general.id,
-          threads: [{ thread, opening: Option.some(opening), pending: false }]
+          threads: [{ thread, opening: Option.some(opening), pending: false, unread: 0 }]
         })
       ),
       message(Message.ClickedThread({ threadId: thread.id })),
-      message(Message.GotMessages({ threadId: thread.id, messages: [{ message: opening, pending: false }] })),
+      message(
+        Message.GotThread({
+          threadId: thread.id,
+          messages: [{ message: opening, pending: false }],
+          following: Option.none(),
+          latest: 0,
+          readThrough: 0
+        })
+      ),
       message(Message.TypedReply({ text: "Sounds good" })),
       message(Message.SubmittedReply()),
       Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds good" })),
@@ -130,7 +148,7 @@ describe("a workspace", () => {
       message(
         Message.GotThreads({
           groupId: GroupId.GroupId.make("other"),
-          threads: [{ thread, opening: Option.none(), pending: true }]
+          threads: [{ thread, opening: Option.none(), pending: true, unread: 0 }]
         })
       ),
       message(Message.TypedThread({ text: "Plans for the week" })),
@@ -148,6 +166,60 @@ describe("a workspace", () => {
           Option.some([])
         )
       })
+    )
+  })
+
+  it("an open thread is read through its latest activity, once, and its title and messages change from what was seen", () => {
+    const participationId = ThreadParticipationId.ThreadParticipationId.make("participation-1")
+    const got = (latest: number, readThrough: number, active = true) =>
+      message(
+        Message.GotThread({
+          threadId: thread.id,
+          messages: [{ message: opening, pending: false }],
+          following: Option.some({ participationId, active, pending: false }),
+          latest,
+          readThrough
+        })
+      )
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedGroup({ groupId: general.id })),
+      message(
+        Message.GotThreads({
+          groupId: general.id,
+          threads: [{ thread, opening: Option.some(opening), pending: false, unread: 2 }]
+        })
+      ),
+      message(Message.ClickedThread({ threadId: thread.id })),
+      got(4, 2),
+      Command.expectExact(MarkThreadRead({ threadId: thread.id, throughSequence: 4 })),
+      Command.resolve(MarkThreadRead, Message.WroteAction()),
+      // Nothing newer than what it asked for: it does not ask again.
+      got(4, 2),
+      message(Message.ClickedRename()),
+      message(Message.TypedTitle({ title: "This week" })),
+      message(Message.SubmittedRename()),
+      Command.expectExact(RenameThread({ threadId: thread.id, title: "This week", expectedTitle: null })),
+      Command.resolve(RenameThread, Message.WroteAction()),
+      message(Message.ClickedEdit({ messageId: opening.id })),
+      message(Message.TypedEdit({ text: "Plans for next week" })),
+      message(Message.SubmittedEdit()),
+      Command.expectExact(EditMessage({ messageId: opening.id, text: "Plans for next week", expectedRevision: 1 })),
+      Command.resolve(EditMessage, Message.WroteAction()),
+      message(Message.ClickedDelete({ messageId: opening.id })),
+      Command.expectExact(DeleteMessage({ messageId: opening.id })),
+      Command.resolve(DeleteMessage, Message.WroteAction()),
+      message(Message.ClickedUnfollow()),
+      Command.expectExact(UnfollowThread({ threadId: thread.id, participationId })),
+      Command.resolve(UnfollowThread, Message.WroteAction()),
+      got(4, 4, false),
+      message(Message.ClickedFollow()),
+      Command.expectExact(FollowThread({ threadId: thread.id })),
+      Command.resolve(FollowThread, Message.WroteAction())
     )
   })
 
