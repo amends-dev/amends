@@ -247,6 +247,7 @@ describe("the app", () => {
     const invitation = Schema.decodeSync(Invitation.Invitation)({
       details: {
         recipientId: "carol",
+        recipientEmail: "carol@example.com",
         roleId: BuiltinRoles.MemberId,
         expiresAt: "2026-10-25T12:00:00Z",
         id: "invitation-1",
@@ -317,7 +318,7 @@ describe("the app", () => {
       Subscription.emit(Message.GotInvitations({ invitations: [{ invitation, pending: false }] })),
       inside(
         role("region", { name: "Invitations" }),
-        expect(text("Member, until 2026-10-25")).toExist(),
+        expect(text("carol@example.com · Member, until 2026-10-25")).toExist(),
         click(role("button", { name: "Revoke" }))
       ),
       Command.expectExact(RevokeInvitation({ invitationId: invitation.details.id })),

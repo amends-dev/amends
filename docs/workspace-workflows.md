@@ -85,8 +85,9 @@ it returns their member record. The same name again records nothing. Each name i
 `POST /invitations` issues an invitation to an email address with an
 ISO expiry in the future and a required built-in role. The host resolves the address to its
 account, creating one with a new human ID the first time the address comes up, and the invitation
-names that human ID as its `recipientId`; the person signing in with the address later signs in as
-that account. With the local host's development tokens, the recipient's token is that human ID:
+names that human ID as its `recipientId` and keeps the address as its `recipientEmail`, so the
+people who manage invitations can tell whom it is for; the person signing in with the address later
+signs in as that account. With the local host's development tokens, the recipient's token is that human ID:
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'Amends-Workspace: <workspace-id>' \

@@ -86,9 +86,10 @@ const denied = new CoreError.Denied({
   })
 })
 const actor = Actor.Actor.of({ workspaceId, memberId, identity: alice })
-const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Invitation.Invitation => ({
+const pending = ({ recipientId, recipientEmail, roleId, expiresAt }: Invitation.IssueInput): Invitation.Invitation => ({
   details: {
     recipientId,
+    recipientEmail,
     roleId,
     expiresAt,
     id: Invitation.InvitationId.make("invitation-one"),
@@ -331,6 +332,7 @@ const operations = Layer.mergeAll(
       list: Effect.succeed([
         pending({
           recipientId: bob,
+          recipientEmail: "bob@example.com",
           roleId: BuiltinRoles.MemberId,
           expiresAt: DateTime.makeUnsafe("2026-02-01T00:00:00Z")
         })

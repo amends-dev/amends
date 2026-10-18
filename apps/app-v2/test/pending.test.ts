@@ -317,6 +317,7 @@ describe("Pending.overlay, for the workspace", () => {
       value: Schema.decodeSync(Invitation.Invitation)({
         details: {
           recipientId: "carol",
+          recipientEmail: "carol@example.com",
           roleId: BuiltinRoles.MemberId,
           expiresAt: "2026-10-25T12:00:00Z",
           id: "invitation-1",

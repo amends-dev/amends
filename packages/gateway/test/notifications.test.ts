@@ -896,6 +896,7 @@ describe("notifications", () => {
             gateway.asMember(workspace.id, bob, program)
           const invitation = yield* invite(workspace.id, alice, {
             recipientId: bob.id,
+            recipientEmail: "bob@example.com",
             roleId: BuiltinRoles.MemberId,
             expiresAt: yield* future
           })
@@ -968,6 +969,7 @@ describe("notifications", () => {
           const join = Effect.gen(function* () {
             const invitation = yield* invite(workspace.id, alice, {
               recipientId: bob.id,
+              recipientEmail: "bob@example.com",
               roleId: BuiltinRoles.MemberId,
               expiresAt: yield* future
             })

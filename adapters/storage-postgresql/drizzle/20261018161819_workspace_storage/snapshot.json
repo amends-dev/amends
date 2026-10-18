@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "b3c1a987-ff6a-4d4f-9e0b-65622d1eea19",
+  "id": "47a64d2b-f6a1-43af-a90b-16f62ba455d9",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1784,6 +1784,19 @@
       "generated": null,
       "identity": null,
       "name": "recipient_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "invitations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_email",
       "entityType": "columns",
       "schema": "public",
       "table": "invitations"

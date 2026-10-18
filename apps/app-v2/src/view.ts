@@ -840,7 +840,7 @@ const invitationsView = (settings: Settings, opened: Opened, h: HtmlBuilder<Mess
                   details.id,
                   [],
                   [
-                    `${opened.roles.find((role) => role.id === details.roleId)?.name ?? "A role"}, until ${DateTime.formatIsoDateUtc(details.expiresAt)}`,
+                    `${details.recipientEmail} · ${opened.roles.find((role) => role.id === details.roleId)?.name ?? "A role"}, until ${DateTime.formatIsoDateUtc(details.expiresAt)}`,
                     sending(pending, h),
                     pending
                       ? h.empty

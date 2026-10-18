@@ -436,7 +436,7 @@ export const request = (
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
   roleId: Role.RoleId = BuiltinRoles.MemberId
-): Invitation.IssueInput => ({ recipientId, expiresAt, roleId })
+): Invitation.IssueInput => ({ recipientId, recipientEmail: `${recipientId}@example.com`, expiresAt, roleId })
 
 /**
  * Replace what a store's by-ID reads return for one ID, in both single and batch reads;

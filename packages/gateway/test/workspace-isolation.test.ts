@@ -84,6 +84,7 @@ describe("workspace isolation", () => {
                 issuedAt: now,
                 expiresAt: DateTime.add(now, { hours: 1 }),
                 recipientId: Identity.HumanId.make("someone"),
+                recipientEmail: "someone@example.com",
                 roleId: BuiltinRoles.MemberId
               },
               state: { _tag: "Pending" }

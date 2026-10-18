@@ -60,7 +60,7 @@ const workspace: Operations<typeof WorkspaceSync.Actions> = {
     Effect.gen(function* () {
       const recipient = yield* Effect.flatMap(Accounts.Accounts, (accounts) => accounts.findOrCreate(email))
       const invitationService = yield* InvitationService.InvitationService
-      return yield* invitationService.issue({ ...invitation, recipientId: recipient.id })
+      return yield* invitationService.issue({ ...invitation, recipientId: recipient.id, recipientEmail: email })
     }),
   InvitationRevoked: ({ invitationId }) =>
     Effect.flatMap(InvitationService.InvitationService, (service) => service.revoke(invitationId)),

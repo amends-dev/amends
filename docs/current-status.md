@@ -196,9 +196,6 @@ that:
 - An action whose commit lands before a new store's first reset, as one written offline before the
   store ever reached its host can, never hears how it ended: the reset holds what it did, but the
   action stays pending, with no way to dismiss it.
-- An invitation records its recipient's account, not the address it was sent to, so the settings
-  list a waiting invitation by its role and expiry alone; the address shows only while the
-  invitation is on its way to the server.
 - What the server refused is worded as core words its errors, such as a group's ID not found, not
   yet for the person reading it.
 - The app has no styles yet: its markup uses `@foldkit/ui`'s headless components alone.

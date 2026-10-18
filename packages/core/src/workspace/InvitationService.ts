@@ -157,6 +157,7 @@ export const make: Effect.Effect<
         issuedAt,
         expiresAt: request.expiresAt,
         recipientId: request.recipientId,
+        recipientEmail: request.recipientEmail,
         roleId: request.roleId
       }
       yield* journal.publish(InvitationFacts.Issued, details).pipe(Publication.withOccurredAt(issuedAt))

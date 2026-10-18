@@ -188,6 +188,7 @@ CREATE TABLE "invitations" (
 	"workspace_id" text,
 	"id" text,
 	"recipient_id" text NOT NULL,
+	"recipient_email" text NOT NULL,
 	"inviter_member_id" text NOT NULL,
 	"role_id" text NOT NULL,
 	"issued_at" timestamp with time zone NOT NULL,

@@ -124,7 +124,12 @@ const admit = (gateway: Gateway.Gateway["Service"], workspace: Workspace.Workspa
       workspace.id,
       Identity.MemberReference.cases.Human.make({ id: alice }),
       Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-        invitationService.issue({ recipientId: human, roleId: BuiltinRoles.MemberId, expiresAt })
+        invitationService.issue({
+          recipientId: human,
+          recipientEmail: `${human}@example.com`,
+          roleId: BuiltinRoles.MemberId,
+          expiresAt
+        })
       )
     )
     return yield* gateway.inWorkspace(
@@ -317,7 +322,10 @@ describe("Store", () => {
         const invitation = (yield* firstWhere(store.list("Invitation", everywhere), (held) => held.some(isOpen))).find(
           isOpen
         )
-        expect(invitation!.record.value.details.recipientId).toBe((yield* accounts.findOrCreate(carol)).id)
+        expect(invitation!.record.value.details).toMatchObject({
+          recipientId: (yield* accounts.findOrCreate(carol)).id,
+          recipientEmail: carol
+        })
 
         const isBobs = ({ record }: { readonly record: { readonly value: Assignment.Assignment } }) =>
           record.value.memberId === bob.id

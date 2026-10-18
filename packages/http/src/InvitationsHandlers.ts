@@ -32,7 +32,7 @@ export const layer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const recipient = yield* accounts.findOrCreate(email)
           const invitationService = yield* InvitationService.InvitationService
-          return yield* invitationService.issue({ ...invitation, recipientId: recipient.id })
+          return yield* invitationService.issue({ ...invitation, recipientId: recipient.id, recipientEmail: email })
         }).pipe(Request.withKey(headers["idempotency-key"])),
       revoke: ({ params }) =>
         InvitationService.InvitationService.use((invitationService) => invitationService.revoke(params.invitationId))

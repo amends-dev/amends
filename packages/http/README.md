@@ -96,7 +96,7 @@ is a member's, and acts in the workspace its `Amends-Workspace` header names.
 - `invitations`: `GET /invitations` lists invitations; `POST` to the same path issues one to an
   `email`, with required `roleId` and `expiresAt`. The host resolves the address to its account,
   creating one the first time, and the invitation records that account's human ID as
-  `recipientId`. `POST /invitations/:invitationId/revoke` revokes one; its recipient accepts it
+  `recipientId` and the address as `recipientEmail`. `POST /invitations/:invitationId/revoke` revokes one; its recipient accepts it
   through `workspaces`.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).

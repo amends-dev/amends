@@ -252,6 +252,7 @@ export const invitations = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     recipientId: text("recipient_id").notNull(),
+    recipientEmail: text("recipient_email").notNull(),
     inviterMemberId: text("inviter_member_id").notNull(),
     roleId: text("role_id").notNull(),
     issuedAt: instant("issued_at").notNull(),

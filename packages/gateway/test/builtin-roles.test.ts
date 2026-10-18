@@ -230,6 +230,7 @@ describe("built-in roles", () => {
               const choices = yield* (yield* AssignmentService.AssignmentService).roles
               const invitation = yield* (yield* InvitationService.InvitationService).issue({
                 recipientId: Identity.HumanId.make("recipient"),
+                recipientEmail: "recipient@example.com",
                 roleId: BuiltinRoles.MemberId,
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 })
               })
