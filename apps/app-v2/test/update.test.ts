@@ -1,11 +1,13 @@
+import { GroupId } from "@amends-dev/core/group"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
 import { Message } from "../src/message.ts"
 import { type Model, Page, SignInForm, StoreState, Workspaces } from "../src/model.ts"
+import { PostReply, StartThread } from "../src/store.ts"
 import { update } from "../src/update.ts"
-import { apiUrl, membership, session, signedIn, signedOut } from "./fixtures.ts"
+import { apiUrl, general, membership, opening, session, signedIn, signedOut, thread } from "./fixtures.ts"
 
 describe("signing in", () => {
   it("an address gets a code, the code a session, and the session the person's workspaces", () => {
@@ -74,30 +76,77 @@ describe("signing in", () => {
 const openedIn = (model: Model) =>
   Page.matchOrElse(model.page, { SignedIn: ({ opened }) => opened }, () => Option.none())
 
-describe("a workspace's store", () => {
-  it("opens with the workspace, follows its replica, and closes when the person leaves it", () => {
+describe("a workspace", () => {
+  it("opens with its store, then a group, a thread, and a reply written to the store", () => {
     story(
       update,
       given(signedIn),
       message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
       message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
       model((model) => {
-        expect(openedIn(model)).toEqual(Option.some({ workspace: membership.workspace, store: StoreState.Opening() }))
+        expect(Option.map(openedIn(model), ({ store, memberId }) => ({ store, memberId }))).toEqual(
+          Option.some({ store: StoreState.Opening(), memberId: membership.member.id })
+        )
       }),
       message(Message.AcquiredStore()),
-      message(Message.CountedRecords({ counts: { Workspace: 1, Member: 1 } })),
+      message(Message.GotGroups({ groups: [general] })),
+      message(Message.ClickedGroup({ groupId: general.id })),
+      message(
+        Message.GotThreads({
+          groupId: general.id,
+          threads: [{ thread, opening: Option.some(opening), pending: false }]
+        })
+      ),
+      message(Message.ClickedThread({ threadId: thread.id })),
+      message(Message.GotMessages({ threadId: thread.id, messages: [{ message: opening, pending: false }] })),
+      message(Message.TypedReply({ text: "Sounds good" })),
+      message(Message.SubmittedReply()),
+      Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds good" })),
+      Command.resolve(PostReply, Message.WroteAction()),
       model((model) => {
-        expect(openedIn(model)).toEqual(
-          Option.some({
-            workspace: membership.workspace,
-            store: StoreState.Open({ counts: { Workspace: 1, Member: 1 } })
-          })
-        )
+        const group = Option.flatMap(openedIn(model), ({ group }) => group)
+        expect(Option.map(group, ({ threads }) => threads.length)).toEqual(Option.some(1))
+        expect(
+          Option.flatMap(group, ({ thread }) => Option.map(thread, ({ messages, draft }) => ({ messages, draft })))
+        ).toEqual(Option.some({ messages: [{ message: opening, pending: false }], draft: "" }))
       }),
       message(Message.ClickedAllWorkspaces()),
       model((model) => {
         expect(Page.isAnyOf(["SignedIn"])(model.page)).toBe(true)
         expect(openedIn(model)).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("starts a thread with the draft, and says why a write could not be kept", () => {
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.ClickedGroup({ groupId: general.id })),
+      // Threads of a group no longer open are passed over.
+      message(
+        Message.GotThreads({
+          groupId: GroupId.GroupId.make("other"),
+          threads: [{ thread, opening: Option.none(), pending: true }]
+        })
+      ),
+      message(Message.TypedThread({ text: "Plans for the week" })),
+      message(Message.SubmittedThread()),
+      Command.expectExact(StartThread({ groupId: general.id, text: "Plans for the week" })),
+      Command.resolve(
+        StartThread,
+        Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
+      ),
+      model((model) => {
+        expect(Option.flatMap(openedIn(model), ({ notice }) => notice)).toEqual(
+          Option.some("This browser could not keep that. Try again.")
+        )
+        expect(Option.flatMap(openedIn(model), ({ group }) => Option.map(group, ({ threads }) => threads))).toEqual(
+          Option.some([])
+        )
       })
     )
   })

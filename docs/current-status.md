@@ -176,9 +176,10 @@ workspace-wide oversight of private groups or direct groups by design.
 The web and desktop apps have been removed, and their replacement,
 [`app-v2`](../apps/app-v2/README.md), is being built on Foldkit. It signs a person in, lists their
 workspaces, and keeps the one they open in sync through
-[`@amends-dev/sync`](../packages/sync/README.md), its replica in IndexedDB, but shows only how many
-records of each kind the replica holds: there are no screens yet, and it writes no actions, so a
-workspace is still worked in through the HTTP API. Beyond that:
+[`@amends-dev/sync`](../packages/sync/README.md), its replica in IndexedDB. It shows a workspace's
+groups, a group's threads, and a thread's messages, and starts threads and replies as actions,
+shown at once and sent when the host can be reached; the rest of a workspace is still worked in
+through the HTTP API. Beyond that:
 
 - The list of workspaces comes from the host each time: a store opens and reads offline, but the
   app lists no workspace to open while the host cannot be reached.
@@ -186,6 +187,11 @@ workspace is still worked in through the HTTP API. Beyond that:
   reset's whole snapshot among them, so a store's journal only grows.
 - A store that fails to open, or whose replica cannot be written, stays failed until the person
   leaves the workspace and opens it again.
+- An action whose commit lands before a new store's first reset, as one written offline before the
+  store ever reached its host can, never hears how it ended: the reset holds what it did, but the
+  action stays pending, with no way to dismiss it.
+- What the server refused is worded as core words its errors, such as a group's ID not found, not
+  yet for the person reading it.
 - The app has no styles yet: its markup uses `@foldkit/ui`'s headless components alone.
 
 Some of what an app would show has no backend: searching messages, files, reactions, and task

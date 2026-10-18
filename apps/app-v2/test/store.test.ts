@@ -1,8 +1,12 @@
 // @vitest-environment node
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
 import { DeliveryJobs } from "@amends-dev/core/channel"
+import { CoreError } from "@amends-dev/core/error"
+import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
+import { ReplicaRecord } from "@amends-dev/core/replica"
+import { ThreadId } from "@amends-dev/core/thread"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { Member, type Workspace } from "@amends-dev/core/workspace"
 import {
@@ -26,7 +30,6 @@ import { FetchHttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effe
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
 import { KeyValueStore } from "effect/persistence"
 import { Socket } from "effect/socket"
-import type * as Replica from "../src/sync/Replica.ts"
 import * as Store from "../src/sync/Store.ts"
 
 const alice = Identity.HumanId.make("alice")
@@ -66,8 +69,11 @@ const host = Effect.gen(function* () {
   )
 })
 
-/** Serve the host's routes and sync server on a port of its own for as long as `scope` lasts. */
-const serve = (services: Effect.Success<typeof host>, scope: Scope.Scope) =>
+/**
+ * Serve the host's routes and sync server for as long as `scope` lasts, at `port`, or a port of
+ * its own; the address it serves at.
+ */
+const serve = (services: Effect.Success<typeof host>, scope: Scope.Scope, port = 0) =>
   Layer.buildWithScope(
     HttpRouter.serve(Layer.mergeAll(Routes.layer, SyncServer.layer), {
       disableLogger: true,
@@ -76,11 +82,11 @@ const serve = (services: Effect.Success<typeof host>, scope: Scope.Scope) =>
       Layer.provide([sessionTokens, signIn, Draining.layer, Layer.succeedContext(services)]),
       // Bun's graceful stop waits its whole limit for a WebSocket open as it begins, even once closed.
       Layer.provideMerge(
-        Layer.orDie(BunHttpServer.layer({ hostname: "127.0.0.1", port: 0, gracefulShutdownTimeout: "100 millis" }))
+        Layer.orDie(BunHttpServer.layer({ hostname: "127.0.0.1", port, gracefulShutdownTimeout: "100 millis" }))
       )
     ),
     scope
-  ).pipe(Effect.map((served) => HttpServer.formatAddress(Context.get(served, HttpServer.HttpServer).address)))
+  ).pipe(Effect.map((served) => Context.get(served, HttpServer.HttpServer).address))
 
 /** What a browser provides a store: its storage, cryptography, HTTP client, and WebSocket. */
 const browser = Layer.mergeAll(
@@ -90,19 +96,30 @@ const browser = Layer.mergeAll(
   ),
   KeyValueStore.layerMemory,
   EventLogEncryption.layerSubtle,
-  FetchHttpClient.layer,
+  BunCrypto.layer,
+  // A connection kept alive would reach a host after it stopped, as a page's would not.
+  FetchHttpClient.layer.pipe(Layer.provide(Layer.succeed(FetchHttpClient.RequestInit)({ keepalive: false }))),
   Socket.layerWebSocketConstructorGlobal
 )
 
 /** Open alice's store of `workspace` on the host at `apiUrl` for as long as `scope` lasts. */
 const openStore = (apiUrl: string, workspace: Workspace.Workspace, scope: Scope.Scope) =>
-  Layer.buildWithScope(Store.layer({ apiUrl, token: alice, humanId: alice, workspaceId: workspace.id }), scope).pipe(
-    Effect.map(Context.get(Store.Store))
-  )
+  Layer.buildWithScope(
+    Store.layer({
+      apiUrl,
+      token: alice,
+      humanId: alice,
+      workspaceId: workspace.id,
+      memberId: workspace.ownerMemberId
+    }),
+    scope
+  ).pipe(Effect.map(Context.get(Store.Store)))
 
-/** The first counts `store` reports that `holds` accepts. */
-const countsWhere = (store: Store.Store["Service"], holds: (counts: Replica.Counts) => boolean) =>
-  store.counts.pipe(Stream.filter(holds), Stream.runHead, Effect.map(Option.getOrThrow), Effect.timeout("5 seconds"))
+/** The first of `stream`'s values that `holds` accepts, within five seconds. */
+const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => boolean) =>
+  stream.pipe(Stream.filter(holds), Stream.runHead, Effect.map(Option.getOrThrow), Effect.timeout("5 seconds"))
+
+const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
 
 describe("Store", () => {
   it.live("a store keeps its replica in sync with the host, and reads it again offline", () =>
@@ -111,15 +128,15 @@ describe("Store", () => {
       const gateway = Context.get(services, Gateway.Gateway)
       const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
       const serving = yield* Scope.make()
-      const apiUrl = yield* serve(services, serving)
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, serving))
 
       const opened = yield* Scope.make()
       const store = yield* openStore(apiUrl, workspace, opened)
       // The server resets the new replica with everything alice may see.
-      const reset = yield* countsWhere(store, (counts) => counts.Workspace === 1)
-      expect(reset.Member).toBe(1)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      const groups = yield* firstWhere(store.list("Group", everywhere), (held) => held.length > 0)
       // A group made elsewhere reaches it as its commit lands.
-      const groups = yield* HttpApiClient.make(Api.Api, { baseUrl: apiUrl }).pipe(
+      const client = yield* HttpApiClient.make(Api.Api, { baseUrl: apiUrl }).pipe(
         Effect.provide([
           HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
             next(HttpClientRequest.bearerToken(request, alice))
@@ -128,14 +145,62 @@ describe("Store", () => {
           FetchHttpClient.layer
         ])
       )
-      yield* groups.groups.create({ headers: {}, payload: { name: "Crew", memberIds: [workspace.ownerMemberId] } })
-      const grown = yield* countsWhere(store, (counts) => (counts.Group ?? 0) > (reset.Group ?? 0))
+      yield* client.groups.create({ headers: {}, payload: { name: "Crew", memberIds: [workspace.ownerMemberId] } })
+      const grown = yield* firstWhere(store.list("Group", everywhere), (held) => held.length > groups.length)
       yield* Scope.close(opened, Exit.void)
 
       // With the host gone, the store opens and reads what it held.
       yield* Scope.close(serving, Exit.void)
       const reopened = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      expect(yield* countsWhere(reopened, () => true)).toEqual(grown)
+      expect(yield* firstWhere(reopened.list("Group", everywhere), () => true)).toEqual(grown)
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live("an action shows at once, reaches the host when it can, and comes back done or rejected", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const serving = yield* Scope.make()
+      const address = yield* serve(services, serving)
+      const apiUrl = HttpServer.formatAddress(address)
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+
+      // A thread started shows at once, then as the server made it, under the same ID.
+      yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Hello", mentions: [] })
+      const [started] = yield* firstWhere(store.threads(Group.GeneralId), (threads) => threads.length === 1)
+      expect(started!.thread.pending).toBe(true)
+      expect(Option.map(started!.opening, (message) => message.content)).toMatchObject(
+        Option.some({ _tag: "Text", text: "Hello" })
+      )
+      const threadId = started!.thread.record.value.id
+      yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.thread.pending === false)
+      const thread = ReplicaRecord.Place.cases.Thread.make({ threadId })
+      expect(yield* firstWhere(store.actions, () => true)).toEqual([])
+
+      // Written with the host gone, a reply waits, then reaches it when it is back.
+      yield* Scope.close(serving, Exit.void)
+      yield* store.write("ThreadMessagePosted", { threadId, text: "While away", mentions: [] })
+      const waiting = yield* firstWhere(store.list("ThreadMessage", thread), (held) => held.length === 2)
+      expect(waiting.filter((message) => message.pending)).toHaveLength(1)
+      yield* serve(services, yield* Effect.scope, Option.getOrThrow(port(address)))
+      yield* firstWhere(store.list("ThreadMessage", thread), (held) => held.every((message) => !message.pending))
+
+      // One the host refuses comes back rejected, with why, and leaves nothing it expected.
+      const nowhere = ThreadId.ThreadId.make("no-such-thread")
+      yield* store.write("ThreadMessagePosted", { threadId: nowhere, text: "Lost", mentions: [] })
+      const [rejected] = yield* firstWhere(store.actions, ([action]) =>
+        Option.isSome(action?.rejection ?? Option.none())
+      )
+      expect(rejected!.tag).toBe("ThreadMessagePosted")
+      expect(rejected!.rejection).toEqual(Option.some(new CoreError.NotFound({ resource: "Thread", id: nowhere })))
+      const place = ReplicaRecord.Place.cases.Thread.make({ threadId: nowhere })
+      expect(yield* firstWhere(store.list("ThreadMessage", place), () => true)).toEqual([])
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })
+
+/** The port a server listens at, when it listens on one. */
+const port = (address: HttpServer.HttpServer["Service"]["address"]) =>
+  "port" in address ? Option.some(address.port) : Option.none()

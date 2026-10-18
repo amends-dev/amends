@@ -3,6 +3,7 @@
  * runtime provides it to every command, and each store opens over it.
  */
 
+import * as BrowserCrypto from "@effect/platform-browser/BrowserCrypto"
 import * as BrowserKeyValueStore from "@effect/platform-browser/BrowserKeyValueStore"
 import * as IndexedDb from "@effect/platform-browser/IndexedDb"
 import * as EventLogEncryption from "effect/eventlog/EventLogEncryption"
@@ -12,6 +13,7 @@ import * as Socket from "effect/socket/Socket"
 
 /** The browser's services, over `window`. */
 export const layer = Layer.mergeAll(
+  BrowserCrypto.layer,
   BrowserKeyValueStore.layerLocalStorage,
   IndexedDb.layerWindow,
   EventLogEncryption.layerSubtle,

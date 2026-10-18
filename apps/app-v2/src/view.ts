@@ -1,15 +1,31 @@
 /**
- * What the person sees: signing in, their workspaces, and the open workspace's replica, how many
- * records of each kind it holds, which is all a store shows until the screens come. Markup only:
- * the headless components from `@foldkit/ui` give each control its attributes, and no styles yet.
+ * What the person sees: signing in, their workspaces, and the open workspace: its groups, a group's
+ * threads, and a thread's messages, with what the person started or posted shown at once, marked
+ * as sending until the server has it, and what the server refused, with why. Markup only: the
+ * headless components from `@foldkit/ui` give each control its attributes, and no styles yet.
  */
 
+import type { Group } from "@amends-dev/core/group"
+import { ThreadMessage } from "@amends-dev/core/thread"
+import type { Member } from "@amends-dev/core/workspace"
 import * as Button from "@foldkit/ui/button"
 import * as Input from "@foldkit/ui/input"
+import * as Textarea from "@foldkit/ui/textarea"
 import * as Option from "effect/Option"
 import type { Document, Html, HtmlBuilder } from "foldkit/html"
 import { Message } from "./message.ts"
-import { type Model, type Opened, Page, SignInForm, StoreState, Workspaces } from "./model.ts"
+import {
+  type ActionItem,
+  type Model,
+  type OpenGroup,
+  type Opened,
+  type OpenThread,
+  Page,
+  SignInForm,
+  StoreState,
+  type ThreadItem,
+  Workspaces
+} from "./model.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
 
@@ -104,11 +120,162 @@ const workspacesView = (workspaces: Workspaces, h: HtmlBuilder<Message>): Html =
           )
   })
 
-const storeView = ({ workspace, store }: Opened, h: HtmlBuilder<Message>): Html =>
-  h.section(
-    [h.AriaLabel(workspace.name)],
+const textarea = (
+  h: HtmlBuilder<Message>,
+  config: Readonly<{ id: string; label: string; value: string; onInput: (value: string) => Message }>
+) =>
+  Textarea.view(
+    {
+      id: config.id,
+      value: config.value,
+      rows: 3,
+      onInput: config.onInput,
+      toView: (attributes) => h.div([], [h.label(attributes.label, [config.label]), h.textarea(attributes.textarea)])
+    },
+    h
+  )
+
+/** A group's name: a team's own, or a direct group's members by their names here. */
+const groupName = (group: Group.Group, members: ReadonlyArray<Member.Member>) =>
+  "name" in group
+    ? group.name
+    : group.memberIds.map((id) => members.find((member) => member.id === id)?.name ?? "Someone").join(", ")
+
+/** Who wrote a message, by their name here. */
+const authorName = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>) =>
+  ThreadMessage.Author.match(message.author, {
+    Member: ({ memberId }) => members.find((member) => member.id === memberId)?.name ?? "Someone",
+    Contact: () => "A contact"
+  })
+
+const textOf = (message: ThreadMessage.ThreadMessage) =>
+  ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => "This message was deleted." })
+
+/** A thread as its group lists it: its title, or its opening message. */
+const threadLabel = ({ thread, opening }: ThreadItem) =>
+  thread.title ?? Option.match(opening, { onNone: () => "A thread", onSome: textOf })
+
+const sending = (pending: boolean, h: HtmlBuilder<Message>): Html => (pending ? h.span([], [" · Sending…"]) : h.empty)
+
+const actionsView = (actions: ReadonlyArray<ActionItem>, notice: Option.Option<string>, h: HtmlBuilder<Message>) => {
+  const refused = actions.flatMap((action) =>
+    Option.match(action.rejection, { onNone: () => [], onSome: (why) => [{ ...action, why }] })
+  )
+  return h.div(
+    [h.AriaLive("polite")],
     [
-      h.h2([], [workspace.name]),
+      Option.match(notice, { onNone: () => h.empty, onSome: (text) => h.p([h.Role("alert")], [text]) }),
+      ...refused.map(({ key, what, text, why }) =>
+        h.keyed("div")(
+          key,
+          [h.Role("alert")],
+          [
+            h.p([], [`Couldn't ${what}: ${why}`]),
+            Option.match(text, { onNone: () => h.empty, onSome: (text) => h.blockquote([], [text]) }),
+            Button.view(
+              {
+                onClick: Message.ClickedDismiss({ key }),
+                toView: (attributes) => h.button(attributes.button, ["Dismiss"])
+              },
+              h
+            )
+          ]
+        )
+      )
+    ]
+  )
+}
+
+const threadView = (thread: OpenThread, members: ReadonlyArray<Member.Member>, h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.AriaLabel("Thread")],
+    [
+      Button.view(
+        { onClick: Message.ClickedAllThreads(), toView: (attributes) => h.button(attributes.button, ["All threads"]) },
+        h
+      ),
+      h.ol(
+        [h.AriaLabel("Messages")],
+        thread.messages.map(({ message, pending }) =>
+          h.keyed("li")(
+            message.id,
+            [],
+            [h.p([], [h.strong([], [authorName(message, members)]), sending(pending, h)]), h.p([], [textOf(message)])]
+          )
+        )
+      ),
+      h.form(
+        [h.OnSubmit(Message.SubmittedReply())],
+        [
+          textarea(h, {
+            id: "reply",
+            label: "Reply",
+            value: thread.draft,
+            onInput: (text) => Message.TypedReply({ text })
+          }),
+          submit(h, "Reply")
+        ]
+      )
+    ]
+  )
+
+const groupView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const found = opened.groups.find(({ id }) => id === group.groupId)
+  return h.section(
+    [h.AriaLabel("Group")],
+    [
+      h.h3([], [found === undefined ? "A group" : groupName(found, opened.members)]),
+      Option.match(group.thread, {
+        onSome: (thread) => threadView(thread, opened.members, h),
+        onNone: () =>
+          h.div(
+            [],
+            [
+              group.threads.length === 0
+                ? h.p([], ["No threads yet."])
+                : h.ul(
+                    [h.AriaLabel("Threads")],
+                    group.threads.map((item) =>
+                      h.keyed("li")(
+                        item.thread.id,
+                        [],
+                        [
+                          Button.view(
+                            {
+                              onClick: Message.ClickedThread({ threadId: item.thread.id }),
+                              toView: (attributes) => h.button(attributes.button, [threadLabel(item)])
+                            },
+                            h
+                          ),
+                          sending(item.pending, h)
+                        ]
+                      )
+                    )
+                  ),
+              h.form(
+                [h.OnSubmit(Message.SubmittedThread())],
+                [
+                  textarea(h, {
+                    id: "thread",
+                    label: "Start a thread",
+                    value: group.draft,
+                    onInput: (text) => Message.TypedThread({ text })
+                  }),
+                  submit(h, "Start")
+                ]
+              )
+            ]
+          )
+      })
+    ]
+  )
+}
+
+const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.AriaLabel(opened.workspace.name)],
+    [
+      h.h2([], [opened.workspace.name]),
       Button.view(
         {
           onClick: Message.ClickedAllWorkspaces(),
@@ -116,13 +283,39 @@ const storeView = ({ workspace, store }: Opened, h: HtmlBuilder<Message>): Html 
         },
         h
       ),
-      StoreState.match(store, {
+      StoreState.match(opened.store, {
         Opening: () => h.p([], ["Opening…"]),
         Failed: ({ error }) => h.p([h.Role("alert")], [error]),
-        Open: ({ counts }) =>
-          h.dl(
-            [h.AriaLabel("Replica")],
-            Object.entries(counts).flatMap(([kind, count]) => [h.dt([], [kind]), h.dd([], [String(count)])])
+        Open: () =>
+          h.div(
+            [],
+            [
+              actionsView(opened.actions, opened.notice, h),
+              h.nav(
+                [h.AriaLabel("Groups")],
+                [
+                  h.ul(
+                    [],
+                    opened.groups.map((group) =>
+                      h.keyed("li")(
+                        group.id,
+                        [],
+                        [
+                          Button.view(
+                            {
+                              onClick: Message.ClickedGroup({ groupId: group.id }),
+                              toView: (attributes) => h.button(attributes.button, [groupName(group, opened.members)])
+                            },
+                            h
+                          )
+                        ]
+                      )
+                    )
+                  )
+                ]
+              ),
+              Option.match(opened.group, { onNone: () => h.empty, onSome: (group) => groupView(group, opened, h) })
+            ]
           )
       })
     ]
@@ -142,7 +335,10 @@ const signedInView = ({ session, workspaces, opened }: SignedIn, h: HtmlBuilder<
           )
         ]
       ),
-      Option.match(opened, { onNone: () => workspacesView(workspaces, h), onSome: (opened) => storeView(opened, h) })
+      Option.match(opened, {
+        onNone: () => workspacesView(workspaces, h),
+        onSome: (opened) => workspaceView(opened, h)
+      })
     ]
   )
 

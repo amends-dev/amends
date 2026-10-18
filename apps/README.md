@@ -2,12 +2,12 @@
 
 The apps are what people see: the workspace app, the site at amends.dev, built from the design
 system, and the libraries it draws with. The workspace app is being built: it signs people in and
-keeps each workspace they open in sync, but has no screens yet, so a workspace is still worked in
-through the [HTTP API](../packages/http/README.md). None of these is published to npm.
+keeps each workspace they open in sync, with its groups, threads, and replies; the rest of a
+workspace is still worked in through the [HTTP API](../packages/http/README.md). None of these is published to npm.
 
 | Package                      | What it is                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------ |
-| [`app-v2`](app-v2/README.md) | The workspace app, on Foldkit: sign-in, workspaces, and each one's replica.    |
+| [`app-v2`](app-v2/README.md) | The workspace app, on Foldkit: groups, threads, and replies, kept in sync.     |
 | [`ui`](ui/README.md)         | The design system: foundations, components, layout patterns, and every screen. |
 | [`site`](site/README.md)     | amends.dev: the product, the packages, and their docs, on Astro and Starlight. |
 | [`icons`](icons/README.md)   | The icons, drawn as data and generated as Solid components and SVGs.           |

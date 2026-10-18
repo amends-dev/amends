@@ -8,14 +8,29 @@ import type * as SignIn from "@amends-dev/gateway/SignIn"
 import type * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import type { Update } from "foldkit"
+import type * as ManagedResource from "foldkit/managedResource"
 import { modifyFields } from "foldkit/struct"
 import type * as Browser from "./browser.ts"
 import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "./command.ts"
 import type { Flags } from "./flags.ts"
 import { Message } from "./message.ts"
-import { type Model, type Opened, Page, SignInForm, StoreState, Workspaces } from "./model.ts"
+import {
+  type Model,
+  type OpenGroup,
+  type Opened,
+  type OpenThread,
+  Page,
+  SignInForm,
+  StoreState,
+  Workspaces
+} from "./model.ts"
+import { Dismiss, PostReply, StartThread, type StoreResource } from "./store.ts"
 
-export type UpdateReturn = Update.Return<Model, Message, Layer.Success<typeof Browser.layer>>
+export type UpdateReturn = Update.Return<
+  Model,
+  Message,
+  Layer.Success<typeof Browser.layer> | ManagedResource.ServiceOf<typeof StoreResource>
+>
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
 
@@ -61,12 +76,26 @@ const atSignedIn = (model: Model, change: (page: SignedIn) => SignedIn): UpdateR
     model
   }))
 
+/** The open workspace as `change` makes it, while one is open; otherwise nothing. */
+const atOpened = (model: Model, change: (opened: Opened) => Opened): UpdateReturn =>
+  atSignedIn(model, (page) => modifyFields(page, { opened: Option.map(change) }))
+
 /** The open workspace's store as `change` makes it, while one is open; otherwise nothing. */
 const atStore = (model: Model, change: (store: StoreState) => StoreState): UpdateReturn =>
-  atSignedIn(model, (page) =>
-    modifyFields(page, {
-      opened: Option.map((opened: Opened) => modifyFields(opened, { store: change }))
-    })
+  atOpened(model, (opened) => modifyFields(opened, { store: change }))
+
+/** The open group as `change` makes it, while one is open; otherwise nothing. */
+const atGroup = (model: Model, change: (group: OpenGroup) => OpenGroup): UpdateReturn =>
+  atOpened(model, (opened) => modifyFields(opened, { group: Option.map(change) }))
+
+/** The open thread as `change` makes it, while one is open; otherwise nothing. */
+const atThread = (model: Model, change: (thread: OpenThread) => OpenThread): UpdateReturn =>
+  atGroup(model, (group) => modifyFields(group, { thread: Option.map(change) }))
+
+/** The open group, if one is. */
+const groupIn = (model: Model): Option.Option<OpenGroup> =>
+  Page.matchOrElse(model.page, { SignedIn: ({ opened }) => Option.flatMap(opened, ({ group }) => group) }, () =>
+    Option.none()
   )
 
 export const update = (model: Model, message: Message): UpdateReturn =>
@@ -168,7 +197,17 @@ export const update = (model: Model, message: Message): UpdateReturn =>
               const membership = memberships.find(({ workspace }) => workspace.id === workspaceId)
               if (membership === undefined) return page
               return modifyFields(page, {
-                opened: () => Option.some({ workspace: membership.workspace, store: StoreState.Opening() })
+                opened: () =>
+                  Option.some({
+                    workspace: membership.workspace,
+                    memberId: membership.member.id,
+                    store: StoreState.Opening(),
+                    groups: [],
+                    members: [],
+                    actions: [],
+                    notice: Option.none(),
+                    group: Option.none()
+                  })
               })
             }
           },
@@ -177,16 +216,56 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       ),
     ClickedAllWorkspaces: () => atSignedIn(model, (page) => modifyFields(page, { opened: () => Option.none() })),
     AcquiredStore: () =>
-      atStore(model, (store) =>
-        StoreState.matchOrElse(store, { Opening: () => StoreState.Open({ counts: {} }) }, () => store)
-      ),
+      atStore(model, (store) => StoreState.matchOrElse(store, { Opening: () => StoreState.Open() }, () => store)),
     ReleasedStore: () => ({ model }),
     FailedAcquireStore: ({ error }) => atStore(model, () => StoreState.Failed({ error })),
-    CountedRecords: ({ counts }) =>
-      atStore(model, (store) =>
-        StoreState.matchOrElse(store, { Open: () => StoreState.Open({ counts }) }, () => store)
-      ),
     FailedReadStore: ({ error }) => atStore(model, () => StoreState.Failed({ error })),
+    GotGroups: ({ groups }) => atOpened(model, (opened) => modifyFields(opened, { groups: () => groups })),
+    GotMembers: ({ members }) => atOpened(model, (opened) => modifyFields(opened, { members: () => members })),
+    GotActions: ({ actions }) => atOpened(model, (opened) => modifyFields(opened, { actions: () => actions })),
+    GotThreads: ({ groupId, threads }) =>
+      atGroup(model, (group) => (group.groupId === groupId ? modifyFields(group, { threads: () => threads }) : group)),
+    GotMessages: ({ threadId, messages }) =>
+      atThread(model, (thread) =>
+        thread.threadId === threadId ? modifyFields(thread, { messages: () => messages }) : thread
+      ),
+    ClickedGroup: ({ groupId }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, {
+          group: () => Option.some({ groupId, threads: [], draft: "", thread: Option.none() })
+        })
+      ),
+    ClickedThread: ({ threadId }) =>
+      atGroup(model, (group) =>
+        modifyFields(group, { thread: () => Option.some({ threadId, messages: [], draft: "" }) })
+      ),
+    ClickedAllThreads: () => atGroup(model, (group) => modifyFields(group, { thread: () => Option.none() })),
+    TypedThread: ({ text }) => atGroup(model, (group) => modifyFields(group, { draft: () => text })),
+    SubmittedThread: () =>
+      Option.match(groupIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ groupId, draft }) => ({
+          ...atGroup(model, (group) => modifyFields(group, { draft: () => "" })),
+          commands: [StartThread({ groupId, text: draft })]
+        })
+      }),
+    TypedReply: ({ text }) => atThread(model, (thread) => modifyFields(thread, { draft: () => text })),
+    SubmittedReply: () =>
+      Option.match(
+        Option.flatMap(groupIn(model), ({ thread }) => thread),
+        {
+          onNone: () => ({ model }),
+          onSome: ({ threadId, draft }) => ({
+            ...atThread(model, (thread) => modifyFields(thread, { draft: () => "" })),
+            commands: [PostReply({ threadId, text: draft })]
+          })
+        }
+      ),
+    WroteAction: () => atOpened(model, (opened) => modifyFields(opened, { notice: () => Option.none() })),
+    FailedWriteAction: ({ error }) =>
+      atOpened(model, (opened) => modifyFields(opened, { notice: () => Option.some(error) })),
+    ClickedDismiss: ({ key }) => ({ model, commands: [Dismiss({ key })] }),
+    CompletedDismiss: () => ({ model }),
     ClickedSignOut: () =>
       Page.matchOrElse(
         model.page,
