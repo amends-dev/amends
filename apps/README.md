@@ -1,12 +1,13 @@
 # Apps
 
-The apps are what people see: the site at amends.dev, built from the design system, and the
-libraries it draws with. The app people work in is being rebuilt; until it lands, a workspace is
-reached through the [HTTP API](../packages/http/README.md). None of these is published to npm.
+The apps are what people see: the workspace app, the site at amends.dev, built from the design
+system, and the libraries it draws with. The workspace app is being built: it signs people in and
+keeps each workspace they open in sync, but has no screens yet, so a workspace is still worked in
+through the [HTTP API](../packages/http/README.md). None of these is published to npm.
 
 | Package                      | What it is                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------ |
-| [`app-v2`](app-v2/README.md) | The workspace app being built on Foldkit; so far, its browser's sync.          |
+| [`app-v2`](app-v2/README.md) | The workspace app, on Foldkit: sign-in, workspaces, and each one's replica.    |
 | [`ui`](ui/README.md)         | The design system: foundations, components, layout patterns, and every screen. |
 | [`site`](site/README.md)     | amends.dev: the product, the packages, and their docs, on Astro and Starlight. |
 | [`icons`](icons/README.md)   | The icons, drawn as data and generated as Solid components and SVGs.           |
@@ -28,7 +29,9 @@ From the repository root, after `bun install`, run each in its own terminal:
 ```sh
 bun run --filter @amends-dev/ui dev        # the design system's workshop, http://127.0.0.1:6010/
 bun run --filter @amends-dev/site dev      # the site, http://127.0.0.1:4400/
+bun run --filter @amends-dev/app-v2 dev    # the workspace app, http://127.0.0.1:4410/
 ```
 
-They need only Bun. `bun run test apps` runs every app's tests, and each package's README covers
+The design system and the site need only Bun; the workspace app reaches the
+[local host](../hosts/local/README.md), which it expects at its default port. `bun run test apps` runs every app's tests, and each package's README covers
 its own checks.

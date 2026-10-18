@@ -121,7 +121,9 @@ runs them, and keeps `console` to tests and scripts.
   sections, and docs whose package guides and API reference are generated from each published
   package's README and source, deployed with [Alchemy](https://alchemy.run) from its
   `alchemy.run.ts`; `stacks/` holds Alchemy stacks for the repository itself, such as its CI
-  secrets. Apps may install UI dependencies and consume shared packages.
+  secrets. `app-v2` is the workspace app being built on Foldkit: a browser app that signs people in
+  over the HTTP API and keeps each workspace they open in sync through `sync`, its replica in
+  IndexedDB. Apps may install UI dependencies and consume shared packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no

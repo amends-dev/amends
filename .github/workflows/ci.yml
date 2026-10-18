@@ -99,6 +99,9 @@ jobs:
       - name: Site
         working-directory: apps/site
         run: bun run build
+      - name: Workspace app
+        working-directory: apps/app-v2
+        run: bun run build
 
   # Each published package as npm gets it, in a project that installs its other dependencies,
   # Effect among them, from npm at the newest versions the package allows.

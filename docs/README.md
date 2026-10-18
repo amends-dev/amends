@@ -43,7 +43,8 @@ remaining gaps with links to their owning code.
 | [Memory storage](../packages/core/README.md#memory)                  | The in-memory reference implementation of the storage contracts, in core and the gateway.                                       |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                                    |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                                          |
-| [Apps](../apps/README.md)                                            | The design system, its icons, and the site; the workspace app is being rebuilt.                                                 |
+| [Apps](../apps/README.md)                                            | The workspace app, being built on Foldkit, the design system, its icons, and the site.                                          |
+| [Workspace app](../apps/app-v2/README.md)                            | The browser app: sign-in, workspaces, and each workspace's replica kept in sync in IndexedDB.                                   |
 | [Sync](../packages/sync/README.md)                                   | How a browser keeps a workspace in sync over Effect eventlog: the actions it writes, the changes it reads, and the server.      |
 | [UI](../apps/ui/README.md)                                           | Pattern-based design system from the Lunacy mocks, with every app screen.                                                       |
 | [Site](../apps/site/README.md)                                       | amends.dev on Astro and Starlight, with docs generated from the packages' READMEs and sources.                                  |

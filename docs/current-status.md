@@ -173,10 +173,20 @@ workspace-wide oversight of private groups or direct groups by design.
 
 ## The workspace app
 
-There is no app to work in a workspace: the web and desktop apps have been removed, and their
-replacement, a browser app that keeps a replica of the workspace in sync through
-[`@amends-dev/sync`](../packages/sync/README.md), is being built. Until it lands, a workspace is
-reached only through the HTTP API.
+The web and desktop apps have been removed, and their replacement,
+[`app-v2`](../apps/app-v2/README.md), is being built on Foldkit. It signs a person in, lists their
+workspaces, and keeps the one they open in sync through
+[`@amends-dev/sync`](../packages/sync/README.md), its replica in IndexedDB, but shows only how many
+records of each kind the replica holds: there are no screens yet, and it writes no actions, so a
+workspace is still worked in through the HTTP API. Beyond that:
+
+- The list of workspaces comes from the host each time: a store opens and reads offline, but the
+  app lists no workspace to open while the host cannot be reached.
+- Effect eventlog's IndexedDB journal keeps every entry it receives, each commit's batch and every
+  reset's whole snapshot among them, so a store's journal only grows.
+- A store that fails to open, or whose replica cannot be written, stays failed until the person
+  leaves the workspace and opens it again.
+- The app has no styles yet: its markup uses `@foldkit/ui`'s headless components alone.
 
 Some of what an app would show has no backend: searching messages, files, reactions, and task
 references. Triage, which routes tasks, stays a placeholder: tasks admit and tell it, but nothing
