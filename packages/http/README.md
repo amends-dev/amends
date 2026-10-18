@@ -106,6 +106,10 @@ is a member's, and acts in the workspace its `Amends-Workspace` header names.
   systems send; see [channels](#channels).
 - `agents` and `turns`: agents, on connections, and their turns on threads; see [Agents](#agents)
   and [Turns](#turns).
+- `presence`: `GET /presence/events` follows who is present, as server-sent events, each a list of
+  members with the thread each types in where the caller may read it, and keeps the caller present
+  while it is open; `PUT /presence/typing` accepts `{ threadId }`, a thread the caller may read or
+  null, and returns 204.
 
 `POST /workspaces`, `POST /invitations`, `POST /groups`, `POST /connections`, `POST /agents`,
 both thread starts, and `POST /threads/:threadId/messages` accept an optional `Idempotency-Key`
@@ -360,7 +364,8 @@ channel's transport says to give.
 
 ## Streams
 
-`TurnsHandlers.watchLog` serves `TurnService.watchLog` as server-sent events. Effect's HTTP server
+`TurnsHandlers.watchLog` serves `TurnService.watchLog`, and `PresenceHandlers.watch`
+`PresenceService.watch`, as server-sent events. Effect's HTTP server
 moves the request's scope to the response stream, so the workspace and the subscription stay open
 until the stream completes or the client disconnects. HTTP owns the SSE encoding, cache headers, and comment heartbeats every
 five seconds; core owns the messages and who may see each one. The handlers send no frontend query

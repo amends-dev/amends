@@ -40,6 +40,11 @@ export * as PostgresNotices from "./PostgresNotices.ts"
 /**
  * @since 0.1.0
  */
+export * as PostgresPresenceRelay from "./PostgresPresenceRelay.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as PostgresReads from "./PostgresReads.ts"
 
 /**

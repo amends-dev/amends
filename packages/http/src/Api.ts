@@ -20,6 +20,7 @@ import * as InvitationsGroup from "./InvitationsGroup.ts"
 import * as MeGroup from "./MeGroup.ts"
 import * as MembersGroup from "./MembersGroup.ts"
 import * as NotificationsGroup from "./NotificationsGroup.ts"
+import * as PresenceGroup from "./PresenceGroup.ts"
 import * as SessionGroup from "./SessionGroup.ts"
 import * as SettingsGroup from "./SettingsGroup.ts"
 import * as TasksGroup from "./TasksGroup.ts"
@@ -44,6 +45,7 @@ const groups = HttpApi.make("amends")
   .add(ConnectionsGroup.ConnectionsGroup)
   .add(AgentsGroup.AgentsGroup)
   .add(TurnsGroup.TurnsGroup)
+  .add(PresenceGroup.PresenceGroup)
   .add(ChannelsGroup.ChannelsGroup)
   .add(ChannelsGroup.ChannelEventsGroup)
 

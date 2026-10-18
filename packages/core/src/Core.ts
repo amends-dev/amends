@@ -49,6 +49,7 @@ import * as Journal from "./journal/Journal.ts"
 import type * as Reaction from "./journal/Reaction.ts"
 import * as NotificationProjection from "./notification/NotificationProjection.ts"
 import * as NotificationService from "./notification/NotificationService.ts"
+import * as PresenceService from "./presence/PresenceService.ts"
 import * as ReadStateProjection from "./read-state/ReadStateProjection.ts"
 import * as ReadStateService from "./read-state/ReadStateService.ts"
 import * as ReplicaCommits from "./replica/ReplicaCommits.ts"
@@ -243,6 +244,7 @@ const operations = Layer.mergeAll(
   ConnectionService.layer,
   AgentService.layer,
   TurnService.layer,
+  PresenceService.layer,
   RequestService.layer,
   ReplicaService.layer
 ).pipe(

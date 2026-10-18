@@ -6,6 +6,7 @@ import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/
 import { Identity, Performer } from "@amends-dev/core/identity"
 import { Checkpoint, Event } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { ThreadStore, ThreadParticipationStore, ThreadMessageStore, ThreadActivityStore } from "@amends-dev/core/thread"
 import { TurnJobs } from "@amends-dev/core/turn"
@@ -43,7 +44,9 @@ export const journalLog = Entry.LogId.make("journal")
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
-  context: Context.Context<WorkspaceStorage.Bindings | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs>
+  context: Context.Context<
+    WorkspaceStorage.Bindings | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs | PresenceRelay.PresenceRelay
+  >
 ) => ({
   context,
   threads: Context.get(context, ThreadStore.ThreadStore),
@@ -70,13 +73,16 @@ export const views = (options: PostgresWorkspaceStorage.Options = {}) =>
     const service = yield* PostgresWorkspaceStorage.make(options)
     return {
       forWorkspace: (workspaceId: WorkspaceId.WorkspaceId) =>
-        Effect.map(service.forWorkspace(workspaceId), (context) =>
-          bind(
-            context.pipe(
-              Context.add(TurnJobs.TurnJobs, TurnJobs.noRunner),
-              Context.add(DeliveryJobs.DeliveryJobs, DeliveryJobs.noRunner)
+        Effect.map(
+          Effect.all([service.forWorkspace(workspaceId), PresenceRelay.makeMemory]),
+          ([context, presenceRelay]) =>
+            bind(
+              context.pipe(
+                Context.add(TurnJobs.TurnJobs, TurnJobs.noRunner),
+                Context.add(DeliveryJobs.DeliveryJobs, DeliveryJobs.noRunner),
+                Context.add(PresenceRelay.PresenceRelay, presenceRelay)
+              )
             )
-          )
         )
     }
   })

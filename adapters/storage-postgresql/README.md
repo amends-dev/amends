@@ -17,7 +17,7 @@ Gateway.layer().pipe(
 ```
 
 `PostgresStorage.layer(options)` provides the storage contract, the directory, the
-accounts, the sign-in storage, and the sync storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
+accounts, the sign-in storage, the sync storage, and core's presence relay, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
@@ -270,7 +270,8 @@ for one workspace (`layerWorkspace`), its private `layerStores` registers each s
 `PostgresTurns.ts` and `PostgresReads.ts` are
 the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`,
 `PostgresSignInStorage.ts`, and `PostgresSyncStorage.ts` keep the host's accounts, sign-in, and
-sync keys, and
+sync keys, `PostgresPresenceRelay.ts` carries presence between processes as notices on the
+listener's channel, storing nothing, and
 `PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the
 wakeup for the job requests commits store.
 Follow the [adapter conventions](../README.md).

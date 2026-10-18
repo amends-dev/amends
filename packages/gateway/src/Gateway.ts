@@ -14,6 +14,7 @@ import { CoreError } from "@amends-dev/core/error"
 import { Actor, type Identity } from "@amends-dev/core/identity"
 import { Checkpoint } from "@amends-dev/core/journal"
 import { Operation } from "@amends-dev/core/operation"
+import type { PresenceRelay } from "@amends-dev/core/presence"
 import { Request } from "@amends-dev/core/request"
 import type { TurnJobs } from "@amends-dev/core/turn"
 import {
@@ -128,7 +129,12 @@ export const make = Effect.fnUntraced(function* (
 ): Effect.fn.Return<
   Gateway["Service"],
   never,
-  WorkspaceStorage.WorkspaceStorage | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs | Crypto.Crypto | Scope.Scope
+  | WorkspaceStorage.WorkspaceStorage
+  | TurnJobs.TurnJobs
+  | DeliveryJobs.DeliveryJobs
+  | PresenceRelay.PresenceRelay
+  | Crypto.Crypto
+  | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options)
   /**

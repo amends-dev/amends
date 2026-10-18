@@ -4,6 +4,7 @@ import { Group, GroupService, GroupMembershipService, GroupId } from "@amends-de
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal } from "@amends-dev/core/journal"
 import { Notification, NotificationService, type NotificationStore } from "@amends-dev/core/notification"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ThreadService, ThreadId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { TurnId } from "@amends-dev/core/turn"
 import { Member, MemberId } from "@amends-dev/core/workspace"
@@ -677,7 +678,9 @@ describe("notifications", () => {
           )
           yield* b.store.transaction(b.notifications.insert(foreign))
           const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 })
-          const gateway = yield* Gateway.make().pipe(Effect.provide([layerRecordedTurnJobs, layerRecordedDeliveryJobs]))
+          const gateway = yield* Gateway.make().pipe(
+            Effect.provide([layerRecordedTurnJobs, layerRecordedDeliveryJobs, PresenceRelay.layerMemory])
+          )
           yield* gateway.asMember(
             workspaceId,
             humanIdentity,

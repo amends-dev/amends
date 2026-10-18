@@ -7,6 +7,7 @@ import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Checkpoint } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadStore, ThreadParticipationStore, ThreadMessageStore, ThreadActivityStore } from "@amends-dev/core/thread"
@@ -327,6 +328,7 @@ const host = (storage: WorkspaceStorage.WorkspaceStorage["Service"]) =>
     Layer.succeed(WorkspaceStorage.WorkspaceStorage, storage),
     TurnJobs.layerNoRunner,
     DeliveryJobs.layerNoRunner,
+    PresenceRelay.layerMemory,
     Layer.succeed(Crypto.Crypto, Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }))
   )
 const run = <A, E>(

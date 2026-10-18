@@ -146,6 +146,16 @@ export * as NotificationsHandlers from "./NotificationsHandlers.ts"
 /**
  * @since 0.1.0
  */
+export * as PresenceGroup from "./PresenceGroup.ts"
+
+/**
+ * @since 0.1.0
+ */
+export * as PresenceHandlers from "./PresenceHandlers.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as Routes from "./Routes.ts"
 
 /**

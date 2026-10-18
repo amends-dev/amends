@@ -9,6 +9,7 @@ import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId, ThreadMessage, ThreadMessageService, ThreadParticipation } from "@amends-dev/core/thread"
 import { type Turn, TurnJobs } from "@amends-dev/core/turn"
@@ -108,7 +109,7 @@ const host = Effect.gen(function* () {
   ).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provideMerge(BunCrypto.layer))
   return yield* Layer.build(
     Gateway.layer({ integrations: [testApi, testModels, testChannels] }).pipe(
-      Layer.provideMerge([storage, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner]),
+      Layer.provideMerge([storage, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner, PresenceRelay.layerMemory]),
       Layer.provide(MemoryDatabase.layer)
     )
   )

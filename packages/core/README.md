@@ -610,6 +610,18 @@ which deliver each request to whatever runs the jobs; each one's `layerNoRunner`
 and runs nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
 [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run them, as the local host does.
 
+## Presence
+
+Who has a workspace open now, and where they are typing, is never recorded. `PresenceService.watch`
+follows it as the actor sees it: everyone present, and the thread each types in where the actor may
+read it, each time it changes; for as long as they follow it, the actor is present on a connection
+of their own, which says so every 15 seconds and says it is gone as it closes, and following ends
+once their membership has. `PresenceService.type` says the actor types in a thread they may read,
+which lapses after six seconds unless said again, or that they stopped. Each process keeps what it
+heard, `Presence.State`, from `PresenceRelay`, a host service shared by every workspace that carries
+each signal to every process; a connection lapses 45 seconds after it was last heard.
+`PresenceRelay.layerMemory` serves a host of one process.
+
 ## Memory
 
 Every store contract has a `layerMemory` beside it that implements it in

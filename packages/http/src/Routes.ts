@@ -27,6 +27,7 @@ import * as InvitationsHandlers from "./InvitationsHandlers.ts"
 import * as MeHandlers from "./MeHandlers.ts"
 import * as MembersHandlers from "./MembersHandlers.ts"
 import * as NotificationsHandlers from "./NotificationsHandlers.ts"
+import * as PresenceHandlers from "./PresenceHandlers.ts"
 import * as SessionHandlers from "./SessionHandlers.ts"
 import * as SettingsHandlers from "./SettingsHandlers.ts"
 import * as TasksHandlers from "./TasksHandlers.ts"
@@ -57,6 +58,7 @@ export const layerHandlers = Layer.mergeAll(
   ConnectionsHandlers.layer,
   AgentsHandlers.layer,
   TurnsHandlers.layer,
+  PresenceHandlers.layer,
   ChannelsHandlers.layer
 ).pipe(Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)))
 

@@ -98,7 +98,7 @@ runs them, and keeps `console` to tests and scripts.
   `storage-postgresql` implements workspace storage, the workspace directory, accounts, sign-in
   storage, and sync storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record
   field, except the kind-specific `details` of a thread activity or a session log entry, stored as
-  JSON. The
+  JSON, and carries core's presence between a host's processes as notices, storing none of it. The
   reference implementation of the same contracts, in process memory, is each contract's
   `layerMemory`, beside it in core and the gateway, which their tests run over. Both follow one
   shape: each store over a workspace binding, merged at the edge.

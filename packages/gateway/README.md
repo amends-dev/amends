@@ -14,8 +14,8 @@ published to npm.
 ## Use
 
 `Gateway.make(options?)` builds a `Gateway.Gateway["Service"]` in the host's scope from
-`WorkspaceStorage.WorkspaceStorage`, core's `TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs`, and
-`Crypto.Crypto`. It opens no workspace and resolves no actor until it is called. Its options:
+`WorkspaceStorage.WorkspaceStorage`, core's `TurnJobs.TurnJobs`, `DeliveryJobs.DeliveryJobs`, and
+`PresenceRelay.PresenceRelay`, and `Crypto.Crypto`. It opens no workspace and resolves no actor until it is called. Its options:
 
 - `idleTimeToLive`: how long an unused workspace stays prepared, five minutes by default.
 - `integrations`: the [integrations](../connection/README.md) the host installs, with distinct ids,
@@ -118,7 +118,9 @@ from sign-in and session tokens, which [email sign-in](#email-sign-in) implement
 membership's `activeMemberCount` is `people`.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
-`inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do.
+`inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do, and its
+`PresenceRelay` between their processes: `layerMemory` for a host of one, or a storage adapter's,
+as the PostgreSQL adapter's over its notices.
 
 ## Memory
 

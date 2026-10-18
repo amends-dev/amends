@@ -3,6 +3,7 @@ import { CoreError } from "@amends-dev/core/error"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReplicaChange, ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { TurnJobs } from "@amends-dev/core/turn"
@@ -54,7 +55,9 @@ const connect = Effect.gen(function* () {
     Layer.provideMerge(Layer.succeed(Crypto.Crypto, webCrypto))
   )
   const services = yield* Layer.build(
-    Gateway.layer().pipe(Layer.provideMerge([host, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner]))
+    Gateway.layer().pipe(
+      Layer.provideMerge([host, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner, PresenceRelay.layerMemory])
+    )
   )
   const gateway = Context.get(services, Gateway.Gateway)
   const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })

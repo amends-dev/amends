@@ -11,6 +11,7 @@ import { Core } from "@amends-dev/core"
 import { BuiltinRoleUpgrade } from "@amends-dev/core/authorization"
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { Journal } from "@amends-dev/core/journal"
+import { PresenceRelay } from "@amends-dev/core/presence"
 import { TurnJobs } from "@amends-dev/core/turn"
 import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Context from "effect/Context"
@@ -77,6 +78,7 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage
   const turnJobs = yield* TurnJobs.TurnJobs
   const deliveryJobs = yield* DeliveryJobs.DeliveryJobs
+  const presenceRelay = yield* PresenceRelay.PresenceRelay
   const crypto = yield* Crypto.Crypto
   const hostContext = yield* Effect.context<never>()
   const integrations = yield* Integrations.make(options.integrations ?? [])
@@ -91,6 +93,7 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
         Layer.succeed(Crypto.Crypto, crypto),
         Layer.succeed(TurnJobs.TurnJobs, turnJobs),
         Layer.succeed(DeliveryJobs.DeliveryJobs, deliveryJobs),
+        Layer.succeed(PresenceRelay.PresenceRelay, presenceRelay),
         Layer.succeed(Integrations.Integrations, integrations)
       ]),
       Layer.orDie

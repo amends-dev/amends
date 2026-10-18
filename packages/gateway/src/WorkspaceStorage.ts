@@ -18,6 +18,7 @@ import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/con
 import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends-dev/core/group"
 import { Checkpoint, MemoryDatabase, MemoryBinding } from "@amends-dev/core/journal"
 import { NotificationStore } from "@amends-dev/core/notification"
+import type { PresenceRelay } from "@amends-dev/core/presence"
 import { ReadStateStore } from "@amends-dev/core/read-state"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadActivityStore, ThreadMessageStore, ThreadParticipationStore, ThreadStore } from "@amends-dev/core/thread"
@@ -31,14 +32,18 @@ import * as Layer from "effect/Layer"
 
 /**
  * What storage binds to one workspace: its stores. The gateway supplies
- * cryptography, the turn and delivery jobs, and the integrations the host installs.
+ * cryptography, the turn and delivery jobs, the presence relay, and the integrations the host installs.
  *
  * @category models
  * @since 0.1.0
  */
 export type Bindings = Exclude<
   Core.HostServices,
-  Crypto.Crypto | Integrations.Integrations | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs
+  | Crypto.Crypto
+  | Integrations.Integrations
+  | TurnJobs.TurnJobs
+  | DeliveryJobs.DeliveryJobs
+  | PresenceRelay.PresenceRelay
 >
 
 /**
