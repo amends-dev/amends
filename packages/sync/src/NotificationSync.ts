@@ -1,7 +1,6 @@
 /**
- * What a member's browser and the server exchange about the member's notifications. `Actions` are
- * how the member marks them seen, which their browser applies at once and the server runs as
- * `NotificationService` operations. `Changes` keep the notifications in their replica current.
+ * How a member marks their notifications seen, as actions their browser writes: it applies each at
+ * once, and the server runs it as a `NotificationService` operation.
  *
  * @since 0.1.0
  */
@@ -9,7 +8,6 @@
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import * as EventGroup from "effect/eventlog/EventGroup"
 import * as Schema from "effect/Schema"
-import { recordChanges } from "./internal/recordChanges.ts"
 
 /**
  * How a member marks their notifications seen: one, or every one recorded up to a point. Each
@@ -30,18 +28,3 @@ export const Actions = EventGroup.empty
     primaryKey: () => "inbox",
     payload: Schema.Struct({ through: NotificationStore.Cursor })
   })
-
-/**
- * The member's own notifications, which a replica holds.
- *
- * @category events
- * @since 0.1.0
- */
-export const Changes = EventGroup.empty.pipe(
-  recordChanges(
-    "Notification",
-    Notification.Notification,
-    Schema.Struct({ id: Notification.NotificationId }),
-    ({ id }) => ({ id })
-  )
-)

@@ -15,6 +15,7 @@
 
 import * as Entry from "@amends-dev/log/Entry"
 import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -61,8 +62,9 @@ export class ReplicaService extends Context.Service<
   {
     /**
      * The acting person's replica as it changes, a batch for each commit after `after`, the
-     * position of the last batch it holds, then for each commit as it lands. Without a position,
-     * or with one past what the journal holds, it starts with a reset and everything they may see.
+     * position of the last batch it holds, then for each commit as it lands; a commit that changes
+     * nothing there sends none. Without a position, or with one past what the journal holds, it
+     * starts with a batch of a reset and everything they may see, as of the journal's head.
      * The stream fails with `Denied` once they are no longer a member, and with `Unavailable` when
      * following stops short, to be followed again from the last position held.
      */
@@ -75,9 +77,6 @@ export class ReplicaService extends Context.Service<
     >
   }
 >()("@amends-dev/core/replica/ReplicaService") {}
-
-/** How many records one batch of a snapshot carries. */
-const snapshotBatch = 500
 
 /**
  * What a commit changed about one member's access, and how their own requests ended in it.
@@ -151,61 +150,51 @@ export const make = Effect.gen(function* () {
     return { removed, grantsChanged, joined, left, outcomes } satisfies AccessChanges
   })
 
-  /** `records` as changes, in batches of at most `snapshotBatch`, all at `position`. */
-  const batchesOf = (
+  /** The records the member may see now, after a reset: their replica as of `position`. */
+  const reset = Effect.fnUntraced(function* (
+    memberId: MemberId.MemberId,
     position: Entry.Position,
-    records: Stream.Stream<ReplicaRecord.ReplicaRecord, ReplicaQuery.Error>,
-    first: ReadonlyArray<ReplicaChange.ReplicaChange> = []
-  ) =>
-    Stream.concat(
-      Stream.make({ position, changes: first }),
-      records.pipe(
-        Stream.map((record) => ReplicaChange.ReplicaChange.cases.Changed.make({ record })),
-        Stream.grouped(snapshotBatch),
-        Stream.map((changes): ReplicaChange.Batch => ({ position, changes }))
-      )
-    ).pipe(Stream.filter((batch) => batch.changes.length > 0))
+    recordedAt: DateTime.Utc
+  ) {
+    const { cases } = ReplicaChange.ReplicaChange
+    const records = yield* Stream.runCollect(replicaQuery.snapshot(yield* replicaQuery.viewerOf(memberId)))
+    return {
+      position,
+      recordedAt,
+      changes: [cases.Reset.make({}), ...records.map((record) => cases.Changed.make({ record }))]
+    } satisfies ReplicaChange.Batch
+  })
 
-  /** Everything `memberId` may see now, after a reset, at `position`. */
-  const reset = (memberId: MemberId.MemberId, position: Entry.Position) =>
-    Stream.unwrap(
-      Effect.map(replicaQuery.viewerOf(memberId), (viewer) =>
-        batchesOf(position, replicaQuery.snapshot(viewer), [ReplicaChange.ReplicaChange.cases.Reset.make({})])
-      )
-    )
-
-  /** The batches one commit gives `memberId`'s replica. */
-  const batchesFor = (memberId: MemberId.MemberId) => (commit: ReplicaCommits.Commit) =>
-    Stream.unwrap(
-      Effect.gen(function* (): Effect.fn.Return<
-        Stream.Stream<ReplicaChange.Batch, CoreError.Denied | ReplicaQuery.Error>,
-        ReplicaQuery.Error
-      > {
-        const access = yield* readAccessChanges(commit.entries, memberId)
-        if (access.removed)
-          return Stream.fail(
-            new CoreError.Denied({ reason: new CoreError.InvalidActor({ memberId, reason: "membership-removed" }) })
-          )
-        if (access.grantsChanged) return reset(memberId, commit.position)
-        // Read after the commit's records, so nothing reaches them that they could no longer see.
-        const viewer = yield* replicaQuery.viewerOf(memberId)
-        const { cases } = ReplicaChange.ReplicaChange
-        const changes: Array<ReplicaChange.ReplicaChange> = [
-          ...access.left.map((id) => cases.Dropped.make({ key: ReplicaRecord.Key.cases.Group.make({ id }) })),
-          ...commit.records
-            .filter((record) => ReplicaVisibility.canSee(viewer, commit.places, record))
-            .map((record) => cases.Changed.make({ record })),
-          ...access.outcomes
-        ]
-        // What they still see of a group they left, such as a public team, and all of one they joined.
-        const groups = [...access.left, ...access.joined]
-        return batchesOf(
-          commit.position,
-          Stream.fromIterable(groups).pipe(Stream.flatMap((groupId) => replicaQuery.snapshotGroup(viewer, groupId))),
-          changes
+  /** What one commit changes in `memberId`'s replica, whole, or nothing when it changes nothing there. */
+  const batchFor = (memberId: MemberId.MemberId) =>
+    Effect.fnUntraced(function* (commit: ReplicaCommits.Commit) {
+      const access = yield* readAccessChanges(commit.entries, memberId)
+      if (access.removed)
+        return yield* new CoreError.Denied({
+          reason: new CoreError.InvalidActor({ memberId, reason: "membership-removed" })
+        })
+      if (access.grantsChanged) return [yield* reset(memberId, commit.position, commit.recordedAt)]
+      // Read after the commit's records, so nothing reaches them that they could no longer see.
+      const viewer = yield* replicaQuery.viewerOf(memberId)
+      // What they still see of a group they left, such as a public team, and all of one they joined.
+      const regrouped = yield* Stream.runCollect(
+        Stream.fromIterable([...access.left, ...access.joined]).pipe(
+          Stream.flatMap((groupId) => replicaQuery.snapshotGroup(viewer, groupId))
         )
-      })
-    )
+      )
+      const { cases } = ReplicaChange.ReplicaChange
+      const changes = [
+        ...access.left.map((id) => cases.Dropped.make({ key: ReplicaRecord.Key.cases.Group.make({ id }) })),
+        ...commit.records
+          .filter((record) => ReplicaVisibility.canSee(viewer, commit.places, record))
+          .map((record) => cases.Changed.make({ record })),
+        ...regrouped.map((record) => cases.Changed.make({ record })),
+        ...access.outcomes
+      ]
+      return changes.length === 0
+        ? []
+        : [{ position: commit.position, recordedAt: commit.recordedAt, changes } satisfies ReplicaChange.Batch]
+    })
 
   const logInterrupted = () => new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() })
   const isDenied = Schema.is(CoreError.Denied)
@@ -220,14 +209,20 @@ export const make = Effect.gen(function* () {
     const live = yield* replicaCommits.follow
     const through = live.after
     const startsOver = Option.isNone(after) || Option.isNone(through) || after.value > through.value
+    const batches = Stream.mapEffect(batchFor(memberId))
     const caughtUp = startsOver
-      ? reset(
-          memberId,
-          Option.getOrElse(through, () => Entry.Position.make(0))
+      ? Stream.fromEffect(
+          Effect.flatMap(DateTime.now, (now) =>
+            reset(
+              memberId,
+              Option.getOrElse(through, () => Entry.Position.make(0)),
+              now
+            )
+          )
         )
-      : replicaCommits.read(after, through).pipe(Stream.flatMap(batchesFor(memberId)))
+      : replicaCommits.read(after, through).pipe(batches, Stream.flattenIterable)
     // Storage that stops following leaves the replica to follow again from where it stands.
-    return Stream.concat(caughtUp, live.commits.pipe(Stream.flatMap(batchesFor(memberId)))).pipe(
+    return Stream.concat(caughtUp, live.commits.pipe(batches, Stream.flattenIterable)).pipe(
       Stream.mapError((error) => (isDenied(error) ? error : logInterrupted()))
     )
   }, Operation.report)

@@ -1,9 +1,9 @@
 /**
- * What a member's replica receives as the workspace changes: for each commit, a batch of changes
- * to the records it holds, and the outcomes of the member's own requests the commit recorded. A
- * batch names its commit's position, which the member's browser keeps, to ask for what follows it
- * when it reconnects. A reset and the records that follow it can take several batches at one
- * position.
+ * What a member's replica receives as the workspace changes: for each commit, one batch of the
+ * changes to the records it holds, and the outcomes of the member's own requests the commit
+ * recorded, whole, so a replica applies a commit or none of it. A batch names its commit's position,
+ * which the member's browser keeps, to ask for what follows it when it reconnects, and when the
+ * commit was recorded.
  *
  * @since 0.1.0
  */
@@ -38,13 +38,15 @@ export const ReplicaChange = Schema.TaggedUnion({
 export type ReplicaChange = typeof ReplicaChange.Type
 
 /**
- * The changes one commit makes to a replica, at the commit's position.
+ * The changes one commit makes to a replica, at the commit's position and time. A reset's batch is
+ * at the position it reset to, as of when it was read.
  *
  * @category schemas
  * @since 0.1.0
  */
 export const Batch = Schema.Struct({
   position: Entry.Position,
+  recordedAt: Schema.DateTimeUtcFromString,
   changes: Schema.Array(ReplicaChange)
 })
 

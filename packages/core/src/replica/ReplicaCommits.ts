@@ -10,6 +10,7 @@
 import type * as Entry from "@amends-dev/log/Entry"
 import type * as Log from "@amends-dev/log/Log"
 import * as Context from "effect/Context"
+import type * as DateTime from "effect/DateTime"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -26,14 +27,15 @@ import type * as ReplicaRecord from "./ReplicaRecord.ts"
 import type * as ReplicaVisibility from "./ReplicaVisibility.ts"
 
 /**
- * One commit as replicas read it: its position and entries, the records it changed as stored when
- * it was read, and the groups and threads they belong to.
+ * One commit as replicas read it: its position, time, and entries, the records it changed as stored
+ * when it was read, and the groups and threads they belong to.
  *
  * @category models
  * @since 0.1.0
  */
 export interface Commit {
   readonly position: Entry.Position
+  readonly recordedAt: DateTime.Utc
   readonly entries: ReadonlyArray<Log.Entry<Event.Envelope>>
   readonly records: ReadonlyArray<ReplicaRecord.ReplicaRecord>
   readonly places: ReplicaVisibility.Places
@@ -89,7 +91,13 @@ export const make = Effect.gen(function* () {
 
   const readCommit = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
     const records = yield* replicaQuery.readRecords(yield* replicaQuery.keysChangedBy(batch.entries))
-    return { position: batch.position, entries: batch.entries, records, places: yield* replicaQuery.placesOf(records) }
+    return {
+      position: batch.position,
+      recordedAt: batch.commit.recordedAt,
+      entries: batch.entries,
+      records,
+      places: yield* replicaQuery.placesOf(records)
+    }
   })
 
   /**
