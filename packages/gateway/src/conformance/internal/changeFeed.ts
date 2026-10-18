@@ -2,7 +2,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import type { CoreError } from "@amends-dev/core/error"
 import { Identity } from "@amends-dev/core/identity"
-import { InvitationFacts, InvitationService } from "@amends-dev/core/workspace"
+import { InvitationService } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -76,7 +76,7 @@ export const changeFeed = (fixture: Fixture.Fixture) => {
             )
           )
           const fromOther = committed(yield* next)
-          expect(fromOther.events.map((e) => e.name)).toEqual([InvitationFacts.Issued.name])
+          expect(fromOther.stale).toEqual([{ read: "invitations" }])
           yield* on(
             first,
             Effect.flatMap(Gateway.Gateway, (gateway) =>
@@ -124,9 +124,10 @@ export const changeFeed = (fixture: Fixture.Fixture) => {
               reset: false
             })
             const replayed = [committed(yield* next), committed(yield* next)]
-            expect(replayed.map((m) => m.events[0]?.payload)).toMatchObject(
-              missed.map((invitation) => ({ id: invitation.details.id }))
-            )
+            // Each missed invitation's commit, in order.
+            expect(replayed.map((m) => m.stale)).toEqual(missed.map(() => [{ read: "invitations" }]))
+            expect(Number(replayed[0]?.cursor)).toBeGreaterThan(Number(cursor))
+            expect(Number(replayed[1]?.cursor)).toBeGreaterThan(Number(replayed[0]?.cursor))
           }).pipe(Effect.provide(gateway(second)))
         })
       )

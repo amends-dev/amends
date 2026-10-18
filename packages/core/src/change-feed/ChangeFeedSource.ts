@@ -34,8 +34,8 @@ import * as ChangeFeedChanges from "./ChangeFeedChanges.ts"
 import * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
 
 /**
- * One committed batch of the journal, with the events the feed may deliver from it and what it
- * changed in what readers show.
+ * One committed batch of the journal, with the events the feed tells readers of from it and what
+ * it changed in what readers show.
  *
  * @category models
  * @since 0.1.0

@@ -40,7 +40,7 @@ import {
   type Thread,
   type ThreadTimeline
 } from "../src/index.ts"
-import { Signal, affectedKeys, signalKeys } from "../src/live/api.ts"
+import { Signal, signalKeys, staleKeys } from "../src/live/api.ts"
 
 afterEach(cleanup)
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })
@@ -138,76 +138,27 @@ function mount<A>(fetch: typeof globalThis.fetch, use: () => PagedView<A>) {
   return () => view
 }
 
-it("maps conversation facts and signals to the reads of their groups and threads", () => {
-  const keys = (names: Array<{ name: string; payload?: unknown }>) => affectedKeys("one", names).toSorted()
-  // Thread activity reads nothing again: its timeline, its group's stream, and the groups list take
-  // what the commit delivers.
+it("reads again what a commit made stale and what signals settle, each once", () => {
+  const keys = (stale: Parameters<typeof staleKeys>[1]) => staleKeys("one", stale).toSorted()
+  // A workspace read, the reader's directory, and one group's or thread's read.
   expect(
     keys([
-      {
-        name: "thread.activity.recorded",
-        payload: { groupId: "group", activity: { threadId: "thread" } }
-      }
+      { read: "groups" },
+      { read: "directory" },
+      { read: "streams", id: "group" },
+      { read: "threads", id: "thread" }
     ])
-  ).toEqual([])
-  // Leaving a group also changes which notification sources the reader can still read.
-  // Every open thread checks its access again, since the fact names no threads.
-  // Public groups show who belongs, so their listing refreshes too.
-  expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
-    "workspace/one/active-turns",
-    "workspace/one/groups",
-    "workspace/one/inbox",
-    "workspace/one/participants",
-    "workspace/one/pending",
-    "workspace/one/public-groups",
-    "workspace/one/rosters:group",
-    "workspace/one/streams:group",
-    "workspace/one/timelines"
-  ])
-  // A payload without the expected field refreshes the whole collection rather than none.
-  expect(keys([{ name: "thread.renamed", payload: {} }])).toEqual(["workspace/one/threads"])
-  expect(keys([{ name: "workspace.assignment.revoked" }])).toContain("workspace/one/streams")
-  // A new name shows wherever the groups list names the group, and among public groups.
-  expect(keys([{ name: "group.renamed", payload: { groupId: "group" } }])).toEqual([
-    "workspace/one/groups",
-    "workspace/one/public-groups"
-  ])
-  // A public group's creation reaches everyone who might join it.
-  expect(keys([{ name: "group.created", payload: { id: "group" } }])).toEqual([
-    "workspace/one/groups",
-    "workspace/one/public-groups"
-  ])
-  // Each read refreshes once: a notification repeats no key, and a collection covers its items.
+  ).toEqual(["directory", "workspace/one/groups", "workspace/one/streams:group", "workspace/one/threads:thread"])
+  // A stale collection covers its items, and each read refreshes once.
   expect(
-    affectedKeys(
-      "one",
-      [
-        {
-          name: "thread.activity.recorded",
-          payload: { groupId: "group", activity: { threadId: "thread" } }
-        },
-        { name: "workspace.assignment.created" }
-      ],
-      true
-    ).toSorted()
-  ).toEqual([
-    "workspace/one/active-turns",
-    "workspace/one/agents",
-    "workspace/one/connections",
-    "workspace/one/groups",
-    "workspace/one/inbox",
-    "workspace/one/members",
-    "workspace/one/ownership",
-    "workspace/one/participants",
-    "workspace/one/pending",
-    "workspace/one/permissions",
-    "workspace/one/rosters",
-    "workspace/one/settings",
-    "workspace/one/streams",
-    "workspace/one/threads",
-    "workspace/one/timelines",
-    "workspace/one/turns"
-  ])
+    keys([
+      { read: "timelines", id: "thread" },
+      { read: "timelines" },
+      { read: "pending" },
+      { read: "pending" },
+      { read: "rosters", id: "group" }
+    ])
+  ).toEqual(["workspace/one/pending", "workspace/one/rosters:group", "workspace/one/timelines"])
   // Reading a thread settles notifications from it.
   const signal = Schema.decodeSync(Signal.Signal)
   const recipient = { workspaceId: "one", memberId: "alice" }

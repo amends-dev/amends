@@ -1,12 +1,12 @@
 import { Role, RoleFacts } from "@amends-dev/core/authorization"
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import type { CoreError } from "@amends-dev/core/error"
-import { GroupFacts, GroupService } from "@amends-dev/core/group"
+import { GroupService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { NotificationService } from "@amends-dev/core/notification"
 import { Signal } from "@amends-dev/core/signal"
-import { ThreadMessage, ThreadMessageFacts, ThreadMessageService, ThreadService } from "@amends-dev/core/thread"
+import { ThreadMessage, ThreadMessageService, ThreadService } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Queue, Stream } from "effect"
@@ -114,14 +114,12 @@ describe("change feed", () => {
           yield* marker(bound)
           const [readerFeed, outsiderFeed, unpermittedFeed] = feeds
           if (!readerFeed || !outsiderFeed || !unpermittedFeed) return yield* Effect.die("Expected three feeds")
+          // The group's creation makes the reader's groups stale. Its thread's commits deliver what
+          // changed, but for who takes part, which starting it changed.
           const created = committed(yield* readerFeed)
-          expect(created.events.map((e) => e.name)).toContain(GroupFacts.Created.name)
+          expect(created.stale).toEqual(expect.arrayContaining([{ read: "groups" }, { read: "public-groups" }]))
           const started = committed(yield* readerFeed)
-          const text = started.events.find((e) => e.name === ThreadMessageFacts.Published.name)
-          expect(text?.payload).toMatchObject({
-            content: { text: "Secret plan" },
-            groupId: group.id
-          })
+          expect(started.stale).toEqual([{ read: "participants", id: thread.thread.id }])
           // The commit's changes: the timeline items it recorded, as the timeline shows them, the
           // preview of their thread, as its group's stream shows it, and their group's latest
           // activity, as the groups list shows it.
@@ -161,11 +159,12 @@ describe("change feed", () => {
             ["preview", 2, 1, "Secret plan"],
             ["group", group.id]
           ])
-          expect(committed(yield* readerFeed).events[0]?.name).toBe(RoleFacts.Created.name)
+          const roleCreated = [{ read: "settings" }, { read: "members" }]
+          expect(committed(yield* readerFeed).stale).toEqual(roleCreated)
           // Outside the group, or without read permission, only workspace facts arrive, and no change.
           for (const next of [outsiderFeed, unpermittedFeed]) {
             const received = committed(yield* next)
-            expect(received.events.map((e) => e.name)).toEqual([RoleFacts.Created.name])
+            expect(received.stale).toEqual(roleCreated)
             expect(received.changes).toEqual([])
           }
         })
@@ -271,8 +270,11 @@ describe("change feed", () => {
           // The bystander sees the conversation, but nothing addressed to someone else.
           const seen = committed(yield* bystanderFeed)
           expect(seen.cursor).toBe(started.cursor)
-          expect(seen.events.map((e) => e.name)).toContain(ThreadMessageFacts.Published.name)
+          expect(seen.changes).not.toEqual([])
           expect(seen.notifications).toEqual([])
+          // The mention makes the recipient's pending counts stale, and nobody else's.
+          expect(started.stale).toContainEqual({ read: "pending" })
+          expect(seen.stale).not.toContainEqual({ read: "pending" })
         })
       )
     )

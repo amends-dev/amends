@@ -1,9 +1,9 @@
 /**
- * Which facts the change feed delivers, and how each becomes an event a reader may see: a registry
- * of fact versions with the audience each reaches, the read permission a reader also needs, the
- * public view of its payload, whose access it changes, and the notifications it created.
- * `ChangeFeedSource` prepares each committed entry with `prepare`, and `ChangeFeedService` filters
- * what it prepared for each reader. A fact not registered here stays within the host.
+ * Which facts the change feed tells readers of, and what each tells them: a registry of fact
+ * versions with the audience each reaches, the read permission a reader also needs, the reads it
+ * makes stale, whose access it changes, and the notifications it created. `ChangeFeedSource`
+ * prepares each committed entry with `prepare`, and `ChangeFeedService` filters what it prepared
+ * for each reader. A fact not registered here stays within the host.
  *
  * @since 0.1.0
  */
@@ -41,7 +41,6 @@ import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"
 import * as ThreadFacts from "../thread/ThreadFacts.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessageFacts from "../thread/ThreadMessageFacts.ts"
-import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
 import * as ThreadParticipationFacts from "../thread/ThreadParticipationFacts.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as TurnFacts from "../turn/TurnFacts.ts"
@@ -53,7 +52,7 @@ import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberPermissions from "../workspace/MemberPermissions.ts"
 import * as WorkspaceFacts from "../workspace/WorkspaceFacts.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
-import * as ChangeFeed from "./ChangeFeed.ts"
+import type * as ChangeFeed from "./ChangeFeed.ts"
 
 /**
  * How a fact changes what one reader may see: their group admissions, their grants (or anyone's,
@@ -91,7 +90,11 @@ export interface Addressed {
  * @since 0.1.0
  */
 export interface Prepared {
-  readonly event: ChangeFeed.Event
+  /** The fact's name and decoded payload, for those inside the host following commits, such as a turn's log. */
+  readonly name: string
+  readonly payload: unknown
+  /** The reads it makes stale for the readers it reaches. */
+  readonly stale: ReadonlyArray<ChangeFeed.Stale>
   readonly audience: Audience.Audience
   /** The read permission a reader also needs, beyond holding one of the audience's scopes. */
   readonly requirement: Requirement.Requirement | undefined
@@ -125,55 +128,75 @@ type Standalone = Fact.Definition & {
   readonly payload: { readonly DecodingServices: never; readonly EncodingServices: never }
 }
 
-/**
- * Deliver one fact version to its audience. The payload is the fact's own unless a view names
- * the public shape, which then matches what the corresponding read returns.
- */
-const registerFact = <F extends Standalone, View extends Schema.Constraint = F["payload"]>(
+/** Tell one fact version's audience of it: the reads it makes stale, and the rest it carries. */
+const registerFact = <F extends Standalone>(
   fact: F,
   options: {
     readonly requirement?: (payload: Fact.Payload<F>, workspaceId: WorkspaceId.WorkspaceId) => Requirement.Requirement
-    readonly view?: {
-      readonly schema: View
-      readonly from: (payload: Fact.Payload<F>) => View["Type"]
-    }
+    /** The reads the fact makes stale; the change feed delivers the rest of what it changed. */
+    readonly stale?: (payload: Fact.Payload<F>) => ReadonlyArray<ChangeFeed.Stale>
     readonly access?: (payload: Fact.Payload<F>) => Access | undefined
     /** The member the fact is about, who sees it without the read permission. */
     readonly concerns?: (payload: Fact.Payload<F>) => MemberId.MemberId
     /** The notifications the fact's projection creates, as their recipients' inboxes list them. */
     readonly notifications?: (event: Event.Metadata & { readonly payload: Fact.Payload<F> }) => ReadonlyArray<Addressed>
   } = {}
-): Registered => {
-  // Domain payload schemas need no services, so the JSON codec runs without context.
-  const codec = Schema.toCodecJson(options.view?.schema ?? fact.payload) as unknown as Schema.Codec<unknown, unknown>
-  const encode = Schema.encodeUnknownEffect(codec)
-  return {
-    name: fact.name,
-    version: fact.version,
-    prepare: Effect.fnUntraced(function* (entry: Log.Entry<Event.Envelope>) {
-      const event = yield* Event.decode(fact, entry)
-      const payload = event.payload as Fact.Payload<F>
-      const workspaceId = event.provenance.workspaceId
-      return {
-        event: ChangeFeed.Event.make({
-          id: event.id,
-          name: event.name,
-          version: event.version,
-          recordedAt: event.recordedAt,
-          provenance: event.provenance,
-          payload: yield* encode(options.view === undefined ? payload : options.view.from(payload)).pipe(
-            Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json))
-          )
-        }),
-        audience: yield* Fact.makeAudience(fact, payload),
-        requirement: options.requirement?.(payload, workspaceId),
-        exempt: options.concerns === undefined ? undefined : Member.audienceOf(options.concerns(payload)),
-        access: options.access?.(payload),
-        notifications: options.notifications?.(Object.assign({}, event, { payload })) ?? []
-      }
-    })
-  }
-}
+): Registered => ({
+  name: fact.name,
+  version: fact.version,
+  prepare: Effect.fnUntraced(function* (entry: Log.Entry<Event.Envelope>) {
+    const event = yield* Event.decode(fact, entry)
+    const payload = event.payload as Fact.Payload<F>
+    const workspaceId = event.provenance.workspaceId
+    return {
+      name: event.name,
+      payload,
+      stale: options.stale?.(payload) ?? [],
+      audience: yield* Fact.makeAudience(fact, payload),
+      requirement: options.requirement?.(payload, workspaceId),
+      exempt: options.concerns === undefined ? undefined : Member.audienceOf(options.concerns(payload)),
+      access: options.access?.(payload),
+      notifications: options.notifications?.(Object.assign({}, event, { payload })) ?? []
+    }
+  })
+})
+
+/** Stale reads: of the workspace, of one group, thread, or turn, or of every one of a kind. */
+const reads = (...names: ReadonlyArray<ChangeFeed.Read>): ReadonlyArray<ChangeFeed.Stale> =>
+  names.map((read) => ({ read }))
+const readOf = (read: ChangeFeed.Read, id: string): ChangeFeed.Stale => ({ read, id })
+/**
+ * Grants decide what the reader may do and see, from another member's access to which threads,
+ * rosters, and turns they may read, and which notification sources they can still read.
+ */
+const grantsChanged = reads(
+  "settings",
+  "ownership",
+  "members",
+  "groups",
+  "inbox",
+  "pending",
+  "permissions",
+  "connections",
+  "agents",
+  "active-turns",
+  "streams",
+  "rosters",
+  "threads",
+  "timelines",
+  "participants",
+  "turns"
+)
+/**
+ * Who belongs to a group decides who is listed there and which of its threads the reader may see.
+ * A fact names its group but not its threads, so every timeline and participant list checks its
+ * access again.
+ */
+const membershipChanged = ({ groupId }: { readonly groupId: GroupId.GroupId }) => [
+  ...reads("groups", "public-groups", "inbox", "pending", "active-turns", "timelines", "participants"),
+  readOf("streams", groupId),
+  readOf("rosters", groupId)
+]
 
 const readThreadRequirement = (threadId: ThreadId.ThreadId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
@@ -200,86 +223,121 @@ const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Works
  * the matching read requires. Facts absent from this list are internal.
  */
 const registry: ReadonlyArray<Registered> = [
-  registerFact(WorkspaceFacts.Initialized),
-  registerFact(WorkspaceFacts.Renamed),
-  registerFact(WorkspaceFacts.OwnershipTransferred),
+  // A workspace's name and owner show in its settings and the reader's directory; its owner
+  // decides who may manage members, connections, and agents.
+  registerFact(WorkspaceFacts.Initialized, { stale: () => reads("settings", "ownership", "directory") }),
+  registerFact(WorkspaceFacts.Renamed, { stale: () => reads("settings", "ownership", "directory") }),
+  registerFact(WorkspaceFacts.OwnershipTransferred, {
+    stale: () => reads("settings", "ownership", "members", "permissions", "connections", "agents", "directory")
+  }),
   // Membership and access changes reach those who may read them, and always the member concerned.
+  // An agent is a member: its name, and whether it is still in the workspace, show with it, and
+  // rosters list active members only.
   registerFact(MemberFacts.Added, {
     requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
+    stale: () => reads("members", "ownership", "agents", "directory", "rosters"),
     concerns: ({ memberId }) => memberId
   }),
   registerFact(MemberFacts.Removed, {
     requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
+    stale: () => reads("members", "ownership", "agents", "directory", "rosters"),
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => Access.Removed({ memberId })
   }),
+  // A member's name shows wherever members are named, and in the directory's memberships.
   registerFact(MemberFacts.Renamed, {
     requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
+    stale: () => reads("members", "agents", "directory"),
     concerns: ({ memberId }) => memberId
   }),
   // Invitations name their recipient and role, which only invitation managers may list.
-  registerFact(InvitationFacts.Issued, { requirement: manageInvitationsRequirement }),
+  registerFact(InvitationFacts.Issued, {
+    requirement: manageInvitationsRequirement,
+    stale: () => reads("invitations")
+  }),
   registerFact(InvitationFacts.Accepted, {
     requirement: manageInvitationsRequirement,
+    stale: () => reads("invitations", "members", "ownership", "directory"),
     concerns: ({ memberId }) => memberId
   }),
-  registerFact(InvitationFacts.Revoked, { requirement: manageInvitationsRequirement }),
-  registerFact(RoleFacts.Created),
-  registerFact(RoleFacts.Renamed),
+  registerFact(InvitationFacts.Revoked, {
+    requirement: manageInvitationsRequirement,
+    stale: () => reads("invitations")
+  }),
+  // Roles show in the settings and beside each member.
+  registerFact(RoleFacts.Created, { stale: () => reads("settings", "members") }),
+  registerFact(RoleFacts.Renamed, { stale: () => reads("settings", "members") }),
   // Marks a built-in role revision; the renames and permission changes it made come with it.
   registerFact(RoleFacts.BuiltinsRevised),
   registerFact(RoleFacts.PermissionsChanged, {
+    stale: () => grantsChanged,
     access: () => Access.Grants({ memberId: undefined })
   }),
   registerFact(AssignmentFacts.Created, {
     requirement: ({ memberId }, workspaceId) => readAccessRequirement(memberId, workspaceId),
+    stale: () => grantsChanged,
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => Access.Grants({ memberId })
   }),
   registerFact(AssignmentFacts.Revoked, {
     requirement: ({ memberId }, workspaceId) => readAccessRequirement(memberId, workspaceId),
+    stale: () => grantsChanged,
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => Access.Grants({ memberId })
   }),
+  // A group's name shows in the groups list and among public groups, where a public group's
+  // creation reaches everyone who might join it.
   registerFact(GroupFacts.Created, {
-    requirement: ({ id }, workspaceId) => readGroupRequirement(id, workspaceId)
+    requirement: ({ id }, workspaceId) => readGroupRequirement(id, workspaceId),
+    stale: () => reads("groups", "public-groups")
   }),
   registerFact(GroupFacts.Renamed, {
-    requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId)
+    requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
+    stale: () => reads("groups", "public-groups")
   }),
   registerFact(GroupMembershipFacts.Added, {
     requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
+    stale: membershipChanged,
     access: ({ memberId }) => Access.Groups({ memberId })
   }),
   registerFact(GroupMembershipFacts.Removed, {
     requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
+    stale: membershipChanged,
     access: ({ memberId }) => Access.Groups({ memberId })
   }),
-  // Connections reach those who may read them; no fact carries a key.
+  // Connections reach those who may read them; no fact carries a key. Their names, settings, and
+  // readiness show with them and with the agents that use them; replacing a key changes none.
   registerFact(ConnectionFacts.Created, {
-    requirement: ({ id }, workspaceId) => readConnectionRequirement(id, workspaceId)
+    requirement: ({ id }, workspaceId) => readConnectionRequirement(id, workspaceId),
+    stale: () => reads("connections", "agents")
   }),
   registerFact(ConnectionFacts.Renamed, {
-    requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId)
+    requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId),
+    stale: () => reads("connections", "agents")
   }),
   registerFact(ConnectionFacts.Configured, {
-    requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId)
+    requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId),
+    stale: () => reads("connections", "agents")
   }),
   registerFact(ConnectionFacts.KeyReplaced, {
     requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId)
   }),
   registerFact(ConnectionFacts.Removed, {
-    requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId)
+    requirement: ({ connectionId }, workspaceId) => readConnectionRequirement(connectionId, workspaceId),
+    stale: () => reads("connections", "agents")
   }),
   // Agents' configuration reaches those who may read it; their names and departures come with
   // membership facts.
   registerFact(AgentFacts.Created, {
-    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId)
+    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
+    stale: () => reads("agents")
   }),
   registerFact(AgentFacts.Configured, {
-    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId)
+    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
+    stale: () => reads("agents")
   }),
-  // Turns reach those who may read their thread: what the agent is doing there, and how it ended.
+  // Turns reach those who may read their thread: what the agent is doing there, and how it ended,
+  // which the commit delivers as the turn.
   registerFact(TurnFacts.Created, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId)
   }),
@@ -301,13 +359,16 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(TurnFacts.Cancelled, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId)
   }),
-  registerFact(GroupFollowFacts.Started),
-  registerFact(GroupFollowFacts.Ended),
+  // Whether the reader follows a group shows in their groups list.
+  registerFact(GroupFollowFacts.Started, { stale: () => reads("groups") }),
+  registerFact(GroupFollowFacts.Ended, { stale: () => reads("groups") }),
   registerFact(ThreadFacts.Created, {
     requirement: ({ id }, workspaceId) => readThreadRequirement(id, workspaceId)
   }),
+  // A thread's title: the thread itself; its stream and timeline take what the commit delivers.
   registerFact(ThreadFacts.Renamed, {
-    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId)
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+    stale: ({ threadId }) => [readOf("threads", threadId)]
   }),
   registerFact(ThreadMessageFacts.Published, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId)
@@ -349,8 +410,8 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(DeliveryFacts.Failed, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId)
   }),
-  // Readers see the timeline item without whom it notified; each human or agent recipient
-  // receives the notification it created for them, which needs no thread read permission.
+  // Each human or agent recipient receives the notification the activity created for them, which
+  // needs no thread read permission; readers take the timeline item the commit delivers.
   registerFact(ThreadActivityFacts.Recorded, {
     requirement: ({ activity }, workspaceId) => readThreadRequirement(activity.threadId, workspaceId),
     notifications: (event) =>
@@ -367,28 +428,16 @@ const registry: ReadonlyArray<Registered> = [
               }
             ]
           : []
-      ),
-    view: {
-      schema: Schema.Struct({
-        groupId: ThreadActivityFacts.Recorded.payload.fields.groupId,
-        activity: ThreadActivityFacts.Recorded.payload.fields.activity
-      }),
-      from: ({ groupId, activity }) => ({ groupId, activity })
-    }
+      )
   }),
-  // Readers see the public participant summary, without routing identities or admissions.
+  // Who takes part in a thread, and so follows it.
   registerFact(ThreadParticipationFacts.Added, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
-    view: {
-      schema: Schema.Struct({
-        ...ThreadParticipation.Summary.fields,
-        groupId: ThreadParticipationFacts.Added.payload.fields.groupId
-      }),
-      from: (payload) => Object.assign(ThreadParticipation.toSummary(payload), { groupId: payload.groupId })
-    }
+    stale: ({ threadId }) => [readOf("participants", threadId)]
   }),
   registerFact(ThreadParticipationFacts.Ended, {
-    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId)
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+    stale: ({ threadId }) => [readOf("participants", threadId)]
   })
 ]
 

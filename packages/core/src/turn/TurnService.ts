@@ -179,8 +179,7 @@ const endings: ReadonlySet<string> = new Set([
 /** Whether a commit ends the turn: it holds a fact ending a turn, whose payload names this one. */
 const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: TurnId.TurnId) =>
   delivery.events.some(
-    ({ event }) =>
-      endings.has(event.name) && Predicate.hasProperty(event.payload, "turnId") && event.payload.turnId === turnId
+    ({ name, payload }) => endings.has(name) && Predicate.hasProperty(payload, "turnId") && payload.turnId === turnId
   )
 
 /**

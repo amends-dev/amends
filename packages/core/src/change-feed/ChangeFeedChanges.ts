@@ -3,7 +3,7 @@
  * it in place rather than read it again: each change as it is now, with who may see it.
  * `ChangeFeedSource` asks once for each commit it prepares, after the commit, so a change may
  * reflect later commits too, and the last change to anything follows its last commit.
- * `ChangeFeedService` filters what it prepared for each reader, as it filters events.
+ * `ChangeFeedService` filters what it prepared for each reader, as it filters the commit's facts.
  *
  * @since 0.1.0
  */

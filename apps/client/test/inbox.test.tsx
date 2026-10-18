@@ -272,8 +272,8 @@ it("shows the notifications a commit delivers, the sources it changes, and what 
     workspaceId: "one",
     cursor,
     commitId: `commit-${cursor}`,
-    events: [],
     changes: items.map((item) => ({ _tag: "TimelineItem", item })),
+    stale: notifications.length > 0 ? [{ read: "pending" }] : [],
     notifications
   })
   // A new notification shows first, with the timeline item the same commit delivered.

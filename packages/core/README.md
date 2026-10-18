@@ -574,13 +574,13 @@ version this host does not know or a payload its schema rejects, is logged and e
 subscription so the consumer refreshes, and the follower goes on past it.
 
 `watch` checks active membership, then emits `Ready { workspaceId, cursor, reset }` and a
-`Committed { workspaceId, cursor, commitId, events, changes, notifications }` for each later commit
+`Committed { workspaceId, cursor, commitId, changes, stale, notifications }` for each later commit
 with something the reader may see. A cursor is opaque and resumes after the commit that carried it. Given
 `after`, the feed replays the commits after it, up to 500, with `reset: false`; without one, or with
 a cursor it cannot resume from, `Ready` has `reset: true` at the head and the consumer must refresh
 its view. `Ready`'s cursor is null only for an empty journal.
 
-A reader sees an event when they hold a scope in its fact's
+A reader is told of a fact when they hold a scope in its
 [audience](../../docs/journal.md#fact-audiences), the workspace, their membership or identity, or a
 group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts`
 names for it: `invitation.manage` for invitations, `member.read` and `assignment.read` for
@@ -588,10 +588,12 @@ membership and access changes, `group.read` for group facts, and `thread.read` f
 registration can name the member a fact concerns, who sees it without the permission. Their
 membership, admissions, and grants are read after the subscription registers and reloaded before
 filtering a commit that changes them, so a commit that admits the reader delivers what it admits.
-The commit that removes the reader from the workspace is delivered, then the stream ends. Registry
-views give some facts their public shape: activity omits its recipients, and participation omits
-routing identities and admissions. A core test checks that the registry holds every fact that
-declares an audience, at each version, and no other.
+The commit that removes the reader from the workspace is delivered, then the stream ends. Each
+registration also names the reads its fact makes stale, which a commit's `stale` gives the readers
+it reaches, with `pending` for a reader it notified: what its `changes` do not deliver, such as a
+member's rename or a group's creation. Facts whose changes the commit delivers, such as thread
+activity and turns, name none. A core test checks that the registry holds every fact that declares
+an audience, at each version, and no other.
 
 A commit's `changes` are what it changed in what readers show, each as it is now, so a reader puts it
 in place rather than reading it again: a `TimelineItem` for every timeline item about a subject the

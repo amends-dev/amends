@@ -143,29 +143,30 @@ the subscription registers. With `reset: false`, the commits after the given cur
 live ones. With `reset: true` (no cursor, an unknown one, one more than 500 commits behind, or one
 before a commit the server cannot read) delivery starts at the head and the client must refresh the
 views it keeps; `cursor` is null only for an empty workspace. Later messages contain
-`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, a `changes`
-array, and a `notifications` array; at least one of the three is nonempty. `changes` holds what the
+`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, a `changes` array, a `stale` array, and a
+`notifications` array; at least one of the three is nonempty. `changes` holds what the
 commit changed in what the caller may see, each as it is now, which clients put in place of what
 they show: a `TimelineItem` with an `item` exactly as the timeline returns it, and a `Preview` with
 a `preview` of the thread as the group's stream shows it to every reader, an opening without the
 caller's `readThrough` and `unread`, a `GroupLatest` with the `latest` activity of a group, as
 `groupId` and `occurredAt`, from which the groups list derives `latestActivityAt` and
 `newActivity`, and a `Turn` with a `turn` exactly as `GET /turns/:turnId` returns it to the caller.
-`notifications` holds the notifications
-the commit created for the caller, with the same fields the inbox list returns, so clients can
-update an inbox or badge without a refetch. Each event contains `id`, `name`, `version`,
-`recordedAt` (UTC ISO string), `provenance`, and its JSON-encoded `payload`. Provenance includes the
-workspace, performer, immediate cause, correlation ID, and occurrence time; public request bodies
-cannot choose that attribution. The server sends no query keys; clients choose which queries to
-update or invalidate for each commit.
+`stale` names the reads the commit changed for the caller that `changes` does not carry, which
+clients read again, each `{ read, id? }`: `read` is a workspace read, `directory` (`GET
+/me/workspaces`), `settings`, `ownership`, `members`, `invitations`, `permissions`, `groups`,
+`public-groups`, `inbox`, `pending` (`GET /notifications/count`), `connections`, `agents`, or
+`active-turns`, or a read of one group, thread, or turn, `streams` and `rosters` (a group's openings
+and members), `threads`, `timelines`, and `participants` (a thread, its timeline, and its
+participants), or `turns`, with `id` naming which one, or without it every one.
+`notifications` holds the notifications the commit created for the caller, with the same fields the
+inbox list returns, so clients can update an inbox without a refetch, and makes `pending` stale.
 
-Events reach the readers in their fact's audience with the matching read permission: workspace
-metadata, ownership, and role facts reach every member; invitations only holders of
+What a commit tells reaches the readers in its facts' audiences with the matching read permission:
+workspace metadata, ownership, and role facts reach every member; invitations only holders of
 `invitation.manage`; member and access changes holders of `member.read` or `assignment.read` on that
 member, and always the member concerned; group and thread facts the group's members with
-`group.read` or `thread.read`; and follows only the follower. Message events carry the full message,
-so clients can render it without a refetch; activity and participation events carry their public
-views. A commit with nothing the caller may see and no notification for them sends no message. The
+`group.read` or `thread.read`; and follows only the follower. A commit with nothing the caller may
+see and no notification for them sends no message. The
 commit that removes the caller from the workspace is delivered, then the stream ends; reconnecting
 returns 403.
 

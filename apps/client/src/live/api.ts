@@ -1,6 +1,7 @@
 import { ChangeFeed } from "@amends-dev/core/change-feed"
 import { CoreError } from "@amends-dev/core/error"
 import { Signal } from "@amends-dev/core/signal"
+import { ThreadMessage } from "@amends-dev/core/thread"
 import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as Cause from "effect/Cause"
@@ -23,8 +24,7 @@ import {
   workspaceCollections,
   workspaceKey,
   workspaceResources,
-  type WorkspaceCollection,
-  type WorkspaceResource
+  type WorkspaceCollection
 } from "../api/keys.ts"
 import { errorsOf, retryDelay } from "../api/retry.ts"
 import {
@@ -58,163 +58,33 @@ export type ChangeFeedState = Data.TaggedEnum<{
 }>
 export const ChangeFeedState = Data.taggedEnum<ChangeFeedState>()
 
-type Affected = WorkspaceResource | typeof directoryKey
+/** Whether a read is one of a group, thread, or turn, which a stale read may name. */
+const isCollection = (read: ChangeFeed.Read): read is WorkspaceCollection =>
+  (workspaceCollections as ReadonlyArray<string>).includes(read)
 /**
- * The reads each delivered fact can change. Facts not listed change no read this client makes
- * yet; add a fact here when a read starts depending on it.
+ * The keys of the reads a commit made stale, each once, so every stale read refreshes once. An
+ * item's key is dropped when its whole collection is stale.
  */
-const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
-  "workspace.initialized": ["settings", "ownership", directoryKey],
-  "workspace.renamed": ["settings", "ownership", directoryKey],
-  "workspace.ownership-transferred": [
-    "settings",
-    "ownership",
-    "members",
-    "permissions",
-    "connections",
-    "agents",
-    directoryKey
-  ],
-  // An agent is a member: its name, and whether it is still in the workspace, show with it.
-  "workspace.member.added": ["members", "ownership", "agents", directoryKey],
-  "workspace.member.removed": ["members", "ownership", "agents", directoryKey],
-  // A member's name shows wherever members are named, and in the directory's memberships.
-  "workspace.member.renamed": ["members", "agents", directoryKey],
-  "workspace.invitation.issued": ["invitations"],
-  "workspace.invitation.revoked": ["invitations"],
-  "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],
-  "workspace.role.created": ["settings", "members"],
-  "workspace.role.renamed": ["settings", "members"],
-  // Grants decide what the reader may do and see, including another member's access, and which
-  // notification sources they can still read.
-  "workspace.role.permissions-changed": [
-    "settings",
-    "ownership",
-    "members",
-    "groups",
-    "inbox",
-    "pending",
-    "permissions",
-    "connections",
-    "agents",
-    "active-turns"
-  ],
-  "workspace.assignment.created": [
-    "settings",
-    "ownership",
-    "members",
-    "groups",
-    "inbox",
-    "pending",
-    "permissions",
-    "connections",
-    "agents",
-    "active-turns"
-  ],
-  "workspace.assignment.revoked": [
-    "settings",
-    "ownership",
-    "members",
-    "groups",
-    "inbox",
-    "pending",
-    "permissions",
-    "connections",
-    "agents",
-    "active-turns"
-  ],
-  // A public group's creation reaches everyone who might join it.
-  "group.created": ["groups", "public-groups"],
-  // A team group's name shows in the sidebar, on its page, and among public groups.
-  "group.renamed": ["groups", "public-groups"],
-  // Group access decides the same for the group's threads; public groups show who belongs.
-  "group.membership.added": ["groups", "public-groups", "inbox", "pending", "active-turns"],
-  "group.membership.removed": ["groups", "public-groups", "inbox", "pending", "active-turns"],
-  "group.follow.started": ["groups"],
-  "group.follow.ended": ["groups"],
-  // Connections: their names, settings, and readiness, which agents name and follow.
-  // Replacing a key changes none of them.
-  "connection.created": ["connections", "agents"],
-  "connection.renamed": ["connections", "agents"],
-  "connection.configured": ["connections", "agents"],
-  "connection.removed": ["connections", "agents"],
-  // Agents: how each is set up, and so its readiness.
-  "agent.created": ["agents"],
-  "agent.configured": ["agents"]
-}
-/** A field of an event's JSON payload, when it is a string. */
-const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {
-  let current = value
-  for (const name of path) {
-    if (typeof current !== "object" || current === null || !Object.hasOwn(current, name)) return undefined
-    current = (current as Readonly<Record<string, unknown>>)[name]
-  }
-  return typeof current === "string" ? current : undefined
-}
-interface Target {
-  readonly collection: WorkspaceCollection
-  readonly id: string | undefined
-}
-/** The reads of one group or thread each fact can change, found from its payload. */
-const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Target>>> = {
-  // A thread's title: the thread itself. Its group's stream takes the preview the commit delivers,
-  // and its timeline the items.
-  "thread.renamed": (payload) => [{ collection: "threads", id: text(payload, "threadId") }],
-  // Who belongs to a group, and which of its threads the reader may see. A fact names its group
-  // but not its threads, so every open timeline and participant list checks its access again.
-  "group.membership.added": (payload) => [
-    { collection: "streams", id: text(payload, "groupId") },
-    { collection: "rosters", id: text(payload, "groupId") },
-    { collection: "timelines", id: undefined },
-    { collection: "participants", id: undefined }
-  ],
-  "group.membership.removed": (payload) => [
-    { collection: "streams", id: text(payload, "groupId") },
-    { collection: "rosters", id: text(payload, "groupId") },
-    { collection: "timelines", id: undefined },
-    { collection: "participants", id: undefined }
-  ],
-  // Who takes part in a thread, and so follows it.
-  "thread.participation.added": (payload) => [{ collection: "participants", id: text(payload, "threadId") }],
-  "thread.participation.ended": (payload) => [{ collection: "participants", id: text(payload, "threadId") }],
-  // Rosters list active workspace members only.
-  "workspace.member.added": () => [{ collection: "rosters", id: undefined }],
-  "workspace.member.removed": () => [{ collection: "rosters", id: undefined }]
-}
-/** Grants decide which threads each stream shows, which threads and rosters are readable. */
-const everyStream = new Set([
-  "workspace.role.permissions-changed",
-  "workspace.assignment.created",
-  "workspace.assignment.revoked"
-])
-const key = (workspaceId: string) => (affected: Affected) =>
-  affected === directoryKey ? directoryKey : workspaceKey(workspaceId, affected)
-/**
- * The keys a commit invalidates, each once, so every affected read refreshes once. An item's key
- * is dropped when its whole collection is invalidated.
- */
-export const affectedKeys = (
-  workspaceId: string,
-  events: Iterable<{ readonly name: string; readonly payload?: unknown }>,
-  notified = false
-): Array<string> => {
-  const affected = new Set<Affected>(notified ? ["pending"] : [])
-  const collections = new Set<WorkspaceCollection>(),
+export const staleKeys = (workspaceId: string, stale: ReadonlyArray<ChangeFeed.Stale>): Array<string> => {
+  const reads = new Set<string>(),
+    collections = new Set<string>(),
     items = new Set<string>()
-  for (const event of events) {
-    for (const resource of affects[event.name] ?? []) affected.add(resource)
-    for (const target of targets[event.name]?.(event.payload) ?? [])
-      if (target.id === undefined) collections.add(target.collection)
-      else items.add(itemKey(workspaceId, target.collection, target.id))
-    if (everyStream.has(event.name)) for (const collection of workspaceCollections) collections.add(collection)
-  }
-  const whole = [...collections].map((collection) => collectionKey(workspaceId, collection))
+  for (const { read, id } of stale)
+    if (read === "directory") reads.add(directoryKey)
+    else if (!isCollection(read)) reads.add(workspaceKey(workspaceId, read))
+    else if (id === undefined) collections.add(collectionKey(workspaceId, read))
+    else items.add(itemKey(workspaceId, read, id))
   return [
-    ...[...affected].map(key(workspaceId)),
-    ...whole,
-    ...[...items].filter((item) => !whole.some((prefix) => item.startsWith(`${prefix}:`)))
+    ...reads,
+    ...collections,
+    ...[...items].filter((item) => ![...collections].some((prefix) => item.startsWith(`${prefix}:`)))
   ]
 }
+/** The messages a commit delivered, each in the timeline item that shows it. */
+const deliveredMessagesOf = (changes: ReadonlyArray<ChangeFeed.Change>) =>
+  changes.flatMap((change) =>
+    ChangeFeed.Change.isAnyOf(["TimelineItem"])(change) && "message" in change.item ? [change.item] : []
+  )
 /** The timeline item a commit delivered at a notification's source, if it delivered that. */
 const deliveredSourceOf = (
   changes: ReadonlyArray<ChangeFeed.Change>,
@@ -269,7 +139,7 @@ const run = Effect.fnUntraced(function* (
   const typists = typistsAtom(workspaceId)
   const everything = [
     directoryKey,
-    ...workspaceResources.map(key(workspaceId)),
+    ...workspaceResources.map((resource) => workspaceKey(workspaceId, resource)),
     ...workspaceCollections.map((collection) => collectionKey(workspaceId, collection))
   ]
   /** The reads of the reader's own read state, which signals carry and a dropped feed may have missed. */
@@ -318,13 +188,12 @@ const run = Effect.fnUntraced(function* (
       },
       Committed: (message) => {
         cursor = message.cursor
+        const messages = deliveredMessagesOf(message.changes)
         // A member whose message arrived is no longer typing it.
-        for (const event of message.events)
-          if (event.name === "thread.message.published") {
-            const threadId = text(event.payload, "threadId"),
-              memberId = text(event.payload, "author", "memberId")
-            if (threadId && memberId)
-              registry.update(typists, (current) => posted(current, threadId, memberId, Date.now()))
+        for (const { activity, message: posting } of messages)
+          if (activity.kind === "message.published" && ThreadMessage.Author.isAnyOf(["Member"])(posting.author)) {
+            const memberId = posting.author.memberId
+            registry.update(typists, (current) => posted(current, activity.threadId, memberId, Date.now()))
           }
         // What the commit changed shows in place, without reading it again.
         for (const change of message.changes)
@@ -338,11 +207,7 @@ const run = Effect.fnUntraced(function* (
         recordMessages(
           registry,
           workspaceId,
-          message.changes.flatMap((change) =>
-            ChangeFeed.Change.isAnyOf(["TimelineItem"])(change) && "message" in change.item
-              ? [change.item.message.id]
-              : []
-          )
+          messages.map((item) => item.message.id)
         )
         // A notification for the reader shows in their inbox with the timeline item it tells of,
         // when the commit delivered that too, and changes their pending counts.
@@ -350,7 +215,8 @@ const run = Effect.fnUntraced(function* (
           const source = deliveredSourceOf(message.changes, notification.thread)
           deliverNotification(registry, workspaceId, source === undefined ? { notification } : { notification, source })
         }
-        const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0)
+        // What it did not deliver, the reader reads again.
+        const keys = staleKeys(workspaceId, message.stale)
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void
       },
       Signal: (message) => {

@@ -688,14 +688,7 @@ it("shows a rename committed elsewhere without a reload, keeping the draft being
   expect(input).toHaveValue("Studio")
   fireEvent.input(input, { target: { value: "My draft" } })
   name = "Atelier"
-  feed.streams[0]?.send(
-    committed("one", "2", [
-      {
-        name: "workspace.renamed",
-        payload: { workspaceId: "one", previousName: "Studio", name: "Atelier" }
-      }
-    ])
-  )
+  feed.streams[0]?.send(committed("one", "2", [{ read: "settings" }, { read: "ownership" }, { read: "directory" }]))
   await waitFor(() => expect(sidebar).toHaveTextContent("Atelier"))
   expect(screen.getByRole("textbox", { name: "Workspace name" })).toBe(input)
   expect(input).toHaveValue("My draft")
@@ -710,11 +703,7 @@ it("leaves a workspace once a commit removes the member, without signing out", a
   )
   await screen.findByRole("heading", { name: "Inbox" })
   status = "removed"
-  feed.streams[0]?.send(
-    committed("one", "2", [
-      { name: "workspace.member.removed", payload: { workspaceId: "one", memberId: "owner-one" } }
-    ])
-  )
+  feed.streams[0]?.send(committed("one", "2", [{ read: "members" }, { read: "directory" }]))
   feed.streams[0]?.unavailable()
   await screen.findByRole("heading", { name: "That workspace is closed to you" })
   expect(fixture.store.read()?.token).toBe("alice")

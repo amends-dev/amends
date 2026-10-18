@@ -14,7 +14,6 @@ import {
   type ThreadEntry,
   type TurnControls
 } from "../src/index.ts"
-import { affectedKeys } from "../src/live/api.ts"
 import { Turn, turnWith, withDeliveredTurns } from "../src/turns/api.ts"
 import { drafted, writing, type Drafts } from "../src/turns/drafts.ts"
 
@@ -593,27 +592,6 @@ it("tells a failed turn's end once, rather than as an interruption and again as 
     reason: "Anthropic is limiting requests.",
     retrying: false
   })
-})
-
-it("reads nothing again as a turn's facts arrive, since the commit delivers the turn", () => {
-  for (const name of [
-    "turn.created",
-    "turn.retried",
-    "turn.started",
-    "turn.completed",
-    "turn.failed",
-    "turn.cancelled"
-  ])
-    expect(affectedKeys("one", [{ name, payload: { threadId: "thread", turnId: "turn-1" } }])).toEqual([])
-  // A thread's timeline takes the turn's items as the commit delivers them, rather than read again.
-  expect(
-    affectedKeys("one", [
-      {
-        name: "thread.activity.recorded",
-        payload: { groupId: "general", activity: { threadId: "thread", kind: "turn.ended" } }
-      }
-    ])
-  ).not.toContain("workspace/one/timelines:thread")
 })
 
 it("shows the turns the change feed delivered after a read in place of what it read", () => {

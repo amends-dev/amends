@@ -1,3 +1,5 @@
+import { Connection as ConnectionContract } from "@amends-dev/connection"
+import { ConnectionFacts, ConnectionPermissions } from "@amends-dev/core/connection"
 import {
   GroupFacts,
   GroupFollow,
@@ -11,6 +13,7 @@ import {
 import { Subject } from "@amends-dev/core/journal"
 import {
   ThreadFacts,
+  Thread,
   ThreadMessage,
   ThreadMessageFacts,
   ThreadParticipationFacts,
@@ -259,7 +262,8 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
         GroupPermissions.Read,
         MemberPermissions.Read,
         InvitationPermissions.Manage,
-        AssignmentPermissions.Read
+        AssignmentPermissions.Read,
+        ConnectionPermissions.Read
       ])
     )
     const services = Layer.mergeAll(
@@ -317,6 +321,12 @@ const committed = (message: ChangeFeed.Message) => {
   if (!ChangeFeed.Message.isAnyOf(["Committed"])(message)) throw new Error(`Expected a commit, got ${message._tag}`)
   return message
 }
+/** The reads a commit made stale for the reader, as `read` or `read:id`. */
+const staleOf = (message: ChangeFeed.Message) =>
+  committed(message).stale.map((stale) => (stale.id === undefined ? stale.read : `${stale.read}:${stale.id}`))
+/** A thread's new title, which makes the thread's read stale for its readers. */
+const rename = (thread: ThreadId.ThreadId, group: GroupId.GroupId, title = "Renamed") =>
+  publish(ThreadFacts.Renamed, { workspaceId, threadId: thread, groupId: group, title: Thread.Title.make(title) })
 const signal = (value: Signal.Signal) => Effect.flatMap(SignalHub.SignalHub, (signalHub) => signalHub.publish(value))
 const typing = (thread: ThreadId.ThreadId, group: GroupId.GroupId, memberId = bobMember) =>
   Signal.Signal.cases.Typing.make({
@@ -349,13 +359,9 @@ it.effect("a subscription without a cursor resets at the head, then delivers lat
       const ready = yield* feed.next
       expect(ready).toEqual({ _tag: "Ready", workspaceId, cursor: "0", reset: true })
       yield* commit(publish(InvitationFacts.Issued, invitation("after")))
-      const received = committed(yield* feed.next)
-      expect(received.cursor).toBe("1")
-      expect(received.events.map((event) => event.name)).toEqual([InvitationFacts.Issued.name])
-      expect(received.events[0]?.payload).toMatchObject({
-        id: "after",
-        issuedAt: "2026-09-20T12:00:00.123Z"
-      })
+      const received = yield* feed.next
+      expect(committed(received).cursor).toBe("1")
+      expect(staleOf(received)).toEqual(["invitations"])
       expect(yield* Queue.size(feed.queue)).toBe(0)
     })
   )
@@ -388,11 +394,11 @@ it.effect("a cursor resumes after its commit without a reset, replaying what fol
       yield* commit(publish(InvitationFacts.Issued, invitation("missed-2")))
       const feed = yield* listen({ after: cursor })
       expect(yield* feed.next).toEqual({ _tag: "Ready", workspaceId, cursor, reset: false })
+      // The internal fact's commit carries nothing for the reader.
       const replayed = [committed(yield* feed.next), committed(yield* feed.next)]
-      expect(replayed.map((m) => m.events[0]?.payload)).toMatchObject([{ id: "missed-1" }, { id: "missed-2" }])
       expect(replayed.map((m) => m.cursor)).toEqual(["1", "3"])
       yield* commit(publish(InvitationFacts.Issued, invitation("live")))
-      expect(committed(yield* feed.next).events[0]?.payload).toMatchObject({ id: "live" })
+      expect(committed(yield* feed.next).cursor).toBe("4")
       // Resuming at the head replays nothing and still needs no reset.
       const current = yield* listen({ after: ChangeFeed.Cursor.make("4") })
       expect(yield* current.next).toMatchObject({ reset: false, cursor: "4" })
@@ -437,17 +443,17 @@ it.effect("invalid cursors are rejected before subscribing", () =>
   )
 )
 
-it.effect("group and thread events reach the group's readers, and admission reloads the reader's scopes", () =>
+it.effect("group and thread facts reach the group's readers, and admission reloads the reader's scopes", () =>
   run(({ admitted }) =>
     Effect.gen(function* () {
       const feed = yield* listen()
       yield* feed.next
-      // Not yet a member: the group's thread and messages are withheld.
+      // Not yet a member: the group and its thread are withheld.
       yield* commit(
         Effect.gen(function* () {
           yield* publish(GroupFacts.Created, group(groupId))
           yield* publish(ThreadFacts.Created, thread(threadId, groupId))
-          yield* publish(ThreadMessageFacts.Published, message("hidden", threadId, groupId))
+          yield* rename(threadId, groupId, "Hidden")
         })
       )
       // The projection admits the reader in the same commit that records the admission.
@@ -455,17 +461,25 @@ it.effect("group and thread events reach the group's readers, and admission relo
       yield* commit(
         Effect.gen(function* () {
           yield* publish(GroupMembershipFacts.Added, admission(groupId))
-          yield* publish(ThreadMessageFacts.Published, message("visible", threadId, groupId))
+          yield* rename(threadId, groupId, "Visible")
         })
       )
-      const joined = committed(yield* feed.next)
-      expect(joined.cursor).toBe("1")
-      expect(joined.events.map((e) => e.name)).toEqual([
-        GroupMembershipFacts.Added.name,
-        ThreadMessageFacts.Published.name
+      const joined = yield* feed.next
+      expect(committed(joined).cursor).toBe("1")
+      expect(staleOf(joined)).toEqual([
+        "groups",
+        "public-groups",
+        "inbox",
+        "pending",
+        "active-turns",
+        "timelines",
+        "participants",
+        `streams:${groupId}`,
+        `rosters:${groupId}`,
+        `threads:${threadId}`
       ])
-      // Another group's activity stays withheld.
-      yield* commit(publish(ThreadMessageFacts.Published, message("elsewhere", otherThreadId, otherGroupId)))
+      // Another group's thread stays withheld.
+      yield* commit(rename(otherThreadId, otherGroupId))
       admitted.delete(groupId)
       yield* commit(
         Effect.gen(function* () {
@@ -476,20 +490,21 @@ it.effect("group and thread events reach the group's readers, and admission relo
             memberId: actor.memberId,
             reason: "removed"
           })
-          yield* publish(ThreadMessageFacts.Published, message("after", threadId, groupId))
+          yield* rename(threadId, groupId, "After")
         })
       )
       // The removed reader learns of their removal, and nothing after it.
-      const left = committed(yield* feed.next)
-      expect(left.cursor).toBe("3")
-      expect(left.events.map((e) => e.name)).toEqual([GroupMembershipFacts.Removed.name])
+      const left = yield* feed.next
+      expect(committed(left).cursor).toBe("3")
+      expect(staleOf(left)).not.toContain(`threads:${threadId}`)
+      expect(staleOf(left)).toContain(`streams:${groupId}`)
       yield* commit(publish(InvitationFacts.Issued, invitation("marker")))
-      expect(committed(yield* feed.next).events[0]?.name).toBe(InvitationFacts.Issued.name)
+      expect(staleOf(yield* feed.next)).toEqual(["invitations"])
     })
   )
 )
 
-it.effect("thread events also need the reader's thread.read grant for that thread", () =>
+it.effect("thread facts also need the reader's thread.read grant for that thread", () =>
   run(
     ({ admitted }) =>
       Effect.gen(function* () {
@@ -498,12 +513,11 @@ it.effect("thread events also need the reader's thread.read grant for that threa
         yield* feed.next
         yield* commit(
           Effect.gen(function* () {
-            yield* publish(ThreadMessageFacts.Published, message("granted", threadId, groupId))
-            yield* publish(ThreadMessageFacts.Published, message("ungranted", otherThreadId, groupId))
+            yield* rename(threadId, groupId)
+            yield* rename(otherThreadId, groupId)
           })
         )
-        const received = committed(yield* feed.next)
-        expect(received.events.map((e) => e.payload)).toMatchObject([{ id: "granted" }])
+        expect(staleOf(yield* feed.next)).toEqual([`threads:${threadId}`])
       }),
     { grants: [threadGrant(threadId)] }
   )
@@ -573,7 +587,7 @@ it.effect("a commit's changes reach the readers of what changed, who hold its re
   )
 )
 
-it.effect("follows reach only their owner, and thread views hide recipients and routing", () =>
+it.effect("follows reach only their owner, and a thread's participation its readers", () =>
   run(({ admitted }) =>
     Effect.gen(function* () {
       admitted.add(groupId)
@@ -633,41 +647,10 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
           })
         })
       )
-      const received = committed(yield* feed.next)
-      expect(received.events.map((e) => [e.name, e.payload])).toEqual([
-        [GroupFollowFacts.Started.name, expect.objectContaining({ memberId: actor.memberId })],
-        [
-          ThreadParticipationFacts.Added.name,
-          {
-            id: "participation",
-            workspaceId,
-            groupId,
-            threadId,
-            participant: { _tag: "Member", memberId: bobMember },
-            joinedAt: "2026-09-20T12:00:00.123Z",
-            joinedAtSequence: 1
-          }
-        ],
-        [
-          ThreadActivityFacts.Recorded.name,
-          {
-            groupId,
-            activity: {
-              id: "activity",
-              workspaceId,
-              threadId,
-              sequence: 1,
-              kind: "message.published",
-              version: 1,
-              subject: "thread-message:message",
-              occurrence: JSON.stringify(["message.published", "thread-message:message"]),
-              newActivity: true,
-              details: { messageId: "message" },
-              occurredAt: "2026-09-20T12:00:00.123Z"
-            }
-          }
-        ]
-      ])
+      // Bob's follow is his alone; the activity makes nothing stale, since the commit delivers it.
+      const received = yield* feed.next
+      expect(staleOf(received)).toEqual(["groups", `participants:${threadId}`])
+      expect(committed(received).notifications).toEqual([])
     })
   )
 )
@@ -716,8 +699,10 @@ it.effect("the notifications a commit creates reach their recipient alone, with 
       yield* feed.next
       yield* commit(notifying)
       const received = committed(yield* feed.next)
-      const [activity] = received.events
-      expect(activity?.name).toBe(ThreadActivityFacts.Recorded.name)
+      const [activity] = yield* (yield* Journal.Journal).log.readEntries({
+        name: ThreadActivityFacts.Recorded.name,
+        limit: 1
+      })
       expect(received.notifications).toEqual([
         {
           id: JSON.stringify(["journal", activity?.id, "alice-participation"]),
@@ -726,10 +711,12 @@ it.effect("the notifications a commit creates reach their recipient alone, with 
           participationId: "alice-participation",
           thread: { threadId, groupId, sequence: 3 },
           recipient: Notification.ofMember(actor.memberId, alice),
-          recordedAt: activity?.recordedAt,
+          recordedAt: received.notifications[0]?.recordedAt,
           state: { _tag: "Pending" }
         }
       ])
+      // A notification makes the recipient's pending counts stale.
+      expect(received.stale).toEqual([{ read: "pending" }])
     })
   )
 )
@@ -742,7 +729,7 @@ it.effect("a recipient without read access still receives their notification alo
         yield* feed.next
         yield* commit(notifying)
         const received = committed(yield* feed.next)
-        expect(received.events).toEqual([])
+        expect(received.stale).toEqual([{ read: "pending" }])
         expect(received.notifications.map((n) => n.participationId)).toEqual(["alice-participation"])
       }),
     { grants: [] }
@@ -761,9 +748,9 @@ it.effect("internal facts are skipped, and a commit of only internal facts sends
           yield* publish(InvitationFacts.Issued, invitation("public"))
         })
       )
-      const received = committed(yield* feed.next)
-      expect(received.cursor).toBe("1")
-      expect(received.events.map((e) => e.name)).toEqual([InvitationFacts.Issued.name])
+      const received = yield* feed.next
+      expect(committed(received).cursor).toBe("1")
+      expect(staleOf(received)).toEqual(["invitations"])
     })
   )
 )
@@ -883,7 +870,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
           })
         )
         yield* commit(roleMarker("marker"))
-        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([RoleFacts.Created.name])
+        expect(staleOf(yield* feed.next)).toEqual(["settings", "members"])
         // The member a fact concerns sees it anyway: their own access and their own removal.
         yield* commit(
           publish(AssignmentFacts.Created, {
@@ -893,7 +880,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
             source: workspaceGrant(GroupPermissions.Read)
           })
         )
-        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([AssignmentFacts.Created.name])
+        expect(staleOf(yield* feed.next)).toContain("permissions")
         yield* commit(
           publish(AssignmentFacts.Revoked, {
             workspaceId,
@@ -901,11 +888,56 @@ it.effect("workspace facts reach readers who may read them, and the member they 
             memberId: actor.memberId
           })
         )
-        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([AssignmentFacts.Revoked.name])
+        expect(staleOf(yield* feed.next)).toContain("permissions")
         yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId }))
-        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([MemberFacts.Removed.name])
+        expect(staleOf(yield* feed.next)).toEqual(["members", "ownership", "agents", "directory", "rosters"])
       }),
     { grants: [workspaceGrant(ThreadPermissions.Read)] }
+  )
+)
+
+it.effect("each fact names the reads it makes stale, and one that changes none sends nothing", () =>
+  run(
+    () =>
+      Effect.gen(function* () {
+        const feed = yield* listen()
+        yield* feed.next
+        const connection = { workspaceId, connectionId: ConnectionContract.ConnectionId.make("search") }
+        // A replaced key changes nothing a reader shows; a removed connection, what agents use too.
+        yield* commit(publish(ConnectionFacts.KeyReplaced, connection))
+        yield* commit(publish(ConnectionFacts.Removed, connection))
+        const removed = yield* feed.next
+        expect(committed(removed).cursor).toBe("1")
+        expect(staleOf(removed)).toEqual(["connections", "agents"])
+        // A member's name shows wherever members are named, agents among them.
+        yield* commit(publish(MemberFacts.Renamed, { workspaceId, memberId: bobMember, name: Member.Name.make("Bob") }))
+        expect(staleOf(yield* feed.next)).toEqual(["members", "agents", "directory"])
+        // A role's permissions decide what every member may see.
+        yield* commit(
+          publish(RoleFacts.PermissionsChanged, { roleId: Role.RoleId.make("member"), workspaceId, permissions: [] })
+        )
+        expect(staleOf(yield* feed.next)).toEqual([
+          "settings",
+          "ownership",
+          "members",
+          "groups",
+          "inbox",
+          "pending",
+          "permissions",
+          "connections",
+          "agents",
+          "active-turns",
+          "streams",
+          "rosters",
+          "threads",
+          "timelines",
+          "participants",
+          "turns"
+        ])
+      }),
+    {
+      grants: [workspaceGrant(MemberPermissions.Read), workspaceGrant(ConnectionPermissions.Read)]
+    }
   )
 )
 
@@ -924,9 +956,8 @@ it.effect("an exact member-read grant shows that member's changes, and not other
               name: Member.Name.make(memberId)
             })
           )
-        expect(committed(yield* feed.next).events[0]?.payload).toMatchObject({
-          memberId: bobMember
-        })
+        // Only the second commit, Bob's, reaches the reader.
+        expect(committed(yield* feed.next).cursor).toBe("1")
         expect(yield* Queue.size(feed.queue)).toBe(0)
       }),
     {
@@ -944,16 +975,16 @@ it.effect("an exact member-read grant shows that member's changes, and not other
   )
 )
 
-it.effect("a rename reaches every member without a read grant, with both names", () =>
-  run(() =>
-    Effect.gen(function* () {
-      const feed = yield* listen()
-      yield* feed.next
-      yield* commit(publish(WorkspaceFacts.Renamed, { workspaceId, previousName: "Studio", name: "Atelier" }))
-      const [event] = committed(yield* feed.next).events
-      expect(event?.name).toBe(WorkspaceFacts.Renamed.name)
-      expect(event?.payload).toEqual({ workspaceId, previousName: "Studio", name: "Atelier" })
-    })
+it.effect("a workspace rename reaches every member without a read grant", () =>
+  run(
+    () =>
+      Effect.gen(function* () {
+        const feed = yield* listen()
+        yield* feed.next
+        yield* commit(publish(WorkspaceFacts.Renamed, { workspaceId, previousName: "Studio", name: "Atelier" }))
+        expect(staleOf(yield* feed.next)).toEqual(["settings", "ownership", "directory"])
+      }),
+    { grants: [] }
   )
 )
 
@@ -963,12 +994,9 @@ it.effect("the reader's removal from the workspace is delivered, then the stream
       const feed = yield* listen()
       yield* feed.next
       yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: MemberId.MemberId.make("someone-else") }))
-      expect(committed(yield* feed.next).events[0]?.name).toBe(MemberFacts.Removed.name)
+      expect(staleOf(yield* feed.next)).toContain("members")
       yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId }))
-      expect(committed(yield* feed.next).events[0]?.payload).toEqual({
-        workspaceId,
-        memberId: actor.memberId
-      })
+      expect(staleOf(yield* feed.next)).toContain("members")
       const exit = yield* Fiber.await(feed.fiber)
       expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
         Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() }))
@@ -999,10 +1027,10 @@ it.effect("a revocation that commits while the reader subscribes still applies t
       )
       const feed = yield* listen()
       yield* feed.next
-      yield* commit(publish(ThreadMessageFacts.Published, message("after", threadId, groupId)))
+      yield* commit(rename(threadId, groupId, "After"))
       yield* commit(roleMarker("marker"))
-      expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([GroupMembershipFacts.Removed.name])
-      expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([RoleFacts.Created.name])
+      expect(staleOf(yield* feed.next)).toContain(`streams:${groupId}`)
+      expect(staleOf(yield* feed.next)).toEqual(["settings", "members"])
     })
   )
 )
@@ -1021,7 +1049,7 @@ it.effect("a workspace removal that commits while the reader subscribes still en
       const feed = yield* listen()
       yield* feed.next
       yield* commit(roleMarker("marker"))
-      expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([MemberFacts.Removed.name])
+      expect(staleOf(yield* feed.next)).toContain("members")
       const exit = yield* Fiber.await(feed.fiber)
       expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
         Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() }))

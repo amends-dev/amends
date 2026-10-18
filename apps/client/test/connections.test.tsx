@@ -13,7 +13,6 @@ import {
   type ConnectionsDone,
   type SessionStore
 } from "../src/index.ts"
-import { affectedKeys } from "../src/live/api.ts"
 
 afterEach(cleanup)
 const json = (body: unknown, status = 200) =>
@@ -266,14 +265,6 @@ describe("settings forms", () => {
       stream: "false"
     })
   })
-})
-
-it("refreshes connections on their facts and on access changes, but not on a key replaced", () => {
-  const keys = (name: string) => affectedKeys("one", [{ name }])
-  expect(keys("connection.created")).toContain("workspace/one/connections")
-  expect(keys("connection.removed")).toContain("workspace/one/connections")
-  expect(keys("workspace.assignment.created")).toContain("workspace/one/connections")
-  expect(keys("connection.key-replaced")).not.toContain("workspace/one/connections")
 })
 
 it("shapes connections with their integrations' fields, readiness, and who created them", async () => {

@@ -40,33 +40,20 @@ const owner = {
   name: "alice",
   status: "active"
 }
-const event = (name: string, payload: unknown) => ({
-  id: `entry-${name}`,
-  name,
-  version: 1,
-  recordedAt: at,
-  provenance: {
-    workspaceId: "one",
-    performedBy: { _tag: "System", id: "test" },
-    causedBy: null,
-    correlationId: "correlation",
-    occurredAt: at
-  },
-  payload
-})
 const ready = (cursor: string | null, reset: boolean) => ({
   _tag: "Ready",
   workspaceId: "one",
   cursor,
   reset
 })
-const committed = (cursor: string, ...events: Array<ReturnType<typeof event>>) => ({
+/** A commit for the reader that made these reads stale. */
+const committed = (cursor: string, ...stale: Array<{ readonly read: string; readonly id?: string }>) => ({
   _tag: "Committed",
   workspaceId: "one",
   cursor,
   commitId: `commit-${cursor}`,
-  events,
   changes: [],
+  stale,
   notifications: []
 })
 
@@ -213,14 +200,12 @@ it("refreshes the reads each commit affects, and every read after a reset", asyn
   expect(f.count("/me/workspaces")).toBe(before.directory + 1)
   // Invitations are not read here, so their commits refresh nothing.
   const quiet = f.reads.length
-  first.send(committed("3", event("workspace.invitation.issued", {})))
-  first.send(committed("4", event("thread.message.published", {})))
+  first.send(committed("3", { read: "invitations" }))
+  first.send(committed("4"))
   await new Promise((resolve) => setTimeout(resolve, 50))
   expect(f.reads).toHaveLength(quiet)
   f.rename("Atelier")
-  first.send(
-    committed("5", event("workspace.renamed", { workspaceId: "one", previousName: "Studio", name: "Atelier" }))
-  )
+  first.send(committed("5", { read: "settings" }, { read: "ownership" }, { read: "directory" }))
   await waitFor(() => expect(f.settings.workspace()?.name).toBe("Atelier"))
   expect(f.count("/ownership")).toBe(before.settings + 2)
   await waitFor(() => expect(f.count("/me/workspaces")).toBe(before.directory + 2))
@@ -239,7 +224,7 @@ it("resumes after the last commit when the stream drops, refreshing only the rea
   })
   const first = await f.connected(0)
   first.send(ready("2", true))
-  first.send(committed("3", event("workspace.invitation.issued", {})))
+  first.send(committed("3", { read: "invitations" }))
   await waitFor(() => expect(f.feed.state()._tag).toBe("Live"))
   first.unavailable()
   await waitFor(() => expect(f.feed.state()).toMatchObject({ _tag: "Reconnecting", attempt: 1 }))
@@ -286,7 +271,7 @@ it("ends and refreshes the directory when the member loses the workspace", async
   await waitFor(() => expect(f.feed.state()._tag).toBe("Live"))
   const directory = f.count("/me/workspaces")
   denied = true
-  first.send(committed("3", event("workspace.member.removed", { workspaceId: "one", memberId: "owner" })))
+  first.send(committed("3", { read: "members" }, { read: "directory" }))
   first.unavailable()
   await waitFor(() => expect(f.feed.state()).toMatchObject({ _tag: "Reconnecting" }))
   window.dispatchEvent(new Event("online"))
@@ -353,15 +338,16 @@ it("shows who is typing until their signal runs out or their message arrives, ne
   await waitFor(() => expect(f.typing("thread")).toEqual(["ada"]))
   expect(f.typing("other")).toEqual([])
   // Ada's message arriving ends her typing it.
-  stream.send(
-    committed(
-      "2",
-      event("thread.message.published", {
-        threadId: "thread",
-        author: { _tag: "Member", memberId: "ada" }
-      })
-    )
-  )
+  const posted = timelineItem(2, "Here it is")
+  stream.send({
+    ...committed("2"),
+    changes: [
+      {
+        _tag: "TimelineItem",
+        item: { ...posted, message: { ...posted.message, author: { _tag: "Member", memberId: "ada" } } }
+      }
+    ]
+  })
   await waitFor(() => expect(f.typing("thread")).toEqual([]))
   // A signal lasts only until the moment it names.
   stream.send(typing("rae", 300))

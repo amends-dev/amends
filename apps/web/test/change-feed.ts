@@ -4,36 +4,24 @@ export interface FeedStream {
   readonly send: (message: unknown) => void
   readonly unavailable: () => void
 }
-const at = "2026-09-25T12:00:00.000Z"
 export const ready = (workspaceId: string, cursor = "1", reset = false) => ({
   _tag: "Ready",
   workspaceId,
   cursor,
   reset
 })
+/** A commit for the reader that made these reads stale, as the server tells them. */
 export const committed = (
   workspaceId: string,
   cursor: string,
-  events: ReadonlyArray<{ readonly name: string; readonly payload: unknown }>
+  stale: ReadonlyArray<{ readonly read: string; readonly id?: string }>
 ) => ({
   _tag: "Committed",
   workspaceId,
   cursor,
   commitId: `commit-${cursor}`,
-  events: events.map((event, index) => ({
-    id: `entry-${cursor}-${index}`,
-    version: 1,
-    recordedAt: at,
-    provenance: {
-      workspaceId,
-      performedBy: { _tag: "System", id: "test" },
-      causedBy: null,
-      correlationId: "correlation",
-      occurredAt: at
-    },
-    ...event
-  })),
   changes: [],
+  stale,
   notifications: []
 })
 

@@ -11,7 +11,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
    each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`,
-   `public-groups`, `inbox`, `permissions`, `connections`, and `agents`, and one key
+   `public-groups`, `inbox`, `pending`, `permissions`, `connections`, and `agents`, and one key
    per group stream, group roster, thread timeline, thread participants, and turn within their
    collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
    follows it by its own stream (see the [turn guide](turns.md)).
@@ -28,37 +28,29 @@ and cache invalidation; apps mount it once per workspace view; features show its
    reflect later commits too, and the last change to an item follows the last commit that changed
    it. An edit therefore updates the message's item where it already shows, and a reply the
    thread's preview, with its reply count and latest activity.
-4. Each `Committed` message maps its events to the keys they affect
-   (`apps/client/src/live/api.ts`) and invalidates each once, so every affected read
-   refreshes once. A member's rename refreshes the members and the directory. Group creation,
-   renames, and membership changes also refresh the public groups, and a public group's creation
-   reaches the whole workspace. Thread activity refreshes nothing: the thread's timeline, its
-   group's stream, and the groups list take the commit's changes. A thread's rename refreshes the
-   thread, and a group's rename the groups list; group membership
-   refreshes the groups and that group's stream and roster, and every open timeline and participant
-   list, since the fact names no threads and each must check its access again; joining or leaving a
-   thread refreshes its participants, workspace membership every roster, and grant changes every
-   stream, roster, timeline, and participant list. Group membership and grant changes also refresh the
-   inbox, since they decide which notification sources the reader can still read, and grant and
-   ownership changes refresh what the reader may do. Every `connection.*` fact but a replaced
-   key refreshes connections and the integrations they name, which share one key, as do grant
-   and ownership changes, which decide who may manage them. Agents follow every `agent.*`
-   fact, and the `connection.*` facts, but a replaced key, and the membership and grant facts
-   their readiness, names, and access follow; a connection's models refresh with connections.
-   A `turn.*` fact refreshes nothing: the commit delivers each turn it changes, and the one a
-   retry supersedes, and a thread's turns show in its timeline, which takes the turn's items as
-   the commit delivers them. Group membership and grant changes refresh the active
-   turns. A notification for the reader shows at the top of their inbox, with the timeline item
-   it tells of when the same commit delivers it, and refreshes their pending counts. Mounted reads
-   refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
-   value, so the stream and thread panel replace what they show with an unavailable state once a
-   refresh answers gone or denied, until a later refresh succeeds. Facts with no mapping refresh nothing. Add
-   a mapping when a read starts depending on a fact.
+4. Each `Committed` message names the reads the commit made stale for the reader, those its
+   changes do not cover, and the client invalidates each once (`staleKeys` in
+   `apps/client/src/live/api.ts`), a whole collection covering its items. Core's
+   `ChangeFeedEvents` declares them per fact. A member's rename makes the members, agents, and
+   directory stale; a group's creation or rename the groups and public groups, and a public
+   group's creation reaches the whole workspace; group membership the groups, public groups,
+   inbox, pending counts, active turns, that group's stream and roster, and every timeline and
+   participant list, since the fact names no threads and each must check its access again;
+   joining or leaving a thread its participants; workspace membership every roster; grant changes
+   every read but the invitations, public groups, and directory; every `connection.*` fact but a
+   replaced key the connections and agents; agent facts the agents; and a thread's rename the
+   thread. Thread activity, messages, tasks, and turns make nothing stale: the commit delivers
+   what they changed. A notification for the reader shows at the top of their inbox, with the
+   timeline item it tells of when the same commit delivers it, and makes their pending counts
+   stale. Mounted reads refetch; unmounted reads refetch when next mounted. A read that loses
+   access keeps its last value, so the stream and thread panel replace what they show with an
+   unavailable state once a refresh answers gone or denied, until a later refresh succeeds. A fact
+   that names no read refreshes nothing; declare its reads when a read starts depending on it.
 5. `Ready` with `reset` invalidates every key for the workspace and the directory, and forgets the
-   changes and notifications delivered so far, since what was missed may have changed them. A first
+   timeline items and previews delivered so far, since what was missed may have changed them. A first
    connection always resets, because reads loaded before it may have missed commits. A timeline's
-   refresh reads again every item it shows, and an inbox page shows the notifications delivered
-   after it was read. A `Ready` that resumes without a reset refreshes the reader's read state, the
+   refresh reads again every item it shows, and the inbox, the active turns, and a turn show only
+   what was delivered after their read began. A `Ready` that resumes without a reset refreshes the reader's read state, the
    groups, streams, inbox, and pending counts, since the signals missed meanwhile are never
    replayed.
 

@@ -324,11 +324,7 @@ it("keeps a workspace current through its change feed over the desktop host conn
   expect(stream?.request.headers.get("amends-workspace")).toBe("one")
   expect(stream?.request.headers.get("authorization")).toBe("Bearer jo")
   name = "Atelier"
-  stream?.send(
-    committed("one", "2", [
-      { name: "workspace.renamed", payload: { workspaceId: "one", previousName: "Studio", name } }
-    ])
-  )
+  stream?.send(committed("one", "2", [{ read: "settings" }, { read: "ownership" }, { read: "directory" }]))
   await waitFor(() => expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Atelier"))
   expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue("Atelier")
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace")
