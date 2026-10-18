@@ -3,11 +3,10 @@ import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ThreadMessage, type ThreadId } from "@amends-dev/core/thread"
 import type { MemberId } from "@amends-dev/core/workspace"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Redacted, Schedule } from "effect"
 import { Base64 } from "effect/encoding"
-import { HttpRouter } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -19,12 +18,14 @@ const alice = Identity.HumanId.make("alice")
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))))
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server, over `host`. */
 const serve = <E>(host: LocalHost.HostLayer<E>) =>
-  HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
-    Layer.provide(
-      DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer), Layer.provideMerge(host))
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  LocalServer.serve(
+    host,
+    DevelopmentAuthentication.layer(() => Effect.void),
+    {
+      disableLogger: true,
+      disableListenLog: true
+    }
+  ).pipe(Layer.provideMerge(BunHttpServer.layerTest))
 
 /**
  * The servers the tests run against: one process that serves the API and runs turn jobs on

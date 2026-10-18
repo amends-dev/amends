@@ -25,6 +25,7 @@
     "@amends-dev/sandbox-local": "workspace:*",
     "@amends-dev/sandbox-vercel": "workspace:*",
     "@amends-dev/storage-postgresql": "workspace:*",
+    "@amends-dev/sync": "workspace:*",
     "@daytona/sdk": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@vercel/sandbox": "catalog:",

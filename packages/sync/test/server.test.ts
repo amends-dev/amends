@@ -58,7 +58,7 @@ const connect = Effect.gen(function* () {
   )
   const gateway = Context.get(services, Gateway.Gateway)
   const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
-  const server = SyncServer.layer.pipe(Layer.provide(Layer.succeedContext(services)))
+  const server = SyncServer.layerHandlers.pipe(Layer.provide(Layer.succeedContext(services)))
   const client = yield* RpcTest.makeClient(EventLogMessage.EventLogRemoteRpcs).pipe(Effect.provide(server))
   const remote = yield* EventLogRemote.makeUnencrypted.pipe(
     Effect.provideService(EventLogRemote.EventLogRemoteClient, client),

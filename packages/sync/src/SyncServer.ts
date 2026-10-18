@@ -6,7 +6,9 @@
  * as their requests, each once, keyed by its entry's ID, in the order they wrote them; a store or
  * host that cannot be reached fails the write, which their browser sends again. What they read is
  * their replica as it changes, from core's `ReplicaService`, a `ReplicaChanged` for each commit at
- * its position. Browsers import the contract's modules, never this one.
+ * its position. A host serves `layer` on its HTTP router, a WebSocket that browsers reach through
+ * `SyncClient`, and `layerHandlers` is the RPC handlers alone, for tests. Browsers import the
+ * contract's modules and `SyncClient`, never this one.
  *
  * @since 0.1.0
  */
@@ -17,19 +19,25 @@ import { ReplicaService } from "@amends-dev/core/replica"
 import { Request, RequestService } from "@amends-dev/core/request"
 import { WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway, SyncStorage } from "@amends-dev/gateway"
+import { Draining } from "@amends-dev/http"
 import * as Entry from "@amends-dev/log/Entry"
 import * as Array from "effect/Array"
 import type * as Crypto from "effect/Crypto"
+import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as EventJournal from "effect/eventlog/EventJournal"
 import * as EventLogMessage from "effect/eventlog/EventLogMessage"
 import * as EventLogServer from "effect/eventlog/EventLogServer"
+import * as HttpRouter from "effect/http/HttpRouter"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import * as RpcServer from "effect/rpc/RpcServer"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Entries from "./internal/entries.ts"
 import * as Operations from "./internal/operations.ts"
+import * as Transport from "./internal/transport.ts"
 
 const decodeWorkspaceId = Schema.decodeEffect(WorkspaceId.WorkspaceId)
 const isDenied = Schema.is(CoreError.Denied)
@@ -42,7 +50,7 @@ const isDenied = Schema.is(CoreError.Denied)
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.unwrap(
+export const layerHandlers = Layer.unwrap(
   Effect.gen(function* () {
     const gateway = yield* Gateway.Gateway
     const syncStorage = yield* SyncStorage.SyncStorage
@@ -144,4 +152,41 @@ export const layer = Layer.unwrap(
         )
     })
   })
+)
+
+/**
+ * The WebSocket a host serves at `/sync` on its HTTP router. Each socket closes as the HTTP server
+ * begins to drain, and none opens after, so each browser reconnects to the host that serves it
+ * next rather than wait for this one to stop.
+ */
+const layerWebsocket = Layer.effect(
+  RpcServer.Protocol,
+  Effect.gen(function* () {
+    const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket
+    const router = yield* HttpRouter.HttpRouter
+    const draining = yield* Draining.Draining
+    const serveSocket = Effect.raceFirst(httpEffect, Effect.as(Deferred.await(draining), HttpServerResponse.empty()))
+    // A browser reconnects at once, while the server is still taking requests before it stops.
+    const refuse = Effect.succeed(HttpServerResponse.empty({ status: 503 }))
+    yield* router.add(
+      "GET",
+      Transport.path,
+      Effect.flatMap(Deferred.isDone(draining), (drained) => (drained ? refuse : serveSocket))
+    )
+    return protocol
+  })
+)
+
+/**
+ * The sync server on the host's HTTP router: `layerHandlers` served over a WebSocket at `/sync`,
+ * which closes as `Draining` completes. A host provides the gateway, its `SyncStorage`,
+ * cryptography, and `Draining`, beside the HTTP API's routes.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layer = RpcServer.layer(EventLogMessage.EventLogRemoteRpcs).pipe(
+  Layer.provide(layerHandlers),
+  Layer.provide(layerWebsocket),
+  Layer.provide(Transport.layerSerialization)
 )

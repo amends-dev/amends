@@ -16,6 +16,7 @@
     "@amends-dev/connection": "workspace:*",
     "@amends-dev/core": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/http": "workspace:*",
     "@amends-dev/log": "workspace:*",
     "effect": "catalog:"
   }

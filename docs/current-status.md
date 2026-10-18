@@ -234,17 +234,22 @@ permissions, and custom roles, which a workspace would edit itself, are not impl
 Core follows each member's replica as the workspace changes (`ReplicaService.changes`, see core's
 [replica](../packages/core/README.md#replica)), and [`@amends-dev/sync`](../packages/sync/README.md)'s
 server runs the actions a browser writes and serves its replica as Effect eventlog's RPC handlers,
-opening a person's stores to the browser keys they register over HTTP, but no host serves them yet:
-there is no WebSocket transport. Typing and presence are not implemented. A turn's log still streams over HTTP as its session log grows,
+opening a person's stores to the browser keys they register over HTTP. The local host serves it
+over a WebSocket at `/sync`, which `SyncClient` reaches, but no app uses it yet. Typing and
+presence are not implemented. A turn's log still streams over HTTP as its session log grows,
 without drafts of the step being written. Other gaps:
 
+- Sync sockets count toward no limit, unlike turn logs' streams, which a workspace and each member
+  of it may hold only so many of.
+- On Bun 1.3.14 a WebSocket the server closed still counts as open, so a host that had a sync
+  socket open when it began to stop closes it at once but exits only at its graceful stop's limit,
+  twenty seconds.
 - A browser's key outlives the session it was registered in: only removing it, as the browser does
   when it signs out, stops it opening the person's stores, while a token revoked elsewhere or
   expired leaves it registered, and a stream open when a key is removed stays open until it ends.
 - Effect eventlog's server keeps the signing key it looked up for each key for as long as the
   process runs, and a lookup that failed too: a key whose lookup failed once, as when storage could
   not be reached, authenticates on that process again only after it restarts.
-
 - PostgreSQL wakes log readers, such as a turn log's, with `LISTEN`/`NOTIFY`, sent just after each
   commit rather than inside it, where the notification queue's lock would serialize every notifying
   commit on the server through its WAL flush. A process that stops between its commit and the

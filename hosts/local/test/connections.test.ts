@@ -1,11 +1,11 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { Request } from "@amends-dev/core/request"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
 import { Base64 } from "effect/encoding"
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http"
+import { HttpClient, HttpClientRequest } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -18,15 +18,11 @@ const secret = "sk-mcp-connections-test"
 const nowhere = "http://127.0.0.1:1/mcp"
 /** The real routes, gateway, integrations, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string, credentialKey: Redacted.Redacted<string> | undefined) =>
-  HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
-    Layer.provide(
-      DevelopmentAuthentication.layer(() => Effect.void).pipe(
-        Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url), { credentialKey }))
-      )
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  LocalServer.serve(
+    LocalHost.layer(Redacted.make(url), { credentialKey }),
+    DevelopmentAuthentication.layer(() => Effect.void),
+    { disableLogger: true, disableListenLog: true }
+  ).pipe(Layer.provideMerge(BunHttpServer.layerTest))
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))))
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {

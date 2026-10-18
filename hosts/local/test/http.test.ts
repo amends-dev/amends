@@ -1,10 +1,10 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { Member, MemberId } from "@amends-dev/core/workspace"
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
-import { HttpBody, HttpClient, HttpRouter } from "effect/http"
+import { HttpBody, HttpClient } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
 import * as LocalServer from "../src/LocalServer.ts"
@@ -15,18 +15,11 @@ const alice = Identity.HumanId.make("alice")
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server; codes are captured. */
 const server = (url: string) => {
   const delivered = new Map<string, string>()
-  const layer = HttpRouter.serve(LocalServer.layerRoutes, {
-    disableLogger: true,
-    disableListenLog: true
-  }).pipe(
-    Layer.provide(
-      DevelopmentAuthentication.layer((email, code) => Effect.sync(() => delivered.set(email, code))).pipe(
-        Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url)))
-      )
-    ),
-    Layer.provideMerge(BunHttpServer.layerTest)
-  )
+  const layer = LocalServer.serve(
+    LocalHost.layer(Redacted.make(url)),
+    DevelopmentAuthentication.layer((email, code) => Effect.sync(() => delivered.set(email, code))),
+    { disableLogger: true, disableListenLog: true }
+  ).pipe(Layer.provideMerge(BunHttpServer.layerTest))
   return { layer, delivered }
 }
 const { available, withDatabase } = setup()

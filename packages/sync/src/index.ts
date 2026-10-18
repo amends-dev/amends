@@ -43,6 +43,11 @@ export * as ReplicaSync from "./ReplicaSync.ts"
 /**
  * @since 0.1.0
  */
+export * as SyncClient from "./SyncClient.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as SyncSchema from "./SyncSchema.ts"
 
 /**

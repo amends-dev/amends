@@ -57,11 +57,12 @@ runs them, and keeps `console` to tests and scripts.
   private function of that caller. `gateway` is how a
   host enters core: it bootstraps a workspace and resolves an authenticated identity into the actor,
   and it holds the host contracts for storage, accounts, sign-in, session token resolution, the
-  workspace directory, and the keys browsers sync with. `http` is the HTTP protocol: the contract clients call, which they import by
-  module, and the handlers that implement it over the gateway, including its authentication. Another
-  protocol adds its own package over the same gateway rather than new gateway methods: `sync` is how a
-  member's browser keeps a workspace in sync, as Effect eventlog events, the actions their browser
-  writes and the changes and rejections the server writes back to their store. The gateway's
+  workspace directory, and the keys browsers sync with. `http` is the HTTP protocol: the contract
+  clients call, which they import by module, and the handlers that implement it over the gateway,
+  including its authentication. Another protocol adds its own package over the same gateway rather
+  than new gateway methods: `sync` is how a member's browser keeps a workspace in sync, as Effect
+  eventlog events, the actions their browser writes and the changes and rejections the server
+  writes back to their store, over a WebSocket a host serves beside the HTTP API. The gateway's
   `conformance` module holds the test suites every storage adapter runs against itself through a
   fixture: what the storage contracts promise, from transactions and logs to accounts, across hosts
   over the same storage. The gateway's tests run them over the memory implementation, and test
@@ -95,8 +96,9 @@ runs them, and keeps `console` to tests and scripts.
   interpreter for code mode; the root manifest's `overrides` keeps that package on the catalog's
   Effect until it declares Effect as a peer.
   `storage-postgresql` implements workspace storage, the workspace directory, accounts, sign-in
-  storage, and sync storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field, except
-  the kind-specific `details` of a thread activity or a session log entry, stored as JSON. The
+  storage, and sync storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record
+  field, except the kind-specific `details` of a thread activity or a session log entry, stored as
+  JSON. The
   reference implementation of the same contracts, in process memory, is each contract's
   `layerMemory`, beside it in core and the gateway, which their tests run over. Both follow one
   shape: each store over a workspace binding, merged at the edge.
