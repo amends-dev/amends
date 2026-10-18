@@ -9,15 +9,18 @@
  * the ones before it left; one the server completed or rejected no longer applies.
  */
 
+import { Agent } from "@amends-dev/core/agent"
 import { Assignment, type Role, Scope } from "@amends-dev/core/authorization"
 import { Group, type GroupFollow, GroupMembership } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import { Turn } from "@amends-dev/core/turn"
-import { Invitation, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, Member, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
+import type * as AgentSync from "@amends-dev/sync/AgentSync"
 import type * as ConnectionSync from "@amends-dev/sync/ConnectionSync"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as NotificationSync from "@amends-dev/sync/NotificationSync"
@@ -97,6 +100,7 @@ const isNotification = ReplicaRecord.ReplicaRecord.isAnyOf(["Notification"])
 const isTask = ReplicaRecord.ReplicaRecord.isAnyOf(["Task"])
 const isTurn = ReplicaRecord.ReplicaRecord.isAnyOf(["Turn"])
 const isConnection = ReplicaRecord.ReplicaRecord.isAnyOf(["Connection"])
+const isAgent = ReplicaRecord.ReplicaRecord.isAnyOf(["Agent"])
 
 /** `record`, a notification, as seen when `action` was written. */
 const seen = (record: Replica.RecordOf<"Notification">, action: Action) =>
@@ -578,6 +582,67 @@ export const connections: EffectsOf<typeof ConnectionSync.Actions> = {
   }
 }
 
+/**
+ * What the person does with the workspace's agents: adding one, a member as any other, with its
+ * role, its admission to the general group where the workspace has one, and how it is set up;
+ * replacing how one is set up; and renaming one, from the name they saw. How ready an agent is the
+ * server tells: a new one reads as ready until it does, since the server takes one only when it can
+ * run, or is on `Auto` with no harness to choose yet, and a changed one as the server last found it.
+ */
+export const agents: EffectsOf<typeof AgentSync.Actions> = {
+  AgentCreated: {
+    creates: ({ name, roleId, ...setup }, action, find) =>
+      asRequest(
+        action,
+        Effect.gen(function* () {
+          const agentId = yield* Agent.newId
+          const memberId = yield* Member.newId
+          const general = yield* find(ReplicaRecord.Key.cases.Group.make({ id: Group.GeneralId }))
+          return [
+            cases.Member.make({
+              value: {
+                id: memberId,
+                workspaceId: action.workspaceId,
+                identity: Identity.MemberReference.cases.Agent.make({ id: agentId }),
+                name,
+                status: "active"
+              }
+            }),
+            yield* roleAssignment(action, memberId, roleId),
+            ...(Option.isSome(general) ? [yield* membership(action, Group.GeneralId, memberId)] : []),
+            cases.Agent.make({
+              value: {
+                id: agentId,
+                workspaceId: action.workspaceId,
+                memberId,
+                ...setup,
+                createdBy: action.memberId,
+                createdAt: action.writtenAt,
+                readiness: Agent.Readiness.cases.Ready.make({})
+              }
+            })
+          ]
+        })
+      )
+  },
+  AgentConfigured: {
+    changes: ({ agentId, ...setup }, record) =>
+      isAgent(record) && record.value.id === agentId
+        ? cases.Agent.make({ value: { ...record.value, ...setup } })
+        : undefined
+  },
+  // An agent's name is its membership's.
+  AgentRenamed: {
+    changes: ({ agentId, name, expectedName }, record) =>
+      isMember(record) &&
+      Identity.MemberReference.isAnyOf(["Agent"])(record.value.identity) &&
+      record.value.identity.id === agentId &&
+      record.value.name === expectedName
+        ? cases.Member.make({ value: { ...record.value, name } })
+        : undefined
+  }
+}
+
 const effectsByTag = {
   ...threads,
   ...groups,
@@ -585,7 +650,8 @@ const effectsByTag = {
   ...notifications,
   ...tasks,
   ...turns,
-  ...connections
+  ...connections,
+  ...agents
 } as Readonly<Record<string, Effects<unknown> | undefined>>
 
 /** What the action `tag` does, if anything, before the server's changes arrive. */

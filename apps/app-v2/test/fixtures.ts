@@ -217,3 +217,65 @@ export const connectionOf = (id: string, name: string) =>
     createdAt: "2026-10-18T12:00:00Z",
     readiness: { _tag: "Ready" }
   })
+
+/** An integration whose connections give `provides`, and take no settings or key, as its readers see it. */
+export const integrationGiving = (
+  id: string,
+  name: string,
+  provides: ReadonlyArray<"models" | "harnesses" | "sandboxes">
+) =>
+  Schema.decodeSync(Connection.IntegrationView)({
+    id,
+    name,
+    auth: ["none"],
+    provides,
+    requiresSandbox: false,
+    settings: { type: "object", properties: {} }
+  })
+
+/** A ready connection called `name` to the integration `integration`, which takes no key. */
+export const keylessConnection = (id: string, integration: string, name: string) =>
+  Schema.decodeSync(ReplicaRecord.Connection)({
+    id,
+    workspaceId: "workspace-1",
+    integration,
+    name,
+    settings: {},
+    auth: "none",
+    status: "active",
+    createdBy: "member-1",
+    createdAt: "2026-10-18T12:00:00Z",
+    readiness: { _tag: "Ready" }
+  })
+
+/** Scout's setup: on any harness, the test model of the models connection, and no sandbox. */
+export const scoutAgent = Schema.decodeSync(ReplicaRecord.Agent)({
+  id: "agent-1",
+  workspaceId: "workspace-1",
+  memberId: "member-3",
+  instructions: "Review what is asked.",
+  harness: { _tag: "Auto" },
+  model: { connectionId: "models-1", id: "test-model" },
+  sandbox: null,
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z",
+  readiness: { _tag: "Ready" }
+})
+
+/** What the models connection offers: the test model, which reasons with a low or high effort, and any other. */
+export const offered = Schema.decodeSync(Connection.Models)({
+  listed: [
+    {
+      id: "test-model",
+      name: "Test model",
+      protocol: "openai-chat",
+      url: "https://models.example/v1",
+      released: "2026-01",
+      limits: { context: 100000, output: 8000 },
+      modalities: { input: ["text"], output: ["text"] },
+      tools: true,
+      reasoning: { toggle: false, efforts: ["low", "high"] }
+    }
+  ],
+  unlisted: true
+})

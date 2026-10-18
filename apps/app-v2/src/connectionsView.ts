@@ -1,10 +1,11 @@
 /**
  * The workspace's connections, each with its integration, how ready it is, and, for a person who may
  * manage it, renaming it, changing its settings, replacing its key, checking it with its system, and
- * removing it; and adding one, to an integration the host installs, for a person who may.
+ * removing it; and adding one, to an integration the host installs, for a person who may. Other
+ * panes read here the integrations the host lists, and the connections that give what they need.
  */
 
-import type { Connection as ConnectionContract } from "@amends-dev/connection"
+import type { Connection as ConnectionContract, Integration } from "@amends-dev/connection"
 import { Target } from "@amends-dev/core/authorization"
 import { Connection, ConnectionPermissions } from "@amends-dev/core/connection"
 import type { ReplicaRecord } from "@amends-dev/core/replica"
@@ -36,11 +37,22 @@ const healthText = ({ status, description }: ConnectionContract.Health) => {
 }
 
 /** The integrations the host installs, once it listed them. */
-const integrationsOf = (opened: Opened): ReadonlyArray<Connection.IntegrationView> =>
+export const integrationsOf = (opened: Opened): ReadonlyArray<Connection.IntegrationView> =>
   Option.match(opened.integrations, {
     onNone: () => [],
     onSome: Integrations.matchOrElse({ Loaded: ({ integrations }) => integrations }, () => [])
   })
+
+/** The connections whose integration gives `capability`, by what each is called. */
+export const connectionsGiving = (
+  opened: Opened,
+  capability: Integration.Capability
+): ReadonlyArray<readonly [ConnectionContract.ConnectionId, string]> =>
+  opened.connections.flatMap(({ connection }) =>
+    integrationsOf(opened).some(({ id, provides }) => id === connection.integration && provides.includes(capability))
+      ? [[connection.id, connection.name] as const]
+      : []
+  )
 
 /** The fields of `form`, each as the draft fills it in. */
 const settingsFields = (

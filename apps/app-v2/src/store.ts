@@ -7,6 +7,7 @@
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
+import { Agent } from "@amends-dev/core/agent"
 import { Assignment, Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
 import type { CoreError } from "@amends-dev/core/error"
@@ -303,6 +304,11 @@ export const subscriptions = Subscription.make<
                   Stream.map(store.every("GroupMembership"), (memberships): Message =>
                     Message.GotMemberships({
                       memberships: memberships.map(({ record, pending }) => ({ membership: record.value, pending }))
+                    })
+                  ),
+                  Stream.map(store.list("Agent", workspace), (agents): Message =>
+                    Message.GotAgents({
+                      agents: agents.map(({ record, pending }) => ({ agent: record.value, pending }))
                     })
                   ),
                   Stream.map(store.list("Connection", workspace), (connections): Message =>
@@ -764,4 +770,38 @@ export const RemoveConnection = Command.define("RemoveConnection", {
   args: { connectionId: ConnectionContract.ConnectionId },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("ConnectionRemoved", input))
+})
+
+/** Add an agent called `name`, starting with the role `roleId`, set up as `configuration` says. */
+export const CreateAgent = Command.define("CreateAgent", {
+  args: { name: Schema.String, roleId: Role.RoleId, configuration: Agent.Configuration },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ name, roleId, configuration }) =>
+    Schema.decodeEffect(Agent.CreateInput)({ name, roleId, ...configuration }).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("An agent needs a name.")),
+        onSuccess: (input) => toStore((store) => store.write("AgentCreated", input))
+      })
+    )
+})
+
+/** Set `agentId` up as `configuration` says, in place of how it is set up. */
+export const ConfigureAgent = Command.define("ConfigureAgent", {
+  args: { agentId: Identity.AgentId, configuration: Agent.Configuration },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ agentId, configuration }) =>
+    toStore((store) => store.write("AgentConfigured", { agentId, ...configuration }))
+})
+
+/** Rename `agentId` to `name`, from the name the person saw. */
+export const RenameAgent = Command.define("RenameAgent", {
+  args: { agentId: Identity.AgentId, name: Schema.String, expectedName: Schema.String },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(Agent.RenameInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("An agent needs a name.")),
+        onSuccess: (input) => toStore((store) => store.write("AgentRenamed", input))
+      })
+    )
 })

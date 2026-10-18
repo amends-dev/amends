@@ -8,6 +8,7 @@ import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Task } from "@amends-dev/core/task"
@@ -18,6 +19,7 @@ import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Schema from "effect/Schema"
 import { defineTaggedUnion } from "foldkit/schema"
+import * as AgentSetup from "./agentSetup.ts"
 import * as SettingsForm from "./settingsForm.ts"
 
 /** Where signing in has got to: an address to send a code to, then the code it was sent. */
@@ -248,12 +250,47 @@ export const Connections = Schema.Struct({
 })
 export type Connections = typeof Connections.Type
 
-/** What the open workspace shows beside its groups: a group, the person's inbox, its settings, or its connections. */
+/** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
+export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
+export type AgentItem = typeof AgentItem.Type
+
+/**
+ * The form open among the workspace's agents: adding one, with its name, the role it starts with,
+ * and how it is set up; changing how one is set up; or renaming one. A setup the person left
+ * wanting keeps why.
+ */
+export const AgentForm = defineTaggedUnion({
+  Adding: { name: Schema.String, roleId: Role.RoleId, setup: AgentSetup.Draft, error: Schema.Option(Schema.String) },
+  Configuring: { agentId: Identity.AgentId, setup: AgentSetup.Draft, error: Schema.Option(Schema.String) },
+  Renaming: { agentId: Identity.AgentId, name: Schema.String }
+})
+export type AgentForm = typeof AgentForm.Type
+
+/** The models a connection offers, as the host lists them: loading, loaded, or not reached, with why. */
+export const OfferedModels = defineTaggedUnion({
+  Loading: {},
+  Loaded: { models: Connection.Models },
+  Failed: { error: Schema.String }
+})
+export type OfferedModels = typeof OfferedModels.Type
+
+/** The workspace's agents as the person manages them: the form open among them, and the models its chosen connection offers. */
+export const Agents = Schema.Struct({
+  form: Schema.Option(AgentForm),
+  models: Schema.Option(Schema.Struct({ connectionId: ConnectionContract.ConnectionId, offered: OfferedModels }))
+})
+export type Agents = typeof Agents.Type
+
+/**
+ * What the open workspace shows beside its groups: a group, the person's inbox, its settings, its
+ * connections, or its agents.
+ */
 export const Pane = defineTaggedUnion({
   Group: { group: OpenGroup },
   Inbox: {},
   Settings: { settings: Settings },
-  Connections: { connections: Connections }
+  Connections: { connections: Connections },
+  Agents: { agents: Agents }
 })
 export type Pane = typeof Pane.Type
 
@@ -268,7 +305,7 @@ export type Composing = typeof Composing.Type
  * The workspace the person opened, as their member of it: the workspace, and whether a change to
  * it is on its way; its store; what the replica holds of it: its groups, members, roles and their
  * assignments, invitations, the person's notifications, groups' memberships, the person's
- * follows among them, and its connections; the integrations the host installs, once asked for; the
+ * follows among them, its connections, and its agents; the integrations the host installs, once asked for; the
  * actions not finished yet, why the last one could not be written, what the person is starting,
  * and the pane open in it.
  */
@@ -286,6 +323,7 @@ export const Opened = Schema.Struct({
   memberships: Schema.Array(MembershipItem),
   follows: Schema.Array(FollowItem),
   connections: Schema.Array(ConnectionItem),
+  agents: Schema.Array(AgentItem),
   integrations: Schema.Option(Integrations),
   actions: Schema.Array(ActionItem),
   notice: Schema.Option(Schema.String),

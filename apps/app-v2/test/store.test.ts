@@ -27,7 +27,7 @@ import { SyncServer } from "@amends-dev/sync"
 import { IndexedDb } from "@effect/platform-browser"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Context, DateTime, Effect, Exit, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
+import { Context, DateTime, Effect, Exit, Layer, Option, Redacted, Result, Schema, Scope, Stream } from "effect"
 import * as EventLogEncryption from "effect/eventlog/EventLogEncryption"
 import { FetchHttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
@@ -65,9 +65,23 @@ const testApi = Integration.make({
   check: () => Effect.succeed({ status: "healthy" })
 })
 
+/** An integration whose connections offer models at an endpoint, by any id, and take no key. */
+const testModels = Integration.make({
+  id: "test-models",
+  name: "Test models",
+  auth: ["none"],
+  models: {
+    listed: [],
+    unlisted: true,
+    endpoint: (_, { model }) =>
+      Result.succeed({ provider: "test-models", model, protocol: "openai-chat", url: "http://127.0.0.1:9/v1" })
+  },
+  check: () => Effect.succeed({ status: "healthy" })
+})
+
 /**
- * A host over memory storage, which installs the test API: the gateway, its storage, and the HTTP
- * API and sync server it serves.
+ * A host over memory storage, which installs the test API and test models: the gateway, its
+ * storage, and the HTTP API and sync server it serves.
  */
 const host = Effect.gen(function* () {
   const storage = Layer.mergeAll(
@@ -78,7 +92,7 @@ const host = Effect.gen(function* () {
     SyncStorage.layerMemory
   ).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provideMerge(BunCrypto.layer))
   return yield* Layer.build(
-    Gateway.layer({ integrations: [testApi] }).pipe(
+    Gateway.layer({ integrations: [testApi, testModels] }).pipe(
       Layer.provideMerge([storage, TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner]),
       Layer.provide(MemoryDatabase.layer)
     )
@@ -508,6 +522,80 @@ describe("Store, for the workspace's connections", () => {
         ([held]) => held?.pending === false && held.record.value.status === "removed"
       )
     }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+})
+
+describe("Store, for the workspace's agents", () => {
+  it.live(
+    "an agent added here is the one the host makes, with its membership, role, and admission, under the same IDs",
+    () =>
+      Effect.gen(function* () {
+        const services = yield* host
+        const gateway = Context.get(services, Gateway.Gateway)
+        const workspace = yield* gateway.createWorkspace(alice, {
+          name: "Studio",
+          memberName: Member.Name.make("Alice")
+        })
+        const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+        const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+        yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+        const client = yield* memberClient(apiUrl, alice, workspace.id)
+        const models = yield* client.connections.create({
+          headers: {},
+          payload: { integration: "test-models", name: "Models", settings: {}, auth: "none" }
+        })
+        yield* firstWhere(store.list("Connection", everywhere), (held) => held.length === 1)
+
+        yield* store.write("AgentCreated", {
+          name: "Scout",
+          roleId: BuiltinRoles.MemberId,
+          instructions: "Review what is asked.",
+          harness: { _tag: "Auto" },
+          model: { connectionId: models.id, id: "any-model" },
+          sandbox: null
+        })
+        const [made] = yield* firstWhere(store.list("Agent", everywhere), ([held]) => held?.pending === true)
+        const { id: agentId, memberId } = made!.record.value
+        const admitted = <A extends { readonly record: { readonly value: { readonly memberId: string } } }>(
+          memberships: ReadonlyArray<A>
+        ) => memberships.find(({ record }) => record.value.memberId === memberId)
+        const shown = {
+          member: (yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)).find(
+            ({ record }) => record.value.id === memberId
+          ),
+          assignment: (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+            held.some(({ record }) => record.value.memberId === memberId)
+          )).find(({ record }) => record.value.memberId === memberId),
+          admission: admitted(yield* firstWhere(store.every("GroupMembership"), (held) => admitted(held) !== undefined))
+        }
+        expect(shown.member).toMatchObject({
+          pending: true,
+          record: { value: { name: "Scout", identity: { id: agentId } } }
+        })
+
+        // The server's own records arrive under the IDs the browser gave them.
+        const [arrived] = yield* firstWhere(store.list("Agent", everywhere), ([held]) => held?.pending === false)
+        expect(arrived!.record.value).toMatchObject({ id: agentId, memberId, model: { id: "any-model" } })
+        // On Auto with no connection giving harnesses, the server finds it can't run yet.
+        expect(arrived!.record.value.readiness).toMatchObject({ _tag: "Incomplete", issues: [{ _tag: "NoHarness" }] })
+        const settled = {
+          member: (yield* firstWhere(store.list("Member", everywhere), (held) =>
+            held.some(({ record, pending }) => record.value.id === memberId && !pending)
+          )).find(({ record }) => record.value.id === memberId),
+          assignment: (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+            held.some(({ record, pending }) => record.value.memberId === memberId && !pending)
+          )).find(({ record }) => record.value.memberId === memberId),
+          admission: admitted(
+            yield* firstWhere(store.every("GroupMembership"), (held) =>
+              held.some(({ record, pending }) => record.value.memberId === memberId && !pending)
+            )
+          )
+        }
+        expect(settled.assignment!.record.value.id).toBe(shown.assignment!.record.value.id)
+        expect(settled.admission!.record.value.id).toBe(shown.admission!.record.value.id)
+        expect(settled.member!.record.value.id).toBe(memberId)
+        expect(yield* firstWhere(store.actions, () => true)).toEqual([])
+      }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })
 

@@ -7,6 +7,7 @@ import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
 import { Task } from "@amends-dev/core/task"
 import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
@@ -18,6 +19,7 @@ import * as Schema from "effect/Schema"
 import { defineMessageUnion } from "foldkit/message"
 import {
   ActionItem,
+  AgentItem,
   AssignmentItem,
   ConnectionItem,
   FollowItem,
@@ -83,6 +85,23 @@ export const Message = defineMessageUnion({
   CheckedConnection: { connectionId: ConnectionContract.ConnectionId, health: ConnectionContract.Health },
   FailedCheckConnection: { connectionId: ConnectionContract.ConnectionId, error: Schema.String },
   ClickedRemoveConnection: { connectionId: ConnectionContract.ConnectionId },
+  GotAgents: { agents: Schema.Array(AgentItem) },
+  ClickedAgents: {},
+  ClickedAddAgent: {},
+  TypedAgentName: { name: Schema.String },
+  ChoseAgentRole: { roleId: Role.RoleId },
+  TypedInstructions: { instructions: Schema.String },
+  ChoseHarness: { harness: Schema.String },
+  ChoseModelConnection: { connectionId: Schema.String },
+  ChoseModel: { modelId: Schema.String },
+  ChoseEffort: { effort: Schema.String },
+  ChoseSandbox: { sandbox: Schema.String },
+  SubmittedAgentForm: {},
+  ClickedCancelAgentForm: {},
+  ClickedRenameAgent: { agentId: Identity.AgentId },
+  ClickedConfigureAgent: { agentId: Identity.AgentId },
+  GotModels: { connectionId: ConnectionContract.ConnectionId, models: Connection.Models },
+  FailedLoadModels: { connectionId: ConnectionContract.ConnectionId, error: Schema.String },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
   ToggledTeamPublic: { isPublic: Schema.Boolean },

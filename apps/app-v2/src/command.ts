@@ -2,8 +2,8 @@
  * The app's side effects over HTTP, each a named command that ends in a message: the sign-in
  * requests, keeping the session, listing the person's workspaces, and signing out; and, as a
  * member of a workspace, what no replica holds or no action may carry: the integrations the host
- * installs, and adding a connection, replacing its key, and checking it, since a key never enters an
- * action. A command's failures are messages too, worded for the person.
+ * installs and the models a connection offers, and adding a connection, replacing its key, and
+ * checking it, since a key never enters an action. A command's failures are messages too, worded for the person.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -194,5 +194,19 @@ export const CheckConnection = Command.define("CheckConnection", {
       return Message.CheckedConnection({ connectionId, health })
     }).pipe(
       Effect.catch((error) => Effect.succeed(Message.FailedCheckConnection({ connectionId, error: refusalOf(error) })))
+    )
+})
+
+/** List the models `connectionId` offers an agent. */
+export const LoadModels = Command.define("LoadModels", {
+  args: { ...asMember, connectionId: ConnectionContract.ConnectionId },
+  messages: [Message.GotModels, Message.FailedLoadModels],
+  execute: ({ apiUrl, token, workspaceId, connectionId }) =>
+    Effect.gen(function* () {
+      const client = yield* Api.memberClient(apiUrl, token, workspaceId)
+      const models = yield* client.connections.models({ params: { connectionId } })
+      return Message.GotModels({ connectionId, models })
+    }).pipe(
+      Effect.catch((error) => Effect.succeed(Message.FailedLoadModels({ connectionId, error: refusalOf(error) })))
     )
 })

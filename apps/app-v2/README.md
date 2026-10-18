@@ -17,7 +17,9 @@ rename the workspace and themselves, change a member's role, remove a member, ha
 to another person, and invite someone by address or revoke an invitation; and the workspace's
 connections to the integrations the host installs, where they add one, with its key and the
 settings its integration's form asks for, rename it, change its settings, replace its key, check it
-with its system, and remove it. What they do shows at
+with its system, and remove it; and the workspace's agents, where they add one, with the role it
+starts with and how it is set up, on the harnesses, models, and sandboxes the connections give, and
+rename it or change its setup. What they do shows at
 once, marked as sending, even offline, and what the server refuses comes back with why. A control
 shows only when the person may use it.
 
@@ -48,17 +50,19 @@ that decides, and commands that act.
   the open thread, with its messages, the reply, its task, its turns, and the log being followed;
   the inbox; the settings, with the names
   being given and the invitation being written; or the connections, with the form open among
-  them, adding, renaming, configuring, or replacing a key, and the last check. The integrations
-  the host installs are read once the person opens the connections.
+  them, adding, renaming, configuring, or replacing a key, and the last check; or the agents, with
+  the form open among them, adding, configuring, or renaming one, and the models the chosen
+  connection offers. The integrations the host installs are read once the person opens the
+  connections or the agents.
 - `message.ts`, `update.ts`: what happens and what it changes. A message the page is past, such as
   a code check finishing after the person left the form, changes nothing.
 - `command.ts`: the sign-in requests, keeping the session, listing workspaces, and signing out, each
   ending in a message, failures worded for the person. Signing out forgets the session, the
   person's stores, and their sync identity first, so it works offline, then removes the browser's
   sync key and ends the session as far as the host can be reached. As a member of the open
-  workspace: listing the integrations the host installs, and adding a connection, replacing its
-  key, and checking it, over HTTP, since a key never enters an action and no replica holds what a
-  check finds.
+  workspace: listing the integrations the host installs and the models a connection offers, and
+  adding a connection, replacing its key, and checking it, over HTTP, since a key never enters an
+  action and no replica holds what a check finds.
 - `store.ts`: the open workspace's store as a managed resource, open while a workspace is open and
   closed when the person leaves it or signs out; what its replica holds as subscriptions, the
   groups, members, memberships, follows, and actions, the open group's threads, and the open
@@ -68,7 +72,9 @@ that decides, and commands that act.
 - `view.ts`: markup over `@foldkit/ui`'s headless components, with no styles yet, from the controls
   `controls.ts` shares; `connectionsView.ts` is the connections pane, whose settings fields
   `settingsForm.ts` reads from each integration's form: text, numbers, yes or no, and choices, the
-  draft the person writes, and the settings it makes, or which field it wants.
+  draft the person writes, and the settings it makes, or which field it wants; and
+  `agentsView.ts` is the agents pane, whose setup `agentSetup.ts` drafts from an agent and makes
+  a configuration of, or says what it still wants.
 - `permissions.ts`: what the person may do, as core decides it from the replica's records: the
   grants their own assignments confer through the workspace's roles, from core's
   `GrantResolver.grantsOf`, and whose roles they may change, from `Delegation.recipientDenial`. The
@@ -87,7 +93,8 @@ that decides, and commands that act.
   when it can; its local handler holds the action in the replica until the server completes it,
   with the records `sync/Pending.ts` says it creates: a thread started in a group, with its opening
   message and the task it starts as, a conversation's direct group, a reply, a team and its
-  admissions, an admission, a role assignment, a thread's task, and a turn run again, under the IDs
+  admissions, an admission, a role assignment, a thread's task, a turn run again, and an agent with
+  its membership, role, and admission to the general group, under the IDs
   core derives from the action's key, the request key the server runs it under, or from what it
   names, as a retry's from the turn it retries. An action whose payload only names a record it
   copies from, as a task copies its thread's group, finds that record as the person sees it: the
@@ -103,7 +110,8 @@ that decides, and commands that act.
   reads, by core's own `NotificationStore.isAtOrBefore` and `isPendingInThread`, changing a task
   from the value they saw, by core's `Task.apply`, which a task changed meanwhile keeps,
   stopping a turn, at once while it is queued, and renaming a connection from the name they saw,
-  replacing its settings, and removing it; how ready a connection is stays as the server found it.
+  replacing its settings, and removing it, and changing how an agent is set up and renaming it
+  from the name they saw; how ready a connection or an agent is stays as the server found it.
   Following a thread they never took part in, or a group they never followed, waits for the
   server, which gives the participation or the follow their group membership; so does issuing an
   invitation, whose recipient's account only the server finds. `overlay` applies the unfinished actions, in the order they were
@@ -152,13 +160,15 @@ browser's storage:
   not be kept, a thread's actions, a team and a conversation started, a team's actions, the
   workspace's settings, the inbox, a thread's task and turns, a turn's log followed until it ends
   and again after it could not be, the connections, from listing the integrations through adding,
-  renaming, configuring, replacing a key, checking, and removing one, and signing out.
+  renaming, configuring, replacing a key, checking, and removing one, the agents, adding one on a
+  connection's model and changing and renaming one, and signing out.
 - Scene tests drive the view as a person does, from typing their address through a reply and a
   refused action to signing out, from joining a team through creating one, seeing it at once, and
   admitting and removing its members, and an owner managing the workspace's settings, then seeing
   only their own name to change once another member owns it, an owner adding a connection from its
   integration's form, checking it and opening its settings, then seeing it without the controls as
-  a member, the inbox's count, its
+  a member, an owner adding an agent on a connection's model and opening its setup, then reading
+  how it runs as a member, the inbox's count, its
   notifications, and opening one's thread, and a thread made a task and changed, its turns stopped
   and retried, and a turn's log followed, then seen without the grants to change any of it.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
@@ -166,7 +176,8 @@ browser's storage:
   to the server's, its changes over the server's records, actions applied in order, edits and
   deletes, a team renamed, members removed and leaving, a group's follow ended and taken up, the
   workspace renamed and handed over, the person renamed, a member removed, roles replaced, a
-  connection renamed, configured, and removed, an
+  connection renamed, configured, and removed, an agent added under the IDs the server gives, set
+  up again, and renamed, an
   invitation revoked, notifications marked seen and settled by reading their thread, a task made
   from the thread the person sees or started with its thread, changed from the value seen, turns
   stopped and run again, and refused actions applying nothing; `find`'s cover a record as the
@@ -182,8 +193,11 @@ browser's storage:
   inbox, which reading the thread settles at once and then on the server; and a thread made a task
   and changed shows at once and becomes the server's, while a change from a stale value comes back
   refused; and a connection added over HTTP, to an integration the test host installs, reaches the
-  store, and its rename and removal show at once, then as the server made them. `Store.viewTurns` is
+  store, and its rename and removal show at once, then as the server made them; and an agent added
+  in the browser, with its membership, role, and admission, comes back as the server's under the
+  IDs the browser gave them. `Store.viewTurns` is
   tested apart: which turns may run again, and `settingsForm.ts`: the fields an integration's form
-  gives, a draft from its defaults or a connection's settings, and the settings a draft makes.
+  gives, a draft from its defaults or a connection's settings, and the settings a draft makes, and
+  `agentSetup.ts`: an agent's draft, and the configuration a draft makes.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

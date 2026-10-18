@@ -12,6 +12,7 @@ import {
   CheckCode,
   CheckConnection,
   LoadIntegrations,
+  LoadModels,
   LoadWorkspaces,
   ReplaceConnectionKey,
   SaveSession,
@@ -23,7 +24,9 @@ import { LogState, type Model, Page, Pane, SignInForm, StoreState, Workspaces } 
 import {
   AddGroupMember,
   ChangeRole,
+  ConfigureAgent,
   ConfigureConnection,
+  CreateAgent,
   CreateTask,
   CreateTeam,
   DeleteMessage,
@@ -40,6 +43,7 @@ import {
   RemoveConnection,
   RemoveGroupMember,
   RemoveMember,
+  RenameAgent,
   RenameConnection,
   RenameGroup,
   RenameSelf,
@@ -66,11 +70,16 @@ import {
   connectionOf,
   design,
   general,
+  integrationGiving,
+  keylessConnection,
   membership,
   notificationOf,
+  offered,
   opening,
   reply,
   roles,
+  scout,
+  scoutAgent,
   session,
   signedIn,
   signedOut,
@@ -725,6 +734,88 @@ describe("a workspace", () => {
       // A form about a connection that is gone closes.
       message(Message.ClickedRenameConnection({ connectionId: models.id })),
       message(Message.GotConnections({ connections: [] })),
+      model((model) => {
+        expect(formIn(model)).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("adds an agent on a connection's model, and changes how one is set up and what it is called", () => {
+    const member = { apiUrl, token: session.token, workspaceId: membership.workspace.id }
+    const models = keylessConnection("models-1", "test-models", "Models")
+    const formIn = (model: Model) =>
+      Option.flatMap(openedIn(model), ({ pane }) =>
+        Option.flatMap(
+          pane,
+          Pane.matchOrElse({ Agents: ({ agents }) => agents.form }, () => Option.none())
+        )
+      )
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(Message.GotConnections({ connections: [{ connection: models, pending: false }] })),
+      message(Message.ClickedAgents()),
+      Command.expectExact(LoadIntegrations(member)),
+      Command.resolve(
+        LoadIntegrations,
+        Message.GotIntegrations({ integrations: [integrationGiving("test-models", "Test models", ["models"])] })
+      ),
+      message(Message.ClickedAddAgent()),
+      message(Message.TypedAgentName({ name: "Scout" })),
+      message(Message.TypedInstructions({ instructions: "Review what is asked." })),
+      // Without a model it says what it wants, and sends nothing.
+      message(Message.SubmittedAgentForm()),
+      model((model) => {
+        expect(formIn(model)).toMatchObject(
+          Option.some({ error: Option.some("Choose the connection of the agent's model.") })
+        )
+      }),
+      message(Message.ChoseModelConnection({ connectionId: models.id })),
+      Command.expectExact(LoadModels({ ...member, connectionId: models.id })),
+      Command.resolve(LoadModels, Message.GotModels({ connectionId: models.id, models: offered })),
+      message(Message.ChoseModel({ modelId: "test-model" })),
+      message(Message.ChoseEffort({ effort: "high" })),
+      message(Message.SubmittedAgentForm()),
+      Command.expectExact(
+        CreateAgent({
+          name: "Scout",
+          roleId: BuiltinRoles.MemberId,
+          configuration: {
+            instructions: "Review what is asked.",
+            harness: { _tag: "Auto" },
+            model: { connectionId: models.id, id: "test-model", effort: "high" },
+            sandbox: null
+          }
+        })
+      ),
+      Command.resolve(CreateAgent, Message.WroteAction()),
+      message(Message.GotMembers({ members: [{ member: scout, pending: false }] })),
+      message(Message.GotAgents({ agents: [{ agent: scoutAgent, pending: false }] })),
+      message(Message.ClickedConfigureAgent({ agentId: scoutAgent.id })),
+      Command.expectExact(LoadModels({ ...member, connectionId: models.id })),
+      Command.resolve(LoadModels, Message.GotModels({ connectionId: models.id, models: offered })),
+      message(Message.TypedInstructions({ instructions: "Only review." })),
+      message(Message.SubmittedAgentForm()),
+      Command.expectExact(
+        ConfigureAgent({
+          agentId: scoutAgent.id,
+          configuration: {
+            instructions: "Only review.",
+            harness: scoutAgent.harness,
+            model: scoutAgent.model,
+            sandbox: null
+          }
+        })
+      ),
+      Command.resolve(ConfigureAgent, Message.WroteAction()),
+      message(Message.ClickedRenameAgent({ agentId: scoutAgent.id })),
+      message(Message.TypedAgentName({ name: "Reviewer" })),
+      message(Message.SubmittedAgentForm()),
+      Command.expectExact(RenameAgent({ agentId: scoutAgent.id, name: "Reviewer", expectedName: "Scout" })),
+      Command.resolve(RenameAgent, Message.WroteAction()),
       model((model) => {
         expect(formIn(model)).toEqual(Option.none())
       })

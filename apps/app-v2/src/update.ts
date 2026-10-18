@@ -1,12 +1,13 @@
 /**
  * How each message changes the app: signing in a step at a time, listing and opening workspaces,
  * following the open store, what the person does in its groups, threads and their tasks and turns,
- * settings, and connections, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
+ * settings, connections, and agents, following a turn's log, and signing out. A message that comes when the page is past it, such as a code check finishing after the
  * person signed out, changes nothing.
  */
 
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
+import type { Identity } from "@amends-dev/core/identity"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Task } from "@amends-dev/core/task"
 import { ThreadMessage } from "@amends-dev/core/thread"
@@ -18,12 +19,14 @@ import * as Result from "effect/Result"
 import type { Update } from "foldkit"
 import type * as ManagedResource from "foldkit/managedResource"
 import { modifyFields } from "foldkit/struct"
+import * as AgentSetup from "./agentSetup.ts"
 import type * as Browser from "./browser.ts"
 import {
   AddConnection,
   CheckCode,
   CheckConnection,
   LoadIntegrations,
+  LoadModels,
   LoadWorkspaces,
   ReplaceConnectionKey,
   SaveSession,
@@ -33,6 +36,8 @@ import {
 import type { Flags } from "./flags.ts"
 import { Message } from "./message.ts"
 import {
+  AgentForm,
+  type Agents,
   Check,
   ConnectionForm,
   type Connections,
@@ -42,6 +47,7 @@ import {
   Integrations,
   LogState,
   type Model,
+  OfferedModels,
   type OpenGroup,
   type Opened,
   type OpenThread,
@@ -58,7 +64,9 @@ import * as SettingsForm from "./settingsForm.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  ConfigureAgent,
   ConfigureConnection,
+  CreateAgent,
   CreateTask,
   CreateTeam,
   DeleteMessage,
@@ -76,6 +84,7 @@ import {
   RemoveConnection,
   RemoveGroupMember,
   RemoveMember,
+  RenameAgent,
   RenameConnection,
   RenameGroup,
   RenameSelf,
@@ -304,6 +313,122 @@ const submitConnectionForm = (
     })
   })
 }
+
+/** The open agents pane as `change` makes it from the workspace, while it is open; otherwise nothing. */
+const atAgents = (model: Model, change: (agents: Agents, opened: Opened) => Agents): UpdateReturn =>
+  atOpened(model, (opened) =>
+    modifyFields(opened, {
+      pane: Option.map(
+        Pane.matchOrElse({ Agents: ({ agents }) => Pane.Agents({ agents: change(agents, opened) }) }, (pane) => pane)
+      )
+    })
+  )
+
+/** The form open among the agents as `change` makes it, while one is open; otherwise nothing. */
+const atAgentForm = (model: Model, change: (form: AgentForm) => AgentForm) =>
+  atAgents(model, (agents) => modifyFields(agents, { form: Option.map(change) }))
+
+/** The setup in the form open among the agents as `change` makes it, while it holds one. */
+const atAgentSetup = (model: Model, change: (setup: AgentSetup.Draft) => AgentSetup.Draft) =>
+  atAgentForm(model, (form) =>
+    AgentForm.matchOrElse(
+      form,
+      {
+        Adding: (adding) => AgentForm.Adding({ ...adding, setup: change(adding.setup), error: Option.none() }),
+        Configuring: (configuring) =>
+          AgentForm.Configuring({ ...configuring, setup: change(configuring.setup), error: Option.none() })
+      },
+      () => form
+    )
+  )
+
+/** The open agents pane, and the workspace it is of, while it is open. */
+const agentsIn = (model: Model): Option.Option<{ readonly agents: Agents; readonly opened: Opened }> =>
+  Option.flatMap(openedIn(model), (opened) =>
+    Option.flatMap(
+      opened.pane,
+      Pane.matchOrElse({ Agents: ({ agents }) => Option.some({ agents, opened }) }, () => Option.none())
+    )
+  )
+
+/** Ask for the models `connectionId` offers, unless it is no connection. */
+const loadingModels = (model: Model, connectionId: string): UpdateReturn =>
+  Option.match(
+    Option.flatMap(asMemberIn(model), (member) =>
+      Option.map(
+        Option.fromUndefinedOr(
+          Option.getOrUndefined(openedIn(model))?.connections.find(({ connection }) => connection.id === connectionId)
+        ),
+        ({ connection }) => ({ member, connectionId: connection.id })
+      )
+    ),
+    {
+      onNone: () => atAgents(model, (agents) => modifyFields(agents, { models: () => Option.none() })),
+      onSome: ({ member, connectionId }) => ({
+        ...atAgents(model, (agents) =>
+          modifyFields(agents, { models: () => Option.some({ connectionId, offered: OfferedModels.Loading() }) })
+        ),
+        commands: [LoadModels({ ...member, connectionId })]
+      })
+    }
+  )
+
+/** The pane `pane` opened, with the host's integrations asked for unless they are loaded or loading. */
+const openingWithIntegrations = (model: Model, pane: Pane): UpdateReturn => {
+  const asked = Option.exists(
+    Option.flatMap(openedIn(model), ({ integrations }) => integrations),
+    Integrations.isAnyOf(["Loading", "Loaded"])
+  )
+  const opening = atOpened(model, (opened) =>
+    modifyFields(opened, {
+      pane: () => Option.some(pane),
+      integrations: (integrations) => (asked ? integrations : Option.some(Integrations.Loading()))
+    })
+  )
+  return Option.match(asMemberIn(model), {
+    onNone: () => opening,
+    onSome: (member) => (asked ? opening : { ...opening, commands: [LoadIntegrations(member)] })
+  })
+}
+
+/** Send the form open among the agents, as an action. */
+const submitAgentForm = (model: Model, form: AgentForm, opened: Opened): UpdateReturn => {
+  const leaving = (next: Option.Option<AgentForm>) =>
+    atAgents(model, (agents) => modifyFields(agents, { form: () => next }))
+  return AgentForm.match(form, {
+    Adding: (adding) =>
+      Result.match(AgentSetup.configurationOf(adding.setup), {
+        onFailure: (error) => leaving(Option.some(AgentForm.Adding({ ...adding, error: Option.some(error) }))),
+        onSuccess: (configuration) => ({
+          ...leaving(Option.none()),
+          commands: [CreateAgent({ name: adding.name, roleId: adding.roleId, configuration })]
+        })
+      }),
+    Configuring: (configuring) =>
+      Result.match(AgentSetup.configurationOf(configuring.setup), {
+        onFailure: (error) =>
+          leaving(Option.some(AgentForm.Configuring({ ...configuring, error: Option.some(error) }))),
+        onSuccess: (configuration) => ({
+          ...leaving(Option.none()),
+          commands: [ConfigureAgent({ agentId: configuring.agentId, configuration })]
+        })
+      }),
+    Renaming: ({ agentId, name }) =>
+      Option.match(agentNameOf(opened, agentId), {
+        onNone: () => leaving(Option.none()),
+        onSome: (expectedName) => ({
+          ...leaving(Option.none()),
+          commands: [RenameAgent({ agentId, name, expectedName })]
+        })
+      })
+  })
+}
+
+/** The name of the agent `agentId`, its member's. */
+const agentNameOf = (opened: Opened, agentId: Identity.AgentId) =>
+  Option.flatMap(Option.fromUndefinedOr(opened.agents.find(({ agent }) => agent.id === agentId)), ({ agent }) =>
+    Option.fromUndefinedOr(opened.members.find(({ member }) => member.id === agent.memberId)?.member.name)
+  )
 
 /** The open settings, and the workspace they are of, while they are open. */
 const settingsIn = (model: Model): Option.Option<{ readonly settings: Settings; readonly opened: Opened }> =>
@@ -582,6 +707,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                     memberships: [],
                     follows: [],
                     connections: [],
+                    agents: [],
                     integrations: Option.none(),
                     actions: [],
                     notice: Option.none(),
@@ -680,23 +806,9 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           )
         })
       ),
-    // The host's integrations are asked for once the person opens the connections, and again after it could not be reached.
-    ClickedConnections: () => {
-      const loading = Option.exists(
-        Option.flatMap(openedIn(model), ({ integrations }) => integrations),
-        Integrations.isAnyOf(["Loading", "Loaded"])
-      )
-      const opening = atOpened(model, (opened) =>
-        modifyFields(opened, {
-          pane: () => Option.some(Pane.Connections({ connections: { form: Option.none(), check: Option.none() } })),
-          integrations: (integrations) => (loading ? integrations : Option.some(Integrations.Loading()))
-        })
-      )
-      return Option.match(asMemberIn(model), {
-        onNone: () => opening,
-        onSome: (member) => (loading ? opening : { ...opening, commands: [LoadIntegrations(member)] })
-      })
-    },
+    // The host's integrations are asked for once the person opens the connections or the agents, and again after it could not be reached.
+    ClickedConnections: () =>
+      openingWithIntegrations(model, Pane.Connections({ connections: { form: Option.none(), check: Option.none() } })),
     GotIntegrations: ({ integrations }) =>
       atOpened(model, (opened) =>
         modifyFields(opened, { integrations: () => Option.some(Integrations.Loaded({ integrations })) })
@@ -869,6 +981,127 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         })
       ),
     ClickedRemoveConnection: ({ connectionId }) => ({ model, commands: [RemoveConnection({ connectionId })] }),
+    GotAgents: ({ agents }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, {
+          agents: () => agents,
+          // A form about an agent no longer there closes.
+          pane: Option.map(
+            Pane.matchOrElse(
+              {
+                Agents: ({ agents: pane }) =>
+                  Pane.Agents({
+                    agents: modifyFields(pane, {
+                      form: Option.filter((form) =>
+                        AgentForm.matchOrElse(
+                          form,
+                          {
+                            Configuring: ({ agentId }) => agents.some(({ agent }) => agent.id === agentId),
+                            Renaming: ({ agentId }) => agents.some(({ agent }) => agent.id === agentId)
+                          },
+                          () => true
+                        )
+                      )
+                    })
+                  })
+              },
+              (pane) => pane
+            )
+          )
+        })
+      ),
+    ClickedAgents: () =>
+      openingWithIntegrations(model, Pane.Agents({ agents: { form: Option.none(), models: Option.none() } })),
+    ClickedAddAgent: () =>
+      atAgents(model, (agents) =>
+        modifyFields(agents, {
+          form: () =>
+            Option.some(
+              AgentForm.Adding({
+                name: "",
+                roleId: BuiltinRoles.MemberId,
+                setup: AgentSetup.empty,
+                error: Option.none()
+              })
+            ),
+          models: () => Option.none()
+        })
+      ),
+    TypedAgentName: ({ name }) =>
+      atAgentForm(model, (form) =>
+        AgentForm.matchOrElse(
+          form,
+          {
+            Adding: (adding) => AgentForm.Adding({ ...adding, name }),
+            Renaming: (renaming) => AgentForm.Renaming({ ...renaming, name })
+          },
+          () => form
+        )
+      ),
+    ChoseAgentRole: ({ roleId }) =>
+      atAgentForm(model, (form) =>
+        AgentForm.matchOrElse(form, { Adding: (adding) => AgentForm.Adding({ ...adding, roleId }) }, () => form)
+      ),
+    TypedInstructions: ({ instructions }) => atAgentSetup(model, (setup) => ({ ...setup, instructions })),
+    ChoseHarness: ({ harness }) => atAgentSetup(model, (setup) => ({ ...setup, harness })),
+    // Another connection offers other models, so the model is chosen again from what it offers.
+    ChoseModelConnection: ({ connectionId }) =>
+      loadingModels(
+        atAgentSetup(model, (setup) => ({ ...setup, modelConnectionId: connectionId, modelId: "", effort: "" })).model,
+        connectionId
+      ),
+    ChoseModel: ({ modelId }) => atAgentSetup(model, (setup) => ({ ...setup, modelId, effort: "" })),
+    ChoseEffort: ({ effort }) => atAgentSetup(model, (setup) => ({ ...setup, effort })),
+    ChoseSandbox: ({ sandbox }) => atAgentSetup(model, (setup) => ({ ...setup, sandbox })),
+    SubmittedAgentForm: () =>
+      Option.match(
+        Option.flatMap(agentsIn(model), ({ agents, opened }) => Option.map(agents.form, (form) => ({ form, opened }))),
+        { onNone: () => ({ model }), onSome: ({ form, opened }) => submitAgentForm(model, form, opened) }
+      ),
+    ClickedCancelAgentForm: () => atAgents(model, (agents) => modifyFields(agents, { form: () => Option.none() })),
+    ClickedRenameAgent: ({ agentId }) =>
+      atAgents(model, (agents, opened) =>
+        modifyFields(agents, {
+          form: () => Option.map(agentNameOf(opened, agentId), (name) => AgentForm.Renaming({ agentId, name }))
+        })
+      ),
+    ClickedConfigureAgent: ({ agentId }) =>
+      Option.match(
+        Option.flatMap(openedIn(model), ({ agents }) =>
+          Option.fromUndefinedOr(agents.find(({ agent }) => agent.id === agentId)?.agent)
+        ),
+        {
+          onNone: () => ({ model }),
+          onSome: (agent) =>
+            loadingModels(
+              atAgents(model, (agents) =>
+                modifyFields(agents, {
+                  form: () =>
+                    Option.some(
+                      AgentForm.Configuring({ agentId, setup: AgentSetup.draftOf(agent), error: Option.none() })
+                    )
+                })
+              ).model,
+              agent.model.connectionId
+            )
+        }
+      ),
+    GotModels: ({ connectionId, models }) =>
+      atAgents(model, (agents) =>
+        modifyFields(agents, {
+          models: Option.map((asked) =>
+            asked.connectionId === connectionId ? { connectionId, offered: OfferedModels.Loaded({ models }) } : asked
+          )
+        })
+      ),
+    FailedLoadModels: ({ connectionId, error }) =>
+      atAgents(model, (agents) =>
+        modifyFields(agents, {
+          models: Option.map((asked) =>
+            asked.connectionId === connectionId ? { connectionId, offered: OfferedModels.Failed({ error }) } : asked
+          )
+        })
+      ),
     ClickedSettings: () =>
       atOpened(model, (opened) =>
         modifyFields(opened, { pane: () => Option.some(Pane.Settings({ settings: freshSettings })) })

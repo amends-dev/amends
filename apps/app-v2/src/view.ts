@@ -29,6 +29,7 @@ import * as Select from "@foldkit/ui/select"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Document, Html, HtmlBuilder } from "foldkit/html"
+import { agentsView } from "./agentsView.ts"
 import { connectionsView } from "./connectionsView.ts"
 import { button, choiceSelect, field, memberSelect, sending, submit, textarea, toggle } from "./controls.ts"
 import { Message } from "./message.ts"
@@ -1109,6 +1110,7 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
       ),
       button(h, "Settings", Message.ClickedSettings()),
       button(h, "Connections", Message.ClickedConnections()),
+      button(h, "Agents", Message.ClickedAgents()),
       StoreState.match(opened.store, {
         Opening: () => h.p([], ["Opening…"]),
         Failed: ({ error }) => h.p([h.Role("alert")], [error]),
@@ -1128,7 +1130,8 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
                   Group: ({ group }) => groupView(group, opened, h),
                   Inbox: () => inboxView(opened, h),
                   Settings: ({ settings }) => settingsView(settings, opened, h),
-                  Connections: ({ connections }) => connectionsView(connections, opened, h)
+                  Connections: ({ connections }) => connectionsView(connections, opened, h),
+                  Agents: ({ agents }) => agentsView(agents, opened, h)
                 })
               })
             ]

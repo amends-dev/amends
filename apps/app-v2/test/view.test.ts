@@ -25,6 +25,7 @@ import {
   CheckCode,
   CheckConnection,
   LoadIntegrations,
+  LoadModels,
   LoadWorkspaces,
   SaveSession,
   SendCode,
@@ -34,6 +35,7 @@ import { Message } from "../src/message.ts"
 import {
   AddGroupMember,
   ChangeRole,
+  CreateAgent,
   CreateTask,
   CreateTeam,
   Dismiss,
@@ -61,13 +63,17 @@ import {
   connectionOf,
   design,
   general,
+  integrationGiving,
+  keylessConnection,
   membership,
   notificationOf,
+  offered,
   opening,
   reply,
   roleOf,
   roles,
   scout,
+  scoutAgent,
   scoutInGeneral,
   session,
   signedIn,
@@ -564,6 +570,78 @@ describe("the app", () => {
       expect(role("button", { name: "Check" })).toBeAbsent(),
       expect(role("button", { name: "Remove" })).toBeAbsent(),
       expect(role("button", { name: "Add a connection" })).toBeAbsent()
+    )
+  })
+
+  it("an owner adds an agent on a connection's model and changes its setup, and a member reads how it runs", () => {
+    const member = { apiUrl, token: session.token, workspaceId: membership.workspace.id }
+    const models = keylessConnection("models-1", "test-models", "Models")
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(Message.GotRoles({ roles })),
+      Subscription.emit(Message.GotAssignments({ assignments: [{ assignment: aliceOwns, pending: false }] })),
+      Subscription.emit(Message.GotConnections({ connections: [{ connection: models, pending: false }] })),
+      click(role("button", { name: "Agents" })),
+      Command.resolve(
+        LoadIntegrations,
+        Message.GotIntegrations({ integrations: [integrationGiving("test-models", "Test models", ["models"])] })
+      ),
+      expect(text("No agents yet.")).toExist(),
+      click(role("button", { name: "Add an agent" })),
+      inside(
+        role("form", { name: "Add an agent" }),
+        type(label("Name"), "Scout"),
+        change(label("Model connection"), models.id)
+      ),
+      Command.expectExact(LoadModels({ ...member, connectionId: models.id })),
+      Command.resolve(LoadModels, Message.GotModels({ connectionId: models.id, models: offered })),
+      inside(
+        role("form", { name: "Add an agent" }),
+        change(label("Model"), "test-model"),
+        change(label("Effort"), "low"),
+        click(role("button", { name: "Add" }))
+      ),
+      Command.expectExact(
+        CreateAgent({
+          name: "Scout",
+          roleId: BuiltinRoles.MemberId,
+          configuration: {
+            instructions: "",
+            harness: { _tag: "Auto" },
+            model: { connectionId: models.id, id: "test-model", effort: "low" },
+            sandbox: null
+          }
+        })
+      ),
+      Command.resolve(CreateAgent, Message.WroteAction()),
+      Subscription.emit(Message.GotMembers({ members: [{ member: scout, pending: true }] })),
+      Subscription.emit(Message.GotAgents({ agents: [{ agent: scoutAgent, pending: true }] })),
+      inside(role("region", { name: "Agents" }), expect(text(" · Sending…")).toExist()),
+      Subscription.emit(Message.GotAgents({ agents: [{ agent: scoutAgent, pending: false }] })),
+      inside(
+        role("region", { name: "Agents" }),
+        expect(text(" · Ready")).toExist(),
+        expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist(),
+        click(role("button", { name: "Change setup" }))
+      ),
+      Command.resolve(LoadModels, Message.GotModels({ connectionId: models.id, models: offered })),
+      inside(role("form", { name: "Change the agent's setup" }), expect(label("Model ID")).toExist()),
+      click(role("button", { name: "Cancel" })),
+      // A member reads how the agent runs, and changes none of it.
+      Subscription.emit(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: roleOf("assignment-3", membership.member.id, BuiltinRoles.MemberId), pending: false }
+          ]
+        })
+      ),
+      expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist(),
+      expect(role("button", { name: "Change setup" })).toBeAbsent(),
+      expect(role("button", { name: "Add an agent" })).toBeAbsent()
     )
   })
 

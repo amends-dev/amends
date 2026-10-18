@@ -1,3 +1,4 @@
+import { Agent } from "@amends-dev/core/agent"
 import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
@@ -607,6 +608,108 @@ describe("Pending, for the workspace's connections", () => {
     const removed = unfinished("ConnectionRemoved", { connectionId: "connection-1" }, 4)
     expect(view(Pending.overlay("Connection", everywhere, [connection], [removed]))).toEqual([
       { value: { ...connection.value, status: "removed" }, pending: true }
+    ])
+  })
+})
+
+describe("Pending, for the workspace's agents", () => {
+  const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
+  const written = { ...author, key: Request.Key.make("action-8"), writtenAt: at(8) }
+  const setup = {
+    instructions: "Review what is asked.",
+    harness: Agent.Harness.cases.Auto.make({}),
+    model: { connectionId: "models-1", id: "test-model" },
+    sandbox: null
+  }
+  const general = cases.Group.make({
+    value: Schema.decodeSync(Group.Group)({
+      id: "general",
+      workspaceId: "workspace-1",
+      kind: "Team",
+      visibility: "Public",
+      name: "General",
+      createdBy: "member-1",
+      createdAt: "2026-10-18T12:00:00Z"
+    })
+  })
+
+  it.effect(
+    "adds an agent as a member, with its role, its admission to general, and its setup, as the server will",
+    () =>
+      Effect.gen(function* () {
+        const { creates } = Pending.effectsOf("AgentCreated")
+        const made = yield* creates!(
+          { name: "Scout", roleId: BuiltinRoles.MemberId, ...setup },
+          written,
+          findAmong([general])
+        )
+        const [agentId, memberId] = yield* Effect.provideService(
+          Effect.all([Agent.newId, Member.newId]),
+          Request.Current,
+          written
+        )
+        expect(made.map((record) => record._tag)).toEqual(["Member", "Assignment", "GroupMembership", "Agent"])
+        expect(made[0]).toEqual(
+          cases.Member.make({
+            value: {
+              id: memberId,
+              workspaceId: author.workspaceId,
+              identity: { _tag: "Agent", id: agentId },
+              name: "Scout",
+              status: "active"
+            }
+          })
+        )
+        expect(made[2]?.value).toMatchObject({ groupId: "general", memberId })
+        expect(made[3]?.value).toMatchObject({ id: agentId, memberId, ...setup, readiness: { _tag: "Ready" } })
+        // A workspace without a general group admits it to none.
+        const elsewhere = yield* creates!(
+          { name: "Scout", roleId: BuiltinRoles.MemberId, ...setup },
+          written,
+          findAmong([])
+        )
+        expect(elsewhere.map((record) => record._tag)).toEqual(["Member", "Assignment", "Agent"])
+      }).pipe(Effect.provide(BrowserCrypto.layer))
+  )
+
+  it("changes an agent's setup, and renames its member from the name the person saw", () => {
+    const agent = cases.Agent.make({
+      value: Schema.decodeSync(ReplicaRecord.Agent)({
+        id: "agent-1",
+        workspaceId: "workspace-1",
+        memberId: "member-3",
+        ...setup,
+        createdBy: "member-1",
+        createdAt: "2026-10-18T12:00:00Z",
+        readiness: { _tag: "Ready" }
+      })
+    })
+    const member = cases.Member.make({
+      value: Schema.decodeSync(Member.Member)({
+        id: "member-3",
+        workspaceId: "workspace-1",
+        identity: { _tag: "Agent", id: "agent-1" },
+        name: "Scout",
+        status: "active"
+      })
+    })
+    const configured = { ...setup, instructions: "Only review.", sandbox: { connectionId: "sandboxes-1" } }
+    expect(
+      view(
+        Pending.overlay(
+          "Agent",
+          everywhere,
+          [agent],
+          [unfinished("AgentConfigured", { agentId: "agent-1", ...configured }, 1)]
+        )
+      )
+    ).toEqual([{ value: { ...agent.value, ...configured }, pending: true }])
+    const pending = [
+      unfinished("AgentRenamed", { agentId: "agent-1", name: "Reviewer", expectedName: "Scout" }, 2),
+      unfinished("AgentRenamed", { agentId: "agent-1", name: "Stale", expectedName: "Scout" }, 3)
+    ]
+    expect(view(Pending.overlay("Member", everywhere, [member], pending))).toEqual([
+      { value: { ...member.value, name: "Reviewer" }, pending: true }
     ])
   })
 })
