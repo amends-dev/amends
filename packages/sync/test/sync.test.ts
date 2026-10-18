@@ -1,4 +1,5 @@
 import { Assignment, Scope } from "@amends-dev/core/authorization"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Task } from "@amends-dev/core/task"
 import { Thread } from "@amends-dev/core/thread"
 import { Invitation } from "@amends-dev/core/workspace"
@@ -78,6 +79,16 @@ describe("SyncSchema", () => {
     const tags = new Set(events.map((event) => event.tag))
     const kinds = [...tags].flatMap((tag) => (tag.endsWith("Changed") ? [tag.slice(0, -"Changed".length)] : []))
     expect(kinds.filter((kind) => !tags.has(`${kind}Dropped`))).toEqual([])
+  })
+
+  it("changes exactly the kinds of record a replica holds, each as core keeps it there", () => {
+    const changed = new Map(
+      events.flatMap((event) => (event.tag.endsWith("Changed") ? [[event.tag.slice(0, -"Changed".length), event]] : []))
+    )
+    const { cases } = ReplicaRecord.ReplicaRecord
+    expect([...changed.keys()].toSorted()).toEqual(Object.keys(cases).toSorted())
+    for (const [kind, recordCase] of Object.entries(cases))
+      expect(changed.get(kind)?.payload, kind).toBe(recordCase.fields.value)
   })
 
   it.effect("carries every event's payload through its binary encoding unchanged", () =>

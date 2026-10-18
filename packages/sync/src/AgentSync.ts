@@ -9,6 +9,7 @@
 
 import { Agent } from "@amends-dev/core/agent"
 import { Identity } from "@amends-dev/core/identity"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import * as EventGroup from "effect/eventlog/EventGroup"
 import * as Schema from "effect/Schema"
 import { recordChanges } from "./internal/recordChanges.ts"
@@ -33,10 +34,5 @@ export const Actions = EventGroup.empty
  * @since 0.1.0
  */
 export const Changes = EventGroup.empty.pipe(
-  recordChanges(
-    "Agent",
-    Schema.Struct({ ...Agent.Agent.fields, readiness: Agent.Readiness }),
-    Schema.Struct({ id: Identity.AgentId }),
-    ({ id }) => ({ id })
-  )
+  recordChanges("Agent", ReplicaRecord.Agent, Schema.Struct({ id: Identity.AgentId }), ({ id }) => ({ id }))
 )

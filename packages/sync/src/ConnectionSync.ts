@@ -10,6 +10,7 @@
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection } from "@amends-dev/core/connection"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import * as EventGroup from "effect/eventlog/EventGroup"
 import * as Schema from "effect/Schema"
 import { recordChanges } from "./internal/recordChanges.ts"
@@ -43,7 +44,7 @@ export const Actions = EventGroup.empty
 export const Changes = EventGroup.empty.pipe(
   recordChanges(
     "Connection",
-    Schema.Struct({ ...Connection.Connection.fields, readiness: Connection.Readiness }),
+    ReplicaRecord.Connection,
     Schema.Struct({ id: ConnectionContract.ConnectionId }),
     ({ id }) => ({ id })
   )

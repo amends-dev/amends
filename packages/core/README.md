@@ -53,6 +53,7 @@ implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journ
 | `notification`  | Notifications, the inbox, and marking them seen. See [notifications](#notifications).                                     |
 | `read-state`    | Private read positions in threads and groups. See [read state](#read-state).                                              |
 | `request`       | Request keys, the IDs of what a request creates, and running a request once. See [request keys](#request-keys).           |
+| `replica`       | What a member's replica holds, and who may see each record. See [replica](#replica).                                      |
 | `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                     |
 
 ## How operations run
@@ -366,12 +367,27 @@ Notifications never create turns, accept their input, or run work. See
 and `markGroupRead` record `ReadStateFacts.ThreadRead` and `GroupRead`, which `ReadStateProjection`
 keeps in the `ReadStateStore`; reading a thread also marks the person's notifications from it seen
 up to the position, through `NotificationProjection`. Starting a thread and replying record the
-author's position in the same commit, so an author has read what they posted. It is what makes ambient activity visible in the
+author's position in the same commit, so an author has read what they posted. It is what makes
+ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
 notifications. See
 [marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
+
+## Replica
+
+A replica is the copy of a workspace one member's browser keeps, of what that member may see.
+`@amends-dev/core/replica` holds `ReplicaRecord`, every kind of record a replica holds, as core
+keeps it, with the `Key` each is held under: a turn without where its log begins, which only the
+server reads, and a connection or an agent with how ready it is. `ReplicaVisibility.canSee` decides,
+from a viewer's grants and the groups they belong to, whether they may see a record, as core's
+operations authorize reading it: the workspace, its roles, and its contacts are every member's;
+members, assignments, invitations, channels, connections, and agents follow their read permission,
+and a member always sees their own record and assignments; a group and its members are its
+members' under `group.read`, and a public team's whoever may join it; a thread and everything in it
+are its group's members' under `thread.read` on it; and read state, follows, and notifications are
+their member's alone.
 
 ## Connections
 

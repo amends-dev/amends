@@ -16,6 +16,7 @@
     "./workspace": "./src/workspace/index.ts",
     "./agent": "./src/agent/index.ts",
     "./read-state": "./src/read-state/index.ts",
+    "./replica": "./src/replica/index.ts",
     "./request": "./src/request/index.ts",
     "./operation": "./src/operation/index.ts",
     "./connection": "./src/connection/index.ts",

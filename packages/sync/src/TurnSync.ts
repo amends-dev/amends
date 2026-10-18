@@ -7,10 +7,10 @@
  * @since 0.1.0
  */
 
-import { Turn, TurnId } from "@amends-dev/core/turn"
+import { ReplicaRecord } from "@amends-dev/core/replica"
+import { TurnId } from "@amends-dev/core/turn"
 import * as EventGroup from "effect/eventlog/EventGroup"
 import * as Schema from "effect/Schema"
-import * as Struct from "effect/Struct"
 import { recordChanges } from "./internal/recordChanges.ts"
 
 /**
@@ -36,10 +36,5 @@ export const Actions = EventGroup.empty
  * @since 0.1.0
  */
 export const Changes = EventGroup.empty.pipe(
-  recordChanges(
-    "Turn",
-    Schema.Struct(Struct.omit(Turn.Turn.fields, ["logAfter"])),
-    Schema.Struct({ id: TurnId.TurnId }),
-    ({ id }) => ({ id })
-  )
+  recordChanges("Turn", ReplicaRecord.Turn, Schema.Struct({ id: TurnId.TurnId }), ({ id }) => ({ id }))
 )

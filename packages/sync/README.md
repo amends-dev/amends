@@ -20,7 +20,8 @@ may see.
 Each domain has a module with its `Actions` and `Changes`: `WorkspaceSync`, `GroupSync`,
 `ThreadSync`, `TaskSync`, `TurnSync`, `NotificationSync`, `ConnectionSync`, `AgentSync`, and
 `ChannelSync`. `Rejections` holds the rejections, and `SyncSchema` every group, as the
-`EventLog.schema` the server and the browser build their event logs over.
+`EventLog.schema` the server and the browser build their event logs over. The changes cover exactly
+the kinds of record core's `ReplicaRecord` names, each with the shape it gives them.
 
 What a browser shows beyond the records, such as a thread's preview, its unread count, or whether
 the member may rename it, it derives from the records and the member's own grants. Some writes
