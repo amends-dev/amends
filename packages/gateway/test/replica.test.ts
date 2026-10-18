@@ -16,6 +16,7 @@ import {
   Member,
   MemberId,
   MemberService,
+  OwnershipService,
   WorkspaceSettingsService
 } from "@amends-dev/core/workspace"
 import type { Storage } from "@amends-dev/gateway/conformance"
@@ -649,6 +650,39 @@ describe("ReplicaService", () => {
           )
           const taken = yield* takeSettled(as, batches, "settled")
           expect(taken[0]?.changes[0]?._tag).toBe("Reset")
+        })
+      )
+    )
+  )
+
+  it.effect("a reset carries how the member's own requests in its commit ended", () =>
+    withStorage((storage) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { owner, as } = yield* world(storage)
+          const { batches } = yield* follow(as, owner, Option.some(yield* headOf(as)))
+          // Handing ownership to the other member changes the owner's own grants.
+          yield* as(
+            owner,
+            Effect.flatMap(
+              Effect.zip(OwnershipService.OwnershipService, RequestService.RequestService),
+              ([ownershipService, requestService]) =>
+                Effect.flatMap(ownershipService.get, (view) =>
+                  requestService.runOnce(
+                    Request.Key.make("hand-over"),
+                    ownershipService.transfer({
+                      memberId: other.memberId,
+                      expectedOwnerAssignmentId: view.ownerAssignmentId
+                    })
+                  )
+                )
+            )
+          )
+          const [reset] = yield* takeSettled(as, batches, "settled")
+          expect(reset?.changes.some(ReplicaChange.ReplicaChange.isAnyOf(["Reset"]))).toBe(true)
+          expect(reset?.changes.filter(ReplicaChange.ReplicaChange.isAnyOf(["Completed", "Rejected"]))).toEqual([
+            ReplicaChange.ReplicaChange.cases.Completed.make({ key: Request.Key.make("hand-over") })
+          ])
         })
       )
     )

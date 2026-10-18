@@ -413,7 +413,7 @@ a commit, a changed record reaches them as `Changed` when they may see it as the
 after it, so nothing reaches them once they lost access; joining a group sends what it holds,
 leaving one sends `Dropped` for the group, which takes everything in it along, then what of it they
 still see; a change to their grants resets the replica; and their own requests' outcomes arrive as
-`Completed` and `Rejected`. The stream fails with `Denied` once they are no longer a member, and with
+`Completed` and `Rejected`, a reset's among its changes, since nothing follows it for its commit. The stream fails with `Denied` once they are no longer a member, and with
 `Unavailable` (`LogInterrupted`) when following stops short. `ReplicaCommits` reads each commit and
 the records it changed once for every member following the workspace: one reader follows the
 journal while anyone does, and a stream that starts later reads the commits before it joined from

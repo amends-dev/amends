@@ -173,7 +173,11 @@ export const make = Effect.gen(function* () {
         return yield* new CoreError.Denied({
           reason: new CoreError.InvalidActor({ memberId, reason: "membership-removed" })
         })
-      if (access.grantsChanged) return [yield* reset(memberId, commit.position, commit.recordedAt)]
+      // A reset leaves nothing to follow its commit, so it carries how their requests in it ended.
+      if (access.grantsChanged) {
+        const batch = yield* reset(memberId, commit.position, commit.recordedAt)
+        return [{ ...batch, changes: [...batch.changes, ...access.outcomes] }]
+      }
       // Read after the commit's records, so nothing reaches them that they could no longer see.
       const viewer = yield* replicaQuery.viewerOf(memberId)
       // What they still see of a group they left, such as a public team, and all of one they joined.
