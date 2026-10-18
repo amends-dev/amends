@@ -73,7 +73,7 @@ jobs:
           - suite: apps
             args: >-
               --project @amends-dev/icons --project @amends-dev/ui
-              --project @amends-dev/site
+              --project @amends-dev/site --project @amends-dev/app-v2
     env:
       # Each PostgreSQL shard starts its own cluster from the runner's installation.
       AMENDS_POSTGRES_REQUIRED: "true"

@@ -381,7 +381,10 @@ notifications. See
 A replica is the copy of a workspace one member's browser keeps, of what that member may see.
 `@amends-dev/core/replica` holds `ReplicaRecord`, every kind of record a replica holds, as core
 keeps it, with the `Key` each is held under: a turn without where its log begins, which only the
-server reads, and a connection or an agent with how ready it is. `ReplicaVisibility.canSee` decides,
+server reads, and a connection or an agent with how ready it is. `placeOf` says where a record
+sits, in the workspace, a group, or a thread, so a replica that drops a group or a thread drops
+what sits in it: a group's admissions, follows, read time, and threads, and everything a thread
+holds. `ReplicaVisibility.canSee` decides,
 from a viewer's grants and the groups they belong to, whether they may see a record, as core's
 operations authorize reading it: the workspace, its roles, and its contacts are every member's;
 members, assignments, invitations, channels, connections, and agents follow their read permission,

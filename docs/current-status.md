@@ -241,9 +241,9 @@ without drafts of the step being written. Other gaps:
 
 - Sync sockets count toward no limit, unlike turn logs' streams, which a workspace and each member
   of it may hold only so many of.
-- On Bun 1.3.14 a WebSocket the server closed still counts as open, so a host that had a sync
-  socket open when it began to stop closes it at once but exits only at its graceful stop's limit,
-  twenty seconds.
+- On Bun 1.3.14 a graceful stop that begins with a WebSocket open waits until its limit even once
+  the socket closed, whichever side closed it, so a host that had a sync socket open when it began
+  to stop closes it at once but exits only at its graceful stop's limit, twenty seconds.
 - A browser's key outlives the session it was registered in: only removing it, as the browser does
   when it signs out, stops it opening the person's stores, while a token revoked elsewhere or
   expired leaves it registered, and a stream open when a key is removed stays open until it ends.

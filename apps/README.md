@@ -4,11 +4,12 @@ The apps are what people see: the site at amends.dev, built from the design syst
 libraries it draws with. The app people work in is being rebuilt; until it lands, a workspace is
 reached through the [HTTP API](../packages/http/README.md). None of these is published to npm.
 
-| Package                    | What it is                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------ |
-| [`ui`](ui/README.md)       | The design system: foundations, components, layout patterns, and every screen. |
-| [`site`](site/README.md)   | amends.dev: the product, the packages, and their docs, on Astro and Starlight. |
-| [`icons`](icons/README.md) | The icons, drawn as data and generated as Solid components and SVGs.           |
+| Package                      | What it is                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| [`app-v2`](app-v2/README.md) | The workspace app being built on Foldkit; so far, its browser's sync.          |
+| [`ui`](ui/README.md)         | The design system: foundations, components, layout patterns, and every screen. |
+| [`site`](site/README.md)     | amends.dev: the product, the packages, and their docs, on Astro and Starlight. |
+| [`icons`](icons/README.md)   | The icons, drawn as data and generated as Solid components and SVGs.           |
 
 ## How they fit
 

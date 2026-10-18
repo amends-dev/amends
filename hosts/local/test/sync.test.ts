@@ -141,8 +141,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const workspace = yield* createWorkspace(server, "Stop")
           const next = yield* (yield* openBrowser(server)).follow(workspace)
           yield* next
-          // The process itself exits only at its graceful stop's limit: Bun counts a socket the
-          // server closed as open. The test's scope kills it.
+          // The process itself exits only at its graceful stop's limit: Bun's stop waits for a
+          // socket open as it began, even once closed. The test's scope kills it.
           yield* Effect.forkScoped(Effect.promise(() => server.stop()))
           const [heardAfter, closed] = yield* Effect.timed(Effect.flip(next))
           // Without the drain, the socket would stay open until that limit, twenty seconds.

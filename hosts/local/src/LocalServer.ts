@@ -54,8 +54,8 @@ export const serve = <E>(
   options?: { readonly disableLogger?: boolean | undefined; readonly disableListenLog?: boolean }
 ) =>
   // Built after the server, the drain is released first as the host stops, ending open turn logs
-  // and sync sockets so their clients reconnect at once. Bun counts a socket the server closed as
-  // open, so the graceful stop of a server that had one waits its full limit.
+  // and sync sockets so their clients reconnect at once. Bun's graceful stop still waits its full
+  // limit when it begins with a socket open, even once the socket closed.
   Draining.layerOnRelease.pipe(
     Layer.provide(
       HttpRouter.serve(layerRoutes, options).pipe(

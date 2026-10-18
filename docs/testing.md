@@ -17,6 +17,7 @@ bun run test --project postgresql
 bun run test --project @amends-dev/icons
 bun run test --project @amends-dev/ui
 bun run test --project @amends-dev/site
+bun run test --project @amends-dev/app-v2
 bun run test --watch packages/core/test
 bun run check
 ```
@@ -27,7 +28,9 @@ the sandbox and harness adapters, whose live tests run only when an `AMENDS_TEST
 [integration resources](#integration-resources) describes. The `postgresql` project covers the
 PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI uses
 Solid/Vite transforms and Happy DOM. The site's
-tests cover its documentation generator's Markdown transforms, in Node. Vendored repositories are
+tests cover its documentation generator's Markdown transforms, in Node. The workspace app's run in
+Happy DOM with `fake-indexeddb` as the browser's storage, and its store's test serves a host in
+process, in Node, so Bun's own `fetch` and `WebSocket` reach it. Vendored repositories are
 outside test discovery.
 
 The [icons package](../apps/icons/README.md) tests geometry validation, composition,
@@ -116,9 +119,10 @@ lockfile. A new push to a pull request cancels its earlier run. The PostgreSQL s
 throwaway cluster from the runner's installation with `AMENDS_POSTGRES_REQUIRED=true`. The
 migration step regenerates the baseline and fails if anything changes. When one project's tests
 outgrow their job, give it its own matrix entry or more shards; `--shard` splits by test file.
-The `backend` and `postgresql` projects allow each test 20 seconds rather than Vitest's 5: on the
-two-CPU runners, sharing the machine with PostgreSQL, their heaviest tests (such as a commit
-binding more parameters than one statement can) run about three times slower than on a laptop.
+The `backend`, `postgresql`, and workspace app projects allow each test 20 seconds rather than
+Vitest's 5: on the two-CPU runners, sharing the machine with PostgreSQL, their heaviest tests (such
+as a commit binding more parameters than one statement can) run about three times slower than on a
+laptop.
 
 [`.github/workflows/site.yml`](../.github/workflows/site.yml) deploys the site with Alchemy: main to
 amends.dev, and each pull request opened from this repository to a preview that it links in a

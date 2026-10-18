@@ -1,5 +1,6 @@
 /**
- * The records a member's replica holds: every kind, with the key each is held under. A replica is
+ * The records a member's replica holds: every kind, with the key each is held under and the place
+ * it sits, the workspace, a group, or a thread. A replica is
  * the copy of a workspace one member's browser keeps, of what that member may see, and these are
  * the rows it keeps, as core's stores keep them, except where a replica holds a record's own shape:
  * a turn without where its log begins, which only the server reads, and a connection or agent with
@@ -210,3 +211,65 @@ export const keyOf = (record: ReplicaRecord): Key =>
     Delivery: ({ value }) => cases.Delivery.make({ id: value.id }),
     Contact: ({ value }) => cases.Contact.make({ id: value.id })
   })
+
+/**
+ * Where a record sits: in the workspace, in a group, or in a thread. A replica drops what sits in a
+ * group, and in that group's threads, when it drops the group, and what sits in a thread when it
+ * drops the thread, so it keeps each record's place beside it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Place = Schema.TaggedUnion({
+  Workspace: {},
+  Group: { groupId: GroupId.GroupId },
+  Thread: { threadId: ThreadId.ThreadId }
+})
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Place = typeof Place.Type
+
+const places = Place.cases
+
+/**
+ * Where `record` sits. A group sits in the workspace; its admissions, follows, read time, and
+ * threads in the group; and everything a thread holds, and a member's position in it, in the thread.
+ *
+ * @category getters
+ * @since 0.1.0
+ */
+export const placeOf = (record: ReplicaRecord): Place => {
+  const inWorkspace = () => places.Workspace.make({})
+  const inGroup = ({ value }: { readonly value: { readonly groupId: GroupId.GroupId } }) =>
+    places.Group.make({ groupId: value.groupId })
+  const inThread = ({ value }: { readonly value: { readonly threadId: ThreadId.ThreadId } }) =>
+    places.Thread.make({ threadId: value.threadId })
+  return Match.valueTags(record, {
+    Workspace: inWorkspace,
+    Member: inWorkspace,
+    Role: inWorkspace,
+    Assignment: inWorkspace,
+    Invitation: inWorkspace,
+    Group: inWorkspace,
+    GroupMembership: inGroup,
+    GroupFollow: inGroup,
+    GroupRead: inGroup,
+    Thread: inGroup,
+    ThreadActivity: inThread,
+    ThreadMessage: inThread,
+    ThreadParticipation: inThread,
+    ThreadPosition: inThread,
+    Task: inThread,
+    Turn: inThread,
+    Notification: inWorkspace,
+    Connection: inWorkspace,
+    Agent: inWorkspace,
+    Channel: inWorkspace,
+    ChannelBinding: inThread,
+    Delivery: inThread,
+    Contact: inWorkspace
+  })
+}

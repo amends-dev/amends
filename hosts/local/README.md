@@ -63,8 +63,8 @@ The server refuses request bodies over one mebibyte with 413, and serves at most
 streams per workspace and twenty per member of it, answering 429 beyond them; sync sockets have no
 such limit yet. When the host stops, open streams and sync sockets end first, telling their clients
 to reconnect, and no socket opens after. The process exits once ordinary requests finish, except
-that Bun 1.3.14 counts a socket the server closed as still open, so a host that had one exits only
-at its graceful stop's limit of twenty seconds.
+that on Bun 1.3.14 a graceful stop that begins with a WebSocket open waits for its limit even once
+the socket closed, so a host that had one exits only at that limit, twenty seconds.
 
 ## Integrations
 

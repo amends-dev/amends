@@ -42,6 +42,7 @@ export default defineConfig({
           include: ["apps/site/test/**/*.test.ts"]
         }
       },
+      "apps/app-v2/vitest.config.ts",
       "apps/icons/vite.config.ts",
       "apps/ui/vite.config.ts"
     ]
