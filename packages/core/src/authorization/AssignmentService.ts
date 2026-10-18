@@ -31,7 +31,6 @@ import * as Delegation from "./Delegation.ts"
 import type * as Permission from "./Permission.ts"
 import * as PermissionCatalog from "./PermissionCatalog.ts"
 import * as Requirement from "./Requirement.ts"
-import * as Scope from "./Scope.ts"
 import * as Target from "./Target.ts"
 
 /**
@@ -196,19 +195,13 @@ export const make: Effect.Effect<
       canManage: record.status === "active" && (yield* Delegation.isAllowedBy(authorizeRecipient(memberId)))
     })
   }, Operation.report)
-  /** Is this a role held across the workspace? Its source then names the role. */
-  const isWorkspaceRole = (
-    record: Assignment.Assignment
-  ): record is Assignment.Assignment & {
-    readonly source: Extract<Assignment.Source, { readonly _tag: "Role" }>
-  } => Assignment.Source.isAnyOf(["Role"])(record.source) && Scope.Scope.isAnyOf(["Workspace"])(record.source.scope)
   const assign = Effect.fn("AssignmentService.assign")(
     function* (input: Assignment.AssignInput) {
       const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input)
       yield* authorizeRecipient(request.memberId)
       yield* delegation.requireGrant(request.roleId)
       const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
-        (record) => isWorkspaceRole(record) && record.source.roleId === request.roleId
+        (record) => Assignment.isWorkspaceRole(record) && record.source.roleId === request.roleId
       )
       if (existing !== undefined) return existing
       return yield* assignmentCommand.assignRole(request.memberId, request.roleId)
@@ -240,7 +233,7 @@ export const make: Effect.Effect<
       const request = yield* Schema.decodeEffect(Assignment.ChangeInput)(input)
       yield* authorizeRecipient(request.memberId)
       yield* delegation.requireGrant(request.roleId)
-      const current = (yield* delegation.assignmentsFor(request.memberId)).filter(isWorkspaceRole)
+      const current = (yield* delegation.assignmentsFor(request.memberId)).filter(Assignment.isWorkspaceRole)
       if (
         current.length !== request.expectedAssignmentIds.length ||
         current.some(({ id }) => !request.expectedAssignmentIds.includes(id))

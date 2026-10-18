@@ -1,41 +1,52 @@
+import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
 import { ThreadParticipationId } from "@amends-dev/core/thread"
-import { MemberId } from "@amends-dev/core/workspace"
+import { Invitation, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
 import { Message } from "../src/message.ts"
-import { type Model, Page, SignInForm, StoreState, Workspaces } from "../src/model.ts"
+import { type Model, Page, Pane, SignInForm, StoreState, Workspaces } from "../src/model.ts"
 import {
-  AddMember,
+  AddGroupMember,
+  ChangeRole,
   CreateTeam,
   DeleteMessage,
   EditMessage,
   FollowGroup,
   FollowThread,
+  Invite,
   JoinGroup,
   LeaveGroup,
   MarkThreadRead,
   PostReply,
+  RemoveGroupMember,
   RemoveMember,
   RenameGroup,
+  RenameSelf,
   RenameThread,
+  RenameWorkspace,
+  RevokeInvitation,
   StartDirect,
   StartThread,
+  TransferOwnership,
   UnfollowGroup,
   UnfollowThread
 } from "../src/store.ts"
 import { update } from "../src/update.ts"
 import {
   aliceInDesign,
+  aliceOwns,
   apiUrl,
   bob,
   bobInDesign,
+  bobIsMember,
   design,
   general,
   membership,
   opening,
+  roles,
   session,
   signedIn,
   signedOut,
@@ -109,6 +120,15 @@ describe("signing in", () => {
 const openedIn = (model: Model) =>
   Page.matchOrElse(model.page, { SignedIn: ({ opened }) => opened }, () => Option.none())
 
+/** The group open in it, if any. */
+const groupIn = (model: Model) =>
+  Option.flatMap(openedIn(model), ({ pane }) =>
+    Option.flatMap(
+      pane,
+      Pane.matchOrElse({ Group: ({ group }) => Option.some(group) }, () => Option.none())
+    )
+  )
+
 describe("a workspace", () => {
   it("opens with its store, then a group, a thread, and a reply written to the store", () => {
     story(
@@ -145,7 +165,7 @@ describe("a workspace", () => {
       Command.expectExact(PostReply({ threadId: thread.id, text: "Sounds good" })),
       Command.resolve(PostReply, Message.WroteAction()),
       model((model) => {
-        const group = Option.flatMap(openedIn(model), ({ group }) => group)
+        const group = groupIn(model)
         expect(Option.map(group, ({ threads }) => threads.length)).toEqual(Option.some(1))
         expect(
           Option.flatMap(group, ({ thread }) => Option.map(thread, ({ messages, draft }) => ({ messages, draft })))
@@ -185,9 +205,7 @@ describe("a workspace", () => {
         expect(Option.flatMap(openedIn(model), ({ notice }) => notice)).toEqual(
           Option.some("This browser could not keep that. Try again.")
         )
-        expect(Option.flatMap(openedIn(model), ({ group }) => Option.map(group, ({ threads }) => threads))).toEqual(
-          Option.some([])
-        )
+        expect(Option.map(groupIn(model), ({ threads }) => threads)).toEqual(Option.some([]))
       })
     )
   })
@@ -282,7 +300,14 @@ describe("a workspace", () => {
       message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
       message(Message.AcquiredStore()),
       message(Message.GotGroups({ groups: [{ group: design, pending: false }] })),
-      message(Message.GotMembers({ members: [membership.member, bob] })),
+      message(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false }
+          ]
+        })
+      ),
       message(
         Message.GotMemberships({
           memberships: [
@@ -295,21 +320,19 @@ describe("a workspace", () => {
       message(Message.ClickedRenameGroup()),
       // The form starts from the name it has.
       model((model) => {
-        expect(
-          Option.flatMap(openedIn(model), ({ group }) => Option.flatMap(group, ({ renaming }) => renaming))
-        ).toEqual(Option.some("Design"))
+        expect(Option.flatMap(groupIn(model), ({ renaming }) => renaming)).toEqual(Option.some("Design"))
       }),
       message(Message.TypedGroupName({ name: "Product" })),
       message(Message.SubmittedGroupName()),
       Command.expectExact(RenameGroup({ groupId: design.id, name: "Product", expectedName: "Design" })),
       Command.resolve(RenameGroup, Message.WroteAction()),
-      message(Message.ClickedRemoveMember({ membershipId: bobInDesign.id })),
-      Command.expectExact(RemoveMember({ groupId: design.id, membershipId: bobInDesign.id })),
-      Command.resolve(RemoveMember, Message.WroteAction()),
-      message(Message.ChoseMemberToAdd({ memberId: Option.some(bob.id) })),
-      message(Message.SubmittedAddMember()),
-      Command.expectExact(AddMember({ groupId: design.id, memberId: bob.id })),
-      Command.resolve(AddMember, Message.WroteAction()),
+      message(Message.ClickedRemoveGroupMember({ membershipId: bobInDesign.id })),
+      Command.expectExact(RemoveGroupMember({ groupId: design.id, membershipId: bobInDesign.id })),
+      Command.resolve(RemoveGroupMember, Message.WroteAction()),
+      message(Message.ChoseGroupMemberToAdd({ memberId: Option.some(bob.id) })),
+      message(Message.SubmittedAddGroupMember()),
+      Command.expectExact(AddGroupMember({ groupId: design.id, memberId: bob.id })),
+      Command.resolve(AddGroupMember, Message.WroteAction()),
       message(Message.ClickedFollowGroup()),
       Command.expectExact(FollowGroup({ groupId: design.id, memberId: membership.member.id })),
       Command.resolve(FollowGroup, Message.WroteAction()),
@@ -325,17 +348,97 @@ describe("a workspace", () => {
       // Leaving a group the person does not belong to asks nothing of the server.
       message(Message.GotMemberships({ memberships: [{ membership: bobInDesign, pending: false }] })),
       message(Message.ClickedLeave()),
-      message(Message.ChoseMemberToAdd({ memberId: Option.some(MemberId.MemberId.make("member-3")) })),
+      message(Message.ChoseGroupMemberToAdd({ memberId: Option.some(MemberId.MemberId.make("member-3")) })),
       model((model) => {
-        expect(Option.flatMap(openedIn(model), ({ group }) => Option.flatMap(group, ({ adding }) => adding))).toEqual(
+        expect(Option.flatMap(groupIn(model), ({ adding }) => adding)).toEqual(
           Option.some(MemberId.MemberId.make("member-3"))
         )
       }),
       // A group the person can no longer see closes.
       message(Message.GotGroups({ groups: [{ group: general, pending: false }] })),
       model((model) => {
-        expect(Option.flatMap(openedIn(model), ({ group }) => group)).toEqual(Option.none())
+        expect(groupIn(model)).toEqual(Option.none())
       })
+    )
+  })
+
+  it("renames the workspace and the person, changes and removes members, hands the workspace over, and invites", () => {
+    const settingsIn = (model: Model) =>
+      Option.flatMap(openedIn(model), ({ pane }) =>
+        Option.flatMap(
+          pane,
+          Pane.matchOrElse({ Settings: ({ settings }) => Option.some(settings) }, () => Option.none())
+        )
+      )
+    const invitationId = Invitation.InvitationId.make("invitation-1")
+    story(
+      update,
+      given(signedIn),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      message(Message.AcquiredStore()),
+      message(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false }
+          ]
+        })
+      ),
+      message(Message.GotRoles({ roles })),
+      message(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: aliceOwns, pending: false },
+            { assignment: bobIsMember, pending: false }
+          ]
+        })
+      ),
+      message(Message.ClickedSettings()),
+      message(Message.ClickedRenameWorkspace()),
+      // Each form starts from the name it changes.
+      model((model) => {
+        expect(Option.flatMap(settingsIn(model), ({ workspaceName }) => workspaceName)).toEqual(Option.some("Studio"))
+      }),
+      message(Message.TypedWorkspaceName({ name: "Atelier" })),
+      message(Message.SubmittedWorkspaceName()),
+      Command.expectExact(RenameWorkspace({ name: "Atelier", expectedName: "Studio" })),
+      Command.resolve(RenameWorkspace, Message.WroteAction()),
+      message(Message.ClickedRenameSelf()),
+      model((model) => {
+        expect(Option.flatMap(settingsIn(model), ({ ownName }) => ownName)).toEqual(Option.some("Alice"))
+      }),
+      message(Message.TypedOwnName({ name: "Ali" })),
+      message(Message.SubmittedOwnName()),
+      Command.expectExact(RenameSelf({ name: "Ali" })),
+      Command.resolve(RenameSelf, Message.WroteAction()),
+      // A new role replaces the roles the person saw the member hold.
+      message(Message.ChoseRole({ memberId: bob.id, roleId: BuiltinRoles.AdministratorId })),
+      Command.expectExact(
+        ChangeRole({ memberId: bob.id, roleId: BuiltinRoles.AdministratorId, expectedAssignmentIds: [bobIsMember.id] })
+      ),
+      Command.resolve(ChangeRole, Message.WroteAction()),
+      message(Message.ClickedRemoveMember({ memberId: bob.id })),
+      Command.expectExact(RemoveMember({ memberId: bob.id })),
+      Command.resolve(RemoveMember, Message.WroteAction()),
+      // Ownership passes from the owner's assignment the person saw.
+      message(Message.ClickedTransferOwnership({ memberId: bob.id })),
+      Command.expectExact(TransferOwnership({ memberId: bob.id, expectedOwnerAssignmentId: aliceOwns.id })),
+      Command.resolve(TransferOwnership, Message.WroteAction()),
+      message(Message.TypedInviteEmail({ email: "carol@example.com" })),
+      message(Message.ChoseInviteRole({ roleId: BuiltinRoles.AdministratorId })),
+      message(Message.SubmittedInvite()),
+      Command.expectExact(Invite({ email: "carol@example.com", roleId: BuiltinRoles.AdministratorId })),
+      Command.resolve(Invite, Message.WroteAction()),
+      // The form keeps the role for the next invitation.
+      model((model) => {
+        expect(Option.map(settingsIn(model), ({ inviting }) => inviting)).toEqual(
+          Option.some({ email: "", roleId: BuiltinRoles.AdministratorId })
+        )
+      }),
+      message(Message.ClickedRevokeInvitation({ invitationId })),
+      Command.expectExact(RevokeInvitation({ invitationId })),
+      Command.resolve(RevokeInvitation, Message.WroteAction())
     )
   })
 

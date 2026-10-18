@@ -5,17 +5,21 @@
  * and the actions the person writes to it.
  */
 
+import { Assignment, Role } from "@amends-dev/core/authorization"
 import type { CoreError } from "@amends-dev/core/error"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ReadState } from "@amends-dev/core/read-state"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
-import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, Member, MemberId, WorkspaceId, WorkspaceSettings } from "@amends-dev/core/workspace"
+import * as Accounts from "@amends-dev/gateway/Accounts"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
+import type * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import type * as Event from "effect/eventlog/Event"
 import type * as EventGroup from "effect/eventlog/EventGroup"
@@ -23,6 +27,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Command from "foldkit/command"
@@ -30,7 +35,16 @@ import * as ManagedResource from "foldkit/managedResource"
 import * as Subscription from "foldkit/subscription"
 import * as Browser from "./browser.ts"
 import { Message } from "./message.ts"
-import { type ActionItem, type GroupItem, type Model, type Opened, Page, StoreState } from "./model.ts"
+import {
+  type ActionItem,
+  type GroupItem,
+  type Model,
+  type OpenGroup,
+  type Opened,
+  Page,
+  Pane,
+  StoreState
+} from "./model.ts"
 import * as Store from "./sync/Store.ts"
 
 export const StoreResource = ManagedResource.tag<Store.Store["Service"]>()("Store")
@@ -59,6 +73,15 @@ const openStore = (model: Model): Option.Option<Store.Options> =>
 /** The open workspace, once its store has opened. */
 const openWorkspace = (model: Model): Option.Option<Opened> =>
   Option.filter(openedIn(model), ({ store }) => StoreState.matchOrElse(store, { Open: () => true }, () => false))
+
+/** The group open in the workspace, once its store has opened. */
+const openGroup = (model: Model): Option.Option<OpenGroup> =>
+  Option.flatMap(openWorkspace(model), ({ pane }) =>
+    Option.flatMap(
+      pane,
+      Pane.matchOrElse({ Group: ({ group }) => Option.some(group) }, () => Option.none())
+    )
+  )
 
 export const managedResources = ManagedResource.make<Model, Message>()((entry) => ({
   store: entry(
@@ -104,8 +127,20 @@ const nameOf = (group: Group.Group): string => ("name" in group ? group.name : g
 
 /** What each action does, as the person reads it. */
 const whatEach: Readonly<
-  Record<Event.Tag<EventGroup.Events<typeof ThreadSync.Actions | typeof GroupSync.Actions>>, string>
+  Record<
+    Event.Tag<EventGroup.Events<typeof ThreadSync.Actions | typeof GroupSync.Actions | typeof WorkspaceSync.Actions>>,
+    string
+  >
 > = {
+  WorkspaceRenamed: "rename the workspace",
+  OwnershipTransferred: "transfer ownership",
+  MemberRenamed: "change your name",
+  MemberRemoved: "remove a member",
+  InvitationIssued: "invite someone",
+  InvitationRevoked: "revoke an invitation",
+  RoleAssigned: "give a role",
+  RolesReplaced: "change a role",
+  AssignmentRevoked: "take away a role",
   ThreadStarted: "start a thread",
   DirectThreadStarted: "start a conversation",
   ThreadRenamed: "rename a thread",
@@ -117,23 +152,29 @@ const whatEach: Readonly<
   ThreadMarkedRead: "mark a thread read",
   TeamCreated: "create a team",
   GroupRenamed: "rename a team",
-  GroupMemberAdded: "add a member",
+  GroupMemberAdded: "add a member to a team",
   GroupJoined: "join a team",
-  GroupMemberRemoved: "remove a member",
+  GroupMemberRemoved: "remove a member from a team",
   GroupLeft: "leave a team",
   GroupFollowed: "follow a group",
   GroupUnfollowed: "unfollow a group",
   GroupMarkedRead: "mark a group read"
 }
 
-/** An action as the person reads it: what it does, the text it carries, and why it was refused. */
+/** The text an action carries for the person to recognize it by: a message's, or an invitation's address. */
+const textOf = (payload: unknown): Option.Option<string> =>
+  Predicate.hasProperty(payload, "text") && Predicate.isString(payload.text)
+    ? Option.some(payload.text)
+    : Predicate.hasProperty(payload, "email") && Predicate.isString(payload.email)
+      ? Option.some(payload.email)
+      : Option.none()
+
+/** An action as the person reads it: which, what it does, the text it carries, and why it was refused. */
 const describe = (action: Store.ActionView): ActionItem => ({
   key: action.key,
+  tag: action.tag,
   what: (whatEach as Readonly<Record<string, string | undefined>>)[action.tag] ?? action.tag,
-  text:
-    Predicate.hasProperty(action.payload, "text") && Predicate.isString(action.payload.text)
-      ? Option.some(action.payload.text)
-      : Option.none(),
+  text: textOf(action.payload),
   rejection: Option.map(action.rejection, (error: CoreError.Rejection) => error.message)
 })
 
@@ -148,6 +189,11 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
             ? fromStore((store) =>
                 Stream.mergeAll(
                   [
+                    Stream.filterMap(store.list("Workspace", workspace), ([held]) =>
+                      held === undefined
+                        ? Result.fail(undefined)
+                        : Result.succeed(Message.GotWorkspace({ workspace: held.record.value, pending: held.pending }))
+                    ),
                     Stream.map(store.list("Group", workspace), (groups): Message =>
                       Message.GotGroups({
                         groups: Array.sort(
@@ -157,7 +203,22 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
                       })
                     ),
                     Stream.map(store.list("Member", workspace), (members): Message =>
-                      Message.GotMembers({ members: members.map(({ record }) => record.value) })
+                      Message.GotMembers({
+                        members: members.map(({ record, pending }) => ({ member: record.value, pending }))
+                      })
+                    ),
+                    Stream.map(store.list("Role", workspace), (roles): Message =>
+                      Message.GotRoles({ roles: roles.map(({ record }) => record.value) })
+                    ),
+                    Stream.map(store.list("Assignment", workspace), (assignments): Message =>
+                      Message.GotAssignments({
+                        assignments: assignments.map(({ record, pending }) => ({ assignment: record.value, pending }))
+                      })
+                    ),
+                    Stream.map(store.list("Invitation", workspace), (invitations): Message =>
+                      Message.GotInvitations({
+                        invitations: invitations.map(({ record, pending }) => ({ invitation: record.value, pending }))
+                      })
                     ),
                     Stream.map(store.every("GroupMembership"), (memberships): Message =>
                       Message.GotMemberships({
@@ -182,9 +243,7 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
     group: entry(
       { groupId: Schema.Option(GroupId.GroupId) },
       {
-        modelToDependencies: (model) => ({
-          groupId: Option.flatMap(openWorkspace(model), ({ group }) => Option.map(group, ({ groupId }) => groupId))
-        }),
+        modelToDependencies: (model) => ({ groupId: Option.map(openGroup(model), ({ groupId }) => groupId) }),
         dependenciesToStream: ({ groupId }) =>
           Option.match(groupId, {
             onNone: () => Stream.empty,
@@ -209,9 +268,7 @@ export const subscriptions = Subscription.make<Model, Message, ManagedResource.S
       { threadId: Schema.Option(ThreadId.ThreadId) },
       {
         modelToDependencies: (model) => ({
-          threadId: Option.flatMap(openWorkspace(model), ({ group }) =>
-            Option.flatMap(group, ({ thread }) => Option.map(thread, ({ threadId }) => threadId))
-          )
+          threadId: Option.flatMap(openGroup(model), ({ thread }) => Option.map(thread, ({ threadId }) => threadId))
         }),
         dependenciesToStream: ({ threadId }) =>
           Option.match(threadId, {
@@ -391,14 +448,14 @@ export const RenameGroup = Command.define("RenameGroup", {
 })
 
 /** Admit `memberId` to `groupId`. */
-export const AddMember = Command.define("AddMember", {
+export const AddGroupMember = Command.define("AddGroupMember", {
   args: { groupId: GroupId.GroupId, memberId: MemberId.MemberId },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("GroupMemberAdded", input))
 })
 
 /** End the membership `membershipId` of `groupId`. */
-export const RemoveMember = Command.define("RemoveMember", {
+export const RemoveGroupMember = Command.define("RemoveGroupMember", {
   args: { groupId: GroupId.GroupId, membershipId: GroupMembership.GroupMembershipId },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("GroupMemberRemoved", input))
@@ -430,4 +487,83 @@ export const UnfollowGroup = Command.define("UnfollowGroup", {
   args: { groupId: GroupId.GroupId, memberId: MemberId.MemberId },
   messages: [Message.WroteAction, Message.FailedWriteAction],
   execute: (input) => toStore((store) => store.write("GroupUnfollowed", input))
+})
+
+/** Rename the workspace to `name`, from the name the person saw. */
+export const RenameWorkspace = Command.define("RenameWorkspace", {
+  args: { name: Schema.String, expectedName: Schema.String },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (args) =>
+    Schema.decodeEffect(WorkspaceSettings.RenameInput)(args).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("A workspace needs a name.")),
+        onSuccess: (input) => toStore((store) => store.write("WorkspaceRenamed", input))
+      })
+    )
+})
+
+/** Change the name the person goes by in the workspace to `name`. */
+export const RenameSelf = Command.define("RenameSelf", {
+  args: { name: Schema.String },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ name }) =>
+    Schema.decodeEffect(Member.NewName)(name).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("Your name can't be empty.")),
+        onSuccess: (name) => toStore((store) => store.write("MemberRenamed", { name }))
+      })
+    )
+})
+
+/** Remove `memberId` from the workspace. */
+export const RemoveMember = Command.define("RemoveMember", {
+  args: { memberId: MemberId.MemberId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("MemberRemoved", input))
+})
+
+/** Give `memberId` the role `roleId` in place of the workspace roles the person saw them hold. */
+export const ChangeRole = Command.define("ChangeRole", {
+  args: {
+    memberId: MemberId.MemberId,
+    roleId: Role.RoleId,
+    expectedAssignmentIds: Schema.Array(Assignment.AssignmentId)
+  },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("RolesReplaced", input))
+})
+
+/** Hand the workspace to `memberId`, from the owner's assignment the person saw. */
+export const TransferOwnership = Command.define("TransferOwnership", {
+  args: { memberId: MemberId.MemberId, expectedOwnerAssignmentId: Assignment.AssignmentId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("OwnershipTransferred", input))
+})
+
+/** How long an invitation can be accepted for. */
+const invitationLasts = { days: 7 }
+
+/** Invite whoever `email` names, with `roleId`, for as long as an invitation lasts. */
+export const Invite = Command.define("Invite", {
+  args: { email: Schema.String, roleId: Role.RoleId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: ({ email, roleId }) =>
+    Schema.decodeEffect(Accounts.Email)(email).pipe(
+      Effect.matchEffect({
+        onFailure: () => Effect.succeed(unwritable("Enter an email address.")),
+        onSuccess: (email) =>
+          Effect.flatMap(DateTime.now, (now) =>
+            toStore((store) =>
+              store.write("InvitationIssued", { email, roleId, expiresAt: DateTime.add(now, invitationLasts) })
+            )
+          )
+      })
+    )
+})
+
+/** Revoke the invitation `invitationId`. */
+export const RevokeInvitation = Command.define("RevokeInvitation", {
+  args: { invitationId: Invitation.InvitationId },
+  messages: [Message.WroteAction, Message.FailedWriteAction],
+  execute: (input) => toStore((store) => store.write("InvitationRevoked", input))
 })

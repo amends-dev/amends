@@ -23,6 +23,7 @@ import {
   OwnershipService,
   WorkspaceSettingsService
 } from "@amends-dev/core/workspace"
+import * as Accounts from "@amends-dev/gateway/Accounts"
 import * as Effect from "effect/Effect"
 import type * as Event from "effect/eventlog/Event"
 import type * as EventGroup from "effect/eventlog/EventGroup"
@@ -38,8 +39,8 @@ import * as ThreadSync from "../ThreadSync.ts"
 import * as TurnSync from "../TurnSync.ts"
 import * as WorkspaceSync from "../WorkspaceSync.ts"
 
-/** What running an action asks of a workspace: its operations, as the acting member. */
-type Operation = Effect.Effect<unknown, CoreError.CoreError, Core.Operations | Actor.Actor>
+/** What running an action asks of a workspace, its operations, as the acting member, and of the host, its accounts. */
+type Operation = Effect.Effect<unknown, CoreError.CoreError, Core.Operations | Actor.Actor | Accounts.Accounts>
 
 /** The operation of each of a group's actions, given its payload. */
 type Operations<Group extends EventGroup.Any> = {
@@ -55,7 +56,12 @@ const workspace: Operations<typeof WorkspaceSync.Actions> = {
     Effect.flatMap(OwnershipService.OwnershipService, (service) => service.transfer(input)),
   MemberRenamed: ({ name }) => Effect.flatMap(MemberService.MemberService, (service) => service.rename(name)),
   MemberRemoved: ({ memberId }) => Effect.flatMap(MemberService.MemberService, (service) => service.remove(memberId)),
-  InvitationIssued: (input) => Effect.flatMap(InvitationService.InvitationService, (service) => service.issue(input)),
+  InvitationIssued: ({ email, ...invitation }) =>
+    Effect.gen(function* () {
+      const recipient = yield* Effect.flatMap(Accounts.Accounts, (accounts) => accounts.findOrCreate(email))
+      const invitationService = yield* InvitationService.InvitationService
+      return yield* invitationService.issue({ ...invitation, recipientId: recipient.id })
+    }),
   InvitationRevoked: ({ invitationId }) =>
     Effect.flatMap(InvitationService.InvitationService, (service) => service.revoke(invitationId)),
   RoleAssigned: (input) => Effect.flatMap(AssignmentService.AssignmentService, (service) => service.assign(input)),

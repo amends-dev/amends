@@ -1,7 +1,9 @@
+import { Core } from "@amends-dev/core"
+import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupMembership } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
-import { Member } from "@amends-dev/core/workspace"
+import { Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { Option, Schema } from "effect"
 import type { Model } from "../src/model.ts"
@@ -76,6 +78,26 @@ const admission = (id: string, groupId: string, memberId: string) =>
 export const aliceInGeneral = admission("membership-1", "general", "member-1")
 export const aliceInDesign = admission("membership-2", "design", "member-1")
 export const bobInDesign = admission("membership-3", "design", "member-2")
+
+/** The workspace's built-in roles, as it was created with them. */
+export const roles = BuiltinRoles.make(WorkspaceId.WorkspaceId.make("workspace-1"), Core.permissions)
+
+/** `memberId`'s assignment of `roleId` across the workspace. */
+export const roleOf = (id: string, memberId: Member.Member["id"], roleId: Role.RoleId) =>
+  Assignment.Assignment.make({
+    id: Assignment.AssignmentId.make(id),
+    workspaceId: WorkspaceId.WorkspaceId.make("workspace-1"),
+    memberId,
+    status: "active",
+    source: Assignment.Source.cases.Role.make({
+      roleId,
+      scope: Scope.Scope.cases.Workspace.make({ workspaceId: WorkspaceId.WorkspaceId.make("workspace-1") })
+    })
+  })
+
+/** Alice owns the workspace; bob is a member of it. */
+export const aliceOwns = roleOf("assignment-1", membership.member.id, BuiltinRoles.OwnerId)
+export const bobIsMember = roleOf("assignment-2", bob.id, BuiltinRoles.MemberId)
 
 export const thread = Schema.decodeSync(Thread.Thread)({
   id: "thread-1",

@@ -1,9 +1,11 @@
 /**
  * How each message changes the app: signing in a step at a time, listing and opening workspaces,
- * following the open store, and signing out. A message that comes when the page is past it, such
- * as a code check finishing after the person signed out, changes nothing.
+ * following the open store, what the person does in its groups, threads, and settings, and signing
+ * out. A message that comes when the page is past it, such as a code check finishing after the
+ * person signed out, changes nothing.
  */
 
+import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 import { ThreadMessage } from "@amends-dev/core/thread"
 import type * as SignIn from "@amends-dev/gateway/SignIn"
 import type * as Layer from "effect/Layer"
@@ -23,28 +25,38 @@ import {
   type Opened,
   type OpenThread,
   Page,
+  Pane,
+  type Settings,
   SignInForm,
   StoreState,
   Workspaces
 } from "./model.ts"
+import { workspaceRolesOf } from "./permissions.ts"
 import {
-  AddMember,
+  AddGroupMember,
+  ChangeRole,
   CreateTeam,
   DeleteMessage,
   Dismiss,
   EditMessage,
   FollowGroup,
   FollowThread,
+  Invite,
   JoinGroup,
   LeaveGroup,
   MarkThreadRead,
   PostReply,
+  RemoveGroupMember,
   RemoveMember,
   RenameGroup,
+  RenameSelf,
   RenameThread,
+  RenameWorkspace,
+  RevokeInvitation,
   StartDirect,
   StartThread,
   type StoreResource,
+  TransferOwnership,
   UnfollowGroup,
   UnfollowThread
 } from "./store.ts"
@@ -109,7 +121,40 @@ const atStore = (model: Model, change: (store: StoreState) => StoreState): Updat
 
 /** The open group as `change` makes it, while one is open; otherwise nothing. */
 const atGroup = (model: Model, change: (group: OpenGroup) => OpenGroup): UpdateReturn =>
-  atOpened(model, (opened) => modifyFields(opened, { group: Option.map(change) }))
+  atOpened(model, (opened) =>
+    modifyFields(opened, {
+      pane: Option.map(Pane.matchOrElse({ Group: ({ group }) => Pane.Group({ group: change(group) }) }, (pane) => pane))
+    })
+  )
+
+/** The open settings as `change` makes them from the workspace, while they are open; otherwise nothing. */
+const atSettings = (model: Model, change: (settings: Settings, opened: Opened) => Settings): UpdateReturn =>
+  atOpened(model, (opened) =>
+    modifyFields(opened, {
+      pane: Option.map(
+        Pane.matchOrElse(
+          { Settings: ({ settings }) => Pane.Settings({ settings: change(settings, opened) }) },
+          (pane) => pane
+        )
+      )
+    })
+  )
+
+/** The open settings, and the workspace they are of, while they are open. */
+const settingsIn = (model: Model): Option.Option<{ readonly settings: Settings; readonly opened: Opened }> =>
+  Option.flatMap(openedIn(model), (opened) =>
+    Option.flatMap(
+      opened.pane,
+      Pane.matchOrElse({ Settings: ({ settings }) => Option.some({ settings, opened }) }, () => Option.none())
+    )
+  )
+
+/** The settings form with nothing being changed, inviting as a member. */
+const freshSettings: Settings = {
+  workspaceName: Option.none(),
+  ownName: Option.none(),
+  inviting: { email: "", roleId: BuiltinRoles.MemberId }
+}
 
 /** The open thread as `change` makes it, while one is open; otherwise nothing. */
 const atThread = (model: Model, change: (thread: OpenThread) => OpenThread): UpdateReturn =>
@@ -172,8 +217,23 @@ const textOf = (thread: OpenThread, messageId: Editing["messageId"]) =>
 
 /** The open group, if one is. */
 const groupIn = (model: Model): Option.Option<OpenGroup> =>
-  Page.matchOrElse(model.page, { SignedIn: ({ opened }) => Option.flatMap(opened, ({ group }) => group) }, () =>
-    Option.none()
+  Option.flatMap(openedIn(model), ({ pane }) =>
+    Option.flatMap(
+      pane,
+      Pane.matchOrElse({ Group: ({ group }) => Option.some(group) }, () => Option.none())
+    )
+  )
+
+/** The active assignment that makes the workspace's owner its owner. */
+const ownerAssignment = (opened: Opened) =>
+  Option.fromUndefinedOr(
+    opened.assignments.find(
+      ({ assignment }) =>
+        assignment.memberId === opened.workspace.ownerMemberId &&
+        assignment.status === "active" &&
+        Assignment.isWorkspaceRole(assignment) &&
+        assignment.source.roleId === BuiltinRoles.OwnerId
+    )?.assignment
   )
 
 export const update = (model: Model, message: Message): UpdateReturn =>
@@ -278,16 +338,20 @@ export const update = (model: Model, message: Message): UpdateReturn =>
                 opened: () =>
                   Option.some({
                     workspace: membership.workspace,
+                    workspacePending: false,
                     memberId: membership.member.id,
                     store: StoreState.Opening(),
                     groups: [],
                     members: [],
+                    roles: [],
+                    assignments: [],
+                    invitations: [],
                     memberships: [],
                     follows: [],
                     actions: [],
                     notice: Option.none(),
                     composing: Option.none(),
-                    group: Option.none()
+                    pane: Option.none()
                   })
               })
             }
@@ -306,10 +370,96 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         modifyFields(opened, {
           groups: () => groups,
           // A group the person can no longer see, as one they left or one refused, closes.
-          group: Option.filter(({ groupId }) => groups.some(({ group }) => group.id === groupId))
+          pane: Option.filter(
+            Pane.matchOrElse(
+              { Group: ({ group: open }) => groups.some(({ group }) => group.id === open.groupId) },
+              () => true
+            )
+          )
         })
       ),
+    GotWorkspace: ({ workspace, pending }) =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, { workspace: () => workspace, workspacePending: () => pending })
+      ),
     GotMembers: ({ members }) => atOpened(model, (opened) => modifyFields(opened, { members: () => members })),
+    GotRoles: ({ roles }) => atOpened(model, (opened) => modifyFields(opened, { roles: () => roles })),
+    GotAssignments: ({ assignments }) =>
+      atOpened(model, (opened) => modifyFields(opened, { assignments: () => assignments })),
+    GotInvitations: ({ invitations }) =>
+      atOpened(model, (opened) => modifyFields(opened, { invitations: () => invitations })),
+    ClickedSettings: () =>
+      atOpened(model, (opened) =>
+        modifyFields(opened, { pane: () => Option.some(Pane.Settings({ settings: freshSettings })) })
+      ),
+    ClickedRenameWorkspace: () =>
+      atSettings(model, (settings, opened) => ({ ...settings, workspaceName: Option.some(opened.workspace.name) })),
+    TypedWorkspaceName: ({ name }) =>
+      atSettings(model, (settings) => ({ ...settings, workspaceName: Option.some(name) })),
+    SubmittedWorkspaceName: () =>
+      Option.match(settingsIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ settings, opened }) =>
+          Option.match(settings.workspaceName, {
+            onNone: () => ({ model }),
+            onSome: (name) => ({
+              ...atSettings(model, (settings) => ({ ...settings, workspaceName: Option.none() })),
+              commands: [RenameWorkspace({ name, expectedName: opened.workspace.name })]
+            })
+          })
+      }),
+    ClickedCancelWorkspaceName: () => atSettings(model, (settings) => ({ ...settings, workspaceName: Option.none() })),
+    ClickedRenameSelf: () =>
+      atSettings(model, (settings, opened) => ({
+        ...settings,
+        ownName: Option.some(opened.members.find(({ member }) => member.id === opened.memberId)?.member.name ?? "")
+      })),
+    TypedOwnName: ({ name }) => atSettings(model, (settings) => ({ ...settings, ownName: Option.some(name) })),
+    SubmittedOwnName: () =>
+      Option.match(
+        Option.flatMap(settingsIn(model), ({ settings }) => settings.ownName),
+        {
+          onNone: () => ({ model }),
+          onSome: (name) => ({
+            ...atSettings(model, (settings) => ({ ...settings, ownName: Option.none() })),
+            commands: [RenameSelf({ name })]
+          })
+        }
+      ),
+    ClickedCancelOwnName: () => atSettings(model, (settings) => ({ ...settings, ownName: Option.none() })),
+    ChoseRole: ({ memberId, roleId }) =>
+      Option.match(openedIn(model), {
+        onNone: () => ({ model }),
+        onSome: (opened) => ({
+          model,
+          commands: [
+            ChangeRole({
+              memberId,
+              roleId,
+              expectedAssignmentIds: workspaceRolesOf(opened, memberId).map(({ id }) => id)
+            })
+          ]
+        })
+      }),
+    ClickedRemoveMember: ({ memberId }) => ({ model, commands: [RemoveMember({ memberId })] }),
+    ClickedTransferOwnership: ({ memberId }) =>
+      Option.match(Option.flatMap(openedIn(model), ownerAssignment), {
+        onNone: () => ({ model }),
+        onSome: ({ id }) => ({ model, commands: [TransferOwnership({ memberId, expectedOwnerAssignmentId: id })] })
+      }),
+    TypedInviteEmail: ({ email }) =>
+      atSettings(model, (settings) => ({ ...settings, inviting: { ...settings.inviting, email } })),
+    ChoseInviteRole: ({ roleId }) =>
+      atSettings(model, (settings) => ({ ...settings, inviting: { ...settings.inviting, roleId } })),
+    SubmittedInvite: () =>
+      Option.match(settingsIn(model), {
+        onNone: () => ({ model }),
+        onSome: ({ settings }) => ({
+          ...atSettings(model, (settings) => ({ ...settings, inviting: { ...settings.inviting, email: "" } })),
+          commands: [Invite(settings.inviting)]
+        })
+      }),
+    ClickedRevokeInvitation: ({ invitationId }) => ({ model, commands: [RevokeInvitation({ invitationId })] }),
     GotMemberships: ({ memberships }) =>
       atOpened(model, (opened) => modifyFields(opened, { memberships: () => memberships })),
     GotFollows: ({ follows }) => atOpened(model, (opened) => modifyFields(opened, { follows: () => follows })),
@@ -422,8 +572,8 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           )
       }),
     ClickedCancelGroupName: () => atGroup(model, (group) => modifyFields(group, { renaming: () => Option.none() })),
-    ChoseMemberToAdd: ({ memberId }) => atGroup(model, (group) => modifyFields(group, { adding: () => memberId })),
-    SubmittedAddMember: () =>
+    ChoseGroupMemberToAdd: ({ memberId }) => atGroup(model, (group) => modifyFields(group, { adding: () => memberId })),
+    SubmittedAddGroupMember: () =>
       Option.match(
         Option.flatMap(groupIn(model), ({ groupId, adding }) =>
           Option.map(adding, (memberId) => ({ groupId, memberId }))
@@ -432,14 +582,14 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           onNone: () => ({ model }),
           onSome: (input) => ({
             ...atGroup(model, (group) => modifyFields(group, { adding: () => Option.none() })),
-            commands: [AddMember(input)]
+            commands: [AddGroupMember(input)]
           })
         }
       ),
-    ClickedRemoveMember: ({ membershipId }) =>
+    ClickedRemoveGroupMember: ({ membershipId }) =>
       Option.match(groupIn(model), {
         onNone: () => ({ model }),
-        onSome: ({ groupId }) => ({ model, commands: [RemoveMember({ groupId, membershipId })] })
+        onSome: ({ groupId }) => ({ model, commands: [RemoveGroupMember({ groupId, membershipId })] })
       }),
     GotActions: ({ actions }) => atOpened(model, (opened) => modifyFields(opened, { actions: () => actions })),
     GotThreads: ({ groupId, threads }) =>
@@ -470,15 +620,19 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ClickedGroup: ({ groupId }) =>
       atOpened(model, (opened) =>
         modifyFields(opened, {
-          group: () =>
-            Option.some({
-              groupId,
-              threads: [],
-              draft: "",
-              thread: Option.none(),
-              renaming: Option.none(),
-              adding: Option.none()
-            })
+          pane: () =>
+            Option.some(
+              Pane.Group({
+                group: {
+                  groupId,
+                  threads: [],
+                  draft: "",
+                  thread: Option.none(),
+                  renaming: Option.none(),
+                  adding: Option.none()
+                }
+              })
+            )
         })
       ),
     ClickedThread: ({ threadId }) =>

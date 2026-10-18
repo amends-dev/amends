@@ -18,7 +18,7 @@ import { Identity } from "@amends-dev/core/identity"
 import { ReplicaService } from "@amends-dev/core/replica"
 import { Request, RequestService } from "@amends-dev/core/request"
 import { WorkspaceId } from "@amends-dev/core/workspace"
-import { Gateway, SyncStorage } from "@amends-dev/gateway"
+import { Accounts, Gateway, SyncStorage } from "@amends-dev/gateway"
 import { Draining } from "@amends-dev/http"
 import * as Entry from "@amends-dev/log/Entry"
 import * as Array from "effect/Array"
@@ -53,6 +53,7 @@ const isDenied = Schema.is(CoreError.Denied)
 export const layerHandlers = Layer.unwrap(
   Effect.gen(function* () {
     const gateway = yield* Gateway.Gateway
+    const accounts = yield* Accounts.Accounts
     const syncStorage = yield* SyncStorage.SyncStorage
     const remoteId = yield* syncStorage.remoteId
     const services = yield* Effect.context<Crypto.Crypto>()
@@ -117,7 +118,10 @@ export const layerHandlers = Layer.unwrap(
           Array.sort(request.entries, EventJournal.Entry.Order),
           (entry) =>
             Effect.flatMap(RequestService.RequestService, (requestService) =>
-              requestService.runOnce(Request.Key.make(entry.idString), Operations.operationOf(entry))
+              requestService.runOnce(
+                Request.Key.make(entry.idString),
+                Operations.operationOf(entry).pipe(Effect.provideService(Accounts.Accounts, accounts))
+              )
             ),
           { discard: true }
         )
@@ -179,8 +183,8 @@ const layerWebsocket = Layer.effect(
 
 /**
  * The sync server on the host's HTTP router: `layerHandlers` served over a WebSocket at `/sync`,
- * which closes as `Draining` completes. A host provides the gateway, its `SyncStorage`,
- * cryptography, and `Draining`, beside the HTTP API's routes.
+ * which closes as `Draining` completes. A host provides the gateway, its `SyncStorage` and
+ * `Accounts`, cryptography, and `Draining`, beside the HTTP API's routes.
  *
  * @category layers
  * @since 0.1.0

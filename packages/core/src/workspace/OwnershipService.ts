@@ -20,7 +20,6 @@ import * as Authorization from "../authorization/Authorization.ts"
 import * as BuiltinRoles from "../authorization/BuiltinRoles.ts"
 import * as Delegation from "../authorization/Delegation.ts"
 import * as Requirement from "../authorization/Requirement.ts"
-import * as Scope from "../authorization/Scope.ts"
 import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
@@ -190,12 +189,7 @@ export const make: Effect.Effect<
       const recipientAssignments = yield* delegation.assignmentsFor(recipient.id)
       for (const records of [previousAssignments, recipientAssignments]) {
         for (const assignment of records) {
-          const source = assignment.source
-          if (
-            Assignment.Source.isAnyOf(["Role"])(source) &&
-            Scope.Scope.isAnyOf(["Workspace"])(source.scope) &&
-            builtins.includes(source.roleId)
-          )
+          if (Assignment.isWorkspaceRole(assignment) && builtins.includes(assignment.source.roleId))
             yield* assignmentCommand.revokeAssignment(assignment)
         }
       }

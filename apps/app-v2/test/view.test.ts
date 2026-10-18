@@ -1,4 +1,6 @@
+import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
+import { Invitation } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import {
@@ -18,19 +20,34 @@ import {
 } from "foldkit/scene"
 import { CheckCode, LoadWorkspaces, SaveSession, SendCode, SignOut } from "../src/command.ts"
 import { Message } from "../src/message.ts"
-import { AddMember, CreateTeam, Dismiss, JoinGroup, managedResources, PostReply, RemoveMember } from "../src/store.ts"
+import {
+  AddGroupMember,
+  ChangeRole,
+  CreateTeam,
+  Dismiss,
+  Invite,
+  JoinGroup,
+  managedResources,
+  PostReply,
+  RemoveGroupMember,
+  RevokeInvitation
+} from "../src/store.ts"
 import { update } from "../src/update.ts"
 import { view } from "../src/view.ts"
 import {
   aliceInDesign,
   aliceInGeneral,
+  aliceOwns,
   apiUrl,
   bob,
   bobInDesign,
+  bobIsMember,
   design,
   general,
   membership,
   opening,
+  roleOf,
+  roles,
   session,
   signedIn,
   signedOut,
@@ -100,6 +117,7 @@ describe("the app", () => {
           actions: [
             {
               key: "refused",
+              tag: "ThreadMessagePosted",
               what: "post a reply",
               text: Option.some("Sounds good"),
               rejection: Option.some("You may not post in this thread")
@@ -143,7 +161,23 @@ describe("the app", () => {
           ]
         })
       ),
-      Subscription.emit(Message.GotMembers({ members: [membership.member, bob] })),
+      Subscription.emit(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(Message.GotRoles({ roles })),
+      Subscription.emit(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: aliceOwns, pending: false },
+            { assignment: bobIsMember, pending: false }
+          ]
+        })
+      ),
       Subscription.emit(Message.GotMemberships({ memberships: [{ membership: aliceInGeneral, pending: false }] })),
       inside(role("list", { name: "Your groups" }), expect(role("button", { name: "General" })).toExist()),
       // A team the person may join shows its members, but not its threads, nor managing it.
@@ -187,8 +221,8 @@ describe("the app", () => {
         change(label("Add a member"), bob.id),
         click(role("button", { name: "Add" }))
       ),
-      Command.expectExact(AddMember({ groupId: design.id, memberId: bob.id })),
-      Command.resolve(AddMember, Message.WroteAction()),
+      Command.expectExact(AddGroupMember({ groupId: design.id, memberId: bob.id })),
+      Command.resolve(AddGroupMember, Message.WroteAction()),
       Subscription.emit(
         Message.GotMemberships({
           memberships: [
@@ -204,8 +238,108 @@ describe("the app", () => {
         expect(label("Add a member")).toBeAbsent(),
         click(role("button", { name: "Remove" }))
       ),
-      Command.expectExact(RemoveMember({ groupId: design.id, membershipId: bobInDesign.id })),
-      Command.resolve(RemoveMember, Message.WroteAction())
+      Command.expectExact(RemoveGroupMember({ groupId: design.id, membershipId: bobInDesign.id })),
+      Command.resolve(RemoveGroupMember, Message.WroteAction())
+    )
+  })
+
+  it("an owner manages the workspace from its settings, and a member sees only what they may change", () => {
+    const invitation = Schema.decodeSync(Invitation.Invitation)({
+      details: {
+        recipientId: "carol",
+        roleId: BuiltinRoles.MemberId,
+        expiresAt: "2026-10-25T12:00:00Z",
+        id: "invitation-1",
+        workspaceId: "workspace-1",
+        inviterMemberId: "member-1",
+        issuedAt: "2026-10-18T12:00:00Z"
+      },
+      state: { _tag: "Pending" }
+    })
+    scene(
+      { update, view },
+      given(signedIn),
+      Subscription.emit(Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      click(role("button", { name: "Studio" })),
+      ManagedResource.acquire(managedResources.store),
+      Subscription.emit(
+        Message.GotMembers({
+          members: [
+            { member: membership.member, pending: false },
+            { member: bob, pending: false }
+          ]
+        })
+      ),
+      Subscription.emit(Message.GotRoles({ roles })),
+      Subscription.emit(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: aliceOwns, pending: false },
+            { assignment: bobIsMember, pending: false }
+          ]
+        })
+      ),
+      click(role("button", { name: "Settings" })),
+      expect(role("button", { name: "Rename workspace" })).toExist(),
+      inside(role("region", { name: "Workspace members" }), change(label("Role of Bob"), BuiltinRoles.AdministratorId)),
+      Command.expectExact(
+        ChangeRole({ memberId: bob.id, roleId: BuiltinRoles.AdministratorId, expectedAssignmentIds: [bobIsMember.id] })
+      ),
+      Command.resolve(ChangeRole, Message.WroteAction()),
+      inside(
+        role("region", { name: "Workspace members" }),
+        expect(role("button", { name: "Remove" })).toExist(),
+        expect(role("button", { name: "Make owner" })).toExist()
+      ),
+      inside(
+        role("region", { name: "Invitations" }),
+        type(label("Email"), "carol@example.com"),
+        click(role("button", { name: "Invite" }))
+      ),
+      Command.expectExact(Invite({ email: "carol@example.com", roleId: BuiltinRoles.MemberId })),
+      Command.resolve(Invite, Message.WroteAction()),
+      // An invitation on its way shows by the address the person gave, until the server issues it.
+      Subscription.emit(
+        Message.GotActions({
+          actions: [
+            {
+              key: "inviting",
+              tag: "InvitationIssued",
+              what: "invite someone",
+              text: Option.some("carol@example.com"),
+              rejection: Option.none()
+            }
+          ]
+        })
+      ),
+      inside(role("region", { name: "Invitations" }), expect(text("carol@example.com")).toExist()),
+      Subscription.emit(Message.GotActions({ actions: [] })),
+      Subscription.emit(Message.GotInvitations({ invitations: [{ invitation, pending: false }] })),
+      inside(
+        role("region", { name: "Invitations" }),
+        expect(text("Member, until 2026-10-25")).toExist(),
+        click(role("button", { name: "Revoke" }))
+      ),
+      Command.expectExact(RevokeInvitation({ invitationId: invitation.details.id })),
+      Command.resolve(RevokeInvitation, Message.WroteAction()),
+      // Once bob owns the workspace and alice is a member, she may change only her own name.
+      Subscription.emit(
+        Message.GotWorkspace({ workspace: { ...membership.workspace, ownerMemberId: bob.id }, pending: false })
+      ),
+      Subscription.emit(
+        Message.GotAssignments({
+          assignments: [
+            { assignment: roleOf("assignment-3", membership.member.id, BuiltinRoles.MemberId), pending: false },
+            { assignment: roleOf("assignment-4", bob.id, BuiltinRoles.OwnerId), pending: false }
+          ]
+        })
+      ),
+      expect(role("button", { name: "Rename workspace" })).toBeAbsent(),
+      expect(role("button", { name: "Change your name" })).toExist(),
+      expect(label("Role of Bob")).toBeAbsent(),
+      expect(role("button", { name: "Remove" })).toBeAbsent(),
+      expect(role("button", { name: "Make owner" })).toBeAbsent(),
+      expect(role("region", { name: "Invitations" })).toBeAbsent()
     )
   })
 })

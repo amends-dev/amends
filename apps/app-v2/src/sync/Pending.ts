@@ -8,14 +8,16 @@
  * the ones before it left; one the server completed or rejected no longer applies.
  */
 
+import { Assignment, type Role, Scope } from "@amends-dev/core/authorization"
 import { Group, type GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Thread, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
-import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, type MemberId, type WorkspaceId } from "@amends-dev/core/workspace"
 import type * as GroupSync from "@amends-dev/sync/GroupSync"
 import * as SyncSchema from "@amends-dev/sync/SyncSchema"
 import type * as ThreadSync from "@amends-dev/sync/ThreadSync"
+import type * as WorkspaceSync from "@amends-dev/sync/WorkspaceSync"
 import type * as Crypto from "effect/Crypto"
 import type * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -63,6 +65,10 @@ const isPosition = ReplicaRecord.ReplicaRecord.isAnyOf(["ThreadPosition"])
 const isMembership = ReplicaRecord.ReplicaRecord.isAnyOf(["GroupMembership"])
 const isFollow = ReplicaRecord.ReplicaRecord.isAnyOf(["GroupFollow"])
 const isGroupRead = ReplicaRecord.ReplicaRecord.isAnyOf(["GroupRead"])
+const isWorkspace = ReplicaRecord.ReplicaRecord.isAnyOf(["Workspace"])
+const isMember = ReplicaRecord.ReplicaRecord.isAnyOf(["Member"])
+const isAssignment = ReplicaRecord.ReplicaRecord.isAnyOf(["Assignment"])
+const isInvitation = ReplicaRecord.ReplicaRecord.isAnyOf(["Invitation"])
 
 /** Whether `participation` is `memberId`'s own. */
 const isMemberOf = (memberId: MemberId.MemberId, participation: ThreadParticipation.ThreadParticipation) =>
@@ -330,7 +336,87 @@ export const groups: EffectsOf<typeof GroupSync.Actions> = {
   }
 }
 
-const effectsByTag = { ...threads, ...groups } as Readonly<Record<string, Effects<unknown> | undefined>>
+/** The assignment `action` gives `memberId` of `roleId`, at the workspace's scope, as the server makes it. */
+const roleAssignment = (action: Action, memberId: MemberId.MemberId, roleId: Role.RoleId) =>
+  asRequest(
+    action,
+    Effect.map(Assignment.newId(memberId, roleId), (id) =>
+      cases.Assignment.make({
+        value: Assignment.Assignment.make({
+          id,
+          workspaceId: action.workspaceId,
+          memberId,
+          status: "active",
+          source: Assignment.Source.cases.Role.make({
+            roleId,
+            scope: Scope.Scope.cases.Workspace.make({ workspaceId: action.workspaceId })
+          })
+        })
+      })
+    )
+  )
+
+/** `record`, the assignment `assignmentId` while it is active, as revoked. */
+const revokeAssignment = (record: ReplicaRecord.ReplicaRecord, assignmentId: Assignment.AssignmentId) =>
+  isAssignment(record) && record.value.id === assignmentId && record.value.status === "active"
+    ? cases.Assignment.make({ value: { ...record.value, status: "revoked" } })
+    : undefined
+
+/**
+ * What the person does to the workspace: renaming it or handing it to another member, renaming
+ * themselves, removing a member, revoking an invitation, and giving, replacing, or taking away a
+ * member's roles. An invitation names its recipient by address, whose account only the server
+ * knows, so issuing one waits for the server. Handing the workspace over changes its owner at once,
+ * and the roles that go with it when the server's changes arrive.
+ */
+export const workspace: EffectsOf<typeof WorkspaceSync.Actions> = {
+  WorkspaceRenamed: {
+    changes: ({ name }, record) =>
+      isWorkspace(record) ? cases.Workspace.make({ value: { ...record.value, name } }) : undefined
+  },
+  OwnershipTransferred: {
+    changes: ({ memberId }, record) =>
+      isWorkspace(record) ? cases.Workspace.make({ value: { ...record.value, ownerMemberId: memberId } }) : undefined
+  },
+  MemberRenamed: {
+    changes: ({ name }, record, action) =>
+      isMember(record) && record.value.id === action.memberId
+        ? cases.Member.make({ value: { ...record.value, name } })
+        : undefined
+  },
+  MemberRemoved: {
+    changes: ({ memberId }, record) =>
+      isMember(record) && record.value.id === memberId && record.value.status === "active"
+        ? cases.Member.make({ value: { ...record.value, status: "removed" } })
+        : undefined
+  },
+  InvitationRevoked: {
+    changes: ({ invitationId }, record, action) =>
+      isInvitation(record) &&
+      record.value.details.id === invitationId &&
+      Invitation.State.isAnyOf(["Pending"])(record.value.state)
+        ? cases.Invitation.make({
+            value: {
+              ...record.value,
+              state: Invitation.State.cases.Revoked.make({ revokedBy: action.memberId, revokedAt: action.writtenAt })
+            }
+          })
+        : undefined
+  },
+  RoleAssigned: {
+    creates: ({ memberId, roleId }, action) => Effect.map(roleAssignment(action, memberId, roleId), (made) => [made])
+  },
+  RolesReplaced: {
+    creates: ({ memberId, roleId }, action) => Effect.map(roleAssignment(action, memberId, roleId), (made) => [made]),
+    changes: ({ expectedAssignmentIds }, record) =>
+      isAssignment(record) && expectedAssignmentIds.includes(record.value.id)
+        ? revokeAssignment(record, record.value.id)
+        : undefined
+  },
+  AssignmentRevoked: { changes: ({ assignmentId }, record) => revokeAssignment(record, assignmentId) }
+}
+
+const effectsByTag = { ...threads, ...groups, ...workspace } as Readonly<Record<string, Effects<unknown> | undefined>>
 
 /** What the action `tag` does, if anything, before the server's changes arrive. */
 export const effectsOf = (tag: string): Effects<unknown> => effectsByTag[tag] ?? {}

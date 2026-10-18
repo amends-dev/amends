@@ -49,7 +49,9 @@ opens it is one whose key the person registered, with `PUT /me/sync-keys/:public
 only that one authenticates it after. The actions a store receives run as the person's requests,
 through core's `RequestService.runOnce` keyed by each entry's ID, in the order the browser wrote
 them, each by the operation its tag names; an entry that is no action, or does not decode, is
-rejected as `Invalid`. A store or host that cannot be reached fails the write, which the browser
+rejected as `Invalid`. An invitation names its recipient by address, since a browser knows no
+account but its own: the server finds or creates the account through the host's `Accounts`, as
+the HTTP API does, and invites its person. A store or host that cannot be reached fails the write, which the browser
 sends again. A store's changes are the person's replica as it changes, from core's
 `ReplicaService.changes`, after the position the browser holds: a `ReplicaChanged` for each commit,
 its sequence the commit's position and its entry ID derived from the store and the commit, so a

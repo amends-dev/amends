@@ -4,9 +4,10 @@
  * the one they opened, whose store syncs while it is open.
  */
 
+import { Assignment, Role } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
-import { Member, MemberId, Workspace } from "@amends-dev/core/workspace"
+import { Invitation, Member, MemberId, Workspace } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Schema from "effect/Schema"
@@ -54,9 +55,10 @@ export type ThreadItem = typeof ThreadItem.Type
 export const MessageItem = Schema.Struct({ message: ThreadMessage.ThreadMessage, pending: Schema.Boolean })
 export type MessageItem = typeof MessageItem.Type
 
-/** An action of the person's the server has not finished: what it does, its text, and why it was refused. */
+/** An action of the person's the server has not finished: which, what it does, its text, and why it was refused. */
 export const ActionItem = Schema.Struct({
   key: Schema.String,
+  tag: Schema.String,
   what: Schema.String,
   text: Schema.Option(Schema.String),
   rejection: Schema.Option(Schema.String)
@@ -107,6 +109,10 @@ export const OpenGroup = Schema.Struct({
 })
 export type OpenGroup = typeof OpenGroup.Type
 
+/** A member of the workspace, and whether a change to them is on its way. */
+export const MemberItem = Schema.Struct({ member: Member.Member, pending: Schema.Boolean })
+export type MemberItem = typeof MemberItem.Type
+
 /** A group's membership, and whether a change to it is on its way. */
 export const MembershipItem = Schema.Struct({ membership: GroupMembership.GroupMembership, pending: Schema.Boolean })
 export type MembershipItem = typeof MembershipItem.Type
@@ -114,6 +120,32 @@ export type MembershipItem = typeof MembershipItem.Type
 /** One of the person's follows of a group, and whether a change to it is on its way. */
 export const FollowItem = Schema.Struct({ follow: GroupFollow.GroupFollow, pending: Schema.Boolean })
 export type FollowItem = typeof FollowItem.Type
+
+/** A role assignment, and whether a change to it is on its way. */
+export const AssignmentItem = Schema.Struct({ assignment: Assignment.Assignment, pending: Schema.Boolean })
+export type AssignmentItem = typeof AssignmentItem.Type
+
+/** An invitation, and whether a change to it is on its way. */
+export const InvitationItem = Schema.Struct({ invitation: Invitation.Invitation, pending: Schema.Boolean })
+export type InvitationItem = typeof InvitationItem.Type
+
+/**
+ * The workspace's settings as the person changes them: the workspace's name and their own while
+ * they give one, and whom they are inviting, with the role the invitation gives.
+ */
+export const Settings = Schema.Struct({
+  workspaceName: Schema.Option(Schema.String),
+  ownName: Schema.Option(Schema.String),
+  inviting: Schema.Struct({ email: Schema.String, roleId: Role.RoleId })
+})
+export type Settings = typeof Settings.Type
+
+/** What the open workspace shows beside its groups: a group, or its settings. */
+export const Pane = defineTaggedUnion({
+  Group: { group: OpenGroup },
+  Settings: { settings: Settings }
+})
+export type Pane = typeof Pane.Type
 
 /** What the person is starting beside the open group: a team, or a conversation with another member. */
 export const Composing = defineTaggedUnion({
@@ -123,22 +155,28 @@ export const Composing = defineTaggedUnion({
 export type Composing = typeof Composing.Type
 
 /**
- * The workspace the person opened, as their member of it: its store, what the replica holds of it,
- * its groups' memberships and the person's follows among them, the actions not finished yet, why
- * the last one could not be written, what the person is starting, and the group open in it.
+ * The workspace the person opened, as their member of it: the workspace, and whether a change to
+ * it is on its way; its store; what the replica holds of it: its groups, members, roles and their
+ * assignments, invitations, groups' memberships, and the person's follows among them; the actions
+ * not finished yet, why the last one could not be written, what the person is starting, and the
+ * pane open in it.
  */
 export const Opened = Schema.Struct({
   workspace: Workspace.Workspace,
+  workspacePending: Schema.Boolean,
   memberId: MemberId.MemberId,
   store: StoreState,
   groups: Schema.Array(GroupItem),
-  members: Schema.Array(Member.Member),
+  members: Schema.Array(MemberItem),
+  roles: Schema.Array(Role.Role),
+  assignments: Schema.Array(AssignmentItem),
+  invitations: Schema.Array(InvitationItem),
   memberships: Schema.Array(MembershipItem),
   follows: Schema.Array(FollowItem),
   actions: Schema.Array(ActionItem),
   notice: Schema.Option(Schema.String),
   composing: Schema.Option(Composing),
-  group: Schema.Option(OpenGroup)
+  pane: Schema.Option(Pane)
 })
 export type Opened = typeof Opened.Type
 

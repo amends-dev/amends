@@ -1,19 +1,30 @@
 /**
  * What the person sees: signing in, their workspaces, and the open workspace: the groups they
- * belong to and the teams they may join, a group's members and threads, and a thread's messages,
- * with what the person started or changed shown at once, marked as sending until the server has
- * it, and what the server refused, with why. Markup only: the headless components from
- * `@foldkit/ui` give each control its attributes, and no styles yet.
+ * belong to and the teams they may join, a group's members and threads, a thread's messages, and
+ * the workspace's settings, with what the person started or changed shown at once, marked as
+ * sending until the server has it, and what the server refused, with why. A control shows only
+ * when the person may use it. Markup only: the headless components from `@foldkit/ui` give each
+ * control its attributes, and no styles yet.
  */
 
-import { Group } from "@amends-dev/core/group"
+import { AssignmentPermissions, BuiltinRoles, type Role, Target } from "@amends-dev/core/authorization"
+import { Group, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import { ThreadMessage } from "@amends-dev/core/thread"
-import type { Member } from "@amends-dev/core/workspace"
+import {
+  Invitation,
+  InvitationPermissions,
+  type Member,
+  MemberPermissions,
+  OwnershipPermissions,
+  WorkspaceSettingsPermissions
+} from "@amends-dev/core/workspace"
 import * as Button from "@foldkit/ui/button"
 import * as Checkbox from "@foldkit/ui/checkbox"
 import * as Input from "@foldkit/ui/input"
 import * as Select from "@foldkit/ui/select"
 import * as Textarea from "@foldkit/ui/textarea"
+import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Document, Html, HtmlBuilder } from "foldkit/html"
 import { Message } from "./message.ts"
@@ -28,11 +39,14 @@ import {
   type Opened,
   type OpenThread,
   Page,
+  Pane,
+  type Settings,
   SignInForm,
   StoreState,
   type ThreadItem,
   Workspaces
 } from "./model.ts"
+import { givableRoles, isOwner, may, mayActOn, workspaceRolesOf } from "./permissions.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
 
@@ -143,8 +157,8 @@ const textarea = (
   )
 
 /** A member by their name here. */
-const memberName = (memberId: Member.Member["id"], members: ReadonlyArray<Member.Member>) =>
-  members.find((member) => member.id === memberId)?.name ?? "Someone"
+const memberName = (memberId: Member.Member["id"], opened: Opened) =>
+  opened.members.find(({ member }) => member.id === memberId)?.member.name ?? "Someone"
 
 /** A group's name: a team's own, or the person's direct group's other members, by their names here. */
 const groupName = (group: Group.Group, opened: Opened) =>
@@ -152,7 +166,7 @@ const groupName = (group: Group.Group, opened: Opened) =>
     ? group.name
     : group.memberIds
         .filter((id) => id !== opened.memberId)
-        .map((id) => memberName(id, opened.members))
+        .map((id) => memberName(id, opened))
         .join(", ")
 
 /**
@@ -172,9 +186,9 @@ const belongsTo = (opened: Opened, groupId: Group.Group["id"]) =>
 const isJoinable = (group: Group.Group) => group.kind === "Team" && group.visibility === "Public"
 
 /** Who wrote a message, by their name here. */
-const authorName = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>) =>
+const authorName = (message: ThreadMessage.ThreadMessage, opened: Opened) =>
   ThreadMessage.Author.match(message.author, {
-    Member: ({ memberId }) => memberName(memberId, members),
+    Member: ({ memberId }) => memberName(memberId, opened),
     Contact: () => "A contact"
   })
 
@@ -253,7 +267,16 @@ const memberSelect = (
 
 /** The members of the workspace other than the person, who are still members of it. */
 const othersIn = (opened: Opened) =>
-  opened.members.filter((member) => member.id !== opened.memberId && member.status === "active")
+  opened.members
+    .map(({ member }) => member)
+    .filter((member) => member.id !== opened.memberId && member.status === "active")
+
+/** The open workspace as a target of the permissions that act on it. */
+const workspaceTarget = (opened: Opened) => Target.Reference.cases.Workspace.make({ workspaceId: opened.workspace.id })
+
+/** The group `groupId` as a target of the permissions that act on it. */
+const groupTarget = (opened: Opened, groupId: Group.Group["id"]) =>
+  Target.Reference.cases.Group.make({ workspaceId: opened.workspace.id, groupId })
 
 /** The groups the person belongs to, the teams they may join, and starting a team or a conversation. */
 const groupsView = (opened: Opened, h: HtmlBuilder<Message>): Html => {
@@ -290,7 +313,9 @@ const groupsView = (opened: Opened, h: HtmlBuilder<Message>): Html => {
               )
             ]
           ),
-      button(h, "New team", Message.ClickedNewTeam()),
+      may(opened, GroupPermissions.Create, workspaceTarget(opened))
+        ? button(h, "New team", Message.ClickedNewTeam())
+        : h.empty,
       button(h, "New conversation", Message.ClickedNewDirect())
     ]
   )
@@ -383,7 +408,9 @@ const groupHeaderView = (group: OpenGroup, found: GroupItem | undefined, opened:
             [],
             [
               h.h3([], [found === undefined ? "A group" : groupName(found.group, opened)]),
-              isTeam && isMember ? button(h, "Rename", Message.ClickedRenameGroup()) : h.empty
+              isTeam && isMember && may(opened, GroupPermissions.Rename, groupTarget(opened, group.groupId))
+                ? button(h, "Rename", Message.ClickedRenameGroup())
+                : h.empty
             ]
           ),
         onSome: (draft) =>
@@ -419,14 +446,17 @@ const groupHeaderView = (group: OpenGroup, found: GroupItem | undefined, opened:
 }
 
 /**
- * A team's members, and for a member of it, removing them and admitting another member, except to
- * general, which every member belongs to.
+ * A team's members, and for a member of it who may manage them, removing them and admitting
+ * another member, except to general, which every member belongs to.
  */
 const membersView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>): Html => {
   const admitted = opened.memberships.filter(
     ({ membership }) => membership.groupId === group.groupId && membership.status === "active"
   )
-  const isManaged = belongsTo(opened, group.groupId) && !Group.isGeneral({ id: group.groupId })
+  const isManaged =
+    belongsTo(opened, group.groupId) &&
+    !Group.isGeneral({ id: group.groupId }) &&
+    may(opened, GroupMembershipPermissions.Manage, groupTarget(opened, group.groupId))
   const admissible = othersIn(opened).filter(
     (member) => !admitted.some(({ membership }) => membership.memberId === member.id)
   )
@@ -441,11 +471,11 @@ const membersView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>):
             membership.id,
             [],
             [
-              memberName(membership.memberId, opened.members),
+              memberName(membership.memberId, opened),
               sending(pending, h),
               !isManaged || pending || membership.memberId === opened.memberId
                 ? h.empty
-                : button(h, "Remove", Message.ClickedRemoveMember({ membershipId: membership.id }))
+                : button(h, "Remove", Message.ClickedRemoveGroupMember({ membershipId: membership.id }))
             ]
           )
         )
@@ -453,14 +483,14 @@ const membersView = (group: OpenGroup, opened: Opened, h: HtmlBuilder<Message>):
       !isManaged || admissible.length === 0
         ? h.empty
         : h.form(
-            [h.OnSubmit(Message.SubmittedAddMember())],
+            [h.OnSubmit(Message.SubmittedAddGroupMember())],
             [
               memberSelect(h, {
                 id: "add-member",
                 label: "Add a member",
                 members: admissible,
                 value: group.adding,
-                onChange: (memberId) => Message.ChoseMemberToAdd({ memberId })
+                onChange: (memberId) => Message.ChoseGroupMemberToAdd({ memberId })
               }),
               submit(h, "Add")
             ]
@@ -531,11 +561,7 @@ const messageView = (
     [
       h.p(
         [],
-        [
-          h.strong([], [authorName(message, opened.members)]),
-          sending(pending, h),
-          edited ? h.span([], [" · edited"]) : h.empty
-        ]
+        [h.strong([], [authorName(message, opened)]), sending(pending, h), edited ? h.span([], [" · edited"]) : h.empty]
       ),
       Option.match(editing, {
         onSome: ({ draft }) =>
@@ -658,18 +684,250 @@ const threadsView = (group: OpenGroup, h: HtmlBuilder<Message>): Html =>
     ]
   )
 
+/** A choice of one of `roles`. */
+const roleSelect = (
+  h: HtmlBuilder<Message>,
+  config: Readonly<{
+    id: string
+    label: string
+    roles: ReadonlyArray<Role.Role>
+    value: Role.Role["id"] | undefined
+    onChange: (roleId: Role.Role["id"]) => Message
+  }>
+) =>
+  Select.view(
+    {
+      id: config.id,
+      value: config.value ?? "",
+      onChange: (value) => config.onChange(config.roles.find((role) => role.id === value)?.id ?? BuiltinRoles.MemberId),
+      toView: (attributes) =>
+        h.div(
+          [],
+          [
+            h.label(attributes.label, [config.label]),
+            h.select(
+              attributes.select,
+              config.roles.map((role) => h.option([h.Value(role.id)], [role.name]))
+            )
+          ]
+        )
+    },
+    h
+  )
+
+/** A name the person may change, and the form to change it while they do. */
+const renamable = (
+  h: HtmlBuilder<Message>,
+  config: Readonly<{
+    id: string
+    label: string
+    name: string
+    pending: boolean
+    draft: Option.Option<string>
+    mayRename: boolean
+    renameLabel: string
+    onRename: Message
+    onInput: (name: string) => Message
+    onSubmit: Message
+    onCancel: Message
+  }>
+): Html =>
+  Option.match(config.draft, {
+    onNone: () =>
+      h.p(
+        [],
+        [
+          config.name,
+          sending(config.pending, h),
+          config.mayRename ? button(h, config.renameLabel, config.onRename) : h.empty
+        ]
+      ),
+    onSome: (draft) =>
+      h.form(
+        [h.OnSubmit(config.onSubmit)],
+        [
+          field(
+            h,
+            { id: config.id, label: config.label, type: "text", value: draft, onInput: config.onInput },
+            Option.none()
+          ),
+          submit(h, "Save"),
+          button(h, "Cancel", config.onCancel)
+        ]
+      )
+  })
+
+/**
+ * The workspace's members, with their roles, and for each the person may act on, changing their
+ * role and removing them; and for the owner, handing the workspace to another person.
+ */
+const workspaceMembersView = (opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const mayChangeRoles = may(opened, AssignmentPermissions.Manage, workspaceTarget(opened))
+  const mayTransfer = isOwner(opened) && may(opened, OwnershipPermissions.Transfer, workspaceTarget(opened))
+  const roles = givableRoles(opened)
+  return h.section(
+    [h.AriaLabel("Workspace members")],
+    [
+      h.h4([], ["Members"]),
+      h.ul(
+        [],
+        opened.members
+          .filter(({ member }) => member.status === "active")
+          .map(({ member, pending }) => {
+            const held = workspaceRolesOf(opened, member.id)
+            const changing = opened.assignments.some((item) => item.pending && item.assignment.memberId === member.id)
+            const mayActOnThem = member.id !== opened.memberId && mayActOn(opened, member.id)
+            const memberTarget = Target.Reference.cases.Member.make({
+              workspaceId: opened.workspace.id,
+              memberId: member.id
+            })
+            return h.keyed("li")(
+              member.id,
+              [],
+              [
+                h.span([], [member.name]),
+                h.span(
+                  [],
+                  held.map(
+                    (assignment) =>
+                      ` · ${opened.roles.find((role) => role.id === assignment.source.roleId)?.name ?? "A role"}`
+                  )
+                ),
+                sending(pending || changing, h),
+                mayActOnThem && mayChangeRoles && held.length <= 1
+                  ? roleSelect(h, {
+                      id: `role-${member.id}`,
+                      label: `Role of ${member.name}`,
+                      roles,
+                      value: held[0]?.source.roleId,
+                      onChange: (roleId) => Message.ChoseRole({ memberId: member.id, roleId })
+                    })
+                  : h.empty,
+                mayActOnThem && may(opened, MemberPermissions.Remove, memberTarget)
+                  ? button(h, "Remove", Message.ClickedRemoveMember({ memberId: member.id }))
+                  : h.empty,
+                mayTransfer &&
+                member.id !== opened.memberId &&
+                Identity.MemberReference.isAnyOf(["Human"])(member.identity)
+                  ? button(h, "Make owner", Message.ClickedTransferOwnership({ memberId: member.id }))
+                  : h.empty
+              ]
+            )
+          })
+      )
+    ]
+  )
+}
+
+/** The invitations still to be accepted, those on their way, and the form to invite someone by address. */
+const invitationsView = (settings: Settings, opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const issuing = opened.actions.filter(({ tag, rejection }) => tag === "InvitationIssued" && Option.isNone(rejection))
+  const open = opened.invitations.filter(({ invitation }) => Invitation.State.isAnyOf(["Pending"])(invitation.state))
+  return h.section(
+    [h.AriaLabel("Invitations")],
+    [
+      h.h4([], ["Invitations"]),
+      issuing.length + open.length === 0
+        ? h.p([], ["No invitations waiting."])
+        : h.ul(
+            [],
+            [
+              ...issuing.map(({ key, text }) =>
+                h.keyed("li")(key, [], [Option.getOrElse(text, () => "Someone"), sending(true, h)])
+              ),
+              ...open.map(({ invitation: { details }, pending }) =>
+                h.keyed("li")(
+                  details.id,
+                  [],
+                  [
+                    `${opened.roles.find((role) => role.id === details.roleId)?.name ?? "A role"}, until ${DateTime.formatIsoDateUtc(details.expiresAt)}`,
+                    sending(pending, h),
+                    pending
+                      ? h.empty
+                      : button(h, "Revoke", Message.ClickedRevokeInvitation({ invitationId: details.id }))
+                  ]
+                )
+              )
+            ]
+          ),
+      h.form(
+        [h.OnSubmit(Message.SubmittedInvite()), h.AriaLabel("Invite someone")],
+        [
+          field(
+            h,
+            {
+              id: "invite-email",
+              label: "Email",
+              type: "email",
+              value: settings.inviting.email,
+              onInput: (email) => Message.TypedInviteEmail({ email })
+            },
+            Option.none()
+          ),
+          roleSelect(h, {
+            id: "invite-role",
+            label: "Role",
+            roles: givableRoles(opened),
+            value: settings.inviting.roleId,
+            onChange: (roleId) => Message.ChoseInviteRole({ roleId })
+          }),
+          submit(h, "Invite")
+        ]
+      )
+    ]
+  )
+}
+
+/** The workspace's settings: its name, the person's own, its members and their roles, and its invitations. */
+const settingsView = (settings: Settings, opened: Opened, h: HtmlBuilder<Message>): Html => {
+  const self = opened.members.find(({ member }) => member.id === opened.memberId)
+  return h.section(
+    [h.AriaLabel("Settings")],
+    [
+      h.h3([], ["Settings"]),
+      h.h4([], ["Workspace name"]),
+      renamable(h, {
+        id: "workspace-name",
+        label: "Workspace name",
+        name: opened.workspace.name,
+        pending: opened.workspacePending,
+        draft: settings.workspaceName,
+        mayRename: may(opened, WorkspaceSettingsPermissions.Rename, workspaceTarget(opened)),
+        renameLabel: "Rename workspace",
+        onRename: Message.ClickedRenameWorkspace(),
+        onInput: (name) => Message.TypedWorkspaceName({ name }),
+        onSubmit: Message.SubmittedWorkspaceName(),
+        onCancel: Message.ClickedCancelWorkspaceName()
+      }),
+      h.h4([], ["Your name"]),
+      renamable(h, {
+        id: "own-name",
+        label: "Your name",
+        name: self?.member.name ?? "",
+        pending: self?.pending ?? false,
+        draft: settings.ownName,
+        mayRename: true,
+        renameLabel: "Change your name",
+        onRename: Message.ClickedRenameSelf(),
+        onInput: (name) => Message.TypedOwnName({ name }),
+        onSubmit: Message.SubmittedOwnName(),
+        onCancel: Message.ClickedCancelOwnName()
+      }),
+      workspaceMembersView(opened, h),
+      may(opened, InvitationPermissions.Manage, workspaceTarget(opened))
+        ? invitationsView(settings, opened, h)
+        : h.empty
+    ]
+  )
+}
+
 const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
   h.section(
     [h.AriaLabel(opened.workspace.name)],
     [
-      h.h2([], [opened.workspace.name]),
-      Button.view(
-        {
-          onClick: Message.ClickedAllWorkspaces(),
-          toView: (attributes) => h.button(attributes.button, ["All workspaces"])
-        },
-        h
-      ),
+      h.h2([], [opened.workspace.name, sending(opened.workspacePending, h)]),
+      button(h, "All workspaces", Message.ClickedAllWorkspaces()),
+      button(h, "Settings", Message.ClickedSettings()),
       StoreState.match(opened.store, {
         Opening: () => h.p([], ["Opening…"]),
         Failed: ({ error }) => h.p([h.Role("alert")], [error]),
@@ -683,7 +941,13 @@ const workspaceView = (opened: Opened, h: HtmlBuilder<Message>): Html =>
                 onNone: () => h.empty,
                 onSome: (composing) => composingView(composing, opened, h)
               }),
-              Option.match(opened.group, { onNone: () => h.empty, onSome: (group) => groupView(group, opened, h) })
+              Option.match(opened.pane, {
+                onNone: () => h.empty,
+                onSome: Pane.match({
+                  Group: ({ group }) => groupView(group, opened, h),
+                  Settings: ({ settings }) => settingsView(settings, opened, h)
+                })
+              })
             ]
           )
       })

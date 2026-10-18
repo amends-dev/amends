@@ -1,9 +1,10 @@
+import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import { Thread, ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
-import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, Member, MemberId, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ThreadSync from "@amends-dev/sync/ThreadSync"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
@@ -239,6 +240,103 @@ describe("Pending.overlay, for groups", () => {
     ])
     // Following a group they never followed waits for the server.
     expect(view(Pending.overlay("GroupFollow", undefined, [], [followed]))).toEqual([])
+  })
+})
+
+describe("Pending.overlay, for the workspace", () => {
+  const place = ReplicaRecord.Place.cases.Workspace.make({})
+  const studio = cases.Workspace.make({
+    value: Schema.decodeSync(Workspace.Workspace)({
+      id: "workspace-1",
+      name: "Studio",
+      createdBy: "alice",
+      ownerMemberId: "member-1"
+    })
+  })
+  const member = (id: string, name: string) =>
+    cases.Member.make({
+      value: Schema.decodeSync(Member.Member)({
+        id,
+        workspaceId: "workspace-1",
+        identity: { _tag: "Human", id },
+        name,
+        status: "active"
+      })
+    })
+  const holds = (id: string, memberId: string, roleId: Role.RoleId) =>
+    cases.Assignment.make({
+      value: Assignment.Assignment.make({
+        id: Assignment.AssignmentId.make(id),
+        workspaceId: author.workspaceId,
+        memberId: MemberId.MemberId.make(memberId),
+        status: "active",
+        source: Assignment.Source.cases.Role.make({
+          roleId,
+          scope: Scope.Scope.cases.Workspace.make({ workspaceId: author.workspaceId })
+        })
+      })
+    })
+
+  it("renames the workspace and hands it to another member", () => {
+    const pending = [
+      unfinished("WorkspaceRenamed", { name: "Atelier", expectedName: "Studio" }, 1),
+      unfinished("OwnershipTransferred", { memberId: "member-2", expectedOwnerAssignmentId: "assignment-1" }, 2)
+    ]
+    expect(view(Pending.overlay("Workspace", place, [studio], pending))).toEqual([
+      { value: { ...studio.value, name: "Atelier", ownerMemberId: MemberId.MemberId.make("member-2") }, pending: true }
+    ])
+  })
+
+  it("renames the person who wrote the action, and removes the member it names", () => {
+    const alice = member("member-1", "Alice")
+    const bob = member("member-2", "Bob")
+    const pending = [
+      unfinished("MemberRenamed", { name: "Ali" }, 1),
+      unfinished("MemberRemoved", { memberId: "member-2" }, 2)
+    ]
+    expect(view(Pending.overlay("Member", place, [alice, bob], pending))).toEqual([
+      { value: { ...alice.value, name: "Ali" }, pending: true },
+      { value: { ...bob.value, status: "removed" }, pending: true }
+    ])
+  })
+
+  it("replaces the roles the person saw a member hold, and revokes an invitation still pending", () => {
+    const bobIsMember = holds("assignment-2", "member-2", BuiltinRoles.MemberId)
+    const bobAdministers = holds("assignment-3", "member-2", BuiltinRoles.AdministratorId)
+    const replaced = unfinished(
+      "RolesReplaced",
+      { memberId: "member-2", roleId: BuiltinRoles.AdministratorId, expectedAssignmentIds: ["assignment-2"] },
+      1,
+      [bobAdministers]
+    )
+    expect(view(Pending.overlay("Assignment", place, [bobIsMember], [replaced]))).toEqual([
+      { value: { ...bobIsMember.value, status: "revoked" }, pending: true },
+      { value: bobAdministers.value, pending: true }
+    ])
+    const invited = cases.Invitation.make({
+      value: Schema.decodeSync(Invitation.Invitation)({
+        details: {
+          recipientId: "carol",
+          roleId: BuiltinRoles.MemberId,
+          expiresAt: "2026-10-25T12:00:00Z",
+          id: "invitation-1",
+          workspaceId: "workspace-1",
+          inviterMemberId: "member-1",
+          issuedAt: "2026-10-18T12:00:00Z"
+        },
+        state: { _tag: "Pending" }
+      })
+    })
+    const revoked = unfinished("InvitationRevoked", { invitationId: "invitation-1" }, 2)
+    expect(view(Pending.overlay("Invitation", place, [invited], [revoked]))).toEqual([
+      {
+        value: {
+          ...invited.value,
+          state: Invitation.State.cases.Revoked.make({ revokedBy: author.memberId, revokedAt: at(2) })
+        },
+        pending: true
+      }
+    ])
   })
 })
 

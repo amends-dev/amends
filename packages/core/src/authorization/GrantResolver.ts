@@ -1,9 +1,10 @@
 /**
  * The grants a member currently holds, resolved from their active assignments in
  * `AssignmentStore`: a direct assignment is its grant, and a role assignment is each permission of
- * the role in `RoleStore`, at the assignment's scope. `Authorization` resolves once per check. A
- * recorded permission `PermissionCatalog` does not declare is skipped: no requirement can name
- * it, so a retired one grants nothing and breaks nothing else its holder has.
+ * the role in `RoleStore`, at the assignment's scope, as `grantsOf` decides from records alone.
+ * `Authorization` resolves once per check. A recorded permission `PermissionCatalog` does not
+ * declare is skipped: no requirement can name it, so a retired one grants nothing and breaks
+ * nothing else its holder has.
  *
  * @since 0.1.0
  */
@@ -20,6 +21,7 @@ import * as AssignmentStore from "./AssignmentStore.ts"
 import * as Grant from "./Grant.ts"
 import type * as Permission from "./Permission.ts"
 import * as PermissionCatalog from "./PermissionCatalog.ts"
+import type * as Role from "./Role.ts"
 import * as RoleStore from "./RoleStore.ts"
 import type * as Scope from "./Scope.ts"
 
@@ -53,6 +55,25 @@ export class GrantResolver extends Context.Service<
 >()("@amends-dev/core/authorization/GrantResolver") {}
 
 /**
+ * The grants `assignments` confer, before the catalog checks them: a direct assignment's own, and
+ * each permission of a role assignment's role, as `roleOf` gives it, at the assignment's scope. A
+ * role `roleOf` does not give confers nothing. Overlapping grants may repeat.
+ *
+ * @category getters
+ * @since 0.1.0
+ */
+export const grantsOf = (
+  assignments: ReadonlyArray<Assignment.Assignment>,
+  roleOf: (roleId: Role.RoleId) => Role.Role | undefined
+): ReadonlyArray<Grant.Grant> =>
+  assignments.flatMap((assignment) =>
+    Assignment.Source.match(assignment.source, {
+      Direct: ({ grant }) => [grant],
+      Role: ({ roleId, scope }) => (roleOf(roleId)?.permissions ?? []).map((permission) => ({ permission, scope }))
+    })
+  )
+
+/**
  * Construct a resolver from workspace stores and metadata; read assignments and roles per call.
  *
  * @category constructors
@@ -79,18 +100,17 @@ export const make: Effect.Effect<
   })
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: MemberId.MemberId) {
+    const assignments = yield* assignmentStore.listActiveByMember(memberId)
+    const roles = new Map<Role.RoleId, Role.Role>()
+    for (const { source } of assignments) {
+      if (!Assignment.Source.isAnyOf(["Role"])(source) || roles.has(source.roleId)) continue
+      const role = yield* roleStore.get(source.roleId)
+      if (Option.isNone(role)) return yield* Effect.die("An assignment's role is missing")
+      roles.set(source.roleId, role.value)
+    }
     const grants: Array<Grant.Grant> = []
-    for (const assignment of yield* assignmentStore.listActiveByMember(memberId)) {
-      const source = assignment.source
-      if (Assignment.Source.isAnyOf(["Direct"])(source)) {
-        grants.push(...(yield* resolveGrant(source.grant.permission, source.grant.scope)))
-      } else {
-        const role = yield* roleStore.get(source.roleId)
-        if (Option.isNone(role)) return yield* Effect.die("An assignment's role is missing")
-        for (const name of role.value.permissions) {
-          grants.push(...(yield* resolveGrant(name, source.scope)))
-        }
-      }
+    for (const { permission, scope } of grantsOf(assignments, (roleId) => roles.get(roleId))) {
+      grants.push(...(yield* resolveGrant(permission, scope)))
     }
     return grants
   })

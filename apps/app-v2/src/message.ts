@@ -3,14 +3,26 @@
  * subscription report back.
  */
 
+import { Role } from "@amends-dev/core/authorization"
 import { GroupId, GroupMembership } from "@amends-dev/core/group"
 import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
-import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, MemberId, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Schema from "effect/Schema"
 import { defineMessageUnion } from "foldkit/message"
-import { ActionItem, FollowItem, Following, GroupItem, MembershipItem, MessageItem, ThreadItem } from "./model.ts"
+import {
+  ActionItem,
+  AssignmentItem,
+  FollowItem,
+  Following,
+  GroupItem,
+  InvitationItem,
+  MemberItem,
+  MembershipItem,
+  MessageItem,
+  ThreadItem
+} from "./model.ts"
 
 export const Message = defineMessageUnion({
   TypedEmail: { email: Schema.String },
@@ -30,8 +42,12 @@ export const Message = defineMessageUnion({
   ReleasedStore: {},
   FailedAcquireStore: { error: Schema.String },
   FailedReadStore: { error: Schema.String },
+  GotWorkspace: { workspace: Workspace.Workspace, pending: Schema.Boolean },
   GotGroups: { groups: Schema.Array(GroupItem) },
-  GotMembers: { members: Schema.Array(Member.Member) },
+  GotMembers: { members: Schema.Array(MemberItem) },
+  GotRoles: { roles: Schema.Array(Role.Role) },
+  GotAssignments: { assignments: Schema.Array(AssignmentItem) },
+  GotInvitations: { invitations: Schema.Array(InvitationItem) },
   GotMemberships: { memberships: Schema.Array(MembershipItem) },
   GotFollows: { follows: Schema.Array(FollowItem) },
   ClickedNewTeam: {},
@@ -51,9 +67,9 @@ export const Message = defineMessageUnion({
   TypedGroupName: { name: Schema.String },
   SubmittedGroupName: {},
   ClickedCancelGroupName: {},
-  ChoseMemberToAdd: { memberId: Schema.Option(MemberId.MemberId) },
-  SubmittedAddMember: {},
-  ClickedRemoveMember: { membershipId: GroupMembership.GroupMembershipId },
+  ChoseGroupMemberToAdd: { memberId: Schema.Option(MemberId.MemberId) },
+  SubmittedAddGroupMember: {},
+  ClickedRemoveGroupMember: { membershipId: GroupMembership.GroupMembershipId },
   GotActions: { actions: Schema.Array(ActionItem) },
   GotThreads: { groupId: GroupId.GroupId, threads: Schema.Array(ThreadItem) },
   GotThread: {
@@ -64,6 +80,22 @@ export const Message = defineMessageUnion({
     readThrough: Schema.Int
   },
   ClickedGroup: { groupId: GroupId.GroupId },
+  ClickedSettings: {},
+  ClickedRenameWorkspace: {},
+  TypedWorkspaceName: { name: Schema.String },
+  SubmittedWorkspaceName: {},
+  ClickedCancelWorkspaceName: {},
+  ClickedRenameSelf: {},
+  TypedOwnName: { name: Schema.String },
+  SubmittedOwnName: {},
+  ClickedCancelOwnName: {},
+  ChoseRole: { memberId: MemberId.MemberId, roleId: Role.RoleId },
+  ClickedRemoveMember: { memberId: MemberId.MemberId },
+  ClickedTransferOwnership: { memberId: MemberId.MemberId },
+  TypedInviteEmail: { email: Schema.String },
+  ChoseInviteRole: { roleId: Role.RoleId },
+  SubmittedInvite: {},
+  ClickedRevokeInvitation: { invitationId: Invitation.InvitationId },
   ClickedThread: { threadId: ThreadId.ThreadId },
   ClickedAllThreads: {},
   TypedThread: { text: Schema.String },

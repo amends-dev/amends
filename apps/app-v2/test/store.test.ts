@@ -1,4 +1,4 @@
-import { BuiltinRoles } from "@amends-dev/core/authorization"
+import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 // @vitest-environment node
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
 import { DeliveryJobs } from "@amends-dev/core/channel"
@@ -9,7 +9,7 @@ import { MemoryDatabase } from "@amends-dev/core/journal"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { TurnJobs } from "@amends-dev/core/turn"
-import { InvitationService, Member, type Workspace } from "@amends-dev/core/workspace"
+import { Invitation, InvitationService, Member, type Workspace } from "@amends-dev/core/workspace"
 import {
   Accounts,
   Gateway,
@@ -291,6 +291,61 @@ describe("Store", () => {
       ).toHaveLength(1)
       expect(yield* firstWhere(store.actions, () => true)).toEqual([])
     }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live(
+    "an invitation reaches the account its address names, and a role change becomes the server's under its IDs",
+    () =>
+      Effect.gen(function* () {
+        const services = yield* host
+        const gateway = Context.get(services, Gateway.Gateway)
+        const accounts = Context.get(services, Accounts.Accounts)
+        const workspace = yield* gateway.createWorkspace(alice, {
+          name: "Studio",
+          memberName: Member.Name.make("Alice")
+        })
+        const bob = yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
+        const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+        const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+        yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)
+
+        const carol = Accounts.Email.make("carol@example.com")
+        const expiresAt = DateTime.add(yield* DateTime.now, { days: 1 })
+        yield* store.write("InvitationIssued", { email: carol, roleId: BuiltinRoles.MemberId, expiresAt })
+        const isOpen = ({ record }: { readonly record: { readonly value: Invitation.Invitation } }) =>
+          Invitation.State.isAnyOf(["Pending"])(record.value.state)
+        const invitation = (yield* firstWhere(store.list("Invitation", everywhere), (held) => held.some(isOpen))).find(
+          isOpen
+        )
+        expect(invitation!.record.value.details.recipientId).toBe((yield* accounts.findOrCreate(carol)).id)
+
+        const isBobs = ({ record }: { readonly record: { readonly value: Assignment.Assignment } }) =>
+          record.value.memberId === bob.id
+        const member = (yield* firstWhere(store.list("Assignment", everywhere), (held) => held.some(isBobs))).find(
+          isBobs
+        )
+        yield* store.write("RolesReplaced", {
+          memberId: bob.id,
+          roleId: BuiltinRoles.AdministratorId,
+          expectedAssignmentIds: [member!.record.value.id]
+        })
+        // The new role shows at once, and the one it replaces as revoked.
+        const changed = (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+          held.some((item) => isBobs(item) && item.pending)
+        )).filter(isBobs)
+        const given = changed.find(({ record }) => record.value.id !== member!.record.value.id)!
+        expect(changed.find(({ record }) => record.value.id === member!.record.value.id)?.record.value.status).toBe(
+          "revoked"
+        )
+        // Then the server's, under the same ID.
+        const settled = (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+          held.filter(isBobs).every(({ pending }) => !pending)
+        )).filter(isBobs)
+        expect(
+          settled.find(({ record }) => record.value.status === "active" && Assignment.isWorkspaceRole(record.value))
+            ?.record.value.id
+        ).toBe(given.record.value.id)
+      }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })
 
