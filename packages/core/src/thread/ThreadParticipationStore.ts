@@ -72,6 +72,10 @@ export class ThreadParticipationStore extends Context.Service<
       id: ThreadId.ThreadId,
       participants: ReadonlyArray<ThreadParticipation.Reference>
     ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
+    /** Every participation held through this group admission, active or ended, in stable ID order. */
+    readonly listByAdmission: (
+      id: GroupMembership.GroupMembershipId
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
     /**
      * End every active participation held through this group admission at `endedAt`, however many
      * there are, in one write; ended ones keep their time. A departure from the group ends them all.
@@ -114,6 +118,8 @@ export const make = (
     getMany: (ids) =>
       Effect.flatMap(read("getMany", Schema.Array(ThreadParticipationId.ThreadParticipationId), ids), driver.getMany),
     listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, id), driver.listByThread),
+    listByAdmission: (id) =>
+      Effect.flatMap(read("listByAdmission", GroupMembership.GroupMembershipId, id), driver.listByAdmission),
     pageActiveByThread: Effect.fn("ThreadParticipationStore.pageActiveByThread")(function* (id, options) {
       return yield* driver.pageActiveByThread(
         yield* read("pageActiveByThread", ThreadId.ThreadId, id),
@@ -182,6 +188,18 @@ const makeMemory = Effect.fn("ThreadParticipationStore.makeMemory")(function* ()
         return (yield* all).filter((record) => record.threadId === id).toSorted(byId)
       },
       Effect.mapError(StoreError.failed("ThreadParticipationStore", "listByThread"))
+    ),
+    listByAdmission: Effect.fn("ThreadParticipationStore.memory.listByAdmission")(
+      function* (id) {
+        return (yield* all)
+          .filter(
+            (record) =>
+              ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant) &&
+              record.participant.groupMembershipId === id
+          )
+          .toSorted(byId)
+      },
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "listByAdmission"))
     ),
     pageActiveByThread: Effect.fn("ThreadParticipationStore.memory.pageActiveByThread")(
       function* (id, options) {

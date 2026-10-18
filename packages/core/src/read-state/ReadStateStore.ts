@@ -99,7 +99,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
   const driver: ReadStateStore["Service"] = {
     getThreadPositions: Effect.fn("ReadStateStore.memory.getThreadPositions")(
       function* (memberId, threadIds) {
-        const positions = (yield* read).records.of("thread-positions")
+        const positions = (yield* read).records.of("threadPositions")
         return yield* positionRows.getMany(
           positions,
           [...new Set(threadIds)].map((threadId) => MemoryDatabase.keyOf(memberId, threadId))
@@ -109,7 +109,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
     ),
     advanceThread: Effect.fn("ReadStateStore.memory.advanceThread")(
       function* (position) {
-        const positions = (yield* write).records.of("thread-positions")
+        const positions = (yield* write).records.of("threadPositions")
         const key = MemoryDatabase.keyOf(position.memberId, position.threadId)
         const stored = yield* positionRows.get(positions, key)
         if (Option.isSome(stored) && stored.value.readThrough >= position.readThrough) return
@@ -119,7 +119,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
     ),
     getGroupReads: Effect.fn("ReadStateStore.memory.getGroupReads")(
       function* (memberId, groupIds) {
-        const reads = (yield* read).records.of("group-reads")
+        const reads = (yield* read).records.of("groupReads")
         return yield* groupReadRows.getMany(
           reads,
           [...new Set(groupIds)].map((groupId) => MemoryDatabase.keyOf(memberId, groupId))
@@ -129,7 +129,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
     ),
     advanceGroup: Effect.fn("ReadStateStore.memory.advanceGroup")(
       function* (groupRead) {
-        const reads = (yield* write).records.of("group-reads")
+        const reads = (yield* write).records.of("groupReads")
         const key = MemoryDatabase.keyOf(groupRead.memberId, groupRead.groupId)
         const stored = yield* groupReadRows.get(reads, key)
         if (Option.isSome(stored) && DateTime.isGreaterThanOrEqualTo(stored.value.readAt, groupRead.readAt)) return

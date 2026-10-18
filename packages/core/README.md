@@ -386,8 +386,16 @@ operations authorize reading it: the workspace, its roles, and its contacts are 
 members, assignments, invitations, channels, connections, and agents follow their read permission,
 and a member always sees their own record and assignments; a group and its members are its
 members' under `group.read`, and a public team's whoever may join it; a thread and everything in it
-are its group's members' under `thread.read` on it; and read state, follows, and notifications are
-their member's alone.
+are its group's members' under `thread.read` on it; read state and notifications are their member's
+alone; and a follow is its member's while they belong to its group.
+
+`ReplicaQuery` is the replica's reads. `keysChangedBy` names the records one commit changed: each
+fact's subject names the record it changes, and a few facts change more as their projections apply
+them. A thread's activity generates notifications, a member leaving a group ends their
+participations there and settles their notifications from it, reading a thread marks what was
+pending from it seen, and a change to a connection can change whether the agents that use it can
+run. `readRecords` reads the records under keys as a replica holds them, with a connection's
+readiness from `ConnectionReadiness` and an agent's from `AgentReadiness`.
 
 ## Connections
 

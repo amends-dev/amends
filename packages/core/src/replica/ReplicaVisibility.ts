@@ -5,8 +5,8 @@
  * invitations, channels, connections, and agents are seen under their read permission, and a
  * member's own record and assignments always by them; a group and its members by its members
  * under `group.read`, and a public team's by whoever may join it; a thread and everything in it by
- * its group's members under `thread.read` on it; and read state, follows, and notifications by
- * their member alone.
+ * its group's members under `thread.read` on it; read state and notifications by their member
+ * alone; and a follow by its member while they belong to its group.
  *
  * @since 0.1.0
  */
@@ -100,7 +100,8 @@ export const canSee = (viewer: Viewer, places: Places, record: ReplicaRecord.Rep
     Invitation: () => granted(InvitationPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId })),
     Group: ({ value }) => canSeeGroup(value.id),
     GroupMembership: ({ value }) => value.memberId === memberId || canSeeGroup(value.groupId),
-    GroupFollow: ({ value }) => value.memberId === memberId,
+    // A follow means something only to a member of its group: leaving the group ends it.
+    GroupFollow: ({ value }) => value.memberId === memberId && viewer.groupIds.has(value.groupId),
     GroupRead: ({ value }) => value.memberId === memberId,
     Thread: ({ value }) => canSeeThread(value.id),
     ThreadActivity: ({ value }) => canSeeThread(value.threadId),

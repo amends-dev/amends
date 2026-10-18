@@ -237,6 +237,14 @@ describe("ReplicaVisibility", () => {
       ]
       for (const record of owned(me)) expect(ReplicaVisibility.canSee(viewer(), places, record)).toBe(true)
       for (const record of owned(someone)) expect(ReplicaVisibility.canSee(everything, places, record)).toBe(false)
+      // A follow of a group they left means nothing to them.
+      expect(
+        ReplicaVisibility.canSee(
+          viewer(),
+          places,
+          cases.GroupFollow.make({ value: { ...follow, groupId: open, memberId: me } })
+        )
+      ).toBe(false)
       const notification = (recipient: Notification.Recipient) =>
         cases.Notification.make({
           value: {

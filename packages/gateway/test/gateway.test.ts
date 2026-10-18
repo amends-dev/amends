@@ -154,6 +154,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         getMany: unexpected,
         listByThread: unexpected,
+        listByAdmission: unexpected,
         pageActiveByThread: unexpected,
         findActive: unexpected,
         endByAdmission: unexpected,

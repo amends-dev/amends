@@ -10,6 +10,11 @@
 /**
  * @since 0.1.0
  */
+export * as ReplicaQuery from "./ReplicaQuery.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as ReplicaRecord from "./ReplicaRecord.ts"
 
 /**

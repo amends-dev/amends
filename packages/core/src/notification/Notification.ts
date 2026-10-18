@@ -197,6 +197,18 @@ export const Notification = Schema.Struct({
 export interface Notification extends Schema.Schema.Type<typeof Notification> {}
 
 /**
+ * The ID of the notification an activity's journal entry generates for one participation: the
+ * same each time the activity is projected, so rebuilding projections generates it again.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const idForActivity = (
+  entry: { readonly logId: Entry.LogId; readonly id: Entry.EntryId },
+  participationId: ThreadParticipationId.ThreadParticipationId
+): NotificationId => NotificationId.make(JSON.stringify([entry.logId, entry.id, participationId]))
+
+/**
  * The notification that recorded thread activity generates for one selected recipient: pending,
  * or informational for an agent the activity asks no work of. Everything comes from the
  * activity's journal entry, so replay reproduces the record exactly: its ID is
@@ -219,7 +231,7 @@ export const fromActivity = (
     readonly requestsWork: boolean
   }
 ): Notification => ({
-  id: NotificationId.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
+  id: idForActivity(entry, selected.participationId),
   workspaceId: activity.workspaceId,
   source: { logId: entry.logId, entryId: entry.id },
   participationId: selected.participationId,

@@ -39,6 +39,11 @@ export * as ConnectionProjection from "./ConnectionProjection.ts"
 /**
  * @since 0.1.0
  */
+export * as ConnectionReadiness from "./ConnectionReadiness.ts"
+
+/**
+ * @since 0.1.0
+ */
 export * as ConnectionService from "./ConnectionService.ts"
 
 /**

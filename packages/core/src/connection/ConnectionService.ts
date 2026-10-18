@@ -31,6 +31,7 @@ import * as Connection from "./Connection.ts"
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts"
 import * as ConnectionFacts from "./ConnectionFacts.ts"
 import * as ConnectionPermissions from "./ConnectionPermissions.ts"
+import * as ConnectionReadiness from "./ConnectionReadiness.ts"
 import * as ConnectionStore from "./ConnectionStore.ts"
 
 /**
@@ -239,21 +240,10 @@ export const make = Effect.gen(function* () {
     yield* Effect.mapError(integration.validate(Connection.connectionOf(record)), toInvalidConnection)
   })
 
-  /** How ready the connection is, as the integration this host installs now finds it. */
-  const readinessOf = Effect.fnUntraced(function* (
-    record: Connection.Connection
-  ): Effect.fn.Return<Connection.Readiness> {
-    const integration = yield* Effect.option(integrations.find(record.integration))
-    if (Option.isNone(integration)) return Connection.Readiness.cases.Uninstalled.make({})
-    return yield* Effect.match(integration.value.validate(Connection.connectionOf(record)), {
-      onFailure: (error): Connection.Readiness =>
-        Connection.Readiness.cases.Invalid.make({ description: error.reason.message }),
-      onSuccess: (): Connection.Readiness => Connection.Readiness.cases.Ready.make({})
-    })
-  })
-
   const viewOf = (record: Connection.Connection, manageable: boolean) =>
-    Effect.map(readinessOf(record), (readiness) => Connection.view(record, readiness, manageable))
+    Effect.map(ConnectionReadiness.readinessOf(record, integrations), (readiness) =>
+      Connection.view(record, readiness, manageable)
+    )
 
   /** The connection as the actor sees it, including whether they may manage it. */
   const viewForActor = Effect.fnUntraced(function* (record: Connection.Connection) {
