@@ -9,6 +9,7 @@
  */
 
 import { ReadStateService } from "@amends-dev/core/read-state"
+import { Request } from "@amends-dev/core/request"
 import { ThreadService, ThreadMessageService, ThreadParticipationService } from "@amends-dev/core/thread"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
 import * as Api from "./Api.ts"
@@ -27,11 +28,11 @@ export const layer = HttpApiBuilder.group(Api.Api, "threads", (handlers) =>
       ThreadService.ThreadService.use((threadService) => threadService.listOpenings(params.groupId, query)),
     start: ({ params, headers, payload }) =>
       ThreadService.ThreadService.use((threadService) =>
-        threadService.startInGroup({ groupId: params.groupId, ...payload }, { requestKey: headers["idempotency-key"] })
-      ),
+        threadService.startInGroup({ groupId: params.groupId, ...payload })
+      ).pipe(Request.withKey(headers["idempotency-key"])),
     startDirect: ({ headers, payload }) =>
-      ThreadService.ThreadService.use((threadService) =>
-        threadService.startDirect(payload, { requestKey: headers["idempotency-key"] })
+      ThreadService.ThreadService.use((threadService) => threadService.startDirect(payload)).pipe(
+        Request.withKey(headers["idempotency-key"])
       ),
     get: ({ params }) => ThreadService.ThreadService.use((threadService) => threadService.get(params.threadId)),
     rename: ({ params, payload }) =>
@@ -48,11 +49,8 @@ export const layer = HttpApiBuilder.group(Api.Api, "threads", (handlers) =>
       ThreadService.ThreadService.use((threadService) => threadService.listParticipants(params.threadId, query)),
     publish: ({ params, headers, payload }) =>
       ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
-        threadMessageService.publish(
-          { threadId: params.threadId, ...payload },
-          { requestKey: headers["idempotency-key"] }
-        )
-      ),
+        threadMessageService.publish({ threadId: params.threadId, ...payload })
+      ).pipe(Request.withKey(headers["idempotency-key"])),
     edit: ({ params, payload }) =>
       ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
         threadMessageService.edit({ messageId: params.messageId, ...payload })

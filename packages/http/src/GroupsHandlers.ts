@@ -10,6 +10,7 @@
 
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group"
 import { ReadStateService } from "@amends-dev/core/read-state"
+import { Request } from "@amends-dev/core/request"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
 import * as Api from "./Api.ts"
 
@@ -24,8 +25,8 @@ export const layer = HttpApiBuilder.group(Api.Api, "groups", (handlers) =>
     list: ({ query }) => GroupService.GroupService.use((groupService) => groupService.listMine(query)),
     listPublic: ({ query }) => GroupService.GroupService.use((groupService) => groupService.listPublic(query)),
     create: ({ headers, payload }) =>
-      GroupService.GroupService.use((groupService) =>
-        groupService.createTeam(payload, { requestKey: headers["idempotency-key"] })
+      GroupService.GroupService.use((groupService) => groupService.createTeam(payload)).pipe(
+        Request.withKey(headers["idempotency-key"])
       ),
     rename: ({ params, payload }) =>
       GroupService.GroupService.use((groupService) =>

@@ -212,8 +212,8 @@ Group creation, admissions, departures, and follows are journal facts, recorded 
 operation's checks in one commit; a failure leaves nothing behind. Each admission has its own ID,
 so readmission never revives an old one, and replay applies the recorded history without
 rechecking anyone's current permissions or membership. Recording the same fact again reuses the
-original, but calling `createTeam` again creates another group unless both calls pass the
-same `{ requestKey }`: then the retry returns the first group, whatever the second call asks for;
-its ID is derived from the creator and key. See [retrying safely](thread-workflows.md#retrying-safely).
+original, but calling `createTeam` again creates another group unless both calls run as the same
+request (`Request.withKey`): then the retry returns the first group, whatever the second call asks
+for; its ID, and those of its admissions, derive from the creator and key. See [retrying safely](thread-workflows.md#retrying-safely).
 
 Group creation generates no notifications.

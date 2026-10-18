@@ -7,6 +7,7 @@
  * @since 0.1.0
  */
 
+import { Request } from "@amends-dev/core/request"
 import { InvitationService } from "@amends-dev/core/workspace"
 import { Accounts } from "@amends-dev/gateway"
 import * as Effect from "effect/Effect"
@@ -31,11 +32,8 @@ export const layer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const recipient = yield* accounts.findOrCreate(email)
           const invitationService = yield* InvitationService.InvitationService
-          return yield* invitationService.issue(
-            { ...invitation, recipientId: recipient.id },
-            { requestKey: headers["idempotency-key"] }
-          )
-        }),
+          return yield* invitationService.issue({ ...invitation, recipientId: recipient.id })
+        }).pipe(Request.withKey(headers["idempotency-key"])),
       revoke: ({ params }) =>
         InvitationService.InvitationService.use((invitationService) => invitationService.revoke(params.invitationId))
     })

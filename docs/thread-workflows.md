@@ -298,18 +298,20 @@ with its title alone.
 
 ## Retrying safely
 
-Starts (`startInGroup` and `startDirect`) and replies take an optional second argument,
-`{ requestKey }`. A client chooses a new key, such as a UUID, for each message it sends and repeats
-it on every retry. A retry returns the thread or message the first attempt created and records
+Starts (`startInGroup` and `startDirect`) and replies run as a request when the protocol gives them a
+key with `Request.withKey`, as HTTP does from the `Idempotency-Key` header. A client chooses a new
+key, such as a UUID, for each request it sends and repeats it on every retry. A retry returns the thread or message the first attempt created and records
 nothing more, including when the first attempt committed but its answer was lost. The key alone
 names the request: sent again with different text or mentions, it still returns what the first
-attempt created. A retry after an attempt that rolled back runs again. Keys belong to their member
-and their operation, so another member's key, or the same key on a reply rather than a start, is a
-separate request. Without a key, every call creates anew.
+attempt created. A retry after an attempt that rolled back runs again. Keys belong to their member,
+so another member's key is a separate request; a key names one request, so sending it with another
+finds what the first created where their records coincide. Without a key, every call creates anew.
 
-A keyed start derives its thread's and opening message's IDs from the operation, the author, and
-the key (`Request.derivedId`), and a keyed reply derives its message's ID the same way, so a retry
-finds what its first attempt created by those IDs and records no receipt. A retry passes the same
+Within a request, a start's thread and opening message, a reply's message, and every participation
+and activity they record take IDs derived from the author, the key, and what each is
+(`Thread.newId`, `ThreadMessage.newId`, and their kin), so a retry finds what its first attempt
+created by those IDs and records no receipt, and the client that sent the request knows them
+beforehand. A direct group's ID comes from its members (`Group.directId`). A retry passes the same
 checks as the first attempt before it looks: for a start, group membership, `thread.start`, and a
 human author, so an author who has since left the group receives `CoreError.NotFound`; for a reply,
 access to the thread, `thread.publish`, and a human author.

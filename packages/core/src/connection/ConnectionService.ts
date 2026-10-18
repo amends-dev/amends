@@ -26,7 +26,6 @@ import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Request from "../request/Request.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Connection from "./Connection.ts"
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts"
@@ -166,14 +165,10 @@ export class ConnectionService extends Context.Service<
     /**
      * Connect the workspace to an installed integration, with settings and a way of authenticating
      * the integration takes, and its key when it authenticates with one, stored in the same commit.
-     * Needs `connection.create` on the workspace. A retry with the same request key returns the
-     * connection its first attempt created, or `CoreError.NotFound` once that connection is
-     * removed.
+     * Needs `connection.create` on the workspace. Within a request, a retry returns the connection
+     * its first attempt created, or `CoreError.NotFound` once that connection is removed.
      */
-    readonly create: (
-      input: Connection.CreateInput,
-      options?: Request.Options
-    ) => Effect.Effect<Connection.View, CreateError, Actor.Actor>
+    readonly create: (input: Connection.CreateInput) => Effect.Effect<Connection.View, CreateError, Actor.Actor>
     /**
      * Give a connection a new name, under `connection.manage`. The same name again records nothing;
      * otherwise a name other than `expectedName` is `CoreError.Changed`, and nothing is recorded.
@@ -342,17 +337,15 @@ export const make = Effect.gen(function* () {
   }, Operation.report)
 
   const create = Effect.fn("ConnectionService.create")(
-    function* (input: Connection.CreateInput, options: Request.Options = {}) {
+    function* (input: Connection.CreateInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Connection.CreateInput))(input)
       yield* authorization.require([
         Requirement.make(ConnectionPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
       ])
       const actor = yield* Actor.Actor
-      const connectionId = ConnectionContract.ConnectionId.make(
-        yield* Request.idFor(options.requestKey, ["connection.create", workspaceId, actor.memberId])
-      )
+      const connectionId = yield* Connection.newId
       // A retry returns the connection its first attempt created, unless it was removed since.
-      if (options.requestKey !== undefined && Option.isSome(yield* connectionStore.get(connectionId)))
+      if (Option.isSome(yield* connectionStore.get(connectionId)))
         return yield* viewForActor(yield* requireActiveConnection(connectionId))
       const created: Connection.Connection = {
         id: connectionId,

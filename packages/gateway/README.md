@@ -24,9 +24,9 @@ published to npm.
 `Gateway.layer(options?)` provides `Gateway.Gateway` and owns the gateway's scope; a direct caller
 of `make` keeps that scope open for the gateway's lifetime. The gateway's operations:
 
-- `createWorkspace(creator, input, options?)` creates a workspace with a required name and runs
-  core's initialization for the creator. With `options.requestKey`, the workspace's ID derives from
-  the creator and the key, so a retry returns what its first attempt created, whatever name it
+- `createWorkspace(creator, input, requestKey?)` creates a workspace with a required name and runs
+  core's initialization for the creator. With a request key, the workspace's ID derives from the
+  creator and the key, so a retry returns what its first attempt created, whatever name it
   gives. The caller has authenticated the creator and checked that they may create one.
 - `asMember(workspaceId, identity, program)` resolves the identity's active membership into
   `Actor.Actor`, binds the workspace, and runs the program. A non-member, or a workspace that does

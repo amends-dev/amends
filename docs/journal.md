@@ -239,9 +239,10 @@ an atomic create-or-reuse operation. A fresh generated payload under an old key
 correctly conflicts. This primitive does not make existing HTTP operations or
 external sends automatically idempotent.
 
-Core's request keys follow this pattern. Each creating operation derives the IDs of what it creates
-from the operation, the acting member, and the client's key with `Request.derivedId`, as workspace
-creation derives its workspace's ID; a turn retry derives its turn's ID from the turn it retries.
+Core's request keys follow this pattern. Within a request, each record an operation creates takes an
+ID derived from the acting member, the client's key, and what the record is (`Request.newId`), as
+workspace creation derives its workspace's ID from its creator and key; a turn retry derives its
+turn's ID from the turn it retries.
 Inside the commit, the operation finds those records by ID before generating anything and returns
 them; each creation fact declares the ID as its occurrence, so no second record can take it. No
 separate receipt is recorded. Logs written before this change still hold internal

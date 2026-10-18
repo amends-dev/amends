@@ -7,7 +7,9 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Grant from "./Grant.ts"
@@ -171,3 +173,13 @@ export const Access = Schema.Struct({
  * @since 0.1.0
  */
 export interface Access extends Schema.Schema.Type<typeof Access> {}
+
+/**
+ * The ID of the assignment the current request gives `memberId` of a role, as `Request.newId`
+ * derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (memberId: MemberId.MemberId, roleId: Role.RoleId) =>
+  Effect.map(Request.newId("assignment", [memberId, roleId]), (id) => AssignmentId.make(id))

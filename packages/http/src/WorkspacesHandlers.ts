@@ -30,9 +30,7 @@ export const layer = HttpApiBuilder.group(
       create: ({ headers, payload }) =>
         Effect.gen(function* () {
           const person = yield* requireHuman
-          return yield* gateway.createWorkspace(person.id, payload, {
-            requestKey: headers["idempotency-key"]
-          })
+          return yield* gateway.createWorkspace(person.id, payload, headers["idempotency-key"])
         }),
       acceptInvitation: ({ params, payload }) =>
         Effect.gen(function* () {

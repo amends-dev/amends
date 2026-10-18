@@ -9,9 +9,11 @@
  */
 
 import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Role from "../authorization/Role.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "./MemberId.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
 
@@ -116,3 +118,11 @@ export const Invitation = Schema.Struct({ details: Issuance, state: State }).ann
  * @since 0.1.0
  */
 export interface Invitation extends Schema.Schema.Type<typeof Invitation> {}
+
+/**
+ * The ID of the invitation the current request issues, as `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = Effect.map(Request.newId("invitation", []), (id) => InvitationId.make(id))

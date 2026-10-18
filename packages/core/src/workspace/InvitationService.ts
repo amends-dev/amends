@@ -26,7 +26,6 @@ import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Request from "../request/Request.ts"
 import * as Invitation from "./Invitation.ts"
 import * as InvitationFacts from "./InvitationFacts.ts"
 import * as InvitationPermissions from "./InvitationPermissions.ts"
@@ -61,14 +60,10 @@ export class InvitationService extends Context.Service<
   {
     /**
      * Invite a person who is not an active member, under `invitation.manage` and the authority to
-     * delegate the role (`Delegation.requireGrant`); the expiry must be after now. A keyed issuance
-     * derives the invitation's ID from the issuer and key, so a retry returns the invitation its
-     * first attempt issued, as it stands now.
+     * delegate the role (`Delegation.requireGrant`); the expiry must be after now. Within a request,
+     * a retry returns the invitation its first attempt issued, as it stands now.
      */
-    readonly issue: (
-      request: Invitation.IssueInput,
-      options?: Request.Options
-    ) => Effect.Effect<Invitation.Invitation, Error, Actor.Actor>
+    readonly issue: (request: Invitation.IssueInput) => Effect.Effect<Invitation.Invitation, Error, Actor.Actor>
     /**
      * Accept an invitation as the person it names, with the name the workspace will call them.
      * Trusted ingress supplies the authenticated recipient; no membership is required yet. A
@@ -145,15 +140,12 @@ export const make: Effect.Effect<
   })
 
   const issue = Effect.fn("InvitationService.issue")(
-    function* (input: Invitation.IssueInput, options: Request.Options = {}) {
+    function* (input: Invitation.IssueInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input)
       const actor = yield* authorizeInvitation(request)
-      const invitationId = Invitation.InvitationId.make(
-        yield* Request.idFor(options.requestKey, ["invitation.issue", workspaceId, actor.memberId])
-      )
+      const invitationId = yield* Invitation.newId
       // A retry returns the invitation its first attempt issued, as it stands now.
-      if (options.requestKey !== undefined && Option.isSome(yield* invitationStore.get(invitationId)))
-        return yield* requireInvitation(invitationId)
+      if (Option.isSome(yield* invitationStore.get(invitationId))) return yield* requireInvitation(invitationId)
       const issuedAt = yield* DateTime.now
       if (!DateTime.isGreaterThan(request.expiresAt, issuedAt))
         return yield* new CoreError.Invalid({ reason: new CoreError.PastExpiry() })

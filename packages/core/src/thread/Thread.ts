@@ -8,8 +8,10 @@
  */
 
 import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as GroupId from "../group/GroupId.ts"
+import * as Request from "../request/Request.ts"
 import * as Task from "../task/Task.ts"
 import * as Text from "../text/Text.ts"
 import * as MemberId from "../workspace/MemberId.ts"
@@ -376,3 +378,12 @@ export interface Started extends Schema.Schema.Type<typeof Started> {}
  * @since 0.1.0
  */
 export type TimelineItem = ThreadActivityKind.Item
+
+/**
+ * The ID of the thread the current request starts in a group, as `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (groupId: GroupId.GroupId) =>
+  Effect.map(Request.newId("thread", [groupId]), (id) => ThreadId.ThreadId.make(id))

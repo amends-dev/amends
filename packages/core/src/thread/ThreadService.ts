@@ -32,7 +32,6 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
-import * as Request from "../request/Request.ts"
 import * as Task from "../task/Task.ts"
 import * as TaskCommand from "../task/TaskCommand.ts"
 import * as TaskPermissions from "../task/TaskPermissions.ts"
@@ -43,9 +42,9 @@ import * as Thread from "./Thread.ts"
 import type * as ThreadActivityStore from "./ThreadActivityStore.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
 import * as ThreadFacts from "./ThreadFacts.ts"
-import * as ThreadId from "./ThreadId.ts"
+import type * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
-import * as ThreadMessageId from "./ThreadMessageId.ts"
+import type * as ThreadMessageId from "./ThreadMessageId.ts"
 import * as ThreadMessageStore from "./ThreadMessageStore.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadPermissions from "./ThreadPermissions.ts"
@@ -107,19 +106,13 @@ export class ThreadService extends Context.Service<
      * group, the thread's second activity creates the task, admitting its assignee, who must be able
      * to take part, and triage while it is in triage; assigning an agent needs `agent.use` on it.
      */
-    readonly startInGroup: (
-      input: Thread.StartInGroupInput,
-      options?: Request.Options
-    ) => Effect.Effect<Thread.Started, Error, Actor.Actor>
+    readonly startInGroup: (input: Thread.StartInGroupInput) => Effect.Effect<Thread.Started, Error, Actor.Actor>
     /**
      * Establish or reuse the direct group for the author and the given members, then start a
      * thread with all of them. Needs active membership, agent use for every named agent, and
      * thread.start on the direct group; no group-management permission.
      */
-    readonly startDirect: (
-      input: Thread.StartDirectInput,
-      options?: Request.Options
-    ) => Effect.Effect<Thread.Started, Error, Actor.Actor>
+    readonly startDirect: (input: Thread.StartDirectInput) => Effect.Effect<Thread.Started, Error, Actor.Actor>
     /**
      * Give a thread a title, under current group audience and `thread.rename` on the thread. The
      * same title again records nothing; otherwise a title other than `expectedTitle` is
@@ -190,24 +183,19 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
   /**
-   * The IDs a start gives its thread and opening message. Without a key they are new each time. A
-   * keyed start derives them from its author and key, so a retry names what its first attempt
-   * started.
+   * The IDs a start in a group gives its thread and opening message: within a request, those a
+   * retry names too; outside one, new each time.
    */
-  const deriveStartIds = Effect.fnUntraced(function* (operation: string, key: Request.Key | undefined) {
-    const actor = yield* Actor.Actor
-    const parts = [operation, workspaceId, actor.memberId]
-    const threadId = ThreadId.ThreadId.make(yield* Request.idFor(key, [...parts, "thread"]))
-    const messageId = ThreadMessageId.ThreadMessageId.make(yield* Request.idFor(key, [...parts, "message"]))
-    return { threadId, messageId }
+  const startIds = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
+    const threadId = yield* Thread.newId(groupId)
+    return { threadId, messageId: yield* ThreadMessage.newId(threadId) }
   })
 
-  /** What an earlier attempt of this keyed start created, so a retry returns it; None otherwise. */
-  const findRetriedStart = Effect.fnUntraced(function* (
-    key: Request.Key | undefined,
-    ids: { readonly threadId: ThreadId.ThreadId; readonly messageId: ThreadMessageId.ThreadMessageId }
-  ) {
-    if (key === undefined) return Option.none<Thread.Started>()
+  /** What an earlier attempt of this request created, so a retry returns it; None otherwise. */
+  const findRetriedStart = Effect.fnUntraced(function* (ids: {
+    readonly threadId: ThreadId.ThreadId
+    readonly messageId: ThreadMessageId.ThreadMessageId
+  }) {
     const thread = yield* threadStore.get(ids.threadId)
     if (Option.isNone(thread)) return Option.none<Thread.Started>()
     const message = yield* threadMessageStore.get(ids.messageId)
@@ -343,7 +331,7 @@ export const make = Effect.gen(function* () {
   })
 
   const startDirect = Effect.fn("ThreadService.startDirect")(
-    function* (input: Thread.StartDirectInput, options: Request.Options = {}) {
+    function* (input: Thread.StartDirectInput) {
       const request = yield* Schema.decodeEffect(Thread.StartDirectInput)(input)
       yield* authorization.require([])
       const actor = yield* Actor.Actor
@@ -360,8 +348,8 @@ export const make = Effect.gen(function* () {
       yield* authorization.require([
         Requirement.make(ThreadPermissions.Start, Target.Reference.cases.Group.make({ workspaceId, groupId: group.id }))
       ])
-      const ids = yield* deriveStartIds("thread.start-direct", options.requestKey)
-      const retried = yield* findRetriedStart(options.requestKey, ids)
+      const ids = yield* startIds(group.id)
+      const retried = yield* findRetriedStart(ids)
       if (Option.isSome(retried)) return retried.value
       const eligible = yield* threadQuery.eligibleMembers(group.id, memberIds)
       // Creating the group gives its agents a place in all of its threads, as making an agent
@@ -376,7 +364,7 @@ export const make = Effect.gen(function* () {
   )
 
   const startInGroup = Effect.fn("ThreadService.startInGroup")(
-    function* (input: Thread.StartInGroupInput, options: Request.Options = {}) {
+    function* (input: Thread.StartInGroupInput) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input)
       yield* groupQuery.requireAudience(request.groupId)
       yield* authorization.require([
@@ -388,8 +376,8 @@ export const make = Effect.gen(function* () {
       const actor = yield* Actor.Actor
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
-      const ids = yield* deriveStartIds("thread.start", options.requestKey)
-      const retried = yield* findRetriedStart(options.requestKey, ids)
+      const ids = yield* startIds(request.groupId)
+      const retried = yield* findRetriedStart(ids)
       if (Option.isSome(retried)) return retried.value
       const foundGroup = yield* groupStore.get(request.groupId)
       if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing")

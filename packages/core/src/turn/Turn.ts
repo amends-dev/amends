@@ -9,6 +9,7 @@
  */
 
 import { Entry as LogEntry } from "@amends-dev/log"
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
 import * as Agent from "../agent/Agent.ts"
@@ -17,6 +18,7 @@ import * as Requirement from "../authorization/Requirement.ts"
 import * as Target from "../authorization/Target.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Request from "../request/Request.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
@@ -299,3 +301,21 @@ export const LogMessage = Schema.TaggedUnion({
  * @since 0.1.0
  */
 export type LogMessage = typeof LogMessage.Type
+
+/**
+ * The ID of a turn a job accepts work into, as `Request.newId` gives it outside a request: new.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = Effect.map(Request.newId("turn", []), (id) => TurnId.TurnId.make(id))
+
+/**
+ * The ID of the turn that retries `turnId`: derived from it, since a turn is retried at most once,
+ * so asking again names the retry the first ask created.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const retryId = (workspaceId: WorkspaceId.WorkspaceId, turnId: TurnId.TurnId) =>
+  Effect.map(Request.derivedId(["turn.retry", workspaceId, turnId]), (id) => TurnId.TurnId.make(id))

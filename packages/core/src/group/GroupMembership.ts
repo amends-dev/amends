@@ -9,7 +9,9 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as GroupId from "./GroupId.ts"
@@ -166,3 +168,13 @@ export const Removal = Schema.Struct({
  * @since 0.1.0
  */
 export interface Removal extends Schema.Schema.Type<typeof Removal> {}
+
+/**
+ * The ID of the membership the current request admits `memberId` to a group with, as
+ * `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
+  Effect.map(Request.newId("group-membership", [groupId, memberId]), (id) => GroupMembershipId.make(id))

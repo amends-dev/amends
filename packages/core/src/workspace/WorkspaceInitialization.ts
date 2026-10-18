@@ -24,8 +24,8 @@ import * as Identity from "../identity/Identity.ts"
 import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
+import * as Member from "./Member.ts"
 import * as MemberFacts from "./MemberFacts.ts"
-import * as MemberId from "./MemberId.ts"
 import * as Workspace from "./Workspace.ts"
 import * as WorkspaceFacts from "./WorkspaceFacts.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
@@ -78,7 +78,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   return yield* journal.commit(
     Effect.gen(function* () {
       if (Option.isSome(yield* workspaceStore.get)) return yield* new AlreadyInitialized({ workspaceId })
-      const ownerMemberId = MemberId.MemberId.make(yield* crypto.randomUUIDv4())
+      const ownerMemberId = yield* Member.newId.pipe(Effect.provideService(Crypto.Crypto, crypto))
       const record = Workspace.Workspace.make({
         id: workspaceId,
         name,

@@ -12,9 +12,11 @@
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { ModelEndpoint } from "@amends-dev/harness"
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Role from "../authorization/Role.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Request from "../request/Request.ts"
 import * as Text from "../text/Text.ts"
 import * as Member from "../workspace/Member.ts"
 import * as MemberId from "../workspace/MemberId.ts"
@@ -374,3 +376,11 @@ export const view = (
   createdBy: record.createdBy,
   createdAt: record.createdAt
 })
+
+/**
+ * The ID of the agent the current request creates, as `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = Effect.map(Request.newId("agent", []), (id) => Identity.AgentId.make(id))

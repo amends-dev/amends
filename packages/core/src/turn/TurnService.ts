@@ -33,7 +33,6 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Request from "../request/Request.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts"
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
@@ -416,7 +415,7 @@ export const make = Effect.gen(function* () {
       yield* authorization.require([Turn.directRequirement(turn)])
       // A turn is retried at most once, since its retry supersedes it, so the retry's ID comes from
       // the turn it retries and asking again returns that retry.
-      const retryId = TurnId.TurnId.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]))
+      const retryId = yield* Turn.retryId(workspaceId, turn.id)
       if (Option.isSome(yield* turnStore.get(retryId))) return yield* toView(yield* requireReadableTurn(retryId))
       const reason = yield* whyNotRetryable(turn)
       if (reason !== undefined)

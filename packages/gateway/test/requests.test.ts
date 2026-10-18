@@ -1,8 +1,8 @@
 import { CoreError } from "@amends-dev/core/error"
-import { GroupService, GroupMembershipService } from "@amends-dev/core/group"
+import { Group, GroupMembership, GroupService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Request } from "@amends-dev/core/request"
-import { ThreadService, ThreadMessageService } from "@amends-dev/core/thread"
+import { Thread, ThreadMessage, ThreadService, ThreadMessageService } from "@amends-dev/core/thread"
 import { InvitationService, Member, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import type { Storage } from "@amends-dev/gateway/conformance"
@@ -23,7 +23,10 @@ const other = memberActor("other")
 const key = Request.Key.make("request-1")
 const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 })
 
-/** Request keys: a retry of a creating request returns what its first attempt created. */
+/**
+ * Request keys: a retry of a creating request returns what its first attempt created, and the IDs
+ * of what a request creates are those its sender computes.
+ */
 const { core, initialized, seed, gateway } = Support
 
 /** A workspace with its owner and another viewer, both in one team group. */
@@ -50,10 +53,10 @@ const world = (storage: Storage) =>
         })
       )
     )
-    const start = (text: string, options: Request.Options = { requestKey: key }) =>
+    const start = (text: string, requestKey: Request.Key = key) =>
       Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-        threadService.startInGroup({ groupId: group.id, text, mentions: [] }, options)
-      )
+        threadService.startInGroup({ groupId: group.id, text, mentions: [] })
+      ).pipe(Request.withKey(requestKey))
     return { storage, bound, owner, group, services, as, start }
   })
 
@@ -69,7 +72,12 @@ describe("request keys", () => {
         expect(yield* history(bound)).toEqual(before)
         expect(yield* bound.threads.listByGroup(first.thread.groupId)).toHaveLength(1)
         // Without a key, the same call creates another thread.
-        const unkeyed = yield* as(owner, start("Hello", {}))
+        const unkeyed = yield* as(
+          owner,
+          Effect.flatMap(ThreadService.ThreadService, (threadService) =>
+            threadService.startInGroup({ groupId: first.thread.groupId, text: "Hello", mentions: [] })
+          )
+        )
         expect(unkeyed.thread.id).not.toBe(first.thread.id)
       })
     )
@@ -85,8 +93,8 @@ describe("request keys", () => {
         expect(yield* history(bound)).toEqual(before)
         const direct = (text: string) =>
           Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-            threadService.startDirect({ memberIds: [other.memberId], text, mentions: [] }, { requestKey: key })
-          )
+            threadService.startDirect({ memberIds: [other.memberId], text, mentions: [] })
+          ).pipe(Request.withKey(Request.Key.make("request-direct")))
         const opened = yield* as(owner, direct("Hi"))
         const afterDirect = yield* history(bound)
         expect(yield* as(owner, direct("Bye"))).toEqual(opened)
@@ -95,21 +103,50 @@ describe("request keys", () => {
     )
   )
 
-  it.effect("keys belong to their member and their operation", () =>
+  it.effect("keys belong to their member", () =>
     withStorage((storage) =>
       Effect.gen(function* () {
         const { owner, as, start } = yield* world(storage)
         const mine = yield* as(owner, start("Hello"))
         const theirs = yield* as(other, start("Hello"))
         expect(theirs.thread.id).not.toBe(mine.thread.id)
-        // The same key names a different request for another operation.
-        const reply = yield* as(
+      })
+    )
+  )
+
+  it.effect("what a request creates takes the IDs its sender computes for it", () =>
+    withStorage((storage) =>
+      Effect.gen(function* () {
+        const { bound, owner, group, as, start } = yield* world(storage)
+        /** The IDs `program` computes as the owner's request `requestKey`, as a browser computes them. */
+        const computed = <A, E, R>(requestKey: Request.Key, program: Effect.Effect<A, E, R>) =>
+          as(owner, program.pipe(Request.withKey(requestKey)))
+        const started = yield* as(owner, start("Hello"))
+        expect(started.thread.id).toBe(yield* computed(key, Thread.newId(group.id)))
+        expect(started.message.id).toBe(yield* computed(key, ThreadMessage.newId(started.thread.id)))
+        const team = Request.Key.make("request-team")
+        const created = yield* as(
           owner,
-          Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-            threadMessageService.publish({ threadId: mine.thread.id, text: "Hello", mentions: [] }, { requestKey: key })
-          )
+          Effect.flatMap(GroupService.GroupService, (groupService) =>
+            groupService.createTeam({ name: "Second", memberIds: [owner.memberId, other.memberId] })
+          ).pipe(Request.withKey(team))
         )
-        expect(reply.id).not.toBe(mine.message.id)
+        expect(created.id).toBe(yield* computed(team, Group.newId))
+        for (const memberId of [owner.memberId, other.memberId])
+          expect(Option.getOrThrow(yield* bound.groupMemberships.findActive(created.id, memberId)).id).toBe(
+            yield* computed(team, GroupMembership.newId(created.id, memberId))
+          )
+        // A direct group's ID comes from its members, whoever starts it and whatever the key.
+        const direct = yield* as(
+          other,
+          Effect.flatMap(ThreadService.ThreadService, (threadService) =>
+            threadService.startDirect({ memberIds: [owner.memberId], text: "Hi", mentions: [] })
+          ).pipe(Request.withKey(Request.Key.make("request-direct")))
+        )
+        expect(direct.thread.groupId).toBe(
+          yield* as(owner, Group.directId(workspaceId, [other.memberId, owner.memberId]))
+        )
+        expect(direct.thread.groupId).not.toBe(group.id)
       })
     )
   )
@@ -182,26 +219,24 @@ describe("request keys", () => {
         const requestKey = Request.Key.make("request-2")
         yield* twice(
           Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-            threadMessageService.publish({ threadId: started.thread.id, text: "Reply", mentions: [] }, { requestKey })
-          )
+            threadMessageService.publish({ threadId: started.thread.id, text: "Reply", mentions: [] })
+          ).pipe(Request.withKey(requestKey))
         )
         yield* twice(
           Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-            threadService.startDirect({ memberIds: [other.memberId], text: "Hi", mentions: [] }, { requestKey })
-          )
+            threadService.startDirect({ memberIds: [other.memberId], text: "Hi", mentions: [] })
+          ).pipe(Request.withKey(requestKey))
         )
         yield* twice(
           Effect.flatMap(GroupService.GroupService, (groupService) =>
-            groupService.createTeam({ name: "Second", memberIds: [] }, { requestKey })
-          )
+            groupService.createTeam({ name: "Second", memberIds: [] })
+          ).pipe(Request.withKey(requestKey))
         )
         const expiresAt = yield* future
         yield* twice(
           Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-            invitationService.issue(request(expiresAt, Identity.HumanId.make("carol")), {
-              requestKey
-            })
-          )
+            invitationService.issue(request(expiresAt, Identity.HumanId.make("carol")))
+          ).pipe(Request.withKey(requestKey))
         )
       })
     )
@@ -213,8 +248,8 @@ describe("request keys", () => {
         const { bound, owner, as } = yield* world(storage)
         const create = (name: string) =>
           Effect.flatMap(GroupService.GroupService, (groupService) =>
-            groupService.createTeam({ name, memberIds: [] }, { requestKey: key })
-          )
+            groupService.createTeam({ name, memberIds: [] })
+          ).pipe(Request.withKey(key))
         const first = yield* as(owner, create("Second"))
         const before = yield* history(bound)
         expect(yield* as(owner, create("Different"))).toEqual(first)
@@ -229,7 +264,7 @@ describe("request keys", () => {
         const host = yield* storage.connect()
         const create = (name: string, creator = alice.id) =>
           Effect.flatMap(Gateway.Gateway, (gateway) =>
-            gateway.createWorkspace(creator, { name, memberName: Member.Name.make(creator) }, { requestKey: key })
+            gateway.createWorkspace(creator, { name, memberName: Member.Name.make(creator) }, key)
           ).pipe(Effect.provide(gateway(host)))
         const first = yield* create("Studio")
         expect(yield* create("Studio")).toEqual(first)
@@ -241,7 +276,7 @@ describe("request keys", () => {
         const elsewhere = yield* storage.connect()
         expect(
           yield* Effect.flatMap(Gateway.Gateway, (gateway) =>
-            gateway.createWorkspace(alice.id, { name: "Studio", memberName: "alice" }, { requestKey: key })
+            gateway.createWorkspace(alice.id, { name: "Studio", memberName: "alice" }, key)
           ).pipe(Effect.provide(gateway(elsewhere)))
         ).toEqual(first)
       })

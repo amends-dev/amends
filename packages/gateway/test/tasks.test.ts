@@ -107,11 +107,11 @@ describe("tasks", () => {
   const start = (
     input: Omit<Thread.StartInGroupInput, "text" | "mentions"> &
       Partial<Pick<Thread.StartInGroupInput, "text" | "mentions">>,
-    options?: { readonly requestKey: Request.Key }
+    requestKey?: Request.Key
   ) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-      threadService.startInGroup({ text: "Ship it", mentions: [], ...input }, options)
-    )
+      threadService.startInGroup({ text: "Ship it", mentions: [], ...input })
+    ).pipe(Request.withKey(requestKey))
   const taskOf = (threadId: ThreadId.ThreadId) =>
     Effect.flatMap(TaskService.TaskService, (taskService) => taskService.get(threadId))
   const createTask = (input: Task.CreateInput) =>
@@ -235,8 +235,8 @@ describe("tasks", () => {
           // A keyed start names the same thread and task on its retry.
           yield* TestClock.adjust("1 second")
           const key = Request.Key.make("task-1")
-          const first = yield* run(bound, owner, start({ groupId: group.id, task: {} }, { requestKey: key }))
-          expect(yield* run(bound, owner, start({ groupId: group.id, task: {} }, { requestKey: key }))).toEqual(first)
+          const first = yield* run(bound, owner, start({ groupId: group.id, task: {} }, key))
+          expect(yield* run(bound, owner, start({ groupId: group.id, task: {} }, key))).toEqual(first)
           // Lists carry each thread's task, and the group's tasks list by creation and status.
           const listed = yield* run(
             bound,

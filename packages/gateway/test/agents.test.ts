@@ -575,9 +575,9 @@ describe("agents", () => {
           Effect.gen(function* () {
             const { workspace, connections } = yield* workspaceWithConnections
             const bound = yield* boundTo(workspace.id)
-            const options = { requestKey: Request.Key.make("create-reviewer") }
+            const key = Request.Key.make("create-reviewer")
             const create = (input: Agent.CreateInput) =>
-              as(workspace.id, alice, (agentService) => agentService.create(input, options))
+              as(workspace.id, alice, (agentService) => agentService.create(input).pipe(Request.withKey(key)))
             const first = yield* create(reviewer(connections))
             expect(yield* create(reviewer(connections))).toEqual(first)
             // The key alone names the request: reused with another body, it returns the first.

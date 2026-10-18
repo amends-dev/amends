@@ -58,7 +58,7 @@ import * as Turn from "./Turn.ts"
 import * as TurnActivity from "./TurnActivity.ts"
 import * as TurnCommand from "./TurnCommand.ts"
 import * as TurnFacts from "./TurnFacts.ts"
-import * as TurnId from "./TurnId.ts"
+import type * as TurnId from "./TurnId.ts"
 import * as TurnPrompt from "./TurnPrompt.ts"
 import * as TurnStore from "./TurnStore.ts"
 
@@ -493,7 +493,7 @@ export const make = Effect.gen(function* () {
     const notificationIds = accepted.map(({ id }) => id)
     if (!Array.isReadonlyArrayNonEmpty(notificationIds)) return undefined
     const created = Turn.queued({
-      id: TurnId.TurnId.make(yield* crypto.randomUUIDv4()),
+      id: yield* Turn.newId.pipe(Effect.provideService(Crypto.Crypto, crypto)),
       workspaceId,
       groupId: thread.value.groupId,
       threadId,
@@ -727,7 +727,7 @@ export const make = Effect.gen(function* () {
         const text = Schema.decodeOption(ThreadMessage.Text)(reply)
         if (Option.isNone(text)) return yield* closeFailed(turn, "The agent's reply could not be posted.")
         const published = yield* threadCommand.publishMessage({
-          messageId: ThreadMessageId.ThreadMessageId.make(yield* crypto.randomUUIDv4()),
+          messageId: yield* ThreadMessage.newId(turn.threadId).pipe(Effect.provideService(Crypto.Crypto, crypto)),
           threadId: turn.threadId,
           author: ThreadMessage.Author.cases.Member.make({ memberId: turn.memberId }),
           text: text.value,

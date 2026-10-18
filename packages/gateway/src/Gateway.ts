@@ -50,12 +50,14 @@ export class Gateway extends Context.Service<
   {
     /**
      * Allocate a workspace ID and run core initialization for its creator. The
-     * caller has authenticated the creator and checked their entitlement.
+     * caller has authenticated the creator and checked their entitlement. With a request key, the
+     * creator's retry returns the workspace its first attempt created. The key is given here rather
+     * than as `Request.Current`, since the creator is no member of any workspace yet.
      */
     readonly createWorkspace: (
       creator: Identity.HumanId,
       input: Workspace.CreateInput,
-      options?: Request.Options
+      requestKey?: Request.Key
     ) => Effect.Effect<Workspace.Workspace, CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain>
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
@@ -224,9 +226,8 @@ export const make = Effect.fnUntraced(function* (
   const createWorkspace: Gateway["Service"]["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(function* (
     creator: Identity.HumanId,
     input: Workspace.CreateInput,
-    options: Request.Options = {}
+    key?: Request.Key
   ) {
-    const key = options.requestKey
     const id =
       key === undefined
         ? WorkspaceId.WorkspaceId.make(yield* Effect.orDie(crypto.randomUUIDv4()))

@@ -109,12 +109,17 @@ only for the log's other writers; see
 
 ### Request keys
 
-`@amends-dev/core/request` holds `Request.Key`, the `Request.Options` creating operations accept,
-`Request.derivedId`, which derives an ID from an operation, its requester, and a key, and
-`Request.idFor`, a new ID without a key or a derived one with it. Each creating operation names what
-it creates that way, so a retry runs the operation's checks, finds the record by its ID, and returns
-it instead of creating another. The key alone names the request: a retry gets what the key created,
-whatever it asks for. A turn retry derives its turn's ID from the turn it retries. See
+`@amends-dev/core/request` holds `Request.Key`, which names one request of one member, and
+`Request.Current`, the request being run, which a protocol provides around the operation with
+`Request.withKey`. Every record an operation creates takes its ID from its record module's `newId`,
+such as `Thread.newId` or `GroupMembership.newId(groupId, memberId)`, through `Request.newId`: within
+a request, derived from the request, the record's kind, and what tells it apart there; outside one,
+new. A creating operation finds its record by that ID before it creates anything, so a retry runs
+the operation's checks and returns what its first attempt created, whatever it asks for, and a
+browser that wrote the request computes the same IDs with the same functions. A key names one
+request: sent with another, it finds what the first created where their records coincide. A record
+with an identity of its own derives its ID from that with `Request.derivedId`: a direct group from
+its members (`Group.directId`), and a turn's retry from the turn (`Turn.retryId`). See
 [retrying safely](../../docs/thread-workflows.md#retrying-safely).
 
 ### Errors by kind

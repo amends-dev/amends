@@ -431,9 +431,9 @@ describe("connections", () => {
         storage,
         Effect.gen(function* () {
           const workspace = yield* Operations.createWorkspace(alice.id)
-          const options = { requestKey: Request.Key.make("create-models") }
+          const key = Request.Key.make("create-models")
           const create = (input: Connection.CreateInput) =>
-            as(workspace.id, alice, (connectionService) => connectionService.create(input, options))
+            as(workspace.id, alice, (connectionService) => connectionService.create(input).pipe(Request.withKey(key)))
           const first = yield* create(models)
           expect(yield* create(models)).toEqual(first)
           // The key alone names the request: reused with another body, it returns the first.

@@ -9,6 +9,7 @@
  */
 
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel"
+import { Request } from "@amends-dev/core/request"
 import { Gateway } from "@amends-dev/gateway"
 import * as Effect from "effect/Effect"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
@@ -26,8 +27,8 @@ export const layerChannels = HttpApiBuilder.group(Api.Api, "channels", (handlers
   handlers.handleAll({
     list: () => ChannelService.ChannelService.use((channelService) => channelService.list),
     create: ({ headers, payload }) =>
-      ChannelService.ChannelService.use((channelService) =>
-        channelService.create(payload, { requestKey: headers["idempotency-key"] })
+      ChannelService.ChannelService.use((channelService) => channelService.create(payload)).pipe(
+        Request.withKey(headers["idempotency-key"])
       ),
     get: ({ params }) => ChannelService.ChannelService.use((channelService) => channelService.get(params.channelId)),
     redirect: ({ params, payload }) =>

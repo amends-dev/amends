@@ -7,10 +7,12 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as GroupMembership from "../group/GroupMembership.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Notification from "../notification/Notification.ts"
+import * as Request from "../request/Request.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadId from "./ThreadId.ts"
@@ -254,3 +256,23 @@ export const EndReason = Schema.Literals(["unfollowed", "group-left", "group-rem
  * @since 0.1.0
  */
 export type EndReason = typeof EndReason.Type
+
+/**
+ * The ID of the participation the current request gives `participant` in a thread, as
+ * `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = (threadId: ThreadId.ThreadId, participant: Reference) =>
+  Effect.map(
+    Request.newId("thread-participation", [
+      threadId,
+      Reference.match(participant, {
+        Member: ({ memberId }) => `member:${memberId}`,
+        Contact: ({ contactId }) => `contact:${contactId}`,
+        Triage: () => "triage"
+      })
+    ]),
+    (id) => ThreadParticipationId.ThreadParticipationId.make(id)
+  )

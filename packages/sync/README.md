@@ -29,8 +29,10 @@ invitation, and anything that carries a secret, such as a connection's API key.
 ## Encoding
 
 An event's payload travels in eventlog's binary encoding, which writes strings as UTF-8: a string
-holding a lone UTF-16 surrogate comes back with U+FFFD in its place. The tests check that every
-other payload each event accepts comes back unchanged.
+holding a lone UTF-16 surrogate comes back with U+FFFD in its place. Text people enter already
+refuses one, through core's `Text.isStorable` and `Text.isName`, so only an identifier or a key
+could hold one, and no record has such an identifier. The tests check that every other payload
+each event accepts comes back unchanged.
 
 ## Imports
 

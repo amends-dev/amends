@@ -7,8 +7,10 @@
  * @since 0.1.0
  */
 
+import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Identity from "../identity/Identity.ts"
+import * as Request from "../request/Request.ts"
 import * as Text from "../text/Text.ts"
 import * as MemberId from "./MemberId.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
@@ -74,3 +76,11 @@ export const Member = Schema.Struct({
  * @since 0.1.0
  */
 export interface Member extends Schema.Schema.Type<typeof Member> {}
+
+/**
+ * The ID of the member the current request adds, as `Request.newId` derives it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const newId = Effect.map(Request.newId("member", []), (id) => MemberId.MemberId.make(id))

@@ -26,7 +26,6 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
-import * as Request from "../request/Request.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
@@ -92,10 +91,10 @@ export class ThreadMessageService extends Context.Service<
     /**
      * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
      * Mentioned agents need the author's agent-use authority; agents already taking part do not.
+     * Within a request, a retry returns the message its first attempt published.
      */
     readonly publish: (
-      input: ThreadMessage.PublishInput,
-      options?: Request.Options
+      input: ThreadMessage.PublishInput
     ) => Effect.Effect<ThreadMessage.ThreadMessage, Error, Actor.Actor>
     /**
      * Replace the text and mentions of a message the actor wrote, at its next revision, under
@@ -152,17 +151,6 @@ export const make = Effect.gen(function* () {
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
   const workspaceId = yield* WorkspaceId.CurrentWorkspaceId
-  /**
-   * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
-   * from its author and key, so a retry names the message its first attempt published.
-   */
-  const deriveReplyId = Effect.fnUntraced(function* (key: Request.Key | undefined) {
-    const actor = yield* Actor.Actor
-    return ThreadMessageId.ThreadMessageId.make(
-      yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId])
-    )
-  })
-
   /** The thread, once the actor may read it and publish there. */
   const requirePublishable = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* threadQuery.requireAccess(threadId)
@@ -174,10 +162,6 @@ export const make = Effect.gen(function* () {
     ])
     return thread
   })
-
-  /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
-  const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessageId.ThreadMessageId) =>
-    key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId)
 
   /**
    * A message and its thread, once the actor may act in that thread; to anyone outside its group,
@@ -205,14 +189,15 @@ export const make = Effect.gen(function* () {
   const sameMentions = (left: ReadonlyArray<MemberId.MemberId>, right: ReadonlyArray<MemberId.MemberId>) =>
     left.length === right.length && left.every((memberId) => right.includes(memberId))
   const publish = Effect.fn("ThreadMessageService.publish")(
-    function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
+    function* (input: ThreadMessage.PublishInput) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input)
       const thread = yield* requirePublishable(request.threadId)
       const actor = yield* Actor.Actor
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })
-      const messageId = yield* deriveReplyId(options.requestKey)
-      const retried = yield* findRetriedReply(options.requestKey, messageId)
+      // A retry returns the message its first attempt published.
+      const messageId = yield* ThreadMessage.newId(thread.id)
+      const retried = yield* threadMessageStore.get(messageId)
       if (Option.isSome(retried)) return retried.value
       // Without mentions a reply addresses every current participant; with them, only the
       // author and those mentioned are read.

@@ -30,7 +30,6 @@ import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Request from "../request/Request.ts"
 import type * as Member from "../workspace/Member.ts"
 import * as MemberCommand from "../workspace/MemberCommand.ts"
 import * as MemberFacts from "../workspace/MemberFacts.ts"
@@ -132,12 +131,10 @@ export class AgentService extends Context.Service<
      * Add an agent: a membership, with its name and the role it starts with, which the actor must be
      * able to grant, and how it is set up. The actor must be able to read and use each connection
      * the setup names, and an agent set up so must be able to run, except that one on `Auto` may
-     * have no harness to choose yet.
+     * have no harness to choose yet. Within a request, a retry returns the agent its first attempt
+     * created.
      */
-    readonly create: (
-      input: Agent.CreateInput,
-      options?: Request.Options
-    ) => Effect.Effect<Agent.View, CreateError, Actor.Actor>
+    readonly create: (input: Agent.CreateInput) => Effect.Effect<Agent.View, CreateError, Actor.Actor>
     /** Replace how the agent is set up, as a whole, checked as creating checks it. */
     readonly configure: (input: Agent.ConfigureInput) => Effect.Effect<Agent.View, ConfigureError, Actor.Actor>
     /** Rename its membership; a rename made meanwhile is rejected. */
@@ -286,18 +283,16 @@ export const make = Effect.gen(function* () {
   }, Operation.report)
 
   const create = Effect.fn("AgentService.create")(
-    function* (input: Agent.CreateInput, options: Request.Options = {}) {
+    function* (input: Agent.CreateInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Agent.CreateInput))(input)
       yield* authorization.require([
         Requirement.make(AgentPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
       ])
       yield* delegation.requireGrant(request.roleId)
       const actor = yield* Actor.Actor
-      const agentId = Identity.AgentId.make(
-        yield* Request.idFor(options.requestKey, ["agent.create", workspaceId, actor.memberId])
-      )
+      const agentId = yield* Agent.newId
       // A retry returns the agent its first attempt created, unless its membership ended since.
-      if (options.requestKey !== undefined && Option.isSome(yield* agentStore.get(agentId))) {
+      if (Option.isSome(yield* agentStore.get(agentId))) {
         const { record, name } = yield* requireActiveAgent(agentId)
         return yield* viewForActor(record, name)
       }
