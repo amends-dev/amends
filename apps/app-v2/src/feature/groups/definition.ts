@@ -2,7 +2,7 @@
  * The groups the person can see in a workspace, as a list to pick one from: the teams they belong
  * to by name and their conversations by the other members in them, then the public teams they may
  * join; and where they start a team, or a conversation with another member. It reports the group
- * the person picks.
+ * the person picks, and its parent tells it which group is open.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -48,6 +48,7 @@ export const Message = defineMessageUnion({
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },
   FailedRead: { error: Schema.String },
   ClickedGroup: { groupId: GroupId.GroupId },
+  InformedOfOpenGroup: { groupId: Schema.Option(GroupId.GroupId) },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
   ToggledTeamPublic: { isPublic: Schema.Boolean },

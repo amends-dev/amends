@@ -41,6 +41,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
             model: modifyFields(model, { selected: () => Option.some(groupId) }),
             outMessage: OutMessage.SelectedGroup({ groupId })
           },
+    InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
     ClickedNewTeam: () => ({
       model: modifyFields(model, { starting: () => Option.some(Starting.Team({ name: "", isPublic: false })) })
     }),

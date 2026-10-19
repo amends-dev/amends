@@ -29,7 +29,7 @@ const announcements = Schema.decodeSync(Group.Group)({
   createdAt: "2026-10-18T12:00:00Z"
 })
 
-const opened = init(workspace.id, member.id, design.id).model
+const opened = init(workspace.id, member.id, design.id, Option.none()).model
 const inDesign = { workspaceId: workspace.id, memberId: member.id, groupId: design.id }
 
 /** The team read, with alice and bob admitted. */
@@ -104,7 +104,7 @@ describe("a group", () => {
     const groupId = GroupId.GroupId.make(announcements.id)
     story(
       update,
-      given(init(workspace.id, member.id, groupId).model),
+      given(init(workspace.id, member.id, groupId, Option.none()).model),
       message(
         Message.ReceivedGroup({
           group: Option.some({ group: announcements, pending: false }),
@@ -131,6 +131,22 @@ describe("a group", () => {
           Option.some([threadId, threadId])
         )
       }),
+      message(Message.ClickedAllThreads()),
+      model((model) => {
+        expect(model.thread).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("opens with the thread it is given, which reads its reply draft, and closes it", () => {
+    const withThread = init(workspace.id, member.id, design.id, Option.some(threadId))
+    expect(Option.map(withThread.model.thread, (open) => [open.threadId, open.model.threadId])).toEqual(
+      Option.some([threadId, threadId])
+    )
+    expect(withThread.commands?.map(({ name }) => name)).toContain('Thread["thread-1"]/reply/ReadDraft')
+    story(
+      update,
+      given(withThread.model),
       message(Message.ClickedAllThreads()),
       model((model) => {
         expect(model.thread).toEqual(Option.none())

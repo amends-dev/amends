@@ -7,7 +7,6 @@ import { GroupId } from "@amends-dev/core/group"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
-import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -55,15 +54,3 @@ export const OutMessage = defineMessageUnion({
 export type OutMessage = typeof OutMessage.Type
 
 export const ThreadsDefinition = Block.makeDefinition("Threads", { Model, Message, OutMessage, ChildInitContext })
-
-/** A thread as its group lists it: its title, or its opening message. */
-export const labelOf = ({ thread, opening }: Pick<ThreadItem, "thread" | "opening">) =>
-  thread.title ??
-  Option.match(opening, {
-    onNone: () => "A thread",
-    onSome: (message) =>
-      ThreadMessage.Content.match(message.content, {
-        Text: ({ text }) => text,
-        Deleted: () => "This message was deleted."
-      })
-  })

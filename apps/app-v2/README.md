@@ -6,12 +6,13 @@ sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, a
 offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
 pick one; a group's threads with how much of each is new, where they start a thread; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
-stop following it, which opening reads through its latest activity. A reply or a new thread they
-have not sent is kept as a draft in their browser, through a reload and offline, until they send
-it. While the host can be reached, a thread shows who else is typing in it. What they do shows at
-once, marked as sending, even offline, and what the server refuses comes back with why. The
-features the earlier program had beyond these return one Block at a time; [The
-program](#the-program) lists them.
+stop following it, which opening reads through its latest activity; and their inbox, the
+notifications waiting for them, each as the message it is about, to open, or to mark seen one at a
+time or all at once. A reply or a new thread they have not sent is kept as a draft in their
+browser, through a reload and offline, until they send it. While the host can be reached, a thread
+shows who else is typing in it. What they do shows at once, marked as sending, even offline, and
+what the server refuses comes back with why. The features the earlier program had beyond these
+return one Block at a time; [The program](#the-program) lists them.
 
 This cut runs on a Foldkit preview, the Blocks branch's canary build pinned in `package.json`,
 whose APIs its author says will change; upgrading it is a chore of its own. The root manifest's
@@ -68,12 +69,18 @@ the pages that compose them; the root composes the pages.
   being started, and how much is new, and a composer to start one. It reports the thread picked.
 - `feature/group`: a group as the person has it open: its name, their part in it, a team's members,
   its threads, and the thread open among them, a keyed occurrence, so opening another makes a fresh
-  one and a late result cannot land in the wrong one. They rename a team, follow it or stop, join a
-  public team or leave one, and, where they manage its members, admit and remove them.
+  one and a late result cannot land in the wrong one. It opens with a thread already open when its
+  parent gives one. They rename a team, follow it or stop, join a public team or leave one, and,
+  where they manage its members, admit and remove them.
 - `feature/groups`: the groups the person can see, the teams they belong to by name and their
   conversations by the other members in them, then the public teams they may join, to pick one
   from; and where they start a team, or a conversation with another member. It reports the group
-  picked.
+  picked, and its parent tells it which group is open, so the one marked is the one shown.
+- `feature/inbox`: the notifications waiting for the person, newest first, each as the message it is
+  about: who wrote the message its activity is about, and the thread it comes from, by its title or
+  opening message, in its group, as far as the store holds them. They open a notification's thread,
+  or mark one seen, or every one up to the newest that waits. It reports the thread opened, and
+  offers a count of what waits for its parent to show.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it.
 - `page/signIn`: signing in, a step at a time; it keeps the session a right code gives, and reports
@@ -81,7 +88,11 @@ the pages that compose them; the root composes the pages.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP; it reports the one
   picked.
 - `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
-  and the open group, a keyed occurrence. It reports when the person leaves it.
+  an "Inbox" button with how many notifications wait, and the main content, which shows one
+  destination: nothing yet, the inbox, which is always read, or the open group, a keyed occurrence.
+  Picking a group opens it; showing the inbox leaves no group marked in the list; opening a
+  notification's thread opens its group with the thread already open, and marks the group. It
+  reports when the person leaves it.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
   the one open. Signing in lists the workspaces; signing out, `command.ts`,
@@ -97,8 +108,8 @@ sign-in command keeps it, and no model carries the token. What no replica holds 
 the Block that needs it, `api.ts`: listing workspaces, saying the person types in a thread, and
 following a turn's log, which its Block's subscription reads while the log is followed.
 
-Features the earlier program had and this cut does not yet: the inbox, the workspace's settings,
-connections, agents, and channels. Each returns as a Block by the same template;
+Features the earlier program had and this cut does not yet: the workspace's settings, connections,
+agents, and channels. Each returns as a Block by the same template;
 `settingsForm.ts` and `agentSetup.ts` wait for the connections and agents features.
 
 ## The store
@@ -186,10 +197,13 @@ browser's storage. Each Block's tests sit beside it:
   the turn ends or the person hides it, passing over another turn's, and followed again after it
   could not be; a thread started from the composer and the thread picked; a composer filling in its draft only while nothing was written,
   keeping what is written, and sending it once; a group renamed from the name seen, followed, left,
-  or joined, a member admitted and an admission removed, and the thread picked opened and closed;
-  the groups starting a team or a conversation and reporting the group picked once; a workspace
-  opening the group picked; and the root signing in a step at a time, listing the workspaces,
-  opening and closing one, and signing out.
+  or joined, a member admitted and an admission removed, and the thread picked opened and closed, or
+  open already as the group opens; the groups starting a team or a conversation and reporting the
+  group picked once; the inbox listing what waits, newest first, reporting the thread of the
+  notification opened, marking one seen or all through the newest that waits, and why a write could
+  not be kept; a workspace opening the group picked, showing the inbox in its place with no group
+  marked, and opening a notification's thread in its group; and the root signing in a step at a
+  time, listing the workspaces, opening and closing one, and signing out.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
   on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
   line by someone who may not, and made by someone who may create tasks; a thread's turns by their
@@ -197,8 +211,10 @@ browser's storage. Each Block's tests sit beside it:
   otherwise, a turn's log followed as it is written, until the turn ends or it could not be
   followed, and the thread listing its agents' turns; a group's name, the person's part in it, its
   members with removing for the others, and joining in place of the threads of a team they do
-  not belong to; and the groups listed apart from the teams to join, with a new team taken only
-  from someone who may create one.
+  not belong to; the groups listed apart from the teams to join, with a new team taken only from
+  someone who may create one; the inbox's notifications by the message and thread they are about,
+  marked all seen, one seen with its failure shown, and one's thread opened; and a workspace
+  counting what waits beside "Inbox" whichever destination shows, then showing the inbox.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and

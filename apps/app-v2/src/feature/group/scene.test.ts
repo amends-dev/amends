@@ -23,7 +23,7 @@ const announcements = Schema.decodeSync(Group.Group)({
 })
 
 /** The team read, with alice and bob admitted, as a member who manages its members sees it. */
-const opened = modifyFields(init(workspace.id, member.id, design.id).model, {
+const opened = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
   group: () => Option.some({ group: design, pending: false }),
   memberships: () => [
     { membership: aliceInDesign, pending: false },
@@ -56,7 +56,7 @@ describe("a group", () => {
     scene(
       { update, view },
       given(
-        modifyFields(init(workspace.id, member.id, announcements.id).model, {
+        modifyFields(init(workspace.id, member.id, announcements.id, Option.none()).model, {
           group: () => Option.some({ group: announcements, pending: false }),
           members: () => [member, bob]
         })

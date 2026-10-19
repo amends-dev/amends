@@ -1,6 +1,7 @@
 import * as Layer from "effect/Layer"
 import { EffectsLayer } from "./command.ts"
 import { GroupsComposition } from "./composition.ts"
+import { Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -11,5 +12,6 @@ export const GroupsBlock = GroupsComposition.assembleBlock({
   update,
   view,
   subscriptions,
+  operations: { informOpenGroup: Message.InformedOfOpenGroup },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })

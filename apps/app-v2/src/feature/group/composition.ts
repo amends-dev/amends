@@ -6,16 +6,19 @@ import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
 import { GroupDefinition, type Model } from "./definition.ts"
 
+/** Open the thread `threadId` in the group. */
+export const openThread = (threadId: ThreadId.ThreadId) =>
+  GroupDefinition.step((model: Model) =>
+    ThreadBinding.init({
+      key: threadId,
+      args: [model.workspaceId, model.memberId, threadId],
+      toParentModel: (thread) => modifyFields(model, { thread: () => Option.some({ threadId, model: thread }) })
+    })
+  )
+
 /** Picking a thread opens it in the group. */
 const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
-  SelectedThread: ({ threadId }) =>
-    GroupDefinition.step((model: Model) =>
-      ThreadBinding.init({
-        key: threadId,
-        args: [model.workspaceId, model.memberId, threadId],
-        toParentModel: (thread) => modifyFields(model, { thread: () => Option.some({ threadId, model: thread }) })
-      })
-    )
+  SelectedThread: ({ threadId }) => openThread(threadId)
 })
 
 export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {

@@ -1,9 +1,9 @@
 import * as Button from "@foldkit/ui/button"
 import * as Option from "effect/Option"
 import { errorView, sending } from "../../controls.ts"
-import { statusLabel } from "../../seen.ts"
+import { statusLabel, threadLabel } from "../../seen.ts"
 import { ComposerBinding, ThreadsComposition } from "./composition.ts"
-import { labelOf, Message } from "./definition.ts"
+import { Message } from "./definition.ts"
 
 /** The group's threads, and the composer to start one. */
 export const view = ThreadsComposition.makeView((model, h) =>
@@ -23,7 +23,7 @@ export const view = ThreadsComposition.makeView((model, h) =>
                   Button.view(
                     {
                       onClick: Message.ClickedThread({ threadId: item.thread.id }),
-                      toView: (attributes) => h.button(attributes.button, [labelOf(item)])
+                      toView: (attributes) => h.button(attributes.button, [threadLabel(item.thread, item.opening)])
                     },
                     h
                   ),

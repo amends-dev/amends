@@ -1,12 +1,16 @@
 /**
- * What the person sees of the workspace's records: what a member and a group are called, whether
- * anyone may join a group, and how a task's status and priority and a turn's status read.
+ * What the person sees of the workspace's records: what a member and a group are called, who wrote
+ * a message and what it says, how a thread is titled, whether anyone may join a group, and how a
+ * task's status and priority and a turn's status read.
  */
 
+import type { Contact } from "@amends-dev/core/channel"
 import type { Group } from "@amends-dev/core/group"
 import type { Task } from "@amends-dev/core/task"
+import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
+import * as Option from "effect/Option"
 
 /** `memberId` by their name among `members`, or their ID until names are read. */
 export const memberName = (members: ReadonlyArray<Member.Member>, memberId: MemberId.MemberId): string =>
@@ -24,6 +28,25 @@ export const groupName = (
         .filter((id) => id !== self)
         .map((id) => memberName(members, id))
         .join(", ")
+
+/** Who wrote `message`, by their name here: a member's, or the name a channel's contact gave. */
+export const authorName = (
+  message: ThreadMessage.ThreadMessage,
+  members: ReadonlyArray<Member.Member>,
+  contacts: ReadonlyArray<Contact.Contact>
+): string =>
+  ThreadMessage.Author.match(message.author, {
+    Member: ({ memberId }) => members.find((member) => member.id === memberId)?.name ?? "Someone",
+    Contact: ({ contactId }) => contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
+  })
+
+/** What `message` says, or that it was deleted. */
+export const messageText = (message: ThreadMessage.ThreadMessage): string =>
+  ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => "This message was deleted." })
+
+/** A thread as the person reads it in a list: its title, or its opening message. */
+export const threadLabel = (thread: Thread.Thread, opening: Option.Option<ThreadMessage.ThreadMessage>): string =>
+  thread.title ?? Option.match(opening, { onNone: () => "A thread", onSome: messageText })
 
 /** Whether anyone in the workspace may join `group`: a public team. */
 export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"

@@ -2,18 +2,16 @@ import { ThreadMessage } from "@amends-dev/core/thread"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { button, errorView, field, sending, submit, textarea } from "../../controls.ts"
+import { authorName, messageText } from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
-import { authorName, Message, type MessageItem, type Model, typingIn } from "./definition.ts"
-
-const textOf = (message: ThreadMessage.ThreadMessage) =>
-  ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => "This message was deleted." })
+import { Message, type MessageItem, type Model, typingIn } from "./definition.ts"
 
 /** The thread's title, or its opening message, and the form to change it while the person renames it. */
 const titleView = (model: Model, h: ThreadViewBuilder): Html => {
   const title = Option.getOrElse(model.title, () =>
     Option.match(Option.fromUndefinedOr(model.messages.at(0)), {
       onNone: () => "A thread",
-      onSome: ({ message }) => textOf(message)
+      onSome: ({ message }) => messageText(message)
     })
   )
   return Option.match(model.renaming, {
@@ -72,7 +70,11 @@ const messageView = ({ message, pending }: MessageItem, model: Model, h: ThreadV
     [
       h.p(
         [],
-        [h.strong([], [authorName(model, message)]), sending(pending, h), edited ? h.span([], [" · edited"]) : h.empty]
+        [
+          h.strong([], [authorName(message, model.members, model.contacts)]),
+          sending(pending, h),
+          edited ? h.span([], [" · edited"]) : h.empty
+        ]
       ),
       Option.match(editing, {
         onSome: ({ draft }) =>
@@ -88,7 +90,7 @@ const messageView = ({ message, pending }: MessageItem, model: Model, h: ThreadV
           h.div(
             [],
             [
-              h.p([], [textOf(message)]),
+              h.p([], [messageText(message)]),
               ...(own && !pending
                 ? [
                     button(h, "Edit", Message.ClickedEdit({ messageId: message.id })),

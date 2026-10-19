@@ -111,13 +111,6 @@ export const textOf = (model: Model, messageId: ThreadMessageId.ThreadMessageId)
       })
   )
 
-/** Who wrote a message, by their name here: a member's, or the name a channel's contact gave. */
-export const authorName = (model: Model, message: ThreadMessage.ThreadMessage) =>
-  ThreadMessage.Author.match(message.author, {
-    Member: ({ memberId }) => model.members.find((member) => member.id === memberId)?.name ?? "Someone",
-    Contact: ({ contactId }) => model.contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
-  })
-
 /** Who other than the person types in the thread now, by their names here. */
 export const typingIn = (model: Model) =>
   model.present

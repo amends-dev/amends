@@ -1,7 +1,7 @@
 /**
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
- * actions, and the open group, with its threads and the thread open among them. It reports when
- * the person leaves it.
+ * actions, their inbox, and what the main content shows: nothing yet, the inbox, or a group, with
+ * its threads and the thread open among them. It reports when the person leaves it.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -9,13 +9,19 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { defineTaggedUnion } from "foldkit/schema"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
+import { InboxBlock } from "../../feature/inbox/block.ts"
 
-/** The group open in the workspace. */
-export const OpenGroup = Schema.Struct({ groupId: GroupId.GroupId, model: GroupBlock.Model })
-export type OpenGroup = typeof OpenGroup.Type
+/** What the main content shows: nothing yet, the inbox, or the group open in the workspace. */
+export const Open = defineTaggedUnion({
+  Nothing: {},
+  Inbox: {},
+  Group: { groupId: GroupId.GroupId, model: GroupBlock.Model }
+})
+export type Open = typeof Open.Type
 
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -23,15 +29,17 @@ export const Model = Schema.Struct({
   name: Schema.String,
   groups: GroupsBlock.Model,
   actions: ActionsBlock.Model,
-  group: Schema.Option(OpenGroup)
+  inbox: InboxBlock.Model,
+  open: Open
 })
 export type Model = typeof Model.Type
 
-/** What the groups and actions are made from: the workspace, as the member. */
+/** What the groups, actions, and inbox are made from: the workspace, as the member. */
 export const ChildInitContext = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId })
 
 export const Message = defineMessageUnion({
-  ClickedAllWorkspaces: {}
+  ClickedAllWorkspaces: {},
+  ClickedInbox: {}
 })
 export type Message = typeof Message.Type
 
