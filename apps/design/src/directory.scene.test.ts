@@ -110,6 +110,20 @@ describe("columns", () => {
       expect(text("Members")).toHaveClass("w-32")
     )
   })
+
+  it("narrows its cell columns and the room for an action with a row's, below 64rem", () => {
+    scene(
+      { update, view },
+      given(initial),
+      expect(text("Visibility")).toHaveClass("max-desktop:w-24"),
+      expect(text("Members")).toHaveClass("max-desktop:w-24"),
+      expect(within(selector('[aria-hidden="true"]'), selector("span.w-24"))).toHaveClass("max-desktop:w-20")
+    )
+  })
+
+  it("is not shown below 48rem, where a row's cells fold under its title", () => {
+    scene({ update, view }, given(initial), expect(selector('[aria-hidden="true"]')).toHaveClass("max-tablet:hidden"))
+  })
 })
 
 describe("row with cells", () => {
@@ -152,12 +166,26 @@ describe("row with cells", () => {
     )
   })
 
-  it("keeps each cell in a column of its own, hidden from assistive technology", () => {
+  const cellsOf = (title: string) => within(role("button", { name: title }), selector(".contents"))
+
+  const firstCellOf = (title: string) => within(role("button", { name: title }), selector("span.w-32"))
+
+  it("keeps its cells in one element hidden from assistive technology, each in a column of its own", () => {
     scene(
       { update, view: viewOf(rows) },
       given(initial),
-      expect(within(role("button", { name: "design" }), selector("span.w-32"))).toExist(),
-      expect(within(role("button", { name: "design" }), selector("span.w-32"))).toHaveAttr("aria-hidden", "true")
+      expect(cellsOf("design")).toHaveAttr("aria-hidden", "true"),
+      expect(cellsOf("design")).toHaveText("Public12 members"),
+      expect(firstCellOf("design")).toHaveClass("w-32")
+    )
+  })
+
+  it("narrows its columns and the room for its action below 64rem", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(firstCellOf("design")).toHaveClass("max-desktop:w-24"),
+      expect(within(role("button", { name: "design" }), text("Open →"))).toHaveClass("max-desktop:w-20")
     )
   })
 
@@ -168,6 +196,37 @@ describe("row with cells", () => {
       expect(within(role("button", { name: "design" }), text("Open →"))).toHaveClass("w-24"),
       expect(within(role("button", { name: "product" }), selector("span.w-24"))).toExist(),
       expect(within(role("button", { name: "Northstar" }), text("Open →"))).not.toHaveClass("w-24")
+    )
+  })
+
+  it("folds below 48rem: its cells wrap under the title on a line of their own, as wide as each is", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "design" })).toHaveClass("max-tablet:flex-wrap"),
+      expect(cellsOf("design")).toHaveClass("max-tablet:basis-full"),
+      expect(cellsOf("design")).toHaveClass("max-tablet:flex-wrap"),
+      expect(cellsOf("design")).toHaveClass("max-tablet:gap-2"),
+      expect(firstCellOf("design")).toHaveClass("max-tablet:w-auto")
+    )
+  })
+
+  it("does not show its action below 48rem, with or without one", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(within(role("button", { name: "design" }), text("Open →"))).toHaveClass("max-tablet:hidden"),
+      expect(within(role("button", { name: "product" }), selector("span.w-24"))).toHaveClass("max-tablet:hidden")
+    )
+  })
+
+  it("does not fold a row without cells, which keeps its action", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "Northstar" })).not.toHaveClass("max-tablet:flex-wrap"),
+      expect(cellsOf("Northstar")).toBeAbsent(),
+      expect(within(role("button", { name: "Northstar" }), text("Open →"))).not.toHaveClass("max-tablet:hidden")
     )
   })
 

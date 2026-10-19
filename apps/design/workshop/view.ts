@@ -88,6 +88,12 @@ const columnPaneFrame = "flex h-96 max-w-5xl flex-col outline outline-outline"
 
 const sidePaneColumn = "flex w-98 flex-col"
 
+const tableColumn = "flex w-full max-w-2xl flex-col gap-3"
+
+const tableFrame = "h-96 w-90 flex-none outline outline-outline"
+
+const tableFrameBody = "flex flex-col gap-3 p-4"
+
 const iconGrid = "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4"
 
 const iconCell = "flex items-center gap-2 text-hint text-ink-secondary"
@@ -588,6 +594,12 @@ const groupList = (h: ApplicationViewBuilder): Html =>
     )
   )
 
+const groupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  summary(h, { copy: "Public and private groups you've joined.", count: `${groupRows.length} groups` }),
+  columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
+  groupList(h)
+]
+
 const directoryScreen = (h: ApplicationViewBuilder): Html =>
   centered(h, {
     brand: "amends",
@@ -620,16 +632,6 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
     sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col"),
     sample(
       h,
-      "Summary, columns, and rows with cells",
-      [
-        summary(h, { copy: "Public and private groups you've joined.", count: `${groupRows.length} groups` }),
-        columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
-        groupList(h)
-      ],
-      "flex max-w-2xl flex-col gap-3"
-    ),
-    sample(
-      h,
       "Row with cells and no action",
       [
         row(h, {
@@ -641,6 +643,29 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
         })
       ],
       "flex max-w-2xl flex-col"
+    )
+  ])
+
+/**
+ * The `frame` that the workshop is opened with to show the directory table alone. A table folds by the width of the
+ * window, not of what holds it, so a folded table is shown in a frame that is a window of its own, 360px wide.
+ */
+export const directoryTableFrame = "directory-table"
+
+const directoryTableGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Directory table", [
+    sample(
+      h,
+      "Summary, columns, and rows with cells, wide and folded below 48rem in a frame 360px wide",
+      [
+        h.div([h.Class(tableColumn)], groupTable(h)),
+        h.iframe([
+          h.Class(tableFrame),
+          h.Title("Directory table in a window 360px wide"),
+          h.Src(`?frame=${directoryTableFrame}`)
+        ])
+      ],
+      "flex flex-wrap items-start gap-6"
     )
   ])
 
@@ -1967,7 +1992,15 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           centeredGroup(h, model.signInEmail, model.code)
         ]
       ),
-      h.div([h.Class(wideColumn)], [paneColumnGroup(h, model.workspaceName), shellGroup(h, model)])
+      h.div(
+        [h.Class(wideColumn)],
+        [directoryTableGroup(h), paneColumnGroup(h, model.workspaceName), shellGroup(h, model)]
+      )
     ]
   )
+}))
+
+export const directoryTableView = ApplicationComposition.makeView((_model, h) => ({
+  title: "amends design workshop: directory table",
+  body: h.div([h.Class(tableFrameBody)], groupTable(h))
 }))

@@ -6,14 +6,16 @@ import { Runtime } from "foldkit"
 import { ApplicationComposition } from "./composition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { directoryTableFrame, directoryTableView, view } from "./view.ts"
+
+const isDirectoryTableFrame = new URLSearchParams(window.location.search).get("frame") === directoryTableFrame
 
 const application = ApplicationComposition.assembleApplication({
   init,
   update,
-  view,
+  view: isDirectoryTableFrame ? directoryTableView : view,
   container: document.getElementById("root"),
-  devTools: { Message: ApplicationComposition.Message }
+  devTools: isDirectoryTableFrame ? false : { Message: ApplicationComposition.Message }
 })
 
 Runtime.run(application)

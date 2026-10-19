@@ -19,18 +19,22 @@ const summaryLine = "m-0 flex items-baseline justify-between gap-4 text-hint tex
 
 const summaryCount = "flex-none tabular-nums"
 
+const columnsGroup = "max-tablet:hidden"
+
 const columnsLine = "flex items-center gap-4 ps-3 pe-4 pb-2 text-meta text-ink-muted uppercase"
 
 const columnsTitleLabel = "min-w-0 flex-1 truncate"
 
-const columnsCellLabel = "w-32 flex-none truncate"
+const columnsCellLabel = "w-32 flex-none truncate max-desktop:w-24"
 
-const columnsActionSpace = "w-24 flex-none"
+const columnsActionSpace = "w-24 flex-none max-desktop:w-20"
 
 const columnsStitch = "h-0 border-t border-dashed border-stitch"
 
 const rowButton =
   "group flex min-h-19 w-full cursor-pointer items-center gap-4 bg-transparent ps-3 pe-4 text-start focus-ring-inset hover:bg-hover"
+
+const rowFoldsCells = "max-tablet:flex-wrap max-tablet:gap-y-2 max-tablet:py-3"
 
 const rowMark =
   "grid size-10 flex-none place-items-center bg-avatar-neutral-bg text-item font-medium text-avatar-neutral-fg uppercase"
@@ -41,11 +45,15 @@ const rowTitle = "block truncate text-body font-medium text-ink"
 
 const rowMeta = "block truncate text-hint text-ink-secondary"
 
-const rowCell = "block w-32 flex-none text-hint text-ink-secondary"
+const rowCells =
+  "contents max-tablet:flex max-tablet:basis-full max-tablet:min-w-0 max-tablet:flex-wrap max-tablet:items-center max-tablet:gap-2 max-tablet:ps-14"
+
+const rowCell =
+  "block w-32 flex-none text-hint text-ink-secondary max-desktop:w-24 max-tablet:w-auto max-tablet:max-w-full max-tablet:truncate"
 
 const rowAction = "flex-none px-3 text-control font-medium whitespace-nowrap text-ink-secondary group-hover:text-ink"
 
-const rowActionAmongCells = `w-24 text-end ${rowAction}`
+const rowActionAmongCells = `w-24 text-end max-desktop:w-20 max-tablet:hidden ${rowAction}`
 
 const renderMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, letter: string): Html =>
   h.span([h.AriaHidden(true), h.Class(rowMark)], [letter])
@@ -86,14 +94,16 @@ export const summary = <Message, Requirements>(
  * The labels of a table's columns over its `row`s, at the size and in the case of a quiet caption, over a dashed
  * `stitch` rule, hidden from assistive technology since each row describes itself. The `label` is over the mark
  * and the title, and each of the `cells` over the column of its cell, in the order of a row's `cells`. At the end
- * is the room a row with cells keeps for its action, left bare, so the labels stay over their cells.
+ * is the room a row with cells keeps for its action, left bare, so the labels stay over their cells. The columns
+ * are 8rem wide and the bare room 6rem, 6rem and 5rem from 48rem to 64rem, as a row's are. Below 48rem a row's
+ * cells fold under its title, and no column is left to label, so the labels are not shown.
  */
 export const columns = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ label: string; cells: ReadonlyArray<string> }>
 ): Html =>
   h.div(
-    [h.AriaHidden(true)],
+    [h.AriaHidden(true), h.Class(columnsGroup)],
     [
       h.div(
         [h.Class(columnsLine)],
@@ -114,7 +124,14 @@ export const columns = <Message, Requirements>(
  * The `cells`, such as a `badge` and a count, each lie in a column 8rem wide between the title and the action,
  * under the labels `columns` gives them. Like the mark and the action they are hidden from assistive technology,
  * so `cellsText`, what they say in words, such as "Public · 12 members", describes the button after the meta. A
- * row with cells keeps 6rem at its end for its action, right-aligned, whether it has one or not.
+ * row with cells keeps 6rem at its end for its action, right-aligned, whether it has one or not. From 48rem to
+ * 64rem the columns are 6rem wide and the action's room 5rem, so a title keeps its room beside three cells.
+ *
+ * Below 48rem a row with cells folds: the mark, the title, and the meta stay the first line, and the cells wrap
+ * under them as a line of their own, 8px apart, in their order, from the title's start, each as wide as it is, or
+ * as the line if it is wider, ending in an ellipsis. The action is not shown. The cells lie in one element that is
+ * `contents` from 48rem, so that each is a column of the row, and that takes the whole width of its own line
+ * below it, which is what breaks the row after the title.
  */
 export const row = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -129,6 +146,7 @@ export const row = <Message, Requirements>(
   }>
 ): Html => {
   const description = [config.meta, config.cellsText].filter((part) => part !== undefined).join(" · ")
+  const hasCells = config.cells !== undefined
 
   return Button.view(
     {
@@ -139,7 +157,7 @@ export const row = <Message, Requirements>(
             ...attributes.button,
             h.AriaLabel(config.title),
             ...(description === "" ? [] : [h.AriaDescription(description)]),
-            h.Class(rowButton)
+            h.Class(hasCells ? `${rowButton} ${rowFoldsCells}` : rowButton)
           ],
           [
             renderMark(h, config.mark),
@@ -150,8 +168,13 @@ export const row = <Message, Requirements>(
                 config.meta === undefined ? h.empty : h.span([h.Class(rowMeta)], [config.meta])
               ]
             ),
-            ...(config.cells ?? []).map((cell) => h.span([h.AriaHidden(true), h.Class(rowCell)], [cell])),
-            renderAction(h, config.action, config.cells !== undefined)
+            config.cells === undefined
+              ? h.empty
+              : h.span(
+                  [h.AriaHidden(true), h.Class(rowCells)],
+                  config.cells.map((cell) => h.span([h.Class(rowCell)], [cell]))
+                ),
+            renderAction(h, config.action, hasCells)
           ]
         )
     },

@@ -25,8 +25,9 @@ by side and wrapping in a narrow column; a select with its label hidden, in a ro
 field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
 tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
-directory's section and rows, and a table of three groups' rows with cells, under the line that says
-what it holds and the labels of its columns, and a row with cells and no action; the centered screen as the
+directory's section and rows, and a row with cells and no action, and a table of three groups' rows
+with cells, under the line that says what it holds and the labels of its columns, wide and beside it
+folded, in a frame 360px wide; the centered screen as the
 sign-in's two steps and as the workspace picker, each with its pieces in `screenContent` as the app's
 pages return them; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
@@ -55,8 +56,10 @@ side pane whose dialog shows nothing, since the navigation drawer and the side p
 the whole window and are for the app to show. A frame makes itself the containing block of the
 notices, which are fixed to a window's corner, with `contain: layout`. Open it to look at a piece
 before a page composes it. It follows the browser's light or dark preference. A browser tab that is
-hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. `bun
-run --filter @amends-dev/design build` bundles it, which CI builds too.
+hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. The
+folded table's frame is an `iframe` of the workshop itself, opened with `?frame=directory-table` to
+show the table alone, since a table folds by the width of the window, which a `div` 360px wide does
+not change. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
 
 ## Using it in an app
 
@@ -270,7 +273,9 @@ What a directory screen lists.
   assistive technology, since each row describes itself: the `label` over the mark and the title,
   filling the width, then one of the `cells` over each cell column, 8rem wide, at meta size in
   `ink-muted` and upper case, over a dashed `stitch` rule. Its end leaves 6rem bare, where a row with
-  cells keeps its action, so the labels stay over their cells.
+  cells keeps its action, so the labels stay over their cells. From 48rem to 64rem the columns are
+  6rem wide and the bare end 5rem, as a row's are. Below 48rem the labels are not shown, since a
+  row's cells fold under its title and no column is left to label.
 - `row(h, { mark, title, meta?, cells?, cellsText?, action?, onClick })` is one button the width of
   its container, at least 76px tall: a 40px square mark holding the `mark` letter on
   `avatar-neutral`, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
@@ -281,6 +286,16 @@ What a directory screen lists.
   gives them, and are hidden like the mark; `cellsText`, what they say in words, such as "Public ·
   12 members", describes the button after the meta. A row with cells keeps 6rem at its end for its
   action, right-aligned, whether it has one or not. A page lists rows as `li` items of a `ul`.
+  - From 48rem to 64rem (`max-desktop:`) the cell columns are 6rem wide and the room for the action
+    5rem, so a title keeps its room beside three cells, and `columns` follows with the same widths.
+  - Below 48rem (`max-tablet:`) a row with cells folds, in CSS alone and from the same markup: the
+    mark, the title, and the meta stay the first line, and the cells wrap under them as a line of
+    their own, 8px apart, in their order, each only as wide as it is, or as the line if it is wider,
+    with an ellipsis, starting under the title. The action is not shown, and neither are the labels
+    of `columns`. The cells lie in one element that is `display: contents` from 48rem, so each is a
+    column of the row there, and below it takes the whole width of its line (`basis-full`), which is
+    what breaks the row after the title. A row without cells does not fold and keeps its action.
+    `cellsText` is unchanged, so the folded row is described as it is wide.
 
 ### `@amends-dev/design/shell`
 
@@ -664,4 +679,6 @@ before; the side pane in place at `Split` and otherwise inside the dialog named 
 visible and nowhere before; the notices' live region once, inside the dialog that is visible and
 in the frame otherwise; and the dialogs it is lent, in the frame at every viewport and last, after the
 drawer's and the side pane's, empty while closed, with the notices left in the frame while one is
-open. They query no class. The viewport's decision, `viewportOf`, is a plain test.
+open. They query a class only where a layout is what is under test, such as the classes that fold a
+directory row below 48rem and size its columns by breakpoint, since happy-dom applies no CSS. The
+viewport's decision, `viewportOf`, is a plain test.
