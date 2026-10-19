@@ -2,7 +2,7 @@ import { ThreadMessage } from "@amends-dev/core/thread"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { button, errorView, field, sending, submit, textarea } from "../../controls.ts"
-import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder } from "./composition.ts"
+import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { authorName, Message, type MessageItem, type Model, typingIn } from "./definition.ts"
 
 const textOf = (message: ThreadMessage.ThreadMessage) =>
@@ -115,6 +115,7 @@ export const view = ThreadComposition.makeView((model, h) =>
       titleView(model, h),
       followView(model, h),
       h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
+      h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
       errorView(model.notice, h),
       h.ol(
         [h.AriaLabel("Messages")],

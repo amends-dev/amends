@@ -3,9 +3,12 @@ import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { Command, Subscription, click, expect, given, label, role, scene, text, type } from "foldkit/scene"
+import { scout, turnOf } from "../../../test/fixtures.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
+import { TurnsBlock } from "../turns/block.ts"
+import { subscriptions as turnsSubscriptions } from "../turns/subscription.ts"
 import { ThreadBlock } from "./block.ts"
 import { PostReply, TellTyping } from "./command.ts"
 import { Message } from "./definition.ts"
@@ -101,6 +104,26 @@ describe("a thread", () => {
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       Command.resolve(PostReply, Message.WroteAction()),
       Command.resolve(TellTyping, Message.ToldTyping())
+    )
+  })
+
+  it("lists its agents' turns, whose log the person follows", () => {
+    scene(
+      { update, view, subscriptions: ThreadBlock.subscriptions },
+      given(init(workspaceId, memberId, threadId).model),
+      expect(role("region", { name: "Turns" })).toBeAbsent(),
+      Subscription.emit(
+        turnsSubscriptions.turns,
+        TurnsBlock.Message.ReceivedTurns({
+          turns: [{ turn: turnOf("turn-1", "running"), pending: false, retryOpen: false }]
+        })
+      ),
+      Subscription.emit(turnsSubscriptions.turns, TurnsBlock.Message.ReceivedMembers({ members: [alice, bob, scout] })),
+      expect(role("region", { name: "Turns" })).toExist(),
+      expect(text("Scout")).toExist(),
+      expect(text(" · Running")).toExist(),
+      click(role("button", { name: "Show log" })),
+      expect(text("Opening the log…")).toExist()
     )
   })
 })

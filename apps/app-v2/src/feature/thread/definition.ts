@@ -1,8 +1,8 @@
 /**
  * A thread as the person reads and takes part in it: its title and messages, their part in it, how
- * far they have read, who types there, the task it tracks, and a composer to reply. They rename it,
- * edit and delete their own messages, and follow it or stop; reading it marks it read through its
- * latest activity.
+ * far they have read, who types there, the task it tracks, its agents' turns, and a composer to
+ * reply. They rename it, edit and delete their own messages, and follow it or stop; reading it
+ * marks it read through its latest activity.
  */
 
 import { Contact } from "@amends-dev/core/channel"
@@ -15,6 +15,7 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
+import { TurnsBlock } from "../turns/block.ts"
 
 /** A message of the thread, and whether it is still being posted. */
 export const MessageItem = Schema.Struct({ message: ThreadMessage.ThreadMessage, pending: Schema.Boolean })
@@ -36,7 +37,8 @@ export type Editing = typeof Editing.Type
  * The thread's title, when it has one, its messages, the person's part in it, the sequence of its
  * latest activity, how far they have read it and asked to, the title or message being changed,
  * whether they said lately that they type there, who could have written its messages, who is
- * present, the reply being written, the task it tracks, and why the last read or write failed.
+ * present, the reply being written, the task it tracks, its agents' turns, and why the last read or
+ * write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -56,11 +58,12 @@ export const Model = Schema.Struct({
   present: Schema.Array(Presence.Present),
   reply: ComposerBlock.Model,
   task: TaskBlock.Model,
+  turns: TurnsBlock.Model,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
 
-/** What the reply composer and the task are made from: the thread, as the member. */
+/** What the reply composer, the task, and the turns are made from: the thread, as the member. */
 export const ChildInitContext = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,

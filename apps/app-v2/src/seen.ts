@@ -1,10 +1,11 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called, whether
- * anyone may join a group, and how a task's status and priority read.
+ * anyone may join a group, and how a task's status and priority and a turn's status read.
  */
 
 import type { Group } from "@amends-dev/core/group"
 import type { Task } from "@amends-dev/core/task"
+import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 
 /** `memberId` by their name among `members`, or their ID until names are read. */
@@ -44,4 +45,14 @@ export const priorityLabel: Readonly<Record<Task.Priority, string>> = {
   medium: "Medium",
   high: "High",
   urgent: "Urgent"
+}
+
+/** A turn's status, as the person reads it. */
+export const turnStatusLabel: Readonly<Record<Turn.Status, string>> = {
+  queued: "Queued",
+  running: "Running",
+  cancelling: "Stopping",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Stopped"
 }

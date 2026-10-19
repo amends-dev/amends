@@ -48,14 +48,22 @@ the pages that compose them; the root composes the pages.
   group, kept as a draft in their browser until they send it. It reports what it sends, and that
   its text changed.
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
-  part in it, how far they have read, who types there, and a composer to reply. They rename it, edit
-  and delete their own messages, and follow it or stop; reading it marks it read through its latest
-  activity, once for each. The reply composer's changes say the person types, at once, then at most
-  as often as typing lasts, by core's `Presence.typingRepeats`, and sending says they stopped.
+  part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
+  composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
+  reading it marks it read through its latest activity, once for each. The reply composer's changes
+  say the person types, at once, then at most as often as typing lasts, by core's
+  `Presence.typingRepeats`, and sending says they stopped.
 - `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
   while the thread tracks none, making it one, when they may create tasks in its group. The thread
   embeds it.
+- `feature/turns`: a thread's agents' turns, oldest first, each with its agent by name and how it
+  stands, who ran it again, and why it failed. The person stops a turn while it is active and runs
+  it again once nothing but who may direct its agent keeps it from running again, when they may
+  use that agent, by core's `Turn.directRequirement`. They follow a turn's log, which opens with
+  its items and then grows as the turn writes it, until the turn ends, or until they hide it or
+  it could not be followed, which says why and offers to follow it again; one log at a time. The
+  thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
   being started, and how much is new, and a composer to start one. It reports the thread picked.
 - `feature/group`: a group as the person has it open: its name, their part in it, a team's members,
@@ -86,11 +94,11 @@ A Block's commands and subscriptions reach the store through `store/Stores.ts`, 
 it opens the person's store of a workspace on the first read or write, shares it among all of them,
 and closes it a while after the last one lets go. The session, `session.ts`, is a service too: the
 sign-in command keeps it, and no model carries the token. What no replica holds goes over HTTP from
-the Block that needs it, `api.ts`: listing workspaces, and saying the person types in a thread.
+the Block that needs it, `api.ts`: listing workspaces, saying the person types in a thread, and
+following a turn's log, which its Block's subscription reads while the log is followed.
 
-Features the earlier program had and this cut does not yet: creating teams and conversations,
-joining, following, renaming, and administering groups, tasks and turns, the inbox, the workspace's
-settings, connections, agents, and channels. Each returns as a Block by the same template;
+Features the earlier program had and this cut does not yet: the inbox, the workspace's settings,
+connections, agents, and channels. Each returns as a Block by the same template;
 `settingsForm.ts` and `agentSetup.ts` wait for the connections and agents features.
 
 ## The store
@@ -173,8 +181,10 @@ browser's storage. Each Block's tests sit beside it:
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
   is written and stopped once it is sent, and why a write could not be kept; a task made and changed
-  from what was seen, unless nothing changes; a thread started from
-  the composer and the thread picked; a composer filling in its draft only while nothing was written,
+  from what was seen, unless nothing changes; a thread's turns stopped while they are active and run
+  again only when nothing else keeps them from it, and a turn's log followed from showing it until
+  the turn ends or the person hides it, passing over another turn's, and followed again after it
+  could not be; a thread started from the composer and the thread picked; a composer filling in its draft only while nothing was written,
   keeping what is written, and sending it once; a group renamed from the name seen, followed, left,
   or joined, a member admitted and an admission removed, and the thread picked opened and closed;
   the groups starting a team or a conversation and reporting the group picked once; a workspace
@@ -182,8 +192,11 @@ browser's storage. Each Block's tests sit beside it:
   opening and closing one, and signing out.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
   on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
-  line by someone who may not, and made by someone who may create tasks; a group's name, the person's part in it,
-  its members with removing for the others, and joining in place of the threads of a team they do
+  line by someone who may not, and made by someone who may create tasks; a thread's turns by their
+  agents' names and how they stand, stopped and run again by someone who may use the agent and not
+  otherwise, a turn's log followed as it is written, until the turn ends or it could not be
+  followed, and the thread listing its agents' turns; a group's name, the person's part in it, its
+  members with removing for the others, and joining in place of the threads of a team they do
   not belong to; and the groups listed apart from the teams to join, with a new team taken only
   from someone who may create one.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
