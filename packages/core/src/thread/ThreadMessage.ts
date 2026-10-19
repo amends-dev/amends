@@ -9,6 +9,7 @@
  */
 
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as ChannelId from "../channel/ChannelId.ts"
 import * as GroupId from "../group/GroupId.ts"
@@ -24,7 +25,7 @@ import * as ThreadMessageId from "./ThreadMessageId.ts"
 /**
  * Markdown, preserved as submitted, including indentation; whitespace-only text and characters
  * storage cannot keep as given are rejected. A mention in it is a link to the member, written by
- * `mentionText`.
+ * `mentionText` and read back by `parts`.
  *
  * @category schemas
  * @since 0.1.0
@@ -54,7 +55,20 @@ const labelMarks = /[\\[\]*_`~<>]/gu
 export const mentionText = (memberId: string, name: string) =>
   `[@${name.replaceAll(labelMarks, "\\$&")}](member:${encodeURIComponent(memberId)})`
 
-const mentionLinks = /\[@(?:\\.|[^\\\]])*\]\(member:([^)\s]+)\)/gu
+const mentionLinks = /\[@((?:\\.|[^\\\]])*)\]\(member:([^)\s]+)\)/gu
+
+type MentionLink = Readonly<{ start: number; end: number; memberId: string; label: string }>
+
+// The links in a text whose ids decode, in order; a link whose id does not is text like the rest.
+const linksIn = (text: string): ReadonlyArray<MentionLink> =>
+  [...text.matchAll(mentionLinks)].flatMap(({ 0: link, 1: label, 2: id, index }) =>
+    Option.match(Option.liftThrowable(decodeURIComponent)(id!), {
+      onNone: () => [],
+      onSome: (memberId) => [
+        { start: index, end: index + link.length, memberId, label: label!.replaceAll(/\\(.)/gu, "$1") }
+      ]
+    })
+  )
 
 /**
  * The members a text mentions, each once, in the order first mentioned.
@@ -63,16 +77,51 @@ const mentionLinks = /\[@(?:\\.|[^\\\]])*\]\(member:([^)\s]+)\)/gu
  * @since 0.1.0
  */
 export const mentionedIn = (text: string): ReadonlyArray<string> => [
-  ...new Set(
-    [...text.matchAll(mentionLinks)].flatMap(([, id]) => {
-      try {
-        return [decodeURIComponent(id!)]
-      } catch {
-        return []
-      }
-    })
-  )
+  ...new Set(linksIn(text).map(({ memberId }) => memberId))
 ]
+
+/**
+ * A run of message text: words as written, or one mention, with the name the member had when
+ * mentioned, without its "@".
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Part = Schema.TaggedUnion({
+  Text: { text: Schema.NonEmptyString },
+  Mention: { memberId: MemberId.MemberId, label: Schema.String }
+})
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Part = typeof Part.Type
+
+/**
+ * The runs a text is made of, in order, so a reader can show each mention as its member's current
+ * name. Adjacent text is one run, and a link whose id does not decode is text; an empty text has
+ * no runs.
+ *
+ * @category getters
+ * @since 0.1.0
+ */
+export const parts = (text: string): ReadonlyArray<Part> => {
+  const runs: Array<Part> = []
+  let textFrom = 0
+  const endTextAt = (end: number) => {
+    if (end > textFrom) runs.push(Part.cases.Text.make({ text: text.slice(textFrom, end) }))
+  }
+
+  for (const { start, end, memberId, label } of linksIn(text)) {
+    endTextAt(start)
+    runs.push(Part.cases.Mention.make({ memberId: MemberId.MemberId.make(memberId), label }))
+    textFrom = end
+  }
+  endTextAt(text.length)
+
+  return runs
+}
 
 /**
  * Who wrote a message: a member, human or agent, writing in a thread, or a contact whose message a
