@@ -2,8 +2,8 @@
  * The workspace's connections, each with its integration and how ready it is, and, for a person who
  * may manage it, renaming it, changing its settings, replacing its key, checking it with its
  * system, and removing it; and adding one to an integration the host installs, for a person who
- * may. The host lists its integrations over HTTP as the Block opens. Other features read here
- * which connections give what they need, by `connectionsGiving`.
+ * may. The workspace page lists the host's integrations once and informs the Block of them. Other
+ * features read here which connections give what they need, by `connectionsGiving`.
  */
 
 import { Connection as ConnectionContract, type Integration } from "@amends-dev/connection"
@@ -119,7 +119,11 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-export const ConnectionsDefinition = Block.makeDefinition("Connections", { Model, Message })
+/** What the Block asks of the workspace page: to list the integrations again, once the host could not be reached. */
+export const OutMessage = defineMessageUnion({ RequestedIntegrations: {} })
+export type OutMessage = typeof OutMessage.Type
+
+export const ConnectionsDefinition = Block.makeDefinition("Connections", { Model, Message, OutMessage })
 
 /** The integrations the host installs, once it listed them. */
 export const integrationsOf = ({

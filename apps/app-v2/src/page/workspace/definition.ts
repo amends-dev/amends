@@ -3,10 +3,12 @@
  * actions, their inbox, their connections, their agents, their settings, and their channels, and
  * what the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
  * the channels, or a group, with its threads and the thread open among them, and whether the
- * navigation drawer is open, which every navigation closes. It reports when the person leaves it,
- * and when they ask to sign out.
+ * navigation drawer is open, which every navigation closes. It lists the host's integrations once,
+ * as it opens, informs the connections, the agents, and the channels of them, and lists them again
+ * when one asks. It reports when the person leaves it, and when they ask to sign out.
  */
 
+import { Connection } from "@amends-dev/core/connection"
 import { GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
@@ -78,7 +80,9 @@ export const Message = defineMessageUnion({
   ClickedSettings: {},
   ClickedChannels: {},
   ClickedMenu: {},
-  ClickedCloseMenu: {}
+  ClickedCloseMenu: {},
+  ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
+  FailedLoadIntegrations: { error: Schema.String }
 })
 export type Message = typeof Message.Type
 

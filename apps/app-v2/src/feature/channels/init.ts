@@ -1,11 +1,10 @@
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import { Integrations } from "../connections/definition.ts"
-import { LoadIntegrations } from "./command.ts"
 import { ChannelsComposition } from "./composition.ts"
 import { Model } from "./definition.ts"
 
-/** The channels before they are read, asking the host for the integrations it installs. */
+/** The channels before they are read, and before the page has listed the integrations the host installs. */
 export const init = ChannelsComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) => ({
     model: Model.make({
@@ -20,7 +19,6 @@ export const init = ChannelsComposition.makeInit(
       grants: [],
       form: Option.none(),
       notice: Option.none()
-    }),
-    commands: [LoadIntegrations({ workspaceId })]
+    })
   })
 )

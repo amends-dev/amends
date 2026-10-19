@@ -4,7 +4,7 @@ import { Identity } from "@amends-dev/core/identity"
 import type { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { Command, given, message, model, story } from "foldkit/story"
+import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import {
   aliceOwns,
   bob,
@@ -21,8 +21,8 @@ import {
 } from "../../../test/fixtures.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
 import { givableRoles } from "../settings/definition.ts"
-import { ConfigureAgent, CreateAgent, LoadIntegrations, LoadModels, RenameAgent } from "./command.ts"
-import { findAgentName, listedAgents, Message, OfferedModels } from "./definition.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
+import { findAgentName, listedAgents, Message, OfferedModels, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -73,8 +73,8 @@ const reviewing = Schema.decodeSync(Agent.Configuration)({
 })
 
 describe("the agents", () => {
-  it("ask the host for its integrations as they open, and keep what comes back or why it did not", () => {
-    expect((init(workspace.id, alice.id).commands ?? []).map(({ name }) => name)).toEqual([LoadIntegrations.name])
+  it("wait for the page to list the integrations, and keep what it informs them of or why it could not", () => {
+    expect(init(workspace.id, alice.id).commands ?? []).toEqual([])
     story(
       update,
       given(listed),
@@ -85,12 +85,14 @@ describe("the agents", () => {
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Failed({ error: "The host could not be reached. Try again." }))
       }),
+      // Trying again shows they are loading and asks the page to list them again.
       message(Message.ClickedReloadIntegrations()),
-      Command.expectExact(LoadIntegrations({ workspaceId })),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
+      Command.expectNone(),
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Loading())
       }),
-      Command.resolve(LoadIntegrations, integrations),
+      message(integrations),
       model((model) => {
         expect(model.integrations).toEqual(
           Integrations.Loaded({ integrations: [modelsIntegration, harnessIntegration, sandboxIntegration] })
@@ -98,6 +100,7 @@ describe("the agents", () => {
       }),
       // Asking again once they are loaded asks nothing.
       message(Message.ClickedReloadIntegrations()),
+      expectNoOutMessage(),
       Command.expectNone()
     )
   })

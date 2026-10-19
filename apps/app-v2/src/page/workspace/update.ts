@@ -1,7 +1,14 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { GroupsBinding, WorkspaceComposition, closeMenu } from "./composition.ts"
+import {
+  AgentsBinding,
+  ChannelsBinding,
+  closeMenu,
+  ConnectionsBinding,
+  GroupsBinding,
+  WorkspaceComposition
+} from "./composition.ts"
 import { Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Show nothing yet in the main content. */
@@ -47,6 +54,18 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedChannels: () =>
       Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showChannels]),
     ClickedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
-    ClickedCloseMenu: () => Update.combine(model, [closeMenu])
+    ClickedCloseMenu: () => Update.combine(model, [closeMenu]),
+    ReceivedIntegrations: ({ integrations }) =>
+      Update.combine(model, [
+        ConnectionsBinding.informReceivedIntegrations({ integrations }),
+        AgentsBinding.informReceivedIntegrations({ integrations }),
+        ChannelsBinding.informReceivedIntegrations({ integrations })
+      ]),
+    FailedLoadIntegrations: ({ error }) =>
+      Update.combine(model, [
+        ConnectionsBinding.informFailedLoadIntegrations({ error }),
+        AgentsBinding.informFailedLoadIntegrations({ error }),
+        ChannelsBinding.informFailedLoadIntegrations({ error })
+      ])
   })
 )

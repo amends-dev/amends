@@ -4,9 +4,18 @@ import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
 import * as AgentSetup from "../../agentSetup.ts"
 import { Integrations } from "../connections/definition.ts"
-import { ConfigureAgent, CreateAgent, LoadIntegrations, LoadModels, RenameAgent } from "./command.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
 import { AgentsComposition } from "./composition.ts"
-import { findAgent, findAgentName, Form, listedAgents, Message, type Model, OfferedModels } from "./definition.ts"
+import {
+  findAgent,
+  findAgentName,
+  Form,
+  listedAgents,
+  Message,
+  type Model,
+  OfferedModels,
+  OutMessage
+} from "./definition.ts"
 
 /** The model with the form open as `change` makes it, while one is open. */
 const atForm = (model: Model, change: (form: Form) => Form): Model => modifyFields(model, { form: Option.map(change) })
@@ -108,7 +117,7 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
             model: modifyFields(model, { integrations: () => Integrations.Loading() }),
-            commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
+            outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },
     ClickedAdd: () => ({

@@ -1,8 +1,8 @@
 /**
  * What the person does with the workspace's connections: renaming one, changing its settings, and
- * removing it are actions written to their store; listing the integrations, adding a connection,
- * replacing a key, and checking a connection go over HTTP, since a key never enters an action and
- * no replica holds the rest.
+ * removing it are actions written to their store; adding a connection, replacing a key, and
+ * checking a connection go over HTTP, since a key never enters an action and no replica holds the
+ * rest.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -75,19 +75,6 @@ export const RemoveConnection = ConnectionsDefinition.command("RemoveConnection"
   handler: function* () {
     const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ connectionId, ...member }) => write(member, (store) => store.write("ConnectionRemoved", { connectionId }))
-  }
-})
-
-/** List the integrations the host installs, which the workspace's connections link to. */
-export const LoadIntegrations = ConnectionsDefinition.command("LoadIntegrations", {
-  args: { workspaceId: WorkspaceId.WorkspaceId },
-  messages: [Message.ReceivedIntegrations, Message.FailedLoadIntegrations],
-  handler: function* () {
-    return ({ workspaceId }) =>
-      Effect.gen(function* () {
-        const client = yield* Api.asMember(workspaceId)
-        return Message.ReceivedIntegrations({ integrations: yield* client.connections.integrations() })
-      }).pipe(Effect.orElseSucceed(() => Message.FailedLoadIntegrations({ error: unreachable })))
   }
 })
 
@@ -166,7 +153,6 @@ export const EffectsLayer = Layer.mergeAll(
   RenameConnection.layer,
   ConfigureConnection.layer,
   RemoveConnection.layer,
-  LoadIntegrations.layer,
   AddConnection.layer,
   ReplaceConnectionKey.layer,
   CheckConnection.layer

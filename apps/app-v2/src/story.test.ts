@@ -5,18 +5,13 @@ import { Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { SignOut } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
-import { AgentsBlock } from "./feature/agents/block.ts"
-import { LoadIntegrations as LoadAgentIntegrations } from "./feature/agents/command.ts"
-import { ChannelsBlock } from "./feature/channels/block.ts"
-import { LoadIntegrations as LoadChannelIntegrations } from "./feature/channels/command.ts"
-import { ConnectionsBlock } from "./feature/connections/block.ts"
-import { LoadIntegrations as LoadConnectionIntegrations } from "./feature/connections/command.ts"
 import { init } from "./init.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { CheckCode, SendCode } from "./page/signIn/command.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
+import { LoadIntegrations } from "./page/workspace/command.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { LoadWorkspaces } from "./page/workspaces/command.ts"
 import { update } from "./update.ts"
@@ -81,10 +76,8 @@ describe("the app", () => {
       Command.expectExact(LoadWorkspaces()),
       Command.resolve(LoadWorkspaces, WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] })),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
-      // Opened, the workspace asks the host for the integrations its connections, agents, and channels read.
-      Command.resolve(LoadConnectionIntegrations, ConnectionsBlock.Message.ReceivedIntegrations({ integrations: [] })),
-      Command.resolve(LoadAgentIntegrations, AgentsBlock.Message.ReceivedIntegrations({ integrations: [] })),
-      Command.resolve(LoadChannelIntegrations, ChannelsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      // Opened, the workspace asks the host once for the integrations its connections, agents, and channels read.
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       model((model) => {
         expect(
           Option.map(openedIn(model), ({ workspaceId, model }) => ({ workspaceId, memberId: model.memberId }))
@@ -114,9 +107,7 @@ describe("the app", () => {
       given(init({ session: Option.some(session) }).model),
       message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
-      Command.resolve(LoadConnectionIntegrations, ConnectionsBlock.Message.ReceivedIntegrations({ integrations: [] })),
-      Command.resolve(LoadAgentIntegrations, AgentsBlock.Message.ReceivedIntegrations({ integrations: [] })),
-      Command.resolve(LoadChannelIntegrations, ChannelsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(fromWorkspace(WorkspaceBlock.Message.ClickedSignOut())),
       Command.expectExact(SignOut()),
       Command.resolve(SignOut, Message.CompletedSignOut()),

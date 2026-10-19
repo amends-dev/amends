@@ -9,6 +9,7 @@ import {
   change,
   click,
   expect,
+  expectOutMessage,
   given,
   inside,
   label,
@@ -34,8 +35,8 @@ import {
 } from "../../../test/fixtures.ts"
 import { Integrations } from "../connections/definition.ts"
 import { ChannelsBlock } from "./block.ts"
-import { CreateChannel, LoadIntegrations, RedirectChannel, RemoveChannel } from "./command.ts"
-import { Message, type Model } from "./definition.ts"
+import { CreateChannel, RedirectChannel, RemoveChannel } from "./command.ts"
+import { Message, type Model, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -43,8 +44,6 @@ import { view } from "./view.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
-const workspaceId = workspace.id
-
 const ownerGrants = grantsOf([aliceOwns])
 const memberGrants = grantsOf([roleOf("assignment-3", member.id, BuiltinRoles.MemberId)])
 
@@ -253,7 +252,7 @@ describe("the channels", () => {
     )
   })
 
-  it("say why the integrations could not be listed, and ask again, offering to add only once they are", () => {
+  it("say why the integrations could not be listed, and ask the page to list them again, offering to add only once they are", () => {
     scene(
       { update, view },
       given(
@@ -264,11 +263,9 @@ describe("the channels", () => {
       expect(text("The host could not be reached. Try again.")).toExist(),
       expect(role("button", { name: "Add a channel" })).toBeAbsent(),
       click(role("button", { name: "Try again" })),
-      Command.expectExact(LoadIntegrations({ workspaceId })),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
       expect(text("Loading the integrations…")).toExist(),
-      Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [channelsIntegration] })),
-      expect(text("Loading the integrations…")).toBeAbsent(),
-      expect(role("button", { name: "Add a channel" })).toExist()
+      expect(role("button", { name: "Add a channel" })).toBeAbsent()
     )
   })
 

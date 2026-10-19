@@ -1,7 +1,7 @@
 /**
  * What the person does with the workspace's agents: adding one, renaming one, and changing how
- * one is set up are actions written to their store; listing the integrations the host installs,
- * and the models a connection offers, go over HTTP, since no replica holds them.
+ * one is set up are actions written to their store; listing the models a connection offers goes
+ * over HTTP, since no replica holds them.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -66,19 +66,6 @@ export const RenameAgent = AgentsDefinition.command("RenameAgent", {
   }
 })
 
-/** List the integrations the host installs, which say what the workspace's connections give. */
-export const LoadIntegrations = AgentsDefinition.command("LoadIntegrations", {
-  args: { workspaceId: WorkspaceId.WorkspaceId },
-  messages: [Message.ReceivedIntegrations, Message.FailedLoadIntegrations],
-  handler: function* () {
-    return ({ workspaceId }) =>
-      Effect.gen(function* () {
-        const client = yield* Api.asMember(workspaceId)
-        return Message.ReceivedIntegrations({ integrations: yield* client.connections.integrations() })
-      }).pipe(Effect.orElseSucceed(() => Message.FailedLoadIntegrations({ error: unreachable })))
-  }
-})
-
 /** List the models `connectionId` offers an agent. */
 export const LoadModels = AgentsDefinition.command("LoadModels", {
   args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
@@ -95,10 +82,4 @@ export const LoadModels = AgentsDefinition.command("LoadModels", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(
-  CreateAgent.layer,
-  ConfigureAgent.layer,
-  RenameAgent.layer,
-  LoadIntegrations.layer,
-  LoadModels.layer
-)
+export const EffectsLayer = Layer.mergeAll(CreateAgent.layer, ConfigureAgent.layer, RenameAgent.layer, LoadModels.layer)

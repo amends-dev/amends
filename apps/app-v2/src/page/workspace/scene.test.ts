@@ -57,7 +57,8 @@ import { CreateTeam } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { WorkspaceBlock } from "./block.ts"
-import { Open, OutMessage } from "./definition.ts"
+import { LoadIntegrations } from "./command.ts"
+import { Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -287,6 +288,30 @@ describe("a workspace", () => {
       expect(role("main", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
       inside(role("list", { name: "Connections" }), expect(text("Models")).toExist(), expect(text("Ready")).toExist())
+    )
+  })
+
+  it("lists the integrations again for the connections when the person asks, after the host could not be reached", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(opened, {
+          connections: (connections) =>
+            modifyFields(connections, {
+              integrations: () => Integrations.Failed({ error: "The host could not be reached. Try again." }),
+              grants: () => grantsOf([aliceOwns])
+            })
+        })
+      ),
+      click(role("button", { name: "Connections" })),
+      expect(text("The host could not be reached. Try again.")).toExist(),
+      expect(role("button", { name: "Add a connection" })).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      Command.expectExact(LoadIntegrations({ workspaceId: workspace.id })),
+      expect(text("Loading the integrations…")).toExist(),
+      Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
+      expect(text("Loading the integrations…")).toBeAbsent(),
+      expect(role("button", { name: "Add a connection" })).toExist()
     )
   })
 

@@ -7,7 +7,6 @@ import {
   AddConnection,
   CheckConnection,
   ConfigureConnection,
-  LoadIntegrations,
   RemoveConnection,
   RenameConnection,
   ReplaceConnectionKey
@@ -21,7 +20,8 @@ import {
   Form,
   Integrations,
   Message,
-  type Model
+  type Model,
+  OutMessage
 } from "./definition.ts"
 
 /** The model with the form open as `change` makes it, while one is open. */
@@ -162,7 +162,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
             model: modifyFields(model, { integrations: () => Integrations.Loading() }),
-            commands: [LoadIntegrations({ workspaceId })]
+            outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },
     ClickedAdd: () => ({

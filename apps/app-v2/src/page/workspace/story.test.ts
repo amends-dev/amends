@@ -19,12 +19,14 @@ import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
+import { Integrations } from "../../feature/connections/definition.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
 import * as Drafts from "../../store/Drafts.ts"
+import { LoadIntegrations } from "./command.ts"
 import {
   AgentsBinding,
   ChannelsBinding,
@@ -42,6 +44,15 @@ const memberId = MemberId.MemberId.make("member-1")
 const groupId = GroupId.GroupId.make("general")
 
 const opened = init(workspaceId, memberId, "Studio").model
+
+const unreachable = "The host could not be reached. Try again."
+
+/** The state of the integrations in the connections, the agents, and the channels. */
+const integrationsOf = (model: typeof opened) => [
+  model.connections.integrations,
+  model.agents.integrations,
+  model.channels.integrations
+]
 
 /** What the groups report, as the workspace receives it. */
 const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
@@ -223,12 +234,52 @@ describe("a workspace", () => {
     )
   })
 
-  it("asks the host for its integrations as it opens, which its connections, agents, and channels list", () => {
+  it("lists the host's integrations once as it opens, and informs its connections, agents, and channels of them", () => {
     expect((init(workspaceId, memberId, "Studio").commands ?? []).map(({ name }) => name)).toEqual([
-      "connections/LoadIntegrations",
-      "agents/LoadIntegrations",
-      "channels/LoadIntegrations"
+      LoadIntegrations.name
     ])
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(integrationsOf(model)).toEqual([Integrations.Loading(), Integrations.Loading(), Integrations.Loading()])
+      }),
+      message(Message.ReceivedIntegrations({ integrations: [testApi] })),
+      model((model) => {
+        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Loaded({ integrations: [testApi] })))
+      })
+    )
+  })
+
+  it("tells its connections, agents, and channels when the host could not be reached", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.FailedLoadIntegrations({ error: unreachable })),
+      model((model) => {
+        expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Failed({ error: unreachable })))
+      })
+    )
+  })
+
+  it("lists them again when its connections, agents, or channels ask, and informs all three of the answer", () => {
+    for (const reload of [
+      fromConnections(ConnectionsBlock.Message.ClickedReloadIntegrations()),
+      fromAgents(AgentsBlock.Message.ClickedReloadIntegrations()),
+      fromChannels(ChannelsBlock.Message.ClickedReloadIntegrations())
+    ]) {
+      story(
+        update,
+        given(opened),
+        message(Message.FailedLoadIntegrations({ error: unreachable })),
+        message(reload),
+        Command.expectExact(LoadIntegrations({ workspaceId })),
+        Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
+        model((model) => {
+          expect(integrationsOf(model)).toEqual(Array(3).fill(Integrations.Loaded({ integrations: [testApi] })))
+        })
+      )
+    }
   })
 
   it("shows the connections in place of the open group, leaving no group marked, and reads them whichever shows", () => {

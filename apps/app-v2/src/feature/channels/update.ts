@@ -1,9 +1,9 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import { Integrations } from "../connections/definition.ts"
-import { CreateChannel, LoadIntegrations, RedirectChannel, RemoveChannel } from "./command.ts"
+import { CreateChannel, RedirectChannel, RemoveChannel } from "./command.ts"
 import { ChannelsComposition } from "./composition.ts"
-import { findChannel, Form, Message, type Model, whatFormLacks } from "./definition.ts"
+import { findChannel, Form, Message, type Model, OutMessage, whatFormLacks } from "./definition.ts"
 
 /** The model with the form open as `change` makes it, while one is open. */
 const atForm = (model: Model, change: (form: Form) => Form): Model => modifyFields(model, { form: Option.map(change) })
@@ -68,7 +68,7 @@ export const update = ChannelsComposition.makeUpdate((model, message) => {
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {
             model: modifyFields(model, { integrations: () => Integrations.Loading() }),
-            commands: [LoadIntegrations({ workspaceId })]
+            outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },
     ClickedAdd: () => ({

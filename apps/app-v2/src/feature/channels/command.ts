@@ -1,15 +1,12 @@
 /**
  * What the person does with the workspace's channels: adding one, sending its conversations to come
- * to another group, and removing it are actions written to their store; listing the integrations,
- * which say what the workspace's connections give, goes over HTTP, since no replica holds them.
+ * to another group, and removing it are actions written to their store.
  */
 
 import { Channel, ChannelId } from "@amends-dev/core/channel"
-import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Api from "../../api.ts"
 import * as Stores from "../../store/Stores.ts"
 import { ChannelsDefinition, Message } from "./definition.ts"
 
@@ -70,26 +67,4 @@ export const RemoveChannel = ChannelsDefinition.command("RemoveChannel", {
   }
 })
 
-/** List the integrations the host installs, which say what the workspace's connections give. */
-export const LoadIntegrations = ChannelsDefinition.command("LoadIntegrations", {
-  args: { workspaceId: WorkspaceId.WorkspaceId },
-  messages: [Message.ReceivedIntegrations, Message.FailedLoadIntegrations],
-  handler: function* () {
-    return ({ workspaceId }) =>
-      Effect.gen(function* () {
-        const client = yield* Api.asMember(workspaceId)
-        return Message.ReceivedIntegrations({ integrations: yield* client.connections.integrations() })
-      }).pipe(
-        Effect.orElseSucceed(() =>
-          Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." })
-        )
-      )
-  }
-})
-
-export const EffectsLayer = Layer.mergeAll(
-  CreateChannel.layer,
-  RedirectChannel.layer,
-  RemoveChannel.layer,
-  LoadIntegrations.layer
-)
+export const EffectsLayer = Layer.mergeAll(CreateChannel.layer, RedirectChannel.layer, RemoveChannel.layer)

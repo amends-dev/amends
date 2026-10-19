@@ -1,18 +1,17 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
-import { Command, given, message, model, story } from "foldkit/story"
+import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import { connectionOf, integrationGiving, keylessConnection, membership, testApi } from "../../../test/fixtures.ts"
 import {
   AddConnection,
   CheckConnection,
   ConfigureConnection,
-  LoadIntegrations,
   RemoveConnection,
   RenameConnection,
   ReplaceConnectionKey
 } from "./command.ts"
-import { checkOf, connectionsGiving, Form, Integrations, Message } from "./definition.ts"
+import { checkOf, connectionsGiving, Form, Integrations, Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -32,8 +31,8 @@ const withModels = [
 ] as const
 
 describe("the connections", () => {
-  it("ask the host for its integrations as they open, and keep what comes back or why it did not", () => {
-    expect((init(workspace.id, member.id).commands ?? []).map(({ name }) => name)).toEqual([LoadIntegrations.name])
+  it("wait for the page to list the integrations, and keep what it informs them of or why it could not", () => {
+    expect(init(workspace.id, member.id).commands ?? []).toEqual([])
     story(
       update,
       given(listed),
@@ -44,17 +43,20 @@ describe("the connections", () => {
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Failed({ error: "The host could not be reached. Try again." }))
       }),
+      // Trying again shows they are loading and asks the page to list them again.
       message(Message.ClickedReloadIntegrations()),
-      Command.expectExact(LoadIntegrations({ workspaceId })),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
+      Command.expectNone(),
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Loading())
       }),
-      Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
+      message(Message.ReceivedIntegrations({ integrations: [testApi] })),
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Loaded({ integrations: [testApi] }))
       }),
       // Asking again once they are loaded asks nothing.
       message(Message.ClickedReloadIntegrations()),
+      expectNoOutMessage(),
       Command.expectNone()
     )
   })

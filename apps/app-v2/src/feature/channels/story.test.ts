@@ -2,7 +2,7 @@ import { ChannelId } from "@amends-dev/core/channel"
 import { Group, GroupId } from "@amends-dev/core/group"
 import { describe, expect, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { Command, given, message, model, story } from "foldkit/story"
+import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import {
   aliceInDesign,
   aliceInGeneral,
@@ -15,14 +15,13 @@ import {
   support
 } from "../../../test/fixtures.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
-import { CreateChannel, LoadIntegrations, RedirectChannel, RemoveChannel } from "./command.ts"
-import { destinations, Form, groupNameOf, Message } from "./definition.ts"
+import { CreateChannel, RedirectChannel, RemoveChannel } from "./command.ts"
+import { destinations, Form, groupNameOf, Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
-const workspaceId = workspace.id
 
 const channelsIntegration = integrationGiving("test-channels", "Test channels", ["channels"])
 const modelsIntegration = integrationGiving("test-models", "Test models", ["models"])
@@ -69,8 +68,8 @@ const read = [
 ] as const
 
 describe("the channels", () => {
-  it("ask the host for its integrations as they open, and keep what comes back or why it did not", () => {
-    expect((init(workspace.id, member.id).commands ?? []).map(({ name }) => name)).toEqual([LoadIntegrations.name])
+  it("wait for the page to list the integrations, and keep what it informs them of or why it could not", () => {
+    expect(init(workspace.id, member.id).commands ?? []).toEqual([])
     story(
       update,
       given(listed),
@@ -81,17 +80,20 @@ describe("the channels", () => {
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Failed({ error: "The host could not be reached. Try again." }))
       }),
+      // Trying again shows they are loading and asks the page to list them again.
       message(Message.ClickedReloadIntegrations()),
-      Command.expectExact(LoadIntegrations({ workspaceId })),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
+      Command.expectNone(),
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Loading())
       }),
-      Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [channelsIntegration] })),
+      message(Message.ReceivedIntegrations({ integrations: [channelsIntegration] })),
       model((model) => {
         expect(model.integrations).toEqual(Integrations.Loaded({ integrations: [channelsIntegration] }))
       }),
       // Asking again once they are loaded asks nothing.
       message(Message.ClickedReloadIntegrations()),
+      expectNoOutMessage(),
       Command.expectNone()
     )
   })

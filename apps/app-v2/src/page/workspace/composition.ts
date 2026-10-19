@@ -12,7 +12,14 @@ import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { LoadIntegrations } from "./command.ts"
 import { type Model, Open, WorkspaceDefinition } from "./definition.ts"
+
+/** List the integrations the host installs again, when a Block that showed them failing asks. */
+const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
+  model,
+  commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
+}))
 
 /** Close the navigation drawer, as going anywhere does. */
 export const closeMenu = WorkspaceDefinition.step((model: Model) => ({
@@ -66,12 +73,14 @@ export const InboxBinding = WorkspaceDefinition.bindChild(InboxBlock, {
 
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
   field: "connections",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: ConnectionsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
 
 export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
   field: "agents",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: AgentsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
 
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
@@ -81,7 +90,8 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
 
 export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   field: "channels",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
 
 /** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */

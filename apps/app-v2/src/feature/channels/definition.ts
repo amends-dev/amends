@@ -2,8 +2,8 @@
  * The workspace's channels, each with the connection that receives its conversations and the group
  * they open in, and, for a person who may manage it, sending its conversations to come to another
  * group and removing it; and adding one, for a person who may, over a connection that gives
- * channels, into a group they belong to. The host lists its integrations over HTTP as the Block
- * opens, to say which connections give channels.
+ * channels, into a group they belong to. The workspace page lists the host's integrations once and
+ * informs the Block of them, to say which connections give channels.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -85,7 +85,11 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-export const ChannelsDefinition = Block.makeDefinition("Channels", { Model, Message })
+/** What the Block asks of the workspace page: to list the integrations again, once the host could not be reached. */
+export const OutMessage = defineMessageUnion({ RequestedIntegrations: {} })
+export type OutMessage = typeof OutMessage.Type
+
+export const ChannelsDefinition = Block.makeDefinition("Channels", { Model, Message, OutMessage })
 
 /** The channel `channelId`, while the workspace has it. */
 export const findChannel = (

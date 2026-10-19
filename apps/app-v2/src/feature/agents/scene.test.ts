@@ -10,6 +10,7 @@ import {
   change,
   click,
   expect,
+  expectOutMessage,
   given,
   inside,
   label,
@@ -34,8 +35,8 @@ import {
 } from "../../../test/fixtures.ts"
 import { Integrations } from "../connections/definition.ts"
 import { AgentsBlock } from "./block.ts"
-import { ConfigureAgent, CreateAgent, LoadIntegrations, LoadModels, RenameAgent } from "./command.ts"
-import { Message, type Model } from "./definition.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
+import { Message, type Model, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -362,7 +363,7 @@ describe("the agents", () => {
     )
   })
 
-  it("say why the integrations could not be listed, and ask again, offering to add only once they are", () => {
+  it("say why the integrations could not be listed, and ask the page to list them again, offering to add only once they are", () => {
     scene(
       { update, view },
       given(
@@ -373,16 +374,9 @@ describe("the agents", () => {
       expect(text("The host could not be reached. Try again.")).toExist(),
       expect(role("button", { name: "Add an agent" })).toBeAbsent(),
       click(role("button", { name: "Try again" })),
-      Command.expectExact(LoadIntegrations({ workspaceId })),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
       expect(text("Loading the integrations…")).toExist(),
-      Command.resolve(
-        LoadIntegrations,
-        Message.ReceivedIntegrations({
-          integrations: [modelsIntegration, harnessIntegration, sandboxIntegration]
-        })
-      ),
-      expect(text("Loading the integrations…")).toBeAbsent(),
-      expect(role("button", { name: "Add an agent" })).toExist()
+      expect(role("button", { name: "Add an agent" })).toBeAbsent()
     )
   })
 

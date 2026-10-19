@@ -2,9 +2,9 @@
  * The workspace's agents, each with how ready it is and what it runs on, and, for a person who may
  * configure it, renaming it and changing how it is set up; and adding one, for a person who may,
  * on the harnesses, models, and sandboxes the workspace's connections give. An agent's role, and
- * its removal, are its membership's, in the settings. The host lists its integrations over HTTP as
- * the Block opens, which say what each connection gives, and a model connection lists its models
- * over HTTP as the form chooses it.
+ * its removal, are its membership's, in the settings. The workspace page lists the host's
+ * integrations once and informs the Block of them, which say what each connection gives, and a
+ * model connection lists its models over HTTP as the form chooses it.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -100,7 +100,11 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-export const AgentsDefinition = Block.makeDefinition("Agents", { Model, Message })
+/** What the Block asks of the workspace page: to list the integrations again, once the host could not be reached. */
+export const OutMessage = defineMessageUnion({ RequestedIntegrations: {} })
+export type OutMessage = typeof OutMessage.Type
+
+export const AgentsDefinition = Block.makeDefinition("Agents", { Model, Message, OutMessage })
 
 /** The agent `agentId`, while the workspace has it. */
 export const findAgent = (model: Pick<Model, "agents">, agentId: Identity.AgentId): Option.Option<AgentItem> =>

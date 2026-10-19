@@ -197,8 +197,9 @@ the pages that compose them; the root composes the pages.
   It reports nothing: the workspace page's own header keeps the name it was opened with.
 - `feature/connections`: the workspace's connections, each by its name with its integration and how
   ready it is, as the store holds it, marked as sending while a change to it is on its way. The
-  host's integrations are listed over HTTP as the Block opens, and again when the person asks after
-  they could not be reached. Where they may manage a connection, they rename it, change its
+  host's integrations are listed by the workspace page, once, which informs the Block of them or of
+  why they could not be reached; the person then asks again, and the Block asks the page, by its out
+  message `RequestedIntegrations`. Where they may manage a connection, they rename it, change its
   settings by the form its integration gives, replace its key, check it with its system, which says
   whether it answers and accepts the key, and remove it; where they may create connections, they add
   one to an integration, choosing a name, how it authenticates, a key when it takes one, and its
@@ -215,9 +216,10 @@ the pages that compose them; the root composes the pages.
   they add one with a name, a role they may give, instructions, a harness, `Auto` or a connection
   that gives harnesses, a model connection, a model from what that connection offers, an effort, and
   a sandbox, none or a connection that gives sandboxes. The host's integrations, which say what each
-  connection gives, are listed over HTTP as the Block opens, and again when the person asks after
-  they could not be reached; choosing a model connection lists its models over HTTP, and an answer
-  for another connection than the one chosen is passed over. Adding, renaming, and setting up again
+  connection gives, are listed by the workspace page, once, which informs the Block of them or of
+  why they could not be reached; the person then asks again, and the Block asks the page, by its out
+  message `RequestedIntegrations`. Choosing a model connection lists its models over HTTP, and an
+  answer for another connection than the one chosen is passed over. Adding, renaming, and setting up again
   are actions written to the store; `agentSetup.ts` makes the configuration of a draft, or says what
   it still wants. A form about an agent that is gone closes. An agent's role and its removal are its
   membership's, in the settings.
@@ -229,10 +231,10 @@ the pages that compose them; the root composes the pages.
   whether its conversations open as tasks, and a channel that lacks any of them is refused, with
   why, before it is written. Adding, moving, and removing are actions written to the store. The
   Block reads the connections and groups itself, a team belonged to by the admissions the person
-  holds and a conversation by its members, and lists the host's integrations over HTTP as it
-  opens, and again when the person asks after they could not be reached, to know which connections
-  give channels, by the connections feature's `connectionsGiving`. A form about a channel that is
-  gone closes.
+  holds and a conversation by its members, and is informed by the workspace page of the host's
+  integrations, or of why they could not be reached, to know which connections give channels, by
+  the connections feature's `connectionsGiving`; the person then asks again, and the Block asks the
+  page, by its out message `RequestedIntegrations`. A form about a channel that is gone closes.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it, shown as toasts over the shell's corner.
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
@@ -256,8 +258,10 @@ the pages that compose them; the root composes the pages.
   rest of the window closes it, and every navigation, the rail's, the sidebar's Inbox, a group picked,
   and a notification's thread opened, closes it too (a `closeMenu` step among theirs). The drawer is
   moved by CSS from that flag; it does not yet trap focus, make the rest of the window inert, or
-  close on Escape, which come in a later step. Opening the workspace asks the host for the integrations its connections,
-  agents, and channels link to. It reports when the person leaves it and when they ask to sign out.
+  close on Escape, which come in a later step. Opening the workspace lists the host's integrations
+  once, over HTTP, and informs its connections, agents, and channels of them, or of why they could
+  not be reached; it lists them again when one of the three asks. It reports when the person leaves
+  it and when they ask to sign out.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
   the one open. Signing in lists the workspaces; signing out, from the workspace list or from the
@@ -273,8 +277,9 @@ and closes it a while after the last one lets go. The session, `session.ts`, is 
 sign-in command keeps it, and no model carries the token. What no replica holds goes over HTTP from
 the Block that needs it, `api.ts`: listing workspaces, saying the person types in a thread,
 following a turn's log, which its Block's subscription reads while the log is followed, and listing
-the host's integrations, for the connections, the agents, and the channels, adding a connection,
-replacing its key, checking it, and listing the models a connection offers an agent.
+the host's integrations, which the workspace page does once for the connections, the agents, and the
+channels, adding a connection, replacing its key, checking it, and listing the models a connection
+offers an agent.
 
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
 feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
@@ -376,19 +381,21 @@ browser's storage. Each Block's tests sit beside it:
   or the dialog closes, dropping what was being started, and reporting the group picked once; the inbox
   listing what waits, newest
   first, reporting the thread of the notification opened, marking one seen or all through the newest
-  that waits, and why a write could not be kept; the connections asking for the host's integrations
-  as they open, keeping them or why they could not be listed, asking again, adding a connection over
+  that waits, and why a write could not be kept; the connections keeping the integrations the page
+  informs them of or why they could not be listed, asking the page to list them again, adding a connection over
   HTTP once its integration, name, required settings, and key are in, once while it sends, and
   refused with why, renaming, changing the settings of, and removing one as actions from what was
   seen, replacing a key and checking over HTTP, closing a form about a connection that is gone,
   naming the connections whose integration gives a capability, and why a read or a write could not
-  be kept; the agents asking for the host's integrations as they open, adding an agent as an action
+  be kept; the agents keeping the integrations the page informs them of or why they could not be
+  listed, asking the page to list them again, adding an agent as an action
   with the configuration its draft makes and refusing a draft with what it still wants, loading the
   models of the model connection the form chooses over HTTP and passing over a late answer for
   another connection, choosing the model again when the connection changes, renaming and setting up
   an agent again from what was seen, closing a form about an agent that is gone, offering the roles
-  the person may give, and why a read or a write could not be kept; the channels asking for the
-  host's integrations as they open, adding a channel as an action once its connection, group, and
+  the person may give, and why a read or a write could not be kept; the channels keeping the
+  integrations the page informs them of or why they could not be listed, asking the page to list
+  them again, adding a channel as an action once its connection, group, and
   name are chosen and refusing one that lacks any, with why, offering only the connections that give
   channels and the groups the person belongs to, by name, moving a channel's conversations to
   another group of theirs and removing it, closing a form about a channel that is gone, and why a
@@ -396,7 +403,9 @@ browser's storage. Each Block's tests sit beside it:
   person, one name at a time, changing a member's role from the assignments seen, removing a member,
   handing the workspace over from the owner's assignment seen, inviting by email with the role
   chosen, revoking an invitation, and what an owner, an administrator, and a member may do to the
-  members; a workspace asking for the integrations as it opens, opening the group picked, showing
+  members; a workspace listing the integrations once as it opens, informing its connections, agents,
+  and channels of them or of why they could not be listed, and listing them again when one asks,
+  opening the group picked, showing
   the inbox, the connections, the agents, the settings, or the channels in its place with no group
   marked, going home from a group or a destination, handing the settings and the channels what the
   person does in them, opening a notification's thread in its group, naming the thread open in the
@@ -465,7 +474,8 @@ browser's storage. Each Block's tests sit beside it:
   composer to reply, marked in the list and under the group in the sidebar, the group's settings
   opened in a dialog from its main pane, the Menu button opening the drawer and its scrim, or a
   link of the sidebar or the rail, a group picked among them, closing it, and what the server
-  refused as toasts. The root's own scenes show
+  refused as toasts, and the connections listing the integrations again after the host could not be
+  reached. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through

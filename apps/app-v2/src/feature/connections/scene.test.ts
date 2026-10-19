@@ -6,6 +6,7 @@ import {
   change,
   click,
   expect,
+  expectOutMessage,
   given,
   inside,
   label,
@@ -17,15 +18,8 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { aliceOwns, connectionOf, membership, roleOf, roles, testApi } from "../../../test/fixtures.ts"
 import { ConnectionsBlock } from "./block.ts"
-import {
-  AddConnection,
-  CheckConnection,
-  LoadIntegrations,
-  RemoveConnection,
-  RenameConnection,
-  ReplaceConnectionKey
-} from "./command.ts"
-import { Integrations, Message, type Model } from "./definition.ts"
+import { AddConnection, CheckConnection, RemoveConnection, RenameConnection, ReplaceConnectionKey } from "./command.ts"
+import { Integrations, Message, type Model, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -222,7 +216,7 @@ describe("the connections", () => {
     )
   })
 
-  it("say why the integrations could not be listed, and ask again, offering to add only once they are", () => {
+  it("say why the integrations could not be listed, and ask the page to list them again, offering to add only once they are", () => {
     scene(
       { update, view },
       given(
@@ -233,11 +227,9 @@ describe("the connections", () => {
       expect(text("The host could not be reached. Try again.")).toExist(),
       expect(role("button", { name: "Add a connection" })).toBeAbsent(),
       click(role("button", { name: "Try again" })),
-      Command.expectExact(LoadIntegrations({ workspaceId })),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
       expect(text("Loading the integrations…")).toExist(),
-      Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
-      expect(text("Loading the integrations…")).toBeAbsent(),
-      expect(role("button", { name: "Add a connection" })).toExist()
+      expect(role("button", { name: "Add a connection" })).toBeAbsent()
     )
   })
 
