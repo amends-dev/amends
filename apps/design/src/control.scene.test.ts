@@ -322,6 +322,33 @@ describe("choiceSelect", () => {
       expect(label("Plan")).toHaveValue("team")
     )
   })
+
+  it("is still found by its label when the label is hidden, and changing it sends the choice", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          h.p([], ["Ada"]),
+          choiceSelect(
+            h,
+            {
+              id: "plan",
+              label: "Plan of Ada",
+              choices: plans,
+              value: model.plan,
+              onChange: (plan) => Message.ChangedPlan({ plan })
+            },
+            { isLabelHidden: true }
+          )
+        ])
+      },
+      given(initial),
+      expect(label("Plan of Ada")).toHaveValue("free"),
+      expect(role("option", { name: "Team" })).toExist(),
+      change(label("Plan of Ada"), "team"),
+      expect(label("Plan of Ada")).toHaveValue("team")
+    )
+  })
 })
 
 describe("fieldGrid", () => {

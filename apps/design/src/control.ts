@@ -41,7 +41,7 @@ const buttonWide = "w-full"
 const iconButtonBase =
   "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring hover:bg-subtle hover:text-ink"
 
-const iconButtonLabel = "sr-only"
+const hiddenLabel = "sr-only"
 
 const iconButtonSizes = {
   regular: "size-8 max-desktop:size-11",
@@ -111,6 +111,11 @@ export type IconButtonOptions = Readonly<{
   size?: "compact"
 }>
 
+export type ChoiceSelectOptions = Readonly<{
+  /** The label names the select for assistive technology and is not shown, for a select in a row of its own. */
+  isLabelHidden?: boolean
+}>
+
 export type NoticeTone = keyof typeof noticeTones
 
 export type NoticeOptions = Readonly<{
@@ -172,7 +177,7 @@ const renderIconButton = <Message, Requirements>(
       toView: (attributes) =>
         h.button(
           [...attributes.button, h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))],
-          [icon(h, config.icon, { size: "sm" }), h.span([h.Class(iconButtonLabel)], [config.label])]
+          [icon(h, config.icon, { size: "sm" }), h.span([h.Class(hiddenLabel)], [config.label])]
         )
     },
     h
@@ -324,7 +329,10 @@ export const toggle = <Message, Requirements>(
     h
   )
 
-/** A choice of one of `choices`, each a value and how the person reads it. */
+/**
+ * A choice of one of `choices`, each a value and how the person reads it. With `isLabelHidden` the label does not
+ * show above the select, and still names it.
+ */
 export const choiceSelect = <Choice extends string, Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
@@ -333,7 +341,8 @@ export const choiceSelect = <Choice extends string, Message, Requirements>(
     choices: ReadonlyArray<readonly [Choice, string]>
     value: Choice
     onChange: (value: Choice) => Message
-  }>
+  }>,
+  options: ChoiceSelectOptions = {}
 ) =>
   Select.view(
     {
@@ -344,7 +353,10 @@ export const choiceSelect = <Choice extends string, Message, Requirements>(
         h.div(
           [h.Class(fieldColumn)],
           [
-            h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
+            h.label(
+              [...attributes.label, h.Class(options.isLabelHidden === true ? hiddenLabel : fieldLabel)],
+              [config.label]
+            ),
             h.div(
               [h.Class(selectChevron)],
               [

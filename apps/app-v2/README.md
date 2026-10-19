@@ -60,9 +60,14 @@ each its agent's initials and name with a `badge` for how it stands, its buttons
 and its `log`. The inbox lists its notifications as `message`s in a `messageList`, each its author's
 initials and name, its thread and group as the `context` line, its text, which opens the thread, and
 a quiet Mark seen, with Mark all seen among the header's actions, and `paneEmpty` when nothing
-waits. The connections, agents, settings, and channels are still built with `src/controls.ts` and
-switch to `@amends-dev/design/control` a Block at a time; a view that has not switched is plain
-semantic HTML under Tailwind's base styles.
+waits. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
+line of what it is for, and a secondary button to change it, which a `form` of a `field` with Save
+and a quiet Cancel replaces while the person does; the members and the invitations waiting are
+`entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
+quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its email and role. The
+connections, agents, and channels are still built with `src/controls.ts` and switch to
+`@amends-dev/design/control` a Block at a time; a view that has not switched is plain semantic HTML
+under Tailwind's base styles.
 
 ## The program
 
@@ -147,7 +152,17 @@ the pages that compose them; the root composes the pages.
   from the owner's assignment they saw; and the invitations still waiting, which they revoke, with a
   form to invite someone by email with a role, valid for seven days, where they manage
   invitations. A control shows only when their grants allow it, and what is on its way is marked as
-  sending. It reports nothing: the workspace page's own header keeps the name it was opened with.
+  sending. Its view is the settings pane, one column of sections titled Workspace name, Your name,
+  Members, and, where they manage invitations, Invitations. A name shows as a row of the name and
+  what it is for with the button to change it, or, while the person changes it, as a form of its
+  field with Save and Cancel; a section whose name is on its way says "Sending…" after its title.
+  Each member is an entry of their initials and name, with the role they hold as a badge, or, where
+  the person may change it, as a select named "Role of" and the member's name, "Sending…" while
+  they or their role is on its way, and under them Remove and Make owner, where the person may use
+  them. Each invitation waiting is an entry of the address's first letter and the address, the
+  role's name as a badge, "until" and the day it ends, and Revoke until it is on its way; with none
+  waiting, the section says so. The invite form's email field does not take focus, since the form is there as the page opens.
+  It reports nothing: the workspace page's own header keeps the name it was opened with.
 - `feature/connections`: the workspace's connections, each by its name with its integration and how
   ready it is, as the store holds it, marked as sending while a change to it is on its way. The
   host's integrations are listed over HTTP as the Block opens, and again when the person asks after
@@ -379,9 +394,11 @@ browser's storage. Each Block's tests sit beside it:
   without the controls until the person is given the role that manages them, marked as sending with
   none while a change is on its way, offering to add only once the host listed its integrations and
   a connection gives models, and why they could not be read; the settings' two names renamed, the
-  members listed with their roles, changed, removed, and handed the workspace by the owner, the
-  invitations listed, revoked, and sent, what is on its way marked, a member offered only their own
-  name to change, and the store's changes and failure to read shown; the channels listed with their
+  members listed with their roles as badges, or as a select to change for the members the person may
+  act on, changed, removed, and handed the workspace by the owner, the invitations listed by their
+  address, role, and end, revoked, and sent, what is on its way marked in each section, a name
+  left as it was when renaming is cancelled, a member offered only their own name to change, and the
+  store's changes and failure to read shown; the channels listed with their
   connection and group, a conversation's group by the others in it, added by an owner over a
   connection that gives channels into a group they belong to, refused with why when one is lacking,
   moved and removed with a failure shown, read by an ordinary member without the controls until the

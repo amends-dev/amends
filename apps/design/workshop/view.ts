@@ -18,7 +18,7 @@ import {
 } from "../src/control.ts"
 import { badge, detailList, entry, entryList, log } from "../src/details.ts"
 import { row, section } from "../src/directory.ts"
-import { form, inline, valueWithAction } from "../src/form.ts"
+import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
 import { divider, message, messageList } from "../src/message.ts"
@@ -333,7 +333,26 @@ const fieldGroup = (
       sampleStack
     ),
     sample(h, "In a grid, side by side", [taskFields(h, model, "grid")], "flex max-w-xl flex-col"),
-    sample(h, "In a grid, wrapping in a narrow column", [taskFields(h, model, "narrow")], sidePaneColumn)
+    sample(h, "In a grid, wrapping in a narrow column", [taskFields(h, model, "narrow")], sidePaneColumn),
+    sample(
+      h,
+      "Select with its label hidden, in a row",
+      [
+        h.span([h.Class(lineText)], ["Alex Morgan"]),
+        choiceSelect(
+          h,
+          {
+            id: "row-status",
+            label: "Status of Alex Morgan",
+            choices: taskStatusChoices,
+            value: model.taskStatus,
+            onChange: (status) => Message.ChangedTaskStatus({ status })
+          },
+          { isLabelHidden: true }
+        )
+      ],
+      sampleRow
+    )
   ])
 
 const toggleGroup = (h: ApplicationViewBuilder, isNotificationsOn: boolean, isDigestOn: boolean): Html =>
@@ -493,7 +512,7 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
     sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col")
   ])
 
-const formGroup = (h: ApplicationViewBuilder): Html =>
+const formGroup = (h: ApplicationViewBuilder, taskStatus: TaskStatus): Html =>
   group(h, "Form", [
     sample(
       h,
@@ -510,6 +529,46 @@ const formGroup = (h: ApplicationViewBuilder): Html =>
         ])
       ],
       sampleStack
+    ),
+    sample(
+      h,
+      "Setting rows: with an action, with a select, and with a label alone",
+      [
+        settingRow(h, {
+          label: "Mercier & Co",
+          copy: "Everyone in this workspace sees this name.",
+          action: button(h, "Rename workspace", Message.ClickedButton())
+        }),
+        settingRow(h, {
+          label: "Alex Morgan",
+          copy: "Owner of this workspace.",
+          action: choiceSelect(
+            h,
+            {
+              id: "setting-status",
+              label: "Status of Alex Morgan",
+              choices: taskStatusChoices,
+              value: taskStatus,
+              onChange: (status) => Message.ChangedTaskStatus({ status })
+            },
+            { isLabelHidden: true }
+          )
+        }),
+        settingRow(h, { label: "Mercier & Co" })
+      ],
+      "flex max-w-xl flex-col gap-6"
+    ),
+    sample(
+      h,
+      "Setting row, wrapping in a narrow column",
+      [
+        settingRow(h, {
+          label: "A workspace with a name that runs on and on",
+          copy: "Everyone in this workspace sees this name.",
+          action: button(h, "Rename workspace", Message.ClickedButton())
+        })
+      ],
+      "flex w-64 flex-col"
     )
   ])
 
@@ -1310,7 +1369,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           messageGroup(h, model.openThread, model.editText),
           paneEmptyGroup(h),
           composerGroup(h, model.draft, model.filledDraft),
-          formGroup(h),
+          formGroup(h, model.taskStatus),
           directoryGroup(h),
           centeredGroup(h, model.signInEmail, model.code)
         ]

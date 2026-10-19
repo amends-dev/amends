@@ -21,8 +21,10 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
 buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
 placeholder, filled, and invalid; a hint; a textarea; a grid of selects, side by side and wrapping
-in a narrow column; the toggle on and off; a select; the notice tones; `sending`; a form with its
-inline text and a value with its link; the directory's section and rows; the centered screen as the
+in a narrow column; a select with its label hidden, in a row beside a name; the toggle on and off;
+a select; the notice tones; `sending`; a form with its inline text and a value with its link, and
+setting rows with an action, with a select, with a label alone, and wrapping in a narrow column; the
+directory's section and rows; the centered screen as the
 sign-in's two steps and as the workspace picker; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the marks by size; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
@@ -135,8 +137,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
   named by its label.
-- `choiceSelect(h, { id, label, choices, value, onChange })` is a select over `choices`, each a
-  value and how the person reads it, in the input's look.
+- `choiceSelect(h, { id, label, choices, value, onChange }, options?)` is a select over `choices`,
+  each a value and how the person reads it, in the input's look. With `options.isLabelHidden` the
+  label is not shown above the select and still names it, for a select in a row that says what it is
+  for, such as a member's role beside their name.
 - `notice(h, message, options?)` renders an `Option<string>` as an alert in a tone, `"danger"` by
   default, `"caution"`, or `"success"`, and nothing when there is none.
 - `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
@@ -185,6 +189,10 @@ What a form screen is made of beside its controls.
   such as "Need a new code?" beside its Send again link. A child is an `Html` or a string.
 - `valueWithAction(h, value, action)` is what the person entered, in `ink`, with the link that
   changes it at the right, such as an email and Change email.
+- `settingRow(h, { label, copy?, action? })` is one setting as a row, as the group settings mock shows
+  its membership: the `label` at item size in medium weight in `ink` over the `copy` at hint size in
+  `ink-secondary`, and the `action`, any control, at the right. When they do not fit side by side,
+  because the text would be narrower than 12rem, the action wraps to a line of its own, at the start.
 
 ### `@amends-dev/design/directory`
 
@@ -297,8 +305,8 @@ What a pane says about one thing.
   size in medium weight. `tone` is `"neutral"` (the default) on `subtle`, or `"success"`, `"caution"`,
   or `"danger"` on its own surface and text with a 1px border.
 - `entryList(h, { label, children })` is a `ul` named by `label`, a column with no list style, of
-  `entry`s. It is for lists of people or agents' work, such as a thread's turns and, later, a group's
-  members.
+  `entry`s. It is for lists of people or agents' work, such as a thread's turns, and of people, such as
+  a workspace's members and the invitations waiting.
 - `entry(h, { key, mark?, title, trailing?, children? })` is one item of it, keyed by `key`: the `mark`
   letters, the `sm` mark, at the start when it has them, then a column of the `title` at item size in
   medium weight with the `trailing` pieces after it, wrapping onto a new line when they do not fit,
@@ -363,7 +371,8 @@ What floats over the shell's corner, for something that went wrong and the one t
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
-`aria-invalid`, and description, a switch by its label, a select's change, the centered screen's
+`aria-invalid`, and description, a switch by its label, a select's change, also when its label is
+hidden, a setting row's label, copy, and action, the centered screen's
 landmarks, a form by its label, with the pane variant of a form the same; a row by its title; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
 destination by `role("button", { name })` with `aria-current`; a sidebar item by its name with

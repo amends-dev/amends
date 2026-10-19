@@ -59,20 +59,44 @@ describe("the settings", () => {
       given(owner),
       expect(role("main", { name: "Settings" })).toExist(),
       expect(role("heading", { name: "Settings", level: 1 })).toExist(),
-      expect(role("button", { name: "Rename workspace" })).toExist(),
+      inside(
+        role("region", { name: "Workspace name" }),
+        expect(text("Studio")).toExist(),
+        expect(text("Everyone in this workspace sees this name.")).toExist(),
+        expect(role("button", { name: "Rename workspace" })).toExist()
+      ),
+      inside(
+        role("region", { name: "Your name" }),
+        expect(text("Alice")).toExist(),
+        expect(text("How others in this workspace see you.")).toExist()
+      ),
       click(role("button", { name: "Rename workspace" })),
       expect(role("button", { name: "Rename workspace" })).toBeAbsent(),
-      type(label("Workspace name"), "Atelier"),
+      type(role("textbox", { name: "Workspace name" }), "Atelier"),
+      expect(role("button", { name: "Cancel" })).toExist(),
       click(role("button", { name: "Save" })),
       Command.expectExact(RenameWorkspace({ ...asMember, name: "Atelier", expectedName: "Studio" })),
       Command.resolve(RenameWorkspace, Message.WroteAction()),
       expect(role("button", { name: "Rename workspace" })).toExist(),
       click(role("button", { name: "Change your name" })),
-      type(label("Your name"), "Alice M."),
+      type(role("textbox", { name: "Your name" }), "Alice M."),
       click(role("button", { name: "Save" })),
       Command.expectExact(RenameSelf({ ...asMember, name: "Alice M." })),
       Command.resolve(RenameSelf, Message.WroteAction()),
       expect(role("button", { name: "Change your name" })).toExist()
+    )
+  })
+
+  it("leave a name as it was when the person cancels renaming it", () => {
+    scene(
+      { update, view },
+      given(owner),
+      click(role("button", { name: "Rename workspace" })),
+      type(role("textbox", { name: "Workspace name" }), "Atelier"),
+      click(role("button", { name: "Cancel" })),
+      expect(role("textbox", { name: "Workspace name" })).toBeAbsent(),
+      inside(role("region", { name: "Workspace name" }), expect(text("Studio")).toExist()),
+      Command.expectNone()
     )
   })
 
@@ -81,11 +105,11 @@ describe("the settings", () => {
       { update, view },
       given(owner),
       inside(
-        role("region", { name: "Workspace members" }),
+        role("region", { name: "Members" }),
         expect(text("Alice")).toExist(),
-        expect(text(" · Owner")).toExist(),
+        expect(text("Owner")).toExist(),
         expect(text("Bob")).toExist(),
-        expect(text(" · Member")).toExist(),
+        expect(label("Role of Bob")).toHaveValue(BuiltinRoles.MemberId),
         expect(label("Role of Alice")).toBeAbsent(),
         change(label("Role of Bob"), BuiltinRoles.AdministratorId),
         Command.expectExact(
@@ -114,11 +138,16 @@ describe("the settings", () => {
       { update, view },
       given(owner),
       inside(
-        role("region", { name: "Invitations" }),
-        expect(text("carol@example.com · Member, until 2026-10-25")).toExist(),
-        click(role("button", { name: "Revoke" })),
-        Command.expectExact(RevokeInvitation({ ...asMember, invitationId: invitation.details.id })),
-        Command.resolve(RevokeInvitation, Message.WroteAction()),
+        role("list", { name: "Invitations" }),
+        expect(text("carol@example.com")).toExist(),
+        expect(text("Member")).toExist(),
+        expect(text("until 2026-10-25")).toExist(),
+        click(role("button", { name: "Revoke" }))
+      ),
+      Command.expectExact(RevokeInvitation({ ...asMember, invitationId: invitation.details.id })),
+      Command.resolve(RevokeInvitation, Message.WroteAction()),
+      inside(
+        role("form", { name: "Invite someone" }),
         type(label("Email"), "dana@example.com"),
         change(label("Role"), BuiltinRoles.AdministratorId),
         click(role("button", { name: "Invite" })),
@@ -137,8 +166,36 @@ describe("the settings", () => {
           invitations: () => [{ invitation, pending: true }]
         })
       ),
-      expect(text(" · Sending…")).toExist(),
-      inside(role("region", { name: "Invitations" }), expect(role("button", { name: "Revoke" })).toBeAbsent())
+      inside(role("region", { name: "Workspace name" }), expect(text(" · Sending…")).toExist()),
+      inside(
+        role("list", { name: "Invitations" }),
+        expect(text("carol@example.com")).toExist(),
+        expect(text(" · Sending…")).toExist(),
+        expect(role("button", { name: "Revoke" })).toBeAbsent()
+      ),
+      inside(role("region", { name: "Your name" }), expect(text(" · Sending…")).toBeAbsent())
+    )
+  })
+
+  it("mark a member on its way, and a role being changed", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(owner, {
+          members: (members) => members.map((item) => (item.member.id === bob.id ? { ...item, pending: true } : item))
+        })
+      ),
+      inside(role("list", { name: "Members" }), expect(text(" · Sending…")).toExist())
+    )
+    scene(
+      { update, view },
+      given(
+        modifyFields(owner, {
+          assignments: (assignments) =>
+            assignments.map((item) => (item.assignment.id === bobIsMember.id ? { ...item, pending: true } : item))
+        })
+      ),
+      inside(role("list", { name: "Members" }), expect(text(" · Sending…")).toExist())
     )
   })
 
@@ -149,11 +206,14 @@ describe("the settings", () => {
       expect(role("button", { name: "Rename workspace" })).toBeAbsent(),
       expect(role("button", { name: "Change your name" })).toExist(),
       inside(
-        role("region", { name: "Workspace members" }),
+        role("region", { name: "Members" }),
         expect(text("Alice")).toExist(),
+        expect(text("Owner")).toExist(),
+        expect(text("Member")).toExist(),
         expect(role("button", { name: "Remove" })).toBeAbsent(),
         expect(role("button", { name: "Make owner" })).toBeAbsent(),
-        expect(label("Role of Alice")).toBeAbsent()
+        expect(label("Role of Alice")).toBeAbsent(),
+        expect(label("Role of Bob")).toBeAbsent()
       ),
       expect(role("region", { name: "Invitations" })).toBeAbsent()
     )
@@ -175,7 +235,8 @@ describe("the settings", () => {
           grants: owner.grants
         })
       ),
-      expect(text("carol@example.com · Member, until 2026-10-25")).toExist(),
+      expect(text("carol@example.com")).toExist(),
+      expect(text("until 2026-10-25")).toExist(),
       expect(role("button", { name: "Rename workspace" })).toExist(),
       Subscription.emit(
         subscriptions.settings,
