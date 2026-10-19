@@ -50,7 +50,7 @@ picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces`
 forms, fields, and rows from the design's `centered`, `control`, `form`, and `directory` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups` renders the sidebar's sections and the modal where
-a team or a conversation is started, `feature/group` the main pane and the side pane, `feature/actions` the toasts, and every destination's view wraps
+a team or a conversation is started, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
 initials and the time of day from `src/seen.ts`. The task and the turns a thread embeds are the
@@ -78,9 +78,11 @@ an entry of its name, its integration and how ready it is as `badge`s, a hint of
 used, what its last check found, and its quiet buttons; each agent an entry of its initials and
 name, a badge of whether it can run, a hint of why not and of what it runs on, and its quiet
 buttons; each channel an entry of its name, a badge when it opens tasks, a hint of where its
-conversations come from and open, and its quiet buttons. The group's members are a `paneSection` of
-an `entryList` with each member's initials, name, and an Online `badge` while they have the
-workspace open, and the admit form below it.
+conversations come from and open, and its quiet buttons. The group's settings are the design's
+`modal` of `paneTabs`: the General tab is a `field` for the team's name with a `hint`, and a
+`settingRow` each for the visibility and the person's membership, with Leave or Join as its action; the
+Members tab is an `entryList` with each member's initials, name, and an Online `badge` while they have
+the workspace open, and the admit form below it.
 
 ## The program
 
@@ -134,15 +136,25 @@ the pages that compose them; the root composes the pages.
   while it is being started, how much is new, and where its task stands; the thread open is the
   current row. `composerView` is the composer to start one, for the pane's footer, whose box
   shows "Message" and the group's name until the person writes.
-- `feature/group`: a group as the person has it open: its name, their part in it, a team's members,
-  its threads, and the thread open among them, a keyed occurrence, so opening another makes a fresh
-  one and a late result cannot land in the wrong one. It opens with a thread already open when its
-  parent gives one. They rename a team, follow it or stop, join a public team or leave one, and,
-  where they manage its members, admit and remove them. It has two views. `view`, its canonical one,
-  is the group's main pane, titled by its name with its part in it as the header's buttons, one
-  column of the form to rename a team, its members, each marked Online while they have the workspace
-  open, and its threads, with the composer to start one in the footer, which a team the person
-  has not joined does not have; `threadView` is the thread open in it as a side pane, titled by the
+- `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
+  the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
+  result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
+  open when its parent gives one. They follow a group or stop, join a public team, and, in its
+  settings, rename a team, leave one, and, where they manage its members, admit and remove them. It
+  has two views. `view`, its canonical one, is the group's main pane, titled by its name with Follow
+  or Join, where they apply, and a gear that opens the settings as the header's buttons, and its
+  threads, with the composer to start one in the footer, which a team the person has not joined does
+  not have. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
+  rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
+  beside it. Its General tab holds the team's name, a field with Save changes for someone who may
+  rename the team, its draft starting from the name as the dialog opens, and plain text for everyone
+  else; the team's visibility in words, which nothing changes yet; and the person's membership, with
+  Leave for a team they belong to, except general, and Join for a public team they do not. Its
+  Members tab, for a team only, lists the members, each marked Online while they have the workspace
+  open, with Remove and the form to admit another where the person manages them, and counts them in
+  the tab. The dialog opens on General, and closing it, by Cancel, Close, Escape, a click on the
+  scrim, Save changes, or Leave, drops the draft of the name and the member chosen to admit.
+  `threadView` is the thread open in it as a side pane, titled by the
   thread, with a button that closes it, the thread's messages, and the reply composer in the footer,
   and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
   and `threadView` in its side pane. The main pane embeds the threads Block twice and the side pane
@@ -348,7 +360,10 @@ browser's storage. Each Block's tests sit beside it:
   the turn ends or the person hides it, passing over another turn's, and followed again after it
   could not be; a thread started from the composer and the thread picked; a composer filling in its
   draft only while nothing was written, keeping what is written, and sending it once; a group
-  renamed from the name seen, followed, left, or joined, a member admitted and an admission removed,
+  opening its settings on General, with the draft of the team's name started only for someone who
+  may rename it, renamed from the name seen, writing nothing when the name is unchanged, and closing
+  its settings, which drop their drafts, whichever way they close; followed, left from its settings,
+  or joined, a member admitted and an admission removed,
   and the thread picked opened and closed, or open already as the group opens; the groups starting a
   team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
   or the dialog closes, dropping what was being started, and reporting the group picked once; the inbox
@@ -391,10 +406,15 @@ browser's storage. Each Block's tests sit beside it:
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
   may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends
   or it could not be followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
-  a conversation's other member, with the person's part in it, its members, those present marked
+  a conversation's other member, with the person's part in it and the gear to its settings, and
+  joining in place of the threads of a team they do not belong to,
+  with the composer to start a thread in its footer; its settings in a dialog named for them, in a
+  team's name beside the title, with General and Members as tabs, the name a field for someone who
+  may rename the team and text for everyone else, the visibility and the membership in words, with
+  leaving, closing the dialog, and joining, which keeps it open, and a conversation's with neither tabs nor
+  visibility; its members, those present marked
   Online and one on its way marked sending, with removing for the others, admitting, offered only to
-  someone who manages them, renaming, and joining in place of the threads of a team they do not belong to,
-  with the composer to start a thread in its footer, and its side pane for the thread open in it,
+  someone who manages them; and its side pane for the thread open in it,
   with the composer to reply in its footer, closed by its button; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, with the
   thread open under the group picked, and a new team taken in a dialog named for it, with the name
@@ -433,8 +453,8 @@ browser's storage. Each Block's tests sit beside it:
   destination open, Home from the inbox and the groups too, the sidebar naming the workspace with
   who is signed in and the way out in its footer, the group's threads as messages in the main pane
   with the composer to start one, the thread picked opened in the side pane with its messages and the
-  composer to reply, marked in the list and under the group in the sidebar, and what the server
-  refused as toasts. The root's own scenes show
+  composer to reply, marked in the list and under the group in the sidebar, the group's settings
+  opened in a dialog from its main pane, and what the server refused as toasts. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through

@@ -1,18 +1,21 @@
 /**
- * A group as the person has it open: its name, their part in it, a team's members, its threads, and
- * the thread open among them. They rename a team, follow it or stop, join a public team or leave
- * one, and, where they manage its members, admit and remove them.
+ * A group as the person has it open: its name, their part in it, its threads, and the thread open
+ * among them, and its settings in a modal: a team's name and members, and the person's membership.
+ * They follow a group or stop, rename a team, join a public team or leave one, and, where they manage
+ * its members, admit and remove them.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
-import { Group, GroupFollow, GroupId, GroupMembership } from "@amends-dev/core/group"
+import { Group, GroupFollow, GroupId, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
 import { Presence } from "@amends-dev/core/presence"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { groupTarget, may } from "../../permissions.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
 
@@ -32,11 +35,15 @@ export type FollowItem = typeof FollowItem.Type
 export const OpenThread = Schema.Struct({ threadId: ThreadId.ThreadId, model: ThreadBlock.Model })
 export type OpenThread = typeof OpenThread.Type
 
+/** The sections of the group's settings. */
+export const SettingsTab = Schema.Literals(["General", "Members"])
+export type SettingsTab = typeof SettingsTab.Type
+
 /**
  * The group, while the replica holds it, its admissions, the person's follow of it, the workspace's
  * members, what the person may do, who is present, the name being given the team, the member
- * chosen to admit, the group's threads, the thread open among them, and why the last read or write
- * failed.
+ * chosen to admit, the group's threads, the thread open among them, the settings' dialog and the
+ * section of it shown, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -52,6 +59,8 @@ export const Model = Schema.Struct({
   admitting: Schema.Option(MemberId.MemberId),
   threads: ThreadsBlock.Model,
   thread: Schema.Option(OpenThread),
+  dialog: DialogBlock.Model,
+  settingsTab: SettingsTab,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -73,10 +82,10 @@ export const Message = defineMessageUnion({
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },
   ReceivedPresence: { present: Schema.Array(Presence.Present) },
   FailedRead: { error: Schema.String },
-  ClickedRename: {},
+  ClickedSettings: {},
+  ChoseSettingsTab: { tab: SettingsTab },
   TypedName: { name: Schema.String },
   SubmittedRename: {},
-  ClickedCancelRename: {},
   ClickedFollow: {},
   ClickedUnfollow: {},
   ClickedJoin: {},
@@ -111,3 +120,9 @@ export const belongs = (model: Model): boolean =>
 /** The team's name, while the group is a team. */
 export const teamName = (model: Model): Option.Option<string> =>
   Option.flatMap(model.group, ({ group }) => (group.kind === "Team" ? Option.some(group.name) : Option.none()))
+
+/** Whether the person may rename the group: a team they belong to, where they are granted to. */
+export const mayRename = (model: Model): boolean =>
+  Option.isSome(teamName(model)) &&
+  belongs(model) &&
+  may(model.grants, GroupPermissions.Rename, groupTarget(model.workspaceId, model.groupId))

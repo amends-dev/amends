@@ -504,6 +504,29 @@ describe("a workspace", () => {
     )
   })
 
+  it("opens the group's settings from its main pane in a dialog over the page, its members a tab away", () => {
+    scene(
+      { update, view: sceneView },
+      given(withConversation),
+      click(within(role("main", { name: "General" }), role("button", { name: "Group settings" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(text("# General")).toExist(),
+        expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "true"),
+        expect(text("Everyone in the workspace belongs to general.")).toExist(),
+        click(role("tab", { name: "Members" })),
+        expect(within(role("list", { name: "Members" }), text("Alice"))).toExist(),
+        click(role("button", { name: "Cancel" }))
+      ),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
+      expect(role("main", { name: "General" })).toExist()
+    )
+  })
+
   it("shows the thread open in the group in a side pane beside its main pane, and under the group in the sidebar", () => {
     scene(
       { update, view: sceneView },

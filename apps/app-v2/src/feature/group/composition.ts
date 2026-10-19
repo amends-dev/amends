@@ -1,4 +1,5 @@
 import { ThreadId } from "@amends-dev/core/thread"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
@@ -27,6 +28,19 @@ export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {
   outMessage: { fold: foldThreadsOutMessage }
 })
 
+/** The dialog closing, by the person or by the settings' own submit, drops the drafts it held. */
+const foldDialogOutMessage = DialogBlock.OutMessage.match({
+  Opened: () => GroupDefinition.stepNoop(),
+  Closed: () => GroupDefinition.stepFields(() => ({ renaming: () => Option.none(), admitting: () => Option.none() })),
+  CompletedClose: () => GroupDefinition.stepNoop()
+})
+
+export const DialogBinding = GroupDefinition.bindChild(DialogBlock, {
+  field: "dialog",
+  init: { contextToArgs: () => [{ id: "group-settings" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
 /** The open thread, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
   readAll: (model) => Option.toArray(model.thread),
@@ -39,5 +53,7 @@ export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
     })
 })
 
-export const GroupComposition = GroupDefinition.makeComposition({ bindings: [ThreadsBinding, ThreadBinding] })
+export const GroupComposition = GroupDefinition.makeComposition({
+  bindings: [ThreadsBinding, ThreadBinding, DialogBinding]
+})
 export type GroupViewBuilder = Block.ViewBuilderFor<typeof GroupComposition>

@@ -5,8 +5,8 @@ import * as Option from "effect/Option"
 import { GroupComposition, openThread } from "./composition.ts"
 
 /**
- * The group `groupId` as it opens, before it is read, its threads listed, and the thread `threadId`
- * open in it, if there is one.
+ * The group `groupId` as it opens, before it is read, its threads listed, the thread `threadId`
+ * open in it, if there is one, and its settings' dialog closed, on the General section.
  */
 export const init = GroupComposition.makeInit(
   (
@@ -29,6 +29,7 @@ export const init = GroupComposition.makeInit(
       renaming: Option.none(),
       admitting: Option.none(),
       thread: Option.none(),
+      settingsTab: "General",
       notice: Option.none()
     },
     steps: Option.toArray(Option.map(threadId, openThread))

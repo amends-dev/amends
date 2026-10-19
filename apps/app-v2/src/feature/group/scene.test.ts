@@ -2,9 +2,11 @@ import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
 import {
   Command,
+  Mount,
   change,
   click,
   expect,
@@ -19,8 +21,18 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, bob, bobInDesign, design, membership, opening, thread } from "../../../test/fixtures.ts"
-import { AdmitMember, RemoveMember, RenameGroup } from "./command.ts"
+import {
+  aliceInDesign,
+  aliceInGeneral,
+  bob,
+  bobInDesign,
+  design,
+  general,
+  membership,
+  opening,
+  thread
+} from "../../../test/fixtures.ts"
+import { AdmitMember, JoinGroup, LeaveGroup, RemoveMember, RenameGroup } from "./command.ts"
 import { Message, type Model } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -64,6 +76,28 @@ const followOfDesign = Schema.decodeSync(GroupFollow.GroupFollow)({
 
 const inWorkspace = Scope.Scope.cases.Workspace.make({ workspaceId: workspace.id })
 
+const inDesign = { workspaceId: workspace.id, memberId: member.id, groupId: design.id }
+
+/** The dialog acknowledged open: its element shown, and the resources it holds acquired. */
+const dialogOpened = () =>
+  [
+    Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+    Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources())
+  ] as const
+
+/** The dialog acknowledged closed: its element hidden, and the resources it held released. */
+const dialogClosed = () =>
+  [
+    Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+    Mount.expectEnded(Dialog.test.AcquireResources)
+  ] as const
+
+/** The person asks for the group's settings, which open. */
+const openSettings = () => [click(role("button", { name: "Group settings" })), ...dialogOpened()] as const
+
+/** The settings open on their Members section. */
+const openMembers = () => [...openSettings(), click(role("tab", { name: "Members" }))] as const
+
 /** The team read, with alice and bob admitted, as a member who manages its members sees it. */
 const opened: Model = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
   group: () => Option.some({ group: design, pending: false }),
@@ -73,6 +107,11 @@ const opened: Model = modifyFields(init(workspace.id, member.id, design.id, Opti
   ],
   members: () => [member, bob],
   grants: () => [Grant.make(GroupMembershipPermissions.Manage, inWorkspace)]
+})
+
+/** The same, as a member who may also rename the team. */
+const openedToRename = modifyFields(opened, {
+  grants: (grants) => [...grants, Grant.make(GroupPermissions.Rename, inWorkspace)]
 })
 
 /** The team with a thread open in it, titled. */
@@ -91,93 +130,57 @@ const withThread = modifyFields(
   }
 )
 
+/** The general group, which every member belongs to. */
+const openedGeneral = modifyFields(init(workspace.id, member.id, general.id, Option.none()).model, {
+  group: () => Option.some({ group: general, pending: false }),
+  memberships: () => [{ membership: aliceInGeneral, pending: false }],
+  members: () => [member, bob]
+})
+
+/** A public team the person does not belong to, as they read it. */
+const openedAnnouncements = modifyFields(init(workspace.id, member.id, announcements.id, Option.none()).model, {
+  group: () => Option.some({ group: announcements, pending: false }),
+  members: () => [member, bob]
+})
+
+/** The conversation with Bob read. */
+const openedConversation = modifyFields(init(workspace.id, member.id, withBob.id, Option.none()).model, {
+  group: () => Option.some({ group: withBob, pending: false }),
+  members: () => [member, bob]
+})
+
 describe("a group's main pane", () => {
-  it("is the main landmark titled by the group's name, with the person's part in it and its members", () => {
+  it("is the main landmark titled by the group's name, with the person's part in it and the button to its settings", () => {
     scene(
       { update, view },
       given(opened),
       expect(role("main", { name: "Design" })).toExist(),
       expect(role("heading", { name: "Design", level: 1 })).toExist(),
       expect(within(role("main"), role("button", { name: "Follow" }))).toExist(),
-      expect(within(role("main"), role("button", { name: "Leave" }))).toExist(),
+      expect(within(role("main"), role("button", { name: "Group settings" }))).toExist(),
+      expect(role("button", { name: "Leave" })).toBeAbsent(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
-      inside(
-        role("region", { name: "Members" }),
-        inside(
-          role("list", { name: "Members" }),
-          expect(text("Alice")).toExist(),
-          expect(text("Bob")).toExist(),
-          expect(role("button", { name: "Remove" })).toExist()
-        )
-      ),
-      expect(text("Choose a member")).toBeAbsent(),
+      expect(role("list", { name: "Members" })).toBeAbsent(),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
       expect(text("No threads yet.")).toExist()
     )
   })
 
-  it("marks a member who has the workspace open as online", () => {
+  it("offers no settings until the group is read", () => {
     scene(
       { update, view },
-      given(opened),
-      inside(role("list", { name: "Members" }), expect(text("Online")).toBeAbsent())
-    )
-    scene(
-      { update, view },
-      given(modifyFields(opened, { present: () => [{ memberId: bob.id, typingIn: null }] })),
-      inside(role("list", { name: "Members" }), expect(text("Online")).toExist())
+      given(init(workspace.id, member.id, design.id, Option.none()).model),
+      expect(role("button", { name: "Group settings" })).toBeAbsent()
     )
   })
 
-  it("marks an admission that is on its way, and offers no button to remove it", () => {
+  it("marks a change to the person's follow that is on its way, and offers no button for it", () => {
     scene(
       { update, view },
-      given(
-        modifyFields(opened, {
-          memberships: () => [
-            { membership: aliceInDesign, pending: false },
-            { membership: bobInDesign, pending: true }
-          ]
-        })
-      ),
-      inside(
-        role("list", { name: "Members" }),
-        expect(text("Bob")).toExist(),
-        expect(text(" · Sending…")).toExist(),
-        expect(role("button", { name: "Remove" })).toBeAbsent()
-      )
-    )
-  })
-
-  it("removes a member and admits another, where the person manages them", () => {
-    const inDesign = { workspaceId: workspace.id, memberId: member.id, groupId: design.id }
-    scene(
-      { update, view },
-      given(modifyFields(opened, { memberships: () => [{ membership: aliceInDesign, pending: false }] })),
-      inside(role("list", { name: "Members" }), expect(text("Alice")).toExist()),
-      inside(
-        role("form", { name: "Add a member" }),
-        change(role("combobox", { name: "Add a member" }), bob.id),
-        click(role("button", { name: "Add" }))
-      ),
-      Command.expectExact(AdmitMember({ ...inDesign, admitMemberId: bob.id })),
-      Command.resolve(AdmitMember, Message.WroteAction())
-    )
-    scene(
-      { update, view },
-      given(opened),
-      inside(role("list", { name: "Members" }), click(role("button", { name: "Remove" }))),
-      Command.expectExact(RemoveMember({ ...inDesign, membershipId: bobInDesign.id })),
-      Command.resolve(RemoveMember, Message.WroteAction())
-    )
-  })
-
-  it("shows the members to someone who may not manage them, with no way to remove or add", () => {
-    scene(
-      { update, view },
-      given(modifyFields(opened, { grants: () => [] })),
-      inside(role("list", { name: "Members" }), expect(text("Bob")).toExist()),
-      expect(role("button", { name: "Remove" })).toBeAbsent(),
-      expect(role("form", { name: "Add a member" })).toBeAbsent()
+      given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: true }) })),
+      expect(text(" · Sending…")).toExist(),
+      expect(role("button", { name: "Unfollow" })).toBeAbsent(),
+      expect(role("button", { name: "Follow" })).toBeAbsent()
     )
   })
 
@@ -218,12 +221,7 @@ describe("a group's main pane", () => {
   it("offers joining a public team the person does not belong to, in place of its threads", () => {
     scene(
       { update, view },
-      given(
-        modifyFields(init(workspace.id, member.id, announcements.id, Option.none()).model, {
-          group: () => Option.some({ group: announcements, pending: false }),
-          members: () => [member, bob]
-        })
-      ),
+      given(openedAnnouncements),
       expect(role("heading", { name: "Announcements", level: 1 })).toExist(),
       expect(role("button", { name: "Join" })).toExist(),
       expect(role("button", { name: "Follow" })).toBeAbsent(),
@@ -232,63 +230,15 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("offers admitting a member who is not in the team, from the members' choice", () => {
-    scene(
-      { update, view },
-      given(modifyFields(opened, { memberships: () => [{ membership: aliceInDesign, pending: false }] })),
-      expect(text("Choose a member")).toExist(),
-      expect(role("button", { name: "Add" })).toExist()
-    )
-  })
-
   it("is titled by the other member of a conversation, marked by their first letter, with no members", () => {
     scene(
       { update, view },
-      given(
-        modifyFields(init(workspace.id, member.id, withBob.id, Option.none()).model, {
-          group: () => Option.some({ group: withBob, pending: false }),
-          members: () => [member, bob]
-        })
-      ),
+      given(openedConversation),
       expect(role("heading", { name: "Bob", level: 1 })).toExist(),
       expect(within(role("main", { name: "Bob" }), text("B"))).toExist(),
       expect(role("heading", { name: "Members" })).toBeAbsent(),
       expect(role("button", { name: "Leave" })).toBeAbsent(),
       expect(label("Start a thread")).toHaveAttr("placeholder", "Message Bob")
-    )
-  })
-
-  it("renames a team from its header, in a form in the body, for someone who may", () => {
-    scene(
-      { update, view },
-      given(
-        modifyFields(opened, { grants: (grants) => [...grants, Grant.make(GroupPermissions.Rename, inWorkspace)] })
-      ),
-      click(role("button", { name: "Rename" })),
-      expect(role("button", { name: "Rename" })).toBeAbsent(),
-      type(label("Name"), "Design team"),
-      click(role("button", { name: "Save" })),
-      Command.expectExact(
-        RenameGroup({
-          workspaceId: workspace.id,
-          memberId: member.id,
-          groupId: design.id,
-          name: "Design team",
-          expectedName: "Design"
-        })
-      ),
-      Command.resolve(RenameGroup, Message.WroteAction()),
-      expect(label("Name")).toBeAbsent()
-    )
-  })
-
-  it("marks a change to the person's follow that is on its way, and offers no button for it", () => {
-    scene(
-      { update, view },
-      given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: true }) })),
-      expect(text(" · Sending…")).toExist(),
-      expect(role("button", { name: "Unfollow" })).toBeAbsent(),
-      expect(role("button", { name: "Follow" })).toBeAbsent()
     )
   })
 
@@ -299,6 +249,312 @@ describe("a group's main pane", () => {
       expect(role("main", { name: "Design" })).toExist(),
       expect(role("complementary")).toBeAbsent(),
       expect(role("heading", { name: "Composer paste crash" })).toBeAbsent()
+    )
+  })
+})
+
+describe("a group's settings", () => {
+  it("open in a dialog named for them, with the team's name beside the title and the General section first", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      expect(role("dialog", { name: "Group settings" })).toExist(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("heading", { name: "Group settings", level: 2 })).toExist(),
+        expect(text("# Design")).toExist(),
+        expect(role("tablist", { name: "Group settings" })).toExist(),
+        expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "true"),
+        expect(role("tab", { name: "Members" })).toHaveAttr("aria-selected", "false"),
+        expect(role("tab", { name: "Members" })).toHaveAttr("aria-description", "2"),
+        expect(role("button", { name: "Close" })).toExist(),
+        expect(role("button", { name: "Cancel" })).toExist()
+      )
+    )
+  })
+
+  it("show a team's name as text, its visibility, and the way to leave it, to someone who may not rename it", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(text("Group name")).toExist(),
+        expect(text("Design")).toExist(),
+        expect(role("textbox", { name: "Group name" })).toBeAbsent(),
+        expect(text("Everyone in this group sees this name.")).toBeAbsent(),
+        expect(text("Visibility")).toExist(),
+        expect(text("Private. Members are admitted by the group.")).toExist(),
+        expect(text("Membership")).toExist(),
+        expect(text("You're a member of this group.")).toExist(),
+        expect(role("button", { name: "Leave" })).toExist(),
+        expect(role("button", { name: "Save changes" })).toBeAbsent()
+      )
+    )
+  })
+
+  it("say that a public team lets anyone in the workspace join", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          group: () => Option.some({ group: { ...design, visibility: "Public" }, pending: false })
+        })
+      ),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(text("Public. Anyone in the workspace can join.")).toExist()
+      )
+    )
+  })
+
+  it("rename a team the person may rename, in a field holding the focus, from the name it has", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("textbox", { name: "Group name" })).toExist(),
+        expect(label("Group name")).toHaveValue("Design"),
+        expect(label("Group name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+        expect(text("Everyone in this group sees this name.")).toExist(),
+        type(label("Group name"), "Design team"),
+        click(role("button", { name: "Save changes" }))
+      ),
+      Command.expectHas(
+        RenameGroup({ ...inDesign, name: "Design team", expectedName: "Design" }),
+        Dialog.test.CloseDialog
+      ),
+      Command.resolve(RenameGroup, Message.WroteAction()),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
+      expect(role("button", { name: "Group settings" })).toExist()
+    )
+  })
+
+  it("write no rename when the name is the one the team has, and close", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...openSettings(),
+      click(role("button", { name: "Save changes" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent()
+    )
+  })
+
+  it("drop a name being typed when they close with Cancel, and open on the name the team has", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...openSettings(),
+      type(label("Group name"), "Design team"),
+      click(role("button", { name: "Cancel" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
+      ...openSettings(),
+      expect(label("Group name")).toHaveValue("Design")
+    )
+  })
+
+  it("close with their Close button", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      click(within(role("dialog", { name: "Group settings" }), role("button", { name: "Close" }))),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent()
+    )
+  })
+
+  it("let the person leave a team they belong to, closing", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      click(within(role("dialog", { name: "Group settings" }), role("button", { name: "Leave" }))),
+      Command.expectHas(LeaveGroup({ ...inDesign, membershipId: aliceInDesign.id }), Dialog.test.CloseDialog),
+      Command.resolve(LeaveGroup, Message.WroteAction()),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Group settings" })).toBeAbsent()
+    )
+  })
+
+  it("let the person join a public team they do not belong to, staying open", () => {
+    scene(
+      { update, view },
+      given(openedAnnouncements),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(text("You're not a member.")).toExist(),
+        expect(role("button", { name: "Leave" })).toBeAbsent(),
+        click(role("button", { name: "Join" }))
+      ),
+      Command.expectExact(JoinGroup({ ...inDesign, groupId: announcements.id })),
+      Command.resolve(JoinGroup, Message.WroteAction()),
+      expect(role("dialog", { name: "Group settings" })).toExist()
+    )
+  })
+
+  it("say that everyone in the workspace belongs to general, with no way to leave it", () => {
+    scene(
+      { update, view },
+      given(openedGeneral),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(text("# general")).toBeAbsent(),
+        expect(text("Everyone in the workspace belongs to general.")).toExist(),
+        expect(role("button", { name: "Leave" })).toBeAbsent(),
+        expect(role("button", { name: "Join" })).toBeAbsent()
+      )
+    )
+  })
+
+  it("are a conversation's name and its members, with no tabs, no visibility, and no way to leave", () => {
+    scene(
+      { update, view },
+      given(openedConversation),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("tablist")).toBeAbsent(),
+        expect(text("Bob")).toExist(),
+        expect(text("# Bob")).toBeAbsent(),
+        expect(text("Visibility")).toBeAbsent(),
+        expect(text("A conversation between its members.")).toExist(),
+        expect(role("button", { name: "Leave" })).toBeAbsent(),
+        expect(role("button", { name: "Save changes" })).toBeAbsent(),
+        expect(role("button", { name: "Cancel" })).toExist()
+      )
+    )
+  })
+
+  it("list a team's members in the Members section, which the tabs switch to and from", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      expect(role("list", { name: "Members" })).toBeAbsent(),
+      click(role("tab", { name: "Members" })),
+      expect(role("tab", { name: "Members" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "false"),
+      inside(
+        role("list", { name: "Members" }),
+        expect(text("Alice")).toExist(),
+        expect(text("Bob")).toExist(),
+        expect(role("button", { name: "Remove" })).toExist()
+      ),
+      expect(text("Choose a member")).toBeAbsent(),
+      expect(text("Visibility")).toBeAbsent(),
+      expect(role("button", { name: "Cancel" })).toExist(),
+      expect(role("button", { name: "Save changes" })).toBeAbsent(),
+      click(role("tab", { name: "General" })),
+      expect(role("list", { name: "Members" })).toBeAbsent(),
+      expect(text("Visibility")).toExist()
+    )
+  })
+
+  it("open on the General section, whichever one they last showed", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openMembers(),
+      click(role("button", { name: "Cancel" })),
+      ...dialogClosed(),
+      ...openSettings(),
+      expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "true"),
+      expect(role("list", { name: "Members" })).toBeAbsent()
+    )
+  })
+
+  it("mark a member who has the workspace open as online", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openMembers(),
+      inside(role("list", { name: "Members" }), expect(text("Online")).toBeAbsent())
+    )
+    scene(
+      { update, view },
+      given(modifyFields(opened, { present: () => [{ memberId: bob.id, typingIn: null }] })),
+      ...openMembers(),
+      inside(role("list", { name: "Members" }), expect(text("Online")).toExist())
+    )
+  })
+
+  it("mark an admission that is on its way, and offer no button to remove it", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          memberships: () => [
+            { membership: aliceInDesign, pending: false },
+            { membership: bobInDesign, pending: true }
+          ]
+        })
+      ),
+      ...openMembers(),
+      inside(
+        role("list", { name: "Members" }),
+        expect(text("Bob")).toExist(),
+        expect(text(" · Sending…")).toExist(),
+        expect(role("button", { name: "Remove" })).toBeAbsent()
+      )
+    )
+  })
+
+  it("remove a member and admit another, where the person manages them", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { memberships: () => [{ membership: aliceInDesign, pending: false }] })),
+      ...openMembers(),
+      inside(role("list", { name: "Members" }), expect(text("Alice")).toExist()),
+      inside(
+        role("form", { name: "Add a member" }),
+        change(role("combobox", { name: "Add a member" }), bob.id),
+        click(role("button", { name: "Add" }))
+      ),
+      Command.expectExact(AdmitMember({ ...inDesign, admitMemberId: bob.id })),
+      Command.resolve(AdmitMember, Message.WroteAction())
+    )
+    scene(
+      { update, view },
+      given(opened),
+      ...openMembers(),
+      inside(role("list", { name: "Members" }), click(role("button", { name: "Remove" }))),
+      Command.expectExact(RemoveMember({ ...inDesign, membershipId: bobInDesign.id })),
+      Command.resolve(RemoveMember, Message.WroteAction()),
+      expect(role("dialog", { name: "Group settings" })).toExist()
+    )
+  })
+
+  it("offer admitting a member who is not in the team, from the members' choice", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { memberships: () => [{ membership: aliceInDesign, pending: false }] })),
+      ...openMembers(),
+      expect(text("Choose a member")).toExist(),
+      expect(role("button", { name: "Add" })).toExist()
+    )
+  })
+
+  it("show the members to someone who may not manage them, with no way to remove or add", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { grants: () => [] })),
+      ...openMembers(),
+      inside(role("list", { name: "Members" }), expect(text("Bob")).toExist()),
+      expect(role("button", { name: "Remove" })).toBeAbsent(),
+      expect(role("form", { name: "Add a member" })).toBeAbsent()
     )
   })
 })
