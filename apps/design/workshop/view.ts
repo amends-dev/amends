@@ -1048,6 +1048,30 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
+      "A list ended by a quiet button, centered: Show older",
+      [
+        messageList(h, {
+          label: "Inbox paged",
+          children: [
+            divider(h, "Yesterday"),
+            notification(h, {
+              key: "paged-caleb",
+              mark: "C",
+              author: "Caleb",
+              activity: "mentioned you",
+              place: "Caleb · Direct message",
+              text: mentionRuns("@Jamie", " let's grab coffee after the rollout."),
+              age: "Yesterday",
+              onOpen: press
+            })
+          ]
+        }),
+        buttonRow(h, [button(h, "Show older", press, { variant: "quiet" })], { isCentered: true })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
       "A body in place of the text",
       [
         messageList(h, {

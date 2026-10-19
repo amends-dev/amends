@@ -98,7 +98,8 @@ and its `log`. The inbox has `paneTabs` of All and Unread, which counts those wa
 notifications as `notification`s in a `messageList`, under a `divider` for each day, each its
 author's initials and name and what they did, its place, its text, which opens the thread, how long
 ago it came, and a dot while it waits, the row of the notification whose thread is open drawn
-current, with Mark all seen among the header's actions, and `paneEmpty` when a tab has nothing. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
+current, with Mark all seen among the header's actions, a quiet Show older after the list, in a
+centered `buttonRow`, while there are older notifications, and `paneEmpty` when a tab has nothing. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
 line of what it is for, and a secondary button to change it, which a `form` of a `field` with Save
 and a quiet Cancel replaces while the person does; the members and the invitations waiting are
 `entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
@@ -331,9 +332,12 @@ the pages that compose them; the root composes the pages.
   the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
   when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
   pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
-  nothing, since it asked. The Block offers a count of what waits for its parent to show. It lacks
-  "Show older", the mock's page of older notifications: the store gives every notification the
-  person has at once, and paging them waits for the store to page.
+  nothing, since it asked. The Block offers a count of what waits for its parent to show. The store gives every
+  notification the person has at once, so the list is paged by the view: the model's `shown` is how
+  many of the newest the list shows, `pageSize` (20) at first, and `ClickedShowOlder` adds a page. While
+  the tab keeps notifications older than those listed (`hasOlderItems`), Show older, a quiet button,
+  centered, follows the list. The tabs keep what is shown, and the notification opened stays listed in
+  its place even when newer ones push it past the page.
 - `feature/tasks`: the tasks the person can see across their groups, from the store's `tasks`: each
   with its thread, its group's name, how many replies the thread has, and when it was last active,
   and the members and contacts that name who started a thread and who is assigned to it. It is made
@@ -660,7 +664,8 @@ browser's storage. Each Block's tests sit beside it:
   found or the rows shown are for an earlier query; the inbox
   saying why the person is told, who wrote what and what they did, where it comes from, and what it
   says, grouping the notifications by the day they came on, listing every one or those waiting, and the
-  one opened in its place, newest first, as its tab chooses, opening the thread of a notification,
+  one opened in its place, newest first, as its tab chooses, the newest page of them and a page more each
+  time older ones are asked for, whichever tab shows, with the one opened kept past the page, opening the thread of a notification,
   which writes it seen only while it waits, selects it, and reports it, opening none for a notification
   from no thread, moving the selection to the next one opened, clearing it with Close and reporting
   that, or as its parent asks and reporting nothing, finding the group the thread is in, marking all through
@@ -758,8 +763,9 @@ browser's storage. Each Block's tests sit beside it:
   seen ones on All without the dot and not on Unread, the tabs counted and chosen, all marked seen,
   which keeps the thread open, one's thread opened by its text, which marks it seen unless it was and
   fails visibly, its row current and moving as another is opened, kept on Unread once seen with only
-  what waits counted, and an empty All saying there is nothing yet and an empty Unread saying all is
-  caught up, only once the thread is closed; the inbox's side pane, titled by the thread under the
+  what waits counted, an empty All saying there is nothing yet and an empty Unread saying all is
+  caught up, only once the thread is closed, and the newest page with Show older after it, which goes
+  once older ones are asked for and is not offered on a tab that keeps none; the inbox's side pane, titled by the thread under the
   group it is in, with the message the notification is about drawn current, the reply composer in
   its footer, closed by its Close or its Back, and absent while no thread is open; the tasks in triage as a main pane titled
   Triage, and every open task as one titled Tasks, each task by its group, its assignee's initials,

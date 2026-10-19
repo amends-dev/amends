@@ -1,4 +1,4 @@
-import { button, notice } from "@amends-dev/design/control"
+import { button, buttonRow, notice } from "@amends-dev/design/control"
 import { divider, messageList, notification } from "@amends-dev/design/message"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
@@ -11,6 +11,7 @@ import { InboxComposition, type InboxViewBuilder, ThreadBinding } from "./compos
 import {
   byDay,
   findGroup,
+  hasOlderItems,
   type InboxItem,
   isSelected,
   isWaiting,
@@ -73,7 +74,8 @@ const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: In
 
 /**
  * The notifications the tab lists, newest first, under the days they came, to open beside the inbox, with the one
- * open kept in its place, or what a tab says when it has none.
+ * open kept in its place, and Show older after them while the tab keeps older ones, or what a tab says when it has
+ * none.
  */
 export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) => {
   const items = shownItems(model)
@@ -100,7 +102,14 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
                   divider(h, day.label),
                   ...day.items.map((item) => notificationRow(item, model, now, h))
                 ])
-              })
+              }),
+          ...(hasOlderItems(model)
+            ? [
+                buttonRow(h, [button(h, "Show older", Message.ClickedShowOlder(), { variant: "quiet" })], {
+                  isCentered: true
+                })
+              ]
+            : [])
         ],
         { isWide: true }
       )

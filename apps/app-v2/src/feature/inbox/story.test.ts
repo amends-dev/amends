@@ -24,6 +24,7 @@ import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
 import {
   byDay,
   findGroup,
+  hasOlderItems,
   type InboxItem,
   Message,
   newestWaiting,
@@ -32,6 +33,7 @@ import {
   notificationReason,
   notificationText,
   OutMessage,
+  pageSize,
   shownItems,
   waitingCount
 } from "./definition.ts"
@@ -83,6 +85,10 @@ const markedSeen = (item: InboxItem): InboxItem => ({
   ...item,
   notification: { ...item.notification, state: Notification.State.cases.Seen.make({ seenAt: newer.recordedAt }) }
 })
+
+/** `count` notifications of the thread, a minute apart, the first the oldest, as the store gives them. */
+const many = (count: number): ReadonlyArray<InboxItem> =>
+  Array.from({ length: count }, (_, index) => itemOf(notificationOf(`notification-${index + 1}`, index + 1, 5 + index)))
 
 const listed = init(workspace.id, member.id).model
 
@@ -381,6 +387,96 @@ describe("the inbox", () => {
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(idsOf(shownItems(model))).toEqual([seen.id, newer.id, older.id])
+      })
+    )
+  })
+
+  it("lists the newest page of notifications, and a page more each time the person asks for older ones", () => {
+    const items = many(pageSize + 1)
+
+    story(
+      update,
+      given(known),
+      model((model) => {
+        expect(model.shown).toBe(pageSize)
+      }),
+      message(Message.ReceivedInbox({ items })),
+      model((model) => {
+        expect(shownItems(model)).toHaveLength(pageSize)
+        expect(idsOf(shownItems(model))).not.toContain(items[0]?.notification.id)
+        expect(hasOlderItems(model)).toBe(true)
+      }),
+      message(Message.ClickedShowOlder()),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.shown).toBe(2 * pageSize)
+        expect(shownItems(model)).toHaveLength(pageSize + 1)
+        expect(hasOlderItems(model)).toBe(false)
+      })
+    )
+  })
+
+  it("lists every notification, and no older ones, while there are no more than a page", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: many(pageSize) })),
+      model((model) => {
+        expect(shownItems(model)).toHaveLength(pageSize)
+        expect(hasOlderItems(model)).toBe(false)
+      })
+    )
+  })
+
+  it("keeps how many it lists as the tab changes, and cuts each tab to it", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [...many(pageSize + 1), markedSeen(itemOf(seen))] })),
+      message(Message.ChoseTab({ tab: "Unread" })),
+      model((model) => {
+        expect(shownItems(model)).toHaveLength(pageSize)
+        expect(hasOlderItems(model)).toBe(true)
+      }),
+      message(Message.ClickedShowOlder()),
+      message(Message.ChoseTab({ tab: "All" })),
+      model((model) => {
+        expect(model.shown).toBe(2 * pageSize)
+        expect(shownItems(model)).toHaveLength(pageSize + 2)
+        expect(hasOlderItems(model)).toBe(false)
+      }),
+      message(Message.ChoseTab({ tab: "Unread" })),
+      model((model) => {
+        expect(shownItems(model)).toHaveLength(pageSize + 1)
+        expect(hasOlderItems(model)).toBe(false)
+      })
+    )
+  })
+
+  it("keeps the notification opened in its place when newer ones push it past the page, and says older ones remain", () => {
+    const [oldest, ...rest] = many(pageSize + 2)
+    if (oldest === undefined) throw new Error("no notifications")
+
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: many(pageSize) })),
+      message(Message.ClickedOpen({ notificationId: oldest.notification.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ReceivedInbox({ items: [markedSeen(oldest), ...rest] })),
+      model((model) => {
+        expect(idsOf(shownItems(model))).toEqual([
+          ...idsOf(rest.toReversed().slice(0, pageSize)),
+          oldest.notification.id
+        ])
+        expect(hasOlderItems(model)).toBe(true)
+      }),
+      message(Message.ClickedShowOlder()),
+      model((model) => {
+        expect(shownItems(model)).toHaveLength(pageSize + 2)
+        expect(hasOlderItems(model)).toBe(false)
       })
     )
   })

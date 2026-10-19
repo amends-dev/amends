@@ -51,6 +51,8 @@ const iconButtonSizes = {
 
 const buttonRowLook = "flex flex-wrap items-center gap-2"
 
+const centeredLook = "justify-center"
+
 const fieldColumn = "flex flex-col gap-2"
 
 const columnLook = "flex flex-col gap-3"
@@ -258,11 +260,17 @@ export const iconSubmit = <Message, Requirements>(
   options: IconButtonOptions = {}
 ) => renderIconButton(h, config, { type: "submit" }, options)
 
+export type ButtonRowOptions = Readonly<{
+  /** Put the controls in the middle of the row's width, for what ends a list, such as a quiet Show older. */
+  isCentered?: boolean
+}>
+
 /** Controls side by side, 8px apart, wrapping onto a new line when they do not fit. */
 export const buttonRow = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  children: ReadonlyArray<Html>
-): Html => h.div([h.Class(buttonRowLook)], children)
+  children: ReadonlyArray<Html>,
+  options: ButtonRowOptions = {}
+): Html => h.div([h.Class(joinClasses(buttonRowLook, options.isCentered === true && centeredLook))], children)
 
 /** A few pieces that belong together inside a section, one under another, 12px apart, such as a notice and its button. */
 export const column = <Message, Requirements>(

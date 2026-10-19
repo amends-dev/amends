@@ -39,7 +39,7 @@ conversation's messages as a list with a current row whose text opens the thread
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with a form in place of the text, and set apart by dividers, centered and at the
-start, and notifications under the days Today and Yesterday, unread with a dot and read, and with the notification whose thread is open as the current row among them; a pane's empty state with a title
+start, and notifications under the days Today and Yesterday, unread with a dot and read, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
@@ -181,8 +181,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   such as the composer's send button.
 - `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
   already give it its behavior, as `buttonWith` is for `button`.
-- `buttonRow(h, children)` is a row of controls with an 8px gap, wrapping onto a new line when they do
-  not fit, such as a thread's Follow and Rename or a form's Save and Cancel.
+- `buttonRow(h, children, options?)` is a row of controls with an 8px gap, wrapping onto a new line when
+  they do not fit, such as a thread's Follow and Rename or a form's Save and Cancel. With `isCentered`
+  the controls are in the middle of the row's width, for the quiet button that ends a list, such as
+  Show older under the inbox.
 - `column(h, children)` is a few pieces that belong together inside a section, one under another and
   12px apart, such as a notice over the button that answers it, or over a Try again row.
 - `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping

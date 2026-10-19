@@ -12,6 +12,7 @@ import {
   messageOfNotification,
   newestWaiting,
   OutMessage,
+  pageSize,
   threadOfNotification
 } from "./definition.ts"
 
@@ -37,6 +38,7 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
+    ClickedShowOlder: () => ({ model: modifyFields(model, { shown: (shown) => shown + pageSize }) }),
     ClickedOpen: ({ notificationId }) =>
       Option.match(threadOfNotification(model, notificationId), {
         onNone: () => ({ model }),

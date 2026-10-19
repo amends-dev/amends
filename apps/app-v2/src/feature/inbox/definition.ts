@@ -3,9 +3,9 @@
  * days they came, each by the author of the message its activity is about, what they did, the group
  * it comes from, and what the message says, as far as the store holds them. They open a
  * notification's thread beside the inbox, which marks that notification seen, and the row stays
- * selected, in its place, while the thread is open; or they mark every notification seen at once. It
- * reports when the thread opens and when the person closes it, and closes the thread when its parent
- * asks.
+ * selected, in its place, while the thread is open; or they mark every notification seen at once. The
+ * list shows the newest few and the person asks for older ones a page at a time. It reports when the
+ * thread opens and when the person closes it, and closes the thread when its parent asks.
  */
 
 import { Contact } from "@amends-dev/core/channel"
@@ -52,14 +52,19 @@ export const Selected = Schema.Struct({
 })
 export type Selected = typeof Selected.Type
 
+/** How many notifications the list shows at first, and how many more each Show older adds. */
+export const pageSize = 20
+
 /**
- * The person's notifications, which of them the inbox shows, the one they opened with its thread, the groups and
- * the people that name where they come from and who wrote them, and why the last read or write failed.
+ * The person's notifications, which of them the inbox shows, how many of the newest it lists, the one they opened
+ * with its thread, the groups and the people that name where they come from and who wrote them, and why the last
+ * read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   tab: Tab,
+  shown: Schema.Int,
   items: Schema.Array(InboxItem),
   selected: Schema.Option(Selected),
   groups: Schema.Array(Group.Group),
@@ -75,6 +80,7 @@ export const Message = defineMessageUnion({
   ReceivedPeople: { members: Schema.Array(Member.Member), contacts: Schema.Array(Contact.Contact) },
   FailedRead: { error: Schema.String },
   ChoseTab: { tab: Tab },
+  ClickedShowOlder: {},
   ClickedOpen: { notificationId: Notification.NotificationId },
   ClickedClose: {},
   ClickedMarkAllSeen: {},
@@ -103,15 +109,25 @@ export const isSelected = (model: Model, { notification }: InboxItem): boolean =
   Option.exists(model.selected, ({ notificationId }) => notificationId === notification.id)
 
 /**
- * The notifications the tab lists, newest first: on All every one, on Unread those still waiting and the one
- * the person opened, which stays in its place while its thread is open, though it is no longer waiting.
+ * The notifications the tab keeps, newest first: on All every one, on Unread those still waiting and the one the
+ * person opened, which stays in its place while its thread is open, though it is no longer waiting.
  */
-export const shownItems = (model: Model): ReadonlyArray<InboxItem> => {
+const tabItems = (model: Model): ReadonlyArray<InboxItem> => {
   const items =
     model.tab === "All" ? model.items : model.items.filter((item) => isWaiting(item) || isSelected(model, item))
 
   return items.toSorted(byNewest)
 }
+
+/**
+ * The notifications the tab lists, newest first, as many as the person has asked for, and the one they opened
+ * wherever it falls, so that it stays in its place while its thread is open.
+ */
+export const shownItems = (model: Model): ReadonlyArray<InboxItem> =>
+  tabItems(model).filter((item, index) => index < model.shown || isSelected(model, item))
+
+/** Whether the tab keeps notifications older than those it lists. */
+export const hasOlderItems = (model: Model): boolean => tabItems(model).length > shownItems(model).length
 
 /** How many notifications wait for the person, which counts none that was only kept in place. */
 export const waitingCount = (model: Model): number => model.items.filter(isWaiting).length

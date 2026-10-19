@@ -621,6 +621,30 @@ describe("buttonRow", () => {
       expect(role("status")).toHaveText("Saved 1, removed 2, submitted 0")
     )
   })
+
+  it("keeps its controls at the start of its width, and centers them when asked", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [buttonRow(h, [button(h, "Show older", Message.ClickedSave(), { variant: "quiet" })])])
+      },
+      given(initial),
+      expect(selector(".flex-wrap")).toExist(),
+      expect(selector(".flex-wrap.justify-center")).toBeAbsent()
+    )
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          buttonRow(h, [button(h, "Show older", Message.ClickedSave(), { variant: "quiet" })], { isCentered: true })
+        ])
+      },
+      given(initial),
+      expect(within(selector(".flex-wrap.justify-center"), role("button", { name: "Show older" }))).toExist(),
+      click(role("button", { name: "Show older" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
+    )
+  })
 })
 
 describe("column", () => {

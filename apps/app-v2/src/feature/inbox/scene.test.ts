@@ -41,7 +41,7 @@ import { ReadDraft } from "../composer/command.ts"
 import { init as initThread } from "../thread/init.ts"
 import { InboxBlock } from "./block.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
-import { Message, OutMessage } from "./definition.ts"
+import { Message, OutMessage, pageSize } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -99,6 +99,13 @@ const selectedOf = (notificationId: Notification.NotificationId) =>
     messageId: Option.some(reply.id),
     model: threadRead
   })
+
+/** `count` notifications of Bob's reply, a minute apart, as the store gives them. */
+const many = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    ...bobsReply,
+    notification: notificationOf(`notification-${index + 1}`, 2, 5 + index)
+  }))
 
 /** The inbox with the notification's thread open beside it. */
 const openedThread = modifyFields(opened, { selected: () => selectedOf(notification.id) })
@@ -181,6 +188,56 @@ describe("the inbox", () => {
       expect(role("button", { name: "Bob mentioned you" })).toBeAbsent(),
       click(role("tab", { name: "All" })),
       expect(role("button", { name: "Bob mentioned you" })).toExist()
+    )
+  })
+
+  it("lists the newest page of notifications, with Show older after them until the person asks for the rest", () => {
+    const bobsReplies = all.role("button", { name: "Bob replied" })
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => many(pageSize + 1) })),
+      expectAll(bobsReplies).toHaveCount(pageSize),
+      expect(role("button", { name: "Show older" })).toExist(),
+      click(role("button", { name: "Show older" })),
+      Command.expectNone(),
+      expectAll(bobsReplies).toHaveCount(pageSize + 1),
+      expect(role("button", { name: "Show older" })).toBeAbsent()
+    )
+  })
+
+  it("shows no Show older while the tab holds no more than a page of notifications", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => many(pageSize) })),
+      expectAll(all.role("button", { name: "Bob replied" })).toHaveCount(pageSize),
+      expect(role("button", { name: "Show older" })).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [bobsReply] })),
+      expect(role("button", { name: "Show older" })).toBeAbsent()
+    )
+  })
+
+  it("keeps the page as the tab changes, and offers older notifications only on a tab that keeps them", () => {
+    const [waiting, ...earlier] = many(pageSize + 1).toReversed()
+    if (waiting === undefined) throw new Error("no notifications")
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [waiting, ...earlier.map(seen)] })),
+      expect(role("button", { name: "Show older" })).toExist(),
+      click(role("tab", { name: "Unread" })),
+      expectAll(all.role("button", { name: "Bob replied" })).toHaveCount(1),
+      expect(role("button", { name: "Show older" })).toBeAbsent(),
+      click(role("tab", { name: "All" })),
+      expect(role("button", { name: "Show older" })).toExist(),
+      click(role("button", { name: "Show older" })),
+      click(role("tab", { name: "Unread" })),
+      click(role("tab", { name: "All" })),
+      expectAll(all.role("button", { name: "Bob replied" })).toHaveCount(pageSize + 1),
+      expect(role("button", { name: "Show older" })).toBeAbsent()
     )
   })
 
