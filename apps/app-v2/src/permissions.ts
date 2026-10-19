@@ -4,6 +4,7 @@
  * would refuse.
  */
 
+import type { Connection } from "@amends-dev/connection"
 import { Grant, type Permission, Requirement, Target } from "@amends-dev/core/authorization"
 import type { GroupId } from "@amends-dev/core/group"
 import type { ThreadId } from "@amends-dev/core/thread"
@@ -31,3 +32,7 @@ export const threadTarget = (workspaceId: WorkspaceId.WorkspaceId, threadId: Thr
 /** The member `memberId` as a target of the permissions that act on them. */
 export const memberTarget = (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) =>
   Target.Reference.cases.Member.make({ workspaceId, memberId })
+
+/** The connection `connectionId` as a target of the permissions that act on it. */
+export const connectionTarget = (workspaceId: WorkspaceId.WorkspaceId, connectionId: Connection.ConnectionId) =>
+  Target.Reference.cases.Connection.make({ workspaceId, connectionId })

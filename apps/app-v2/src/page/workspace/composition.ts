@@ -5,6 +5,7 @@ import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { ActionsBlock } from "../../feature/actions/block.ts"
+import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
@@ -51,6 +52,11 @@ export const InboxBinding = WorkspaceDefinition.bindChild(InboxBlock, {
   outMessage: { fold: foldInboxOutMessage }
 })
 
+export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
+  field: "connections",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+})
+
 /** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
   readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
@@ -65,6 +71,6 @@ export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
 })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
-  bindings: [GroupsBinding, ActionsBinding, InboxBinding, GroupBinding]
+  bindings: [GroupsBinding, ActionsBinding, InboxBinding, ConnectionsBinding, GroupBinding]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

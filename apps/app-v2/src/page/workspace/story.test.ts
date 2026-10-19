@@ -3,14 +3,15 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { notificationOf, opening, reply, thread } from "../../../test/fixtures.ts"
+import { connectionOf, notificationOf, opening, reply, testApi, thread } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
+import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { GroupsBinding, InboxBinding } from "./composition.ts"
+import { ConnectionsBinding, GroupsBinding, InboxBinding } from "./composition.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -28,6 +29,10 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
 /** What the inbox reports, as the workspace receives it. */
 const fromInbox = (message: typeof InboxBlock.Message.Type) =>
   InboxBinding.embedView({ slotId: "inbox", model: opened.inbox }).toParentMessage(message)
+
+/** What the connections report, as the workspace receives it. */
+const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
+  ConnectionsBinding.embedView({ slotId: "connections", model: opened.connections }).toParentMessage(message)
 
 /** The notification of activity in a thread of general, read by the inbox. */
 const notification = notificationOf("notification-1", 2, 5)
@@ -75,6 +80,41 @@ describe("a workspace", () => {
         expect(model.groups.selected).toEqual(Option.none())
       }),
       // With the inbox shown, picking the group opens it again.
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("asks the host for its integrations as it opens, which its connections list", () => {
+    expect((init(workspaceId, memberId, "Studio").commands ?? []).map(({ name }) => name)).toEqual([
+      "connections/LoadIntegrations"
+    ])
+  })
+
+  it("shows the connections in place of the open group, leaving no group marked, and reads them whichever shows", () => {
+    story(
+      update,
+      given(opened),
+      message(
+        fromConnections(
+          ConnectionsBlock.Message.ReceivedConnections({
+            connections: [{ connection: connectionOf("connection-1", "Models"), pending: false }]
+          })
+        )
+      ),
+      message(fromConnections(ConnectionsBlock.Message.ReceivedIntegrations({ integrations: [testApi] }))),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedConnections()),
+      model((model) => {
+        expect(Open.isAnyOf(["Connections"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+        expect(model.connections.connections.map(({ connection }) => connection.name)).toEqual(["Models"])
+      }),
+      // With the connections shown, picking the group opens it again.
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {

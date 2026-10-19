@@ -1,8 +1,23 @@
+import { GrantResolver } from "@amends-dev/core/authorization"
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Subscription, click, expect, given, role, scene, text } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, general, membership, notificationOf, opening, reply, thread } from "../../../test/fixtures.ts"
+import {
+  aliceOwns,
+  bob,
+  connectionOf,
+  general,
+  membership,
+  notificationOf,
+  opening,
+  reply,
+  roles,
+  testApi,
+  thread
+} from "../../../test/fixtures.ts"
+import { ConnectionsBlock } from "../../feature/connections/block.ts"
+import { Integrations } from "../../feature/connections/definition.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { init } from "./init.ts"
@@ -29,6 +44,23 @@ const withNotification = modifyFields(opened, {
       ],
       groups: () => [general],
       members: () => [member, bob]
+    })
+})
+
+/** The connections as an owner of the workspace sees them, once the host listed the test API. */
+const asOwner = modifyFields(opened, {
+  connections: (connections) =>
+    modifyFields(connections, {
+      integrations: () => Integrations.Loaded({ integrations: [testApi] }),
+      grants: () => GrantResolver.grantsOf([aliceOwns], (roleId) => roles.find(({ id }) => id === roleId))
+    })
+})
+
+/** The owner's view of the workspace, with one connection to the test API read. */
+const withConnection = modifyFields(asOwner, {
+  connections: (connections) =>
+    modifyFields(connections, {
+      connections: () => [{ connection: connectionOf("connection-1", "Models"), pending: false }]
     })
 })
 
@@ -66,6 +98,33 @@ describe("a workspace", () => {
       ),
       expect(role("button", { name: "Inbox (1)" })).toExist(),
       expect(role("region", { name: "Inbox" })).toBeAbsent()
+    )
+  })
+
+  it("shows the connections on request, with what the person may do with them", () => {
+    scene(
+      { update, view },
+      given(withConnection),
+      expect(role("button", { name: "Connections" })).toExist(),
+      expect(role("region", { name: "Connections" })).toBeAbsent(),
+      click(role("button", { name: "Connections" })),
+      expect(role("region", { name: "Connections" })).toExist(),
+      expect(text(" · Test API · Ready")).toExist(),
+      expect(role("button", { name: "Add a connection" })).toExist()
+    )
+  })
+
+  it("reads the connections whichever destination it shows", () => {
+    scene(
+      { update, view, subscriptions: workspaceSubscriptions },
+      given(asOwner),
+      Subscription.emit(
+        workspaceSubscriptions["connections/connections"],
+        ConnectionsBlock.Message.ReceivedConnections({ connections: withConnection.connections.connections })
+      ),
+      expect(role("region", { name: "Connections" })).toBeAbsent(),
+      click(role("button", { name: "Connections" })),
+      expect(text(" · Test API · Ready")).toExist()
     )
   })
 })
