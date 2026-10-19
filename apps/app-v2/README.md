@@ -68,8 +68,8 @@ and a quiet Cancel replaces while the person does; the members and the invitatio
 quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its email and role. The
 connections, the agents, and the channels are each a `paneColumn` of what failed, the list, and the
 form open among it: the list is an `entryList` of `entry`s, or a `paneEmpty` that says what adding
-one does, and the form is a `paneSection` titled as the form is named, holding a `form` of the
-design's fields, selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of
+one does, and the form is a `paneForm` titled as the form is named, holding the design's fields,
+selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of
 its submit and a quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit while the
 host answers. Adding is the secondary button among the header's actions, shown only when the person
 may, the host's integrations are listed, and a connection gives what the thing needs; the line

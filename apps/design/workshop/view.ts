@@ -24,7 +24,7 @@ import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
 import { divider, message, messageList } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
-import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "../src/pane.ts"
+import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
 import {
@@ -1215,7 +1215,12 @@ const turnEntries = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
 
 const detailsGroup = (
   h: ApplicationViewBuilder,
-  model: Readonly<{ taskStatus: TaskStatus; taskPriority: TaskPriority; taskAssignee: TaskAssignee }>
+  model: Readonly<{
+    workspaceName: string
+    taskStatus: TaskStatus
+    taskPriority: TaskPriority
+    taskAssignee: TaskAssignee
+  }>
 ): Html =>
   group(h, "Details", [
     sample(
@@ -1288,6 +1293,30 @@ const detailsGroup = (
             title: "Turns",
             children: [entryList(h, { label: "Turns in a section", children: turnEntries(h).slice(0, 2) })]
           })
+        ])
+      ],
+      sidePaneColumn
+    ),
+    sample(
+      h,
+      "Pane form: a section that is one form",
+      [
+        paneColumn(h, [
+          paneForm(h, { title: "Rename the workspace", onSubmit: Message.ClickedButton() }, [
+            field(
+              h,
+              {
+                id: "pane-form-name",
+                label: "Name",
+                type: "text",
+                value: model.workspaceName,
+                onInput: (value) => Message.TypedWorkspaceName({ value }),
+                isAutofocus: false
+              },
+              Option.none()
+            ),
+            buttonRow(h, [submit(h, "Save"), button(h, "Cancel", Message.ClickedButton(), { variant: "quiet" })])
+          ])
         ])
       ],
       sidePaneColumn

@@ -1,12 +1,12 @@
 import { describe, it } from "@effect/vitest"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
+import { click, expect, given, label, role, scene, selector, submit, text, type, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { iconButton, sending } from "./control.ts"
-import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "./pane.ts"
+import { field, iconButton, sending, submit as submitButton } from "./control.ts"
+import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "./pane.ts"
 
 const Tab = Schema.Literals(["threads", "tasks"])
 type Tab = typeof Tab.Type
@@ -15,20 +15,31 @@ const Message = defineMessageUnion({
   ChangedTab: { tab: Tab },
   ClosedThread: {},
   WentBack: {},
-  OpenedSettings: {}
+  OpenedSettings: {},
+  TypedName: { name: Schema.String },
+  SubmittedName: {}
 })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ tab: Tab; closings: number; backs: number; settings: number }>
+type Model = Readonly<{
+  tab: Tab
+  closings: number
+  backs: number
+  settings: number
+  name: string
+  submissions: number
+}>
 
-const initial: Model = { tab: "threads", closings: 0, backs: 0, settings: 0 }
+const initial: Model = { tab: "threads", closings: 0, backs: 0, settings: 0, name: "", submissions: 0 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ChangedTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
     ClosedThread: () => ({ model: modifyFields(model, { closings: (closings) => closings + 1 }) }),
     WentBack: () => ({ model: modifyFields(model, { backs: (backs) => backs + 1 }) }),
-    OpenedSettings: () => ({ model: modifyFields(model, { settings: (settings) => settings + 1 }) })
+    OpenedSettings: () => ({ model: modifyFields(model, { settings: (settings) => settings + 1 }) }),
+    TypedName: ({ name }) => ({ model: modifyFields(model, { name: () => name }) }),
+    SubmittedName: () => ({ model: modifyFields(model, { submissions: (submissions) => submissions + 1 }) })
   })
 
 const paneView = (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (model: Model, h: HtmlBuilder<Message>) =>
@@ -319,6 +330,71 @@ describe("paneSection", () => {
       expect(within(role("region", { name: "Turns" }), text("Scout"))).toExist(),
       expect(within(role("region", { name: "Turns" }), text(/Sending/))).toBeAbsent(),
       expect(within(role("region", { name: "Turns" }), text("Triage"))).toBeAbsent()
+    )
+  })
+})
+
+describe("paneForm", () => {
+  const formView =
+    (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (model: Model, h: HtmlBuilder<Message>) =>
+      h.div([], [h.p([h.Role("status")], [`Submitted ${model.submissions}`]), render(model, h)])
+
+  const renamePane = (model: Model, h: HtmlBuilder<Message>) =>
+    paneColumn(h, [
+      paneForm(h, { title: "Rename the workspace", onSubmit: Message.SubmittedName() }, [
+        field(
+          h,
+          {
+            id: "pane-form-name",
+            label: "Name",
+            type: "text",
+            value: model.name,
+            onInput: (name) => Message.TypedName({ name }),
+            isAutofocus: false
+          },
+          Option.none()
+        ),
+        submitButton(h, "Save")
+      ]),
+      paneSection(h, { title: "Turns", children: [h.p([], ["Scout"])] })
+    ])
+
+  it("is a region and a form named by its title, an h3 over the form", () => {
+    scene(
+      { update, view: formView(renamePane) },
+      given(initial),
+      expect(role("region", { name: "Rename the workspace" })).toExist(),
+      expect(
+        within(
+          role("region", { name: "Rename the workspace" }),
+          role("heading", { name: "Rename the workspace", level: 3 })
+        )
+      ).toExist(),
+      expect(
+        within(role("region", { name: "Rename the workspace" }), role("form", { name: "Rename the workspace" }))
+      ).toExist(),
+      expect(within(role("form", { name: "Rename the workspace" }), label("Name"))).toExist(),
+      expect(within(role("form", { name: "Rename the workspace" }), role("button", { name: "Save" }))).toExist()
+    )
+  })
+
+  it("holds the fields it is given, and submitting it sends its message", () => {
+    scene(
+      { update, view: formView(renamePane) },
+      given(initial),
+      type(label("Name"), "Mercier"),
+      expect(label("Name")).toHaveValue("Mercier"),
+      submit(role("form", { name: "Rename the workspace" })),
+      expect(role("status")).toHaveText("Submitted 1")
+    )
+  })
+
+  it("sits among the other sections of the column, which are not forms", () => {
+    scene(
+      { update, view: formView(renamePane) },
+      given(initial),
+      expect(role("form")).toExist(),
+      expect(within(role("region", { name: "Turns" }), role("form"))).toBeAbsent()
     )
   })
 })

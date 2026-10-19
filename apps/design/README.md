@@ -30,7 +30,8 @@ two, each in a frame of its own; the modal, opened by a button, as a form with a
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
 one with tabs and a description; the marks by size; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
-a log short and long, and a pane's sections as a task to change, a task to read, and the turns; a
+a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
+pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
 actions, and meta, with a context line under the author and a quiet action, with a form in place of
 the text, and set apart by dividers, centered and at the start; a pane's empty state with a title
@@ -333,6 +334,10 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
 - `paneSection(h, { title, trailing?, children })` is a section of that column, a `section` named by
   its title: the title as an `h3` at item size in medium weight, with the `trailing` pieces after it on
   the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart.
+- `paneForm(h, { title, onSubmit }, children)` is a section of that column that is one form, named
+  and titled alike: a `paneSection` of the `title` holding a `pane` `form` of the same name that
+  sends `onSubmit`, with the `children`, its fields and buttons, in the form's column. The section
+  is a region and the form a landmark, both found by the `title`.
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
   header's `actions`. It shows from 48rem; below that the side pane is full screen and has `paneBack`.
 - `paneBack(h, onClick)` is the side pane's Back button, an `iconButton` named Back, for the header's

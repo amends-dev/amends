@@ -12,8 +12,7 @@ import {
   toggle
 } from "@amends-dev/design/control"
 import { badge, entry, entryList } from "@amends-dev/design/details"
-import { form } from "@amends-dev/design/form"
-import { pane, paneColumn, paneEmpty, paneSection } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneForm } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { connectionTarget, may, workspaceTarget } from "../../permissions.ts"
@@ -85,131 +84,108 @@ const settingsFields = (
     })
   })
 
-/** A section titled `title` holding the form of that name, whose `children` are its fields and buttons. */
-const formSection = (title: string, children: ReadonlyArray<Html>, h: ConnectionsViewBuilder): Html =>
-  paneSection(h, {
-    title,
-    children: [form(h, { onSubmit: Message.SubmittedForm(), label: title, variant: "pane" }, children)]
-  })
-
 /** The form open among the connections. */
 const formView = (open: Form, model: Model, h: ConnectionsViewBuilder): Html => {
   const cancel = button(h, "Cancel", Message.ClickedCancelForm(), { variant: "quiet" })
   return Form.match(open, {
     Adding: ({ integrationId, name, auth, apiKey, settings, sending: isSending, error }) => {
       const integration = Option.getOrUndefined(findIntegration(model, integrationId))
-      return formSection(
-        "Add a connection",
-        [
-          choiceSelect(h, {
-            id: "connection-integration",
-            label: "Integration",
-            choices: [
-              ["", "Choose an integration"] as const,
-              ...integrationsOf(model).map(({ id, name }) => [id, name] as const)
-            ],
-            value: integrationId,
-            onChange: (integrationId) => Message.ChoseIntegration({ integrationId })
-          }),
-          ...(integration === undefined
-            ? []
-            : [
-                field(
-                  h,
-                  {
-                    id: "connection-name",
-                    label: "Name",
-                    type: "text",
-                    value: name,
-                    onInput: (name) => Message.TypedName({ name })
-                  },
-                  Option.none()
-                ),
-                integration.auth.length > 1
-                  ? choiceSelect(h, {
-                      id: "connection-auth",
-                      label: "Authentication",
-                      choices: integration.auth.map((method) => [method, SettingsForm.authLabels[method]] as const),
-                      value: auth,
-                      onChange: (auth) => Message.ChoseAuth({ auth })
-                    })
-                  : h.empty,
-                auth === "apiKey"
-                  ? field(
-                      h,
-                      {
-                        id: "connection-key",
-                        label: "API key",
-                        type: "password",
-                        value: apiKey,
-                        onInput: (apiKey) => Message.TypedApiKey({ apiKey })
-                      },
-                      Option.none()
-                    )
-                  : h.empty,
-                ...settingsFields(integration.settings, settings, h)
-              ]),
-          notice(h, error),
-          buttonRow(h, [isSending ? hint(h, "Adding…") : submit(h, "Add"), cancel])
-        ],
-        h
-      )
+      return paneForm(h, { title: "Add a connection", onSubmit: Message.SubmittedForm() }, [
+        choiceSelect(h, {
+          id: "connection-integration",
+          label: "Integration",
+          choices: [
+            ["", "Choose an integration"] as const,
+            ...integrationsOf(model).map(({ id, name }) => [id, name] as const)
+          ],
+          value: integrationId,
+          onChange: (integrationId) => Message.ChoseIntegration({ integrationId })
+        }),
+        ...(integration === undefined
+          ? []
+          : [
+              field(
+                h,
+                {
+                  id: "connection-name",
+                  label: "Name",
+                  type: "text",
+                  value: name,
+                  onInput: (name) => Message.TypedName({ name })
+                },
+                Option.none()
+              ),
+              integration.auth.length > 1
+                ? choiceSelect(h, {
+                    id: "connection-auth",
+                    label: "Authentication",
+                    choices: integration.auth.map((method) => [method, SettingsForm.authLabels[method]] as const),
+                    value: auth,
+                    onChange: (auth) => Message.ChoseAuth({ auth })
+                  })
+                : h.empty,
+              auth === "apiKey"
+                ? field(
+                    h,
+                    {
+                      id: "connection-key",
+                      label: "API key",
+                      type: "password",
+                      value: apiKey,
+                      onInput: (apiKey) => Message.TypedApiKey({ apiKey })
+                    },
+                    Option.none()
+                  )
+                : h.empty,
+              ...settingsFields(integration.settings, settings, h)
+            ]),
+        notice(h, error),
+        buttonRow(h, [isSending ? hint(h, "Adding…") : submit(h, "Add"), cancel])
+      ])
     },
     Renaming: ({ name }) =>
-      formSection(
-        "Rename the connection",
-        [
-          field(
-            h,
-            {
-              id: "connection-rename",
-              label: "Name",
-              type: "text",
-              value: name,
-              onInput: (name) => Message.TypedName({ name })
-            },
-            Option.none()
-          ),
-          buttonRow(h, [submit(h, "Save"), cancel])
-        ],
-        h
-      ),
+      paneForm(h, { title: "Rename the connection", onSubmit: Message.SubmittedForm() }, [
+        field(
+          h,
+          {
+            id: "connection-rename",
+            label: "Name",
+            type: "text",
+            value: name,
+            onInput: (name) => Message.TypedName({ name })
+          },
+          Option.none()
+        ),
+        buttonRow(h, [submit(h, "Save"), cancel])
+      ]),
     Configuring: ({ connectionId, settings, error }) => {
       const integration = Option.getOrUndefined(
         Option.flatMap(findConnection(model, connectionId), ({ connection }) =>
           findIntegration(model, connection.integration)
         )
       )
-      return formSection(
-        "Change the connection's settings",
-        [
-          ...(integration === undefined ? [] : settingsFields(integration.settings, settings, h)),
-          notice(h, error),
-          buttonRow(h, [submit(h, "Save"), cancel])
-        ],
-        h
-      )
+      return paneForm(h, { title: "Change the connection's settings", onSubmit: Message.SubmittedForm() }, [
+        ...(integration === undefined ? [] : settingsFields(integration.settings, settings, h)),
+        notice(h, error),
+        buttonRow(h, [submit(h, "Save"), cancel])
+      ])
     },
     ReplacingKey: ({ apiKey, sending: isSending, error }) =>
-      formSection(
-        "Replace the connection's key",
-        [
-          field(
-            h,
-            {
-              id: "connection-new-key",
-              label: "New API key",
-              type: "password",
-              value: apiKey,
-              onInput: (apiKey) => Message.TypedApiKey({ apiKey })
-            },
-            Option.none()
-          ),
-          notice(h, error),
-          buttonRow(h, [isSending ? hint(h, "Replacing…") : submit(h, "Replace"), cancel])
-        ],
-        h
-      )
+      paneForm(h, { title: "Replace the connection's key", onSubmit: Message.SubmittedForm() }, [
+        field(
+          h,
+          {
+            id: "connection-new-key",
+            label: "New API key",
+            type: "password",
+            value: apiKey,
+            onInput: (apiKey) => Message.TypedApiKey({ apiKey })
+          },
+          Option.none()
+        ),
+        notice(h, error),
+        buttonRow(h, [isSending ? hint(h, "Replacing…") : submit(h, "Replace"), cancel])
+      ])
   })
 }
 

@@ -11,21 +11,13 @@ import {
   toggle
 } from "@amends-dev/design/control"
 import { badge, entry, entryList } from "@amends-dev/design/details"
-import { form } from "@amends-dev/design/form"
-import { pane, paneColumn, paneEmpty, paneSection } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneForm } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { channelTarget, may, workspaceTarget } from "../../permissions.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
 import { ChannelsComposition, type ChannelsViewBuilder } from "./composition.ts"
 import { type ChannelItem, destinations, Form, groupNameOf, Message, type Model } from "./definition.ts"
-
-/** A section titled `title` holding the form of that name, whose `children` are its fields and buttons. */
-const formSection = (title: string, children: ReadonlyArray<Html>, h: ChannelsViewBuilder): Html =>
-  paneSection(h, {
-    title,
-    children: [form(h, { onSubmit: Message.SubmittedForm(), label: title, variant: "pane" }, children)]
-  })
 
 /** The form open among the channels. */
 const formView = (open: Form, model: Model, h: ChannelsViewBuilder): Html => {
@@ -40,49 +32,41 @@ const formView = (open: Form, model: Model, h: ChannelsViewBuilder): Html => {
     })
   return Form.match(open, {
     Adding: ({ connectionId, groupId, name, opensTasks, error }) =>
-      formSection(
-        "Add a channel",
-        [
-          choiceSelect(h, {
-            id: "channel-connection",
-            label: "Connection",
-            choices: [["", "Choose a connection"] as const, ...connectionsGiving(model, "channels")],
-            value: connectionId,
-            onChange: (connectionId) => Message.ChoseConnection({ connectionId })
-          }),
-          groupSelect(groupId, "Opens conversations in"),
-          field(
-            h,
-            {
-              id: "channel-name",
-              label: "Name",
-              type: "text",
-              value: name,
-              onInput: (name) => Message.TypedName({ name })
-            },
-            Option.none()
-          ),
-          toggle(h, {
-            id: "channel-opens-tasks",
-            label: "Each conversation is a task in triage",
-            isOn: opensTasks,
-            onToggle: (opensTasks) => Message.ToggledOpensTasks({ opensTasks })
-          }),
-          notice(h, error),
-          buttonRow(h, [submit(h, "Add"), cancel])
-        ],
-        h
-      ),
+      paneForm(h, { title: "Add a channel", onSubmit: Message.SubmittedForm() }, [
+        choiceSelect(h, {
+          id: "channel-connection",
+          label: "Connection",
+          choices: [["", "Choose a connection"] as const, ...connectionsGiving(model, "channels")],
+          value: connectionId,
+          onChange: (connectionId) => Message.ChoseConnection({ connectionId })
+        }),
+        groupSelect(groupId, "Opens conversations in"),
+        field(
+          h,
+          {
+            id: "channel-name",
+            label: "Name",
+            type: "text",
+            value: name,
+            onInput: (name) => Message.TypedName({ name })
+          },
+          Option.none()
+        ),
+        toggle(h, {
+          id: "channel-opens-tasks",
+          label: "Each conversation is a task in triage",
+          isOn: opensTasks,
+          onToggle: (opensTasks) => Message.ToggledOpensTasks({ opensTasks })
+        }),
+        notice(h, error),
+        buttonRow(h, [submit(h, "Add"), cancel])
+      ]),
     Redirecting: ({ groupId, error }) =>
-      formSection(
-        "Move the channel",
-        [
-          groupSelect(groupId, "Opens new conversations in"),
-          notice(h, error),
-          buttonRow(h, [submit(h, "Move"), cancel])
-        ],
-        h
-      )
+      paneForm(h, { title: "Move the channel", onSubmit: Message.SubmittedForm() }, [
+        groupSelect(groupId, "Opens new conversations in"),
+        notice(h, error),
+        buttonRow(h, [submit(h, "Move"), cancel])
+      ])
   })
 }
 

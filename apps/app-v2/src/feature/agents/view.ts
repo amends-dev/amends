@@ -11,8 +11,7 @@ import {
   textarea
 } from "@amends-dev/design/control"
 import { badge, entry, entryList } from "@amends-dev/design/details"
-import { form } from "@amends-dev/design/form"
-import { pane, paneColumn, paneEmpty, paneSection } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneForm } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type * as AgentSetup from "../../agentSetup.ts"
@@ -144,13 +143,6 @@ const setupFields = (setup: AgentSetup.Draft, model: Model, h: AgentsViewBuilder
   })
 ]
 
-/** A section titled `title` holding the form of that name, whose `children` are its fields and buttons. */
-const formSection = (title: string, children: ReadonlyArray<Html>, h: AgentsViewBuilder): Html =>
-  paneSection(h, {
-    title,
-    children: [form(h, { onSubmit: Message.SubmittedForm(), label: title, variant: "pane" }, children)]
-  })
-
 /** The form open among the agents. */
 const formView = (open: Form, model: Model, h: AgentsViewBuilder): Html => {
   const cancel = button(h, "Cancel", Message.ClickedCancelForm(), { variant: "quiet" })
@@ -162,31 +154,30 @@ const formView = (open: Form, model: Model, h: AgentsViewBuilder): Html => {
     )
   return Form.match(open, {
     Adding: ({ name, roleId, setup, error }) =>
-      formSection(
-        "Add an agent",
-        [
-          nameField(name),
-          choiceSelect(h, {
-            id: "agent-role",
-            label: "Role",
-            choices: givableRoles(model).map(({ id, name }) => [id, name] as const),
-            value: roleId,
-            onChange: (roleId) => Message.ChoseRole({ roleId })
-          }),
-          ...setupFields(setup, model, h),
-          notice(h, error),
-          buttonRow(h, [submit(h, "Add"), cancel])
-        ],
-        h
-      ),
+      paneForm(h, { title: "Add an agent", onSubmit: Message.SubmittedForm() }, [
+        nameField(name),
+        choiceSelect(h, {
+          id: "agent-role",
+          label: "Role",
+          choices: givableRoles(model).map(({ id, name }) => [id, name] as const),
+          value: roleId,
+          onChange: (roleId) => Message.ChoseRole({ roleId })
+        }),
+        ...setupFields(setup, model, h),
+        notice(h, error),
+        buttonRow(h, [submit(h, "Add"), cancel])
+      ]),
     Configuring: ({ setup, error }) =>
-      formSection(
-        "Change the agent's setup",
-        [...setupFields(setup, model, h), notice(h, error), buttonRow(h, [submit(h, "Save"), cancel])],
-        h
-      ),
+      paneForm(h, { title: "Change the agent's setup", onSubmit: Message.SubmittedForm() }, [
+        ...setupFields(setup, model, h),
+        notice(h, error),
+        buttonRow(h, [submit(h, "Save"), cancel])
+      ]),
     Renaming: ({ name }) =>
-      formSection("Rename the agent", [nameField(name), buttonRow(h, [submit(h, "Save"), cancel])], h)
+      paneForm(h, { title: "Rename the agent", onSubmit: Message.SubmittedForm() }, [
+        nameField(name),
+        buttonRow(h, [submit(h, "Save"), cancel])
+      ])
   })
 }
 

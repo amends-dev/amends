@@ -6,6 +6,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { hint, iconButton } from "./control.ts"
+import { form } from "./form.ts"
 import { type IconName, icon } from "./icon.ts"
 import { mark } from "./mark.ts"
 
@@ -248,6 +249,20 @@ export const paneSection = <Message, Requirements>(
       ...config.children
     ]
   )
+
+/**
+ * A section of a pane's column that is one form, named and titled alike: a `paneSection` of the `title` holding a
+ * `pane` form of that name, which sends `onSubmit` and holds the `children`, its fields and buttons.
+ */
+export const paneForm = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ title: string; onSubmit: Message }>,
+  children: ReadonlyArray<Html>
+): Html =>
+  paneSection(h, {
+    title: config.title,
+    children: [form(h, { onSubmit: config.onSubmit, label: config.title, variant: "pane" }, children)]
+  })
 
 /**
  * The side panel's close button, named Close, for the header's `actions`. It shows from 48rem; below that the
