@@ -10,7 +10,7 @@ import {
   OutMessage,
   Result,
   resultId,
-  Results,
+  SearchStatus,
   shownResults
 } from "./definition.ts"
 
@@ -30,12 +30,12 @@ export const update = SearchComposition.makeUpdate((model, message) => {
     RequestedOpen: () => Update.combine(model, [clearQuery, DialogBinding.requestOpen()]),
     TypedQuery: ({ query }) => {
       const typed = modifyFields(model, { query: () => query, activeIndex: () => 0 })
-      if (!isSearchable(query)) return { model: modifyFields(typed, { results: () => Results.Idle() }) }
+      if (!isSearchable(query)) return { model: modifyFields(typed, { status: () => SearchStatus.Idle() }) }
 
       return {
         // The rows found before stay until the search for this query answers, so the list does not blink.
         model: modifyFields(typed, {
-          results: (results) => (Results.isAnyOf(["Found"])(results) ? results : Results.Searching({ query }))
+          status: (status) => (SearchStatus.isAnyOf(["Found"])(status) ? status : SearchStatus.Searching({ query }))
         }),
         commands: [Search({ workspaceId: model.workspaceId, memberId: model.memberId, query })]
       }
@@ -43,11 +43,11 @@ export const update = SearchComposition.makeUpdate((model, message) => {
     // An answer for a query that is not the one typed now is late, and dropped.
     CompletedSearch: ({ query, results }) =>
       query === model.query
-        ? { model: modifyFields(model, { results: () => Results.Found({ query, results }), activeIndex: () => 0 }) }
+        ? { model: modifyFields(model, { status: () => SearchStatus.Found({ query, results }), activeIndex: () => 0 }) }
         : { model },
     FailedSearch: ({ query, error }) =>
       query === model.query
-        ? { model: modifyFields(model, { results: () => Results.Failed({ error }), activeIndex: () => 0 }) }
+        ? { model: modifyFields(model, { status: () => SearchStatus.Failed({ error }), activeIndex: () => 0 }) }
         : { model },
     // The view counts the results it shows, so it says which one is active.
     MovedActive: ({ to }) => {

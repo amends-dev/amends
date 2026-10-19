@@ -23,6 +23,7 @@ import { ReadDraft } from "../composer/command.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
 import {
   byDay,
+  findGroup,
   type InboxItem,
   Message,
   newestWaiting,
@@ -32,7 +33,6 @@ import {
   notificationText,
   OutMessage,
   shownItems,
-  threadSubtitle,
   waitingCount
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -385,12 +385,9 @@ describe("the inbox", () => {
     )
   })
 
-  it("says where the thread opened beside the inbox is: a team by its name, a conversation by the others, or only a thread", () => {
-    expect(threadSubtitle(known, general.id)).toBe("Thread in #General")
-    expect(threadSubtitle(modifyFields(known, { groups: () => [conversationWithBob] }), conversationWithBob.id)).toBe(
-      "Thread in Bob"
-    )
-    expect(threadSubtitle(listed, general.id), "while the store lacks the group").toBe("Thread")
+  it("finds the group of a thread while the store holds it", () => {
+    expect(findGroup(known, general.id)).toEqual(Option.some(general))
+    expect(findGroup(listed, general.id)).toEqual(Option.none())
   })
 
   it("marks every notification seen through the newest that waits, which keeps the thread open", () => {

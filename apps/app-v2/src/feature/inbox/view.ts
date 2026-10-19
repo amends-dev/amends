@@ -4,12 +4,13 @@ import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneTabs } from "@ame
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { ageLabel } from "../../seen.ts"
+import { ageLabel, threadSubtitle } from "../../seen.ts"
 import { titleOf } from "../thread/definition.ts"
 import { replyView } from "../thread/view.ts"
 import { InboxComposition, type InboxViewBuilder, ThreadBinding } from "./composition.ts"
 import {
   byDay,
+  findGroup,
   type InboxItem,
   isSelected,
   isWaiting,
@@ -20,7 +21,6 @@ import {
   notificationText,
   shownItems,
   type Tab,
-  threadSubtitle,
   waitingCount
 } from "./definition.ts"
 
@@ -123,7 +123,7 @@ export const threadView = InboxComposition.makeView.withInputs<ViewInputs>((mode
         header: {
           title: titleOf(selected.model),
           icon: "mark-reply",
-          subtitle: threadSubtitle(model, selected.groupId),
+          subtitle: threadSubtitle(findGroup(model, selected.groupId), model.members, model.memberId),
           leading: paneBack(h, Message.ClickedClose()),
           actions: [paneClose(h, Message.ClickedClose())]
         },

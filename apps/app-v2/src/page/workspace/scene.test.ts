@@ -846,7 +846,7 @@ describe("a workspace", () => {
       expect(
         within(role("complementary", { name: "Thread" }), role("heading", { name: "Composer paste crash", level: 2 }))
       ).toExist(),
-      expect(within(role("complementary", { name: "Thread" }), text("Thread in General"))).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), text("Thread in #General"))).toExist(),
       expect(within(role("main", { name: "General" }), role("complementary"))).toBeAbsent(),
       expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
       expect(

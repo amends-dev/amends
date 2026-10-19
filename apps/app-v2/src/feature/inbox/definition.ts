@@ -14,14 +14,13 @@ import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import type { TextRun } from "@amends-dev/design/message"
-import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorName, dayLabel, dayOf, groupName, initials, messageRuns } from "../../seen.ts"
+import { authorName, type Day, groupByDay, initials, messageRuns, placeName } from "../../seen.ts"
 import { ThreadBlock } from "../thread/block.ts"
 
 /**
@@ -153,33 +152,16 @@ export const messageOfNotification = (
 ): Option.Option<ThreadMessageId.ThreadMessageId> =>
   Option.flatMap(itemOfNotification(model, notificationId), ({ message }) => Option.map(message, ({ id }) => id))
 
-/**
- * Where the thread opened beside the inbox is, as the pane's subtitle says it: a team as `#` and its name, a
- * conversation by the others in it, or only that it is a thread while the store lacks its group.
- */
-export const threadSubtitle = (model: Model, groupId: GroupId.GroupId): string =>
-  Option.match(Option.fromUndefinedOr(model.groups.find(({ id }) => id === groupId)), {
-    onNone: () => "Thread",
-    onSome: (group) => `Thread in ${group.kind === "Team" ? "#" : ""}${groupName(group, model.members, model.memberId)}`
-  })
-
-/** The notifications that came on one local day, newest first, under what that day is called. */
-export type InboxDay = Readonly<{ label: string; items: ReadonlyArray<InboxItem> }>
+/** The group `groupId`, while the store holds it. */
+export const findGroup = (model: Model, groupId: GroupId.GroupId): Option.Option<Group.Group> =>
+  Option.fromUndefinedOr(model.groups.find(({ id }) => id === groupId))
 
 /**
  * `items`, newest first, as the days they came on by the person's own clock, each named as it is from `now`:
  * "Today", "Yesterday", a weekday, or a date.
  */
-export const byDay = (items: ReadonlyArray<InboxItem>, now: DateTime.Utc): ReadonlyArray<InboxDay> => {
-  const dated = items.map((item) => ({ item, day: dayOf(item.notification.recordedAt) }))
-
-  return Array.isReadonlyArrayNonEmpty(dated)
-    ? Array.groupWith(dated, (a, b) => DateTime.Equivalence(a.day, b.day)).map((run) => ({
-        label: dayLabel(run[0].day, now),
-        items: run.map(({ item }) => item)
-      }))
-    : []
-}
+export const byDay = (items: ReadonlyArray<InboxItem>, now: DateTime.Utc): ReadonlyArray<Day<InboxItem>> =>
+  groupByDay(items, ({ notification }) => notification.recordedAt, now)
 
 /** What the message a notification is about is to the person: it addresses them, opens the thread, or replies. */
 export type Reason = "Mention" | "Thread" | "Reply"
@@ -243,11 +225,10 @@ export const notificationPlace = (item: InboxItem, model: Model): Option.Option<
     : Option.match(item.thread, {
         onNone: () => Option.some("Unavailable thread"),
         onSome: ({ groupId }) =>
-          Option.map(Option.fromUndefinedOr(model.groups.find(({ id }) => id === groupId)), (group) =>
-            group.kind === "Team"
-              ? `#${group.name}`
-              : `${groupName(group, model.members, model.memberId)} · Direct message`
-          )
+          Option.map(findGroup(model, groupId), (group) => {
+            const place = placeName(group, model.members, model.memberId)
+            return group.kind === "Team" ? place : `${place} · Direct message`
+          })
       })
 
 /**

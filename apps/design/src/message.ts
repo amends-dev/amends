@@ -40,9 +40,7 @@ const headline = "min-w-0 truncate text-item text-ink"
 
 const headlineAuthor = "font-medium"
 
-const trailingRow = "-my-1.5 ms-auto flex flex-none items-center gap-3 self-center"
-
-const ageLook = "flex flex-none items-center gap-1.5 text-meta text-ink-muted"
+const ageLook = "ms-auto flex flex-none items-center gap-1.5 self-center text-meta text-ink-muted"
 
 const unreadDot = "size-1.5 flex-none rounded-full bg-ink"
 
@@ -238,14 +236,13 @@ const renderAge = <Message, Requirements>(
  * One notification, a row of a `messageList` beside `message`, keyed by `key` and set like it: the `mark` letters,
  * then a first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
  * as "Sara" and "mentioned you", under it the `place` it comes from, at `meta` size in `ink-muted`, and the
- * `text`, a string or `TextRun`s, in which a mention is a chip. At the end of the first line are the `actions`,
- * quiet buttons such as Mark seen, and then the `age`, already formatted, such as "2m ago". While `isUnread`, a
- * 6px dot of `ink` comes before the age, hidden from assistive technology, which an `sr-only` "Unread" before the
- * age replaces; a row that is not unread has its text in `ink-secondary`, quieter than the first line. `onOpen`
- * makes the text a button that sends it, named by the author and the activity together, "Sara mentioned you",
- * with the text's words as its description, by an `aria-label` and an `aria-description`, since the first line
- * is where the row says what it is. The current row, the notification whose thread is open, is filled with the
- * 2px bar and `aria-current="true"`, as a message's is.
+ * `text`, a string or `TextRun`s, in which a mention is a chip. At the end of the first line is the `age`, already
+ * formatted, such as "2m ago". While `isUnread`, a 6px dot of `ink` comes before the age, hidden from assistive
+ * technology, which an `sr-only` "Unread" before the age replaces; a row that is not unread has its text in
+ * `ink-secondary`, quieter than the first line. `onOpen` makes the text a button that sends it, named by the author
+ * and the activity together, "Sara mentioned you", with the text's words as its description, by an `aria-label` and
+ * an `aria-description`, since the first line is where the row says what it is. The current row, the notification
+ * whose thread is open, is filled with the 2px bar and `aria-current="true"`, as a message's is.
  */
 export const notification = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -259,7 +256,6 @@ export const notification = <Message, Requirements>(
     age: string
     isUnread?: boolean
     onOpen?: Message
-    actions?: ReadonlyArray<Html>
     isCurrent?: boolean
   }>
 ): Html => {
@@ -277,7 +273,7 @@ export const notification = <Message, Requirements>(
             [h.Class(authorLine)],
             [
               h.span([h.Class(headline)], [h.span([h.Class(headlineAuthor)], [config.author]), ` ${config.activity}`]),
-              h.div([h.Class(trailingRow)], [...(config.actions ?? []), renderAge(h, { age: config.age, isUnread })])
+              renderAge(h, { age: config.age, isUnread })
             ]
           ),
           config.place === undefined ? h.empty : h.p([h.Class(placeLine)], [config.place]),

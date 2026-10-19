@@ -10,7 +10,7 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
-import { groupName, initials, pluralize } from "../../seen.ts"
+import { groupMark, groupName, pluralize } from "../../seen.ts"
 import { DialogBinding, GroupsComposition, type GroupsViewBuilder } from "./composition.ts"
 import {
   type BrowseTab,
@@ -228,7 +228,7 @@ const browseRow = ({ group, pending, members }: GroupItem, model: Model, h: Grou
     [],
     [
       row(h, {
-        mark: group.kind === "Team" ? "#" : initials(name),
+        mark: groupMark(group, name),
         title: name,
         ...(pending ? { meta: "Sending…" } : {}),
         cells: [badge(h, { label: visibility }), h.span([], [memberCount])],

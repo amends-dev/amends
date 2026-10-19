@@ -20,7 +20,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { bob, conversationWithBob, design, membership, thread } from "../../../test/fixtures.ts"
 import { ScrollToResult, Search } from "./command.ts"
-import { Message, type Model, OutMessage, Results, type SearchResults } from "./definition.ts"
+import { Message, type Model, OutMessage, SearchStatus, type SearchResults } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -45,7 +45,7 @@ const opened: Model = modifyFields(closed, { dialog: (dialog) => modifyFields(di
 /** The dialog open once the person typed "b" and the search found `found`. */
 const searched: Model = modifyFields(opened, {
   query: () => "b",
-  results: () => Results.Found({ query: "b", results: found })
+  status: () => SearchStatus.Found({ query: "b", results: found })
 })
 
 /** The dialog acknowledged open: its element shown, and the resources it holds acquired. */
@@ -106,7 +106,7 @@ describe("the search", () => {
       { update, view },
       given(
         modifyFields(searched, {
-          results: () => Results.Found({ query: "b", results: { groups: [], threads: [], people: [bob] } })
+          status: () => SearchStatus.Found({ query: "b", results: { groups: [], threads: [], people: [bob] } })
         })
       ),
       dialogOpened,
@@ -224,7 +224,7 @@ describe("the search", () => {
       given(
         modifyFields(opened, {
           query: () => " zzz ",
-          results: () => Results.Found({ query: " zzz ", results: { groups: [], threads: [], people: [] } })
+          status: () => SearchStatus.Found({ query: " zzz ", results: { groups: [], threads: [], people: [] } })
         })
       ),
       dialogOpened,
@@ -237,7 +237,7 @@ describe("the search", () => {
   it("shows nothing under the field while the first search is on its way", () => {
     scene(
       { update, view },
-      given(modifyFields(opened, { query: () => "b", results: () => Results.Searching({ query: "b" }) })),
+      given(modifyFields(opened, { query: () => "b", status: () => SearchStatus.Searching({ query: "b" }) })),
       dialogOpened,
       expect(search).toHaveValue("b"),
       expect(text("Type to search.")).toBeAbsent(),
@@ -249,7 +249,7 @@ describe("the search", () => {
   it("shows why a search failed", () => {
     scene(
       { update, view },
-      given(modifyFields(opened, { results: () => Results.Failed({ error: "This browser could not read it." }) })),
+      given(modifyFields(opened, { status: () => SearchStatus.Failed({ error: "This browser could not read it." }) })),
       dialogOpened,
       expect(role("alert")).toHaveText("This browser could not read it."),
       expect(role("region")).toBeAbsent()

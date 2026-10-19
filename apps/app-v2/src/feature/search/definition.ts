@@ -34,13 +34,13 @@ export type SearchResults = typeof SearchResults.Type
  * Where the search for what is typed stands: nothing typed yet, on its way, found for the query it answers, or
  * failed.
  */
-export const Results = defineTaggedUnion({
+export const SearchStatus = defineTaggedUnion({
   Idle: {},
   Searching: { query: Schema.String },
   Found: { query: Schema.String, results: SearchResults },
   Failed: { error: Schema.String }
 })
-export type Results = typeof Results.Type
+export type SearchStatus = typeof SearchStatus.Type
 
 /** One result the person can open: a group, a thread, or a person. */
 export const Result = defineTaggedUnion({
@@ -58,7 +58,7 @@ export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   query: Schema.String,
-  results: Results,
+  status: SearchStatus,
   activeIndex: Schema.Int,
   dialog: DialogBlock.Model
 })
@@ -105,12 +105,16 @@ export const resultId = (result: Result): string =>
 
 /** The results shown, which are the last search's until the search for what is typed now answers. */
 export const shownResults = (model: Model): ReadonlyArray<Result> =>
-  Results.matchOrElse(model.results, { Found: ({ results }) => resultsOf(results) }, (): ReadonlyArray<Result> => [])
+  SearchStatus.matchOrElse(
+    model.status,
+    { Found: ({ results }) => resultsOf(results) },
+    (): ReadonlyArray<Result> => []
+  )
 
 /** The result the person has reached with the arrow keys, while the search for what is typed has answered. */
 export const activeResult = (model: Model): Option.Option<Result> =>
-  Results.matchOrElse(
-    model.results,
+  SearchStatus.matchOrElse(
+    model.status,
     {
       Found: ({ query, results }) =>
         query === model.query ? Option.fromUndefinedOr(resultsOf(results)[model.activeIndex]) : Option.none()

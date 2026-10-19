@@ -73,15 +73,15 @@ export type OutMessage = typeof OutMessage.Type
 export const TasksDefinition = Block.makeDefinition("Tasks", { Model, Message, OutMessage })
 
 /** The tasks of `items` in triage, which wait for a decision. */
-export const triage = (items: ReadonlyArray<TaskItem>): ReadonlyArray<TaskItem> =>
+export const triageTasks = (items: ReadonlyArray<TaskItem>): ReadonlyArray<TaskItem> =>
   items.filter(({ task }) => task.status === "triage")
 
 /** The tasks of `items` that are neither done nor dismissed. */
-export const open = (items: ReadonlyArray<TaskItem>): ReadonlyArray<TaskItem> =>
+export const openTasks = (items: ReadonlyArray<TaskItem>): ReadonlyArray<TaskItem> =>
   items.filter(({ task }) => isOpen(task.status))
 
 /** How many of `items` are in triage. */
-export const triageCount = (items: ReadonlyArray<TaskItem>): number => triage(items).length
+export const triageCount = (items: ReadonlyArray<TaskItem>): number => triageTasks(items).length
 
 /** Whether a task assigned to `assignee` is one the person, `self`, wants, by what they chose to see. */
 const assignedAs: Readonly<

@@ -12,11 +12,11 @@ import {
   matching,
   Message,
   type Model,
-  open,
+  openTasks,
   OutMessage,
   type TaskItem,
-  triage,
   triageCount,
+  triageTasks,
   withAnyStatus
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -91,15 +91,15 @@ describe("the workspace's tasks", () => {
   })
 
   it("are in triage while they wait for a decision, and counted so", () => {
-    expect(triage(items)).toEqual([café])
+    expect(triageTasks(items)).toEqual([café])
     expect(triageCount(items)).toBe(1)
     expect(triageCount([retro, release, logo])).toBe(0)
-    expect(triage([])).toEqual([])
+    expect(triageTasks([])).toEqual([])
   })
 
   it("are open while they are neither done nor dismissed", () => {
-    expect(open(items)).toEqual([retro, release, café, legal])
-    expect(open([logo, idea])).toEqual([])
+    expect(openTasks(items)).toEqual([retro, release, café, legal])
+    expect(openTasks([logo, idea])).toEqual([])
   })
 })
 
@@ -151,8 +151,8 @@ describe("the tasks a filter keeps", () => {
   })
 
   it("are among the tasks they are given, and no others", () => {
-    expect(kept({ assignee: "NoOne" }, triage(items))).toEqual(threadsOf(café))
-    expect(kept({ assignee: "Me" }, triage(items))).toEqual([])
+    expect(kept({ assignee: "NoOne" }, triageTasks(items))).toEqual(threadsOf(café))
+    expect(kept({ assignee: "Me" }, triageTasks(items))).toEqual([])
     expect(kept({}, [])).toEqual([])
   })
 

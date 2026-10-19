@@ -786,7 +786,7 @@ describe("a group's side pane", () => {
       expect(
         within(role("complementary", { name: "Thread" }), role("heading", { name: "Composer paste crash", level: 2 }))
       ).toExist(),
-      expect(within(role("complementary", { name: "Thread" }), text("Thread in Design"))).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), text("Thread in #Design"))).toExist(),
       expect(within(role("complementary", { name: "Thread" }), role("region", { name: "Thread" }))).toExist()
     )
   })

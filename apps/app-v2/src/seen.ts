@@ -1,9 +1,10 @@
 /**
- * What the person sees of the workspace's records: what a member and a group are called and what
- * letters mark them, who wrote a message and what it says, with a mention in it as its member's current
- * name, when a time was, by its time of day, its day, either as a message shows it, and how long ago it
- * was, how a thread is titled and how many replies it has, whether anyone may join a group, how two texts
- * are compared when the person searches and whether a thread's title or opening has what they search for,
+ * What the person sees of the workspace's records: what a member and a group are called, what letters
+ * mark them, and where a group is as a line says it, who wrote a message and what it says, with a
+ * mention in it as its member's current name, when a time was, by its time of day, its day, either as a
+ * message shows it, and how long ago it was, which day each of a list's items falls on, how a thread is
+ * titled, where it is, and how many replies it has, whether anyone may join a group, how two texts are
+ * compared when the person searches and whether a thread's title or opening has what they search for,
  * how a task's status and priority and a turn's status read, and which statuses leave a task open.
  */
 
@@ -14,6 +15,7 @@ import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { TextRun } from "@amends-dev/design/message"
+import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 
@@ -23,7 +25,7 @@ export const initials = (name: string): string =>
     .split(/\s+/)
     .filter((word) => word !== "")
     .slice(0, 2)
-    .map((word) => Array.from(word).at(0) ?? "")
+    .map((word) => Array.fromIterable(word).at(0) ?? "")
     .join("")
     .toUpperCase()
 
@@ -58,6 +60,28 @@ const readDay = (day: DateTime.Zoned, today: DateTime.Zoned, style: "long" | "sh
 
 /** The day `day` began, as a divider names it from `now`: "Today", "Yesterday", "Tuesday", "September 20". */
 export const dayLabel = (day: DateTime.Zoned, now: DateTime.DateTime): string => readDay(day, dayOf(now), "long")
+
+/** The things that happened on one local day, under what that day is called. */
+export type Day<Item> = Readonly<{ label: string; items: ReadonlyArray<Item> }>
+
+/**
+ * `items`, in the order given, as the days they happened on by the person's own clock, each named as it is from
+ * `now`: "Today", "Yesterday", a weekday, or a date. `happenedAt` says when an item happened.
+ */
+export const groupByDay = <Item>(
+  items: ReadonlyArray<Item>,
+  happenedAt: (item: Item) => DateTime.DateTime,
+  now: DateTime.DateTime
+): ReadonlyArray<Day<Item>> => {
+  const dated = items.map((item) => ({ item, day: dayOf(happenedAt(item)) }))
+
+  return Array.isReadonlyArrayNonEmpty(dated)
+    ? Array.groupWith(dated, (a, b) => DateTime.Equivalence(a.day, b.day)).map((run) => ({
+        label: dayLabel(run[0].day, now),
+        items: run.map(({ item }) => item)
+      }))
+    : []
+}
 
 /**
  * When `at` was, as a message shows it: its time of day when it was today, as "9:41 AM", otherwise the name
@@ -97,6 +121,30 @@ export const groupName = (
         .filter((id) => id !== self)
         .map((id) => memberName(members, id))
         .join(", ")
+
+/** What marks `group`, named `name`, in a list: a team's `#`, or a conversation's other members' initials. */
+export const groupMark = (group: Group.Group, name: string): string => (group.kind === "Team" ? "#" : initials(name))
+
+/** Where `group` is, as a line says it: a team as `#` and its name, a conversation by the others in it. */
+export const placeName = (
+  group: Group.Group,
+  members: ReadonlyArray<Member.Member>,
+  self: MemberId.MemberId
+): string => (group.kind === "Team" ? `#${group.name}` : groupName(group, members, self))
+
+/**
+ * Where a thread is, as the side pane's subtitle says it: "Thread in #general" for a team, "Thread in Bob" for a
+ * conversation, or only "Thread" while its group is not read.
+ */
+export const threadSubtitle = (
+  group: Option.Option<Group.Group>,
+  members: ReadonlyArray<Member.Member>,
+  self: MemberId.MemberId
+): string =>
+  Option.match(group, {
+    onNone: () => "Thread",
+    onSome: (known) => `Thread in ${placeName(known, members, self)}`
+  })
 
 /** `author` by their name here: a member's, or the name a channel's contact gave. */
 export const authorName = (

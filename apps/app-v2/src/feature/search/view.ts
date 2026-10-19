@@ -6,9 +6,9 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { initials } from "../../seen.ts"
+import { groupMark, initials } from "../../seen.ts"
 import { DialogBinding, SearchComposition, type SearchViewBuilder } from "./composition.ts"
-import { Message, type Model, Result, resultId, Results, resultsOf, shownResults } from "./definition.ts"
+import { Message, type Model, Result, resultId, SearchStatus, resultsOf, shownResults } from "./definition.ts"
 
 /** What the arrow keys and Enter do in the field: move the active result around the list, or open it. */
 const answerKey = (key: string, count: number, activeIndex: number): Option.Option<Message> =>
@@ -29,7 +29,7 @@ const resultEntry = (result: Result, isActive: boolean, h: SearchViewBuilder): H
   const row = { key: resultId(result), onClick: Message.ClickedResult({ result }), isActive }
 
   return Result.match(result, {
-    Group: ({ group, name }) => entry(h, { ...row, mark: group.kind === "Team" ? "#" : initials(name), title: name }),
+    Group: ({ group, name }) => entry(h, { ...row, mark: groupMark(group, name), title: name }),
     Thread: ({ words, groupName }) => entry(h, { ...row, title: words, trailing: [badge(h, { label: groupName })] }),
     Person: ({ member }) => entry(h, { ...row, mark: initials(member.name), title: member.name })
   })
@@ -59,7 +59,7 @@ const resultSection = (
 
 /** What the dialog says under the field: how to start, nothing while the search is on its way, what was found, or why it failed. */
 const bodyUnderField = (model: Model, h: SearchViewBuilder): ReadonlyArray<Html> =>
-  Results.match(model.results, {
+  SearchStatus.match(model.status, {
     Idle: () => [hint(h, "Type to search.")],
     Searching: () => [],
     Found: ({ query, results }) => {

@@ -17,8 +17,8 @@ import { defineMessageUnion } from "foldkit/message"
 import { may, memberTarget } from "../../permissions.ts"
 
 /** The task, and whether a change to it is on its way. */
-export const TaskItem = Schema.Struct({ task: Task.Task, pending: Schema.Boolean })
-export type TaskItem = typeof TaskItem.Type
+export const ThreadTask = Schema.Struct({ task: Task.Task, pending: Schema.Boolean })
+export type ThreadTask = typeof ThreadTask.Type
 
 /**
  * The thread's group, once the thread is read, the task it tracks, the group's members, what the
@@ -29,7 +29,7 @@ export const Model = Schema.Struct({
   memberId: MemberId.MemberId,
   threadId: ThreadId.ThreadId,
   groupId: Schema.Option(GroupId.GroupId),
-  task: Schema.Option(TaskItem),
+  task: Schema.Option(ThreadTask),
   members: Schema.Array(Member.Member),
   grants: Schema.Array(Grant.Grant),
   notice: Schema.Option(Schema.String)
@@ -37,7 +37,7 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
-  ReceivedTask: { groupId: Schema.Option(GroupId.GroupId), task: Schema.Option(TaskItem) },
+  ReceivedTask: { groupId: Schema.Option(GroupId.GroupId), task: Schema.Option(ThreadTask) },
   ReceivedMembers: { members: Schema.Array(Member.Member) },
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },
   FailedRead: { error: Schema.String },

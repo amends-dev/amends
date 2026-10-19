@@ -8,10 +8,10 @@ import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may, threadTarget } from "../../permissions.ts"
 import { memberName, priorityLabel, statusLabel } from "../../seen.ts"
 import { TaskComposition, type TaskViewBuilder } from "./composition.ts"
-import { assignable, Message, type Model, type TaskItem } from "./definition.ts"
+import { assignable, Message, type Model, type ThreadTask } from "./definition.ts"
 
 /** The task's status, priority, and assignee, as the person changes them, or as they read them. */
-const taskView = ({ task, pending }: TaskItem, model: Model, h: TaskViewBuilder): Html =>
+const taskView = ({ task, pending }: ThreadTask, model: Model, h: TaskViewBuilder): Html =>
   paneSection(h, {
     title: "Task",
     trailing: [sending(h, pending)],

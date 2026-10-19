@@ -14,7 +14,7 @@ import {
   OutMessage,
   Result,
   resultId,
-  Results,
+  SearchStatus,
   type SearchResults,
   shownResults
 } from "./definition.ts"
@@ -48,7 +48,7 @@ const found: SearchResults = {
 const searched: Model = modifyFields(opened, {
   dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
   query: () => "b",
-  results: () => Results.Found({ query: "b", results: found })
+  status: () => SearchStatus.Found({ query: "b", results: found })
 })
 
 describe("the search", () => {
@@ -61,7 +61,7 @@ describe("the search", () => {
       model((model) => {
         expect(model.dialog.isOpen).toBe(true)
         expect(model.query).toBe("")
-        expect(model.results).toEqual(Results.Idle())
+        expect(model.status).toEqual(SearchStatus.Idle())
         expect(model.activeIndex).toBe(0)
       }),
       expectNoOutMessage()
@@ -76,7 +76,7 @@ describe("the search", () => {
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       model((model) => {
         expect(model.query).toBe("")
-        expect(model.results).toEqual(Results.Idle())
+        expect(model.status).toEqual(SearchStatus.Idle())
       })
     )
   })
@@ -89,22 +89,22 @@ describe("the search", () => {
       Command.expectNone(),
       model((model) => {
         expect(model.query).toBe("  ")
-        expect(model.results).toEqual(Results.Idle())
+        expect(model.status).toEqual(SearchStatus.Idle())
       }),
       message(Message.TypedQuery({ query: "des" })),
       Command.expectExact(Search({ ...asMember, query: "des" })),
       model((model) => {
-        expect(model.results).toEqual(Results.Searching({ query: "des" }))
+        expect(model.status).toEqual(SearchStatus.Searching({ query: "des" }))
       }),
       Command.resolve(Search, Message.CompletedSearch({ query: "des", results: found })),
       model((model) => {
-        expect(model.results).toEqual(Results.Found({ query: "des", results: found }))
+        expect(model.status).toEqual(SearchStatus.Found({ query: "des", results: found }))
         expect(model.activeIndex).toBe(0)
       }),
       message(Message.TypedQuery({ query: " " })),
       Command.expectNone(),
       model((model) => {
-        expect(model.results).toEqual(Results.Idle())
+        expect(model.status).toEqual(SearchStatus.Idle())
       })
     )
   })
@@ -116,13 +116,13 @@ describe("the search", () => {
       message(Message.TypedQuery({ query: "bo" })),
       Command.expectExact(Search({ ...asMember, query: "bo" })),
       model((model) => {
-        expect(model.results).toEqual(Results.Found({ query: "b", results: found }))
+        expect(model.status).toEqual(SearchStatus.Found({ query: "b", results: found }))
         expect(model.activeIndex).toBe(0)
       }),
       Command.resolve(Search, Message.CompletedSearch({ query: "bo", results: { ...found, groups: [] } })),
       model((model) => {
         expect(shownResults(model)).toHaveLength(2)
-        expect(model.results).toMatchObject({ _tag: "Found", query: "bo" })
+        expect(model.status).toMatchObject({ _tag: "Found", query: "bo" })
       })
     )
   })
@@ -135,7 +135,7 @@ describe("the search", () => {
       // The answer for "a" comes after "ab" was typed.
       Command.resolve(Search, Message.CompletedSearch({ query: "a", results: found })),
       model((model) => {
-        expect(model.results).toEqual(Results.Searching({ query: "ab" }))
+        expect(model.status).toEqual(SearchStatus.Searching({ query: "ab" }))
       }),
       message(Message.CompletedSearch({ query: "ab", results: { groups: [], threads: [], people: [bob] } })),
       model((model) => {
@@ -148,7 +148,7 @@ describe("the search", () => {
       message(Message.TypedQuery({ query: "ab" })),
       Command.resolve(Search, Message.FailedSearch({ query: "a", error: "late" })),
       model((model) => {
-        expect(model.results).toEqual(Results.Searching({ query: "ab" }))
+        expect(model.status).toEqual(SearchStatus.Searching({ query: "ab" }))
       })
     )
   })
@@ -160,16 +160,16 @@ describe("the search", () => {
       message(Message.TypedQuery({ query: "des" })),
       Command.resolve(Search, Message.FailedSearch({ query: "des", error: "Unreadable" })),
       model((model) => {
-        expect(model.results).toEqual(Results.Failed({ error: "Unreadable" }))
+        expect(model.status).toEqual(SearchStatus.Failed({ error: "Unreadable" }))
       }),
       message(Message.TypedQuery({ query: "desi" })),
       Command.expectExact(Search({ ...asMember, query: "desi" })),
       model((model) => {
-        expect(model.results).toEqual(Results.Searching({ query: "desi" }))
+        expect(model.status).toEqual(SearchStatus.Searching({ query: "desi" }))
       }),
       Command.resolve(Search, Message.CompletedSearch({ query: "desi", results: found })),
       model((model) => {
-        expect(model.results).toMatchObject({ _tag: "Found", query: "desi" })
+        expect(model.status).toMatchObject({ _tag: "Found", query: "desi" })
       })
     )
   })
@@ -182,7 +182,7 @@ describe("the search", () => {
       Result.Person({ member: bob })
     ])
     expect(shownResults(opened)).toEqual([])
-    expect(shownResults(modifyFields(opened, { results: () => Results.Searching({ query: "b" }) }))).toEqual([])
+    expect(shownResults(modifyFields(opened, { status: () => SearchStatus.Searching({ query: "b" }) }))).toEqual([])
     expect(shownResults(searched).map(resultId)).toEqual([
       "search-group-design",
       "search-group-alice-and-bob",
@@ -222,7 +222,7 @@ describe("the search", () => {
         model((model) => {
           expect(model.dialog.isOpen).toBe(false)
           expect(model.query).toBe("")
-          expect(model.results).toEqual(Results.Idle())
+          expect(model.status).toEqual(SearchStatus.Idle())
         })
       )
 

@@ -43,11 +43,11 @@ const openConversationForm = (memberId: Option.Option<MemberId.MemberId>) =>
  * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row
  * does.
  */
-const pickGroup = <Current extends Model>(model: Current, groupId: GroupId.GroupId) =>
+const pickGroup = (model: Model, groupId: GroupId.GroupId) =>
   Option.contains(model.selected, groupId)
     ? { model }
     : {
-        model: { ...model, selected: Option.some(groupId) },
+        model: modifyFields(model, { selected: () => Option.some(groupId) }),
         outMessage: OutMessage.SelectedGroup({ groupId })
       }
 

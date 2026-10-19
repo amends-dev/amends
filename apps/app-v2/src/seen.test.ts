@@ -2,21 +2,36 @@ import { ThreadMessage } from "@amends-dev/core/thread"
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
-import { bob, deleted, membership, opening, reply, saying, thread } from "../test/fixtures.ts"
+import {
+  bob,
+  conversationWithBob,
+  deleted,
+  design,
+  general,
+  membership,
+  opening,
+  reply,
+  saying,
+  thread
+} from "../test/fixtures.ts"
 import {
   ageLabel,
   dayLabel,
   dayOf,
   foldAccents,
+  groupByDay,
+  groupMark,
   initials,
   isOpen,
   messageRuns,
   messageWords,
+  placeName,
   pluralize,
   repliesLabel,
   textRuns,
   threadContains,
   threadRuns,
+  threadSubtitle,
   threadWords,
   timeOf,
   whenLabel
@@ -38,6 +53,28 @@ describe("initials", () => {
     expect(initials("")).toBe("")
     expect(initials("   ")).toBe("")
     expect(initials("🦊 Fox")).toBe("🦊F")
+  })
+})
+
+describe("where a group is", () => {
+  const members = [membership.member, bob]
+  const self = membership.member.id
+
+  it("is marked by a team's #, and a conversation's other members' initials", () => {
+    expect(groupMark(general, "General")).toBe("#")
+    expect(groupMark(conversationWithBob, "Bob")).toBe("B")
+    expect(groupMark(conversationWithBob, "Bob Ross, Alex Morgan")).toBe("BR")
+  })
+
+  it("is said as a line says it: a team as # and its name, a conversation by the others in it", () => {
+    expect(placeName(design, members, self)).toBe("#Design")
+    expect(placeName(conversationWithBob, members, self)).toBe("Bob")
+  })
+
+  it("is said by the side pane's subtitle as the thread in it, or only as a thread while the group is not read", () => {
+    expect(threadSubtitle(Option.some(general), members, self)).toBe("Thread in #General")
+    expect(threadSubtitle(Option.some(conversationWithBob), members, self)).toBe("Thread in Bob")
+    expect(threadSubtitle(Option.none(), members, self)).toBe("Thread")
   })
 })
 
@@ -120,6 +157,33 @@ describe("dayLabel", () => {
 
     expect(label).toBe(spelled(local(2025, 12, 25), { year: "numeric", month: "long", day: "numeric" }))
     expect(label).toContain("2025")
+  })
+})
+
+describe("groupByDay", () => {
+  const at = (item: DateTime.DateTime) => item
+  const today = local(2026, 10, 19, 9, 0)
+  const todayLater = local(2026, 10, 19, 13, 0)
+  const yesterday = local(2026, 10, 18, 22, 0)
+  const lastWeek = local(2026, 10, 9, 8, 0)
+
+  it("makes a day of each run of items that fell on one, named from now, in the order given", () => {
+    const days = groupByDay([todayLater, today, yesterday, lastWeek], at, now)
+
+    expect(days.map(({ label }) => label)).toEqual(["Today", "Yesterday", dayLabel(dayOf(lastWeek), now)])
+    expect(days.map(({ items }) => items)).toEqual([[todayLater, today], [yesterday], [lastWeek]])
+  })
+
+  it("makes a day of its own for a day that comes round again, since it groups the order it is given", () => {
+    expect(groupByDay([today, yesterday, todayLater], at, now).map(({ label }) => label)).toEqual([
+      "Today",
+      "Yesterday",
+      "Today"
+    ])
+  })
+
+  it("makes no day of no items", () => {
+    expect(groupByDay([], at, now)).toEqual([])
   })
 })
 

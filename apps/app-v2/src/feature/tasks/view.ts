@@ -15,9 +15,9 @@ import {
   matching,
   Message,
   type Model,
-  open,
+  openTasks,
   type TaskItem,
-  triage,
+  triageTasks,
   withAnyStatus
 } from "./definition.ts"
 
@@ -44,7 +44,7 @@ const triageDestination: Destination = {
   icon: "mark-triage",
   subtitle: "Tasks waiting for a decision.",
   summary: "Tasks in triage across your groups.",
-  listed: triage,
+  listed: triageTasks,
   nothing: { title: "Nothing to triage", copy: "Tasks you can see will be listed here." }
 }
 
@@ -53,7 +53,7 @@ const tasksDestination: Destination = {
   icon: "mark-tasks",
   subtitle: "Every open task you can see.",
   summary: "Open tasks across your groups.",
-  listed: open,
+  listed: openTasks,
   nothing: { title: "No open tasks", copy: "Tasks you can see will be listed here." },
   statusChoices: statusChoices(Task.Status.literals.filter(isOpen))
 }

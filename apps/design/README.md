@@ -39,8 +39,7 @@ conversation's messages as a list with a current row whose text opens the thread
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with a form in place of the text, and set apart by dividers, centered and at the
-start, and notifications under the days Today and Yesterday, unread with a dot and a quiet action and
-read, and with the notification whose thread is open as the current row among them; a pane's empty state with a title
+start, and notifications under the days Today and Yesterday, unread with a dot and read, and with the notification whose thread is open as the current row among them; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
@@ -503,9 +502,8 @@ What a conversation is made of.
 - `notification(h, config)` is a row of the same list for a notification, keyed by `config.key` and set
   like `message`: the `mark` letters at 32px, then a column of a first line, the place, and the text.
   The first line is the `author` at item size in medium weight, then the `activity` after it in the
-  same size, weight, and `ink`, such as "Sara" and "mentioned you", and at its end the `actions`, quiet
-  buttons such as Mark seen, then the `age`, already formatted, such as "2m ago" or "Yesterday", at
-  `meta` size in `ink-muted`. While `isUnread`, a round 6px dot of `ink`, hidden from assistive
+  same size, weight, and `ink`, such as "Sara" and "mentioned you", and at its end the `age`, already
+  formatted, such as "2m ago" or "Yesterday", at `meta` size in `ink-muted`. While `isUnread`, a round 6px dot of `ink`, hidden from assistive
   technology, comes before the age, and an `sr-only` "Unread" takes its place for it, so the row is
   read as unread;
   a row that is not unread has its `text` in `ink-secondary`, quieter than the first line. The
@@ -650,7 +648,7 @@ context, description, tabs, and footer, the control given `initialFocus` by its 
 Cancel by closing the dialog without sending the form; a message by
 its text button, `aria-current`, its note, actions, meta, and body, a mention in its text by the
 chip that holds it and a button by the words joined, a notification by its
-text button named by its author and activity and described by its text, its place, age, and actions,
+text button named by its author and activity and described by its text, its place and age,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
 and a divider by its label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the

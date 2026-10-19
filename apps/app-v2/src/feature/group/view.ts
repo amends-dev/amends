@@ -22,7 +22,7 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may } from "../../permissions.ts"
-import { groupName, initials, isJoinable, memberName, pluralize } from "../../seen.ts"
+import { groupName, initials, isJoinable, memberName, pluralize, threadSubtitle } from "../../seen.ts"
 import { titleOf } from "../thread/definition.ts"
 import { replyView } from "../thread/view.ts"
 import { composerView, tabsView } from "../threads/view.ts"
@@ -353,7 +353,11 @@ export const threadView = GroupComposition.makeView.withInputs<ViewInputs>((mode
         header: {
           title: titleOf(open),
           icon: "mark-reply",
-          subtitle: `Thread in ${nameOf(model)}`,
+          subtitle: threadSubtitle(
+            Option.map(model.group, ({ group }) => group),
+            model.members,
+            model.memberId
+          ),
           leading: paneBack(h, Message.ClickedAllThreads()),
           actions: [paneClose(h, Message.ClickedAllThreads())]
         },

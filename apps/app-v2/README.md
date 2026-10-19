@@ -10,7 +10,8 @@ stop following it, which opening reads through its latest activity; their inbox,
 notifications under the days they came, all of them or only those waiting, each by who wrote what it
 is about, what they did, where it comes from, and how long ago, to open its thread beside the inbox,
 which marks it seen, or to mark all of them seen at once; the tasks they can see across their groups, those waiting in triage and every
-open one, as a table to narrow by assignee, by status, and by search, each to open in its group;
+open one, as a table to narrow by assignee, by status, and by search, each to open in its group; and a
+search for anything in the workspace, groups, threads, and people, from the sidebar or from the keyboard;
 the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
 rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, to
@@ -61,7 +62,10 @@ the channels, and the side panes, keep the `paneColumn`'s measure; the panes tha
 threads and tasks, the groups to browse, the inbox, and the tasks' Triage and Tasks, pass it `isWide`,
 so that a list spans the pane. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
-initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`.
+initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`,
+which also groups what has a time by the day it was (`groupByDay`, under a `divider` each) and says where a
+group is: its mark in a list (`groupMark`), as a line says it, `#general` or the others in a conversation
+(`placeName`), and as a side pane's subtitle (`threadSubtitle`).
 
 A message's text is markdown as the person wrote it, and a mention in it is a link to the member,
 `[@Ada](member:<id>)`, labelled with the name they had when mentioned. Wherever a message's text is
@@ -240,7 +244,7 @@ the pages that compose them; the root composes the pages.
   the tab. The dialog opens on General, and closing it, by Cancel, Close, Escape, a click on the
   scrim, Save changes, or Leave, drops the draft of the name and the member chosen to admit.
   `threadView` is the thread open in it as a side pane, titled by the
-  thread, with a button that closes it, Close, and, below 48rem where the pane is full screen over
+  thread with "Thread in #Design" or "Thread in Bob" under it (`threadSubtitle`), with a button that closes it, Close, and, below 48rem where the pane is full screen over
   the main pane, Back before the title, both sending `ClickedAllThreads`, the thread's messages, and
   the reply composer in the footer, and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
   and `threadView` in its side pane, giving both the time now, which they give on to the threads Block
@@ -322,7 +326,7 @@ the pages that compose them; the root composes the pages.
   listed (`shownItems`), and the caught-up state shows only once the thread is closed and nothing
   waits. `threadView` is the thread open as a side pane, as the group's is: titled by the thread,
   "Thread in #General" or "Thread in Bob" under it, or only "Thread" while the store lacks the group
-  (`threadSubtitle`), with Close beside the title and, below 48rem, Back before it, both sending
+  (`threadSubtitle` in `seen.ts`, which the group's pane uses too), with Close beside the title and, below 48rem, Back before it, both sending
   `ClickedClose`, the thread's messages, with the one the notification is about drawn current, and
   the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
   when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
@@ -335,8 +339,8 @@ the pages that compose them; the root composes the pages.
   and the members and contacts that name who started a thread and who is assigned to it. It is made
   from the workspace as the member, writes nothing, and has two views, each a main pane that takes
   the time now from its parent. `triageView` is titled Triage, "Tasks waiting for a decision.", and
-  lists the tasks in triage (`triage`); `tasksView`, the Block's canonical view, is titled Tasks,
-  "Every open task you can see.", and lists every task that is neither done nor dismissed (`open`).
+  lists the tasks in triage (`triageTasks`); `tasksView`, the Block's canonical view, is titled Tasks,
+  "Every open task you can see.", and lists every task that is neither done nor dismissed (`openTasks`).
   Under the title are a search field, whose label is hidden and whose placeholder says "Search
   tasks…", beside a select of whom a task is assigned to, Anyone, Me, or No one, and, on Tasks
   alone, a select of the status, All statuses or one of the statuses of an open task, with its label
@@ -659,7 +663,7 @@ browser's storage. Each Block's tests sit beside it:
   one opened in its place, newest first, as its tab chooses, opening the thread of a notification,
   which writes it seen only while it waits, selects it, and reports it, opening none for a notification
   from no thread, moving the selection to the next one opened, clearing it with Close and reporting
-  that, or as its parent asks and reporting nothing, naming where the thread is, marking all through
+  that, or as its parent asks and reporting nothing, finding the group the thread is in, marking all through
   the newest that waits while the thread stays open, and why a write could not be kept; the tasks keeping the tasks and
   the people they are told of, or why they could not be read, telling the tasks in triage and the open
   ones apart and counting those in triage, keeping those a status, an assignee, with Me the member the
@@ -733,8 +737,8 @@ browser's storage. Each Block's tests sit beside it:
   the membership in words, with leaving, closing the dialog, and joining, which keeps it open, and a conversation's with neither tabs nor
   visibility; its members, those present marked
   Online and one on its way marked sending, with removing for the others, admitting, offered only to
-  someone who manages them; and its side pane for the thread open in it,
-  with the composer to reply in its footer, closed by its Close button or its Back, which send the
+  someone who manages them; and its side pane for the thread open in it, titled by the thread
+  under the group it is in, with the composer to reply in its footer, closed by its Close button or its Back, which send the
   same message; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, one still on
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name

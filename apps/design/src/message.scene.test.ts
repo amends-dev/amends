@@ -285,7 +285,6 @@ describe("notification", () => {
     text?: string | ReadonlyArray<TextRun>
     isUnread?: boolean
     isOpenable?: boolean
-    isActionable?: boolean
     isCurrent?: boolean
   }>
 
@@ -300,10 +299,7 @@ describe("notification", () => {
       age: "2m ago",
       ...(options.isUnread === true ? { isUnread: true } : {}),
       ...(options.isCurrent === true ? { isCurrent: true } : {}),
-      ...(options.isOpenable === false ? {} : { onOpen: Message.OpenedThread({ key: "notification-1" }) }),
-      ...(options.isActionable === true
-        ? { actions: [button(h, "Mark seen", Message.ClickedEdit({ key: "notification-1" }), { variant: "quiet" })] }
-        : {})
+      ...(options.isOpenable === false ? {} : { onOpen: Message.OpenedThread({ key: "notification-1" }) })
     })
 
   const notifications =
@@ -403,15 +399,6 @@ describe("notification", () => {
       given(initial),
       expect(text("Unread")).toBeAbsent(),
       expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(1)
-    )
-  })
-
-  it("has its actions as buttons at the end of the first line", () => {
-    scene(
-      { update, view: viewOf(notifications({ isActionable: true })) },
-      given(initial),
-      click(role("button", { name: "Mark seen" })),
-      expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 0")
     )
   })
 

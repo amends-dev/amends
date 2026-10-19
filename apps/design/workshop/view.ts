@@ -938,7 +938,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "Notifications under their days: unread, with a dot and a quiet action, and read",
+      "Notifications under their days: unread, with a dot, and read",
       [
         messageList(h, {
           label: "Inbox",
@@ -953,8 +953,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
               age: "2m ago",
               isUnread: true,
-              onOpen: press,
-              actions: [button(h, "Mark seen", press, { variant: "quiet" })]
+              onOpen: press
             }),
             notification(h, {
               key: "alex",

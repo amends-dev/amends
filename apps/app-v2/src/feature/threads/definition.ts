@@ -17,7 +17,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { dayLabel, dayOf, isOpen, threadContains } from "../../seen.ts"
+import { type Day, groupByDay, isOpen, threadContains } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**
@@ -86,37 +86,26 @@ export type OutMessage = typeof OutMessage.Type
 
 export const ThreadsDefinition = Block.makeDefinition("Threads", { Model, Message, OutMessage, ChildInitContext })
 
-/** The threads created on one local day, oldest first, under what that day is called. */
-export type ThreadDay = Readonly<{ label: string; items: ReadonlyArray<ThreadItem> }>
-
 const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thread.createdAt)
 
 /**
  * `items` oldest first by when their threads were created, as the days they were created on by the person's own
  * clock, each named as it is from `now`: "Today", "Yesterday", a weekday, or a date.
  */
-export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<ThreadDay> => {
-  const dated = Array.sort(items, byCreated).map((item) => ({ item, day: dayOf(item.thread.createdAt) }))
-
-  return Array.isReadonlyArrayNonEmpty(dated)
-    ? Array.groupWith(dated, (a, b) => DateTime.Equivalence(a.day, b.day)).map((run) => ({
-        label: dayLabel(run[0].day, now),
-        items: run.map(({ item }) => item)
-      }))
-    : []
-}
+export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<Day<ThreadItem>> =>
+  groupByDay(Array.sort(items, byCreated), ({ thread }) => thread.createdAt, now)
 
 /** A thread of the group and the task it tracks. */
-export type TaskItem = Readonly<{ item: ThreadItem; task: Task.Task }>
+export type TrackingThread = Readonly<{ item: ThreadItem; task: Task.Task }>
 
-const byLastActive = Order.mapInput(Order.flip(DateTime.Order), ({ item }: TaskItem) => item.lastActiveAt)
+const byLastActive = Order.mapInput(Order.flip(DateTime.Order), ({ item }: TrackingThread) => item.lastActiveAt)
 
 /**
  * The threads that track a task, latest active first, kept to the status the filter chose, every one for All, and
  * to those whose title or opening contains what the filter searches for, in any case and whatever the accents,
  * all of them for no letters.
  */
-export const tasksOf = (model: Model, members: ReadonlyArray<Member.Member>): ReadonlyArray<TaskItem> => {
+export const tasksOf = (model: Model, members: ReadonlyArray<Member.Member>): ReadonlyArray<TrackingThread> => {
   const { status, query } = model.taskFilter
   const tracked = model.threads.flatMap((item) => Option.toArray(Option.map(item.task, (task) => ({ item, task }))))
 

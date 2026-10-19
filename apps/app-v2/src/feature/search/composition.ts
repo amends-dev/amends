@@ -1,11 +1,11 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import type { Block } from "foldkit"
-import { Results, SearchDefinition } from "./definition.ts"
+import { SearchStatus, SearchDefinition } from "./definition.ts"
 
 /** Forget what was typed and found, and which result was active. */
 export const clearQuery = SearchDefinition.stepFields(() => ({
   query: () => "",
-  results: () => Results.Idle(),
+  status: () => SearchStatus.Idle(),
   activeIndex: () => 0
 }))
 
