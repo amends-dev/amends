@@ -259,16 +259,19 @@ the pages that compose them; the root composes the pages.
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email as a view input. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a notification's thread opens its group with the thread already open,
-  and marks the group. Below 64rem the sidebar is a drawer, and below 48rem the rail with it, which
-  the shell's Menu button opens: the page's model keeps `isMenuOpen`, a "Close menu" scrim over the
-  rest of the window closes it, and every navigation, the rail's, the sidebar's Inbox, a group picked,
-  and a notification's thread opened, closes it too (a `closeMenu` step among theirs). The drawer is
-  moved by CSS from that flag; it does not yet trap focus, make the rest of the window inert, or
-  close on Escape, which come in a later step. Opening the workspace lists the host's integrations
+  and marks the group. The shell lays itself out by the window's width: below 64rem the sidebar is
+  not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
+  button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
+  `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
+  window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
+  Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox, a
+  group picked, and a notification's thread opened, asks it to close (a close of a closed dialog does
+  nothing). Opening the workspace lists the host's integrations
   once, over HTTP, and informs its connections, agents, and channels of them, or of why they could
   not be reached; it lists them again when one of the three asks. It keeps the window's width, which
-  the root gives it as it opens and informs it of when the width changes; once the sidebar is in
-  place, from `Desktop`, it closes the drawer. It reports when the person leaves it and when they ask
+  the root gives it as it opens and informs it of when the width changes (`informViewport`); once the
+  sidebar is in place, from `Desktop`, it closes the drawer, so a window that grows past 64rem while
+  the drawer is open gets its sidebar back. It reports when the person leaves it and when they ask
   to sign out.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
@@ -425,8 +428,9 @@ browser's storage. Each Block's tests sit beside it:
   the inbox, the connections, the agents, the settings, or the channels in its place with no group
   marked, going home from a group or a destination, handing the settings and the channels what the
   person does in them, opening a notification's thread in its group, naming the thread open in the
-  group open, opening the navigation drawer and closing it by every navigation, and asking the root
-  to sign out, and taking the window's width, closing the drawer once the sidebar is in place; and
+  group open, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
+  asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
+  place; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
   from the list or from the open workspace, and following the window's width, for the workspace it
   opens too.
@@ -490,11 +494,14 @@ browser's storage. Each Block's tests sit beside it:
   who is signed in and the way out in its footer, the group's threads as messages in the main pane
   with the composer to start one, the thread picked opened in the side pane with its messages and the
   composer to reply, marked in the list and under the group in the sidebar, the group's settings
-  opened in a dialog from its main pane, the Menu button opening the drawer and its scrim, or a
-  link of the sidebar or the rail, a group picked among them, closing it, and what the server
-  refused as toasts, and the connections listing the integrations again after the host could not be
-  reached. The root's own scenes show
-  the open workspace with no header of its own, signing out from its sidebar. A scene opens and closes
+  opened in a dialog from its main pane, the sidebar in place with no Menu button from `Desktop`, the
+  Menu button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
+  sidebar, its scrim closing it, or a link of the sidebar or the rail, a group picked among them,
+  closing it, and what the server refused as toasts, and the connections listing the integrations
+  again after the host could not be reached. The root's own scenes show
+  the open workspace with no header of its own, signing out from its sidebar, and its Menu button
+  appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse.
+  A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through
   its Binding's `embedView`.

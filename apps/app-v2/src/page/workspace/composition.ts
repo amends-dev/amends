@@ -1,5 +1,6 @@
 import { GroupId } from "@amends-dev/core/group"
 import type { ThreadId } from "@amends-dev/core/thread"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
@@ -21,11 +22,6 @@ const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
   commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
 }))
 
-/** Close the navigation drawer, as going anywhere does. */
-export const closeMenu = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { isMenuOpen: () => false })
-}))
-
 /** Open the group `groupId` in the main content, with the thread `threadId` open in it, if there is one. */
 const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.ThreadId>) =>
   WorkspaceDefinition.step((model: Model) =>
@@ -38,7 +34,7 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
 
 /** Picking a group opens it, and closes the navigation drawer. */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
-  SelectedGroup: ({ groupId }) => Update.combine([closeMenu, openGroup(groupId, Option.none())])
+  SelectedGroup: ({ groupId }) => Update.combine([MenuBinding.requestClose(), openGroup(groupId, Option.none())])
 })
 
 /**
@@ -48,10 +44,23 @@ const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
   OpenedThread: ({ groupId, threadId }) =>
     Update.combine([
-      closeMenu,
+      MenuBinding.requestClose(),
       GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
       openGroup(groupId, Option.some(threadId))
     ])
+})
+
+/** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
+const foldMenuOutMessage = DialogBlock.OutMessage.match({
+  Opened: () => WorkspaceDefinition.stepNoop(),
+  Closed: () => WorkspaceDefinition.stepNoop(),
+  CompletedClose: () => WorkspaceDefinition.stepNoop()
+})
+
+export const MenuBinding = WorkspaceDefinition.bindChild(DialogBlock, {
+  field: "menu",
+  init: { contextToArgs: () => [{ id: "workspace-menu" }] },
+  outMessage: { fold: foldMenuOutMessage }
 })
 
 export const GroupsBinding = WorkspaceDefinition.bindChild(GroupsBlock, {
@@ -109,6 +118,7 @@ export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
   bindings: [
+    MenuBinding,
     GroupsBinding,
     ActionsBinding,
     InboxBinding,

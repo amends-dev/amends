@@ -5,9 +5,9 @@ import * as Update from "foldkit/update"
 import {
   AgentsBinding,
   ChannelsBinding,
-  closeMenu,
   ConnectionsBinding,
   GroupsBinding,
+  MenuBinding,
   WorkspaceComposition
 } from "./composition.ts"
 import { Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
@@ -38,6 +38,10 @@ const showChannels = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Channels() })
 }))
 
+/** Go to a destination: close the navigation drawer, leave no group marked in the sidebar, and `show` it. */
+const goTo = (show: typeof showNothing) =>
+  Update.combine([MenuBinding.requestClose(), GroupsBinding.informOpenGroup({ groupId: Option.none() }), show])
+
 /** Lay the workspace out for a window of the width `viewport`. */
 const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))
 
@@ -48,22 +52,18 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
     ClickedSignOut: () => ({ model, outMessage: OutMessage.RequestedSignOut() }),
-    ClickedHome: () =>
-      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showNothing]),
-    ClickedInbox: () =>
-      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showInbox]),
-    ClickedConnections: () =>
-      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),
-    ClickedAgents: () =>
-      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showAgents]),
-    ClickedSettings: () =>
-      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings]),
-    ClickedChannels: () =>
-      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showChannels]),
-    ClickedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
-    ClickedCloseMenu: () => Update.combine(model, [closeMenu]),
+    ClickedHome: () => Update.combine(model, [goTo(showNothing)]),
+    ClickedInbox: () => Update.combine(model, [goTo(showInbox)]),
+    ClickedConnections: () => Update.combine(model, [goTo(showConnections)]),
+    ClickedAgents: () => Update.combine(model, [goTo(showAgents)]),
+    ClickedSettings: () => Update.combine(model, [goTo(showSettings)]),
+    ClickedChannels: () => Update.combine(model, [goTo(showChannels)]),
+    ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
     InformedOfViewport: ({ viewport }) =>
-      Update.combine(model, [showViewport(viewport), ...(hasSidebarInPlace(viewport) ? [closeMenu] : [])]),
+      Update.combine(model, [
+        showViewport(viewport),
+        ...(hasSidebarInPlace(viewport) ? [MenuBinding.requestClose()] : [])
+      ]),
     ReceivedIntegrations: ({ integrations }) =>
       Update.combine(model, [
         ConnectionsBinding.informReceivedIntegrations({ integrations }),

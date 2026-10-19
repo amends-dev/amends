@@ -67,6 +67,9 @@ const { workspace, member } = membership
 
 const opened = init(workspace.id, member.id, workspace.name, "Split").model
 
+/** The window as a phone: the rail and the sidebar are both in the navigation dialog. */
+const onPhone = modifyFields(opened, { viewport: () => "Phone" })
+
 const workspaceSubscriptions = WorkspaceBlock.subscriptions
 
 const sceneView = withViewInputs(view, { email: "alice@example.com" })()
@@ -484,32 +487,64 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens the navigation drawer from the menu button, and closes it from the scrim", () => {
+  it("keeps the sidebar in place from Desktop, with no Menu button and no navigation dialog", () => {
     scene(
       { update, view: sceneView },
       given(opened),
+      expect(role("navigation", { name: "Studio" })).toExist(),
+      expect(role("navigation", { name: "Destinations" })).toExist(),
+      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent()
+    )
+  })
+
+  it("opens the navigation drawer from the menu button as a dialog, and closes it from the scrim", () => {
+    scene(
+      { update, view: sceneView },
+      given(onPhone),
       expect(role("button", { name: "Menu" })).toExist(),
-      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      expect(role("navigation", { name: "Studio" })).toBeAbsent(),
+      expect(role("navigation", { name: "Destinations" })).toBeAbsent(),
       click(role("button", { name: "Menu" })),
-      expect(role("button", { name: "Close menu" })).toExist(),
-      click(role("button", { name: "Close menu" })),
-      expect(role("button", { name: "Close menu" })).toBeAbsent()
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      inside(
+        role("dialog", { name: "Navigation" }),
+        expect(role("navigation", { name: "Destinations" })).toExist(),
+        expect(role("navigation", { name: "Studio" })).toExist()
+      ),
+      // The scrim has no role to find it by; it is the first element in the dialog.
+      click(selector("#workspace-menu div")),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+      expect(role("navigation", { name: "Studio" })).toBeAbsent()
     )
   })
 
   it("closes the navigation drawer when a link of the sidebar or the rail is followed", () => {
     scene(
       { update, view: sceneView },
-      given(opened),
+      given(onPhone),
       click(role("button", { name: "Menu" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       click(within(role("navigation", { name: "Studio" }), role("button", { name: "Inbox" }))),
+      Command.expectExact(Dialog.test.CloseDialog),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
       expect(role("main", { name: "Inbox" })).toExist(),
-      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
       click(role("button", { name: "Menu" })),
-      expect(role("button", { name: "Close menu" })).toExist(),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Navigation" })).toExist(),
       click(role("button", { name: "Connections" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
       expect(role("main", { name: "Connections" })).toExist(),
-      expect(role("button", { name: "Close menu" })).toBeAbsent()
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent()
     )
   })
 
@@ -517,19 +552,22 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(
-        modifyFields(opened, {
+        modifyFields(onPhone, {
           groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false }] })
         })
       ),
       click(role("button", { name: "Menu" })),
-      expect(role("button", { name: "Close menu" })).toExist(),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Navigation" })).toExist(),
       click(role("button", { name: "General" })),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
-      expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
-      expect(role("button", { name: "Close menu" })).toBeAbsent()
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist()
     )
   })
-
   it("keeps the brand a mark and no button, and the workspaces one click away from the sidebar's header", () => {
     scene(
       { update, view: sceneView },

@@ -9,31 +9,37 @@ import { rail } from "./rail.ts"
 import { shell } from "./shell.ts"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "./sidebar.ts"
 import { toast, toastStack } from "./toast.ts"
+import type { Viewport } from "./viewport.ts"
 
 const Message = defineMessageUnion({
   ClickedHome: {},
   ClosedThread: {},
   DismissedRefusal: {},
-  OpenedMenu: {},
-  ClosedMenu: {}
+  OpenedMenu: {}
 })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ isThreadOpen: boolean; isRefused: boolean; isMenuOpen: boolean; homes: number }>
+type Model = Readonly<{
+  viewport: Viewport
+  isThreadOpen: boolean
+  isRefused: boolean
+  isMenuOpen: boolean
+  homes: number
+}>
 
-const initial: Model = { isThreadOpen: true, isRefused: false, isMenuOpen: false, homes: 0 }
+const initial: Model = { viewport: "Split", isThreadOpen: true, isRefused: false, isMenuOpen: false, homes: 0 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ClickedHome: () => ({ model: modifyFields(model, { homes: (homes) => homes + 1 }) }),
     ClosedThread: () => ({ model: modifyFields(model, { isThreadOpen: () => false }) }),
     DismissedRefusal: () => ({ model: modifyFields(model, { isRefused: () => false }) }),
-    OpenedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
-    ClosedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => false }) })
+    OpenedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) })
   })
 
 const viewWithMenu = (hasMenu: boolean) => (model: Model, h: HtmlBuilder<Message>) =>
   shell(h, {
+    viewport: model.viewport,
     rail: rail(h, {
       brand: { letter: "A", label: "amends" },
       items: [{ icon: "mark-home", label: "Home", isCurrent: true, onClick: Message.ClickedHome() }],
@@ -81,11 +87,29 @@ const viewWithMenu = (hasMenu: boolean) => (model: Model, h: HtmlBuilder<Message
         }
       : {}),
     ...(hasMenu
-      ? { menu: { onOpen: Message.OpenedMenu(), onClose: Message.ClosedMenu() }, isMenuOpen: model.isMenuOpen }
+      ? {
+          menu: {
+            onOpen: Message.OpenedMenu(),
+            // What a dialog publishes, with no attribute but those that show it and name it while it is open.
+            dialog: (toView) =>
+              toView({
+                dialog: model.isMenuOpen ? [h.Open(true), h.AriaLabel("Navigation")] : [],
+                backdrop: [],
+                panel: [],
+                title: [],
+                description: [],
+                initialFocus: [],
+                closeButton: [],
+                isVisible: model.isMenuOpen
+              })
+          }
+        }
       : {})
   })
 
 const view = viewWithMenu(true)
+
+const inWindow = (viewport: Viewport, extra: Partial<Model> = {}): Model => ({ ...initial, viewport, ...extra })
 
 describe("shell", () => {
   it("frames the rail, the sidebar, the main pane, and the side pane, each by its landmark", () => {
@@ -136,32 +160,55 @@ describe("shell", () => {
     scene({ update, view }, given(initial), expect(selector('[aria-live="polite"]')).toBeAbsent())
   })
 
-  it("has a menu button named Menu that opens the drawer, and a scrim to close it only while it is open", () => {
+  it("keeps the rail and the sidebar in place from Desktop, with no Menu button and no dialog", () => {
+    for (const viewport of ["Desktop", "Split"] as const) {
+      scene(
+        { update, view },
+        given(inWindow(viewport)),
+        expect(role("navigation", { name: "Destinations" })).toExist(),
+        expect(role("navigation", { name: "Workspace" })).toExist(),
+        expect(role("button", { name: "Menu" })).toBeAbsent(),
+        expect(role("dialog")).toBeAbsent()
+      )
+    }
+  })
+
+  it("keeps the rail at Tablet and leaves the sidebar to a dialog that the Menu button opens", () => {
     scene(
       { update, view },
-      given(initial),
+      given(inWindow("Tablet")),
+      expect(role("navigation", { name: "Destinations" })).toExist(),
+      expect(role("navigation", { name: "Workspace" })).toBeAbsent(),
       expect(role("button", { name: "Menu" })).toExist(),
-      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
       click(role("button", { name: "Menu" })),
-      expect(role("button", { name: "Close menu" })).toExist()
+      expect(within(role("dialog", { name: "Navigation" }), role("navigation", { name: "Workspace" }))).toExist(),
+      expect(within(role("dialog", { name: "Navigation" }), role("navigation", { name: "Destinations" }))).toBeAbsent(),
+      expect(role("navigation", { name: "Destinations" })).toExist()
     )
   })
 
-  it("sends the close of the menu when the scrim is clicked while the drawer is open", () => {
+  it("leaves the rail and the sidebar both to the dialog at Phone, under a heading that names it", () => {
     scene(
       { update, view },
-      given({ ...initial, isMenuOpen: true }),
-      expect(role("button", { name: "Close menu" })).toExist(),
-      click(role("button", { name: "Close menu" })),
-      expect(role("button", { name: "Close menu" })).toBeAbsent(),
-      expect(role("navigation", { name: "Workspace" })).toExist()
+      given(inWindow("Phone")),
+      expect(role("navigation", { name: "Destinations" })).toBeAbsent(),
+      expect(role("navigation", { name: "Workspace" })).toBeAbsent(),
+      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("main")).toExist(),
+      click(role("button", { name: "Menu" })),
+      expect(
+        within(role("dialog", { name: "Navigation" }), role("heading", { name: "Navigation", level: 2 }))
+      ).toExist(),
+      expect(within(role("dialog", { name: "Navigation" }), role("navigation", { name: "Destinations" }))).toExist(),
+      expect(within(role("dialog", { name: "Navigation" }), role("navigation", { name: "Workspace" }))).toExist()
     )
   })
 
-  it("keeps the rail and the sidebar working while the drawer is open", () => {
+  it("leaves the rail and the sidebar working in the dialog", () => {
     scene(
       { update, view },
-      given({ ...initial, isMenuOpen: true }),
+      given(inWindow("Phone", { isMenuOpen: true })),
       click(within(role("navigation", { name: "Destinations" }), role("button", { name: "Home" }))),
       expect(within(role("main"), text("Home 1"))).toExist(),
       click(within(role("navigation", { name: "Workspace" }), role("button", { name: "Inbox" }))),
@@ -169,14 +216,17 @@ describe("shell", () => {
     )
   })
 
-  it("has no menu button or scrim when it is given no menu, and the drawer stays shut", () => {
-    scene(
-      { update, view: viewWithMenu(false) },
-      given({ ...initial, isMenuOpen: true }),
-      expect(role("button", { name: "Menu" })).toBeAbsent(),
-      expect(role("button", { name: "Close menu" })).toBeAbsent(),
-      expect(role("navigation", { name: "Workspace" })).toExist()
-    )
+  it("has no Menu button or dialog when it is given no menu, and no sidebar below Desktop", () => {
+    for (const viewport of ["Phone", "Tablet"] as const) {
+      scene(
+        { update, view: viewWithMenu(false) },
+        given(inWindow(viewport, { isMenuOpen: true })),
+        expect(role("button", { name: "Menu" })).toBeAbsent(),
+        expect(role("dialog")).toBeAbsent(),
+        expect(role("navigation", { name: "Workspace" })).toBeAbsent(),
+        expect(role("main")).toExist()
+      )
+    }
   })
 
   it("puts Back before the side pane's title and Close among its actions, each sending its message", () => {

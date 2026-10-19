@@ -2,9 +2,9 @@
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
  * actions, their inbox, their connections, their agents, their settings, and their channels, and
  * what the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
- * the channels, or a group, with its threads and the thread open among them, and whether the
- * navigation drawer is open, which every navigation closes. It lays itself out by the window's width,
- * which its parent informs it of. It lists the host's integrations once, as it opens, informs the
+ * the channels, or a group, with its threads and the thread open among them. It lays itself out by the
+ * window's width, which its parent informs it of, and below 64rem the sidebar is in a navigation drawer,
+ * a dialog that every navigation closes. It lists the host's integrations once, as it opens, informs the
  * connections, the agents, and the channels of them, and lists them again when one asks. It reports
  * when the person leaves it, and when they ask to sign out.
  */
@@ -13,6 +13,7 @@ import { Connection } from "@amends-dev/core/connection"
 import { GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { Viewport } from "@amends-dev/design/viewport"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
@@ -59,8 +60,8 @@ export const Model = Schema.Struct({
   open: Open,
   /** The window's width, which the layout follows. */
   viewport: Viewport,
-  /** Whether the navigation drawer is open, which only shows below 64rem. */
-  isMenuOpen: Schema.Boolean
+  /** The navigation drawer, a dialog, which the shell shows only below 64rem. */
+  menu: DialogBlock.Model
 })
 export type Model = typeof Model.Type
 
@@ -94,7 +95,6 @@ export const Message = defineMessageUnion({
   ClickedSettings: {},
   ClickedChannels: {},
   ClickedMenu: {},
-  ClickedCloseMenu: {},
   InformedOfViewport: { viewport: Viewport },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String }

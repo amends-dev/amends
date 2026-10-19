@@ -15,6 +15,7 @@ import {
   GroupBinding,
   GroupsBinding,
   InboxBinding,
+  MenuBinding,
   SettingsBinding,
   WorkspaceComposition,
   type WorkspaceViewBuilder
@@ -128,9 +129,13 @@ const asideView = (model: Model, h: WorkspaceViewBuilder): Option.Option<Html> =
     () => Option.none()
   )
 
-/** The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane, and the notices. */
+/**
+ * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane,
+ * and the notices, laid out for the window's width, with the navigation drawer's dialog lent to the shell.
+ */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email }, h) =>
   shell(h, {
+    viewport: model.viewport,
     rail: rail(h, {
       brand: { letter: "a", label: "amends" },
       items: railItems(model),
@@ -147,7 +152,9 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     main: mainView(model, h),
     ...Option.match(asideView(model, h), { onNone: () => ({}), onSome: (aside) => ({ aside }) }),
     notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
-    menu: { onOpen: Message.ClickedMenu(), onClose: Message.ClickedCloseMenu() },
-    isMenuOpen: model.isMenuOpen
+    menu: {
+      onOpen: Message.ClickedMenu(),
+      dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
+    }
   })
 )

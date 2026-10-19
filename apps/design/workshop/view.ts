@@ -1518,6 +1518,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           [h.Class(shellFrame)],
           [
             shell(h, {
+              viewport: "Split",
               rail: shellRail(h, model.destination),
               sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
@@ -1536,6 +1537,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           [h.Class(shellFrame)],
           [
             shell(h, {
+              viewport: "Split",
               rail: shellRail(h, model.destination),
               sidebar: shellSidebar(h, false, true),
               main: agentPane(h),

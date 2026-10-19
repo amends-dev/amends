@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { Command, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
+import { Command, Subscription, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
 import { membership, session } from "../test/fixtures.ts"
 import { SignOut } from "./command.ts"
 import { Message } from "./message.ts"
@@ -10,6 +10,7 @@ import { SendCode } from "./page/signIn/command.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { Workspaces } from "./page/workspaces/definition.ts"
+import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
@@ -89,6 +90,21 @@ describe("the app", () => {
       expect(role("main", { name: "Studio" })).toExist(),
       expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
       expect(role("heading", { name: "Sign in to amends" })).toBeAbsent()
+    )
+  })
+
+  it("lays the open workspace out for the window's width as it changes, with the Menu button where the sidebar leaves", () => {
+    scene(
+      { update, view, subscriptions },
+      given(inWorkspace),
+      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("navigation", { name: "Studio" })).toExist(),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Phone" })),
+      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("navigation", { name: "Studio" })).toBeAbsent(),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
+      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("navigation", { name: "Studio" })).toExist()
     )
   })
 

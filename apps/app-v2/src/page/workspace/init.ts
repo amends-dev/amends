@@ -11,7 +11,7 @@ import { Open } from "./definition.ts"
 export const init = WorkspaceComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, name: string, viewport: Viewport) => ({
     childInitContext: { workspaceId, memberId },
-    model: { workspaceId, memberId, name, open: Open.Nothing(), viewport, isMenuOpen: false },
+    model: { workspaceId, memberId, name, open: Open.Nothing(), viewport },
     commands: [LoadIntegrations({ workspaceId })]
   })
 )

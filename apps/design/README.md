@@ -45,9 +45,10 @@ as a plain row under its group and the second with its notices; and the icons by
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The shell's side pane sits beside the main pane from a window of 80rem; narrow
-the window to between 64rem and 80rem to see it float over a scrim. Below 64rem the sidebar leaves
-the frames, and below 48rem the rail with it and the side pane fills the frame; the frames pass the
-shell no menu, so the drawer is for the app to show. Open it to look at a piece
+the window to between 64rem and 80rem to see it float over a scrim, and below 48rem to see it fill the
+frame. The frames pass the shell the viewport `Split`, whatever the window's width, so the rail and the
+sidebar are always in place, and no menu, so the navigation drawer, a dialog over the whole window, is
+for the app to show. Open it to look at a piece
 before a page composes it. It follows the browser's light or dark preference. A browser tab that is
 hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. `bun
 run --filter @amends-dev/design build` bundles it, which CI builds too.
@@ -250,19 +251,20 @@ What a directory screen lists.
 
 The frame of the first four layout patterns, which the modules below fill.
 
-- `shell(h, { rail, sidebar, main, aside?, notices?, menu?, isMenuOpen? })` puts the `rail` on the
+- `shell(h, { viewport, rail, sidebar, main, aside?, notices?, menu? })` puts the `rail` on the
   canvas, then one `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is
   an `aside`, the side pane at 440px. Each is what its module renders. The `notices`, a `toastStack`,
   come last in the frame, over the card and the scrim. The frame is as tall as the viewport (`100dvh`,
   or `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter
-  around the card. The layout follows the width of the window:
+  around the card. The `viewport` is the window's width, a `Viewport` that the app keeps in its model
+  (see [the viewport](#the-viewport)), and the layout follows it:
 
-  | Width       | Navigation                                                    | Side pane                                                      |
-  | ----------- | ------------------------------------------------------------- | -------------------------------------------------------------- |
-  | 80rem+      | Rail and sidebar in place                                     | Beside the main pane, a divider between them                   |
-  | 64 to 80rem | Rail and sidebar in place                                     | Floating over the right of the card, over a scrim              |
-  | 48 to 64rem | The rail stays; the menu button opens the sidebar as a drawer | Floating, as above                                             |
-  | below 48rem | The menu button opens the rail and sidebar together           | Full screen over the main pane, which keeps its state under it |
+  | Viewport  | Width       | Navigation                                                      | Side pane                                                      |
+  | --------- | ----------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
+  | `Split`   | 80rem+      | Rail and sidebar in place                                       | Beside the main pane, a divider between them                   |
+  | `Desktop` | 64 to 80rem | Rail and sidebar in place                                       | Floating over the right of the card, over a scrim              |
+  | `Tablet`  | 48 to 64rem | The rail stays; the menu button opens the sidebar in a dialog   | Floating, as above                                             |
+  | `Phone`   | below 48rem | The menu button opens the rail and sidebar together in a dialog | Full screen over the main pane, which keeps its state under it |
 
   The floating pane has `shadow-popover` over a `scrim` that covers the rest of the shell, and the
   pane's own close button is the way out of it. Below 48rem the frame has no gutter and no gap, so the
@@ -271,21 +273,34 @@ The frame of the first four layout patterns, which the modules below fill.
   shows in its header in place of `paneClose`. Below 64rem the controls and pane headers have their
   touch sizes (44px, and 104px for a header).
 
-  The drawer is the sidebar, and below 48rem the rail before it, moved out of the frame to `fixed`
-  positions at the start of the window, 264px wide for the sidebar with `shadow-modal`, and slid in
-  with a 150ms transition of `translate`. Each is one element the shell wraps, so the rail is not
-  rendered twice. While closed the drawer is `invisible`, so it takes no focus and is not read.
-  The `menu` is `{ onOpen, onClose }`: with it the shell draws the menu button, an `iconButton` named
-  Menu that sends `onOpen`, at the top start of the card over the main pane's header, hidden from
-  64rem; while `isMenuOpen`, it also draws a scrim, a button named Close menu that sends `onClose`,
-  over the rest of the window, and the drawer is in view. Without a `menu` the drawer stays shut, as
-  in the workshop's frames. The page owns whether the drawer is open, and closes it when a
-  destination is picked.
+  The viewport decides what is rendered, not what CSS hides: at `Desktop` and `Split` the sidebar is
+  in the card, and below them it is in the drawer instead, never in both; at `Phone` the rail is in
+  the drawer too, and the frame holds neither. The controls, rows, and headers keep their touch sizes
+  in CSS, from `max-desktop:`, and so does the room a pane's header leaves for the menu button.
 
-  The drawer is driven by CSS from that flag alone. It does not yet trap focus, make the rest of
-  the window inert, or close on Escape, and neither does the floating pane; those come in a later
-  step. The widths are the window's, not the frame's, and the workshop's frames pass no `menu`, so
-  the workshop shows no drawer: resize the browser window around the app to see it.
+  The `menu` is `{ onOpen, dialog }`. Where the frame lacks the sidebar, the shell draws the menu
+  button, an `iconButton` named Menu that sends `onOpen`, at the top start of the card over the main
+  pane's header, and the drawer by `menu.dialog`: the page lends the shell its bound dialog's view,
+  `(toView) => h.block(MenuBinding.embedView({ slotId, model, viewInputs: { toView } }))`, and the
+  shell decides what the dialog holds. That is a `ModalRender`, the `RenderInfo` of `@foldkit/ui`'s
+  headless dialog, from `modal.ts`, which the shell imports from there. While the dialog is visible
+  it is a `dialog` element, transparent and unpadded, with a backdrop over the whole window in
+  `scrim` and a panel at the start of the window, `shadow-modal` on `panel`: an `sr-only` `h2`
+  named Navigation, which names the dialog, then the rail at `Phone`, then the sidebar, which keeps
+  its own 264px. At `Tablet` the panel sits beside the rail, which stays in the frame. Below 48rem
+  its padding is the screen's safe-area insets. It slides in from the start, a 150ms transition of
+  `translate` from `starting:` styles, mirrored in right-to-left and off for reduced motion; closing
+  is instant, since the dialog is not animated.
+
+  The dialog is the framework's, so the drawer gets what a dialog gets: focus is trapped in it and
+  returns to where it was when it closes, the rest of the window is inert, Escape closes it, and
+  so does a click on the backdrop. The page closes it itself when a destination is picked, and when
+  the window grows to `Desktop`. Without a `menu` there is no button and no dialog at any viewport, as
+  in the workshop's frames, and below `Desktop` the sidebar is simply absent. The workshop's frames
+  pass `viewport: "Split"`, so they show the rail and the sidebar in place, and no drawer: it is a
+  window-level overlay, so look at it in the app, narrowing the browser window. The floating and
+  full-screen layouts of the side pane are CSS from the window's width and do not yet trap focus or
+  make the rest of the window inert; that is the next step.
 
 ### `@amends-dev/design/rail`
 
@@ -510,5 +525,7 @@ Cancel by closing the dialog without sending the form; a message by
 its text button, `aria-current`, its note, context, actions, meta, and body, and a divider by its label in
 the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
-the rail and the sidebar, `main`, and `complementary`, with its notices. They query no class. The
-viewport's decision, `viewportOf`, is a plain test.
+the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
+in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
+sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere
+before. They query no class. The viewport's decision, `viewportOf`, is a plain test.

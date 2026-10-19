@@ -1,6 +1,7 @@
 import { GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
 import {
@@ -33,6 +34,7 @@ import {
   ConnectionsBinding,
   GroupsBinding,
   InboxBinding,
+  MenuBinding,
   SettingsBinding
 } from "./composition.ts"
 import { Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
@@ -81,6 +83,16 @@ const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
 /** What the channels report, as the workspace receives it. */
 const fromChannels = (message: typeof ChannelsBlock.Message.Type) =>
   ChannelsBinding.embedView({ slotId: "channels", model: opened.channels }).toParentMessage(message)
+
+/** What the navigation drawer's dialog reports, as the workspace receives it. */
+const fromMenu = (message: typeof DialogBlock.Message.Type) =>
+  MenuBinding.embedView({ slotId: "menu", model: opened.menu, viewInputs: { toView: () => null } }).toParentMessage(
+    message
+  )
+
+/** The dialog showing, as the drawer opening asks it to, and closing, as every navigation asks it to. */
+const menuShown = Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+const menuClosed = Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
 
 /** The notification of activity in a thread of general, read by the inbox. */
 const notification = notificationOf("notification-1", 2, 5)
@@ -135,42 +147,68 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens the navigation drawer, and closes it again", () => {
+  it("opens the navigation drawer, and closes it again as its dialog asks", () => {
     story(
       update,
       given(opened),
       model((model) => {
-        expect(model.isMenuOpen).toBe(false)
+        expect(model.menu.isOpen).toBe(false)
       }),
       message(Message.ClickedMenu()),
+      menuShown,
       model((model) => {
-        expect(model.isMenuOpen).toBe(true)
+        expect(model.menu.isOpen).toBe(true)
       }),
-      message(Message.ClickedCloseMenu()),
+      message(fromMenu(DialogBlock.Message.RequestedClose())),
+      menuClosed,
       model((model) => {
-        expect(model.isMenuOpen).toBe(false)
+        expect(model.menu.isOpen).toBe(false)
       })
     )
   })
 
-  it("lays itself out for the width it is told of, and drops the drawer once the sidebar is in place", () => {
-    for (const [viewport, isMenuOpen] of [
-      ["Phone", true],
-      ["Tablet", true],
-      ["Desktop", false],
-      ["Split", false]
-    ] as const) {
+  it("lays itself out for the width it is told of, and closes the drawer once the sidebar is in place", () => {
+    for (const viewport of ["Desktop", "Split"] as const) {
       story(
         update,
         given(opened),
         message(Message.ClickedMenu()),
+        menuShown,
         message(Message.InformedOfViewport({ viewport })),
+        menuClosed,
         model((model) => {
           expect(model.viewport).toBe(viewport)
-          expect(model.isMenuOpen).toBe(isMenuOpen)
+          expect(model.menu.isOpen).toBe(false)
         })
       )
     }
+  })
+
+  it("keeps the drawer open for a narrower width, and has none to close while it is shut", () => {
+    for (const viewport of ["Phone", "Tablet"] as const) {
+      story(
+        update,
+        given(opened),
+        message(Message.ClickedMenu()),
+        menuShown,
+        message(Message.InformedOfViewport({ viewport })),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.viewport).toBe(viewport)
+          expect(model.menu.isOpen).toBe(true)
+        })
+      )
+    }
+    story(
+      update,
+      given(opened),
+      message(Message.InformedOfViewport({ viewport: "Desktop" })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.viewport).toBe("Desktop")
+        expect(model.menu.isOpen).toBe(false)
+      })
+    )
   })
 
   it("closes the navigation drawer when the person goes home or to a destination", () => {
@@ -186,12 +224,14 @@ describe("a workspace", () => {
         update,
         given(opened),
         message(Message.ClickedMenu()),
+        menuShown,
         model((model) => {
-          expect(model.isMenuOpen).toBe(true)
+          expect(model.menu.isOpen).toBe(true)
         }),
         message(navigation),
+        menuClosed,
         model((model) => {
-          expect(model.isMenuOpen).toBe(false)
+          expect(model.menu.isOpen).toBe(false)
         })
       )
     }
@@ -202,10 +242,12 @@ describe("a workspace", () => {
       update,
       given(opened),
       message(Message.ClickedMenu()),
+      menuShown,
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      menuClosed,
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
-        expect(model.isMenuOpen).toBe(false)
+        expect(model.menu.isOpen).toBe(false)
         expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
       })
     )
@@ -440,7 +482,9 @@ describe("a workspace", () => {
       receivedNotification,
       message(Message.ClickedInbox()),
       message(Message.ClickedMenu()),
+      menuShown,
       message(fromInbox(InboxBlock.Message.ClickedOpen({ notificationId: notification.id }))),
+      menuClosed,
       Command.resolve(
         ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Thread.make({ groupId }) }),
         ComposerBlock.Message.ReceivedDraft({ text: "" })
@@ -458,7 +502,7 @@ describe("a workspace", () => {
         ).toEqual([groupId, Option.some([thread.id, thread.id])])
         expect(openThreadTitle(model.open)).toEqual(Option.some("A thread"))
         expect(model.groups.selected).toEqual(Option.some(groupId))
-        expect(model.isMenuOpen).toBe(false)
+        expect(model.menu.isOpen).toBe(false)
       })
     )
   })
