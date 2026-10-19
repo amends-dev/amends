@@ -11,7 +11,7 @@ import { byDay, Message, type ThreadItem } from "./definition.ts"
 
 /**
  * Who could have written the openings, what the group is called, which of its threads is open, and the time
- * now, which the days the threads opened on and when each did are read from.
+ * now, which the days the threads were created on and when each was are read from.
  */
 export type ViewInputs = Readonly<{
   members: ReadonlyArray<Member.Member>
@@ -36,15 +36,15 @@ const replyMeta = (
       ]
 
 /**
- * A thread as a message: its opening's author and when, its title or opening, who replied and how many times, and
- * what is new in it.
+ * A thread as a message: its opening's author, "A thread" until the opening is read, and when the thread was
+ * created, its title or opening, who replied and how many times, and what is new in it.
  */
 const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs, h: ThreadsViewBuilder): Html => {
   const author = Option.match(item.opening, {
-    onNone: () => ({ name: "A thread", mark: "?", time: undefined }),
+    onNone: () => ({ name: "A thread", mark: "?" }),
     onSome: (opening) => {
       const name = authorName(opening.author, members, [])
-      return { name, mark: initials(name), time: whenLabel(opening.publishedAt, now) }
+      return { name, mark: initials(name) }
     }
   })
 
@@ -52,7 +52,7 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
     key: item.thread.id,
     mark: author.mark,
     author: author.name,
-    time: author.time,
+    time: whenLabel(item.thread.createdAt, now),
     note: item.pending ? "Sending…" : undefined,
     text: threadLabel(item.thread, item.opening),
     onOpen: Message.ClickedThread({ threadId: item.thread.id }),
@@ -65,7 +65,7 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
   })
 }
 
-/** The group's threads under the days they opened on, each as a message of whoever opened it, the open one marked. */
+/** The group's threads, oldest first under the days they were created on, each as a message of whoever opened it. */
 export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   h.div(
     [],

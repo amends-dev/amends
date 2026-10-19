@@ -1,8 +1,8 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called and what
  * letters mark them, who wrote a message and what it says, when a time was, by its time of day, its day,
- * either as a message shows it, and how long ago it was, how a thread is titled and how many replies it has, whether anyone may join a group, and how a task's
- * status and priority and a turn's status read.
+ * either as a message shows it, and how long ago it was, how a thread is titled and how many replies it
+ * has, whether anyone may join a group, and how a task's status and priority and a turn's status read.
  */
 
 import type { Contact } from "@amends-dev/core/channel"

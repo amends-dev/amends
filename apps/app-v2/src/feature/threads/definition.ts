@@ -1,7 +1,7 @@
 /**
- * A group's threads, as the person lists them under the days they opened on: each with its opening
- * message, who replied to it, the task it tracks, and how much of it is new, and a composer to start one.
- * It reports the thread the person picks.
+ * A group's threads, as the person lists them, oldest first under the days they were created on: each with
+ * its opening message, who replied to it, the task it tracks, and how much of it is new, and a composer to
+ * start one. It reports the thread the person picks.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -10,7 +10,6 @@ import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
-import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
@@ -66,41 +65,22 @@ export type OutMessage = typeof OutMessage.Type
 
 export const ThreadsDefinition = Block.makeDefinition("Threads", { Model, Message, OutMessage, ChildInitContext })
 
-/** The threads that opened on one local day, in the list's order, under what that day is called. */
+/** The threads created on one local day, oldest first, under what that day is called. */
 export type ThreadDay = Readonly<{ label: string; items: ReadonlyArray<ThreadItem> }>
 
-type Run = Readonly<{ day: DateTime.Zoned; items: ReadonlyArray<ThreadItem> }>
-
-const byDayOrder = Order.mapInput(DateTime.Order, ({ day }: Run) => day)
-
-/** `undated` first under the newest of `runs`, or alone under today while there are none. */
-const placeUndated = (
-  runs: ReadonlyArray<Run>,
-  undated: ReadonlyArray<ThreadItem>,
-  now: DateTime.Utc
-): ReadonlyArray<Run> => {
-  if (!Array.isReadonlyArrayNonEmpty(undated)) return runs
-  if (!Array.isReadonlyArrayNonEmpty(runs)) return [{ day: dayOf(now), items: undated }]
-  const newest = Array.max(runs, byDayOrder)
-  return runs.map((run) => (run === newest ? { ...run, items: [...undated, ...run.items] } : run))
-}
+const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thread.createdAt)
 
 /**
- * `items` as the runs of the list whose openings were published on one local day by the person's own clock, each
- * named as it is from `now`: "Today", "Yesterday", a weekday, or a date. A thread whose opening is not read yet
- * has no day, so it goes first under the newest one, or under today when none has a day.
+ * `items` oldest first by when their threads were created, as the days they were created on by the person's own
+ * clock, each named as it is from `now`: "Today", "Yesterday", a weekday, or a date.
  */
 export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<ThreadDay> => {
-  const dated = items.flatMap((item) =>
-    Option.toArray(Option.map(item.opening, ({ publishedAt }) => ({ item, day: dayOf(publishedAt) })))
-  )
-  const runs: ReadonlyArray<Run> = Array.isReadonlyArrayNonEmpty(dated)
+  const dated = Array.sort(items, byCreated).map((item) => ({ item, day: dayOf(item.thread.createdAt) }))
+
+  return Array.isReadonlyArrayNonEmpty(dated)
     ? Array.groupWith(dated, (a, b) => DateTime.Equivalence(a.day, b.day)).map((run) => ({
-        day: run[0].day,
+        label: dayLabel(run[0].day, now),
         items: run.map(({ item }) => item)
       }))
     : []
-  const undated = items.filter(({ opening }) => Option.isNone(opening))
-
-  return placeUndated(runs, undated, now).map(({ day, items }) => ({ label: dayLabel(day, now), items }))
 }

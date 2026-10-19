@@ -230,10 +230,10 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("sets the group's threads apart by the day they opened on, by the time now", () => {
+  it("sets the group's threads apart by the day they were created on, by the time now", () => {
     const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
     const listed = (id: string, openingMessage: typeof opening) => ({
-      thread: { ...thread, id: ThreadId.ThreadId.make(id), groupId: design.id },
+      thread: { ...thread, id: ThreadId.ThreadId.make(id), groupId: design.id, createdAt: openingMessage.publishedAt },
       opening: Option.some(openingMessage),
       task: Option.none(),
       replies: 0,

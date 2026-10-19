@@ -83,9 +83,9 @@ const place = Drafts.Place.cases.Thread.make({ groupId })
 /** The item of the list at `index`, a day's divider or a thread. */
 const item = (index: number) => nth(all.role("listitem"), index)
 
-/** Bob's thread, which opened a day before the time now. */
+/** Bob's thread, which was created a day before the time now. */
 const yesterdays = {
-  thread: { ...thread, id: ThreadId.ThreadId.make("thread-3") },
+  thread: { ...thread, id: ThreadId.ThreadId.make("thread-3"), createdAt: DateTime.subtract(now, { days: 1 }) },
   opening: Option.some({
     ...opening,
     author: ThreadMessage.Author.cases.Member.make({ memberId: bob.id }),
@@ -102,7 +102,7 @@ const yesterdays = {
 const bobAuthor = ThreadMessage.Author.cases.Member.make({ memberId: bob.id })
 const strangerAuthor = ThreadMessage.Author.cases.Member.make({ memberId: MemberId.MemberId.make("member-9") })
 
-/** The threads read: `threads`, in the order the list holds them. */
+/** The threads read: `threads`, in the order the store gives them. */
 const listing = (...threads: typeof empty.threads) => modifyFields(empty, { threads: () => threads })
 
 describe("a group's threads", () => {
@@ -120,7 +120,7 @@ describe("a group's threads", () => {
     )
   })
 
-  it("sets the threads apart by the day they opened on, and says when each did by its time of day or its day", () => {
+  it("sets the threads apart by the day they were created on, and says when each was by its time of day or its day", () => {
     scene(
       { update, view: sceneView },
       given(listing(yesterdays, alices)),
@@ -130,30 +130,47 @@ describe("a group's threads", () => {
       expect(within(item(1), text("Yesterday"))).toExist(),
       expect(within(item(2), text("Today"))).toExist(),
       expect(within(item(3), text("Alice"))).toExist(),
-      expect(within(item(3), text(timeOf(opening.publishedAt)))).toExist()
+      expect(within(item(3), text(timeOf(thread.createdAt)))).toExist()
     )
   })
 
-  it("puts a thread whose opening is not read yet first under the newest day, wherever the list holds it", () => {
+  it("lists the threads oldest first by when they were created, in whatever order the store gives them", () => {
+    for (const threads of [[yesterdays, alices] as const, [alices, yesterdays] as const]) {
+      scene(
+        { update, view: sceneView },
+        given(listing(...threads)),
+        expectAll(all.role("listitem")).toHaveCount(4),
+        expect(within(item(0), text("Yesterday"))).toExist(),
+        expect(within(item(1), text("Bob"))).toExist(),
+        expect(within(item(2), text("Today"))).toExist(),
+        expect(within(item(3), text("Alice"))).toExist()
+      )
+    }
+  })
+
+  it("lists the threads created on one day under one divider, oldest first", () => {
+    const later = { ...starting, thread: { ...retro, createdAt: DateTime.subtract(now, { minutes: 10 }) } }
+
     scene(
       { update, view: sceneView },
-      given(listing(alices, yesterdays, starting)),
-      expectAll(all.role("listitem")).toHaveCount(5),
+      given(listing(later, alices)),
+      expectAll(all.role("listitem")).toHaveCount(3),
       expect(within(item(0), text("Today"))).toExist(),
-      expect(within(item(1), text("A thread"))).toExist(),
-      expect(within(item(2), text("Alice"))).toExist(),
-      expect(within(item(3), text("Yesterday"))).toExist(),
-      expect(within(item(4), text("Bob"))).toExist()
+      expect(within(item(1), text("Alice"))).toExist(),
+      expect(within(item(2), text("A thread"))).toExist()
     )
   })
 
-  it("puts a thread whose opening is not read yet under today while no thread has a day", () => {
+  it("says when a thread was created before its opening is read, which leaves its author unknown", () => {
+    const sentYesterday = { ...starting, thread: { ...retro, createdAt: DateTime.subtract(now, { days: 1 }) } }
+
     scene(
       { update, view: sceneView },
-      given(listing(starting)),
+      given(listing(sentYesterday)),
       expectAll(all.role("listitem")).toHaveCount(2),
-      expect(within(item(0), text("Today"))).toExist(),
-      expect(within(item(1), text("A thread"))).toExist()
+      expect(within(item(0), text("Yesterday"))).toExist(),
+      expect(within(item(1), text("A thread"))).toExist(),
+      expect(within(item(1), text("Yesterday"))).toExist()
     )
   })
 

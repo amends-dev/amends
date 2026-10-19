@@ -134,19 +134,19 @@ the pages that compose them; the root composes the pages.
   not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, its task, whether it is still being started, and how much is new, and a composer to
-  start one. It reports the thread picked. It
-  has two views, which take the group's members, its name, the thread open in it, and the time now from
-  their parent. `view`, its canonical one, lists the threads as messages, in the order the list holds
-  them, under a `divider` for each run of them that opened on one day by the person's own clock, named
-  as it is from the time now (`dayLabel`): each the opening's author, by
-  initials and name ("Someone" until the members are read, and "A thread" when the opening is not read
-  yet), when the opening was published (`whenLabel`: its time of day today, "Yesterday" or the day's name
-  before), and the thread's title or its opening as the text that opens it, with "Sending…"
-  while it is being started, under it, while the thread has replies, a reply line: the initials of those
-  who replied, in the order of their first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then
-  how much is new and where its task stands; the thread open is the current row. A thread whose opening is not read yet has no day, so it is first under the newest day, or
-  under Today while no thread has a day. `composerView` is the composer to start one, for the pane's footer, whose box
-  shows "Message" and the group's name until the person writes.
+  start one. It reports the thread picked. It has two views, which take the group's members, its name,
+  the thread open in it, and the time now from their parent. `view`, its canonical one, lists the
+  threads as messages, oldest first by when each thread was created (core's `Thread.createdAt`, the
+  moment its opening was published), whatever order the store gives them, under a `divider` for each
+  day they were created on by the person's own clock, named as it is from the time now (`dayLabel`):
+  each the opening's author, by initials and name ("Someone" until the members are read, and "A thread"
+  when the opening is not read yet), when the thread was created (`whenLabel`: its time of day today,
+  "Yesterday" or the day's name before), which it says before the opening is read too, and the thread's
+  title or its opening as the text that opens it, with "Sending…" while it is being started, under it,
+  while the thread has replies, a reply line: the initials of those who replied, in the order of their
+  first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then how much is new and where its
+  task stands; the thread open is the current row. `composerView` is the composer to start one, for the
+  pane's footer, whose box shows "Message" and the group's name until the person writes.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
