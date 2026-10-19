@@ -25,7 +25,8 @@ by side and wrapping in a narrow column; a select with its label hidden, in a ro
 field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
 tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
-directory's section and rows; the centered screen as the
+directory's section and rows, and a table of three groups' rows with cells, under the line that says
+what it holds and the labels of its columns, and a row with cells and no action; the centered screen as the
 sign-in's two steps and as the workspace picker, each with its pieces in `screenContent` as the app's
 pages return them; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
@@ -248,12 +249,23 @@ What a directory screen lists.
 
 - `section(h, { label, count? })` is the label as an `h2`, the count in a 20px `subtle` badge, and a
   dashed line in `stitch` running to the right edge, 36px below what is above it.
-- `row(h, { mark, title, meta?, action?, onClick })` is one button the width of its container, at
-  least 76px tall: a 40px square mark holding the `mark` letter on `avatar-neutral`, the `title` at
-  body size over the `meta` at hint size in `ink-secondary`, and the `action` at the right in
-  `ink-secondary`. The row is `hover` on hover. The button is named by the title and described by
-  the meta through `aria-description`, and the mark and the action are hidden from assistive
-  technology. A page lists rows as `li` items of a `ul`.
+- `summary(h, { copy, count })` is a line at hint size in `ink-muted` that says what a list holds,
+  the `copy`, with the `count`, such as "4 groups", at its end.
+- `columns(h, { label, cells })` is the labels of a table's columns over its rows, hidden from
+  assistive technology, since each row describes itself: the `label` over the mark and the title,
+  filling the width, then one of the `cells` over each cell column, 8rem wide, at meta size in
+  `ink-muted` and upper case, over a dashed `stitch` rule. Its end leaves 6rem bare, where a row with
+  cells keeps its action, so the labels stay over their cells.
+- `row(h, { mark, title, meta?, cells?, cellsText?, action?, onClick })` is one button the width of
+  its container, at least 76px tall: a 40px square mark holding the `mark` letter on
+  `avatar-neutral`, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
+  `action` at the right in `ink-secondary`. The row is `hover` on hover. The button is named by the
+  title and described by the meta through `aria-description`, and the mark and the action are hidden
+  from assistive technology. The `cells`, such as a `badge` and a count, each lie in an 8rem column
+  between the title and the action, at hint size in `ink-secondary`, under the labels `columns`
+  gives them, and are hidden like the mark; `cellsText`, what they say in words, such as "Public ·
+  12 members", describes the button after the meta. A row with cells keeps 6rem at its end for its
+  action, right-aligned, whether it has one or not. A page lists rows as `li` items of a `ul`.
 
 ### `@amends-dev/design/shell`
 

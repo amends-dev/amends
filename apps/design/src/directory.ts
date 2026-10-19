@@ -1,6 +1,6 @@
 /**
- * What a directory screen lists: a label over each group, with how many it holds, and a row for each
- * thing in it, to open.
+ * What a directory screen lists: a label over each group, with how many it holds, a line that says what a
+ * list holds, the labels of a table's columns, and a row for each thing in it, to open.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -15,6 +15,20 @@ const sectionCount =
 
 const sectionStitch = "h-0 min-w-4 flex-1 border-t border-dashed border-stitch"
 
+const summaryLine = "m-0 flex items-baseline justify-between gap-4 text-hint text-ink-muted"
+
+const summaryCount = "flex-none tabular-nums"
+
+const columnsLine = "flex items-center gap-4 ps-3 pe-4 pb-2 text-meta text-ink-muted uppercase"
+
+const columnsTitleLabel = "min-w-0 flex-1 truncate"
+
+const columnsCellLabel = "w-32 flex-none truncate"
+
+const columnsActionSpace = "w-24 flex-none"
+
+const columnsStitch = "h-0 border-t border-dashed border-stitch"
+
 const rowButton =
   "group flex min-h-19 w-full cursor-pointer items-center gap-4 bg-transparent ps-3 pe-4 text-start focus-ring-inset hover:bg-hover"
 
@@ -27,10 +41,26 @@ const rowTitle = "block truncate text-body font-medium text-ink"
 
 const rowMeta = "block truncate text-hint text-ink-secondary"
 
+const rowCell = "block w-32 flex-none text-hint text-ink-secondary"
+
 const rowAction = "flex-none px-3 text-control font-medium whitespace-nowrap text-ink-secondary group-hover:text-ink"
+
+const rowActionAmongCells = `w-24 text-end ${rowAction}`
 
 const renderMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, letter: string): Html =>
   h.span([h.AriaHidden(true), h.Class(rowMark)], [letter])
+
+const renderAction = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  action: string | undefined,
+  hasCells: boolean
+): Html => {
+  if (hasCells) {
+    return h.span([h.AriaHidden(true), h.Class(rowActionAmongCells)], [action ?? ""])
+  }
+
+  return action === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(rowAction)], [action])
+}
 
 /** The label over a group of rows, with how many are in it and a dashed line running to the edge. */
 export const section = <Message, Requirements>(
@@ -46,15 +76,61 @@ export const section = <Message, Requirements>(
     ]
   )
 
+/** A line of quiet text that says what a list holds, with how many at its end, such as "4 groups". */
+export const summary = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ copy: string; count: string }>
+): Html => h.p([h.Class(summaryLine)], [h.span([], [config.copy]), h.span([h.Class(summaryCount)], [config.count])])
+
+/**
+ * The labels of a table's columns over its `row`s, at the size and in the case of a quiet caption, over a dashed
+ * `stitch` rule, hidden from assistive technology since each row describes itself. The `label` is over the mark
+ * and the title, and each of the `cells` over the column of its cell, in the order of a row's `cells`. At the end
+ * is the room a row with cells keeps for its action, left bare, so the labels stay over their cells.
+ */
+export const columns = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; cells: ReadonlyArray<string> }>
+): Html =>
+  h.div(
+    [h.AriaHidden(true)],
+    [
+      h.div(
+        [h.Class(columnsLine)],
+        [
+          h.span([h.Class(columnsTitleLabel)], [config.label]),
+          ...config.cells.map((label) => h.span([h.Class(columnsCellLabel)], [label])),
+          h.span([h.Class(columnsActionSpace)])
+        ]
+      ),
+      h.div([h.Class(columnsStitch)])
+    ]
+  )
+
 /**
  * A whole row as one button that sends `onClick`: a square mark with the `mark` letter, the `title` over
  * its `meta`, and the `action` at the right. The button is named by the title and described by the meta.
+ *
+ * The `cells`, such as a `badge` and a count, each lie in a column 8rem wide between the title and the action,
+ * under the labels `columns` gives them. Like the mark and the action they are hidden from assistive technology,
+ * so `cellsText`, what they say in words, such as "Public · 12 members", describes the button after the meta. A
+ * row with cells keeps 6rem at its end for its action, right-aligned, whether it has one or not.
  */
 export const row = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ mark: string; title: string; meta?: string; action?: string; onClick: Message }>
-): Html =>
-  Button.view(
+  config: Readonly<{
+    mark: string
+    title: string
+    meta?: string
+    cells?: ReadonlyArray<Html>
+    cellsText?: string
+    action?: string
+    onClick: Message
+  }>
+): Html => {
+  const description = [config.meta, config.cellsText].filter((part) => part !== undefined).join(" · ")
+
+  return Button.view(
     {
       onClick: config.onClick,
       toView: (attributes) =>
@@ -62,7 +138,7 @@ export const row = <Message, Requirements>(
           [
             ...attributes.button,
             h.AriaLabel(config.title),
-            ...(config.meta === undefined ? [] : [h.AriaDescription(config.meta)]),
+            ...(description === "" ? [] : [h.AriaDescription(description)]),
             h.Class(rowButton)
           ],
           [
@@ -74,9 +150,11 @@ export const row = <Message, Requirements>(
                 config.meta === undefined ? h.empty : h.span([h.Class(rowMeta)], [config.meta])
               ]
             ),
-            config.action === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(rowAction)], [config.action])
+            ...(config.cells ?? []).map((cell) => h.span([h.AriaHidden(true), h.Class(rowCell)], [cell])),
+            renderAction(h, config.action, config.cells !== undefined)
           ]
         )
     },
     h
   )
+}

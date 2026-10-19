@@ -19,7 +19,7 @@ import {
   toggle
 } from "../src/control.ts"
 import { badge, detailList, entry, entryList, log } from "../src/details.ts"
-import { row, section } from "../src/directory.ts"
+import { columns, row, section, summary } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
@@ -153,6 +153,12 @@ const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
 const workspaces: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
   { name: "Mercier & Co", meta: "12 members · as Alex" },
   { name: "Fieldwork", meta: "4 members · as Alex" }
+]
+
+const groupRows: ReadonlyArray<Readonly<{ name: string; visibility: string; members: number }>> = [
+  { name: "design", visibility: "Public", members: 12 },
+  { name: "engineering", visibility: "Private", members: 9 },
+  { name: "product", visibility: "Public", members: 8 }
 ]
 
 const emailError = (email: string): Option.Option<string> =>
@@ -551,6 +557,27 @@ const workspaceList = (h: ApplicationViewBuilder): Html =>
     )
   )
 
+const groupList = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [h.AriaLabel("Groups")],
+    groupRows.map(({ name, visibility, members }) =>
+      h.keyed("li")(
+        name,
+        [],
+        [
+          row(h, {
+            mark: "#",
+            title: name,
+            cells: [badge(h, { label: visibility }), h.span([], [`${members} members`])],
+            cellsText: `${visibility} · ${members} members`,
+            action: "Open →",
+            onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
+
 const directoryScreen = (h: ApplicationViewBuilder): Html =>
   centered(h, {
     brand: "amends",
@@ -580,7 +607,31 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
       [row(h, { mark: "N", title: "Northstar Studio", onClick: Message.ClickedButton() })],
       "flex max-w-2xl flex-col"
     ),
-    sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col")
+    sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col"),
+    sample(
+      h,
+      "Summary, columns, and rows with cells",
+      [
+        summary(h, { copy: "Public and private groups you've joined.", count: `${groupRows.length} groups` }),
+        columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
+        groupList(h)
+      ],
+      "flex max-w-2xl flex-col gap-3"
+    ),
+    sample(
+      h,
+      "Row with cells and no action",
+      [
+        row(h, {
+          mark: "#",
+          title: "design",
+          cells: [badge(h, { label: "Public" }), h.span([], ["12 members"])],
+          cellsText: "Public · 12 members",
+          onClick: Message.ClickedButton()
+        })
+      ],
+      "flex max-w-2xl flex-col"
+    )
   ])
 
 const formGroup = (h: ApplicationViewBuilder, taskStatus: TaskStatus): Html =>
