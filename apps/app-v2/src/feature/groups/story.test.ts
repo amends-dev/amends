@@ -5,10 +5,12 @@ import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Effect, Layer, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { modifyFields } from "foldkit/struct"
+import { conversationWithBob, general } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
-import { Message, OutMessage, Starting } from "./definition.ts"
+import { conversationWith, Message, OutMessage, Starting } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -180,5 +182,76 @@ describe("the groups", () => {
       message(Message.ClickedGroup({ groupId })),
       expectNoOutMessage()
     )
+  })
+
+  it("pick the conversation of the person and a member alone, as a click on its row does, when there is one", () => {
+    const withConversation = modifyFields(listed, {
+      groups: () => [
+        { group: general, pending: false, members: 2 },
+        { group: conversationWithBob, pending: false, members: 2 }
+      ]
+    })
+
+    story(
+      update,
+      given(withConversation),
+      message(Message.RequestedConversationWith({ memberId: bobId })),
+      expectOutMessage(OutMessage.SelectedGroup({ groupId: conversationWithBob.id })),
+      model((model) => {
+        expect(model.selected).toEqual(Option.some(conversationWithBob.id))
+        expect(model.starting).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      message(Message.RequestedConversationWith({ memberId: bobId })),
+      expectNoOutMessage(),
+      Command.expectNone()
+    )
+  })
+
+  it("start a conversation with the member already chosen, in its dialog, when there is none with them alone", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.RequestedConversationWith({ memberId: bobId })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberId: Option.some(bobId), text: "" })))
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.selected).toEqual(Option.none())
+      }),
+      message(Message.TypedConversationText({ text: "Got a minute?" })),
+      message(Message.SubmittedConversation()),
+      Command.expectHas(
+        StartConversation({ workspaceId, memberId, withMemberId: bobId, text: "Got a minute?" }),
+        Dialog.test.CloseDialog
+      ),
+      Command.resolve(StartConversation, Message.WroteAction()),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("find the conversation of the person and a member alone, and no other that holds them", () => {
+    const carolId = MemberId.MemberId.make("member-3")
+    const withCarol = { ...conversationWithBob, id: GroupId.GroupId.make("with-carol"), memberIds: [memberId, carolId] }
+    const among = modifyFields(listed, {
+      groups: () => [
+        { group: { ...conversationWithBob, memberIds: [memberId, bobId, carolId] }, pending: false, members: 3 },
+        {
+          group: { ...conversationWithBob, id: GroupId.GroupId.make("bob-and-carol"), memberIds: [bobId, carolId] },
+          pending: false,
+          members: 2
+        },
+        { group: withCarol, pending: false, members: 2 },
+        { group: conversationWithBob, pending: true, members: 2 }
+      ]
+    })
+
+    expect(Option.map(conversationWith(among, bobId), ({ group }) => group.id)).toEqual(
+      Option.some(conversationWithBob.id)
+    )
+    expect(Option.map(conversationWith(among, carolId), ({ group }) => group.id)).toEqual(Option.some(withCarol.id))
+    expect(conversationWith(among, MemberId.MemberId.make("member-4"))).toEqual(Option.none())
+    expect(conversationWith(listed, bobId)).toEqual(Option.none())
   })
 })

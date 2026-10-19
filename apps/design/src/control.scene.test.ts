@@ -3,9 +3,26 @@ import { Option, Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { change, click, expect, given, label, role, scene, selector, submit, text, type, within } from "foldkit/scene"
+import {
+  change,
+  click,
+  expect,
+  expectHandled,
+  expectIgnored,
+  given,
+  keydown,
+  label,
+  role,
+  scene,
+  selector,
+  submit,
+  text,
+  type,
+  within
+} from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
+  answerKeys,
   button,
   buttonRow,
   choiceSelect,
@@ -289,6 +306,69 @@ describe("field", () => {
       expect(label("Email")).toHaveAttr("aria-invalid", "true"),
       expect(label("Email")).toHaveAccessibleDescription("Enter a complete address.")
     )
+  })
+})
+
+describe("answerKeys", () => {
+  const Finding = defineMessageUnion({ TypedFind: { value: Schema.String }, PressedKey: { key: Schema.String } })
+  type Finding = typeof Finding.Type
+
+  const findUpdate = (pressed: ReadonlyArray<string>, message: Finding) =>
+    Finding.match<Update.Return<ReadonlyArray<string>, Finding>>(message, {
+      TypedFind: () => ({ model: pressed }),
+      PressedKey: ({ key }) => ({ model: [...pressed, key] })
+    })
+
+  const answered = (key: string) =>
+    key === "ArrowDown" || key === "Enter" ? Option.some(Finding.PressedKey({ key })) : Option.none()
+
+  const findView = (pressed: ReadonlyArray<string>, h: HtmlBuilder<Finding>) =>
+    h.div(
+      [],
+      [
+        h.p([h.Role("status")], [`Pressed ${pressed.join(" ")}`]),
+        field(
+          h,
+          {
+            id: "find",
+            label: "Find",
+            type: "search",
+            value: "",
+            onInput: (value) => Finding.TypedFind({ value }),
+            isAutofocus: false,
+            attributes: [answerKeys(h, answered)]
+          },
+          Option.none()
+        )
+      ]
+    )
+
+  it("keeps the keys it answers from the field, and leaves the others and those with a modifier to it", () => {
+    scene(
+      { update: findUpdate, view: findView },
+      given([]),
+      keydown(label("Find"), "ArrowDown"),
+      expectHandled(),
+      expect(role("status")).toHaveText("Pressed ArrowDown"),
+      keydown(label("Find"), "a"),
+      expectIgnored(),
+      keydown(label("Find"), "Enter", { shiftKey: true }),
+      expectIgnored(),
+      keydown(label("Find"), "Enter", { metaKey: true }),
+      expectIgnored(),
+      keydown(label("Find"), "Enter"),
+      expectHandled(),
+      expect(role("status")).toHaveText("Pressed ArrowDown Enter")
+    )
+  })
+
+  it("is on a field only when the field is given it", () => {
+    scene(
+      { update, view: viewOf((model, h) => [emailField(model, h, Option.none())]) },
+      given(initial),
+      expect(label("Email")).not.toHaveHandler("keydown")
+    )
+    scene({ update: findUpdate, view: findView }, given([]), expect(label("Find")).toHaveHandler("keydown"))
   })
 })
 

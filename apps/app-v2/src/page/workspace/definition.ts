@@ -6,8 +6,10 @@
  * window's width, which its parent informs it of: below 64rem the sidebar is in a navigation drawer, a
  * dialog that every navigation closes, and below 80rem the thread is in a dialog of its own, which
  * follows the thread opening and closing. It lists the host's integrations once, as it opens, informs the
- * connections, the agents, and the channels of them, and lists them again when one asks. It reports
- * when the person leaves it, and when they ask to sign out.
+ * connections, the agents, and the channels of them, and lists them again when one asks. Its search, in a
+ * dialog over the page, opens from the sidebar and when its parent asks, and what it finds opens a group, a
+ * thread in its group, or a conversation with a member. It reports when the person leaves it, and when they
+ * ask to sign out.
  */
 
 import { Connection } from "@amends-dev/core/connection"
@@ -27,6 +29,7 @@ import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { workspaceName } from "../../feature/settings/definition.ts"
 import { titleOf } from "../../feature/thread/definition.ts"
@@ -58,6 +61,7 @@ export const Model = Schema.Struct({
   agents: AgentsBlock.Model,
   settings: SettingsBlock.Model,
   channels: ChannelsBlock.Model,
+  search: SearchBlock.Model,
   open: Open,
   /** The window's width, which the layout follows. */
   viewport: Viewport,
@@ -91,7 +95,7 @@ export const isThreadOpen = (open: Open): boolean => Option.isSome(openThreadTit
 /** Whether the side pane is in a dialog at `viewport`, not beside the main pane, which is from `Split` alone. */
 export const isAsideFloating = (viewport: Viewport): boolean => viewport !== "Split"
 
-/** What the groups, actions, inbox, connections, agents, settings, and channels are made from: the workspace, as the member. */
+/** What the groups, actions, inbox, connections, agents, settings, channels, and search are made from: the workspace, as the member. */
 export const ChildInitContext = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId })
 
 export const Message = defineMessageUnion({
@@ -104,6 +108,8 @@ export const Message = defineMessageUnion({
   ClickedSettings: {},
   ClickedChannels: {},
   ClickedMenu: {},
+  ClickedSearch: {},
+  RequestedSearch: {},
   InformedOfViewport: { viewport: Viewport },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String }

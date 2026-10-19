@@ -12,6 +12,9 @@ export const GroupsBlock = GroupsComposition.assembleBlock({
   update,
   view,
   subscriptions,
-  operations: { informOpenGroup: Message.InformedOfOpenGroup },
+  operations: {
+    informOpenGroup: Message.InformedOfOpenGroup,
+    requestConversationWith: Message.RequestedConversationWith
+  },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })

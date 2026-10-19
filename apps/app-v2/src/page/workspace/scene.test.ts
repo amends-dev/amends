@@ -28,6 +28,7 @@ import {
   bob,
   bobIsMember,
   connectionOf,
+  design,
   general,
   grantsOf,
   integrationGiving,
@@ -57,6 +58,8 @@ import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { SearchBlock } from "../../feature/search/block.ts"
+import { Search } from "../../feature/search/command.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { timeOf } from "../../seen.ts"
 import { WorkspaceBlock } from "./block.ts"
@@ -1017,6 +1020,61 @@ describe("a workspace", () => {
       click(within(role("alert"), role("button", { name: "Dismiss" }))),
       Command.expectExact(Dismiss({ workspaceId: workspace.id, memberId: member.id, key: "action-1" })),
       Command.resolve(Dismiss, ActionsBlock.Message.CompletedDismiss())
+    )
+  })
+
+  it("shows the search in the sidebar's header, its shortcut hidden from assistive technology, and opens it in a dialog", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Find anything…" }))).toExist(),
+      expect(within(role("button", { name: "Find anything…" }), text("⌘K"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("dialog", { name: "Find anything" })).toBeAbsent(),
+      click(role("button", { name: "Find anything…" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Find anything" })).toExist(),
+      expect(label("Find anything")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
+    )
+  })
+
+  it("opens the group the search found from its row, closing the search", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      click(role("button", { name: "Find anything…" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      type(label("Find anything"), "des"),
+      Command.resolve(
+        Search,
+        SearchBlock.Message.CompletedSearch({
+          query: "des",
+          results: { groups: [{ group: design, name: "Design" }], threads: [], people: [] }
+        })
+      ),
+      click(within(role("dialog", { name: "Find anything" }), role("button", { name: /^Design/ }))),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("dialog", { name: "Find anything" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist()
+    )
+  })
+
+  it("opens the search from the drawer on a phone, in a dialog over the drawer, with the sidebar shut", () => {
+    scene(
+      { update, view: sceneView },
+      given(onPhone),
+      expect(role("navigation", { name: "Studio" })).toBeAbsent(),
+      click(role("button", { name: "Menu" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      click(within(role("dialog", { name: "Navigation" }), role("button", { name: "Find anything…" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Navigation" })).toExist(),
+      expect(role("dialog", { name: "Find anything" })).toExist()
     )
   })
 })

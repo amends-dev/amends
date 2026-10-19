@@ -12,6 +12,7 @@ import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { LoadIntegrations } from "./command.ts"
 import { isAsideFloating, type Model, Open, WorkspaceDefinition } from "./definition.ts"
@@ -79,28 +80,46 @@ export const goTo = (show: typeof showNothing) =>
     show
   ])
 
+/** Open the group `groupId` without a thread, and close the navigation drawer and the side pane's dialog. */
+const openGroupAlone = (groupId: GroupId.GroupId) =>
+  Update.combine([MenuBinding.requestClose(), hideAside, openGroup(groupId, Option.none())])
+
+/**
+ * Open the group `groupId` with the thread `threadId` open in it, mark the group open in the list, close the
+ * navigation drawer, and open the side pane's dialog where the pane is one.
+ */
+const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.ThreadId) =>
+  Update.combine([
+    MenuBinding.requestClose(),
+    GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
+    openGroup(groupId, Option.some(threadId)),
+    showAside
+  ])
+
 /**
  * Picking a group opens it without a thread, and closes the navigation drawer and the side pane's dialog. Asking
  * to browse goes to the groups.
  */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
-  SelectedGroup: ({ groupId }) =>
-    Update.combine([MenuBinding.requestClose(), hideAside, openGroup(groupId, Option.none())]),
+  SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
   RequestedBrowse: () => goTo(showGroups)
 })
 
-/**
- * Opening a notification's thread opens its group with the thread open, marks the group open in the list,
- * closes the navigation drawer, and opens the side pane's dialog where the pane is one.
- */
+/** Opening a notification's thread opens it in its group. */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
-  OpenedThread: ({ groupId, threadId }) =>
-    Update.combine([
-      MenuBinding.requestClose(),
-      GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
-      openGroup(groupId, Option.some(threadId)),
-      showAside
-    ])
+  OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId)
+})
+
+/**
+ * What the search found opens as it would from the sidebar and the inbox, except that the groups do not hear of a
+ * group the search opened, so they are told which is open. A person is opened as a conversation, which the groups
+ * find or start.
+ */
+const foldSearchOutMessage = SearchBlock.OutMessage.match({
+  OpenedGroup: ({ groupId }) =>
+    Update.combine([GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }), openGroupAlone(groupId)]),
+  OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId),
+  OpenedPerson: ({ memberId }) => GroupsBinding.requestConversationWith({ memberId })
 })
 
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
@@ -168,6 +187,12 @@ export const InboxBinding = WorkspaceDefinition.bindChild(InboxBlock, {
   outMessage: { fold: foldInboxOutMessage }
 })
 
+export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
+  field: "search",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: foldSearchOutMessage }
+})
+
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
   field: "connections",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
@@ -219,6 +244,7 @@ export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
     GroupsBinding,
     ActionsBinding,
     InboxBinding,
+    SearchBinding,
     ConnectionsBinding,
     AgentsBinding,
     SettingsBinding,

@@ -1,10 +1,11 @@
+import type { GroupId } from "@amends-dev/core/group"
 import type { MemberId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { DialogBinding, GroupsComposition } from "./composition.ts"
-import { GroupsDefinition, Message, type Model, OutMessage, Starting } from "./definition.ts"
+import { conversationWith, GroupsDefinition, Message, type Model, OutMessage, Starting } from "./definition.ts"
 
 /** The model with what the person is starting as `change` makes it, while they start something. */
 const atStarting = (model: Model, change: (starting: Starting) => Starting) =>
@@ -32,10 +33,23 @@ const openTeamForm = GroupsDefinition.stepFields(() => ({
   starting: () => Option.some(Starting.Team({ name: "", isPublic: false }))
 }))
 
-/** Ask for a new conversation: no member chosen, and no first message. */
-const openConversationForm = GroupsDefinition.stepFields(() => ({
-  starting: () => Option.some(Starting.Conversation({ memberId: Option.none(), text: "" }))
-}))
+/** Ask for a new conversation with `memberId` chosen, or with none chosen, and no first message. */
+const openConversationForm = (memberId: Option.Option<MemberId.MemberId>) =>
+  GroupsDefinition.stepFields(() => ({
+    starting: () => Option.some(Starting.Conversation({ memberId, text: "" }))
+  }))
+
+/**
+ * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row
+ * does.
+ */
+const pickGroup = <Current extends Model>(model: Current, groupId: GroupId.GroupId) =>
+  Option.contains(model.selected, groupId)
+    ? { model }
+    : {
+        model: { ...model, selected: Option.some(groupId) },
+        outMessage: OutMessage.SelectedGroup({ groupId })
+      }
 
 /** Write the team `name`, public when `isPublic`, to the person's store. */
 const writeTeam = (name: string, isPublic: boolean) =>
@@ -58,14 +72,7 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
     ReceivedMemberships: ({ memberships }) => ({ model: modifyFields(model, { memberships: () => memberships }) }),
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
-    // Picking the group already picked changes nothing.
-    ClickedGroup: ({ groupId }) =>
-      Option.contains(model.selected, groupId)
-        ? { model }
-        : {
-            model: modifyFields(model, { selected: () => Option.some(groupId) }),
-            outMessage: OutMessage.SelectedGroup({ groupId })
-          },
+    ClickedGroup: ({ groupId }) => pickGroup(model, groupId),
     InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
     ClickedBrowse: () => ({ model, outMessage: OutMessage.RequestedBrowse() }),
     ChoseBrowseTab: ({ tab }) => ({
@@ -92,7 +99,13 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
         onNone: () => ({ model }),
         onSome: ({ name, isPublic }) => Update.combine(model, [writeTeam(name, isPublic), DialogBinding.requestClose()])
       }),
-    ClickedNewConversation: () => Update.combine(model, [openConversationForm, DialogBinding.requestOpen()]),
+    ClickedNewConversation: () =>
+      Update.combine(model, [openConversationForm(Option.none()), DialogBinding.requestOpen()]),
+    RequestedConversationWith: ({ memberId }) =>
+      Option.match(conversationWith(model, memberId), {
+        onSome: ({ group }) => pickGroup(model, group.id),
+        onNone: () => Update.combine(model, [openConversationForm(Option.some(memberId)), DialogBinding.requestOpen()])
+      }),
     ChoseConversationMember: ({ memberId: chosen }) => ({
       model: atStarting(
         model,

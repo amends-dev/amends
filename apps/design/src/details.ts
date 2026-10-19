@@ -3,6 +3,7 @@
  * or agents' work it lists, and the log an agent wrote.
  */
 
+import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { mark } from "./mark.ts"
 
@@ -24,6 +25,9 @@ const badgeTones = {
 const entryColumn = "m-0 flex list-none flex-col p-0"
 
 const entryRow = "flex items-start gap-3 py-2"
+
+const entryButton =
+  "w-full cursor-pointer bg-transparent px-3 text-start text-ink focus-ring-inset hover:bg-hover aria-[current=true]:bg-selected"
 
 const entryBody = "flex min-w-0 flex-1 flex-col gap-2"
 
@@ -69,35 +73,75 @@ export const entryList = <Message, Requirements>(
   config: Readonly<{ label: string; children: ReadonlyArray<Html> }>
 ): Html => h.ul([h.AriaLabel(config.label), h.Class(entryColumn)], config.children)
 
+/** What an `entry` shows: the `mark` letters, the `title`, and the `trailing` pieces after it. */
+type EntryContent = Readonly<{
+  key: string
+  mark?: string
+  title: string
+  trailing?: ReadonlyArray<Html>
+}>
+
+/**
+ * An `entry` either lists what is under it, its `children`, or is one button that sends `onClick`, which holds
+ * nothing a button cannot, and so has no `children`.
+ */
+export type EntryConfig<Message> = EntryContent &
+  (
+    | Readonly<{ children?: ReadonlyArray<Html>; onClick?: never; isActive?: never }>
+    | Readonly<{ onClick: Message; isActive?: boolean; children?: never }>
+  )
+
 /**
  * One item of an `entryList`, keyed by `key`: the `mark` letters at the start when it has them, then the
  * `title` with the `trailing` pieces after it, such as a `badge` or a quiet word, wrapping onto a new line
  * when they do not fit, and the `children` under it, such as a failure, buttons, or a `log`, 8px apart.
+ *
+ * With `onClick` the whole entry is one button that sends it, with `key` as its id so that a field can name it
+ * as its active descendant, filled on hover. While it `isActive` it is filled with `selected` and is
+ * `aria-current="true"`, for the entry the person has reached with the arrow keys of the field above the list
+ * and would open with Enter. Such an entry holds no `children`, since a button holds no buttons.
  */
 export const entry = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{
-    key: string
-    mark?: string
-    title: string
-    trailing?: ReadonlyArray<Html>
-    children?: ReadonlyArray<Html>
-  }>
-): Html =>
-  h.keyed("li")(
-    config.key,
-    [h.Class(entryRow)],
-    [
-      config.mark === undefined ? h.empty : mark(h, { text: config.mark }),
-      h.div(
-        [h.Class(entryBody)],
+  config: EntryConfig<Message>
+): Html => {
+  const content = [
+    config.mark === undefined ? h.empty : mark(h, { text: config.mark }),
+    h.div(
+      [h.Class(entryBody)],
+      [
+        h.div([h.Class(entryTitleLine)], [h.span([h.Class(entryTitle)], [config.title]), ...(config.trailing ?? [])]),
+        ...(config.children ?? [])
+      ]
+    )
+  ]
+  const { onClick } = config
+
+  return onClick === undefined
+    ? h.keyed("li")(config.key, [h.Class(entryRow)], content)
+    : h.keyed("li")(
+        config.key,
+        [],
         [
-          h.div([h.Class(entryTitleLine)], [h.span([h.Class(entryTitle)], [config.title]), ...(config.trailing ?? [])]),
-          ...(config.children ?? [])
+          Button.view(
+            {
+              onClick,
+              toView: (attributes) =>
+                h.button(
+                  [
+                    ...attributes.button,
+                    h.Id(config.key),
+                    ...(config.isActive === true ? [h.AriaCurrent("true")] : []),
+                    h.Class(`${entryRow} ${entryButton}`)
+                  ],
+                  content
+                )
+            },
+            h
+          )
         ]
       )
-    ]
-  )
+}
 
 /**
  * What an agent wrote as it worked, one `items` line each, in the mono font on `subtle`, an ordered list named

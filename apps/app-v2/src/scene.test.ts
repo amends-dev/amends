@@ -239,4 +239,23 @@ describe("the app", () => {
       expect(label("Email")).toHaveValue("alice@example.com")
     )
   })
+
+  it("opens the search of the open workspace when the search key is pressed, and leaves the key to the browser before one is open", () => {
+    scene(
+      { update, view, subscriptions },
+      given(choosing),
+      Subscription.emit(subscriptions.openSearch, Message.PressedSearchKey()),
+      Command.expectNone(),
+      expect(role("dialog", { name: "Find anything" })).toBeAbsent()
+    )
+    scene(
+      { update, view, subscriptions },
+      given(inWorkspace),
+      Subscription.emit(subscriptions.openSearch, Message.PressedSearchKey()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Find anything" })).toExist(),
+      expect(label("Find anything")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
+    )
+  })
 })

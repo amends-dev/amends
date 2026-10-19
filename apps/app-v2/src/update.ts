@@ -18,6 +18,14 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
           )
         )
       ]),
-    Ticked: ({ now }) => Update.combine(model, [ApplicationDefinition.stepFields(() => ({ now: () => now }))])
+    Ticked: ({ now }) => Update.combine(model, [ApplicationDefinition.stepFields(() => ({ now: () => now }))]),
+    // The search belongs to the open workspace; with none open the key opens nothing.
+    PressedSearchKey: () =>
+      Update.combine(
+        model,
+        Option.toArray(
+          Option.map(openedWorkspaceId(model), (workspaceId) => WorkspaceBinding.requestSearch(workspaceId))
+        )
+      )
   })
 )

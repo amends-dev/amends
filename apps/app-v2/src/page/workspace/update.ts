@@ -7,6 +7,7 @@ import {
   goTo,
   hideAside,
   MenuBinding,
+  SearchBinding,
   showAgents,
   showAside,
   showChannels,
@@ -51,6 +52,8 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedSettings: () => Update.combine(model, [goTo(showSettings)]),
     ClickedChannels: () => Update.combine(model, [goTo(showChannels)]),
     ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
+    ClickedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
+    RequestedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
     InformedOfViewport: ({ viewport }) =>
       Update.combine(model, [
         showViewport(viewport),

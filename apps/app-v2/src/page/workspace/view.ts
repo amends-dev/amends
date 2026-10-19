@@ -19,6 +19,7 @@ import {
   GroupsBinding,
   InboxBinding,
   MenuBinding,
+  SearchBinding,
   SettingsBinding,
   WorkspaceComposition,
   type WorkspaceViewBuilder
@@ -74,7 +75,8 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
           { icon: "chevron-down", label: "All workspaces", onClick: Message.ClickedAllWorkspaces() },
           { size: "compact" }
         )
-      ]
+      ],
+      search: { label: "Find anything…", shortcut: "⌘K", onClick: Message.ClickedSearch() }
     }),
     children: [
       sidebarSection(h, {
@@ -151,8 +153,8 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
 /**
  * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane,
  * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
- * pane lent to the shell, and the groups' dialog for starting a team or a conversation, which the shell keeps
- * in the frame whether or not the sidebar or the browse page that opens it is on the page.
+ * pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, and of the search,
+ * which the shell keeps in the frame whether or not the sidebar or the page that opens them is on the page.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email, now }, h) => {
   const aside = asideView(model, now, h)
@@ -189,6 +191,9 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
       isOpen: model.menu.isOpen,
       dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
     },
-    dialogs: [h.block(GroupsBinding.embedView({ slotId: "groups-dialog", model: model.groups, view: dialogView }))]
+    dialogs: [
+      h.block(GroupsBinding.embedView({ slotId: "groups-dialog", model: model.groups, view: dialogView })),
+      h.block(SearchBinding.embedView({ slotId: "search", model: model.search }))
+    ]
   })
 })

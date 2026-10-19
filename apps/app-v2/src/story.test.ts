@@ -1,6 +1,7 @@
 import { Identity } from "@amends-dev/core/identity"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { now } from "../test/fixtures.ts"
@@ -189,6 +190,27 @@ describe("the app", () => {
       model((model) => {
         expect(model.viewport).toBe("Phone")
         expect(Option.map(openedIn(model), ({ model: opened }) => opened.viewport)).toEqual(Option.some("Phone"))
+      })
+    )
+  })
+
+  it("opens the search of the open workspace when the search key is pressed, and has none to open before one is", () => {
+    story(
+      update,
+      given(init({ session: Option.some(session), viewport: "Split", now }).model),
+      message(Message.PressedSearchKey()),
+      Command.expectNone(),
+      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(Message.PressedSearchKey()),
+      Command.expectNone(),
+      message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      message(Message.PressedSearchKey()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      model((model) => {
+        expect(Option.map(openedIn(model), ({ model: opened }) => opened.search.dialog.isOpen)).toEqual(
+          Option.some(true)
+        )
       })
     )
   })

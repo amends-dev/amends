@@ -53,7 +53,7 @@ forms, fields, and rows from the design's `centered`, `control`, `form`, and `di
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups` renders the sidebar's sections, the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
-a team or a conversation is started, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
+a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
 initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`.
@@ -220,7 +220,7 @@ the pages that compose them; the root composes the pages.
   over the page: a dialog the Block binds from `@foldkit/ui/dialog` and renders with the design's
   `modal`, a team by its name and whether anyone in the workspace can join, with the name field taking
   the focus as the dialog opens, and a conversation by the member and the first message, with the
-  member choice taking it. Cancel, Close, Escape, a click on the scrim, and submitting each close the
+  member choice taking it, or the first message when the member is already chosen. Cancel, Close, Escape, a click on the scrim, and submitting each close the
   dialog, which drops what was being started. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
@@ -244,7 +244,27 @@ the pages that compose them; the root composes the pages.
   closed, and neither the sidebar's view nor the browse page holds it: below 64rem the sidebar is on
   the page only while the navigation drawer is open, and a dialog the framework shows has to be in the
   document. The page lends it to the shell's `dialogs`, so the sidebar's "+" and Create group open it
-  at every width.
+  at every width. Its parent can ask for a conversation with a member (`requestConversationWith`,
+  `RequestedConversationWith`): the Block selects the conversation the person already has with just
+  that member, and, when there is none, opens the dialog for a conversation with the member chosen.
+- `feature/search`: finding anything in the workspace, groups, threads, and people, in a modal named
+  Find anything, which the Block binds from `@foldkit/ui/dialog` and renders with the design's
+  `modal`, wide, over a search field of type search whose label is hidden and which takes the focus as
+  the dialog opens, with its parent asking it to open (`requestOpen`) on an empty field. What is typed
+  is searched for with the store's `search` once it holds more than spaces, a search for each
+  keystroke, and an answer for a query that is no longer the one typed is dropped. The rows of the
+  last answer stay while the next is on its way, so the list does not flicker. They are listed under
+  Groups, Threads, and People, each only when it has something: a group by `#` for a team or the other
+  members' initials for a conversation, and its name; a thread by the words it opened with and a badge
+  of its group; a person by their initials and name. Nothing typed says "Type to search."; nothing
+  found, `Nothing found for "zzz".`, with the query trimmed; a search that failed, why. The first row is
+  active; the arrow keys walk the rows, around the list, and keep the active one in view
+  (`ScrollToResult`), Enter opens the active one, and a click opens the one clicked. The active row
+  is marked with `aria-current` and named as the field's `aria-activedescendant`. A key with
+  Shift, Control, Alt, or Meta held is left to the browser, as are the keys it does not answer. The
+  Block reports what was opened, a group (`OpenedGroup`), a thread in its group (`OpenedThread`), or a
+  person (`OpenedPerson`), and closes its dialog, which, however it closes, forgets what was typed and
+  found. It does not act on a person itself: its parent decides what opening a person is.
 - `feature/inbox`: the person's notifications, newest first, on two tabs: All, every notification
   the store gives, waiting or seen, and Unread, those still waiting, counted while any wait, All at first. Each
   tab's notifications sit under a divider for each day they came on by the person's own clock, named
@@ -335,7 +355,9 @@ the pages that compose them; the root composes the pages.
   or a group is. The
   sidebar, named by the workspace, has the workspace's name over a button to all workspaces, an
   "Inbox" item with how many notifications wait, the groups' sections, and, in its footer, who is
-  signed in with a Sign out button. The main pane shows one destination: nothing yet, titled by the
+  signed in with a Sign out button. Over them, the sidebar's header has a button, Find anything…, with
+  the shortcut ⌘K beside it, hidden from assistive technology, which sends `ClickedSearch`; it reads
+  ⌘K on every platform, though off an Apple platform the key is Control+K. The main pane shows one destination: nothing yet, titled by the
   workspace, the inbox, the groups to browse, the connections, the agents, the settings, or the
   channels, which are always read, or the open group, a keyed occurrence. The groups to browse are
   the groups Block's `browseView`, the same child as the sidebar's under a second slot, which the
@@ -343,7 +365,14 @@ the pages that compose them; the root composes the pages.
   the drawer and the side pane's dialog and marking no group open, and picking a group on that page
   opens it, which leaves the page. The side pane shows the thread open in that group,
   only while one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
-  under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width. The
+  under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width, and
+  so is the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
+  the drawer and the side pane's dialog, so the one opened last is over the rest. `ClickedSearch` and
+  `RequestedSearch`, which the root sends, ask the search to open. The search reports what was opened
+  and the page folds it as it folds the same thing from elsewhere: a group is opened alone, as a group
+  picked is, and marked; a thread is opened in its group, as the inbox's is; and a person is a
+  conversation with them, which the groups Block selects or starts. A group or a thread opened closes the navigation drawer, as any
+  navigation does. The
   workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
@@ -392,7 +421,9 @@ the pages that compose them; the root composes the pages.
   then. What the clock decides, such as which day a time falls on and how long ago it was, needs the
   time now, which enters the same way: the flags read it with `DateTime.now`, and the subscription
   `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
-  Nothing acts on the time, so it goes no further than views: the root's view gives the open
+  The subscription `OpenSearch` follows Control+K, or Command+K on an Apple platform, also from a
+  field, and sends `PressedSearchKey` while a workspace is open, which the update asks the workspace
+  to open its search for; with none open the key is left to the browser. Nothing acts on the time, so it goes no further than views: the root's view gives the open
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
   session, and the browser's services beneath them.
@@ -522,7 +553,15 @@ browser's storage. Each Block's tests sit beside it:
   report, or closed as its parent asks, without one; the groups starting a
   team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
   or the dialog closes, dropping what was being started, and reporting the group picked once, asking
-  to browse each time, and keeping the browse page's tab and search; the inbox
+  to browse each time, and keeping the browse page's tab and search, and selecting the conversation
+  with a member asked for, or opening the dialog with the member chosen when there is none, a team
+  with that member in it not being that conversation; the search opening on an empty field, searching
+  for what is typed only once it holds more than spaces, keeping the rows shown while the next search
+  is on its way, dropping an answer for an earlier query, saying why a search failed and searching again
+  as the person types on, listing groups, threads, and people in that order, moving the active result
+  and scrolling it into view, and opening the active result or one clicked, reporting a group, a thread,
+  or a person, closing the dialog and forgetting the search, and opening none while there is nothing
+  found or the rows shown are for an earlier query; the inbox
   saying why the person is told, who wrote what and what they did, where it comes from, and what it
   says, grouping the notifications by the day they came on, listing every one or those waiting, newest
   first, as its tab chooses, reporting the thread of the notification opened, marking one seen or all
@@ -596,7 +635,8 @@ browser's storage. Each Block's tests sit beside it:
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
   a dialog of its own, both in a view apart from the sidebar's, with the sidebar's buttons that open
-  them and the same team taken from the workspace's sidebar, and the groups to browse: the button in the sidebar's header asking for them, the tabs counted and chosen, each
+  them and the same team taken from the workspace's sidebar, the dialog for a conversation taking the
+  focus on its member choice, or on the first message when the member is chosen, and the groups to browse: the button in the sidebar's header asking for them, the tabs counted and chosen, each
   group's mark, visibility, and members, a team and a conversation told apart, the search narrowing
   either tab in any case and with spaces ignored, nothing matching, nothing to discover, no groups yet, a
   team on its way, a group opened from its row, and Create group only for someone who may create
@@ -653,7 +693,15 @@ browser's storage. Each Block's tests sit beside it:
   and the thread open moving from its place beside the main pane into its dialog as the window narrows
   to `Desktop`, staying there at `Phone`, and back as it widens to `Split`, and the open inbox's
   notifications growing older as the subscription reports each minute.
-  A scene opens and closes
+  The search's scenes show it
+  open on a field named Find anything that takes the focus, searching for what is typed, the sections
+  that have something in them, the first result active and the field's active descendant following the
+  arrow keys round the list, Enter and a click opening a result and closing the dialog, the keys with a
+  modifier and those it does not answer left to the browser, nothing found, a search on its way, and a
+  failed search. The workspace's scenes show the search in the sidebar's header with its shortcut hidden from
+  assistive technology, opening in a dialog from it and, at `Phone`, from the drawer over the
+  drawer, and a group found opening and closing the search. The root's show the key that
+  opens the search opening it in an open workspace and doing nothing before one is open. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through
   its Binding's `embedView`.

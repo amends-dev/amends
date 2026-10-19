@@ -9,6 +9,6 @@ export const WorkspaceBlock = WorkspaceComposition.assembleBlock({
   init,
   update,
   view,
-  operations: { informViewport: Message.InformedOfViewport },
+  operations: { informViewport: Message.InformedOfViewport, requestSearch: Message.RequestedSearch },
   EffectsLayer: LoadIntegrations.layer
 })

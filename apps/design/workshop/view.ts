@@ -1543,6 +1543,27 @@ const detailsGroup = (
       ],
       sidePaneColumn
     ),
+    sample(
+      h,
+      "Entries that open something, the second one active",
+      [
+        entryList(h, {
+          label: "Found",
+          children: [
+            entry(h, { key: "found-design", mark: "#", title: "Design crew", onClick: Message.ClickedButton() }),
+            entry(h, {
+              key: "found-plans",
+              title: "Plans for the week",
+              trailing: [badge(h, { label: "Design crew" })],
+              onClick: Message.ClickedButton(),
+              isActive: true
+            }),
+            entry(h, { key: "found-yumi", mark: "Y", title: "Yumi", onClick: Message.ClickedButton() })
+          ]
+        })
+      ],
+      sidePaneColumn
+    ),
     sample(h, "Log", [log(h, { label: "Log", items: logLines })], sidePaneColumn),
     sample(h, "Log, scrolling past 15rem", [log(h, { label: "Long log", items: longLogLines })], sidePaneColumn),
     sample(

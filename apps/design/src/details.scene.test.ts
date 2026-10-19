@@ -142,6 +142,69 @@ describe("entry", () => {
       expect(within(role("listitem"), text("Yumi"))).toExist()
     )
   })
+
+  it("is one button that sends its message when it is given one, holding its mark, title, and trailing pieces", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) =>
+          entryList(h, {
+            label: "Results",
+            children: [
+              entry(h, {
+                key: "result-group-design",
+                mark: "#",
+                title: "Design crew",
+                trailing: [badge(h, { label: "Private" })],
+                onClick: Message.ClickedOpen()
+              }),
+              entry(h, { key: "result-person-yumi", title: "Yumi", onClick: Message.ClickedOpen() })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("list", { name: "Results" }), role("listitem"))).toExist(),
+      expect(within(role("listitem"), role("button", { name: /^Design crew/ }))).toExist(),
+      expect(role("button", { name: /^Design crew/ })).toHaveAttr("id", "result-group-design"),
+      expect(within(role("button", { name: /^Design crew/ }), text("Private"))).toExist(),
+      expect(within(role("button", { name: /^Design crew/ }), text("#"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("button", { name: "Yumi" })).toHaveAttr("id", "result-person-yumi"),
+      click(role("button", { name: "Yumi" })),
+      expect(role("status")).toHaveText("Stopped 0, opened 1")
+    )
+  })
+
+  it("marks the entry that is active as current, for the field above its list, and no other", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) =>
+          entryList(h, {
+            label: "Results",
+            children: [
+              entry(h, { key: "result-1", title: "Design crew", onClick: Message.ClickedOpen(), isActive: true }),
+              entry(h, { key: "result-2", title: "Yumi", onClick: Message.ClickedOpen(), isActive: false }),
+              entry(h, { key: "result-3", title: "Alex Morgan", onClick: Message.ClickedOpen() })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Design crew" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Yumi" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Alex Morgan" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("is not a button unless it is given a message to send", () => {
+    scene(
+      { update, view: viewOf(turns) },
+      given(initial),
+      expect(role("button", { name: /Scout/ })).toBeAbsent(),
+      expect(role("button", { name: "Stop" })).toExist()
+    )
+  })
 })
 
 describe("log", () => {

@@ -4,13 +4,16 @@
  * join; as a page to browse, the groups they belong to and the public teams they may join, on a tab
  * each, narrowed by a search; and the modal where they start a team, or a conversation with another
  * member. It reports the group the person picks and when they ask to browse, and its parent tells it
- * which group is open.
+ * which group is open and when to talk with a member: the conversation of the two when there is one, and
+ * otherwise a new one to write the first message of.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
+import * as Array from "effect/Array"
+import type * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -71,6 +74,7 @@ export const Message = defineMessageUnion({
   ChoseConversationMember: { memberId: Schema.Option(MemberId.MemberId) },
   TypedConversationText: { text: Schema.String },
   SubmittedConversation: {},
+  RequestedConversationWith: { memberId: MemberId.MemberId },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })
@@ -105,6 +109,17 @@ export const matching = (model: Model, items: ReadonlyArray<GroupItem>, query: s
     ? items
     : items.filter(({ group }) => groupName(group, model.members, model.memberId).toLowerCase().includes(wanted))
 }
+
+/** The conversation of the person and `memberId` alone, when there is one. */
+export const conversationWith = (model: Model, memberId: MemberId.MemberId): Option.Option<GroupItem> =>
+  Array.findFirst(
+    model.groups,
+    ({ group }) =>
+      group.kind !== "Team" &&
+      group.memberIds.length === 2 &&
+      group.memberIds.includes(model.memberId) &&
+      group.memberIds.includes(memberId)
+  )
 
 /** The workspace's other active members, whom the person may start a conversation with. */
 export const others = (model: Model): ReadonlyArray<Member.Member> =>

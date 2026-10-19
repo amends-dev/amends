@@ -33,7 +33,7 @@ two, each in a frame of its own; the modal, opened by a button, as a form with a
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
 one with tabs and a description; the marks by size; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
-a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
+entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
@@ -157,9 +157,15 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   look of `hint`, 8px under it as the label is above it; it describes the input while there is no
   error. It takes focus as it shows unless `isAutofocus` is `false`. With `isLabelHidden` the label
   is not shown above the input and still names it, for a field in a section that already has that
-  name as its title, such as the one that renames the workspace. The `attributes` are a group a headless component publishes,
-  `PublishedAttributes`, that go onto the input, such as a dialog's `initialFocus`, which a field in
-  a dialog takes with `isAutofocus` off.
+  name as its title, such as the one that renames the workspace. The `attributes` go onto the input:
+  a group a headless component publishes, `PublishedAttributes`, such as a dialog's `initialFocus`,
+  which a field in a dialog takes with `isAutofocus` off, and the caller's own, such as `answerKeys`
+  and an `aria-activedescendant`, for a field above a list its keys walk (`ControlAttributes`).
+- `answerKeys(h, onKeyDown)` is the attribute for a text control above a list that its keys walk, such
+  as a search field above its results: `onKeyDown(key)` says what a key sends, or nothing to leave the
+  key to the browser, and a key it answers does not do what the browser does for it, such as moving the
+  caret or adding a line. A key pressed with Shift, Control, Alt, or Meta is left to the browser. The
+  composer's list of members is answered the same way.
 - `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the
   control next to it.
 - `textarea(h, { id, label, value, onInput, rows?, attributes? })` is the input's look over `rows`
@@ -452,7 +458,14 @@ What a pane says about one thing.
   letters, the `sm` mark, at the start when it has them, then a column of the `title` at item size in
   medium weight with the `trailing` pieces after it, wrapping onto a new line when they do not fit,
   such as a `badge`, a `hint`, or `sending`, and under it the `children`, 8px apart, such as a failure,
-  a `buttonRow`, and a `log`. A row has 8px above and below.
+  a `buttonRow`, and a `log`. A row has 8px above and below. Given `onClick`, the whole entry is one
+  button that sends it, with `key` as its id so that a field can name it as its active descendant,
+  filled `hover` on hover and 12px in from the list's edge, and it has no `children`, since a button
+  holds no buttons. The button is named by what is in it, its title and its trailing pieces. With
+  `isActive` it is filled `selected` and is `aria-current="true"`: the entry the person has reached with
+  the arrow keys of the field above the list, whose focus stays in the field, and would open with Enter.
+  (`aria-selected` is not for a button, so the entry says it is current, as the sidebar's and a
+  message's current rows do.)
 - `log(h, { label, items })` is an `ol` named by `label` on `subtle`, one `items` line each in the mono
   font at hint size, wrapping long lines. It is 15rem tall at most and scrolls past that, and takes
   keyboard focus so a keyboard can scroll it.
@@ -614,7 +627,9 @@ section by `role("region")` and its `h3`, its trailing pieces and children; a pa
 its `h2` under the pane's `h1`, its copy, and its icon as `aria-hidden`; a detail list's labels
 and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
-and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
+an entry given a message as the button that holds them, with its key as its id and `aria-current` while
+it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
+those with a modifier, left to the browser, and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
 toast by `role("alert")` with its text, detail, and button, in the stack's live region; a modal by its
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and

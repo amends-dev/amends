@@ -4,9 +4,9 @@
  */
 
 import * as Textarea from "@foldkit/ui/textarea"
-import * as Option from "effect/Option"
-import type { HtmlBuilder, KeyboardModifiers } from "foldkit/html"
-import { iconSubmit } from "./control.ts"
+import type * as Option from "effect/Option"
+import type { HtmlBuilder } from "foldkit/html"
+import { answerKeys, iconSubmit } from "./control.ts"
 import { mark } from "./mark.ts"
 
 const composerBox = "relative flex flex-col border border-outline bg-field focus-within:border-outline-strong"
@@ -45,9 +45,6 @@ export type MentionSuggestions<Message> = Readonly<{
   onKeyDown: (key: string) => Option.Option<Message>
 }>
 
-const hasModifier = ({ shiftKey, ctrlKey, altKey, metaKey }: KeyboardModifiers) =>
-  shiftKey || ctrlKey || altKey || metaKey
-
 const optionId = (suggestions: MentionSuggestions<unknown>, item: MentionSuggestion<unknown>) =>
   `${suggestions.id}-${item.id}`
 
@@ -63,7 +60,7 @@ const suggestionAttributes = <Message, Requirements>(
     h.AriaControls(suggestions.id),
     h.AriaExpanded(true),
     ...(active === undefined ? [] : [h.AriaActiveDescendant(optionId(suggestions, active))]),
-    h.OnKeyDownPreventDefault((key, modifiers) => (hasModifier(modifiers) ? Option.none() : suggestions.onKeyDown(key)))
+    answerKeys(h, suggestions.onKeyDown)
   ]
 }
 

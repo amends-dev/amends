@@ -1,6 +1,6 @@
 /**
  * What happens at the root: the person signs out, what signing out reports back, the window changes width,
- * and a minute passes.
+ * a minute passes, and the person presses the key that opens the search.
  */
 
 import { Viewport } from "@amends-dev/design/viewport"
@@ -11,6 +11,7 @@ export const Message = defineMessageUnion({
   ClickedSignOut: {},
   CompletedSignOut: {},
   ChangedViewport: { viewport: Viewport },
-  Ticked: { now: Schema.DateTimeUtc }
+  Ticked: { now: Schema.DateTimeUtc },
+  PressedSearchKey: {}
 })
 export type Message = typeof Message.Type

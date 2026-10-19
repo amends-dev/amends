@@ -4,8 +4,13 @@ import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { modifyFields } from "foldkit/struct"
 import {
+  bob,
   connectionOf,
+  conversationWithBob,
+  design,
+  general,
   keylessConnection,
   notificationOf,
   now,
@@ -28,6 +33,8 @@ import { init as initGroup } from "../../feature/group/init.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
+import { SearchBlock } from "../../feature/search/block.ts"
+import { Result } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
@@ -42,6 +49,7 @@ import {
   GroupsBinding,
   InboxBinding,
   MenuBinding,
+  SearchBinding,
   SettingsBinding
 } from "./composition.ts"
 import { isThreadOpen, Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
@@ -75,6 +83,10 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
 /** What the inbox reports, as the workspace receives it. */
 const fromInbox = (message: typeof InboxBlock.Message.Type) =>
   InboxBinding.embedView({ slotId: "inbox", model: opened.inbox, viewInputs: { now } }).toParentMessage(message)
+
+/** What the search reports, as the workspace receives it. */
+const fromSearch = (message: typeof SearchBlock.Message.Type) =>
+  SearchBinding.embedView({ slotId: "search", model: opened.search }).toParentMessage(message)
 
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
@@ -756,6 +768,141 @@ describe("a workspace", () => {
         expect(model.aside.isOpen).toBe(false)
         expect(isThreadOpen(model.open)).toBe(false)
         expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(otherGroupId)
+      })
+    )
+  })
+
+  it("opens its search when the person clicks the search in the sidebar, or its parent asks, from a fresh field", () => {
+    for (const request of [Message.ClickedSearch(), Message.RequestedSearch()]) {
+      story(
+        update,
+        given(opened),
+        message(request),
+        dialogShown,
+        model((model) => {
+          expect(model.search.dialog.isOpen).toBe(true)
+          expect(model.search.query).toBe("")
+        })
+      )
+    }
+  })
+
+  it("opens the group the search found without a thread, marks it in the list, and closes the dialogs it was over", () => {
+    story(
+      update,
+      given(atDesktop),
+      ...threadPicked,
+      message(Message.ClickedSearch()),
+      dialogShown,
+      message(
+        fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Group({ group: design, name: "Design" }) }))
+      ),
+      Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
+      dialogClosed,
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(otherGroupId)
+        expect(isThreadOpen(model.open)).toBe(false)
+        expect(model.groups.selected).toEqual(Option.some(otherGroupId))
+        expect(model.search.dialog.isOpen).toBe(false)
+        expect(model.aside.isOpen).toBe(false)
+      })
+    )
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedMenu()),
+      dialogShown,
+      message(Message.ClickedSearch()),
+      dialogShown,
+      message(
+        fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Group({ group: design, name: "Design" }) }))
+      ),
+      Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(Dialog.test.CloseDialog({ id: "workspace-menu" }), DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(model.menu.isOpen).toBe(false)
+        expect(model.search.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("opens the thread the search found in its group, as the inbox does, with the side pane's dialog where it is one", () => {
+    for (const viewport of ["Desktop", "Split"] as const) {
+      story(
+        update,
+        given(init(workspaceId, memberId, "Studio", viewport).model),
+        message(Message.ClickedSearch()),
+        dialogShown,
+        message(
+          fromSearch(
+            SearchBlock.Message.ClickedResult({
+              result: Result.Thread({ thread, groupName: "General", words: "Plans for the week" })
+            })
+          )
+        ),
+        dialogClosed,
+        ...draftsRead,
+        ...(viewport === "Split" ? [] : [dialogShown]),
+        model((model) => {
+          expect(
+            Open.isAnyOf(["Group"])(model.open) && [
+              model.open.groupId,
+              Option.map(model.open.model.thread, (open) => open.threadId)
+            ]
+          ).toEqual([groupId, Option.some(thread.id)])
+          expect(model.groups.selected).toEqual(Option.some(groupId))
+          expect(model.aside.isOpen).toBe(viewport !== "Split")
+          expect(model.search.dialog.isOpen).toBe(false)
+        })
+      )
+    }
+  })
+
+  it("opens the conversation the search found with a person, or asks the groups to start one in their dialog", () => {
+    const person = message(fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Person({ member: bob }) })))
+    const withConversation = modifyFields(opened, {
+      groups: (groups) =>
+        modifyFields(groups, {
+          groups: () => [
+            { group: general, pending: false, members: 2 },
+            { group: conversationWithBob, pending: false, members: 2 }
+          ]
+        })
+    })
+
+    story(
+      update,
+      given(withConversation),
+      message(Message.ClickedSearch()),
+      dialogShown,
+      person,
+      dialogClosed,
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(conversationWithBob.id)
+        expect(model.groups.selected).toEqual(Option.some(conversationWithBob.id))
+        expect(model.groups.dialog.isOpen).toBe(false)
+      })
+    )
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedSearch()),
+      dialogShown,
+      person,
+      Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(
+        Dialog.test.ShowDialog({ id: "groups-starting", focusSelector: "[data-foldkit-dialog-initial-focus]" }),
+        DialogBlock.Message.SucceededShowDialog()
+      ),
+      model((model) => {
+        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+        expect(model.groups.dialog.isOpen).toBe(true)
+        expect(model.groups.starting).toEqual(
+          Option.some({ _tag: "Conversation", memberId: Option.some(bob.id), text: "" })
+        )
       })
     )
   })

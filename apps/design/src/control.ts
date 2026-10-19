@@ -12,7 +12,7 @@ import * as Select from "@foldkit/ui/select"
 import * as Switch from "@foldkit/ui/switch"
 import * as Textarea from "@foldkit/ui/textarea"
 import * as Option from "effect/Option"
-import type { Attribute, ChildAttribute, Html, HtmlBuilder } from "foldkit/html"
+import type { Attribute, ChildAttribute, Html, HtmlBuilder, KeyboardModifiers } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
 
 const buttonBase =
@@ -121,8 +121,8 @@ export type IconButtonOptions = Readonly<{
  */
 export type PublishedAttributes = ReadonlyArray<ChildAttribute>
 
-/** The attributes a button takes: its own, and the group a headless component publishes. */
-export type ButtonAttributes<Message> = ReadonlyArray<Attribute<Message> | ChildAttribute>
+/** The attributes a control takes: the caller's own, such as `answerKeys`, and the group a headless component publishes. */
+export type ControlAttributes<Message> = ReadonlyArray<Attribute<Message> | ChildAttribute>
 
 export type ChoiceSelectOptions = Readonly<{
   /** The label names the select for assistive technology and is not shown, for a select in a row of its own. */
@@ -138,13 +138,26 @@ export type NoticeOptions = Readonly<{
 
 const joinClasses = (...classes: ReadonlyArray<string | false>): string => classes.filter(Boolean).join(" ")
 
+const hasModifier = ({ shiftKey, ctrlKey, altKey, metaKey }: KeyboardModifiers) =>
+  shiftKey || ctrlKey || altKey || metaKey
+
+/**
+ * A key handler for a text control above a list that its keys walk: `onKeyDown` says what a key sends, and a
+ * key it answers does not do what the browser does for it, such as adding a line or moving the caret. A key it
+ * does not answer is left to the browser, as is any key pressed with Shift, Control, Alt, or Meta.
+ */
+export const answerKeys = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  onKeyDown: (key: string) => Option.Option<Message>
+) => h.OnKeyDownPreventDefault((key, modifiers) => (hasModifier(modifiers) ? Option.none() : onKeyDown(key)))
+
 /**
  * A button in the look of `button` over `attributes` that already give it its behavior, such as the group a
  * headless dialog publishes for the control that closes it. Whether it is disabled is for those attributes to say.
  */
 export const buttonWith = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  attributes: ButtonAttributes<Message>,
+  attributes: ControlAttributes<Message>,
   label: string,
   options: Omit<ButtonOptions, "isDisabled"> = {}
 ) => {
@@ -196,7 +209,7 @@ export const submit = <Message, Requirements>(
  */
 export const iconButtonWith = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  attributes: ButtonAttributes<Message>,
+  attributes: ControlAttributes<Message>,
   config: Readonly<{ icon: IconName; label: string }>,
   options: IconButtonOptions = {}
 ) =>
@@ -289,7 +302,8 @@ const describeField = <Message, Requirements>(
  * it was. The `placeholder` shows an example of what to enter while it is empty, and the `hint` is a line of what
  * to know about the input, 8px under it. With `isLabelHidden` the label does not show above the input and still
  * names it, for a field in a section that already names it. The `attributes` go onto the input, such as a
- * dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off.
+ * dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off, and the keys the caller
+ * answers, `answerKeys`, for a field above a list its keys walk.
  */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -303,7 +317,7 @@ export const field = <Message, Requirements>(
     hint?: string
     isAutofocus?: boolean
     isLabelHidden?: boolean
-    attributes?: PublishedAttributes
+    attributes?: ControlAttributes<Message>
   }>,
   error: Option.Option<string>
 ) =>

@@ -98,13 +98,15 @@ const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): 
               members: others(model),
               value: memberId,
               onChange: (memberId) => Message.ChoseConversationMember({ memberId }),
-              attributes: render.initialFocus
+              // The dialog opens on the member choice, or, with a member chosen already, on the first message.
+              attributes: Option.isNone(memberId) ? render.initialFocus : []
             }),
             textarea(h, {
               id: "conversation-text",
               label: "First message",
               value: text,
-              onInput: (text) => Message.TypedConversationText({ text })
+              onInput: (text) => Message.TypedConversationText({ text }),
+              attributes: Option.isSome(memberId) ? render.initialFocus : []
             })
           ],
           cancelLabel: "Cancel",

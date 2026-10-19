@@ -25,7 +25,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, aliceInGeneral, bob, design, general, membership } from "../../../test/fixtures.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
-import { Message, OutMessage } from "./definition.ts"
+import { Message, OutMessage, Starting } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { browseView, dialogView, view } from "./view.ts"
@@ -257,6 +257,31 @@ describe("the groups", () => {
       Command.resolve(StartConversation, Message.WroteAction()),
       ...dialogClosed(),
       expect(role("button", { name: "Start" })).toBeAbsent()
+    )
+  })
+
+  it("open a conversation with the member chosen on its first message, and one with none chosen on the member", () => {
+    const starting = (memberId: Option.Option<typeof bob.id>) =>
+      modifyFields(listed, {
+        starting: () => Option.some(Starting.Conversation({ memberId, text: "" })),
+        dialog: (dialog) => modifyFields(dialog, { isOpen: () => true })
+      })
+
+    scene(
+      { update, view: withDialog },
+      given(starting(Option.some(bob.id))),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "New conversation" })).toExist(),
+      expect(label("With")).toHaveValue(bob.id),
+      expect(label("First message")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      expect(label("With")).not.toHaveAttr("data-foldkit-dialog-initial-focus")
+    )
+    scene(
+      { update, view: withDialog },
+      given(starting(Option.none())),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(label("With")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      expect(label("First message")).not.toHaveAttr("data-foldkit-dialog-initial-focus")
     )
   })
 
