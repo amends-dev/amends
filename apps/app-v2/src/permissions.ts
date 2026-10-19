@@ -6,6 +6,7 @@
 
 import type { Connection } from "@amends-dev/connection"
 import { Grant, type Permission, Requirement, Target } from "@amends-dev/core/authorization"
+import type { ChannelId } from "@amends-dev/core/channel"
 import type { GroupId } from "@amends-dev/core/group"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -24,6 +25,10 @@ export const workspaceTarget = (workspaceId: WorkspaceId.WorkspaceId) =>
 /** The group `groupId` as a target of the permissions that act on it. */
 export const groupTarget = (workspaceId: WorkspaceId.WorkspaceId, groupId: GroupId.GroupId) =>
   Target.Reference.cases.Group.make({ workspaceId, groupId })
+
+/** The channel `channelId` as a target of the permissions that act on it. */
+export const channelTarget = (workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId) =>
+  Target.Reference.cases.Channel.make({ workspaceId, channelId })
 
 /** The thread `threadId` as a target of the permissions that act on it. */
 export const threadTarget = (workspaceId: WorkspaceId.WorkspaceId, threadId: ThreadId.ThreadId) =>

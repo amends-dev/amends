@@ -4,20 +4,25 @@ import { Option } from "effect"
 import { Subscription, click, expect, given, inside, role, scene, text } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
+  aliceInGeneral,
   aliceOwns,
   bob,
   bobIsMember,
   connectionOf,
   general,
   grantsOf,
+  integrationGiving,
+  keylessConnection,
   membership,
   notificationOf,
   opening,
   reply,
   roles,
+  support,
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { Integrations } from "../../feature/connections/definition.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
@@ -64,6 +69,21 @@ const withConnection = modifyFields(asOwner, {
   connections: (connections) =>
     modifyFields(connections, {
       connections: () => [{ connection: connectionOf("connection-1", "Models"), pending: false }]
+    })
+})
+
+/** The channels as an owner of the workspace sees them: one over a connection that gives channels, in general. */
+const withChannel = modifyFields(opened, {
+  channels: (channels) =>
+    modifyFields(channels, {
+      integrations: () =>
+        Integrations.Loaded({ integrations: [integrationGiving("test-channels", "Test channels", ["channels"])] }),
+      connections: () => [{ connection: keylessConnection("channels-1", "test-channels", "Chat"), pending: false }],
+      groups: () => [general],
+      memberships: () => [aliceInGeneral],
+      members: () => [member],
+      channels: () => [{ channel: support, pending: false }],
+      grants: () => grantsOf([aliceOwns])
     })
 })
 
@@ -175,6 +195,35 @@ describe("a workspace", () => {
       expect(role("region", { name: "Settings" })).toBeAbsent(),
       click(role("button", { name: "Settings" })),
       inside(role("region", { name: "Settings" }), expect(role("button", { name: "Rename workspace" })).toExist())
+    )
+  })
+
+  it("shows the channels on request, with what the person may do with them", () => {
+    scene(
+      { update, view },
+      given(withChannel),
+      expect(role("button", { name: "Channels" })).toExist(),
+      expect(role("region", { name: "Channels" })).toBeAbsent(),
+      click(role("button", { name: "Channels" })),
+      inside(
+        role("region", { name: "Channels" }),
+        expect(text(" · from Chat into General · opens tasks")).toExist(),
+        expect(role("button", { name: "Add a channel" })).toExist()
+      )
+    )
+  })
+
+  it("reads the channels whichever destination it shows", () => {
+    scene(
+      { update, view, subscriptions: workspaceSubscriptions },
+      given(withChannel),
+      Subscription.emit(
+        workspaceSubscriptions["channels/channels"],
+        ChannelsBlock.Message.ReceivedChannels({ channels: [] })
+      ),
+      expect(role("region", { name: "Channels" })).toBeAbsent(),
+      click(role("button", { name: "Channels" })),
+      expect(text("No channels yet.")).toExist()
     )
   })
 })

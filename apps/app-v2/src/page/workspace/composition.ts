@@ -5,6 +5,7 @@ import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { ActionsBlock } from "../../feature/actions/block.ts"
+import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
@@ -63,6 +64,11 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
 })
 
+export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
+  field: "channels",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+})
+
 /** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
   readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
@@ -77,6 +83,14 @@ export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
 })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
-  bindings: [GroupsBinding, ActionsBinding, InboxBinding, ConnectionsBinding, SettingsBinding, GroupBinding]
+  bindings: [
+    GroupsBinding,
+    ActionsBinding,
+    InboxBinding,
+    ConnectionsBinding,
+    SettingsBinding,
+    ChannelsBinding,
+    GroupBinding
+  ]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

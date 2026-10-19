@@ -2,6 +2,7 @@ import { button } from "../../controls.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import {
   ActionsBinding,
+  ChannelsBinding,
   ConnectionsBinding,
   GroupBinding,
   GroupsBinding,
@@ -21,6 +22,7 @@ export const view = WorkspaceComposition.makeView((model, h) => {
       button(h, waiting > 0 ? `Inbox (${waiting})` : "Inbox", Message.ClickedInbox()),
       button(h, "Connections", Message.ClickedConnections()),
       button(h, "Settings", Message.ClickedSettings()),
+      button(h, "Channels", Message.ClickedChannels()),
       h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
       h.block(GroupsBinding.embedView({ slotId: "groups", model: model.groups })),
       Open.match(model.open, {
@@ -28,6 +30,7 @@ export const view = WorkspaceComposition.makeView((model, h) => {
         Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox })),
         Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
         Settings: () => h.block(SettingsBinding.embedView({ slotId: "settings", model: model.settings })),
+        Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
         Group: ({ groupId, model: open }) =>
           h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open }))
       })

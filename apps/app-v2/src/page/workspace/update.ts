@@ -17,6 +17,11 @@ const showSettings = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Settings() })
 }))
 
+/** Show the channels in the main content. */
+const showChannels = WorkspaceDefinition.step((model) => ({
+  model: modifyFields(model, { open: () => Open.Channels() })
+}))
+
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
@@ -24,6 +29,8 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedConnections: () =>
       Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),
     ClickedSettings: () =>
-      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings])
+      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings]),
+    ClickedChannels: () =>
+      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showChannels])
   })
 )

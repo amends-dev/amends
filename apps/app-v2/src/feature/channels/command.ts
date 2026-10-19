@@ -1,0 +1,95 @@
+/**
+ * What the person does with the workspace's channels: adding one, sending its conversations to come
+ * to another group, and removing it are actions written to their store; listing the integrations,
+ * which say what the workspace's connections give, goes over HTTP, since no replica holds them.
+ */
+
+import { Channel, ChannelId } from "@amends-dev/core/channel"
+import { WorkspaceId } from "@amends-dev/core/workspace"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Api from "../../api.ts"
+import * as Stores from "../../store/Stores.ts"
+import { ChannelsDefinition, Message } from "./definition.ts"
+
+const written = [Message.WroteAction, Message.FailedWriteAction]
+
+/** Why `error` kept the action from being written, as the person reads it. */
+const failed = (error: string) => Message.FailedWriteAction({ error })
+
+/** Add a channel over `connectionId`, opening its conversations in `groupId`, as tasks or not. */
+export const CreateChannel = ChannelsDefinition.command("CreateChannel", {
+  args: {
+    ...Stores.AsMember,
+    connectionId: Schema.String,
+    groupId: Schema.String,
+    name: Schema.String,
+    opensTasks: Schema.Boolean
+  },
+  messages: written,
+  handler: function* () {
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
+    return ({ connectionId, groupId, name, opensTasks, ...member }) =>
+      Stores.decoded(
+        Channel.CreateInput,
+        { connectionId, groupId, name, opensTasks },
+        failed("A channel needs a connection, a group, and a name.")
+      ).pipe(
+        Effect.flatMap((input) => write(member, (store) => store.write("ChannelCreated", input))),
+        Effect.catch(Effect.succeed)
+      )
+  }
+})
+
+/** Open the conversations to come of `channelId` in `groupId`. */
+export const RedirectChannel = ChannelsDefinition.command("RedirectChannel", {
+  args: { ...Stores.AsMember, channelId: ChannelId.ChannelId, groupId: Schema.String },
+  messages: written,
+  handler: function* () {
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
+    return ({ channelId, groupId, ...member }) =>
+      Stores.decoded(
+        Channel.RedirectInput,
+        { channelId, groupId },
+        failed("A channel's conversations need a group to open in.")
+      ).pipe(
+        Effect.flatMap((input) => write(member, (store) => store.write("ChannelRedirected", input))),
+        Effect.catch(Effect.succeed)
+      )
+  }
+})
+
+/** Remove `channelId` from the workspace. */
+export const RemoveChannel = ChannelsDefinition.command("RemoveChannel", {
+  args: { ...Stores.AsMember, channelId: ChannelId.ChannelId },
+  messages: written,
+  handler: function* () {
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
+    return ({ channelId, ...member }) => write(member, (store) => store.write("ChannelRemoved", { channelId }))
+  }
+})
+
+/** List the integrations the host installs, which say what the workspace's connections give. */
+export const LoadIntegrations = ChannelsDefinition.command("LoadIntegrations", {
+  args: { workspaceId: WorkspaceId.WorkspaceId },
+  messages: [Message.ReceivedIntegrations, Message.FailedLoadIntegrations],
+  handler: function* () {
+    return ({ workspaceId }) =>
+      Effect.gen(function* () {
+        const client = yield* Api.asMember(workspaceId)
+        return Message.ReceivedIntegrations({ integrations: yield* client.connections.integrations() })
+      }).pipe(
+        Effect.orElseSucceed(() =>
+          Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." })
+        )
+      )
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(
+  CreateChannel.layer,
+  RedirectChannel.layer,
+  RemoveChannel.layer,
+  LoadIntegrations.layer
+)

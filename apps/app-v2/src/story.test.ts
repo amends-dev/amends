@@ -5,8 +5,10 @@ import { Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { SignOut } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
+import { ChannelsBlock } from "./feature/channels/block.ts"
+import { LoadIntegrations as LoadChannelIntegrations } from "./feature/channels/command.ts"
 import { ConnectionsBlock } from "./feature/connections/block.ts"
-import { LoadIntegrations } from "./feature/connections/command.ts"
+import { LoadIntegrations as LoadConnectionIntegrations } from "./feature/connections/command.ts"
 import { init } from "./init.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
@@ -76,8 +78,9 @@ describe("the app", () => {
       Command.expectExact(LoadWorkspaces()),
       Command.resolve(LoadWorkspaces, WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] })),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
-      // Opened, the workspace asks the host for the integrations its connections link to.
-      Command.resolve(LoadIntegrations, ConnectionsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      // Opened, the workspace asks the host for the integrations its connections link to, and its channels read.
+      Command.resolve(LoadConnectionIntegrations, ConnectionsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      Command.resolve(LoadChannelIntegrations, ChannelsBlock.Message.ReceivedIntegrations({ integrations: [] })),
       model((model) => {
         expect(
           Option.map(openedIn(model), ({ workspaceId, model }) => ({ workspaceId, memberId: model.memberId }))

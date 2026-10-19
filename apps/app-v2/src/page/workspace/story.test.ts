@@ -3,7 +3,8 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { connectionOf, notificationOf, opening, reply, testApi, thread } from "../../../test/fixtures.ts"
+import { connectionOf, notificationOf, opening, reply, support, testApi, thread } from "../../../test/fixtures.ts"
+import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
@@ -13,7 +14,7 @@ import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { ConnectionsBinding, GroupsBinding, InboxBinding, SettingsBinding } from "./composition.ts"
+import { ChannelsBinding, ConnectionsBinding, GroupsBinding, InboxBinding, SettingsBinding } from "./composition.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -39,6 +40,10 @@ const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
 /** What the settings report, as the workspace receives it. */
 const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
   SettingsBinding.embedView({ slotId: "settings", model: opened.settings }).toParentMessage(message)
+
+/** What the channels report, as the workspace receives it. */
+const fromChannels = (message: typeof ChannelsBlock.Message.Type) =>
+  ChannelsBinding.embedView({ slotId: "channels", model: opened.channels }).toParentMessage(message)
 
 /** The notification of activity in a thread of general, read by the inbox. */
 const notification = notificationOf("notification-1", 2, 5)
@@ -94,9 +99,10 @@ describe("a workspace", () => {
     )
   })
 
-  it("asks the host for its integrations as it opens, which its connections list", () => {
+  it("asks the host for its integrations as it opens, which its connections and channels list", () => {
     expect((init(workspaceId, memberId, "Studio").commands ?? []).map(({ name }) => name)).toEqual([
-      "connections/LoadIntegrations"
+      "connections/LoadIntegrations",
+      "channels/LoadIntegrations"
     ])
   })
 
@@ -157,6 +163,42 @@ describe("a workspace", () => {
       message(fromSettings(SettingsBlock.Message.ClickedRenameSelf())),
       model((model) => {
         expect(model.settings.renaming).toEqual(Option.some(SettingsRenaming.OwnName({ name: "" })))
+      })
+    )
+  })
+
+  it("shows the channels in place of the open group, leaving no group marked, and reads them whichever shows", () => {
+    story(
+      update,
+      given(opened),
+      message(
+        fromChannels(ChannelsBlock.Message.ReceivedChannels({ channels: [{ channel: support, pending: false }] }))
+      ),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedChannels()),
+      model((model) => {
+        expect(Open.isAnyOf(["Channels"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+        expect(model.channels.channels.map(({ channel }) => channel.name)).toEqual(["Support"])
+      }),
+      // With the channels shown, picking the group opens it again.
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("hands the channels what the person does in them", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedChannels()),
+      message(fromChannels(ChannelsBlock.Message.ClickedAdd())),
+      model((model) => {
+        expect(model.channels.form).toMatchObject(Option.some({ _tag: "Adding" }))
       })
     )
   })
