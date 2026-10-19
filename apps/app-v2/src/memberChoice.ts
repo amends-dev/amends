@@ -3,11 +3,11 @@
  */
 
 import type { Member } from "@amends-dev/core/workspace"
-import { choiceSelect } from "@amends-dev/design/control"
+import { type PublishedAttributes, choiceSelect } from "@amends-dev/design/control"
 import * as Option from "effect/Option"
 import type { HtmlBuilder } from "foldkit/html"
 
-/** A choice of one of `members`, or none until one is chosen. */
+/** A choice of one of `members`, or none until one is chosen. The `attributes` go onto the select. */
 export const memberChoice = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
@@ -17,6 +17,7 @@ export const memberChoice = <Message, Requirements>(
     members: ReadonlyArray<Member.Member>
     value: Option.Option<Member.Member["id"]>
     onChange: (memberId: Option.Option<Member.Member["id"]>) => Message
+    attributes?: PublishedAttributes
   }>
 ) =>
   choiceSelect<string, Message, Requirements>(h, {
@@ -25,5 +26,6 @@ export const memberChoice = <Message, Requirements>(
     choices: [["", config.none], ...config.members.map((member) => [member.id, member.name] as const)],
     value: Option.getOrElse(config.value, () => ""),
     onChange: (value) =>
-      config.onChange(Option.fromUndefinedOr(config.members.find((member) => member.id === value)?.id))
+      config.onChange(Option.fromUndefinedOr(config.members.find((member) => member.id === value)?.id)),
+    attributes: config.attributes ?? []
   })

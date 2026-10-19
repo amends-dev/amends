@@ -1,8 +1,10 @@
+import type { MemberId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
+import * as Update from "foldkit/update"
 import { CreateTeam, StartConversation } from "./command.ts"
-import { GroupsComposition } from "./composition.ts"
-import { Message, type Model, OutMessage, Starting } from "./definition.ts"
+import { DialogBinding, GroupsComposition } from "./composition.ts"
+import { GroupsDefinition, Message, type Model, OutMessage, Starting } from "./definition.ts"
 
 /** The model with what the person is starting as `change` makes it, while they start something. */
 const atStarting = (model: Model, change: (starting: Starting) => Starting) =>
@@ -25,9 +27,32 @@ const conversationIn = (model: Model) =>
     )
   )
 
-export const update = GroupsComposition.makeUpdate((model, message) => {
-  const { workspaceId, memberId } = model
-  return Message.match(message, {
+/** Ask for a new team: unnamed, and private. */
+const openTeamForm = GroupsDefinition.stepFields(() => ({
+  starting: () => Option.some(Starting.Team({ name: "", isPublic: false }))
+}))
+
+/** Ask for a new conversation: no member chosen, and no first message. */
+const openConversationForm = GroupsDefinition.stepFields(() => ({
+  starting: () => Option.some(Starting.Conversation({ memberId: Option.none(), text: "" }))
+}))
+
+/** Write the team `name`, public when `isPublic`, to the person's store. */
+const writeTeam = (name: string, isPublic: boolean) =>
+  GroupsDefinition.step((model: Model) => ({
+    model,
+    commands: [CreateTeam({ workspaceId: model.workspaceId, memberId: model.memberId, name, isPublic })]
+  }))
+
+/** Write the conversation with `withMemberId`, `text` its first message, to the person's store. */
+const writeConversation = (withMemberId: MemberId.MemberId, text: string) =>
+  GroupsDefinition.step((model: Model) => ({
+    model,
+    commands: [StartConversation({ workspaceId: model.workspaceId, memberId: model.memberId, withMemberId, text })]
+  }))
+
+export const update = GroupsComposition.makeUpdate((model, message) =>
+  Message.match(message, {
     ReceivedGroups: ({ groups }) => ({ model: modifyFields(model, { groups: () => groups }) }),
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     ReceivedMemberships: ({ memberships }) => ({ model: modifyFields(model, { memberships: () => memberships }) }),
@@ -42,9 +67,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
             outMessage: OutMessage.SelectedGroup({ groupId })
           },
     InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
-    ClickedNewTeam: () => ({
-      model: modifyFields(model, { starting: () => Option.some(Starting.Team({ name: "", isPublic: false })) })
-    }),
+    ClickedNewTeam: () => Update.combine(model, [openTeamForm, DialogBinding.requestOpen()]),
     TypedTeamName: ({ name }) => ({
       model: atStarting(
         model,
@@ -60,16 +83,9 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     SubmittedTeam: () =>
       Option.match(teamIn(model), {
         onNone: () => ({ model }),
-        onSome: ({ name, isPublic }) => ({
-          model: modifyFields(model, { starting: () => Option.none() }),
-          commands: [CreateTeam({ workspaceId, memberId, name, isPublic })]
-        })
+        onSome: ({ name, isPublic }) => Update.combine(model, [writeTeam(name, isPublic), DialogBinding.requestClose()])
       }),
-    ClickedNewConversation: () => ({
-      model: modifyFields(model, {
-        starting: () => Option.some(Starting.Conversation({ memberId: Option.none(), text: "" }))
-      })
-    }),
+    ClickedNewConversation: () => Update.combine(model, [openConversationForm, DialogBinding.requestOpen()]),
     ChoseConversationMember: ({ memberId: chosen }) => ({
       model: atStarting(
         model,
@@ -91,13 +107,10 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     SubmittedConversation: () =>
       Option.match(conversationIn(model), {
         onNone: () => ({ model }),
-        onSome: ({ withMemberId, text }) => ({
-          model: modifyFields(model, { starting: () => Option.none() }),
-          commands: [StartConversation({ workspaceId, memberId, withMemberId, text })]
-        })
+        onSome: ({ withMemberId, text }) =>
+          Update.combine(model, [writeConversation(withMemberId, text), DialogBinding.requestClose()])
       }),
-    ClickedCancelStarting: () => ({ model: modifyFields(model, { starting: () => Option.none() }) }),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
   })
-})
+)

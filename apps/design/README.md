@@ -26,7 +26,9 @@ a select; the notice tones; `sending`; a form with its inline text and a value w
 setting rows with an action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows; the centered screen as the
 sign-in's two steps and as the workspace picker; the toast alone, with a detail, and as a stack of
-two, each in a frame of its own; the marks by size; what a pane says about one thing, as a detail
+two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
+that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
+one with tabs and a description; the marks by size; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
 a log short and long, and a pane's sections as a task to change, a task to read, and the turns; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
@@ -37,9 +39,9 @@ own; the composer empty and filled; the shell twice, with and without its side p
 frame of fixed height, its groups and direct messages through `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
 as a plain row under its group and the second with its notices; and the icons by size, as the shell
-draws them, and with a label. The toggles, fields, composers, and select take input, and so do the
-shell's rail and tabs, whose current item follows a click, and the list of threads, whose current
-row follows a click. The shell's side pane sits beside the main pane from a window of 80rem; narrow
+draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
+open and close. So do the shell's rail and tabs, whose current item follows a click, and the list of
+threads, whose current row follows a click. The shell's side pane sits beside the main pane from a window of 80rem; narrow
 the window to between 64rem and 80rem to see it float over a scrim. Open it to look at a piece
 before a page composes it. It follows the browser's light or dark preference. A browser tab that is
 hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. `bun
@@ -115,15 +117,20 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   link 44px on touch.
 - `submit(h, label, options?)` is a button of `type="submit"`, primary unless `options.variant`
   says otherwise.
-- `field(h, { id, label, type, value, onInput, placeholder?, isAutofocus? }, error)` is a label
-  over a 42px bordered input with the error, an `Option<string>`, below it as a `notice` that
-  describes the input. A field with an error is `aria-invalid` with a danger border. The
+- `buttonWith(h, attributes, label, options?)` is the look of `button` over `attributes` that already
+  give it its behavior, such as the `closeButton` group a headless dialog publishes, which is also
+  what says whether it is disabled, so it takes no `isDisabled`.
+- `field(h, { id, label, type, value, onInput, placeholder?, isAutofocus?, attributes? }, error)` is
+  a label over a 42px bordered input with the error, an `Option<string>`, below it as a `notice`
+  that describes the input. A field with an error is `aria-invalid` with a danger border. The
   `placeholder` shows an example of what to enter while it is empty. It takes focus as it shows
-  unless `isAutofocus` is `false`.
+  unless `isAutofocus` is `false`. The `attributes` are a group a headless component publishes,
+  `PublishedAttributes`, that go onto the input, such as a dialog's `initialFocus`, which a field in
+  a dialog takes with `isAutofocus` off.
 - `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the
   control next to it.
-- `textarea(h, { id, label, value, onInput, rows? })` is the input's look over `rows` lines, three
-  unless given.
+- `textarea(h, { id, label, value, onInput, rows?, attributes? })` is the input's look over `rows`
+  lines, three unless given, with the `attributes` on the box as a field has them.
 - `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
   `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
   that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
@@ -131,16 +138,19 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   button along a list's heading.
 - `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
   such as the composer's send button.
+- `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
+  already give it its behavior, as `buttonWith` is for `button`.
 - `buttonRow(h, children)` is a row of controls with an 8px gap, wrapping onto a new line when they do
   not fit, such as a thread's Follow and Rename or a form's Save and Cancel.
 - `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping
   onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
   named by its label.
-- `choiceSelect(h, { id, label, choices, value, onChange }, options?)` is a select over `choices`,
-  each a value and how the person reads it, in the input's look. With `options.isLabelHidden` the
-  label is not shown above the select and still names it, for a select in a row that says what it is
-  for, such as a member's role beside their name.
+- `choiceSelect(h, { id, label, choices, value, onChange, attributes? }, options?)` is a select over
+  `choices`, each a value and how the person reads it, in the input's look, with the `attributes` on
+  the select as a field has them. With `options.isLabelHidden` the label is not shown above the
+  select and still names it, for a select in a row that says what it is for, such as a member's role
+  beside their name.
 - `notice(h, message, options?)` renders an `Option<string>` as an alert in a tone, `"danger"` by
   default, `"caution"`, or `"success"`, and nothing when there is none.
 - `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
@@ -366,6 +376,49 @@ What floats over the shell's corner, for something that went wrong and the one t
   `ink-secondary`, clamped to three lines, such as the words an action carried, and at the right the
   `action` as a quiet `button`, such as Dismiss.
 
+### `@amends-dev/design/modal`
+
+What takes the person's whole attention until they finish or cancel, such as a form to start a team
+or a group's settings. It is the look of `@foldkit/ui`'s headless dialog, so the framework keeps
+the `dialog` element, the focus inside it, Escape, the click on the scrim, and the labels.
+
+- `modal(h, render, config)` renders `render`, the `RenderInfo` the dialog's view publishes: nothing
+  but the `dialog` element while the dialog is not visible, and a panel over a scrim while it is.
+  The `config` is:
+  - `title`, which heads the panel and names the dialog, as an `h2` at title size in medium weight,
+    and the optional `context` after it in `ink-secondary`, such as `# general`. They sit in a header
+    60px tall under `px-6` with a line under it, and at its end is a Close button, an icon button of
+    `mark-close`. The optional `tabs`, a `paneTabs`, sit under that row inside the header, as a
+    pane's do.
+  - `body`, which scrolls, in a column 16px apart. The optional `description` is its first line, at
+    hint size in `ink-secondary`, and describes the dialog to assistive technology, so the Block
+    passes `hasDescription: true` to the dialog's view when it gives one.
+  - `footer` and `cancelLabel`, which are both optional, and make a footer under a line when either
+    is given. Its buttons sit at the end 8px apart: a quiet Cancel that closes the dialog when there
+    is a `cancelLabel`, then the `footer`'s controls, the one the modal exists for last, such as a
+    `submit`.
+  - `onSubmit`, which makes the panel a form that sends it, so a `submit` in the footer sends it.
+    Close and Cancel are `type="button"`, so they close without sending it. Without `onSubmit` the
+    panel is a `div`.
+  - `width`, `"form"` (the default) for a panel 26rem wide, or `"wide"` for 32rem. A panel is
+    never wider than the window less a 1rem gutter on each side, nor taller than the window less
+    4rem. It is `raised` with `shadow-modal` and no rounding, over a `scrim-strong` scrim.
+
+A Block uses it in four steps:
+
+- It binds `DialogBlock` from `@foldkit/ui/dialog` as a child, with an `id` for the dialog through
+  `init`.
+- Its update opens and closes the dialog with the Binding's `requestOpen()` and `requestClose()`,
+  and folds the dialog's `Closed` out message into whatever the modal was for, such as dropping the
+  form's content.
+- Its view embeds the dialog after its other markup, with
+  `toView: (render) => modal(h, render, config)`.
+- The control that should take focus when the dialog opens gets `render.initialFocus` through its
+  `attributes`, and a `field` there is given `isAutofocus: false`, since the dialog moves the focus
+  itself.
+
+The groups Block's form for a new team does all four.
+
 ## Tests
 
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
@@ -383,7 +436,10 @@ its `h2` under the pane's `h1`, its copy, and its icon as `aria-hidden`; a detai
 and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
-toast by `role("alert")` with its text, detail, and button, in the stack's live region; a message by
+toast by `role("alert")` with its text, detail, and button, in the stack's live region; a modal by its
+title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
+context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and
+Cancel by closing the dialog without sending the form; a message by
 its text button, `aria-current`, its note, context, actions, meta, and body, and a divider by its label in
 the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for

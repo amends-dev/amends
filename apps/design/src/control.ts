@@ -11,7 +11,7 @@ import * as Select from "@foldkit/ui/select"
 import * as Switch from "@foldkit/ui/switch"
 import * as Textarea from "@foldkit/ui/textarea"
 import * as Option from "effect/Option"
-import type { Attribute, Html, HtmlBuilder } from "foldkit/html"
+import type { Attribute, ChildAttribute, Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
 
 const buttonBase =
@@ -111,6 +111,15 @@ export type IconButtonOptions = Readonly<{
   size?: "compact"
 }>
 
+/**
+ * A group of attributes a headless component publishes, which a view hands a control to spread onto its
+ * element: the `initialFocus` of a dialog, on the control that takes focus when the dialog opens.
+ */
+export type PublishedAttributes = ReadonlyArray<ChildAttribute>
+
+/** The attributes a button takes: its own, and the group a headless component publishes. */
+export type ButtonAttributes<Message> = ReadonlyArray<Attribute<Message> | ChildAttribute>
+
 export type ChoiceSelectOptions = Readonly<{
   /** The label names the select for assistive technology and is not shown, for a select in a row of its own. */
   isLabelHidden?: boolean
@@ -125,14 +134,17 @@ export type NoticeOptions = Readonly<{
 
 const joinClasses = (...classes: ReadonlyArray<string | false>): string => classes.filter(Boolean).join(" ")
 
-const renderButton = <Message, Requirements>(
+/**
+ * A button in the look of `button` over `attributes` that already give it its behavior, such as the group a
+ * headless dialog publishes for the control that closes it. Whether it is disabled is for those attributes to say.
+ */
+export const buttonWith = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
+  attributes: ButtonAttributes<Message>,
   label: string,
-  behavior: Readonly<{ type: "button" | "submit"; onClick?: Message }>,
-  options: ButtonOptions,
-  defaultVariant: ButtonVariant
+  options: Omit<ButtonOptions, "isDisabled"> = {}
 ) => {
-  const variant = options.variant ?? defaultVariant
+  const variant = options.variant ?? "secondary"
   const className = joinClasses(
     buttonBase,
     buttonLooks[variant],
@@ -140,15 +152,24 @@ const renderButton = <Message, Requirements>(
     options.wide === true && buttonWide
   )
 
-  return Button.view(
+  return h.button([...attributes, h.Class(className)], [label])
+}
+
+const renderButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  behavior: Readonly<{ type: "button" | "submit"; onClick?: Message }>,
+  options: ButtonOptions,
+  defaultVariant: ButtonVariant
+) =>
+  Button.view(
     {
       ...behavior,
       isDisabled: options.isDisabled ?? false,
-      toView: (attributes) => h.button([...attributes.button, h.Class(className)], [label])
+      toView: (attributes) => buttonWith(h, attributes.button, label, { variant: defaultVariant, ...options })
     },
     h
   )
-}
 
 /** A button that sends `onClick`. */
 export const button = <Message, Requirements>(
@@ -165,6 +186,21 @@ export const submit = <Message, Requirements>(
   options: ButtonOptions = {}
 ) => renderButton(h, label, { type: "submit" }, options, "primary")
 
+/**
+ * A button of one icon in the look of `iconButton`, named by `label`, over `attributes` that already give it its
+ * behavior, such as the group a headless dialog publishes for the control that closes it.
+ */
+export const iconButtonWith = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  attributes: ButtonAttributes<Message>,
+  config: Readonly<{ icon: IconName; label: string }>,
+  options: IconButtonOptions = {}
+) =>
+  h.button(
+    [...attributes, h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))],
+    [icon(h, config.icon, { size: "sm" }), h.span([h.Class(hiddenLabel)], [config.label])]
+  )
+
 const renderIconButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ icon: IconName; label: string }>,
@@ -174,11 +210,7 @@ const renderIconButton = <Message, Requirements>(
   Button.view(
     {
       ...behavior,
-      toView: (attributes) =>
-        h.button(
-          [...attributes.button, h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))],
-          [icon(h, config.icon, { size: "sm" }), h.span([h.Class(hiddenLabel)], [config.label])]
-        )
+      toView: (attributes) => iconButtonWith(h, attributes.button, config, options)
     },
     h
   )
@@ -243,7 +275,8 @@ const describeError = <Message, Requirements>(
 
 /**
  * A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if
- * it was. The `placeholder` shows an example of what to enter while it is empty.
+ * it was. The `placeholder` shows an example of what to enter while it is empty. The `attributes` go onto the
+ * input, such as a dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off.
  */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -255,6 +288,7 @@ export const field = <Message, Requirements>(
     onInput: (value: string) => Message
     placeholder?: string
     isAutofocus?: boolean
+    attributes?: PublishedAttributes
   }>,
   error: Option.Option<string>
 ) =>
@@ -274,6 +308,7 @@ export const field = <Message, Requirements>(
             h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
             h.input([
               ...attributes.input,
+              ...(config.attributes ?? []),
               ...(config.placeholder === undefined ? [] : [h.Placeholder(config.placeholder)]),
               h.Class(inputBox)
             ]),
@@ -284,10 +319,17 @@ export const field = <Message, Requirements>(
     h
   )
 
-/** A labelled box for longer text, `rows` lines tall, three unless given. */
+/** A labelled box for longer text, `rows` lines tall, three unless given. The `attributes` go onto the box. */
 export const textarea = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ id: string; label: string; value: string; onInput: (value: string) => Message; rows?: number }>
+  config: Readonly<{
+    id: string
+    label: string
+    value: string
+    onInput: (value: string) => Message
+    rows?: number
+    attributes?: PublishedAttributes
+  }>
 ) =>
   Textarea.view(
     {
@@ -300,7 +342,7 @@ export const textarea = <Message, Requirements>(
           [h.Class(fieldColumn)],
           [
             h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
-            h.textarea([...attributes.textarea, h.Class(textareaBox)])
+            h.textarea([...attributes.textarea, ...(config.attributes ?? []), h.Class(textareaBox)])
           ]
         )
     },
@@ -331,7 +373,7 @@ export const toggle = <Message, Requirements>(
 
 /**
  * A choice of one of `choices`, each a value and how the person reads it. With `isLabelHidden` the label does not
- * show above the select, and still names it.
+ * show above the select, and still names it. The `attributes` go onto the select.
  */
 export const choiceSelect = <Choice extends string, Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -341,6 +383,7 @@ export const choiceSelect = <Choice extends string, Message, Requirements>(
     choices: ReadonlyArray<readonly [Choice, string]>
     value: Choice
     onChange: (value: Choice) => Message
+    attributes?: PublishedAttributes
   }>,
   options: ChoiceSelectOptions = {}
 ) =>
@@ -361,7 +404,7 @@ export const choiceSelect = <Choice extends string, Message, Requirements>(
               [h.Class(selectChevron)],
               [
                 h.select(
-                  [...attributes.select, h.Class(selectBox)],
+                  [...attributes.select, ...(config.attributes ?? []), h.Class(selectBox)],
                   config.choices.map(([choice, label]) => h.option([h.Value(choice)], [label]))
                 )
               ]

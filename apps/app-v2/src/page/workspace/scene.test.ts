@@ -1,9 +1,11 @@
 import { GrantResolver } from "@amends-dev/core/authorization"
 import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
 import {
   Command,
+  Mount,
   Subscription,
   click,
   expect,
@@ -15,6 +17,7 @@ import {
   scene,
   selector,
   text,
+  type,
   withViewInputs,
   within
 } from "foldkit/scene"
@@ -49,6 +52,8 @@ import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { Integrations } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
+import { GroupsBlock } from "../../feature/groups/block.ts"
+import { CreateTeam } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { WorkspaceBlock } from "./block.ts"
@@ -476,6 +481,26 @@ describe("a workspace", () => {
       expect(role("main", { name: "Studio" })).toBeAbsent(),
       expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
       expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("takes a new team from the sidebar's heading in a dialog over the page, closed once the team is written", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(opened, { groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) }) })
+      ),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "New team" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "New team" })).toExist(),
+      type(label("Team name"), "Research"),
+      click(role("button", { name: "Create team" })),
+      Command.resolve(CreateTeam, GroupsBlock.Message.WroteAction()),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "New team" })).toBeAbsent(),
+      expect(role("alert")).toBeAbsent()
     )
   })
 

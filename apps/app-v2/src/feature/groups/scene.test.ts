@@ -1,9 +1,11 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupPermissions } from "@amends-dev/core/group"
 import { describe, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
 import {
   Command,
+  Mount,
   change,
   click,
   expect,
@@ -28,6 +30,20 @@ import { view } from "./view.ts"
 const { workspace, member } = membership
 
 const sceneView = withViewInputs(view, { openThread: Option.none() })
+
+/** The dialog acknowledged open: its element shown, and the resources it holds acquired. */
+const dialogOpened = () =>
+  [
+    Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+    Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources())
+  ] as const
+
+/** The dialog acknowledged closed: its element hidden, and the resources it held released. */
+const dialogClosed = () =>
+  [
+    Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+    Mount.expectEnded(Dialog.test.AcquireResources)
+  ] as const
 
 /** A public team the person does not belong to. */
 const announcements = Schema.decodeSync(Group.Group)({
@@ -68,7 +84,7 @@ const withConversation = modifyFields(listed, {
 })
 
 describe("the groups", () => {
-  it("list the person's teams apart from the teams they may join, and take a new team", () => {
+  it("list the person's teams apart from the teams they may join", () => {
     scene(
       { update, view: sceneView() },
       given(listed),
@@ -76,14 +92,77 @@ describe("the groups", () => {
       expect(role("button", { name: "Design" })).toExist(),
       expect(role("heading", { name: "Other teams", level: 2 })).toExist(),
       expect(role("button", { name: "Announcements" })).toExist(),
+      expect(role("dialog", { name: "New team" })).toBeAbsent()
+    )
+  })
+
+  it("take a new team in a dialog named for it, the name field holding the focus, and close it when written", () => {
+    scene(
+      { update, view: sceneView() },
+      given(listed),
       click(role("button", { name: "New team" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "New team" })).toExist(),
+      expect(within(role("dialog", { name: "New team" }), label("Team name"))).toExist(),
+      expect(label("Team name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
       type(label("Team name"), "Research"),
       click(role("button", { name: "Create team" })),
-      Command.expectExact(
-        CreateTeam({ workspaceId: workspace.id, memberId: member.id, name: "Research", isPublic: false })
+      Command.expectHas(
+        CreateTeam({ workspaceId: workspace.id, memberId: member.id, name: "Research", isPublic: false }),
+        Dialog.test.CloseDialog
       ),
       Command.resolve(CreateTeam, Message.WroteAction()),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "New team" })).toBeAbsent(),
       expect(role("button", { name: "New team" })).toExist()
+    )
+  })
+
+  it("take a team that anyone in the workspace can join, when the person says so", () => {
+    scene(
+      { update, view: sceneView() },
+      given(listed),
+      click(role("button", { name: "New team" })),
+      ...dialogOpened(),
+      expect(role("switch", { name: "Anyone in the workspace can join" })).toHaveAttr("aria-checked", "false"),
+      click(role("switch", { name: "Anyone in the workspace can join" })),
+      type(label("Team name"), "Announcements"),
+      click(role("button", { name: "Create team" })),
+      Command.expectHas(
+        CreateTeam({ workspaceId: workspace.id, memberId: member.id, name: "Announcements", isPublic: true })
+      ),
+      Command.resolve(CreateTeam, Message.WroteAction()),
+      ...dialogClosed()
+    )
+  })
+
+  it("close the dialog with Cancel, and open a fresh form the next time", () => {
+    scene(
+      { update, view: sceneView() },
+      given(listed),
+      click(role("button", { name: "New team" })),
+      ...dialogOpened(),
+      type(label("Team name"), "Research"),
+      click(role("button", { name: "Cancel" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "New team" })).toBeAbsent(),
+      click(role("button", { name: "New team" })),
+      ...dialogOpened(),
+      expect(label("Team name")).toHaveValue("")
+    )
+  })
+
+  it("close the dialog with its Close button", () => {
+    scene(
+      { update, view: sceneView() },
+      given(listed),
+      click(role("button", { name: "New conversation" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "New conversation" })).toExist(),
+      click(within(role("dialog", { name: "New conversation" }), role("button", { name: "Close" }))),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "New conversation" })).toBeAbsent()
     )
   })
 
@@ -94,6 +173,7 @@ describe("the groups", () => {
       expect(role("button", { name: "New team" })).toBeAbsent(),
       expect(role("button", { name: "New conversation" })).toExist(),
       click(role("button", { name: "New conversation" })),
+      ...dialogOpened(),
       expect(text("Choose a member")).toExist()
     )
   })
@@ -119,23 +199,28 @@ describe("the groups", () => {
     )
   })
 
-  it("start a conversation with the member chosen, the first message written", () => {
+  it("start a conversation with the member chosen, the first message written, in a dialog", () => {
     scene(
       { update, view: sceneView() },
       given(listed),
       click(role("button", { name: "New conversation" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "New conversation" })).toExist(),
+      expect(label("With")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
       change(label("With"), "member-2"),
       type(label("First message"), "Got a minute?"),
       click(role("button", { name: "Start" })),
-      Command.expectExact(
+      Command.expectHas(
         StartConversation({
           workspaceId: workspace.id,
           memberId: member.id,
           withMemberId: bob.id,
           text: "Got a minute?"
-        })
+        }),
+        Dialog.test.CloseDialog
       ),
       Command.resolve(StartConversation, Message.WroteAction()),
+      ...dialogClosed(),
       expect(role("button", { name: "Start" })).toBeAbsent()
     )
   })

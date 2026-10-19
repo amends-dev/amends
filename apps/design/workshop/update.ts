@@ -1,5 +1,5 @@
 import { modifyFields } from "foldkit/struct"
-import { ApplicationComposition } from "./composition.ts"
+import { ApplicationComposition, ModalBinding, WideModalBinding } from "./composition.ts"
 import { Message } from "./definition.ts"
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
@@ -16,11 +16,18 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     TypedDraft: ({ value }) => ({ model: modifyFields(model, { draft: () => value }) }),
     TypedFilledDraft: ({ value }) => ({ model: modifyFields(model, { filledDraft: () => value }) }),
     TypedEdit: ({ value }) => ({ model: modifyFields(model, { editText: () => value }) }),
+    TypedGroupName: ({ value }) => ({ model: modifyFields(model, { groupName: () => value }) }),
     OpenedThread: ({ key }) => ({ model: modifyFields(model, { openThread: () => key }) }),
     ChangedDestination: ({ destination }) => ({ model: modifyFields(model, { destination: () => destination }) }),
     ChangedPaneTab: ({ tab }) => ({ model: modifyFields(model, { paneTab: () => tab }) }),
     ToggledNotifications: ({ isOn }) => ({ model: modifyFields(model, { isNotificationsOn: () => isOn }) }),
     ToggledDigest: ({ isOn }) => ({ model: modifyFields(model, { isDigestOn: () => isOn }) }),
+    ToggledGroupPrivate: ({ isOn }) => ({ model: modifyFields(model, { isGroupPrivate: () => isOn }) }),
+    ClickedOpenModal: () => ModalBinding.requestOpen()(model),
+    ClickedOpenWideModal: () => WideModalBinding.requestOpen()(model),
+    ChangedModalTab: ({ tab }) => ({ model: modifyFields(model, { modalTab: () => tab }) }),
+    SubmittedModal: () => ModalBinding.requestClose()(model),
+    SubmittedWideModal: () => WideModalBinding.requestClose()(model),
     ChangedPlan: ({ plan }) => ({ model: modifyFields(model, { plan: () => plan }) }),
     ChangedTaskStatus: ({ status }) => ({ model: modifyFields(model, { taskStatus: () => status }) }),
     ChangedTaskPriority: ({ priority }) => ({ model: modifyFields(model, { taskPriority: () => priority }) }),

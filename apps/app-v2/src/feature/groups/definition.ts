@@ -1,13 +1,14 @@
 /**
  * The groups the person can see in a workspace, as a list to pick one from: the teams they belong
  * to by name and their conversations by the other members in them, then the public teams they may
- * join; and where they start a team, or a conversation with another member. It reports the group
- * the person picks, and its parent tells it which group is open.
+ * join; and the modal where they start a team, or a conversation with another member. It reports the
+ * group the person picks, and its parent tells it which group is open.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -26,7 +27,7 @@ export type Starting = typeof Starting.Type
 
 /**
  * The groups, the workspace's members, the person's own admissions, what they may do, the group
- * picked, what they are starting, and why the last read or write failed.
+ * picked, what they are starting and the dialog it is in, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -37,6 +38,7 @@ export const Model = Schema.Struct({
   grants: Schema.Array(Grant.Grant),
   selected: Schema.Option(GroupId.GroupId),
   starting: Schema.Option(Starting),
+  dialog: DialogBlock.Model,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -57,7 +59,6 @@ export const Message = defineMessageUnion({
   ChoseConversationMember: { memberId: Schema.Option(MemberId.MemberId) },
   TypedConversationText: { text: Schema.String },
   SubmittedConversation: {},
-  ClickedCancelStarting: {},
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })

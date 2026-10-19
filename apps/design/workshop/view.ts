@@ -1,3 +1,4 @@
+import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { centered, copy, heading } from "../src/centered.ts"
@@ -22,6 +23,7 @@ import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
 import { divider, message, messageList } from "../src/message.ts"
+import { modal } from "../src/modal.ts"
 import { pane, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
@@ -35,7 +37,7 @@ import {
   sidebarSections
 } from "../src/sidebar.ts"
 import { toast, toastStack } from "../src/toast.ts"
-import { type ApplicationViewBuilder, ApplicationComposition } from "./composition.ts"
+import { type ApplicationViewBuilder, ApplicationComposition, ModalBinding, WideModalBinding } from "./composition.ts"
 import {
   type Destination,
   Message,
@@ -1308,6 +1310,112 @@ const toastGroup = (h: ApplicationViewBuilder): Html =>
     )
   ])
 
+const groupNameField = (h: ApplicationViewBuilder, id: string, model: Model, render: RenderInfo): Html =>
+  field(
+    h,
+    {
+      id,
+      label: "Group name",
+      type: "text",
+      value: model.groupName,
+      onInput: (value) => Message.TypedGroupName({ value }),
+      isAutofocus: false,
+      attributes: render.initialFocus
+    },
+    Option.none()
+  )
+
+const groupPrivateToggle = (h: ApplicationViewBuilder, id: string, model: Model): Html =>
+  toggle(h, {
+    id,
+    label: "Only invited members can join",
+    isOn: model.isGroupPrivate,
+    onToggle: (isOn) => Message.ToggledGroupPrivate({ isOn })
+  })
+
+const groupMembers = (h: ApplicationViewBuilder): Html =>
+  entryList(h, {
+    label: "Members",
+    children: [
+      entry(h, {
+        key: "alex",
+        mark: "AM",
+        title: "Alex Morgan",
+        trailing: [badge(h, { label: "Admin", tone: "success" })]
+      }),
+      entry(h, { key: "yumi", mark: "Y", title: "Yumi", trailing: [hint(h, "Joined yesterday")] }),
+      entry(h, { key: "sara", mark: "S", title: "Sara" })
+    ]
+  })
+
+const renameModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Rename group",
+    context: "# general",
+    body: [groupNameField(h, "modal-group-name", model, render), groupPrivateToggle(h, "modal-group-private", model)],
+    cancelLabel: "Cancel",
+    footer: [submit(h, "Save changes")],
+    onSubmit: Message.SubmittedModal()
+  })
+
+const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Group settings",
+    context: "# general",
+    description: "Changes apply to everyone in the group.",
+    tabs: paneTabs(h, {
+      label: "Group settings",
+      tabs: [
+        {
+          label: "General",
+          isCurrent: model.modalTab === "general",
+          onClick: Message.ChangedModalTab({ tab: "general" })
+        },
+        {
+          label: "Members",
+          count: 7,
+          isCurrent: model.modalTab === "members",
+          onClick: Message.ChangedModalTab({ tab: "members" })
+        }
+      ]
+    }),
+    body:
+      model.modalTab === "general"
+        ? [
+            groupNameField(h, "wide-modal-group-name", model, render),
+            groupPrivateToggle(h, "wide-modal-group-private", model)
+          ]
+        : [groupMembers(h)],
+    cancelLabel: "Cancel",
+    footer: [submit(h, "Save changes")],
+    onSubmit: Message.SubmittedWideModal(),
+    width: "wide"
+  })
+
+const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  group(h, "Modal", [
+    sample(h, "A context, a field with the initial focus, a toggle, and a footer", [
+      button(h, "Open the modal", Message.ClickedOpenModal()),
+      h.block(
+        ModalBinding.embedView({
+          slotId: "modal",
+          model: model.modal,
+          viewInputs: { toView: (render) => renameModal(h, render, model) }
+        })
+      )
+    ]),
+    sample(h, "Wide, with tabs and a description", [
+      button(h, "Open the wide modal", Message.ClickedOpenWideModal()),
+      h.block(
+        WideModalBinding.embedView({
+          slotId: "wide-modal",
+          model: model.wideModal,
+          viewInputs: { hasDescription: true, toView: (render) => settingsModal(h, render, model) }
+        })
+      )
+    ])
+  ])
+
 const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
   group(h, "Shell", [
     sample(
@@ -1363,6 +1471,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           selectGroup(h, model.plan),
           noticeGroup(h),
           toastGroup(h),
+          modalGroup(h, model),
           iconGroup(h),
           markGroup(h),
           detailsGroup(h, model),

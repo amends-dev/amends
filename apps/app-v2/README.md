@@ -49,8 +49,8 @@ outside a workspace are composed from it: the root view frames the sign-in page 
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, and rows from the design's `centered`, `control`, `form`, and `directory` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
-and the pane of each destination, `feature/groups` renders the sidebar's sections, `feature/group`
-the main pane and the side pane, `feature/actions` the toasts, and every destination's view wraps
+and the pane of each destination, `feature/groups` renders the sidebar's sections and the modal where
+a team or a conversation is started, `feature/group` the main pane and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
 initials and the time of day from `src/seen.ts`. The task and the turns a thread embeds are the
@@ -149,8 +149,12 @@ the pages that compose them; the root composes the pages.
   the thread Block twice, once for its content and once for its composer, each in a slot of its own.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to by name, their conversations by the other members in them, then the public teams they may join,
-  to pick one from; and where they start a team, or a conversation with another member, in a form
-  after them. It reports the group picked, and its parent tells it which group is open, so the one
+  to pick one from; and where they start a team, or a conversation with another member, in a modal
+  over the page: a dialog the Block binds from `@foldkit/ui/dialog` and renders with the design's
+  `modal`, a team by its name and whether anyone in the workspace can join, with the name field taking
+  the focus as the dialog opens, and a conversation by the member and the first message, with the
+  member choice taking it. Cancel, Close, Escape, a click on the scrim, and submitting each close the
+  dialog, which drops what was being started. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group.
 - `feature/inbox`: the notifications waiting for the person, newest first, each as the message it is
@@ -346,7 +350,9 @@ browser's storage. Each Block's tests sit beside it:
   draft only while nothing was written, keeping what is written, and sending it once; a group
   renamed from the name seen, followed, left, or joined, a member admitted and an admission removed,
   and the thread picked opened and closed, or open already as the group opens; the groups starting a
-  team or a conversation and reporting the group picked once; the inbox listing what waits, newest
+  team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
+  or the dialog closes, dropping what was being started, and reporting the group picked once; the inbox
+  listing what waits, newest
   first, reporting the thread of the notification opened, marking one seen or all through the newest
   that waits, and why a write could not be kept; the connections asking for the host's integrations
   as they open, keeping them or why they could not be listed, asking again, adding a connection over
@@ -391,8 +397,10 @@ browser's storage. Each Block's tests sit beside it:
   with the composer to start a thread in its footer, and its side pane for the thread open in it,
   with the composer to reply in its footer, closed by its button; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, with the
-  thread open under the group picked, and a new team taken only from someone who may create one, a
-  conversation started with the member chosen; the inbox's notifications by their author, the
+  thread open under the group picked, and a new team taken in a dialog named for it, with the name
+  field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
+  once written, only from someone who may create one, a conversation started with the member chosen in
+  a dialog of its own, and the same team taken from the workspace's sidebar; the inbox's notifications by their author, the
   thread and group they come from, and the message they are about, with the thread alone while the
   group is unknown and the activity alone while the thread is, marked all seen, one seen with its
   failure shown, and one's thread opened by its text, and an empty inbox saying it is all caught up;
@@ -427,7 +435,10 @@ browser's storage. Each Block's tests sit beside it:
   with the composer to start one, the thread picked opened in the side pane with its messages and the
   composer to reply, marked in the list and under the group in the sidebar, and what the server
   refused as toasts. The root's own scenes show
-  the open workspace with no header of its own, signing out from its sidebar.
+  the open workspace with no header of its own, signing out from its sidebar. A scene opens and closes
+  a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
+  and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through
+  its Binding's `embedView`.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and

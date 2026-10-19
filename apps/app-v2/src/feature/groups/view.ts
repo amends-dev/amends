@@ -1,13 +1,14 @@
 import { GroupPermissions } from "@amends-dev/core/group"
-import { button, field, iconButton, notice, submit, textarea, toggle } from "@amends-dev/design/control"
-import { form } from "@amends-dev/design/form"
+import { field, iconButton, notice, submit, textarea, toggle } from "@amends-dev/design/control"
+import { modal } from "@amends-dev/design/modal"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
+import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
 import { groupName, isJoinable } from "../../seen.ts"
-import { GroupsComposition, type GroupsViewBuilder } from "./composition.ts"
+import { DialogBinding, GroupsComposition, type GroupsViewBuilder } from "./composition.ts"
 import { belongsTo, type GroupItem, Message, type Model, others, Starting } from "./definition.ts"
 
 /** The title of the thread open in the group open, which the page reads from the group, when one is. */
@@ -36,55 +37,72 @@ const groupRow = (
   })
 }
 
-/** The form for what the person is starting: a team, or a conversation with another member. */
-const startingView = (starting: Starting, model: Model, h: GroupsViewBuilder): Html =>
-  Starting.match(starting, {
-    Team: ({ name, isPublic }) =>
-      form(h, { onSubmit: Message.SubmittedTeam(), label: "New team" }, [
-        field(
-          h,
-          {
-            id: "team-name",
-            label: "Team name",
-            type: "text",
-            value: name,
-            onInput: (name) => Message.TypedTeamName({ name })
-          },
-          Option.none()
-        ),
-        toggle(h, {
-          id: "team-public",
-          label: "Anyone in the workspace can join",
-          isOn: isPublic,
-          onToggle: (isPublic) => Message.ToggledTeamPublic({ isPublic })
+/**
+ * The modal for what the person is starting: a team, or a conversation with another member. While nothing is being
+ * started the dialog has no content to show, so it is an empty frame.
+ */
+const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): Html =>
+  Option.match(model.starting, {
+    onNone: () => modal(h, render, { title: "", body: [] }),
+    onSome: Starting.match({
+      Team: ({ name, isPublic }) =>
+        modal(h, render, {
+          title: "New team",
+          body: [
+            field(
+              h,
+              {
+                id: "team-name",
+                label: "Team name",
+                type: "text",
+                value: name,
+                onInput: (name) => Message.TypedTeamName({ name }),
+                isAutofocus: false,
+                attributes: render.initialFocus
+              },
+              Option.none()
+            ),
+            toggle(h, {
+              id: "team-public",
+              label: "Anyone in the workspace can join",
+              isOn: isPublic,
+              onToggle: (isPublic) => Message.ToggledTeamPublic({ isPublic })
+            })
+          ],
+          cancelLabel: "Cancel",
+          footer: [submit(h, "Create team")],
+          onSubmit: Message.SubmittedTeam()
         }),
-        submit(h, "Create team"),
-        button(h, "Cancel", Message.ClickedCancelStarting(), { variant: "quiet" })
-      ]),
-    Conversation: ({ memberId, text }) =>
-      form(h, { onSubmit: Message.SubmittedConversation(), label: "New conversation" }, [
-        memberChoice(h, {
-          id: "conversation-member",
-          label: "With",
-          none: "Choose a member",
-          members: others(model),
-          value: memberId,
-          onChange: (memberId) => Message.ChoseConversationMember({ memberId })
-        }),
-        textarea(h, {
-          id: "conversation-text",
-          label: "First message",
-          value: text,
-          onInput: (text) => Message.TypedConversationText({ text })
-        }),
-        submit(h, "Start"),
-        button(h, "Cancel", Message.ClickedCancelStarting(), { variant: "quiet" })
-      ])
+      Conversation: ({ memberId, text }) =>
+        modal(h, render, {
+          title: "New conversation",
+          body: [
+            memberChoice(h, {
+              id: "conversation-member",
+              label: "With",
+              none: "Choose a member",
+              members: others(model),
+              value: memberId,
+              onChange: (memberId) => Message.ChoseConversationMember({ memberId }),
+              attributes: render.initialFocus
+            }),
+            textarea(h, {
+              id: "conversation-text",
+              label: "First message",
+              value: text,
+              onInput: (text) => Message.TypedConversationText({ text })
+            })
+          ],
+          cancelLabel: "Cancel",
+          footer: [submit(h, "Start")],
+          onSubmit: Message.SubmittedConversation()
+        })
+    })
   })
 
 /**
  * The sidebar's sections of the groups: the teams the person belongs to, their conversations, and the public
- * teams they may join, with starting a team or a conversation after them.
+ * teams they may join, with the modal for starting a team or a conversation after them.
  */
 export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread }, h) => {
   const own = model.groups.filter(({ group }) => belongsTo(model, group))
@@ -133,9 +151,12 @@ export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { 
           label: "Other teams",
           children: joinable.map((item) => groupRow(item, model, openThread, h))
         }),
-    Option.match(model.starting, {
-      onNone: () => h.empty,
-      onSome: (starting) => startingView(starting, model, h)
-    })
+    h.block(
+      DialogBinding.embedView({
+        slotId: "starting",
+        model: model.dialog,
+        viewInputs: { toView: (render) => startingModal(render, model, h) }
+      })
+    )
   ])
 })

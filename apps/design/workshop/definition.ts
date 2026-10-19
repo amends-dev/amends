@@ -1,9 +1,11 @@
 /**
  * What the workshop remembers: the text of its fields, boxes, and composers, which switches are on, the plan
  * chosen, a task's status, priority, and assignee, which rail destination, pane tab, and thread are current,
+ * the group settings typed in the modals, which section of the wide one shows, whether each modal is open,
  * and how often a button was pressed.
  */
 
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Schema from "effect/Schema"
 import { makeApplicationDefinition } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -26,6 +28,9 @@ export type Destination = typeof Destination.Type
 export const PaneTab = Schema.Literals(["threads", "tasks"])
 export type PaneTab = typeof PaneTab.Type
 
+export const ModalTab = Schema.Literals(["general", "members"])
+export type ModalTab = typeof ModalTab.Type
+
 export const Model = Schema.Struct({
   workspaceName: Schema.String,
   fullName: Schema.String,
@@ -38,11 +43,16 @@ export const Model = Schema.Struct({
   draft: Schema.String,
   filledDraft: Schema.String,
   editText: Schema.String,
+  groupName: Schema.String,
   openThread: Schema.String,
   destination: Destination,
   paneTab: PaneTab,
   isNotificationsOn: Schema.Boolean,
   isDigestOn: Schema.Boolean,
+  isGroupPrivate: Schema.Boolean,
+  modalTab: ModalTab,
+  modal: DialogBlock.Model,
+  wideModal: DialogBlock.Model,
   plan: Plan,
   taskStatus: TaskStatus,
   taskPriority: TaskPriority,
@@ -64,11 +74,18 @@ export const Message = defineMessageUnion({
   TypedDraft: { value: Schema.String },
   TypedFilledDraft: { value: Schema.String },
   TypedEdit: { value: Schema.String },
+  TypedGroupName: { value: Schema.String },
   OpenedThread: { key: Schema.String },
   ChangedDestination: { destination: Destination },
   ChangedPaneTab: { tab: PaneTab },
   ToggledNotifications: { isOn: Schema.Boolean },
   ToggledDigest: { isOn: Schema.Boolean },
+  ToggledGroupPrivate: { isOn: Schema.Boolean },
+  ClickedOpenModal: {},
+  ClickedOpenWideModal: {},
+  ChangedModalTab: { tab: ModalTab },
+  SubmittedModal: {},
+  SubmittedWideModal: {},
   ChangedPlan: { plan: Plan },
   ChangedTaskStatus: { status: TaskStatus },
   ChangedTaskPriority: { priority: TaskPriority },
