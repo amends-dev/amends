@@ -67,7 +67,9 @@ text shows nothing else of its markdown yet: emphasis, links, lists, and code ap
 their marks, and the form that edits a message shows its text as written, mentions too. A title taken
 from a thread's opening is its words as a reader hears them, a mention as "@" and the member's
 current name (`titleOf`, by `messageWords`), in the pane's header and under the group in the
-sidebar. The composers cannot write a mention yet.
+sidebar. Every write of a message's text, a thread's opening, a reply, an edit, and a conversation's
+first message, says whom the message addresses by the mentions in its text (core's
+`ThreadMessage.mentionedIn`, each member once). The composers cannot write a mention yet.
 
 The task and the turns a thread embeds are the
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
@@ -499,7 +501,9 @@ browser's storage. Each Block's tests sit beside it:
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
   from the list or from the open workspace, and following the window's width, for the workspace it
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
-  one.
+  one. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
+  `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
+  with the members their text mentions, and with none when it mentions no one.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, a mention as a chip with its member's current name, a deleted one, who types, a reply written and sent, the title renamed from its form, and a message

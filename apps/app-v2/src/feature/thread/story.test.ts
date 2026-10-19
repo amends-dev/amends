@@ -1,8 +1,9 @@
 import { ThreadId, ThreadMessage, ThreadParticipationId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
-import { Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
+import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
@@ -140,6 +141,42 @@ describe("a thread", () => {
       )
     ).not.toContain(TellTyping.name)
   })
+
+  it.effect("writes a reply and an edit with the members their text mentions", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const bob = ThreadMessage.mentionText("member-2", "Bob")
+      const post = (text: string) =>
+        PostReply({ ...inThread, text }).effect.pipe(Effect.provide(Layer.provide(PostReply.layer, layer)))
+      const edit = (text: string) =>
+        EditMessage({ workspaceId, memberId, messageId: opening.id, text, expectedRevision: 1 }).effect.pipe(
+          Effect.provide(Layer.provide(EditMessage.layer, layer))
+        )
+
+      yield* post(`Sounds good, ${bob}`)
+      yield* post("Sounds good")
+      yield* edit(`Plans for next week, ${bob}`)
+      yield* edit("Plans for next week")
+
+      expect(written).toEqual([
+        { action: "ThreadMessagePosted", payload: { threadId, text: `Sounds good, ${bob}`, mentions: ["member-2"] } },
+        { action: "ThreadMessagePosted", payload: { threadId, text: "Sounds good", mentions: [] } },
+        {
+          action: "ThreadMessageEdited",
+          payload: {
+            messageId: opening.id,
+            text: `Plans for next week, ${bob}`,
+            mentions: ["member-2"],
+            expectedRevision: 1
+          }
+        },
+        {
+          action: "ThreadMessageEdited",
+          payload: { messageId: opening.id, text: "Plans for next week", mentions: [], expectedRevision: 1 }
+        }
+      ])
+    })
+  )
 
   it("keeps why a write could not be kept until the next one is", () => {
     story(

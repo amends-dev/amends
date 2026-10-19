@@ -1,9 +1,10 @@
 import { GroupId } from "@amends-dev/core/group"
-import { Thread, ThreadId } from "@amends-dev/core/thread"
+import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
-import { Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
@@ -58,6 +59,26 @@ describe("a group's threads", () => {
       })
     )
   })
+
+  it.effect("writes the thread with the members its opening mentions", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const start = (text: string) =>
+        StartThread({ workspaceId, memberId, groupId, text }).effect.pipe(
+          Effect.provide(Layer.provide(StartThread.layer, layer))
+        )
+      const bob = ThreadMessage.mentionText("member-2", "Bob")
+      const text = `Ask ${bob} about it, ${bob}`
+
+      yield* start(text)
+      yield* start("Plans for the week")
+
+      expect(written).toEqual([
+        { action: "ThreadStarted", payload: { groupId, text, mentions: ["member-2"] } },
+        { action: "ThreadStarted", payload: { groupId, text: "Plans for the week", mentions: [] } }
+      ])
+    })
+  )
 
   it("reports the thread the person picks", () => {
     story(

@@ -1,7 +1,7 @@
 /** Starting a team or a conversation, each an action written to the person's store. */
 
 import { Group } from "@amends-dev/core/group"
-import { Thread } from "@amends-dev/core/thread"
+import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -41,7 +41,7 @@ export const StartConversation = GroupsDefinition.command("StartConversation", {
     return ({ withMemberId, text, ...member }) =>
       Stores.decoded(
         Thread.StartDirectInput,
-        { memberIds: [withMemberId], text, mentions: [] },
+        { memberIds: [withMemberId], text, mentions: ThreadMessage.mentionedIn(text) },
         failed("A conversation needs a first message.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("DirectThreadStarted", input))),

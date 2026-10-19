@@ -1,9 +1,11 @@
 import { GroupId } from "@amends-dev/core/group"
+import { ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Option } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { recordingStores } from "../../../test/recordingStores.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import { Message, OutMessage, Starting } from "./definition.ts"
@@ -106,6 +108,25 @@ describe("the groups", () => {
       })
     )
   })
+
+  it.effect("write a conversation with the members its first message mentions", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const start = (text: string) =>
+        StartConversation({ workspaceId, memberId, withMemberId: bobId, text }).effect.pipe(
+          Effect.provide(Layer.provide(StartConversation.layer, layer))
+        )
+      const text = `${ThreadMessage.mentionText(bobId, "Bob")} got a minute?`
+
+      yield* start(text)
+      yield* start("Got a minute?")
+
+      expect(written).toEqual([
+        { action: "DirectThreadStarted", payload: { memberIds: [bobId], text, mentions: [bobId] } },
+        { action: "DirectThreadStarted", payload: { memberIds: [bobId], text: "Got a minute?", mentions: [] } }
+      ])
+    })
+  )
 
   it("drop what the person was starting when the dialog closes, and report the group picked once", () => {
     story(

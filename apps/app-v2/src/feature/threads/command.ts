@@ -1,5 +1,5 @@
 import { GroupId } from "@amends-dev/core/group"
-import { Thread } from "@amends-dev/core/thread"
+import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Stores from "../../store/Stores.ts"
@@ -17,7 +17,7 @@ export const StartThread = ThreadsDefinition.command("StartThread", {
     return ({ groupId, text, ...member }) =>
       Stores.decoded(
         Thread.StartInGroupInput,
-        { groupId, text, mentions: [] },
+        { groupId, text, mentions: ThreadMessage.mentionedIn(text) },
         failed("A thread needs an opening message.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadStarted", input))),

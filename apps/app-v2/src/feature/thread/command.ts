@@ -28,7 +28,7 @@ export const PostReply = ThreadDefinition.command("PostReply", {
     return ({ threadId, text, ...member }) =>
       Stores.decoded(
         ThreadMessage.PublishInput,
-        { threadId, text, mentions: [] },
+        { threadId, text, mentions: ThreadMessage.mentionedIn(text) },
         failed("A reply needs some text.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadMessagePosted", input))),
@@ -74,7 +74,7 @@ export const EditMessage = ThreadDefinition.command("EditMessage", {
     return ({ messageId, text, expectedRevision, ...member }) =>
       Stores.decoded(
         ThreadMessage.EditInput,
-        { messageId, text, mentions: [], expectedRevision },
+        { messageId, text, mentions: ThreadMessage.mentionedIn(text), expectedRevision },
         failed("A message needs some text.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadMessageEdited", input))),
