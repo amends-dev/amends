@@ -22,7 +22,8 @@
     "./rail": "./src/rail.ts",
     "./shell": "./src/shell.ts",
     "./sidebar": "./src/sidebar.ts",
-    "./toast": "./src/toast.ts"
+    "./toast": "./src/toast.ts",
+    "./viewport": "./src/viewport.ts"
   },
   "scripts": {
     "workshop": "vite",

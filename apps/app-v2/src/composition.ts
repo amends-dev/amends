@@ -17,18 +17,18 @@ import { WorkspacesBlock } from "./page/workspaces/block.ts"
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
 
 /** The signed-in page as `change` makes it, while the person is signed in; otherwise as it is. */
-const atSignedIn = (model: Model, change: (page: SignedIn) => SignedIn): Model => ({
-  page: Page.matchOrElse(model.page, { SignedIn: change }, () => model.page)
-})
+const atSignedIn = (model: Model, change: (page: SignedIn) => SignedIn): Model =>
+  modifyFields(model, { page: (page) => Page.matchOrElse(page, { SignedIn: change }, () => page) })
 
 const foldSignInOutMessage = SignInBlock.OutMessage.match({
   SignedIn: ({ session }) =>
-    ApplicationDefinition.step(() =>
+    ApplicationDefinition.step((model: Model) =>
       WorkspacesBinding.init({
         args: [],
-        toParentModel: (workspaces) => ({
-          page: Page.SignedIn({ account: session.account, workspaces, workspace: Option.none() })
-        })
+        toParentModel: (workspaces) =>
+          modifyFields(model, {
+            page: () => Page.SignedIn({ account: session.account, workspaces, workspace: Option.none() })
+          })
       })
     )
 })
@@ -36,9 +36,10 @@ const foldSignInOutMessage = SignInBlock.OutMessage.match({
 export const SignInBinding = ApplicationDefinition.bindChild(SignInBlock, {
   read: (model) =>
     Page.matchOrElse(model.page, { SignedOut: ({ signIn }) => Option.some(signIn) }, () => Option.none()),
-  write: (model, nextSignIn) => ({
-    page: Page.matchOrElse(model.page, { SignedOut: () => Page.SignedOut({ signIn: nextSignIn }) }, () => model.page)
-  }),
+  write: (model, nextSignIn) =>
+    modifyFields(model, {
+      page: (page) => Page.matchOrElse(page, { SignedOut: () => Page.SignedOut({ signIn: nextSignIn }) }, () => page)
+    }),
   outMessage: { fold: foldSignInOutMessage }
 })
 
@@ -46,7 +47,7 @@ export const SignInBinding = ApplicationDefinition.bindChild(SignInBlock, {
 export const signOut = ApplicationDefinition.step((model: Model) =>
   SignInBinding.init({
     args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => "")],
-    toParentModel: (signIn) => ({ page: Page.SignedOut({ signIn }) }),
+    toParentModel: (signIn) => modifyFields(model, { page: () => Page.SignedOut({ signIn }) }),
     commands: [SignOut()]
   })
 )
@@ -56,7 +57,7 @@ const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
     ApplicationDefinition.step((model: Model) =>
       WorkspaceBinding.init({
         key: membership.workspace.id,
-        args: [membership.workspace.id, membership.member.id, membership.workspace.name],
+        args: [membership.workspace.id, membership.member.id, membership.workspace.name, model.viewport],
         toParentModel: (workspace) =>
           atSignedIn(model, (page) =>
             modifyFields(page, {

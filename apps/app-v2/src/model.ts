@@ -1,10 +1,12 @@
 /**
- * The app's state: the page the person is on. Signed out, the sign-in form; signed in, their
- * account, the workspaces they belong to, and the one they opened.
+ * The app's state: the page the person is on, and the width of the window. Signed out, the page is the
+ * sign-in form; signed in, their account, the workspaces they belong to, and the one they opened.
  */
 
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import { Viewport } from "@amends-dev/design/viewport"
 import * as Accounts from "@amends-dev/gateway/Accounts"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { defineTaggedUnion } from "foldkit/schema"
 import { SignInBlock } from "./page/signIn/block.ts"
@@ -21,5 +23,13 @@ export const Page = defineTaggedUnion({
 })
 export type Page = typeof Page.Type
 
-export const Model = Schema.Struct({ page: Page })
+export const Model = Schema.Struct({ page: Page, viewport: Viewport })
 export type Model = typeof Model.Type
+
+/** The workspace the person has open, while one is. */
+export const openedWorkspaceId = (model: Model): Option.Option<WorkspaceId.WorkspaceId> =>
+  Page.matchOrElse(
+    model.page,
+    { SignedIn: ({ workspace }) => Option.map(workspace, ({ workspaceId }) => workspaceId) },
+    () => Option.none()
+  )

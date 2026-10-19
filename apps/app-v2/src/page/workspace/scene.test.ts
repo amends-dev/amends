@@ -65,7 +65,7 @@ import { view } from "./view.ts"
 
 const { workspace, member } = membership
 
-const opened = init(workspace.id, member.id, workspace.name).model
+const opened = init(workspace.id, member.id, workspace.name, "Split").model
 
 const workspaceSubscriptions = WorkspaceBlock.subscriptions
 

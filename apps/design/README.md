@@ -101,6 +101,23 @@ of a select on the element it is on, which must hold the select. The base styles
 to the `body` size with no margin; the size is on `body` because on `html` it would make a rem 15px
 instead of the 16px the scale is written in.
 
+## The viewport
+
+CSS follows the window's width by itself, but a view that renders different markup at different
+widths, such as the shell holding the sidebar in place or in a dialog, has to know it, so an app
+keeps it in its model. `@amends-dev/design/viewport` is what both sides share, and the only module
+here that is not a renderer:
+
+- `Viewport` is `"Phone"` below 48rem, `"Tablet"` from 48rem, `"Desktop"` from 64rem, and `"Split"`
+  from 80rem, the cuts of the theme's breakpoints. It is a schema, so a model or a message holds it.
+- `viewportQueries` are the media queries that cut it, `tablet`, `desktop`, and `split`, as
+  `(min-width: 48rem)`, `(min-width: 64rem)`, and `(min-width: 80rem)`. They are the rems of the
+  `--breakpoint-*` properties in `styles.css`, and the two must agree: change one, change the other.
+  An app asks `window.matchMedia` each query at startup, for its flags, and follows them with
+  `Dom.streamFromMediaQuery`, for a subscription.
+- `viewportOf({ isTablet, isDesktop, isSplit })` is the decision: the widest breakpoint whose query
+  matches.
+
 ## Renderers
 
 A renderer takes `h` first, then its config, then anything optional, and returns `Html`. Each is
@@ -493,4 +510,5 @@ Cancel by closing the dialog without sending the form; a message by
 its text button, `aria-current`, its note, context, actions, meta, and body, and a divider by its label in
 the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
-the rail and the sidebar, `main`, and `complementary`, with its notices. They query no class.
+the rail and the sidebar, `main`, and `complementary`, with its notices. They query no class. The
+viewport's decision, `viewportOf`, is a plain test.

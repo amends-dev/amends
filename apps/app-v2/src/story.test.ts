@@ -33,7 +33,7 @@ const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
   people: 1
 })
 
-const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }) }
+const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split" }
 
 /** What the sign-in form reports, as the root receives it. */
 const fromSignIn = (model: Model, message: typeof SignInBlock.Message.Type) =>
@@ -51,7 +51,7 @@ const fromWorkspace = (message: typeof WorkspaceBlock.Message.Type) =>
   WorkspaceBinding.embedView({
     key: membership.workspace.id,
     slotId: "workspace",
-    model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio").model,
+    model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio", "Split").model,
     viewInputs: { email: session.account.email }
   }).toParentMessage(message)
 
@@ -104,7 +104,7 @@ describe("the app", () => {
   it("signs out when the open workspace asks to, the same way as from the workspace list", () => {
     story(
       update,
-      given(init({ session: Option.some(session) }).model),
+      given(init({ session: Option.some(session), viewport: "Split" }).model),
       message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
@@ -124,8 +124,45 @@ describe("the app", () => {
   })
 
   it("starts from a kept session, listing the workspaces", () => {
-    const started = init({ session: Option.some(session) })
+    const started = init({ session: Option.some(session), viewport: "Split" })
     expect(Page.isAnyOf(["SignedIn"])(started.model.page)).toBe(true)
     expect((started.commands ?? []).map(({ name }) => name)).toEqual([LoadWorkspaces.name])
+  })
+
+  it("starts in the window's width, follows it as it changes, and opens a workspace in the width it has then", () => {
+    story(
+      update,
+      given(init({ session: Option.some(session), viewport: "Phone" }).model),
+      model((model) => {
+        expect(model.viewport).toBe("Phone")
+      }),
+      message(Message.ChangedViewport({ viewport: "Tablet" })),
+      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      model((model) => {
+        expect(model.viewport).toBe("Tablet")
+        expect(Option.map(openedIn(model), ({ model: opened }) => opened.viewport)).toEqual(Option.some("Tablet"))
+      })
+    )
+  })
+
+  it("informs the open workspace when the window changes width, and has no one to inform before one is open", () => {
+    story(
+      update,
+      given(init({ session: Option.some(session), viewport: "Split" }).model),
+      message(Message.ChangedViewport({ viewport: "Desktop" })),
+      model((model) => {
+        expect(model.viewport).toBe("Desktop")
+      }),
+      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      message(Message.ChangedViewport({ viewport: "Phone" })),
+      model((model) => {
+        expect(model.viewport).toBe("Phone")
+        expect(Option.map(openedIn(model), ({ model: opened }) => opened.viewport)).toEqual(Option.some("Phone"))
+      })
+    )
   })
 })

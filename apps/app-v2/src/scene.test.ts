@@ -13,7 +13,7 @@ import { Workspaces } from "./page/workspaces/definition.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }) }
+const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split" }
 
 /** Signed in as alice, who belongs to one workspace, with none of them opened. */
 const choosing: Model = {
@@ -21,7 +21,8 @@ const choosing: Model = {
     account: session.account,
     workspaces: WorkspacesBlock.Model.make({ workspaces: Workspaces.Loaded({ memberships: [membership] }) }),
     workspace: Option.none()
-  })
+  }),
+  viewport: "Split"
 }
 
 /** Signed in as alice, with her workspace opened. */
@@ -31,9 +32,11 @@ const inWorkspace: Model = {
     workspaces: WorkspacesBlock.Model.make({ workspaces: Workspaces.Loaded({ memberships: [membership] }) }),
     workspace: Option.some({
       workspaceId: membership.workspace.id,
-      model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, membership.workspace.name).model
+      model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, membership.workspace.name, "Split")
+        .model
     })
-  })
+  }),
+  viewport: "Split"
 }
 
 describe("the app", () => {

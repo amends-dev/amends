@@ -266,16 +266,26 @@ the pages that compose them; the root composes the pages.
   moved by CSS from that flag; it does not yet trap focus, make the rest of the window inert, or
   close on Escape, which come in a later step. Opening the workspace lists the host's integrations
   once, over HTTP, and informs its connections, agents, and channels of them, or of why they could
-  not be reached; it lists them again when one of the three asks. It reports when the person leaves
-  it and when they ask to sign out.
-- The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
-  the page the person is on, signed out at the form or signed in with their account, workspaces, and
-  the one open. Signing in lists the workspaces; signing out, from the workspace list or from the
-  open workspace's sidebar, which asks the root, is one step in `composition.ts`, and its command,
-  `command.ts`, forgets the session, the person's stores, and their sync identity first, so it works
-  offline, then removes the browser's sync key and ends the session as far as the host can be reached.
-  `entry.ts` assembles the application over `services.ts`, which supplies the stores, the session,
-  and the browser's services beneath them.
+  not be reached; it lists them again when one of the three asks. It keeps the window's width, which
+  the root gives it as it opens and informs it of when the width changes; once the sidebar is in
+  place, from `Desktop`, it closes the drawer. It reports when the person leaves it and when they ask
+  to sign out.
+- The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
+  and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
+  workspaces, and the one open, and the width of the window. Signing in lists the workspaces; signing
+  out, from the workspace list or from the open workspace's sidebar, which asks the root, is one step
+  in `composition.ts`, and its command, `command.ts`, forgets the session, the person's stores, and
+  their sync identity first, so it works offline, then removes the browser's sync key and ends the
+  session as far as the host can be reached. The width is the design's `Viewport` (`Phone`, `Tablet`,
+  `Desktop`, or `Split`), which a view that changes with it cannot leave to CSS. It starts from the
+  flags, `flags.ts`, which read the session kept from the last visit and ask `window.matchMedia` the
+  design's `viewportQueries`: the runtime processes no Message until the first render has painted, so
+  a subscription alone would paint the desktop layout on a phone before correcting it. The
+  subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries,
+  drops a width that did not change, and sends `ChangedViewport`, whose update sets the width and
+  informs the open workspace of it, and a workspace opened later starts from the width the root has
+  then. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
+  session, and the browser's services beneath them.
 
 A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
 it opens the person's store of a workspace on the first read or write, shares it among all of them,
@@ -416,8 +426,10 @@ browser's storage. Each Block's tests sit beside it:
   marked, going home from a group or a destination, handing the settings and the channels what the
   person does in them, opening a notification's thread in its group, naming the thread open in the
   group open, opening the navigation drawer and closing it by every navigation, and asking the root
-  to sign out; and the root signing in a step at a time, listing the
-  workspaces, opening and closing one, and signing out, from the list or from the open workspace.
+  to sign out, and taking the window's width, closing the drawer once the sidebar is in place; and
+  the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
+  from the list or from the open workspace, and following the window's width, for the workspace it
+  opens too.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, who types, a reply written and sent, the title renamed from its form, and a message

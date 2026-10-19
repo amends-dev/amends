@@ -43,7 +43,7 @@ const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
 const groupId = GroupId.GroupId.make("general")
 
-const opened = init(workspaceId, memberId, "Studio").model
+const opened = init(workspaceId, memberId, "Studio", "Split").model
 
 const unreachable = "The host could not be reached. Try again."
 
@@ -153,6 +153,26 @@ describe("a workspace", () => {
     )
   })
 
+  it("lays itself out for the width it is told of, and drops the drawer once the sidebar is in place", () => {
+    for (const [viewport, isMenuOpen] of [
+      ["Phone", true],
+      ["Tablet", true],
+      ["Desktop", false],
+      ["Split", false]
+    ] as const) {
+      story(
+        update,
+        given(opened),
+        message(Message.ClickedMenu()),
+        message(Message.InformedOfViewport({ viewport })),
+        model((model) => {
+          expect(model.viewport).toBe(viewport)
+          expect(model.isMenuOpen).toBe(isMenuOpen)
+        })
+      )
+    }
+  })
+
   it("closes the navigation drawer when the person goes home or to a destination", () => {
     for (const navigation of [
       Message.ClickedHome(),
@@ -235,7 +255,7 @@ describe("a workspace", () => {
   })
 
   it("lists the host's integrations once as it opens, and informs its connections, agents, and channels of them", () => {
-    expect((init(workspaceId, memberId, "Studio").commands ?? []).map(({ name }) => name)).toEqual([
+    expect((init(workspaceId, memberId, "Studio", "Split").commands ?? []).map(({ name }) => name)).toEqual([
       LoadIntegrations.name
     ])
     story(

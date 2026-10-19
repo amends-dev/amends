@@ -1,3 +1,4 @@
+import type { Viewport } from "@amends-dev/design/viewport"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
@@ -37,6 +38,12 @@ const showChannels = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Channels() })
 }))
 
+/** Lay the workspace out for a window of the width `viewport`. */
+const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))
+
+/** Whether the sidebar is in place at `viewport`, where there is no drawer to keep open. */
+const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop" || viewport === "Split"
+
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
@@ -55,6 +62,8 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
       Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showChannels]),
     ClickedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
     ClickedCloseMenu: () => Update.combine(model, [closeMenu]),
+    InformedOfViewport: ({ viewport }) =>
+      Update.combine(model, [showViewport(viewport), ...(hasSidebarInPlace(viewport) ? [closeMenu] : [])]),
     ReceivedIntegrations: ({ integrations }) =>
       Update.combine(model, [
         ConnectionsBinding.informReceivedIntegrations({ integrations }),
