@@ -69,7 +69,16 @@ from a thread's opening is its words as a reader hears them, a mention as "@" an
 current name (`titleOf`, by `messageWords`), in the pane's header and under the group in the
 sidebar. Every write of a message's text, a thread's opening, a reply, an edit, and a conversation's
 first message, says whom the message addresses by the mentions in its text (core's
-`ThreadMessage.mentionedIn`, each member once). The composers cannot write a mention yet.
+`ThreadMessage.mentionedIn`, each member once).
+
+The person writes a mention in the composer by typing "@" and some letters of a member's name, and
+picking the member from a list that opens over the box, which writes the link in their place and a
+space after it. Foldkit's builder gives a handler the key pressed and the value of the box, and nothing
+gives the caret, so the composer reads the mention being typed at the end of the text, an "@" at its
+start or after a space and the letters after it with no space among them, and suggests members for
+that alone; a mention typed in the middle of the text is left as typed. A link written there, or by
+hand, still addresses its member, since a write reads the text. The textarea that edits a message,
+and the one that begins a conversation, are not the composer, and suggest no one.
 
 The task and the turns a thread embeds are the
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
@@ -114,8 +123,15 @@ the pages that compose them; the root composes the pages.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread or a new thread in a
   group, kept as a draft in their browser until they send it. It reports what it sends, and that
-  its text changed. Its view takes how the box is labelled, what it shows while it is empty, and what
-  its button says, and is the design's `composer`.
+  its text changed. Its view takes how the box is labelled, what it shows while it is empty, what
+  its button says, and the workspace's members, and is the design's `composer`. While the text ends in
+  a mention being typed (`tailQuery`), the Block lists up to six of the members whose names contain its
+  letters, whatever their case or accents, other than the person and the removed, in the members' order
+  (`suggestMembers`), and the view hands the design's list the keys: the arrows move the active
+  suggestion around the list (`MovedSuggestion` carries the index the view counted), Enter or Tab picks
+  it (`PickedMention` writes `ThreadMessage.mentionText` in place of the "@" and the letters, and a
+  space, as typing does: kept as the draft and reported), and Escape dismisses the list
+  (`DismissedSuggestions`) until the letters change. A draft read as the place opens opens no list.
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
   part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
   composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
@@ -129,7 +145,8 @@ the pages that compose them; the root composes the pages.
   "edited" after it, its text with each mention a chip (`messageRuns`, by the thread's members),
   and Edit and Delete on the person's own, which the form to edit it replaces while they do; and who
   else types, in a live region under them. It shows no title, which
-  the pane's header has. `replyView` is the reply composer, for the pane's footer.
+  the pane's header has. `replyView` is the reply composer, for the pane's footer, which suggests the
+  workspace's members the thread has read.
 - `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
   while the thread tracks none, making it one, when they may create tasks in its group. Its view is
@@ -152,8 +169,9 @@ the pages that compose them; the root composes the pages.
   not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, its task, whether it is still being started, and how much is new, and a composer to
-  start one. It reports the thread picked. It has two views, which take the group's members, its name,
-  the thread open in it, and the time now from their parent. `view`, its canonical one, lists the
+  start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
+  two views, which take the group's members, its name, the thread open in it, and the time now from
+  their parent. `view`, its canonical one, lists the
   threads as messages, oldest first by when each thread was created (core's `Thread.createdAt`, the
   moment its opening was published), whatever order the store gives them, under a `divider` for each
   day they were created on by the person's own clock, named as it is from the time now (`dayLabel`):
@@ -452,7 +470,9 @@ browser's storage. Each Block's tests sit beside it:
   again only when nothing else keeps them from it, and a turn's log followed from showing it until
   the turn ends or the person hides it, passing over another turn's, and followed again after it
   could not be; a thread started from the composer and the thread picked; a composer filling in its
-  draft only while nothing was written, keeping what is written, and sending it once; a group
+  draft only while nothing was written, keeping what is written, and sending it once, listing members for
+  a mention typed at the end of the text and for no other, keeping the list closed for the letters it
+  was dismissed for, opening none for a draft read, and writing the member picked as a link; a group
   opening its settings on General, with the draft of the team's name started only for someone who
   may rename it, renamed from the name seen, writing nothing when the name is unchanged, and closing
   its settings, which drop their drafts, whichever way they close; followed, left from its settings,
@@ -510,7 +530,10 @@ browser's storage. Each Block's tests sit beside it:
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
   author of their opening, their time, a mention in the opening as a chip, who replied and how many
   times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
-  from the composer, whose box is named for the group; a task changed by someone who may, read as
+  from the composer, whose box is named for the group; a composer listing the members whose names
+  contain the letters after the "@" that ends the text, and not the person, saying which is active and
+  what the textarea completes from, picking by a click, by Enter, and by Tab, moving around the list
+  with the arrows, and closing on Escape until other letters are typed; a task changed by someone who may, read as
   rows by someone who may not, and made by someone who may create tasks; a thread's turns by their
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
   may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends

@@ -41,7 +41,7 @@ the current row, with a form in place of the text, and set apart by dividers, ce
 start, and notifications under the days Today and Yesterday, unread with a dot and a quiet action and
 read; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
-own; the composer empty and filled; the shell twice, with and without its side pane, each in a
+own; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
@@ -493,7 +493,7 @@ What a conversation is made of.
 
 ### `@amends-dev/design/composer`
 
-- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel })` is where the person
+- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, suggestions? })` is where the person
   writes a message: a form named by `label` (through `aria-labelledby`, so a lookup by `label` finds
   the textarea and not the form), a box with a border that darkens while the person writes in it,
   holding a textarea for `id` and, under it, the send button at the end. The textarea has the
@@ -501,6 +501,23 @@ What a conversation is made of.
   no border of its own, and grows with what is typed between 2.5rem and 15rem. The button is an
   `iconSubmit` named `submitLabel` showing the `mark-send` icon; it submits the form, which sends
   `onSubmit`. Enter adds a line.
+- `suggestions`, `{ id, items, onKeyDown }`, opens a list of members to mention over the box while
+  the caller gives it. The list is a `listbox` named "Members to mention" with the `id` given, above
+  the box (the form is `relative`; the list is `absolute`, 4px over it, 16rem wide at most, on
+  `raised` with `shadow-popover` and a border), and holds a row for each of `items`, in order, which
+  the caller keeps to six: an `option` of the member's `mark` (`xs`) and `name` at the control text
+  size, `aria-selected` and on `selected` when its `isActive`, and sending its `onPick` when it is
+  clicked, after which the textarea has the focus again. The textarea says that it completes from the
+  list, with `aria-autocomplete="list"`, `aria-controls` the list's `id`, `aria-expanded="true"`, and
+  `aria-activedescendant` the active option's id (the list's `id`, a hyphen, and the item's `id`). The
+  box keeps the focus while the list is open, and a key pressed in it asks `onKeyDown(key)`: a
+  message it answers is sent, and the browser's action for that key, adding a line or moving the
+  focus on, does not happen; no answer leaves the key to the browser, as does any key pressed with
+  Shift, Control, Alt, or Meta. The caller decides what the keys do, such as moving the active row,
+  picking it, or dismissing the list. Without `suggestions` none of this is drawn, and the textarea
+  carries none of those attributes or a key handler. The builder has no handler that prevents the
+  default action of a mouse press, so a click keeps the focus by returning it to the textarea after
+  the row took it, not by never taking it.
 
 ### `@amends-dev/design/toast`
 
@@ -587,7 +604,9 @@ text button named by its author and activity and described by its text, its plac
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
 and a divider by its label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
-send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
+send button, and its list of members by the listbox named for it, its options with the active one selected, the
+textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
+row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere

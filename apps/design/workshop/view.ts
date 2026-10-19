@@ -80,6 +80,8 @@ const conversationColumn = "flex max-w-xl flex-col px-3"
 
 const composerColumn = "flex max-w-md flex-col"
 
+const mentioningColumn = "flex max-w-md flex-col pt-24"
+
 const emptyPaneFrame = "flex h-96 flex-col outline outline-outline"
 
 const sidePaneColumn = "flex w-98 flex-col"
@@ -1055,6 +1057,31 @@ const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: st
         })
       ],
       composerColumn
+    ),
+    sample(
+      h,
+      "Mentioning a member, the second one active",
+      [
+        composer(h, {
+          id: "mentioning-draft",
+          label: "Reply",
+          placeholder: "Reply in thread",
+          value: "Can you look, @al",
+          onInput: () => press,
+          onSubmit: press,
+          submitLabel: "Reply",
+          suggestions: {
+            id: "mentioning-members",
+            items: [
+              { id: "alex", mark: "AM", name: "Alex Morgan", isActive: false, onPick: press },
+              { id: "alma", mark: "AI", name: "Alma Ito", isActive: true, onPick: press },
+              { id: "alan", mark: "AT", name: "Alan Turing", isActive: false, onPick: press }
+            ],
+            onKeyDown: () => Option.none()
+          }
+        })
+      ],
+      mentioningColumn
     )
   ])
 }

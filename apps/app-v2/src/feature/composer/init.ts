@@ -8,7 +8,7 @@ import { Model } from "./definition.ts"
 /** A composer at `place`, reading its draft. */
 export const init = ComposerComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, place: Drafts.Place) => ({
-    model: Model.make({ workspaceId, memberId, place, text: Option.none() }),
+    model: Model.make({ workspaceId, memberId, place, text: Option.none(), picking: Option.none() }),
     commands: [ReadDraft({ workspaceId, memberId, place })]
   })
 )

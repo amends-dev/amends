@@ -82,12 +82,12 @@ export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, i
 )
 
 /** The composer to start a thread in the group, for a pane's footer. */
-export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>((model, { groupName }, h) =>
+export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>((model, { groupName, members }, h) =>
   h.block(
     ComposerBinding.embedView({
       slotId: "composer",
       model: model.composer,
-      viewInputs: { label: "Start a thread", submitLabel: "Start", placeholder: `Message ${groupName}` }
+      viewInputs: { label: "Start a thread", submitLabel: "Start", placeholder: `Message ${groupName}`, members }
     })
   )
 )
