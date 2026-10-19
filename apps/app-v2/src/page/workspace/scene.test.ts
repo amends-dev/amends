@@ -133,6 +133,7 @@ const withConversation = modifyFields(withThread, {
                       task: Option.none(),
                       replies: 1,
                       repliers: [ThreadMessage.Author.cases.Member.make({ memberId: bob.id })],
+                      lastActiveAt: reply.publishedAt,
                       pending: false,
                       unread: 0
                     }

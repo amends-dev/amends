@@ -84,7 +84,7 @@ const sameAuthor = Schema.toEquivalence(ThreadMessage.Author)
 
 /**
  * A thread as its group lists it for the person: its opening message, its task, how many messages follow the
- * opening and who wrote them, and how much they have not read.
+ * opening and who wrote them, when it was last active, and how much they have not read.
  */
 export interface ThreadView {
   readonly thread: Pending.Held<Replica.RecordOf<"Thread">>
@@ -94,6 +94,8 @@ export interface ThreadView {
   readonly replies: number
   /** The authors of those replies, each once, in the order of their first reply. */
   readonly repliers: ReadonlyArray<ThreadMessage.Author>
+  /** When its latest message was published, or when it was created while it has none. */
+  readonly lastActiveAt: DateTime.Utc
   /** Its activities that count as new, past the member's position. */
   readonly unread: number
 }
@@ -111,6 +113,16 @@ export const summarizeReplies = (
     )
   }
 }
+
+/**
+ * When the latest of a thread's `messages`, oldest first, was published, or when the thread was created while it
+ * has none.
+ */
+export const deriveLastActiveAt = (
+  thread: Thread.Thread,
+  messages: ReadonlyArray<ThreadMessage.ThreadMessage>
+): DateTime.Utc =>
+  Option.match(Array.last(messages), { onNone: () => thread.createdAt, onSome: (latest) => latest.publishedAt })
 
 /** A group as the person sees it listed: the group, and how many members it has. */
 export interface GroupView {
@@ -572,6 +584,7 @@ export const layer = (options: Options) =>
                       ({ record }) => record.value
                     ),
                     ...summarizeReplies(messages),
+                    lastActiveAt: deriveLastActiveAt(thread.record.value, messages),
                     unread: (held?.activities ?? []).filter(
                       ({ value }) => value.newActivity && value.sequence > readThrough
                     ).length

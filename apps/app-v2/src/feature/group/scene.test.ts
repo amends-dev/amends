@@ -219,6 +219,7 @@ describe("a group's main pane", () => {
                   task: Option.none(),
                   replies: 0,
                   repliers: [],
+                  lastActiveAt: opening.publishedAt,
                   pending: false,
                   unread: 0
                 }
@@ -239,6 +240,7 @@ describe("a group's main pane", () => {
       task: Option.none(),
       replies: 0,
       repliers: [],
+      lastActiveAt: openingMessage.publishedAt,
       pending: false,
       unread: 0
     })

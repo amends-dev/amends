@@ -87,7 +87,16 @@ describe("a group's threads", () => {
       message(
         Message.ReceivedThreads({
           threads: [
-            { thread, opening: Option.none(), task: Option.none(), replies: 0, repliers: [], pending: false, unread: 2 }
+            {
+              thread,
+              opening: Option.none(),
+              task: Option.none(),
+              replies: 0,
+              repliers: [],
+              lastActiveAt: thread.createdAt,
+              pending: false,
+              unread: 2
+            }
           ]
         })
       ),

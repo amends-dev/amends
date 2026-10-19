@@ -169,7 +169,7 @@ the pages that compose them; the root composes the pages.
   opening shows that alone. A thread with no turns shows only why they could
   not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
-  who wrote them, its task, whether it is still being started, and how much is new, and a composer to
+  who wrote them, when it was last active, its task, whether it is still being started, and how much is new, and a composer to
   start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
   two views, which take the group's members, its name, the thread open in it, and the time now from
   their parent. `view`, its canonical one, lists the
@@ -489,7 +489,8 @@ choice is.
   the server's records alone, and the person's unfinished actions beside them: `Completed` drops
   the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
   of a kind at a place, `threads` a group's threads with their messages, and, for each thread, how many messages follow its
-  opening and who wrote them (`summarizeReplies`), and `actions` the person's
+  opening and who wrote them (`summarizeReplies`) and when it was last active (`deriveLastActiveAt`: when its
+  latest message was published, or when the thread was created while it has none), and `actions` the person's
   unfinished actions, each again after every change, `every` the records of a kind wherever they
   sit, `inbox` the person's notifications with the threads they come from, which the store
   shows each by the message its activity is about, `thread` what a thread holds, with its task
@@ -738,7 +739,8 @@ browser's storage. Each Block's tests sit beside it:
   the member they are with, before the server has them and after, whatever the case or accents of
   the query, and not the person themselves. `Store.viewTurns` is
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
-  replier once in the order of their first reply, and so is `Store.findMatches`: nothing for an empty
+  replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
+  with no messages, and the later of two messages, and so is `Store.findMatches`: nothing for an empty
   query or one of spaces, a group by the name the person reads and a conversation by the other member,
   a thread by its title or its opening's words and shown by its title, a mention in an opening as
   the member's current name, no thread by a deleted opening or without its group, the active members

@@ -271,6 +271,7 @@ describe("Store", () => {
       )
       expect(started!.replies).toBe(0)
       expect(started!.repliers).toEqual([])
+      expect(started!.lastActiveAt).toEqual(Option.getOrThrow(started!.opening).publishedAt)
       const threadId = started!.thread.record.value.id
       yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.thread.pending === false)
       const thread = ReplicaRecord.Place.cases.Thread.make({ threadId })
@@ -311,6 +312,7 @@ describe("Store", () => {
       // The reply shows in its group's list at once, by who wrote it.
       const [replied] = yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.replies === 1)
       expect(replied!.repliers).toEqual([ThreadMessage.Author.cases.Member.make({ memberId: workspace.ownerMemberId })])
+      expect(replied!.lastActiveAt).toEqual(waiting.find((message) => message.pending)!.record.value.publishedAt)
       yield* serve(services, yield* Effect.scope, Option.getOrThrow(port(address)))
       yield* firstWhere(store.list("ThreadMessage", thread), (held) => held.every((message) => !message.pending))
 
@@ -918,6 +920,18 @@ describe("Store.summarizeReplies", () => {
       replies: 4,
       repliers: [decode(bob), decode(dana), decode(alice)]
     })
+  })
+})
+
+describe("Store.deriveLastActiveAt", () => {
+  it("is when the thread was created while it has no messages", () => {
+    expect(Store.deriveLastActiveAt(thread, [])).toEqual(thread.createdAt)
+  })
+
+  it("is when the latest message was published, which a thread with two is the later of", () => {
+    expect(Store.deriveLastActiveAt(thread, [opening])).toEqual(opening.publishedAt)
+    expect(Store.deriveLastActiveAt(thread, [opening, reply])).toEqual(reply.publishedAt)
+    expect(reply.publishedAt).not.toEqual(opening.publishedAt)
   })
 })
 

@@ -60,6 +60,7 @@ const alices = {
   task: Option.some(task),
   replies: 0,
   repliers: [],
+  lastActiveAt: opening.publishedAt,
   pending: false,
   unread: 2
 }
@@ -71,6 +72,7 @@ const starting = {
   task: Option.none(),
   replies: 0,
   repliers: [],
+  lastActiveAt: retro.createdAt,
   pending: true,
   unread: 0
 }
@@ -94,6 +96,7 @@ const yesterdays = {
   task: Option.none(),
   replies: 0,
   repliers: [],
+  lastActiveAt: DateTime.subtract(now, { days: 1 }),
   pending: false,
   unread: 0
 }

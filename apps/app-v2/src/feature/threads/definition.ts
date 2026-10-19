@@ -19,7 +19,7 @@ import { ComposerBlock } from "../composer/block.ts"
 
 /**
  * A thread of the group, with its opening message, its task, how many messages follow the opening and who wrote
- * them, whether it is still being started, and how much is unread.
+ * them, when it was last active, whether it is still being started, and how much is unread.
  */
 export const ThreadItem = Schema.Struct({
   thread: Thread.Thread,
@@ -27,6 +27,7 @@ export const ThreadItem = Schema.Struct({
   task: Schema.Option(Task.Task),
   replies: Schema.Int,
   repliers: Schema.Array(ThreadMessage.Author),
+  lastActiveAt: Schema.DateTimeUtc,
   pending: Schema.Boolean,
   unread: Schema.Int
 })
