@@ -1,6 +1,7 @@
 /**
- * The app's state: the page the person is on, the width of the window, and the time now. Signed out, the page
- * is the sign-in form; signed in, their account, the workspaces they belong to, and the one they opened.
+ * The app's state: the page the person is on, the width of the window, the time now, and whether the page runs
+ * on an Apple platform. Signed out, the page is the sign-in form; signed in, their account, the workspaces they
+ * belong to, and the one they opened.
  */
 
 import { WorkspaceId } from "@amends-dev/core/workspace"
@@ -23,7 +24,12 @@ export const Page = defineTaggedUnion({
 })
 export type Page = typeof Page.Type
 
-export const Model = Schema.Struct({ page: Page, viewport: Viewport, now: Schema.DateTimeUtc })
+export const Model = Schema.Struct({
+  page: Page,
+  viewport: Viewport,
+  now: Schema.DateTimeUtc,
+  isApplePlatform: Schema.Boolean
+})
 export type Model = typeof Model.Type
 
 /** The workspace the person has open, while one is. */

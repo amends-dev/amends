@@ -437,8 +437,9 @@ the pages that compose them; the root composes the pages.
   "Inbox" item with how many notifications wait, a "Triage" item with how many tasks wait in
   triage (`triageCount`), a "Tasks" item, the groups' sections, and, in its footer, who is
   signed in with a Sign out button. Over them, the sidebar's header has a button, Find anything…, with
-  the shortcut ⌘K beside it, hidden from assistive technology, which sends `ClickedSearch`; it reads
-  ⌘K on every platform, though off an Apple platform the key is Control+K. The main pane shows one destination: nothing yet, titled by the
+  the shortcut beside it, hidden from assistive technology, which sends `ClickedSearch`; the shortcut
+  reads ⌘K on an Apple platform and Ctrl K on any other, the key it names being Command+K or Control+K, by
+  the view input `isApplePlatform`. The main pane shows one destination: nothing yet, titled by the
   workspace, the inbox, the tasks in triage, every open task, the groups to browse, the connections,
   the agents, the settings, or the channels, which are always read, or the open group, a keyed
   occurrence. The tasks Block, which the page binds as `tasks` (`TasksBinding`), is the same child
@@ -461,8 +462,8 @@ the pages that compose them; the root composes the pages.
   navigation does. The
   workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
-  the workspace was opened with until then. The page's view takes the account's email and the time now as
-  view inputs, and gives the inbox, the tasks, and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
+  the workspace was opened with until then. The page's view takes the account's email, the time now, and whether the page runs on an Apple
+  platform as view inputs, and gives the inbox, the tasks, and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a task's thread opens its group with the thread already open,
   and marks the group, while opening a notification's leaves the inbox where it is. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
@@ -496,7 +497,8 @@ the pages that compose them; the root composes the pages.
   to sign out.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
-  workspaces, and the one open, the width of the window, and the time now. Signing in lists the workspaces; signing
+  workspaces, and the one open, the width of the window, the time now, and whether the page runs on an Apple
+  platform. Signing in lists the workspaces; signing
   out, from the workspace list or from the open workspace's sidebar, which asks the root, is one step
   in `composition.ts`, and its command, `command.ts`, forgets the session, the person's stores, and
   their sync identity first, so it works offline, then removes the browser's sync key and ends the
@@ -504,15 +506,20 @@ the pages that compose them; the root composes the pages.
   `Desktop`, or `Split`), which a view that changes with it cannot leave to CSS. It starts from the
   flags, `flags.ts`, which read the session kept from the last visit and ask `window.matchMedia` the
   design's `viewportQueries`: the runtime processes no Message until the first render has painted, so
-  a subscription alone would paint the desktop layout on a phone before correcting it. The
+  a subscription alone would paint the desktop layout on a phone before correcting it. The flags also
+  say whether the page runs on an Apple platform (`isApplePlatform`), read once as the page boots from
+  the user agent's platform, `navigator.userAgentData.platform`, in the browsers that have one, and from
+  `navigator.platform` in the others, which `namesApplePlatform` takes for macOS, iOS, or iPadOS. The
+  root keeps it in its model, since nothing changes it, and gives it to the open workspace's view, which
+  writes the search's shortcut by it. The
   subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries,
   drops a width that did not change, and sends `ChangedViewport`, whose update sets the width and
   informs the open workspace of it, and a workspace opened later starts from the width the root has
   then. What the clock decides, such as which day a time falls on and how long ago it was, needs the
   time now, which enters the same way: the flags read it with `DateTime.now`, and the subscription
   `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
-  The subscription `OpenSearch` follows Control+K, or Command+K on an Apple platform, also from a
-  field, and sends `PressedSearchKey` while a workspace is open, which the update asks the workspace
+  The subscription `OpenSearch` follows Control+K, or Command+K on an Apple platform, which Foldkit's
+  `Mod` decides from the user agent, also from a field, and sends `PressedSearchKey` while a workspace is open, which the update asks the workspace
   to open its search for; with none open the key is left to the browser. Nothing acts on the time, so it goes no further than views: the root's view gives the open
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
@@ -713,7 +720,7 @@ browser's storage. Each Block's tests sit beside it:
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
   from the list or from the open workspace, and following the window's width, for the workspace it
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
-  one. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
+  one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
   `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
   with the members their text mentions, and with none when it mentions no one.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
@@ -830,12 +837,16 @@ browser's storage. Each Block's tests sit beside it:
   arrow keys round the list, Enter and a click opening a result and closing the dialog, the keys with a
   modifier and those it does not answer left to the browser, nothing found, a search on its way, and a
   failed search. The workspace's scenes show the search in the sidebar's header with its shortcut hidden from
-  assistive technology, opening in a dialog from it and, at `Phone`, from the drawer over the
-  drawer, and a group found opening and closing the search. The root's show the key that
-  opens the search opening it in an open workspace and doing nothing before one is open. A scene opens and closes
+  assistive technology and written ⌘K on an Apple platform and Ctrl K on another, opening in a dialog from
+  it and, at `Phone`, from the drawer over the drawer, and a group found opening and closing the search.
+  The root's show the key that opens the search opening it in an open workspace and doing nothing before
+  one is open, and the shortcut it gives the workspace by the platform. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through
   its Binding's `embedView`.
+- The flags' tests stub the browser's `navigator`: the page runs on an Apple platform by
+  `userAgentData.platform` where the browser has it, over `navigator.platform`, and by the latter where it
+  has not, and `namesApplePlatform` takes the names macOS, iOS, and iPadOS give and no other system's.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and

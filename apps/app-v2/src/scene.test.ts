@@ -31,7 +31,12 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split", now }
+const signedOut: Model = {
+  page: Page.SignedOut({ signIn: SignInBlock.init("").model }),
+  viewport: "Split",
+  now,
+  isApplePlatform: true
+}
 
 /** Signed in as alice, who belongs to one workspace, with none of them opened. */
 const choosing: Model = {
@@ -41,7 +46,8 @@ const choosing: Model = {
     workspace: Option.none()
   }),
   viewport: "Split",
-  now
+  now,
+  isApplePlatform: true
 }
 
 /** Signed in as alice, with her workspace opened. */
@@ -56,7 +62,8 @@ const inWorkspace: Model = {
     })
   }),
   viewport: "Split",
-  now
+  now,
+  isApplePlatform: true
 }
 
 /** Signed in as alice, with her opened workspace as `change` leaves it. */
@@ -237,6 +244,22 @@ describe("the app", () => {
       Command.resolve(SignOut, Message.CompletedSignOut()),
       expect(role("heading", { name: "Sign in to amends" })).toExist(),
       expect(label("Email")).toHaveValue("alice@example.com")
+    )
+  })
+
+  it("writes the open workspace's search shortcut for the platform the page runs on", () => {
+    scene(
+      { update, view },
+      given(inWorkspace),
+      expect(role("button", { name: "Find anything…" })).toExist(),
+      expect(text("⌘K")).toExist(),
+      expect(text("Ctrl K")).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(modifyFields(inWorkspace, { isApplePlatform: () => false })),
+      expect(text("Ctrl K")).toExist(),
+      expect(text("⌘K")).toBeAbsent()
     )
   })
 

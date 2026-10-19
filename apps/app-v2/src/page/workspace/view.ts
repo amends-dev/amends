@@ -31,10 +31,11 @@ import {
 import { Message, type Model, nameOf, Open, openThreadTitle } from "./definition.ts"
 
 /**
- * Who is signed in, which the sidebar's footer shows beside the way to sign out, and the time now, which the
- * destinations that show ages and days follow.
+ * Who is signed in, which the sidebar's footer shows beside the way to sign out, the time now, which the
+ * destinations that show ages and days follow, and whether the page runs on an Apple platform, which decides
+ * how the search's shortcut is written.
  */
-export type ViewInputs = Readonly<{ email: string; now: DateTime.Utc }>
+export type ViewInputs = Readonly<{ email: string; now: DateTime.Utc; isApplePlatform: boolean }>
 
 /** The destinations of the rail, as the open workspace shows them. */
 const railItems = (model: Model) => [
@@ -65,7 +66,7 @@ const railItems = (model: Model) => [
 ]
 
 /** The sidebar: the workspace's name, the inbox, the tasks, the groups, and who is signed in. */
-const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html => {
+const sidebarView = (model: Model, { email, isApplePlatform }: ViewInputs, h: WorkspaceViewBuilder): Html => {
   const waiting = waitingCount(model.inbox)
   const inTriage = triageCount(model.tasks.items)
   const name = nameOf(model)
@@ -81,7 +82,11 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
           { size: "compact" }
         )
       ],
-      search: { label: "Find anything…", shortcut: "⌘K", onClick: Message.ClickedSearch() }
+      search: {
+        label: "Find anything…",
+        shortcut: isApplePlatform ? "⌘K" : "Ctrl K",
+        onClick: Message.ClickedSearch()
+      }
     }),
     children: [
       sidebarSection(h, {
@@ -191,7 +196,8 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
  * pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, and of the search,
  * which the shell keeps in the frame whether or not the sidebar or the page that opens them is on the page.
  */
-export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email, now }, h) => {
+export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+  const { now } = inputs
   const aside = asideView(model, now, h)
 
   return shell(h, {
@@ -208,7 +214,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
         }
       ]
     }),
-    sidebar: sidebarView(model, email, h),
+    sidebar: sidebarView(model, inputs, h),
     main: mainView(model, now, h),
     ...(Option.isSome(aside)
       ? {

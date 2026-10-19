@@ -35,7 +35,12 @@ const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
   people: 1
 })
 
-const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split", now }
+const signedOut: Model = {
+  page: Page.SignedOut({ signIn: SignInBlock.init("").model }),
+  viewport: "Split",
+  now,
+  isApplePlatform: true
+}
 
 /** What the sign-in form reports, as the root receives it. */
 const fromSignIn = (model: Model, message: typeof SignInBlock.Message.Type) =>
@@ -54,7 +59,7 @@ const fromWorkspace = (message: typeof WorkspaceBlock.Message.Type) =>
     key: membership.workspace.id,
     slotId: "workspace",
     model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio", "Split").model,
-    viewInputs: { email: session.account.email, now }
+    viewInputs: { email: session.account.email, now, isApplePlatform: true }
   }).toParentMessage(message)
 
 /** The workspace the person opened, if any. */
@@ -106,7 +111,7 @@ describe("the app", () => {
   it("signs out when the open workspace asks to, the same way as from the workspace list", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Split", now }).model),
+      given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
       message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
@@ -125,8 +130,22 @@ describe("the app", () => {
     )
   })
 
+  it("starts on the platform the flags name, signed in or signed out", () => {
+    expect(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model).toMatchObject({
+      isApplePlatform: true
+    })
+    expect(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: false }).model).toMatchObject(
+      {
+        isApplePlatform: false
+      }
+    )
+    expect(init({ session: Option.none(), viewport: "Split", now, isApplePlatform: false }).model).toMatchObject({
+      isApplePlatform: false
+    })
+  })
+
   it("starts from a kept session, listing the workspaces", () => {
-    const started = init({ session: Option.some(session), viewport: "Split", now })
+    const started = init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true })
     expect(Page.isAnyOf(["SignedIn"])(started.model.page)).toBe(true)
     expect((started.commands ?? []).map(({ name }) => name)).toEqual([LoadWorkspaces.name])
   })
@@ -134,7 +153,7 @@ describe("the app", () => {
   it("starts in the window's width, follows it as it changes, and opens a workspace in the width it has then", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Phone", now }).model),
+      given(init({ session: Option.some(session), viewport: "Phone", now, isApplePlatform: true }).model),
       model((model) => {
         expect(model.viewport).toBe("Phone")
       }),
@@ -155,7 +174,7 @@ describe("the app", () => {
 
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Split", now }).model),
+      given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
       model((model) => {
         expect(model.now).toEqual(now)
       }),
@@ -178,7 +197,7 @@ describe("the app", () => {
   it("informs the open workspace when the window changes width, and has no one to inform before one is open", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Split", now }).model),
+      given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
       message(Message.ChangedViewport({ viewport: "Desktop" })),
       model((model) => {
         expect(model.viewport).toBe("Desktop")
@@ -197,7 +216,7 @@ describe("the app", () => {
   it("opens the search of the open workspace when the search key is pressed, and has none to open before one is", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Split", now }).model),
+      given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
       message(Message.PressedSearchKey()),
       Command.expectNone(),
       message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),

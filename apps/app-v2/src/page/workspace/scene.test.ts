@@ -81,7 +81,10 @@ const onPhone = modifyFields(opened, { viewport: () => "Phone" })
 
 const workspaceSubscriptions = WorkspaceBlock.subscriptions
 
-const sceneView = withViewInputs(view, { email: "alice@example.com", now })()
+const sceneView = withViewInputs(view, { email: "alice@example.com", now, isApplePlatform: true })()
+
+/** The same page on a platform that is not Apple's, where a shortcut is made with Control. */
+const sceneViewOffApple = withViewInputs(view, { email: "alice@example.com", now, isApplePlatform: false })()
 
 const threadId = ThreadId.ThreadId.make("thread-1")
 
@@ -1252,6 +1255,23 @@ describe("a workspace", () => {
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(role("dialog", { name: "Find anything" })).toExist(),
       expect(label("Find anything")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
+    )
+  })
+
+  it("writes the search's shortcut for the platform: Command K on an Apple platform, and Control K elsewhere", () => {
+    const search = role("button", { name: "Find anything…" })
+
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(within(search, text("⌘K"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(search, text("Ctrl K"))).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneViewOffApple },
+      given(opened),
+      expect(within(search, text("Ctrl K"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(search, text("⌘K"))).toBeAbsent()
     )
   })
 
