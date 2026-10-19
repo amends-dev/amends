@@ -11,14 +11,15 @@ workspace is still worked in through the [HTTP API](../packages/http/README.md).
 | [`design`](design/README.md) | The workspace app's look: Tailwind tokens and the renderers that carry them.   |
 | [`ui`](ui/README.md)         | The design system: foundations, components, layout patterns, and every screen. |
 | [`site`](site/README.md)     | amends.dev: the product, the packages, and their docs, on Astro and Starlight. |
-| [`icons`](icons/README.md)   | The icons, drawn as data and generated as Solid components and SVGs.           |
+| [`icons`](icons/README.md)   | The icons, drawn as data and generated as Solid components, SVGs, and paths.   |
 
 ## How they fit
 
 UI draws: its screens take data and callbacks and render a pane or the navigation, and know nothing
 of the API, the session, or routes. The site composes UI's site sections into static pages; it
 defines no styles of its own. The workspace app draws with `design` instead: its views call
-`design`'s renderers and carry no class, and `design` imports nothing of UI.
+`design`'s renderers and carry no class, and `design` imports nothing of UI; it draws its icons from the
+icons' path data, where UI draws the Solid components.
 
 `bun run check:packages` enforces these boundaries: UI depends on no router, Effect, or platform
 package, and the icons' runtime depends on Solid alone.

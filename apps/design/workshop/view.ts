@@ -1,13 +1,31 @@
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { centered, copy, heading } from "../src/centered.ts"
-import { button, choiceSelect, field, hint, notice, sending, submit, textarea, toggle } from "../src/control.ts"
+import {
+  button,
+  choiceSelect,
+  field,
+  hint,
+  iconButton,
+  notice,
+  sending,
+  submit,
+  textarea,
+  toggle
+} from "../src/control.ts"
 import { row, section } from "../src/directory.ts"
 import { form, inline, valueWithAction } from "../src/form.ts"
+import { type IconName, icon } from "../src/icon.ts"
+import { pane, paneClose, paneColumn, paneTabs } from "../src/pane.ts"
+import { rail } from "../src/rail.ts"
+import { shell } from "../src/shell.ts"
+import { sidebar, sidebarEmpty, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } from "../src/sidebar.ts"
 import { type ApplicationViewBuilder, ApplicationComposition } from "./composition.ts"
-import { Message, type Plan } from "./definition.ts"
+import { type Destination, Message, type Model, type PaneTab, type Plan } from "./definition.ts"
 
 const pageColumn = "mx-auto flex max-w-3xl flex-col px-6 py-8"
+
+const wideColumn = "flex flex-col px-6 pb-8"
 
 const pageTitle = "pb-4 text-display font-medium"
 
@@ -24,6 +42,50 @@ const sampleRow = "flex flex-wrap items-center gap-3"
 const sampleStack = "flex max-w-sm flex-col gap-4"
 
 const screenFrame = "h-144 outline outline-outline [--amends-screen-height:36rem]"
+
+const shellFrame = "h-176 outline outline-outline [--amends-screen-height:44rem]"
+
+const iconSizeRow = "flex items-end gap-4"
+
+const iconGrid = "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4"
+
+const iconCell = "flex items-center gap-2 text-hint text-ink-secondary"
+
+const lineColumn = "flex flex-col gap-5"
+
+const lineGroup = "flex flex-col gap-0.5"
+
+const lineLabel = "text-item font-medium text-ink"
+
+const lineText = "text-body text-ink"
+
+const railDestinations: ReadonlyArray<Readonly<{ destination: Destination; icon: IconName; label: string }>> = [
+  { destination: "home", icon: "mark-home", label: "Home" },
+  { destination: "connections", icon: "mark-connections", label: "Connections" },
+  { destination: "agents", icon: "mark-agents", label: "Agents" },
+  { destination: "channels", icon: "mark-channel", label: "Channels" }
+]
+
+const railSettings = { destination: "settings", icon: "mark-settings", label: "Settings" } as const
+
+const iconNames: ReadonlyArray<IconName> = [
+  "mark-home",
+  "mark-connections",
+  "mark-agents",
+  "mark-channel",
+  "mark-settings",
+  "mark-mail",
+  "mark-triage",
+  "mark-tasks",
+  "mark-search",
+  "mark-new",
+  "mark-menu",
+  "mark-close",
+  "message",
+  "circle-frame",
+  "bell",
+  "bell-filled"
+]
 
 const planChoices: ReadonlyArray<readonly [Plan, string]> = [
   ["free", "Free"],
@@ -371,20 +433,267 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
     sample(h, "Directory width", [h.div([h.Class(screenFrame)], [directoryScreen(h)])], "flex flex-col")
   ])
 
+const iconGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Icons", [
+    sample(
+      h,
+      "Sizes",
+      [
+        icon(h, "mark-channel", { size: "xs" }),
+        icon(h, "mark-channel", { size: "sm" }),
+        icon(h, "mark-channel"),
+        icon(h, "mark-channel", { size: "lg" })
+      ],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "Drawn from the catalog",
+      iconNames.map((name) => h.div([h.Class(iconCell)], [icon(h, name), name])),
+      iconGrid
+    ),
+    sample(h, "Named, which makes it an image", [icon(h, "alert-triangle", { label: "Needs attention" })])
+  ])
+
+const labelledLines = (h: ApplicationViewBuilder, lines: ReadonlyArray<readonly [string, string]>): Html =>
+  h.div(
+    [h.Class(lineColumn)],
+    lines.map(([author, text]) =>
+      h.div([h.Class(lineGroup)], [h.span([h.Class(lineLabel)], [author]), h.p([h.Class(lineText)], [text])])
+    )
+  )
+
+const shellRail = (h: ApplicationViewBuilder, current: Destination): Html => {
+  const toItem = (item: Readonly<{ destination: Destination; icon: IconName; label: string }>) => ({
+    icon: item.icon,
+    label: item.label,
+    isCurrent: item.destination === current,
+    onClick: Message.ChangedDestination({ destination: item.destination })
+  })
+
+  return rail(h, {
+    brand: { letter: "A", label: "amends" },
+    items: railDestinations.map(toItem),
+    footer: [toItem(railSettings)],
+    account: { letter: "JM", label: "Account", onClick: Message.ClickedButton() }
+  })
+}
+
+const shellSidebar = (h: ApplicationViewBuilder, isDirectMessagesEmpty: boolean): Html => {
+  const press = Message.ClickedButton()
+
+  return sidebar(h, {
+    label: "Workspace",
+    header: sidebarHeader(h, {
+      mark: "M",
+      name: "Mercier & Co",
+      actions: [iconButton(h, { icon: "mark-menu", label: "Switch workspace", onClick: press })],
+      search: { label: "Find anything…", shortcut: "⌘ K", onClick: press }
+    }),
+    children: [
+      sidebarSection(h, {
+        children: [
+          sidebarItem(h, { icon: "mark-mail", label: "Inbox", count: 3, isCurrent: false, onClick: press }),
+          sidebarItem(h, { icon: "mark-triage", label: "Triage", isCurrent: false, onClick: press }),
+          sidebarItem(h, { icon: "mark-tasks", label: "Tasks", isCurrent: false, onClick: press })
+        ]
+      }),
+      sidebarSection(h, {
+        label: "Groups",
+        actions: [
+          iconButton(h, { icon: "mark-search", label: "Search groups", onClick: press }, { size: "compact" }),
+          iconButton(h, { icon: "mark-new", label: "Create group", onClick: press }, { size: "compact" })
+        ],
+        children: [
+          sidebarItem(h, {
+            icon: "mark-channel",
+            label: "general",
+            isCurrent: true,
+            onClick: press,
+            children: [{ icon: "circle-frame", label: "Composer paste crash", isCurrent: false, onClick: press }]
+          }),
+          sidebarItem(h, { icon: "mark-channel", label: "design", isCurrent: false, onClick: press }),
+          sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press })
+        ]
+      }),
+      sidebarSection(h, {
+        label: "Direct messages",
+        actions: [iconButton(h, { icon: "mark-new", label: "New message", onClick: press }, { size: "compact" })],
+        children: isDirectMessagesEmpty
+          ? [sidebarEmpty(h, "No conversations yet")]
+          : [
+              sidebarItem(h, { mark: "AM", label: "Alex Morgan", isCurrent: false, onClick: press }),
+              sidebarItem(h, { mark: "Y", label: "Yumi", isCurrent: false, onClick: press })
+            ]
+      })
+    ],
+    footer: sidebarFooter(h, [hint(h, "12 members · as Alex")])
+  })
+}
+
+const groupPane = (h: ApplicationViewBuilder, paneTab: PaneTab, composer: string): Html => {
+  const press = Message.ClickedButton()
+
+  return pane(h, {
+    variant: "main",
+    header: {
+      title: "general",
+      icon: "mark-channel",
+      actions: [
+        iconButton(h, { icon: "bell", label: "Notifications", onClick: press }),
+        iconButton(h, { icon: "mark-settings", label: "Group settings", onClick: press })
+      ],
+      tabs: paneTabs(h, {
+        label: "Group",
+        tabs: [
+          {
+            label: "Threads",
+            isCurrent: paneTab === "threads",
+            onClick: Message.ChangedPaneTab({ tab: "threads" })
+          },
+          {
+            label: "Tasks",
+            count: 12,
+            isCurrent: paneTab === "tasks",
+            onClick: Message.ChangedPaneTab({ tab: "tasks" })
+          }
+        ]
+      })
+    },
+    body: [
+      paneTab === "threads"
+        ? labelledLines(h, [
+            ["Alex", "The preview is ready for another look. I've linked the latest notes in the task."],
+            ["Sara", "Looks good. I'll keep an eye on the release this morning."],
+            ["Oliver", "morning all!"],
+            ["AJ", "found a bug. composer crashes when I paste an image from clipboard lol"],
+            ["Graeme", "@Caleb Let's grab some coffee"]
+          ])
+        : labelledLines(h, [
+            ["Composer paste crash", "AND-214 · In progress"],
+            ["Retry keeps the original request", "AND-209 · Ready for another look"]
+          ])
+    ],
+    footer: [
+      textarea(h, {
+        id: "composer",
+        label: "Message #general",
+        value: composer,
+        onInput: (value) => Message.TypedComposer({ value })
+      })
+    ]
+  })
+}
+
+const threadPane = (h: ApplicationViewBuilder, reply: string): Html =>
+  pane(h, {
+    variant: "side",
+    label: "Composer paste crash",
+    header: {
+      title: "Composer paste crash",
+      icon: "message",
+      subtitle: "Thread in #general",
+      actions: [paneClose(h, Message.ClickedButton())]
+    },
+    body: [
+      labelledLines(h, [
+        ["AJ", "found a bug. composer crashes when I paste an image from clipboard lol"],
+        ["Alex", "uh oh — repro on mac or everywhere?"],
+        ["Yumi", "Reproduced on both — images over 5 MB hit the crash. Filed it and tagged the composer team."],
+        ["AJ", "Thanks! I'll attach the image to the task."]
+      ])
+    ],
+    footer: [
+      textarea(h, {
+        id: "reply",
+        label: "Reply in thread",
+        value: reply,
+        onInput: (value) => Message.TypedReply({ value })
+      })
+    ]
+  })
+
+const agentPane = (h: ApplicationViewBuilder): Html =>
+  pane(h, {
+    variant: "main",
+    header: {
+      title: "Yumi",
+      mark: "Y",
+      context: "Agent",
+      subtitle: "Reads the repository and files what it finds as tasks.",
+      actions: [button(h, "New task", Message.ClickedButton(), { variant: "primary" })]
+    },
+    body: [
+      paneColumn(h, [
+        labelledLines(h, [
+          ["Model", "A model the workspace's connections provide."],
+          ["Tools", "Search the repository, read files, and file tasks."]
+        ]),
+        hint(h, "One column of sections, with nothing beside it.")
+      ])
+    ]
+  })
+
+const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  group(h, "Shell", [
+    sample(
+      h,
+      "Rail, sidebar, main pane, and side pane",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              rail: shellRail(h, model.destination),
+              sidebar: shellSidebar(h, false),
+              main: groupPane(h, model.paneTab, model.composer),
+              aside: threadPane(h, model.reply)
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Without the side pane: a page about one item, and a section with no items",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              rail: shellRail(h, model.destination),
+              sidebar: shellSidebar(h, true),
+              main: agentPane(h)
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    )
+  ])
+
 export const view = ApplicationComposition.makeView((model, h) => ({
   title: "amends design workshop",
   body: h.div(
-    [h.Class(pageColumn)],
+    [],
     [
-      h.h1([h.Class(pageTitle)], ["amends design workshop"]),
-      buttonGroup(h, model.pressCount),
-      fieldGroup(h, model),
-      toggleGroup(h, model.isNotificationsOn, model.isDigestOn),
-      selectGroup(h, model.plan),
-      noticeGroup(h),
-      formGroup(h),
-      directoryGroup(h),
-      centeredGroup(h, model.signInEmail, model.code)
+      h.div(
+        [h.Class(pageColumn)],
+        [
+          h.h1([h.Class(pageTitle)], ["amends design workshop"]),
+          buttonGroup(h, model.pressCount),
+          fieldGroup(h, model),
+          toggleGroup(h, model.isNotificationsOn, model.isDigestOn),
+          selectGroup(h, model.plan),
+          noticeGroup(h),
+          iconGroup(h),
+          formGroup(h),
+          directoryGroup(h),
+          centeredGroup(h, model.signInEmail, model.code)
+        ]
+      ),
+      h.div([h.Class(wideColumn)], [shellGroup(h, model)])
     ]
   )
 }))

@@ -22,9 +22,12 @@ A small Foldkit app in `workshop/` that shows every renderer in every state unde
 buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
 placeholder, filled, and invalid; a hint; a textarea; the toggle on and off; a select; the notice
 tones; `sending`; a form with its inline text and a value with its link; the directory's section
-and rows; and the centered screen as the sign-in's two steps and as the workspace picker, each in a
-frame of fixed height. The toggles, fields, and select take input. Open it to look at a
-piece before a page composes it. It follows the browser's light or dark preference. A browser tab
+and rows; the centered screen as the sign-in's two steps and as the workspace picker, and the shell
+twice, with and without its side pane, each in a frame of fixed height; and the icons by size, as
+the shell draws them, and with a label. The toggles, fields, and select take input, and so do the
+shell's rail and tabs, whose current item follows a click. The shell's side pane sits beside the
+main pane from a window of 80rem; narrow the window to between 64rem and 80rem to see it float over
+a scrim. Open it to look at a piece before a page composes it. It follows the browser's light or dark preference. A browser tab
 that is hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible
 tab. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
 
@@ -67,10 +70,12 @@ Below the desktop breakpoint is touch: controls grow to 44px, written `max-deskt
 tablet breakpoint is a phone, where inputs use 16px text so the browser does not zoom the page,
 written `max-tablet:`.
 
-Three utilities are the theme's own. `focus-ring` draws a 2px outline in `ink`, offset 2px outside
+Four utilities are the theme's own. `focus-ring` draws a 2px outline in `ink`, offset 2px outside
 a control that has keyboard focus, and `focus-ring-inset` draws it inside, for full-width rows that
-would clip an outer one. `chevron-down` draws the arrow of a select on the element it is on, which
-must hold the select. The base styles set `html` to the sans font, `ink`, and `canvas`, and `body`
+would clip an outer one. `indicator-bar` draws the 2px, 20px-tall bar that marks the current rail
+destination and sidebar row, at the inline start of an element that is `relative`; a variant such as
+`aria-[current=page]:indicator-bar` shows it on the current one only. `chevron-down` draws the arrow
+of a select on the element it is on, which must hold the select. The base styles set `html` to the sans font, `ink`, and `canvas`, and `body`
 to the `body` size with no margin; the size is on `body` because on `html` it would make a rem 15px
 instead of the 16px the scale is written in.
 
@@ -105,6 +110,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   control next to it.
 - `textarea(h, { id, label, value, onInput, rows? })` is the input's look over `rows` lines, three
   unless given.
+- `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
+  `label`, which is all it says to assistive technology: the icon is hidden. It is 32px, and 44px on
+  touch; `options.size` is `"compact"` for the 24px button along a list's heading.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
   named by its label.
 - `choiceSelect(h, { id, label, choices, value, onChange })` is a select over `choices`, each a
@@ -112,6 +120,16 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `notice(h, message, options?)` renders an `Option<string>` as an alert in a tone, `"danger"` by
   default, `"caution"`, or `"success"`, and nothing when there is none.
 - `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
+
+### `@amends-dev/design/icon`
+
+- `icon(h, name, options?)` draws one of [`icons`](../icons/README.md)'s drawings by name, an
+  `IconName`, as an `svg` from its path data under that package's rendering contract: a 24-unit
+  viewBox, strokes of width 2 with round caps and joins in `currentColor`, so the icon takes the
+  color of the text around it, and a fill too for `bell-filled`. `options.size` is `"xs"`, `"sm"`,
+  `"md"` (the default), or `"lg"`, at 0.75, 1, 1.25, and 1.5rem, which scale with the reader's text
+  size. An icon is decorative and `aria-hidden`; an `options.label` makes it an image named by that
+  label, with a `title`, for one that stands alone with no text beside it.
 
 ### `@amends-dev/design/centered`
 
@@ -151,10 +169,86 @@ What a directory screen lists.
   the meta through `aria-description`, and the mark and the action are hidden from assistive
   technology. A page lists rows as `li` items of a `ul`.
 
+### `@amends-dev/design/shell`
+
+The frame of the first four layout patterns, which the modules below fill.
+
+- `shell(h, { rail, sidebar, main, aside? })` puts the `rail` on the canvas, then one `panel` card
+  holding the `sidebar`, a divider, the `main` pane, and, when there is an `aside`, the side pane at
+  440px. Each is what its module renders. The frame is as tall as the viewport (`100dvh`, or
+  `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter
+  around the card. From 80rem the aside sits beside the main pane, a divider between them; from
+  64rem to there it floats over the right of the card with `shadow-popover`, above a `scrim` over
+  the rest of the shell. The floating pane does not trap focus, and Escape and a click on the scrim
+  close nothing: the pane's own close button is the way out. Below 64rem the shell is not designed
+  yet: it keeps the rail and sidebar in place, with no drawer, no touch sizes for the sidebar's rows,
+  and no full-screen pane, and the row overflows the window, scrolling sideways.
+
+### `@amends-dev/design/rail`
+
+- `rail(h, { brand, items, footer, account? })` is the column of global destinations, a `nav` named
+  Destinations, 52px wide. The `brand` is `{ letter, label, onClick? }`, a mark with a short line
+  under it that is a button named by `label` when it has an `onClick` and an image otherwise. Each
+  of `items` and `footer`, the second at the bottom, is `{ icon, label, isCurrent, onClick }`: a
+  40px button of the icon alone, named by `label`. The current one is `aria-current="true"`, filled
+  `rail-selected`, with the `indicator-bar` at its left edge. The optional `account` is
+  `{ letter, label, onClick }`, a 24px `avatar-neutral` square in a button, last of all.
+
+### `@amends-dev/design/sidebar`
+
+- `sidebar(h, { label, header, children, footer? })` is a `nav` named by `label`, 264px on `panel`:
+  the `header` above the `children`, which scroll, and the `footer` below them.
+- `sidebarHeader(h, { mark, name, actions?, search? })` is the 96px header, as tall as a pane's, with
+  a line under it: a 24px `avatar-neutral` square holding the `mark` letter, the workspace's `name`
+  at body size in medium weight, `actions` at the right such as an `iconButton` that opens the
+  workspace menu, and, when there is a `search`, `{ label, shortcut?, onClick }`, a full-width button
+  in `search` under them, named by `label`, with the `shortcut` shown at its end and hidden from
+  assistive technology.
+- `sidebarSection(h, { label?, actions?, children })` is a group of items. A `label` is an `h2` in
+  `meta` size, uppercase, in `ink-muted`, with icon-only `actions` at its right, such as compact
+  `iconButton`s; a group without one is the list alone, as a sidebar's first is. Sections sit 22px
+  apart. `children` are `sidebarItem`s or a `sidebarEmpty`.
+- `sidebarItem(h, { icon?, mark?, label, count?, isCurrent, onClick, children? })` is a 38px row,
+  one button: an `icon`, or a `mark` letter on a 20px `avatar-neutral` square for a person, then the
+  `label` in `ink-secondary` and a `count` in a badge at the end. The button is named by the label
+  and described by the count. The current row is `aria-current="page"`, filled `selected`, in `ink`
+  and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick }`
+  rows under it at hint size, 32px, indented and joined to it by a dashed connector in `stitch`,
+  such as a group's open thread.
+- `sidebarEmpty(h, text)` is a quiet line for a section with no items, in the items' place.
+- `sidebarFooter(h, children)` is the strip at the bottom of the sidebar, under a line.
+
+### `@amends-dev/design/pane`
+
+The third and fourth layout patterns share one structure.
+
+- `pane(h, { variant, label?, header, body, footer? })` is a column of a header, a `body` that
+  scrolls, and a `footer` that stays in place. The `"main"` variant is the page's `main` landmark,
+  its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
+  `h2` at body size, in medium weight. A `label` names the main landmark too.
+- The `header` is `{ title, icon?, mark?, context?, leading?, actions?, tabs?, subtitle? }`, 96px
+  tall on desktop so the main pane's, the side pane's, and the sidebar's line up: a 60px row, then
+  the `tabs` or a `subtitle`. In the row, `leading` is a control such as the button that opens the
+  sidebar, then the title with an `icon` or a `mark` letter before it and `context` after it in
+  `ink-secondary`, and `actions` at the right. The line under the header is drawn inside it, so the
+  current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`.
+- `paneTabs(h, { label, tabs })` is a `tablist` named by `label` of `{ label, count?, isCurrent,
+onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
+  a 2px `indicator` bar under it. The tab is named by its label and described by its `count`, which
+  shows in a badge after it. Tabs are all in the tab order; arrow keys do not move between them.
+- `paneColumn(h, children)` is the one column of a page about one item: 680px at most, its sections
+  40px apart, with nothing beside it.
+- `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
+  header's `actions`.
+
 ## Tests
 
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`, `aria-invalid`,
 and description, a switch by its label, a select's change, the centered screen's landmarks, a form
-by its label, and a row by its title. They query no class.
+by its label, and a row by its title; an icon by `role("img", { name })` when it has a label and as
+`aria-hidden` when it has none; a rail destination by `role("button", { name })` with
+`aria-current`; a sidebar item by its name with `aria-current` and its count; a tab by `role("tab")`
+with `aria-selected`; and the shell's landmarks by role and name: `navigation` for the rail and the
+sidebar, `main`, and `complementary`. They query no class.

@@ -280,6 +280,19 @@
   }
 }
 
+@utility indicator-bar {
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 50%;
+    width: 2px;
+    height: 1.25rem;
+    background-color: var(--amends-indicator);
+    transform: translateY(-50%);
+  }
+}
+
 @utility chevron-down {
   position: relative;
 

@@ -12,6 +12,7 @@ import * as Switch from "@foldkit/ui/switch"
 import * as Textarea from "@foldkit/ui/textarea"
 import * as Option from "effect/Option"
 import type { Attribute, Html, HtmlBuilder } from "foldkit/html"
+import { type IconName, icon } from "./icon.ts"
 
 const buttonBase =
   "inline-flex flex-none cursor-pointer items-center justify-center gap-2 whitespace-nowrap focus-ring aria-disabled:cursor-default"
@@ -36,6 +37,14 @@ const buttonRegularSizes = {
 const buttonLargeSize = "min-h-11 px-5 text-item"
 
 const buttonWide = "w-full"
+
+const iconButtonBase =
+  "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring hover:bg-subtle hover:text-ink"
+
+const iconButtonSizes = {
+  regular: "size-8 max-desktop:size-11",
+  compact: "size-6"
+}
 
 const fieldColumn = "flex flex-col gap-2"
 
@@ -91,6 +100,11 @@ export type ButtonOptions = Readonly<{
   isDisabled?: boolean
 }>
 
+export type IconButtonOptions = Readonly<{
+  /** `compact` is 24px, for the actions along a list's heading. The default is 32px, and 44px on touch. */
+  size?: "compact"
+}>
+
 export type NoticeTone = keyof typeof noticeTones
 
 export type NoticeOptions = Readonly<{
@@ -139,6 +153,28 @@ export const submit = <Message, Requirements>(
   label: string,
   options: ButtonOptions = {}
 ) => renderButton(h, label, { type: "submit" }, options, "primary")
+
+/** A quiet square button of one icon, named by `label`, that sends `onClick`. */
+export const iconButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ icon: IconName; label: string; onClick: Message }>,
+  options: IconButtonOptions = {}
+) =>
+  Button.view(
+    {
+      onClick: config.onClick,
+      toView: (attributes) =>
+        h.button(
+          [
+            ...attributes.button,
+            h.AriaLabel(config.label),
+            h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))
+          ],
+          [icon(h, config.icon, { size: "sm" })]
+        )
+    },
+    h
+  )
 
 /** Why what the person entered was refused, or what to know about it, as an alert, when there is one. */
 export const notice = <Message, Requirements>(

@@ -57,6 +57,22 @@ export type IconName = (typeof iconCatalog)[number]["name"];
 `
 )
 
+outputs.set(
+  "src/paths.ts",
+  `${header}
+// Path data only, for views that draw an icon without Solid: one 24-unit drawing for each name,
+// painted with \`currentColor\` strokes, and filled as well for the names in \`filledIconNames\`.
+export const iconPaths = {
+${icons.map((icon) => `  ${JSON.stringify(icon.name)}: ${JSON.stringify(icon.path)}`).join(",\n")}
+} as const;
+export type IconName = keyof typeof iconPaths;
+export const filledIconNames: ReadonlyArray<IconName> = [${icons
+    .filter((icon) => icon.fill)
+    .map((icon) => JSON.stringify(icon.name))
+    .join(", ")}];
+`
+)
+
 // Format in memory with the repository's settings, so --check verifies the exact committed bytes
 // without writing.
 const {
@@ -102,4 +118,4 @@ if (!check) {
   for (const file of changed) await writeFile(`${root}${file}`, outputs.get(file)!)
   for (const file of stale) await rm(`${root}${file}`)
 }
-console.log(`${check ? "Verified" : "Generated"} ${icons.length} icons, Solid exports, catalog, and SVGs.`)
+console.log(`${check ? "Verified" : "Generated"} ${icons.length} icons, Solid exports, catalog, path data, and SVGs.`)

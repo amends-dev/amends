@@ -1,6 +1,6 @@
 /**
  * What the workshop remembers: the text of its fields and boxes, which switches are on, the plan chosen,
- * and how often a button was pressed.
+ * which rail destination and pane tab are current, and how often a button was pressed.
  */
 
 import * as Schema from "effect/Schema"
@@ -10,6 +10,12 @@ import { defineMessageUnion } from "foldkit/message"
 export const Plan = Schema.Literals(["free", "team", "enterprise"])
 export type Plan = typeof Plan.Type
 
+export const Destination = Schema.Literals(["home", "connections", "agents", "channels", "settings"])
+export type Destination = typeof Destination.Type
+
+export const PaneTab = Schema.Literals(["threads", "tasks"])
+export type PaneTab = typeof PaneTab.Type
+
 export const Model = Schema.Struct({
   workspaceName: Schema.String,
   fullName: Schema.String,
@@ -17,6 +23,10 @@ export const Model = Schema.Struct({
   signInEmail: Schema.String,
   code: Schema.String,
   notes: Schema.String,
+  composer: Schema.String,
+  reply: Schema.String,
+  destination: Destination,
+  paneTab: PaneTab,
   isNotificationsOn: Schema.Boolean,
   isDigestOn: Schema.Boolean,
   plan: Plan,
@@ -32,6 +42,10 @@ export const Message = defineMessageUnion({
   TypedSignInEmail: { value: Schema.String },
   TypedCode: { value: Schema.String },
   TypedNotes: { value: Schema.String },
+  TypedComposer: { value: Schema.String },
+  TypedReply: { value: Schema.String },
+  ChangedDestination: { destination: Destination },
+  ChangedPaneTab: { tab: PaneTab },
   ToggledNotifications: { isOn: Schema.Boolean },
   ToggledDigest: { isOn: Schema.Boolean },
   ChangedPlan: { plan: Plan }

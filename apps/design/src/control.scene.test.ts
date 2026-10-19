@@ -3,13 +3,14 @@ import { Option, Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { change, click, expect, given, label, role, scene, submit, text, type } from "foldkit/scene"
+import { change, click, expect, given, label, role, scene, selector, submit, text, type, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
   button,
   choiceSelect,
   field,
   hint,
+  iconButton,
   notice,
   sending,
   submit as submitButton,
@@ -372,5 +373,36 @@ describe("sending", () => {
       given(initial),
       expect(text("Sending…", { exact: false })).toBeAbsent()
     )
+  })
+})
+
+describe("iconButton", () => {
+  it("is a button named by its label, and clicking it sends its message", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          iconButton(h, { icon: "mark-new", label: "Create group", onClick: Message.ClickedSave() })
+        ])
+      },
+      given(initial),
+      click(role("button", { name: "Create group" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
+    )
+  })
+
+  it("holds an icon that assistive technology does not read, at either size", () => {
+    for (const options of [{}, { size: "compact" }] as const) {
+      scene(
+        {
+          update,
+          view: viewOf((_, h) => [
+            iconButton(h, { icon: "mark-search", label: "Search groups", onClick: Message.ClickedSave() }, options)
+          ])
+        },
+        given(initial),
+        expect(within(role("button", { name: "Search groups" }), selector("svg"))).toHaveAttr("aria-hidden", "true")
+      )
+    }
   })
 })

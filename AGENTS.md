@@ -110,11 +110,11 @@ runs them, and keeps `console` to tests and scripts.
   implements gateway contracts and serves protocol packages' handlers; its tests act as a
   client through the same package's contract.
 - `apps/*`: what people see and its building blocks. `icons` holds canonical drawings and
-  generated Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume
-  it. `ui` is the pattern-based design system built from the Lunacy mocks in
-  `design-system/Amends Group Exploration.free`, which are its visual reference: foundations,
-  components, the six layout patterns, presentational screens, and the site's sections, with a
-  standalone Storybook workshop.
+  generated Solid icons, raw SVGs, path data for views without Solid, and a separate metadata
+  catalog; apps and UI packages may consume it. `ui` is the pattern-based design system built from
+  the Lunacy mocks in `design-system/Amends Group Exploration.free`, which are its visual reference:
+  foundations, components, the six layout patterns, presentational screens, and the site's
+  sections, with a standalone Storybook workshop.
   Introduce and verify one piece at a time. It is UI-only and must not depend on routing or API
   contracts. `site` is amends.dev on Astro and Starlight: static pages composed from UI's site
   sections, and docs whose package guides and API reference are generated from each published

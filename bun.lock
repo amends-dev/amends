@@ -226,6 +226,7 @@
       "name": "@amends-dev/design",
       "version": "0.0.0",
       "dependencies": {
+        "@amends-dev/icons": "workspace:*",
         "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
         "@fontsource/figtree": "^5.3.0",
         "@fontsource/geist-mono": "^5.3.0",
