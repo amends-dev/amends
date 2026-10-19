@@ -5,6 +5,7 @@ import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { ActionsBlock } from "../../feature/actions/block.ts"
+import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
@@ -59,6 +60,11 @@ export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
 })
 
+export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
+  field: "agents",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+})
+
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   field: "settings",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
@@ -88,6 +94,7 @@ export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
     ActionsBinding,
     InboxBinding,
     ConnectionsBinding,
+    AgentsBinding,
     SettingsBinding,
     ChannelsBinding,
     GroupBinding

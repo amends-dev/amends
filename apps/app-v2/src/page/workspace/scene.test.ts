@@ -18,10 +18,13 @@ import {
   opening,
   reply,
   roles,
+  scout,
+  scoutAgent,
   support,
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { Integrations } from "../../feature/connections/definition.ts"
@@ -83,6 +86,21 @@ const withChannel = modifyFields(opened, {
       memberships: () => [aliceInGeneral],
       members: () => [member],
       channels: () => [{ channel: support, pending: false }],
+      grants: () => grantsOf([aliceOwns])
+    })
+})
+
+/** The agents as an owner reads them: scout runs on the models connection, which the host listed. */
+const withAgent = modifyFields(opened, {
+  agents: (agents) =>
+    modifyFields(agents, {
+      agents: () => [{ agent: scoutAgent, pending: false }],
+      members: () => [member, bob, scout],
+      connections: () => [{ connection: keylessConnection("models-1", "test-models", "Models"), pending: false }],
+      integrations: () =>
+        Integrations.Loaded({ integrations: [integrationGiving("test-models", "Test models", ["models"])] }),
+      roles: () => roles,
+      workspace: () => Option.some({ workspace, pending: false }),
       grants: () => grantsOf([aliceOwns])
     })
 })
@@ -160,6 +178,44 @@ describe("a workspace", () => {
       expect(role("region", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
       expect(text(" · Test API · Ready")).toExist()
+    )
+  })
+
+  it("shows the agents on request, with what they run on and what the person may do with them", () => {
+    scene(
+      { update, view },
+      given(withAgent),
+      expect(role("button", { name: "Agents" })).toExist(),
+      expect(role("region", { name: "Agents" })).toBeAbsent(),
+      click(role("button", { name: "Agents" })),
+      inside(
+        role("region", { name: "Agents" }),
+        expect(text("Scout")).toExist(),
+        expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist(),
+        expect(role("button", { name: "Add an agent" })).toExist(),
+        expect(role("button", { name: "Change setup" })).toExist()
+      )
+    )
+  })
+
+  it("reads the agents whichever destination it shows", () => {
+    scene(
+      { update, view, subscriptions: workspaceSubscriptions },
+      given(withAgent),
+      Subscription.emit(
+        workspaceSubscriptions["agents/agents"],
+        AgentsBlock.Message.ReceivedAgents({
+          agents: withAgent.agents.agents,
+          members: withAgent.agents.members,
+          connections: withAgent.agents.connections,
+          roles: withAgent.agents.roles,
+          workspace: withAgent.agents.workspace,
+          grants: withAgent.agents.grants
+        })
+      ),
+      expect(role("region", { name: "Agents" })).toBeAbsent(),
+      click(role("button", { name: "Agents" })),
+      expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist()
     )
   })
 

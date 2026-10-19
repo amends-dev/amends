@@ -10,13 +10,13 @@ stop following it, which opening reads through its latest activity; their inbox,
 notifications waiting for them, each as the message it is about, to open, or to mark seen one at a
 time or all at once; the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
-rename, set up, check, and remove; and its channels, which bring in conversations from them, to add,
+rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, to
+add, rename, and set up again; and its channels, which bring in conversations from them, to add,
 send to another group, and remove. A reply or a new thread they have not sent is kept as a draft in
-their
-browser, through a reload and offline, until they send it. While the host can be reached, a thread
-shows who else is typing in it. What they do shows at once, marked as sending, even offline, and
-what the server refuses comes back with why. The features the earlier program had beyond these
-return one Block at a time; [The program](#the-program) lists them.
+their browser, through a reload and offline, until they send it. While the host can be reached, a
+thread shows who else is typing in it. What they do shows at once, marked as sending, even offline,
+and what the server refuses comes back with why. Every feature the earlier program had has returned
+as a Block; [The program](#the-program) lists them.
 
 This cut runs on a Foldkit preview, the Blocks branch's canary build pinned in `package.json`,
 whose APIs its author says will change; upgrading it is a chore of its own. The root manifest's
@@ -106,6 +106,20 @@ the pages that compose them; the root composes the pages.
   about a connection that is gone closes. `connectionsGiving` names the connections whose
   integration gives a capability, from the connections and integrations a Model keeps, for the
   agents and channels features to choose among.
+- `feature/agents`: the workspace's agents, each by its membership's name with how ready it is and
+  what it runs on, its model on which connection, its harness, and its sandbox, as the store holds
+  them, marked as sending while a change to it is on its way; an agent still on its way shows no
+  readiness, since the server tells it once it has the agent. Where they may configure an agent,
+  they rename it, from the name they saw, and change how it is set up; where they may create agents,
+  they add one with a name, a role they may give, instructions, a harness, `Auto` or a connection
+  that gives harnesses, a model connection, a model from what that connection offers, an effort, and
+  a sandbox, none or a connection that gives sandboxes. The host's integrations, which say what each
+  connection gives, are listed over HTTP as the Block opens, and again when the person asks after
+  they could not be reached; choosing a model connection lists its models over HTTP, and an answer
+  for another connection than the one chosen is passed over. Adding, renaming, and setting up again
+  are actions written to the store; `agentSetup.ts` makes the configuration of a draft, or says what
+  it still wants. A form about an agent that is gone closes. An agent's role and its removal are its
+  membership's, in the settings.
 - `feature/channels`: the workspace's channels, each by its name with the connection that receives
   its conversations and the group they open in, whether they open as tasks, and marked as sending
   while a change to it is on its way. Where they may manage a channel, they send its conversations
@@ -125,13 +139,13 @@ the pages that compose them; the root composes the pages.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP; it reports the one
   picked.
 - `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
-  an "Inbox" button with how many notifications wait, a "Connections" button, a "Settings" button, a
-  "Channels" button, and the main content, which shows one destination: nothing yet, the inbox, the
-  connections, the settings, or the channels, which are always read, or the open group, a keyed
-  occurrence. Picking a group opens it; showing the inbox, the connections, the settings, or the
-  channels leaves no group marked in the list; opening a notification's thread opens its group with
-  the thread already open, and marks the group. Opening the workspace asks the host for the
-  integrations its connections and its channels link to. It reports when the person leaves it.
+  an "Inbox" button with how many notifications wait, "Connections", "Agents", "Settings", and
+  "Channels" buttons, and the main content, which shows one destination: nothing yet, the inbox,
+  the connections, the agents, the settings, or the channels, which are always read, or the open
+  group, a keyed occurrence. Picking a group opens it; showing any other destination leaves no
+  group marked in the list; opening a notification's thread opens its group with the thread already
+  open, and marks the group. Opening the workspace asks the host for the integrations its
+  connections, agents, and channels link to. It reports when the person leaves it.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
   the one open. Signing in lists the workspaces; signing out, `command.ts`,
@@ -146,12 +160,11 @@ and closes it a while after the last one lets go. The session, `session.ts`, is 
 sign-in command keeps it, and no model carries the token. What no replica holds goes over HTTP from
 the Block that needs it, `api.ts`: listing workspaces, saying the person types in a thread,
 following a turn's log, which its Block's subscription reads while the log is followed, and listing
-the host's integrations, for the connections and for the channels, adding a connection, replacing
-its key, and checking it.
+the host's integrations, for the connections, the agents, and the channels, adding a connection,
+replacing its key, checking it, and listing the models a connection offers an agent.
 
-Features the earlier program had and this cut does not yet: agents. It returns as a Block by the
-same template; `agentSetup.ts` waits for the agents feature. `settingsForm.ts`, an integration's
-settings form as the person fills it in, is the connections feature's.
+`settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
+feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
 
 ## The store
 
@@ -236,30 +249,36 @@ browser's storage. Each Block's tests sit beside it:
   from what was seen, unless nothing changes; a thread's turns stopped while they are active and run
   again only when nothing else keeps them from it, and a turn's log followed from showing it until
   the turn ends or the person hides it, passing over another turn's, and followed again after it
-  could not be; a thread started from the composer and the thread picked; a composer filling in its draft only while nothing was written,
-  keeping what is written, and sending it once; a group renamed from the name seen, followed, left,
-  or joined, a member admitted and an admission removed, and the thread picked opened and closed, or
-  open already as the group opens; the groups starting a team or a conversation and reporting the
-  group picked once; the inbox listing what waits, newest first, reporting the thread of the
-  notification opened, marking one seen or all through the newest that waits, and why a write could
-  not be kept; the connections asking for the host's integrations as they open, keeping them or why
-  they could not be listed, asking again, adding a connection over HTTP once its integration, name,
-  required settings, and key are in, once while it sends, and refused with why, renaming, changing
-  the settings of, and removing one as actions from what was seen, replacing a key and checking over
-  HTTP, closing a form about a connection that is gone, naming the connections whose integration
-  gives a capability, and why a read or a write could not be kept; the channels asking for the
+  could not be; a thread started from the composer and the thread picked; a composer filling in its
+  draft only while nothing was written, keeping what is written, and sending it once; a group
+  renamed from the name seen, followed, left, or joined, a member admitted and an admission removed,
+  and the thread picked opened and closed, or open already as the group opens; the groups starting a
+  team or a conversation and reporting the group picked once; the inbox listing what waits, newest
+  first, reporting the thread of the notification opened, marking one seen or all through the newest
+  that waits, and why a write could not be kept; the connections asking for the host's integrations
+  as they open, keeping them or why they could not be listed, asking again, adding a connection over
+  HTTP once its integration, name, required settings, and key are in, once while it sends, and
+  refused with why, renaming, changing the settings of, and removing one as actions from what was
+  seen, replacing a key and checking over HTTP, closing a form about a connection that is gone,
+  naming the connections whose integration gives a capability, and why a read or a write could not
+  be kept; the agents asking for the host's integrations as they open, adding an agent as an action
+  with the configuration its draft makes and refusing a draft with what it still wants, loading the
+  models of the model connection the form chooses over HTTP and passing over a late answer for
+  another connection, choosing the model again when the connection changes, renaming and setting up
+  an agent again from what was seen, closing a form about an agent that is gone, offering the roles
+  the person may give, and why a read or a write could not be kept; the channels asking for the
   host's integrations as they open, adding a channel as an action once its connection, group, and
   name are chosen and refusing one that lacks any, with why, offering only the connections that give
   channels and the groups the person belongs to, by name, moving a channel's conversations to
   another group of theirs and removing it, closing a form about a channel that is gone, and why a
-  read or a write could not be kept; the settings renaming the
-  workspace from the name seen and the person, one name at a time, changing a member's role from the
-  assignments seen, removing a member, handing the workspace over from the owner's assignment seen,
-  inviting by email with the role chosen, revoking an invitation, and what an owner, an
-  administrator, and a member may do to the members; a workspace asking for the integrations as it
-  opens, opening the group picked, showing the inbox, the connections, the settings, or the channels
-  in its place with no group marked, handing the settings and the channels what the person does in
-  them, and opening a notification's thread in its group; and the root signing in a step at a time, listing the
+  read or a write could not be kept; the settings renaming the workspace from the name seen and the
+  person, one name at a time, changing a member's role from the assignments seen, removing a member,
+  handing the workspace over from the owner's assignment seen, inviting by email with the role
+  chosen, revoking an invitation, and what an owner, an administrator, and a member may do to the
+  members; a workspace asking for the integrations as it opens, opening the group picked, showing
+  the inbox, the connections, the agents, the settings, or the channels in its place with no group
+  marked, handing the settings and the channels what the person does in them, and opening a
+  notification's thread in its group; and the root signing in a step at a time, listing the
   workspaces, opening and closing one, and signing out.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
   on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
@@ -267,26 +286,33 @@ browser's storage. Each Block's tests sit beside it:
   agents' names and how they stand, stopped and run again by someone who may use the agent and not
   otherwise, a turn's log followed as it is written, until the turn ends or it could not be
   followed, and the thread listing its agents' turns; a group's name, the person's part in it, its
-  members with removing for the others, and joining in place of the threads of a team they do
-  not belong to; the groups listed apart from the teams to join, with a new team taken only from
-  someone who may create one; the inbox's notifications by the message and thread they are about,
-  marked all seen, one seen with its failure shown, and one's thread opened; the connections added
-  by an owner to an integration, with a key field only for the method that takes one, then checked,
-  with their settings shown, their key replaced, renamed with a failure shown, and removed; read by
-  an ordinary member without the controls until the person is given the role that manages them,
-  marked as sending with none while a change is on its way, by how ready each is, with why the
-  integrations could not be listed and a way to ask again, and why they could not be read; the
-  settings' two names renamed, the members listed with their roles, changed, removed, and handed the
-  workspace by the owner, the invitations listed, revoked, and sent, what is on its way marked, a
-  member offered only their own name to change, and the store's changes and failure to read shown;
-  the channels listed with their connection and group, a conversation's group by the others in it,
-  added by an owner over a connection that gives channels into a group they belong to, refused with
-  why when one is lacking, moved and removed with a failure shown, read by an ordinary member
+  members with removing for the others, and joining in place of the threads of a team they do not
+  belong to; the groups listed apart from the teams to join, with a new team taken only from someone
+  who may create one; the inbox's notifications by the message and thread they are about, marked all
+  seen, one seen with its failure shown, and one's thread opened; the connections added by an owner
+  to an integration, with a key field only for the method that takes one, then checked, with their
+  settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
+  member without the controls until the person is given the role that manages them, marked as
+  sending with none while a change is on its way, by how ready each is, with why the integrations
+  could not be listed and a way to ask again, and why they could not be read; the agents added by an
+  owner with a harness, a model connection whose models load, a model, an effort, and a sandbox, or
+  a model the connection does not list by its id, refused with why until the connection and the
+  model are chosen, with the reason a connection's models could not be listed, renamed and set up
+  again with a failure shown, read by how ready each is and what it runs on, by an ordinary member
   without the controls until the person is given the role that manages them, marked as sending with
-  none while a change is on its way, with why the integrations could not be listed and a way to ask
-  again, and why they could not be read; and a workspace counting what waits beside "Inbox"
-  whichever destination shows, then showing the inbox, the connections, the settings, or the
-  channels, which it reads whichever destination shows.
+  none while a change is on its way, offering to add only once the host listed its integrations and
+  a connection gives models, and why they could not be read; the settings' two names renamed, the
+  members listed with their roles, changed, removed, and handed the workspace by the owner, the
+  invitations listed, revoked, and sent, what is on its way marked, a member offered only their own
+  name to change, and the store's changes and failure to read shown; the channels listed with their
+  connection and group, a conversation's group by the others in it, added by an owner over a
+  connection that gives channels into a group they belong to, refused with why when one is lacking,
+  moved and removed with a failure shown, read by an ordinary member without the controls until the
+  person is given the role that manages them, marked as sending with none while a change is on its
+  way, with why the integrations could not be listed and a way to ask again, and why they could not
+  be read; and a workspace counting what waits beside "Inbox" whichever destination shows, then
+  showing the inbox, the connections, the agents, the settings, or the channels, which it reads
+  whichever destination shows.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and

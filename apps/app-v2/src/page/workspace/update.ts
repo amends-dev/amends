@@ -12,6 +12,9 @@ const showConnections = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Connections() })
 }))
 
+/** Show the agents in the main content. */
+const showAgents = WorkspaceDefinition.step((model) => ({ model: modifyFields(model, { open: () => Open.Agents() }) }))
+
 /** Show the settings in the main content. */
 const showSettings = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Settings() })
@@ -28,6 +31,7 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedInbox: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showInbox]),
     ClickedConnections: () =>
       Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),
+    ClickedAgents: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showAgents]),
     ClickedSettings: () =>
       Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings]),
     ClickedChannels: () =>

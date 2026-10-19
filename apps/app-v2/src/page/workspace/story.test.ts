@@ -3,7 +3,18 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { connectionOf, notificationOf, opening, reply, support, testApi, thread } from "../../../test/fixtures.ts"
+import {
+  connectionOf,
+  keylessConnection,
+  notificationOf,
+  opening,
+  reply,
+  scoutAgent,
+  support,
+  testApi,
+  thread
+} from "../../../test/fixtures.ts"
+import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
@@ -14,7 +25,14 @@ import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { ChannelsBinding, ConnectionsBinding, GroupsBinding, InboxBinding, SettingsBinding } from "./composition.ts"
+import {
+  AgentsBinding,
+  ChannelsBinding,
+  ConnectionsBinding,
+  GroupsBinding,
+  InboxBinding,
+  SettingsBinding
+} from "./composition.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -36,6 +54,10 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
   ConnectionsBinding.embedView({ slotId: "connections", model: opened.connections }).toParentMessage(message)
+
+/** What the agents report, as the workspace receives it. */
+const fromAgents = (message: typeof AgentsBlock.Message.Type) =>
+  AgentsBinding.embedView({ slotId: "agents", model: opened.agents }).toParentMessage(message)
 
 /** What the settings report, as the workspace receives it. */
 const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
@@ -99,9 +121,10 @@ describe("a workspace", () => {
     )
   })
 
-  it("asks the host for its integrations as it opens, which its connections and channels list", () => {
+  it("asks the host for its integrations as it opens, which its connections, agents, and channels list", () => {
     expect((init(workspaceId, memberId, "Studio").commands ?? []).map(({ name }) => name)).toEqual([
       "connections/LoadIntegrations",
+      "agents/LoadIntegrations",
       "channels/LoadIntegrations"
     ])
   })
@@ -127,6 +150,40 @@ describe("a workspace", () => {
         expect(model.connections.connections.map(({ connection }) => connection.name)).toEqual(["Models"])
       }),
       // With the connections shown, picking the group opens it again.
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("shows the agents in place of the open group, leaving no group marked, and reads them whichever shows", () => {
+    const models = keylessConnection("models-1", "test-models", "Models")
+    story(
+      update,
+      given(opened),
+      message(
+        fromAgents(
+          AgentsBlock.Message.ReceivedAgents({
+            agents: [{ agent: scoutAgent, pending: false }],
+            members: [],
+            connections: [{ connection: models, pending: false }],
+            roles: [],
+            workspace: Option.none(),
+            grants: []
+          })
+        )
+      ),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedAgents()),
+      model((model) => {
+        expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+        expect(model.agents.agents.map(({ agent }) => agent.id)).toEqual([scoutAgent.id])
+      }),
+      // With the agents shown, picking the group opens it again.
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {

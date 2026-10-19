@@ -158,7 +158,7 @@ export const roleName = (model: Model, roleId: Role.RoleId): string =>
   model.roles.find(({ id }) => id === roleId)?.name ?? "A role"
 
 /** Whether the person is the workspace's owner. */
-export const isOwner = (model: Model): boolean =>
+export const isOwner = (model: Pick<Model, "workspace" | "memberId">): boolean =>
   Option.exists(model.workspace, ({ workspace }) => workspace.ownerMemberId === model.memberId)
 
 /** The active assignment that makes the workspace's owner its owner. */
@@ -184,8 +184,12 @@ const mayActOn = (model: Model, memberId: MemberId.MemberId): boolean =>
       ) === undefined
   )
 
-/** The roles the person may give: Member, and Administrator when they own the workspace; Owner only passes by transfer. */
-export const givableRoles = (model: Model): ReadonlyArray<Role.Role> =>
+/**
+ * The roles the person may give: Member, and Administrator when they own the workspace; Owner only
+ * passes by transfer. It reads the roles, the workspace, and the person a Model keeps, so a Block
+ * that keeps the same three fields asks it of its own.
+ */
+export const givableRoles = (model: Pick<Model, "roles" | "workspace" | "memberId">): ReadonlyArray<Role.Role> =>
   model.roles.filter(
     ({ id }) => id === BuiltinRoles.MemberId || (id === BuiltinRoles.AdministratorId && isOwner(model))
   )
