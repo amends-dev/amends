@@ -27,6 +27,8 @@ const headingText = "mb-3 text-display font-medium text-ink"
 
 const copyText = "text-item text-ink-secondary"
 
+const contentLook = "contents"
+
 export type CenteredWidth = keyof typeof screenBodyWidths
 
 /**
@@ -68,3 +70,13 @@ export const heading = <Message, Requirements>(h: HtmlBuilder<Message, Requireme
 /** A line of secondary text under the screen's title. */
 export const copy = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Class(copyText)], [text])
+
+/**
+ * The pieces of a screen's body as one node, for a view that must return one: they lie in the card's column as
+ * if the node were not there, each spacing itself as `heading` and `copy` do, so a `column`'s gap would add to
+ * theirs.
+ */
+export const screenContent = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  children: ReadonlyArray<Html>
+): Html => h.div([h.Class(contentLook)], children)

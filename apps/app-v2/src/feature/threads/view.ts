@@ -1,6 +1,6 @@
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
-import { hint, notice } from "@amends-dev/design/control"
+import { column, hint, notice } from "@amends-dev/design/control"
 import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -67,21 +67,18 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
 
 /** The group's threads, oldest first under the days they were created on, each as a message of whoever opened it. */
 export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
-  h.div(
-    [],
-    [
-      notice(h, model.notice),
-      model.threads.length === 0
-        ? hint(h, "No threads yet.")
-        : messageList(h, {
-            label: "Threads",
-            children: byDay(model.threads, inputs.now).flatMap((day) => [
-              divider(h, day.label),
-              ...day.items.map((item) => threadRow(item, inputs, h))
-            ])
-          })
-    ]
-  )
+  column(h, [
+    notice(h, model.notice),
+    model.threads.length === 0
+      ? hint(h, "No threads yet.")
+      : messageList(h, {
+          label: "Threads",
+          children: byDay(model.threads, inputs.now).flatMap((day) => [
+            divider(h, day.label),
+            ...day.items.map((item) => threadRow(item, inputs, h))
+          ])
+        })
+  ])
 )
 
 /** The composer to start a thread in the group, for a pane's footer. */

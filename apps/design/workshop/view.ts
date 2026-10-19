@@ -1,7 +1,7 @@
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { centered, copy, heading } from "../src/centered.ts"
+import { centered, copy, heading, screenContent } from "../src/centered.ts"
 import { composer } from "../src/composer.ts"
 import {
   button,
@@ -479,24 +479,26 @@ const emailScreen = (h: ApplicationViewBuilder, signInEmail: string): Html =>
     brand: "amends",
     width: "form",
     children: [
-      heading(h, "Sign in to amends"),
-      copy(h, "Use your email to get a one-time code."),
-      form(h, { onSubmit: Message.ClickedButton(), label: "Sign in" }, [
-        field(
-          h,
-          {
-            id: "screen-email",
-            label: "Email",
-            type: "email",
-            value: signInEmail,
-            placeholder: "you@example.com",
-            onInput: (value) => Message.TypedSignInEmail({ value }),
-            isAutofocus: false
-          },
-          Option.none()
-        ),
-        submit(h, "Continue", { size: "large", wide: true }),
-        hint(h, "Your workspaces appear after you sign in.")
+      screenContent(h, [
+        heading(h, "Sign in to amends"),
+        copy(h, "Use your email to get a one-time code."),
+        form(h, { onSubmit: Message.ClickedButton(), label: "Sign in" }, [
+          field(
+            h,
+            {
+              id: "screen-email",
+              label: "Email",
+              type: "email",
+              value: signInEmail,
+              placeholder: "you@example.com",
+              onInput: (value) => Message.TypedSignInEmail({ value }),
+              isAutofocus: false
+            },
+            Option.none()
+          ),
+          submit(h, "Continue", { size: "large", wide: true }),
+          hint(h, "Your workspaces appear after you sign in.")
+        ])
       ])
     ]
   })
@@ -506,29 +508,31 @@ const codeScreen = (h: ApplicationViewBuilder, code: string): Html =>
     brand: "amends",
     width: "form",
     children: [
-      heading(h, "Enter your code"),
-      copy(h, "Enter the six-digit code for"),
-      valueWithAction(
-        h,
-        "alex@mercier.example",
-        button(h, "Change email", Message.ClickedButton(), { variant: "link" })
-      ),
-      form(h, { onSubmit: Message.ClickedButton(), label: "Verify" }, [
-        field(
+      screenContent(h, [
+        heading(h, "Enter your code"),
+        copy(h, "Enter the six-digit code for"),
+        valueWithAction(
           h,
-          {
-            id: "screen-code",
-            label: "Verification code",
-            type: "text",
-            value: code,
-            onInput: (value) => Message.TypedCode({ value }),
-            isAutofocus: false
-          },
-          Option.none()
+          "alex@mercier.example",
+          button(h, "Change email", Message.ClickedButton(), { variant: "link" })
         ),
-        hint(h, "Use your most recent code."),
-        submit(h, "Verify code", { size: "large", wide: true }),
-        inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedButton(), { variant: "link" })])
+        form(h, { onSubmit: Message.ClickedButton(), label: "Verify" }, [
+          field(
+            h,
+            {
+              id: "screen-code",
+              label: "Verification code",
+              type: "text",
+              value: code,
+              onInput: (value) => Message.TypedCode({ value }),
+              isAutofocus: false
+            },
+            Option.none()
+          ),
+          hint(h, "Use your most recent code."),
+          submit(h, "Verify code", { size: "large", wide: true }),
+          inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedButton(), { variant: "link" })])
+        ])
       ])
     ]
   })
@@ -551,10 +555,12 @@ const directoryScreen = (h: ApplicationViewBuilder): Html =>
     actions: [inline(h, ["alex@mercier.example"]), button(h, "Sign out", Message.ClickedButton())],
     width: "directory",
     children: [
-      heading(h, "Choose a workspace"),
-      copy(h, `${workspaces.length} workspaces`),
-      section(h, { label: "Your workspaces", count: workspaces.length }),
-      workspaceList(h)
+      screenContent(h, [
+        heading(h, "Choose a workspace"),
+        copy(h, `${workspaces.length} workspaces`),
+        section(h, { label: "Your workspaces", count: workspaces.length }),
+        workspaceList(h)
+      ])
     ]
   })
 

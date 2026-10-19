@@ -2,9 +2,9 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, text, within } from "foldkit/scene"
+import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { centered, copy, heading } from "./centered.ts"
+import { centered, copy, heading, screenContent } from "./centered.ts"
 import { button } from "./control.ts"
 
 const Message = defineMessageUnion({ ClickedSignOut: {} })
@@ -40,4 +40,24 @@ describe("centered", () => {
       )
     })
   }
+})
+
+describe("screenContent", () => {
+  it("holds a screen's pieces in one node that does not take part in the card's layout", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          centered(h, {
+            brand: "amends",
+            width: "form",
+            children: [screenContent(h, [heading(h, "Sign in"), copy(h, "Enter the code sent to ada@example.com")])]
+          })
+      },
+      given({ signOuts: 0 }),
+      expect(within(role("main"), selector(".contents"))).toExist(),
+      expect(within(selector(".contents"), role("heading", { name: "Sign in", level: 1 }))).toExist(),
+      expect(within(selector(".contents"), text("Enter the code sent to ada@example.com"))).toExist()
+    )
+  })
 })

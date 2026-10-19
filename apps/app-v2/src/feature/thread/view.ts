@@ -1,5 +1,5 @@
 import { ThreadMessage } from "@amends-dev/core/thread"
-import { button, buttonRow, field, hint, notice, sending, submit, textarea } from "@amends-dev/design/control"
+import { button, buttonRow, column, field, hint, notice, sending, submit, textarea } from "@amends-dev/design/control"
 import { form } from "@amends-dev/design/form"
 import { divider, message, messageList } from "@amends-dev/design/message"
 import { paneColumn } from "@amends-dev/design/pane"
@@ -140,7 +140,7 @@ export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, { 
         h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
         h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
         notice(h, model.notice),
-        h.div([], [messagesView(model, now, h), typingView(typingIn(model), h)])
+        column(h, [messagesView(model, now, h), typingView(typingIn(model), h)])
       ])
     ]
   )

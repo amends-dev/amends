@@ -26,7 +26,8 @@ field with its label hidden, in a section that names it; the toggle on and off; 
 tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows; the centered screen as the
-sign-in's two steps and as the workspace picker; the toast alone, with a detail, and as a stack of
+sign-in's two steps and as the workspace picker, each with its pieces in `screenContent` as the app's
+pages return them; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
 one with tabs and a description; the marks by size; what a pane says about one thing, as a detail
@@ -219,6 +220,10 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
   workshop does to show both widths on one page.
 - `heading(h, text)` is the screen's `h1`, at display size, with 12px below it for what follows.
 - `copy(h, text)` is a line of secondary text under the heading.
+- `screenContent(h, children)` is the pieces of a screen's body as one node, for a view that must return
+  one, such as a page. It is `display: contents`, so they lie in the card's column as if it were not
+  there, each spacing itself as `heading` and `copy` do. Use it, not `column`, whose gap would add to
+  theirs.
 
 ### `@amends-dev/design/form`
 
