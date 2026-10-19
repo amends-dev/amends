@@ -262,24 +262,25 @@ export const hint = <Message, Requirements>(h: HtmlBuilder<Message, Requirements
 export const sending = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, pending: boolean): Html =>
   pending ? h.span([h.Class(sendingMark)], [" · Sending…"]) : h.empty
 
-const describeError = <Message, Requirements>(
+/** What follows an input: why its value was refused, then what to know about it. The refusal describes the input, and the hint does while there is none. */
+const describeField = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   descriptionAttributes: ReadonlyArray<Attribute<Message>>,
+  text: string | undefined,
   error: Option.Option<string>
-): Html => {
-  if (Option.isNone(error)) {
-    return h.empty
-  }
-
-  return h.div([...descriptionAttributes, h.Class(fieldErrorSpacing)], [notice(h, error)])
-}
+): ReadonlyArray<Html> => [
+  Option.isNone(error) ? h.empty : h.div([...descriptionAttributes, h.Class(fieldErrorSpacing)], [notice(h, error)]),
+  text === undefined
+    ? h.empty
+    : h.p([...(Option.isNone(error) ? descriptionAttributes : []), h.Class(hintText)], [text])
+]
 
 /**
  * A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if
- * it was. The `placeholder` shows an example of what to enter while it is empty. With `isLabelHidden` the label
- * does not show above the input and still names it, for a field in a section that already names it. The
- * `attributes` go onto the input, such as a dialog's `initialFocus`, which a field in a dialog takes with
- * `isAutofocus` off.
+ * it was. The `placeholder` shows an example of what to enter while it is empty, and the `hint` is a line of what
+ * to know about the input, 8px under it. With `isLabelHidden` the label does not show above the input and still
+ * names it, for a field in a section that already names it. The `attributes` go onto the input, such as a
+ * dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off.
  */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -290,6 +291,7 @@ export const field = <Message, Requirements>(
     value: string
     onInput: (value: string) => Message
     placeholder?: string
+    hint?: string
     isAutofocus?: boolean
     isLabelHidden?: boolean
     attributes?: PublishedAttributes
@@ -303,7 +305,7 @@ export const field = <Message, Requirements>(
       value: config.value,
       onInput: config.onInput,
       isInvalid: Option.isSome(error),
-      hasDescription: Option.isSome(error),
+      hasDescription: Option.isSome(error) || config.hint !== undefined,
       isAutofocus: config.isAutofocus ?? true,
       toView: (attributes) =>
         h.div(
@@ -319,7 +321,7 @@ export const field = <Message, Requirements>(
               ...(config.placeholder === undefined ? [] : [h.Placeholder(config.placeholder)]),
               h.Class(inputBox)
             ]),
-            describeError(h, attributes.description, error)
+            ...describeField(h, attributes.description, config.hint, error)
           ]
         )
     },

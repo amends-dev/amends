@@ -108,6 +108,7 @@ const membershipSetting = (group: Group.Group, model: Model, h: GroupViewBuilder
  */
 const generalPanel = (group: Group.Group, model: Model, render: RenderInfo, h: GroupViewBuilder): SettingsPanel => {
   const name = nameOf(model)
+  const draft = Option.getOrElse(model.renaming, () => name)
   const mayRenameTeam = mayRename(model)
   return {
     body: [
@@ -119,14 +120,14 @@ const generalPanel = (group: Group.Group, model: Model, render: RenderInfo, h: G
                 id: "group-name",
                 label: "Group name",
                 type: "text",
-                value: Option.getOrElse(model.renaming, () => name),
+                value: draft,
                 onInput: (name) => Message.TypedName({ name }),
+                hint: "Everyone in this group sees this name.",
                 isAutofocus: false,
                 attributes: render.initialFocus
               },
               Option.none()
-            ),
-            hint(h, "Everyone in this group sees this name.")
+            )
           ]
         : [settingRow(h, { label: "Group name", copy: name })]),
       group.kind === "Team"
@@ -140,7 +141,9 @@ const generalPanel = (group: Group.Group, model: Model, render: RenderInfo, h: G
         : h.empty,
       membershipSetting(group, model, h)
     ],
-    ...(mayRenameTeam ? { footer: [submit(h, "Save changes")], onSubmit: Message.SubmittedRename() } : {})
+    ...(mayRenameTeam
+      ? { footer: [submit(h, "Save changes", { isDisabled: draft === name })], onSubmit: Message.SubmittedRename() }
+      : {})
   }
 }
 

@@ -16,6 +16,7 @@ import {
   role,
   scene,
   selector,
+  submit,
   text,
   type,
   within
@@ -336,15 +337,37 @@ describe("a group's settings", () => {
     )
   })
 
-  it("write no rename when the name is the one the team has, and close", () => {
+  it("keep Save changes disabled while the name is the one the team has, and enable it when it differs", () => {
     scene(
       { update, view },
       given(openedToRename),
       ...openSettings(),
-      click(role("button", { name: "Save changes" })),
+      expect(role("button", { name: "Save changes" })).toBeDisabled(),
+      type(label("Group name"), "Design team"),
+      expect(role("button", { name: "Save changes" })).not.toBeDisabled(),
+      type(label("Group name"), "Design"),
+      expect(role("button", { name: "Save changes" })).toBeDisabled()
+    )
+  })
+
+  it("write no rename when the form is submitted with the name the team has, and close", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...openSettings(),
+      submit(selector("form")),
       Command.expectExact(Dialog.test.CloseDialog),
       ...dialogClosed(),
       expect(role("dialog", { name: "Group settings" })).toBeAbsent()
+    )
+  })
+
+  it("describe the name field by the hint under it", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...openSettings(),
+      expect(label("Group name")).toHaveAccessibleDescription("Everyone in this group sees this name.")
     )
   })
 

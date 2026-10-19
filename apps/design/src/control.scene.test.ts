@@ -212,6 +212,38 @@ describe("field", () => {
     )
   })
 
+  it("shows a hint under the input that describes it, and the refusal describes it first when there is one", () => {
+    const hinted = (error: Option.Option<string>) => (model: Model, h: HtmlBuilder<Message>) =>
+      field(
+        h,
+        {
+          id: "email",
+          label: "Email",
+          type: "email",
+          value: model.email,
+          hint: "Use the address you signed up with.",
+          onInput: (value) => Message.TypedEmail({ value })
+        },
+        error
+      )
+    scene(
+      { update, view: viewOf((model, h) => [hinted(Option.none())(model, h)]) },
+      given(initial),
+      expect(text("Use the address you signed up with.")).toExist(),
+      expect(label("Email")).toHaveAccessibleDescription("Use the address you signed up with."),
+      expect(label("Email")).not.toHaveAttr("aria-invalid"),
+      expect(role("alert")).toBeAbsent()
+    )
+    scene(
+      { update, view: viewOf((model, h) => [hinted(Option.some("Enter a complete address."))(model, h)]) },
+      given(modifyFields(initial, { email: () => "ada@" })),
+      expect(role("alert")).toHaveText("Enter a complete address."),
+      expect(text("Use the address you signed up with.")).toExist(),
+      expect(label("Email")).toHaveAccessibleDescription("Enter a complete address."),
+      expect(label("Email")).toHaveAttr("aria-invalid", "true")
+    )
+  })
+
   it("shows its label above the input, unless the label is hidden, which still names the input", () => {
     scene(
       { update, view: viewOf((model, h) => [emailField(model, h, Option.none())]) },

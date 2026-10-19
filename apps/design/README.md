@@ -20,11 +20,11 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
 buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
-placeholder, filled, and invalid; a hint; a textarea; a grid of selects, side by side and wrapping
-in a narrow column; a select with its label hidden, in a row beside a name; a field with its label
-hidden, in a section that names it; the toggle on and off;
-a select; the notice tones; `sending`; a form with its inline text and a value with its link, and
-setting rows with an action, with a select, with a label alone, and wrapping in a narrow column; the
+placeholder, filled, invalid, and with a hint under it; a hint; a textarea; a grid of selects, side
+by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
+field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
+tones; `sending`; a form with its inline text and a value with its link, and setting rows with an
+action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows; the centered screen as the
 sign-in's two steps and as the workspace picker; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
@@ -126,13 +126,15 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `buttonWith(h, attributes, label, options?)` is the look of `button` over `attributes` that already
   give it its behavior, such as the `closeButton` group a headless dialog publishes, which is also
   what says whether it is disabled, so it takes no `isDisabled`.
-- `field(h, { id, label, type, value, onInput, placeholder?, isAutofocus?, isLabelHidden?, attributes? },
-error)` is a label over a 42px bordered input with the error, an `Option<string>`, below it as a
-  `notice` that describes the input. A field with an error is `aria-invalid` with a danger border.
-  The `placeholder` shows an example of what to enter while it is empty. It takes focus as it shows
-  unless `isAutofocus` is `false`. With `isLabelHidden` the label is not shown above the input and
-  still names it, for a field in a section that already has that name as its title, such as the
-  one that renames the workspace. The `attributes` are a group a headless component publishes,
+- `field(h, config, error)` is a label over a 42px bordered input with the error, an
+  `Option<string>`, below it as a `notice` that describes the input. The `config` is
+  `{ id, label, type, value, onInput, placeholder?, hint?, isAutofocus?, isLabelHidden?, attributes? }`.
+  A field with an error is `aria-invalid` with a danger border. The `placeholder` shows an example
+  of what to enter while it is empty. The `hint` is a line of what to know about the input, in the
+  look of `hint`, 8px under it as the label is above it; it describes the input while there is no
+  error. It takes focus as it shows unless `isAutofocus` is `false`. With `isLabelHidden` the label
+  is not shown above the input and still names it, for a field in a section that already has that
+  name as its title, such as the one that renames the workspace. The `attributes` are a group a headless component publishes,
   `PublishedAttributes`, that go onto the input, such as a dialog's `initialFocus`, which a field in
   a dialog takes with `isAutofocus` off.
 - `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the

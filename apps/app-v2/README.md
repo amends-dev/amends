@@ -147,10 +147,11 @@ the pages that compose them; the root composes the pages.
   threads, with the composer to start one in the footer, which a team the person has not joined does
   not have. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
-  beside it. Its General tab holds the team's name, a field with Save changes for someone who may
-  rename the team, its draft starting from the name as the dialog opens, and plain text for everyone
-  else; the team's visibility in words, which nothing changes yet; and the person's membership, with
-  Leave for a team they belong to, except general, and Join for a public team they do not. Its
+  beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
+  name, and Save changes, which is disabled while the draft is the name the team has, for someone
+  who may rename the team, its draft starting from the name as the dialog opens, and plain text for
+  everyone else; the team's visibility in words, which nothing changes yet; and the person's
+  membership, with Leave for a team they belong to, except general, and Join for a public team they do not. Its
   Members tab, for a team only, lists the members, each marked Online while they have the workspace
   open, with Remove and the form to admit another where the person manages them, and counts them in
   the tab. The dialog opens on General, and closing it, by Cancel, Close, Escape, a click on the
@@ -431,8 +432,8 @@ browser's storage. Each Block's tests sit beside it:
   joining in place of the threads of a team they do not belong to,
   with the composer to start a thread in its footer; its settings in a dialog named for them, in a
   team's name beside the title, with General and Members as tabs, the name a field for someone who
-  may rename the team and text for everyone else, the visibility and the membership in words, with
-  leaving, closing the dialog, and joining, which keeps it open, and a conversation's with neither tabs nor
+  may rename the team, saved only once it differs, and text for everyone else, the visibility and
+  the membership in words, with leaving, closing the dialog, and joining, which keeps it open, and a conversation's with neither tabs nor
   visibility; its members, those present marked
   Online and one on its way marked sending, with removing for the others, admitting, offered only to
   someone who manages them; and its side pane for the thread open in it,

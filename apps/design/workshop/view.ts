@@ -320,6 +320,26 @@ const fieldGroup = (
       ],
       sampleStack
     ),
+    sample(
+      h,
+      "Field with a hint under it",
+      [
+        field(
+          h,
+          {
+            id: "hinted-email",
+            label: "Email",
+            type: "email",
+            value: model.signInEmail,
+            hint: "We send the code to this address.",
+            onInput: (value) => Message.TypedSignInEmail({ value }),
+            isAutofocus: false
+          },
+          Option.none()
+        )
+      ],
+      sampleStack
+    ),
     sample(h, "Hint", [hint(h, "Use your most recent code.")], sampleStack),
     sample(
       h,
