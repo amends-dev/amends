@@ -19,7 +19,7 @@ export type ViewInputs = Readonly<{ openThread: Option.Option<string> }>
  * member's name, the group picked marked, and under it the thread open in it, when there is one.
  */
 const groupRow = (
-  { group }: GroupItem,
+  { group, pending }: GroupItem,
   model: Model,
   openThread: Option.Option<string>,
   h: GroupsViewBuilder
@@ -29,6 +29,7 @@ const groupRow = (
   return sidebarItem(h, {
     ...(group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: name.slice(0, 1) }),
     label: name,
+    isPending: pending,
     isCurrent,
     onClick: Message.ClickedGroup({ groupId: group.id }),
     ...(isCurrent && Option.isSome(openThread)

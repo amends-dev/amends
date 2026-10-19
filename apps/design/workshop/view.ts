@@ -925,7 +925,8 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
               ]
             }),
             sidebarItem(h, { icon: "mark-channel", label: "design", isCurrent: false, onClick: press }),
-            sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press })
+            sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press }),
+            sidebarItem(h, { icon: "mark-channel", label: "launch", isPending: true, isCurrent: false, onClick: press })
           ]
         }),
         sidebarSection(h, {

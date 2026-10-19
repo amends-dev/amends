@@ -37,7 +37,8 @@ actions, and meta, with a context line under the author and a quiet action, with
 the text, and set apart by dividers, centered and at the start; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
 own; the composer empty and filled; the shell twice, with and without its side pane, each in a
-frame of fixed height, its groups and direct messages through `sidebarSections`, its threads,
+frame of fixed height, its groups, one of them still on its way, and direct messages through
+`sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
 as a plain row under its group and the second with its notices; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
@@ -288,10 +289,12 @@ The frame of the first four layout patterns, which the modules below fill.
   `iconButton`s; on touch the heading is 44px tall, as they are. A group without a label is the list
   alone, as a sidebar's first is. Sections sit 22px apart. `children` are `sidebarItem`s or a
   `sidebarEmpty`.
-- `sidebarItem(h, { icon?, mark?, label, count?, isCurrent, onClick, children? })` is a 38px row,
-  44px on touch, one button: an `icon`, or a `mark` letter on a 20px `mark` square for a person, then the
-  `label` in `ink-secondary` and a `count` in a badge at the end. The button is named by the label
-  and described by the count. The current row is `aria-current="page"`, filled `selected`, in `ink`
+- `sidebarItem(h, { icon?, mark?, label, count?, isPending?, isCurrent, onClick, children? })` is a
+  38px row, 44px on touch, one button: an `icon`, or a `mark` letter on a 20px `mark` square for a
+  person, then the `label` in `ink-secondary` and a `count` in a badge at the end. A row that
+  `isPending`, as a group still being created is, says "Sending…" at its end at `meta` size in
+  `ink-muted` in the count's place; a pending row has no count. The button is named by the label
+  and described by what is at its end, the count or "Sending…". The current row is `aria-current="page"`, filled `selected`, in `ink`
   and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick? }`
   rows under it at hint size, 32px, 44px on touch, indented and joined to it by a dashed connector in `stitch`,
   such as a group's open thread. A row with an `onClick` is a button; one without is a plain row, a

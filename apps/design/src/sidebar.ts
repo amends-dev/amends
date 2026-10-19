@@ -50,6 +50,8 @@ const itemLabel = "min-w-0 flex-1 truncate"
 const itemCount =
   "inline-grid h-5 min-w-5 flex-none place-items-center bg-subtle px-1.25 text-meta font-medium text-ink-secondary tabular-nums"
 
+const itemPending = "flex-none text-meta text-ink-muted"
+
 const subItemList = "m-0 mt-1 flex list-none flex-col gap-1 p-0"
 
 const subItemColumn = "ms-9.25"
@@ -236,10 +238,12 @@ export const sidebarSections = <Message, Requirements>(
 
 /**
  * A row of the sidebar as one button that sends `onClick`: an `icon`, or a `mark` letter on a small square
- * for a person or a workspace, then the `label` and a `count` at the end. The button is named by the label
- * and described by the count. The current row is filled with the 2px bar and `aria-current="page"`.
- * `children` are the items under it, such as a group's open thread, joined to it by a dashed line; one
- * with no `onClick` is a plain row that says where the person is.
+ * for a person or a workspace, then the `label` and a `count` at the end. A row is `isPending` while what it
+ * stands for is on its way, such as a group still being created, and says "Sending…" at its end in the
+ * count's place; a pending row has no count. The button is named by the label and described by what is at its
+ * end. The current row is filled with the 2px bar and `aria-current="page"`. `children` are the items under
+ * it, such as a group's open thread, joined to it by a dashed line; one with no `onClick` is a plain row that
+ * says where the person is.
  */
 export const sidebarItem = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -248,12 +252,20 @@ export const sidebarItem = <Message, Requirements>(
     mark?: string
     label: string
     count?: number
+    isPending?: boolean
     isCurrent: boolean
     onClick: Message
     children?: ReadonlyArray<SidebarSubItem<Message>>
   }>
-): Html =>
-  h.li(
+): Html => {
+  const end =
+    config.isPending === true
+      ? { text: "Sending…", look: itemPending }
+      : config.count === undefined
+        ? undefined
+        : { text: `${config.count}`, look: itemCount }
+
+  return h.li(
     [],
     [
       Button.view(
@@ -264,16 +276,14 @@ export const sidebarItem = <Message, Requirements>(
               [
                 ...attributes.button,
                 h.AriaLabel(config.label),
-                ...(config.count === undefined ? [] : [h.AriaDescription(`${config.count}`)]),
+                ...(end === undefined ? [] : [h.AriaDescription(end.text)]),
                 ...(config.isCurrent ? [h.AriaCurrent("page")] : []),
                 h.Class(itemRow)
               ],
               [
                 renderItemLeading(h, config),
                 h.span([h.Class(itemLabel)], [config.label]),
-                config.count === undefined
-                  ? h.empty
-                  : h.span([h.AriaHidden(true), h.Class(itemCount)], [`${config.count}`])
+                end === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(end.look)], [end.text])
               ]
             )
         },
@@ -287,6 +297,7 @@ export const sidebarItem = <Message, Requirements>(
           )
     ]
   )
+}
 
 /** A quiet line for a section that has no items yet, lined up with the labels of the items. */
 export const sidebarEmpty = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>

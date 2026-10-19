@@ -96,6 +96,25 @@ describe("the groups", () => {
     )
   })
 
+  it("mark a team still on its way as sending in its row, and no other", () => {
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(init(workspace.id, member.id).model, {
+          groups: () => [
+            { group: general, pending: false },
+            { group: design, pending: true }
+          ],
+          memberships: () => [aliceInGeneral, aliceInDesign]
+        })
+      ),
+      expect(within(role("button", { name: "Design" }), text("Sending…"))).toExist(),
+      expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "Sending…"),
+      expect(within(role("button", { name: "General" }), text("Sending…"))).toBeAbsent(),
+      expect(role("button", { name: "General" })).not.toHaveAttr("aria-description")
+    )
+  })
+
   it("take a new team in a dialog named for it, the name field holding the focus, and close it when written", () => {
     scene(
       { update, view: sceneView() },

@@ -155,6 +155,55 @@ describe("sidebar", () => {
     )
   })
 
+  it("says Sending… at the end of a pending row in the count's place, and describes the row by it", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((model, h) =>
+          sidebarSection(h, {
+            label: "Groups",
+            children: [
+              sidebarItem(h, {
+                icon: "mark-channel",
+                label: "launch",
+                count: 2,
+                isPending: true,
+                isCurrent: model.current === "launch",
+                onClick: open("launch")
+              }),
+              sidebarItem(h, {
+                icon: "mark-channel",
+                label: "general",
+                count: 2,
+                isCurrent: model.current === "general",
+                onClick: open("general")
+              }),
+              sidebarItem(h, {
+                icon: "mark-channel",
+                label: "design",
+                isPending: false,
+                isCurrent: model.current === "design",
+                onClick: open("design")
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "launch" })).toHaveAttr("aria-description", "Sending…"),
+      expect(within(role("button", { name: "launch" }), text("Sending…"))).toExist(),
+      expect(within(role("button", { name: "launch" }), selector('span[aria-hidden="true"]'))).toHaveText("Sending…"),
+      expect(within(role("button", { name: "launch" }), text("2"))).toBeAbsent(),
+      expect(role("button", { name: "general" })).toHaveAttr("aria-description", "2"),
+      expect(within(role("button", { name: "general" }), text("Sending…"))).toBeAbsent(),
+      expect(role("button", { name: "design" })).not.toHaveAttr("aria-description"),
+      expect(within(role("button", { name: "design" }), text("Sending…"))).toBeAbsent(),
+      click(role("button", { name: "launch" })),
+      expect(role("status")).toHaveText("Current launch, searches 0, creations 0"),
+      expect(role("button", { name: "launch" })).toHaveAttr("aria-current", "page")
+    )
+  })
+
   it("names a person's item by their name, not by the letters on its mark", () => {
     scene(
       { update, view: sidebarView(workspaceSidebar) },

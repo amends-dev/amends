@@ -69,8 +69,8 @@ quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its emai
 connections, the agents, and the channels are each a `paneColumn` of what failed, the list, and the
 form open among it: the list is an `entryList` of `entry`s, or a `paneEmpty` that says what adding
 one does, and the form is a `paneForm` titled as the form is named, holding the design's fields,
-selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of
-its submit and a quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit while the
+selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of its submit and a
+quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit while the
 host answers. Adding is the secondary button among the header's actions, shown only when the person
 may, the host's integrations are listed, and a connection gives what the thing needs; the line
 that says the integrations are loading, or that no connection gives models or channels, is a
@@ -168,7 +168,8 @@ the pages that compose them; the root composes the pages.
   `modal`, a team by its name and whether anyone in the workspace can join, with the name field taking
   the focus as the dialog opens, and a conversation by the member and the first message, with the
   member choice taking it. Cancel, Close, Escape, a click on the scrim, and submitting each close the
-  dialog, which drops what was being started. It reports the group picked, and its parent tells it which group is open, so the one
+  dialog, which drops what was being started. A group still on its way shows "Sending…" at the end
+  of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group.
 - `feature/inbox`: the notifications waiting for the person, newest first, each as the message it is
@@ -436,8 +437,8 @@ browser's storage. Each Block's tests sit beside it:
   someone who manages them; and its side pane for the thread open in it,
   with the composer to reply in its footer, closed by its Close button or its Back, which send the
   same message; the groups listed in the
-  sidebar's sections apart from the teams to join, a conversation by its other member, with the
-  thread open under the group picked, and a new team taken in a dialog named for it, with the name
+  sidebar's sections apart from the teams to join, a conversation by its other member, one still on
+  its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
   a dialog of its own, and the same team taken from the workspace's sidebar; the inbox's notifications by their author, the
