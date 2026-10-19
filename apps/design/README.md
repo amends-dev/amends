@@ -36,9 +36,9 @@ pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
-the current row, with a context line under the author and a quiet action, with a form in place of
-the text, and set apart by dividers, centered and at the start, and notifications under the days
-Today and Yesterday, unread with a dot and a quiet action and read; a pane's empty state with a title
+the current row, with a form in place of the text, and set apart by dividers, centered and at the
+start, and notifications under the days Today and Yesterday, unread with a dot and a quiet action and
+read; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
 own; the composer empty and filled; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups, one of them still on its way, and direct messages through
@@ -438,12 +438,10 @@ What a conversation is made of.
 - `messageList(h, { label, children })` is an `ol` named by `label`, a column with no list style, of
   `message`s, `notification`s, and `divider`s.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
-  then a column of the author line, the context, the text, and the meta row. The author line is the
+  then a column of the author line, the text, and the meta row. The author line is the
   `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
   formatted, and a `note` after that as ` · ${note}`, such as "edited" or "Sending…"; `actions` are
-  quiet buttons at its end, such as Edit and Delete. The `context` is a line under it at `meta` size in
-  `ink-muted`, saying where the message comes from, such as a notification's thread and group. The
-  `text` is at body size, a string or `TextRun`s (below); with `onOpen` it is a button named by the
+  quiet buttons at its end, such as Edit and Delete. The `text` is at body size, a string or `TextRun`s (below); with `onOpen` it is a button named by the
   text that sends `onOpen`, aligned to the start, underlined on hover, for a message that is the start
   of a thread, and `body` takes its place, such as the form that edits it. `meta` is a row of quiet
   facts under the text at hint size, such as a `replyLine`, "2 new", and a task's status. `isCurrent` fills the row
@@ -578,7 +576,7 @@ toast by `role("alert")` with its text, detail, and button, in the stack's live 
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and
 Cancel by closing the dialog without sending the form; a message by
-its text button, `aria-current`, its note, context, actions, meta, and body, a mention in its text by the
+its text button, `aria-current`, its note, actions, meta, and body, a mention in its text by the
 chip that holds it and a button by the words joined, a notification by its
 text button named by its author and activity and described by its text, its place, age, and actions,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its

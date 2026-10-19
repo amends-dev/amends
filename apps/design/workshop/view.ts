@@ -860,36 +860,6 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A context line under the author, the text that opens the thread, and a quiet action",
-      [
-        messageList(h, {
-          label: "Notifications",
-          children: [
-            message(h, {
-              key: "composer-fix",
-              mark: "S",
-              author: "Sara",
-              time: "10:02 AM",
-              context: "Composer paste crash in general",
-              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
-              onOpen: press,
-              actions: [button(h, "Mark seen", press, { variant: "quiet" })]
-            }),
-            message(h, {
-              key: "activity",
-              mark: "?",
-              author: "Activity",
-              time: "9:30 AM",
-              text: "New activity",
-              actions: [button(h, "Mark seen", press, { variant: "quiet" })]
-            })
-          ]
-        })
-      ],
-      conversationColumn
-    ),
-    sample(
-      h,
       "Notifications under their days: unread, with a dot and a quiet action, and read",
       [
         messageList(h, {

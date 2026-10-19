@@ -249,38 +249,6 @@ describe("message", () => {
     )
   })
 
-  it("shows its context under the author line, apart from its text, and nothing without one", () => {
-    const notifications = (withContext: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
-      messageList(h, {
-        label: "Notifications",
-        children: [
-          message(h, {
-            key: "notification-1",
-            mark: "B",
-            author: "Bob",
-            time: "9:41 AM",
-            ...(withContext ? { context: "Plans for the week in General" } : {}),
-            text: "Sounds good",
-            onOpen: Message.OpenedThread({ key: "notification-1" })
-          })
-        ]
-      })
-
-    scene(
-      { update, view: viewOf(notifications(true)) },
-      given(initial),
-      expect(text("Plans for the week in General")).toExist(),
-      expect(role("button", { name: "Sounds good" })).toExist(),
-      expect(role("button", { name: "Plans for the week in General" })).toBeAbsent()
-    )
-    scene(
-      { update, view: viewOf(notifications(false)) },
-      given(initial),
-      expect(role("button", { name: "Sounds good" })).toExist(),
-      expect(text("Plans for the week in General")).toBeAbsent()
-    )
-  })
-
   it("shows its body in place of its text", () => {
     scene(
       {
