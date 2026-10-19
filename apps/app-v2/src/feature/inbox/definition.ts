@@ -16,7 +16,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorName, groupName, messageText, threadLabel } from "../../seen.ts"
+import { authorName, groupName, initials, messageText, threadLabel } from "../../seen.ts"
 
 /**
  * A notification, the thread it comes from with its opening message, and the message its activity
@@ -98,21 +98,24 @@ export const threadOfNotification = (
     model.items.find(({ notification }) => notification.id === notificationId)?.notification.thread
   )
 
-/**
- * What a notification tells the person: who wrote the message it is about, and in which thread, as
- * its group lists it.
- */
-export const describeNotification = (item: InboxItem, model: Model): string => {
-  const what = Option.match(item.message, {
-    onNone: () => "New activity",
-    onSome: (message) => `${authorName(message, model.members, model.contacts)}: ${messageText(message)}`
-  })
-  return Option.match(item.thread, {
-    onNone: () => what,
-    onSome: (thread) => {
-      const group = model.groups.find(({ id }) => id === thread.groupId)
-      const label = threadLabel(thread, item.opening)
-      return `${what} · ${group === undefined ? label : `${label} in ${groupName(group, model.members, model.memberId)}`}`
+/** Who wrote the message a notification's activity is about, with the letters that mark them, or the activity alone. */
+export const notificationAuthor = (item: InboxItem, model: Model): Readonly<{ name: string; mark: string }> =>
+  Option.match(item.message, {
+    onNone: () => ({ name: "Activity", mark: "?" }),
+    onSome: (message) => {
+      const name = authorName(message, model.members, model.contacts)
+      return { name, mark: initials(name) }
     }
   })
-}
+
+/** Where a notification comes from: its thread, and the group as its members list it, when the store holds them. */
+export const notificationContext = (item: InboxItem, model: Model): Option.Option<string> =>
+  Option.map(item.thread, (thread) => {
+    const label = threadLabel(thread, item.opening)
+    const group = model.groups.find(({ id }) => id === thread.groupId)
+    return group === undefined ? label : `${label} in ${groupName(group, model.members, model.memberId)}`
+  })
+
+/** What the message a notification's activity is about says, or that there was activity. */
+export const notificationText = (item: InboxItem): string =>
+  Option.match(item.message, { onNone: () => "New activity", onSome: messageText })

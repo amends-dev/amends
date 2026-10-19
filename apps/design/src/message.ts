@@ -20,6 +20,8 @@ const authorName = "min-w-0 truncate text-item font-medium text-ink"
 
 const timeLine = "flex-none text-meta text-ink-muted"
 
+const contextLine = "m-0 text-meta text-ink-muted"
+
 const actionsRow = "-my-1.5 ms-auto flex flex-none items-center gap-1 self-center"
 
 const textLook = "m-0 text-body wrap-break-word text-ink"
@@ -83,11 +85,13 @@ const renderText = <Message, Requirements>(
 /**
  * One message, a row of a `messageList` keyed by `key`: the author's `mark` letters, then the `author`
  * with the `time` after it and a `note` after that, such as "edited" or "Sending…", and the `text`. Under
- * the text, `meta` is a row of quiet facts, such as how much is new, and at the end of the author line,
- * `actions` are quiet buttons, such as Edit and Delete. `onOpen` makes the text a button named by it that
- * sends `onOpen`, for a message that is the start of a thread; `body` takes the text's place, for the form
- * that changes it. The current row is filled with the 2px bar and `aria-current="true"`, and a row
- * reaches 12px into the pane's gutter so its fill reaches past the text.
+ * the author line, a `context` is a quieter line saying where the message comes from, such as the thread
+ * and the group of a notification. Under the text, `meta` is a row of quiet facts, such as how much is
+ * new, and at the end of the author line, `actions` are quiet buttons, such as Edit and Delete. `onOpen`
+ * makes the text a button named by it that sends `onOpen`, for a message that is the start of a thread;
+ * `body` takes the text's place, for the form that changes it. The current row is filled with the 2px bar
+ * and `aria-current="true"`, and a row reaches 12px into the pane's gutter so its fill reaches past the
+ * text.
  */
 export const message = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -97,6 +101,7 @@ export const message = <Message, Requirements>(
     author: string
     time?: string | undefined
     note?: string | undefined
+    context?: string | undefined
     text: string
     onOpen?: Message
     body?: Html | undefined
@@ -124,6 +129,7 @@ export const message = <Message, Requirements>(
               actions.length === 0 ? h.empty : h.div([h.Class(actionsRow)], actions)
             ]
           ),
+          config.context === undefined ? h.empty : h.p([h.Class(contextLine)], [config.context]),
           config.body ?? renderText(h, config),
           meta.length === 0 ? h.empty : h.div([h.Class(metaRow)], meta)
         ]

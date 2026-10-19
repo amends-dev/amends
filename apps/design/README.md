@@ -28,8 +28,10 @@ two, each in a frame of its own; the marks by size; what a pane says about one t
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
 a log short and long, and a pane's sections as a task to change, a task to read, and the turns; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
-actions, and meta, with a form in place of the text, and set apart by dividers, centered and at the
-start; the composer empty and filled; the shell twice, with and without its side pane, each in a
+actions, and meta, with a context line under the author and a quiet action, with a form in place of
+the text, and set apart by dividers, centered and at the start; a pane's empty state with a title
+and a line of copy under a header with an action, and with a title alone, each in a frame of its
+own; the composer empty and filled; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups and direct messages through `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
 as a plain row under its group and the second with its notices; and the icons by size, as the shell
@@ -271,6 +273,11 @@ The third and fourth layout patterns share one structure.
 onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
   a 2px `indicator` bar under it. The tab is named by its label and described by its `count`, which
   shows in a badge after it. Tabs are all in the tab order; arrow keys do not move between them.
+- `paneEmpty(h, { icon, title, copy? })` is what a pane's body says when it has nothing to list, a
+  centered column 64px under the header and 20rem wide at most: a 40px square on `subtle` holding the
+  `icon` at `md` in `ink-secondary`, the `title` as an `h2` at item size in medium weight, under the
+  pane's `h1`, and the `copy` under it at hint size in `ink-muted`. The icon is hidden from assistive
+  technology.
 - `paneColumn(h, children)` is the one column of a page about one item: 680px at most, its sections
   40px apart, with nothing beside it.
 - `paneSection(h, { title, trailing?, children })` is a section of that column, a `section` named by
@@ -308,10 +315,12 @@ What a conversation is made of.
 - `messageList(h, { label, children })` is an `ol` named by `label`, a column with no list style, of
   `message`s and `divider`s.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
-  then a column of the author line, the text, and the meta row. The author line is the `author` at
-  item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already formatted, and
-  a `note` after that as ` · ${note}`, such as "edited" or "Sending…"; `actions` are quiet buttons at its
-  end, such as Edit and Delete. The `text` is at body size; with `onOpen` it is a button named by the
+  then a column of the author line, the context, the text, and the meta row. The author line is the
+  `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
+  formatted, and a `note` after that as ` · ${note}`, such as "edited" or "Sending…"; `actions` are
+  quiet buttons at its end, such as Edit and Delete. The `context` is a line under it at `meta` size in
+  `ink-muted`, saying where the message comes from, such as a notification's thread and group. The
+  `text` is at body size; with `onOpen` it is a button named by the
   text that sends `onOpen`, aligned to the start, underlined on hover, for a message that is the start
   of a thread, and `body` takes its place, such as the form that edits it. `meta` is a row of quiet
   facts under the text at hint size, such as "2 new" and a task's status. `isCurrent` fills the row
@@ -360,12 +369,13 @@ icon by `role("img", { name })` when it has a label and as `aria-hidden` when it
 destination by `role("button", { name })` with `aria-current`; a sidebar item by its name with
 `aria-current` and its count, the row under it as a button or as a plain row, and the sections of
 `sidebarSections` among the sidebar's own; a tab by `role("tab")` with `aria-selected`; a pane's
-section by `role("region")` and its `h3`, its trailing pieces and children; a detail list's labels
+section by `role("region")` and its `h3`, its trailing pieces and children; a pane's empty state by
+its `h2` under the pane's `h1`, its copy, and its icon as `aria-hidden`; a detail list's labels
 and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
 toast by `role("alert")` with its text, detail, and button, in the stack's live region; a message by
-its text button, `aria-current`, its note, actions, meta, and body, and a divider by its label in
+its text button, `aria-current`, its note, context, actions, meta, and body, and a divider by its label in
 the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices. They query no class.

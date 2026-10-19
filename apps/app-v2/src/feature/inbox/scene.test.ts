@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
-import { Option } from "effect"
-import { Command, Subscription, click, expect, expectOutMessage, given, role, scene, text } from "foldkit/scene"
+import { Option, Struct } from "effect"
+import { Command, Subscription, click, expect, expectOutMessage, given, role, scene, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { bob, general, membership, notificationOf, opening, reply, thread } from "../../../test/fixtures.ts"
 import { InboxBlock } from "./block.ts"
@@ -32,11 +32,14 @@ const opened = modifyFields(init(workspace.id, member.id).model, {
 })
 
 describe("the inbox", () => {
-  it("shows each notification by the message it is about and the thread it comes from, and marks them all seen", () => {
+  it("shows each notification as a message of its author, with the thread it comes from, and marks them all seen", () => {
     scene(
       { update, view, subscriptions: InboxBlock.subscriptions },
       given(opened),
-      expect(text("Bob: Sounds good · Plans for the week in General")).toExist(),
+      expect(within(role("list", { name: "Notifications" }), text("Bob"))).toExist(),
+      expect(within(role("list", { name: "Notifications" }), text("Plans for the week in General"))).toExist(),
+      expect(within(role("list", { name: "Notifications" }), role("button", { name: "Sounds good" }))).toExist(),
+      expect(text("Nothing new.")).toBeAbsent(),
       click(role("button", { name: "Mark all seen" })),
       Command.expectExact(
         MarkAllNotificationsSeen({ ...asMember, through: { recordedAt: notification.recordedAt, id: notification.id } })
@@ -44,7 +47,9 @@ describe("the inbox", () => {
       Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
       // Once nothing waits, the inbox says so.
       Subscription.emit(subscriptions.inbox, Message.ReceivedInbox({ items: [] })),
+      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
       expect(text("Nothing new.")).toExist(),
+      expect(role("list", { name: "Notifications" })).toBeAbsent(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent()
     )
   })
@@ -60,7 +65,8 @@ describe("the inbox", () => {
         Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
       ),
       expect(text("This browser could not keep that. Try again.")).toExist(),
-      click(role("button", { name: "Open" })),
+      expect(role("button", { name: "Open" })).toBeAbsent(),
+      click(role("button", { name: "Sounds good" })),
       expectOutMessage(OutMessage.OpenedThread({ groupId: general.id, threadId: thread.id }))
     )
   })
@@ -69,7 +75,34 @@ describe("the inbox", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { items: () => [{ ...bobsReply, thread: Option.none(), message: Option.none() }] })),
-      expect(text("New activity")).toExist()
+      expect(text("Activity")).toExist(),
+      expect(role("button", { name: "New activity" })).toExist(),
+      expect(text(/ in /)).toBeAbsent(),
+      click(role("button", { name: "New activity" })),
+      expectOutMessage(OutMessage.OpenedThread({ groupId: general.id, threadId: thread.id }))
+    )
+  })
+
+  it("shows the text of a notification that comes from no thread as plain text, with nothing to open", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          items: () => [{ ...bobsReply, notification: Struct.omit(notification, ["thread"]), thread: Option.none() }]
+        })
+      ),
+      expect(text("Sounds good")).toExist(),
+      expect(role("button", { name: "Sounds good" })).toBeAbsent(),
+      expect(role("button", { name: "Mark seen" })).toExist()
+    )
+  })
+
+  it("shows the thread alone while the store does not hold its group", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { groups: () => [] })),
+      expect(text("Plans for the week")).toExist(),
+      expect(text("Plans for the week in General")).toBeAbsent()
     )
   })
 })

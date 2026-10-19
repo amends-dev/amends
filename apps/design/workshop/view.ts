@@ -22,7 +22,7 @@ import { form, inline, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
 import { divider, message, messageList } from "../src/message.ts"
-import { pane, paneClose, paneColumn, paneSection, paneTabs } from "../src/pane.ts"
+import { pane, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
 import {
@@ -76,6 +76,8 @@ const iconSizeRow = "flex items-end gap-4"
 const conversationColumn = "flex max-w-xl flex-col px-3"
 
 const composerColumn = "flex max-w-md flex-col"
+
+const emptyPaneFrame = "flex h-96 flex-col outline outline-outline"
 
 const sidePaneColumn = "flex w-98 flex-col"
 
@@ -642,6 +644,36 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
+      "A context line under the author, the text that opens the thread, and a quiet action",
+      [
+        messageList(h, {
+          label: "Notifications",
+          children: [
+            message(h, {
+              key: "composer-fix",
+              mark: "S",
+              author: "Sara",
+              time: "10:02 AM",
+              context: "Composer paste crash in general",
+              text: "@Jamie can you check the composer fix before we ship?",
+              onOpen: press,
+              actions: [button(h, "Mark seen", press, { variant: "quiet" })]
+            }),
+            message(h, {
+              key: "activity",
+              mark: "?",
+              author: "Activity",
+              time: "9:30 AM",
+              text: "New activity",
+              actions: [button(h, "Mark seen", press, { variant: "quiet" })]
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
       "A body in place of the text",
       [
         messageList(h, {
@@ -683,6 +715,49 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
         })
       ],
       conversationColumn
+    )
+  ])
+}
+
+const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return group(h, "Empty pane", [
+    sample(
+      h,
+      "A title and a line of copy, with an action in the header",
+      [
+        h.div(
+          [h.Class(emptyPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Inbox",
+              header: { title: "Inbox", icon: "mark-mail", actions: [button(h, "Mark all seen", press)] },
+              body: [paneEmpty(h, { icon: "mark-done", title: "You're all caught up", copy: "Nothing new." })]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A title alone",
+      [
+        h.div(
+          [h.Class(emptyPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Tasks",
+              header: { title: "Tasks", icon: "mark-tasks" },
+              body: [paneEmpty(h, { icon: "mark-tasks", title: "No tasks yet" })]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
     )
   ])
 }
@@ -1233,6 +1308,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           markGroup(h),
           detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
+          paneEmptyGroup(h),
           composerGroup(h, model.draft, model.filledDraft),
           formGroup(h),
           directoryGroup(h),

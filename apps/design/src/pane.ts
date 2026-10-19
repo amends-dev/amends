@@ -5,7 +5,7 @@
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { iconButton } from "./control.ts"
+import { hint, iconButton } from "./control.ts"
 import { type IconName, icon } from "./icon.ts"
 import { mark } from "./mark.ts"
 
@@ -46,6 +46,12 @@ const tabButton =
 
 const tabCount =
   "inline-grid h-5 min-w-5 flex-none place-items-center bg-subtle px-1.25 text-meta font-medium text-ink-secondary tabular-nums"
+
+const emptyColumn = "mx-auto flex max-w-80 flex-col items-center gap-1 pt-16 text-center"
+
+const emptyIcon = "mb-2 grid size-10 flex-none place-items-center bg-subtle text-ink-secondary"
+
+const emptyTitle = "m-0 text-item font-medium text-ink"
 
 const columnBody = "flex max-w-170 flex-col gap-10 pt-1"
 
@@ -197,6 +203,24 @@ export const paneTabs = <Message, Requirements>(
         h
       )
     )
+  )
+
+/**
+ * What a pane's body says when it has nothing to list: 64px under the header, centered, a 40px square on
+ * `subtle` holding the `icon`, then the `title` as an `h2`, under the pane's `h1`, and the `copy` under it,
+ * a line of what to do or why, in quiet text. The text is centered and 20rem wide at most.
+ */
+export const paneEmpty = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ icon: IconName; title: string; copy?: string }>
+): Html =>
+  h.div(
+    [h.Class(emptyColumn)],
+    [
+      h.span([h.Class(emptyIcon)], [icon(h, config.icon)]),
+      h.h2([h.Class(emptyTitle)], [config.title]),
+      config.copy === undefined ? h.empty : hint(h, config.copy)
+    ]
   )
 
 /** The one column of a page about one item, 680px at most, its sections 40px apart, with nothing beside it. */

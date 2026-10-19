@@ -57,9 +57,12 @@ initials and the time of day from `src/seen.ts`. The task and the turns a thread
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
 a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
 each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
-and its `log`. The inbox, connections, agents, settings, and channels are still built with
-`src/controls.ts` and switch to `@amends-dev/design/control` a Block at a time; a view that has not
-switched is plain semantic HTML under Tailwind's base styles.
+and its `log`. The inbox lists its notifications as `message`s in a `messageList`, each its author's
+initials and name, its thread and group as the `context` line, its text, which opens the thread, and
+a quiet Mark seen, with Mark all seen among the header's actions, and `paneEmpty` when nothing
+waits. The connections, agents, settings, and channels are still built with `src/controls.ts` and
+switch to `@amends-dev/design/control` a Block at a time; a view that has not switched is plain
+semantic HTML under Tailwind's base styles.
 
 ## The program
 
@@ -132,10 +135,10 @@ the pages that compose them; the root composes the pages.
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group.
 - `feature/inbox`: the notifications waiting for the person, newest first, each as the message it is
-  about: who wrote the message its activity is about, and the thread it comes from, by its title or
-  opening message, in its group, as far as the store holds them. They open a notification's thread,
-  or mark one seen, or every one up to the newest that waits. It reports the thread opened, and
-  offers a count of what waits for its parent to show.
+  about: who wrote the message its activity is about, with its text, and the thread it comes from, by
+  its title or opening message, in its group, as far as the store holds them. Their text opens a
+  notification's thread, and they mark one seen, or every one up to the newest that waits. It reports
+  the thread opened, and offers a count of what waits for its parent to show.
 - `feature/settings`: the workspace's name and the person's own, each renamed in place from the name
   seen, one at a time; the workspace's members with their roles, where, for each member the
   delegation rule, by core's `Delegation.recipientDenial`, lets them act on, they change the role
@@ -359,8 +362,11 @@ browser's storage. Each Block's tests sit beside it:
   with the composer to reply in its footer, closed by its button; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, with the
   thread open under the group picked, and a new team taken only from someone who may create one, a
-  conversation started with the member chosen; the inbox's notifications by the message and thread they are about, marked all
-  seen, one seen with its failure shown, and one's thread opened; the connections added by an owner
+  conversation started with the member chosen; the inbox's notifications by their author, the
+  thread and group they come from, and the message they are about, with the thread alone while the
+  group is unknown and the activity alone while the thread is, marked all seen, one seen with its
+  failure shown, and one's thread opened by its text, and an empty inbox saying it is all caught up;
+  the connections added by an owner
   to an integration, with a key field only for the method that takes one, then checked, with their
   settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
   member without the controls until the person is given the role that manages them, marked as

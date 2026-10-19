@@ -224,7 +224,9 @@ describe("a workspace", () => {
       expect(role("main", { name: "Inbox" })).toBeAbsent(),
       click(role("button", { name: "Inbox" })),
       expect(role("main", { name: "Inbox" })).toExist(),
-      expect(text("Bob: Sounds good · Plans for the week in General")).toExist()
+      expect(within(role("main", { name: "Inbox" }), text("Bob"))).toExist(),
+      expect(within(role("main", { name: "Inbox" }), text("Plans for the week in General"))).toExist(),
+      expect(within(role("main", { name: "Inbox" }), role("button", { name: "Sounds good" }))).toExist()
     )
   })
 

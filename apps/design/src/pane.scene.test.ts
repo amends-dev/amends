@@ -3,10 +3,10 @@ import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, text, within } from "foldkit/scene"
+import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { iconButton, sending } from "./control.ts"
-import { pane, paneClose, paneColumn, paneSection, paneTabs } from "./pane.ts"
+import { pane, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "./pane.ts"
 
 const Tab = Schema.Literals(["threads", "tasks"])
 type Tab = typeof Tab.Type
@@ -203,6 +203,49 @@ describe("paneTabs", () => {
       expect(within(role("tab", { name: "Tasks" }), text("12"))).toExist(),
       expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-description", "12"),
       expect(role("tab", { name: "Threads" })).not.toHaveAttr("aria-description")
+    )
+  })
+})
+
+describe("paneEmpty", () => {
+  const emptyPane = (copy?: string) => (_: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "main",
+      header: { title: "Inbox" },
+      body: [
+        paneEmpty(h, {
+          icon: "mark-done",
+          title: "You're all caught up",
+          ...(copy === undefined ? {} : { copy })
+        })
+      ]
+    })
+
+  it("says its title as an h2 under the pane's h1, with its copy under it", () => {
+    scene(
+      { update, view: paneView(emptyPane("Nothing new.")) },
+      given(initial),
+      expect(within(role("main"), role("heading", { name: "Inbox", level: 1 }))).toExist(),
+      expect(within(role("main"), role("heading", { name: "You're all caught up", level: 2 }))).toExist(),
+      expect(within(role("main"), text("Nothing new."))).toExist()
+    )
+  })
+
+  it("shows no copy when it has none", () => {
+    scene(
+      { update, view: paneView(emptyPane()) },
+      given(initial),
+      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
+      expect(selector("p:not([role])")).toBeAbsent()
+    )
+  })
+
+  it("hides its icon from assistive technology", () => {
+    scene(
+      { update, view: paneView(emptyPane("Nothing new.")) },
+      given(initial),
+      expect(selector("svg")).toHaveAttr("aria-hidden", "true"),
+      expect(role("img")).toBeAbsent()
     )
   })
 })

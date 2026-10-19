@@ -2,9 +2,18 @@ import { Notification } from "@amends-dev/core/notification"
 import { describe, expect, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { general, membership, notificationOf, opening, reply, thread } from "../../../test/fixtures.ts"
+import { modifyFields } from "foldkit/struct"
+import { bob, general, membership, notificationOf, opening, reply, thread } from "../../../test/fixtures.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
-import { Message, OutMessage, waitingCount, waitingNewestFirst } from "./definition.ts"
+import {
+  Message,
+  OutMessage,
+  notificationAuthor,
+  notificationContext,
+  notificationText,
+  waitingCount,
+  waitingNewestFirst
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -39,7 +48,23 @@ const itemOf = (notification: Notification.Notification) => ({
 
 const listed = init(workspace.id, member.id).model
 
+/** The inbox once it knows general and the workspace's members. */
+const known = modifyFields(listed, { groups: () => [general], members: () => [member, bob] })
+
 describe("the inbox", () => {
+  it("tells who wrote what a notification is about, where it comes from, and what it says", () => {
+    const item = itemOf(older)
+    const activity = { ...item, thread: Option.none(), opening: Option.none(), message: Option.none() }
+
+    expect(notificationAuthor(item, known)).toEqual({ name: "Bob", mark: "B" })
+    expect(notificationText(item)).toBe("Sounds good")
+    expect(notificationContext(item, known)).toEqual(Option.some("Plans for the week in General"))
+    expect(notificationContext(item, listed)).toEqual(Option.some("Plans for the week"))
+    expect(notificationAuthor(activity, known)).toEqual({ name: "Activity", mark: "?" })
+    expect(notificationText(activity)).toBe("New activity")
+    expect(notificationContext(activity, known)).toEqual(Option.none())
+  })
+
   it("lists the notifications still waiting, newest first, and counts them", () => {
     story(
       update,
