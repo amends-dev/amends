@@ -8,6 +8,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     TypedWorkspaceName: ({ value }) => ({ model: modifyFields(model, { workspaceName: () => value }) }),
     TypedFullName: ({ value }) => ({ model: modifyFields(model, { fullName: () => value }) }),
     TypedEmail: ({ value }) => ({ model: modifyFields(model, { email: () => value }) }),
+    TypedSignInEmail: ({ value }) => ({ model: modifyFields(model, { signInEmail: () => value }) }),
     TypedCode: ({ value }) => ({ model: modifyFields(model, { code: () => value }) }),
     TypedNotes: ({ value }) => ({ model: modifyFields(model, { notes: () => value }) }),
     ToggledNotifications: ({ isOn }) => ({ model: modifyFields(model, { isNotificationsOn: () => isOn }) }),

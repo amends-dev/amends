@@ -9,7 +9,9 @@
   "exports": {
     "./styles.css": "./src/styles.css",
     "./centered": "./src/centered.ts",
-    "./control": "./src/control.ts"
+    "./control": "./src/control.ts",
+    "./directory": "./src/directory.ts",
+    "./form": "./src/form.ts"
   },
   "scripts": {
     "workshop": "vite",

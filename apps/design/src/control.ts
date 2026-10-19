@@ -1,7 +1,8 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons, labelled
- * fields and boxes, a labelled switch, a choice from a list, why an entry was refused, and that an
- * action is on its way. Each renders with the caller's builder and messages, and carries the look.
+ * fields and boxes, a labelled switch, a choice from a list, a line of hint, why an entry was
+ * refused, and that an action is on its way. Each renders with the caller's builder and messages,
+ * and carries the look.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -13,21 +14,23 @@ import * as Option from "effect/Option"
 import type { Attribute, Html, HtmlBuilder } from "foldkit/html"
 
 const buttonBase =
-  "inline-flex flex-none cursor-pointer items-center justify-center gap-2 border whitespace-nowrap focus-ring aria-disabled:cursor-default"
+  "inline-flex flex-none cursor-pointer items-center justify-center gap-2 whitespace-nowrap focus-ring aria-disabled:cursor-default"
 
 const buttonLooks = {
   primary:
-    "border-transparent bg-action font-medium text-on-action not-aria-disabled:hover:opacity-88 aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
+    "border border-transparent bg-action font-medium text-on-action not-aria-disabled:hover:opacity-88 aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
   secondary:
-    "border-outline bg-action-secondary font-medium text-ink not-aria-disabled:hover:border-outline-strong aria-disabled:border-transparent aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
+    "border border-outline bg-action-secondary font-medium text-ink not-aria-disabled:hover:border-outline-strong aria-disabled:border-transparent aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
   quiet:
-    "border-transparent bg-transparent font-normal text-ink-secondary not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-disabled:text-ink-disabled"
+    "border border-transparent bg-transparent font-normal text-ink-secondary not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-disabled:text-ink-disabled",
+  link: "bg-transparent text-ink underline underline-offset-2 not-aria-disabled:hover:text-ink-secondary aria-disabled:text-ink-disabled"
 }
 
 const buttonRegularSizes = {
   primary: "min-h-9 px-4 text-control max-desktop:min-h-11",
   secondary: "min-h-9 px-4 text-control max-desktop:min-h-11",
-  quiet: "min-h-8 px-2.5 text-hint max-desktop:min-h-11"
+  quiet: "min-h-8 px-2.5 text-hint max-desktop:min-h-11",
+  link: ""
 }
 
 const buttonLargeSize = "min-h-11 px-5 text-item"
@@ -71,12 +74,17 @@ const noticeTones = {
 
 const sendingMark = "text-meta text-ink-muted"
 
+const hintText = "text-hint text-ink-muted"
+
 export type ButtonVariant = keyof typeof buttonLooks
 
 export type ButtonOptions = Readonly<{
-  /** Filled for the action a form exists for, `secondary` (the default) beside it, `quiet` for a row's. */
+  /**
+   * Filled for the action a form exists for, `secondary` (the default) beside it, `quiet` for a row's, and
+   * `link` for underlined text in a sentence, at the size around it.
+   */
   variant?: ButtonVariant
-  /** `large` is 44px, for the centered screens. */
+  /** `large` is 44px, for the centered screens. A `link` is as tall as its line. */
   size?: "large"
   /** Fill the container's width. */
   wide?: boolean
@@ -103,7 +111,7 @@ const renderButton = <Message, Requirements>(
   const className = joinClasses(
     buttonBase,
     buttonLooks[variant],
-    options.size === "large" ? buttonLargeSize : buttonRegularSizes[variant],
+    options.size === "large" && variant !== "link" ? buttonLargeSize : buttonRegularSizes[variant],
     options.wide === true && buttonWide
   )
 
@@ -144,6 +152,10 @@ export const notice = <Message, Requirements>(
       h.p([h.Role("alert"), h.Class(joinClasses(noticeBase, noticeTones[options.tone ?? "danger"]))], [text])
   })
 
+/** A line of quiet text, such as what to know about the control above or below it. */
+export const hint = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
+  h.p([h.Class(hintText)], [text])
+
 /** That what the person did is on its way to the server, while it is. */
 export const sending = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, pending: boolean): Html =>
   pending ? h.span([h.Class(sendingMark)], [" · Sending…"]) : h.empty
@@ -160,7 +172,10 @@ const describeError = <Message, Requirements>(
   return h.div([...descriptionAttributes, h.Class(fieldErrorSpacing)], [notice(h, error)])
 }
 
-/** A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if it was. */
+/**
+ * A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if
+ * it was. The `placeholder` shows an example of what to enter while it is empty.
+ */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
@@ -169,6 +184,7 @@ export const field = <Message, Requirements>(
     type: string
     value: string
     onInput: (value: string) => Message
+    placeholder?: string
     isAutofocus?: boolean
   }>,
   error: Option.Option<string>
@@ -187,7 +203,11 @@ export const field = <Message, Requirements>(
           [h.Class(fieldColumn)],
           [
             h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
-            h.input([...attributes.input, h.Class(inputBox)]),
+            h.input([
+              ...attributes.input,
+              ...(config.placeholder === undefined ? [] : [h.Placeholder(config.placeholder)]),
+              h.Class(inputBox)
+            ]),
             describeError(h, attributes.description, error)
           ]
         )

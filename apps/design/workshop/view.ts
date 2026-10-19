@@ -1,7 +1,9 @@
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { centered, copy, heading } from "../src/centered.ts"
-import { button, choiceSelect, field, notice, sending, submit, textarea, toggle } from "../src/control.ts"
+import { button, choiceSelect, field, hint, notice, sending, submit, textarea, toggle } from "../src/control.ts"
+import { row, section } from "../src/directory.ts"
+import { form, inline, valueWithAction } from "../src/form.ts"
 import { type ApplicationViewBuilder, ApplicationComposition } from "./composition.ts"
 import { Message, type Plan } from "./definition.ts"
 
@@ -23,15 +25,16 @@ const sampleStack = "flex max-w-sm flex-col gap-4"
 
 const screenFrame = "h-144 outline outline-outline [--amends-screen-height:36rem]"
 
-const formStack = "mt-9 flex flex-col gap-4"
-
 const planChoices: ReadonlyArray<readonly [Plan, string]> = [
   ["free", "Free"],
   ["team", "Team"],
   ["enterprise", "Enterprise"]
 ]
 
-const workspaces = ["Mercier & Co", "Northwind", "Contoso"]
+const workspaces: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
+  { name: "Mercier & Co", meta: "12 members · as Alex" },
+  { name: "Fieldwork", meta: "4 members · as Alex" }
+]
 
 const emailError = (email: string): Option.Option<string> =>
   /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? Option.none() : Option.some("Enter a complete email address.")
@@ -73,13 +76,17 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
       [button(h, "Primary", press, { variant: "primary", wide: true }), button(h, "Secondary", press, { wide: true })],
       sampleStack
     ),
-    sample(h, "Submit", [h.form([h.OnSubmit(press)], [submit(h, "Send a code")])])
+    sample(h, "Submit", [h.form([h.OnSubmit(press)], [submit(h, "Send a code")])]),
+    sample(h, "Link", [
+      h.p([], ["Wrong address? ", button(h, "Change email", press, { variant: "link" })]),
+      button(h, "Disabled link", press, { variant: "link", isDisabled: true })
+    ])
   ])
 }
 
 const fieldGroup = (
   h: ApplicationViewBuilder,
-  model: Readonly<{ workspaceName: string; fullName: string; email: string; notes: string }>
+  model: Readonly<{ workspaceName: string; fullName: string; email: string; signInEmail: string; notes: string }>
 ): Html =>
   group(h, "Fields", [
     sample(
@@ -139,6 +146,27 @@ const fieldGroup = (
       ],
       sampleStack
     ),
+    sample(
+      h,
+      "Placeholder",
+      [
+        field(
+          h,
+          {
+            id: "sign-in-email",
+            label: "Email",
+            type: "email",
+            value: model.signInEmail,
+            placeholder: "you@example.com",
+            onInput: (value) => Message.TypedSignInEmail({ value }),
+            isAutofocus: false
+          },
+          Option.none()
+        )
+      ],
+      sampleStack
+    ),
+    sample(h, "Hint", [hint(h, "Use your most recent code.")], sampleStack),
     sample(
       h,
       "Textarea",
@@ -210,53 +238,136 @@ const noticeGroup = (h: ApplicationViewBuilder): Html =>
     sample(h, "Sending", [h.p([], ["Rename workspace", sending(h, true)])])
   ])
 
-const formScreen = (h: ApplicationViewBuilder, code: string): Html =>
+const emailScreen = (h: ApplicationViewBuilder, signInEmail: string): Html =>
   centered(h, {
     brand: "amends",
-    actions: [button(h, "Sign out", Message.ClickedButton(), { variant: "quiet" })],
     width: "form",
     children: [
-      heading(h, "Sign in"),
-      copy(h, "Enter the code sent to ada@example.com"),
-      h.form(
-        [h.OnSubmit(Message.ClickedButton()), h.Class(formStack)],
-        [
-          field(
-            h,
-            {
-              id: "code",
-              label: "Code",
-              type: "text",
-              value: code,
-              onInput: (value) => Message.TypedCode({ value }),
-              isAutofocus: false
-            },
-            Option.none()
-          ),
-          submit(h, "Sign in", { size: "large", wide: true })
-        ]
-      )
+      heading(h, "Sign in to amends"),
+      copy(h, "Use your email to get a one-time code."),
+      form(h, { onSubmit: Message.ClickedButton(), label: "Sign in" }, [
+        field(
+          h,
+          {
+            id: "screen-email",
+            label: "Email",
+            type: "email",
+            value: signInEmail,
+            placeholder: "you@example.com",
+            onInput: (value) => Message.TypedSignInEmail({ value }),
+            isAutofocus: false
+          },
+          Option.none()
+        ),
+        submit(h, "Continue", { size: "large", wide: true }),
+        hint(h, "Your workspaces appear after you sign in.")
+      ])
     ]
   })
+
+const codeScreen = (h: ApplicationViewBuilder, code: string): Html =>
+  centered(h, {
+    brand: "amends",
+    width: "form",
+    children: [
+      heading(h, "Enter your code"),
+      copy(h, "Enter the six-digit code for"),
+      valueWithAction(
+        h,
+        "alex@mercier.example",
+        button(h, "Change email", Message.ClickedButton(), { variant: "link" })
+      ),
+      form(h, { onSubmit: Message.ClickedButton(), label: "Verify" }, [
+        field(
+          h,
+          {
+            id: "screen-code",
+            label: "Verification code",
+            type: "text",
+            value: code,
+            onInput: (value) => Message.TypedCode({ value }),
+            isAutofocus: false
+          },
+          Option.none()
+        ),
+        hint(h, "Use your most recent code."),
+        submit(h, "Verify code", { size: "large", wide: true }),
+        inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedButton(), { variant: "link" })])
+      ])
+    ]
+  })
+
+const workspaceList = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [],
+    workspaces.map(({ name, meta }) =>
+      h.keyed("li")(
+        name,
+        [],
+        [row(h, { mark: name.slice(0, 1), title: name, meta, action: "Open →", onClick: Message.ClickedButton() })]
+      )
+    )
+  )
 
 const directoryScreen = (h: ApplicationViewBuilder): Html =>
   centered(h, {
     brand: "amends",
-    actions: [button(h, "Sign out", Message.ClickedButton(), { variant: "quiet" })],
+    actions: [inline(h, ["alex@mercier.example"]), button(h, "Sign out", Message.ClickedButton())],
     width: "directory",
     children: [
       heading(h, "Choose a workspace"),
-      copy(h, "Pick one to open."),
-      h.div(
-        [h.Class(formStack)],
-        workspaces.map((name) => button(h, name, Message.ClickedButton(), { size: "large", wide: true }))
-      )
+      copy(h, `${workspaces.length} workspaces`),
+      section(h, { label: "Your workspaces", count: workspaces.length }),
+      workspaceList(h)
     ]
   })
 
-const centeredGroup = (h: ApplicationViewBuilder, code: string): Html =>
+const directoryGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Directory", [
+    sample(
+      h,
+      "Section and rows",
+      [section(h, { label: "Your workspaces", count: workspaces.length }), workspaceList(h)],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Row without meta or action",
+      [row(h, { mark: "N", title: "Northstar Studio", onClick: Message.ClickedButton() })],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col")
+  ])
+
+const formGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Form", [
+    sample(
+      h,
+      "Form, inline text, and a value with its link",
+      [
+        valueWithAction(
+          h,
+          "alex@mercier.example",
+          button(h, "Change email", Message.ClickedButton(), { variant: "link" })
+        ),
+        form(h, { onSubmit: Message.ClickedButton(), label: "Example" }, [
+          submit(h, "Verify code", { size: "large", wide: true }),
+          inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedButton(), { variant: "link" })])
+        ])
+      ],
+      sampleStack
+    )
+  ])
+
+const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: string): Html =>
   group(h, "Centered screen", [
-    sample(h, "Form width", [h.div([h.Class(screenFrame)], [formScreen(h, code)])], "flex flex-col"),
+    sample(
+      h,
+      "Form width, email step",
+      [h.div([h.Class(screenFrame)], [emailScreen(h, signInEmail)])],
+      "flex flex-col"
+    ),
+    sample(h, "Form width, code step", [h.div([h.Class(screenFrame)], [codeScreen(h, code)])], "flex flex-col"),
     sample(h, "Directory width", [h.div([h.Class(screenFrame)], [directoryScreen(h)])], "flex flex-col")
   ])
 
@@ -271,7 +382,9 @@ export const view = ApplicationComposition.makeView((model, h) => ({
       toggleGroup(h, model.isNotificationsOn, model.isDigestOn),
       selectGroup(h, model.plan),
       noticeGroup(h),
-      centeredGroup(h, model.code)
+      formGroup(h),
+      directoryGroup(h),
+      centeredGroup(h, model.signInEmail, model.code)
     ]
   )
 }))

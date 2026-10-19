@@ -1,43 +1,61 @@
-import { field, submit } from "../../controls.ts"
+import { copy, heading } from "@amends-dev/design/centered"
+import { button, field, hint, submit } from "@amends-dev/design/control"
+import { form, inline, valueWithAction } from "@amends-dev/design/form"
 import { SignInComposition } from "./composition.ts"
 import { Message, SignInForm } from "./definition.ts"
 
 export const view = SignInComposition.makeView((model, h) =>
   SignInForm.match(model.form, {
     EnteringEmail: ({ email, error }) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedEmail())],
+      h.div(
+        [],
         [
-          h.h1([], ["Sign in"]),
-          field(
-            h,
-            {
-              id: "email",
-              label: "Email",
-              type: "email",
-              value: email,
-              onInput: (email) => Message.TypedEmail({ email })
-            },
-            error
-          ),
-          submit(h, "Send a code")
+          heading(h, "Sign in to amends"),
+          copy(h, "Use your email to get a one-time code."),
+          form(h, { onSubmit: Message.SubmittedEmail(), label: "Sign in" }, [
+            field(
+              h,
+              {
+                id: "email",
+                label: "Email",
+                type: "email",
+                value: email,
+                placeholder: "you@example.com",
+                onInput: (email) => Message.TypedEmail({ email })
+              },
+              error
+            ),
+            submit(h, "Continue", { size: "large", wide: true }),
+            hint(h, "Your workspaces appear after you sign in.")
+          ])
         ]
       ),
-    SendingCode: ({ email }) => h.p([], [`Sending a code to ${email}…`]),
+    SendingCode: ({ email }) => h.div([], [heading(h, "Sign in to amends"), copy(h, `Sending a code to ${email}…`)]),
     EnteringCode: ({ email, code, error }) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedCode())],
+      h.div(
+        [],
         [
-          h.h1([], ["Sign in"]),
-          h.p([], [`Enter the code sent to ${email}.`]),
-          field(
-            h,
-            { id: "code", label: "Code", type: "text", value: code, onInput: (code) => Message.TypedCode({ code }) },
-            error
-          ),
-          submit(h, "Sign in")
+          heading(h, "Enter your code"),
+          copy(h, "Enter the six-digit code for"),
+          valueWithAction(h, email, button(h, "Change email", Message.ClickedChangeEmail(), { variant: "link" })),
+          form(h, { onSubmit: Message.SubmittedCode(), label: "Verification" }, [
+            field(
+              h,
+              {
+                id: "code",
+                label: "Verification code",
+                type: "text",
+                value: code,
+                onInput: (code) => Message.TypedCode({ code })
+              },
+              error
+            ),
+            hint(h, "Use your most recent code."),
+            submit(h, "Verify code", { size: "large", wide: true }),
+            inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedSendAgain(), { variant: "link" })])
+          ])
         ]
       ),
-    CheckingCode: () => h.p([], ["Checking the code…"])
+    CheckingCode: () => h.div([], [heading(h, "Enter your code"), copy(h, "Checking the code…")])
   })
 )

@@ -5,6 +5,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     workspaceName: "",
     fullName: "Ada Lovelace",
     email: "ada@",
+    signInEmail: "",
     code: "",
     notes: "",
     isNotificationsOn: true,

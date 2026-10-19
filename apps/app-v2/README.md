@@ -44,9 +44,13 @@ sign-in codes it sends.
 
 The look is [`@amends-dev/design`](../design/README.md)'s. `vite.config.ts` runs Tailwind,
 `src/styles.css` imports the design's theme, and `index.html` links that stylesheet. A view carries
-no class: classes come from a renderer, and the renderers live in the design package. The views
-build with `src/controls.ts` for now and switch to `@amends-dev/design/control` a Block at a time;
-a view that has not switched is plain semantic HTML under Tailwind's base styles.
+no class: classes come from a renderer, and the renderers live in the design package. The screens
+outside a workspace are composed from it: the root view frames the sign-in page and the workspace
+picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
+forms, fields, and rows from the design's `centered`, `control`, `form`, and `directory` modules.
+The other views build with `src/controls.ts` for now and switch to `@amends-dev/design/control` a
+Block at a time; a view that has not switched, and the open workspace's header, are plain semantic
+HTML under Tailwind's base styles.
 
 ## The program
 
@@ -142,10 +146,11 @@ the pages that compose them; the root composes the pages.
   gone closes.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it.
-- `page/signIn`: signing in, a step at a time; it keeps the session a right code gives, and reports
-  it.
-- `page/workspaces`: the workspaces the person belongs to, listed over HTTP; it reports the one
-  picked.
+- `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
+  which the person can change the email or ask for a new code to the same address; it keeps the
+  session a right code gives, and reports it.
+- `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
+  members it has and the name the person goes by in it; it reports the one picked.
 - `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
   an "Inbox" button with how many notifications wait, "Connections", "Agents", "Settings", and
   "Channels" buttons, and the main content, which shows one destination: nothing yet, the inbox,

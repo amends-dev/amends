@@ -5,7 +5,17 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { change, click, expect, given, label, role, scene, submit, text, type } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { button, choiceSelect, field, notice, sending, submit as submitButton, textarea, toggle } from "./control.ts"
+import {
+  button,
+  choiceSelect,
+  field,
+  hint,
+  notice,
+  sending,
+  submit as submitButton,
+  textarea,
+  toggle
+} from "./control.ts"
 
 const Message = defineMessageUnion({
   ClickedSave: {},
@@ -97,6 +107,7 @@ describe("button", () => {
           button(h, "Primary", Message.ClickedSave(), { variant: "primary" }),
           button(h, "Secondary", Message.ClickedSave(), { variant: "secondary" }),
           button(h, "Quiet", Message.ClickedSave(), { variant: "quiet" }),
+          button(h, "Link", Message.ClickedSave(), { variant: "link" }),
           button(h, "Large", Message.ClickedSave(), { size: "large" }),
           button(h, "Wide", Message.ClickedSave(), { wide: true })
         ])
@@ -105,8 +116,23 @@ describe("button", () => {
       expect(role("button", { name: "Primary" })).toExist(),
       expect(role("button", { name: "Secondary" })).toExist(),
       expect(role("button", { name: "Quiet" })).toExist(),
+      expect(role("button", { name: "Link" })).toExist(),
       expect(role("button", { name: "Large" })).toExist(),
       click(role("button", { name: "Wide" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
+    )
+  })
+
+  it("is a link inside a sentence, found by its name, and clicking sends its message", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          h.p([], ["Need a new code? ", button(h, "Send again", Message.ClickedSave(), { variant: "link" })])
+        ])
+      },
+      given(initial),
+      click(role("button", { name: "Send again" })),
       expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
     )
   })
@@ -153,6 +179,32 @@ describe("field", () => {
       expect(label("Email")).toHaveValue("ada@example.com"),
       expect(role("alert")).toBeAbsent(),
       expect(label("Email")).not.toHaveAttr("aria-invalid")
+    )
+  })
+
+  it("shows an example of what to enter while it is empty", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          field(
+            h,
+            {
+              id: "email",
+              label: "Email",
+              type: "email",
+              value: model.email,
+              placeholder: "you@example.com",
+              onInput: (value) => Message.TypedEmail({ value })
+            },
+            Option.none()
+          )
+        ])
+      },
+      given(initial),
+      expect(label("Email")).toHaveAttr("placeholder", "you@example.com"),
+      type(label("Email"), "ada@example.com"),
+      expect(label("Email")).toHaveValue("ada@example.com")
     )
   })
 
@@ -291,6 +343,16 @@ describe("notice", () => {
       { update, view: viewOf((_, h) => [notice(h, Option.none()), notice(h, Option.none(), { tone: "success" })]) },
       given(initial),
       expect(role("alert")).toBeAbsent()
+    )
+  })
+})
+
+describe("hint", () => {
+  it("is a line of text beside the control it is about", () => {
+    scene(
+      { update, view: viewOf((_, h) => [hint(h, "Use your most recent code.")]) },
+      given(initial),
+      expect(text("Use your most recent code.")).toExist()
     )
   })
 })

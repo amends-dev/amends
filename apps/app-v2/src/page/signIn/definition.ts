@@ -1,6 +1,7 @@
 /**
- * Signing in, a step at a time: an address to send a code to, then the code it was sent. It keeps the
- * session a right code gives, and reports it.
+ * Signing in, a step at a time: an address to send a code to, then the code it was sent, from which
+ * the person can go back to change the address or ask for another code. It keeps the session a right
+ * code gives, and reports it.
  */
 
 import * as SignIn from "@amends-dev/gateway/SignIn"
@@ -26,6 +27,8 @@ export const Message = defineMessageUnion({
   SubmittedEmail: {},
   SucceededSendCode: {},
   FailedSendCode: { error: Schema.String },
+  ClickedChangeEmail: {},
+  ClickedSendAgain: {},
   TypedCode: { code: Schema.String },
   SubmittedCode: {},
   SucceededSignIn: { session: SignIn.Session },

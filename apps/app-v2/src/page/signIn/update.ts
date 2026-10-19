@@ -43,6 +43,25 @@ export const update = SignInComposition.makeUpdate((model, message) => {
           () => undefined
         )
       ),
+    ClickedChangeEmail: () =>
+      at(
+        SignInForm.matchOrElse(
+          form,
+          { EnteringCode: ({ email }) => SignInForm.EnteringEmail({ email, error: Option.none() }) },
+          () => undefined
+        )
+      ),
+    ClickedSendAgain: () =>
+      SignInForm.matchOrElse(
+        form,
+        {
+          EnteringCode: ({ email }) => ({
+            model: { form: SignInForm.SendingCode({ email }) },
+            commands: [SendCode({ email })]
+          })
+        },
+        () => ({ model })
+      ),
     TypedCode: ({ code }) =>
       at(
         SignInForm.matchOrElse(

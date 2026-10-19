@@ -23,9 +23,9 @@ const screenBodyWidths = {
   directory: "max-w-212 pt-20 pb-16 max-tablet:pt-6"
 }
 
-const headingText = "text-display font-medium text-ink"
+const headingText = "mb-3 text-display font-medium text-ink"
 
-const copyText = "mt-3 text-item text-ink-secondary"
+const copyText = "text-item text-ink-secondary"
 
 export type CenteredWidth = keyof typeof screenBodyWidths
 
@@ -61,7 +61,7 @@ export const centered = <Message, Requirements>(
     ]
   )
 
-/** The screen's title. */
+/** The screen's title, with the space below it that what follows needs. */
 export const heading = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.h1([h.Class(headingText)], [text])
 

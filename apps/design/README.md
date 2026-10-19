@@ -19,9 +19,11 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide; a field empty, filled, and invalid; a textarea; the
-toggle on and off; a select; the notice tones; `sending`; and the centered screen at both widths,
-each in a frame of fixed height. The toggles, fields, and select take input. Open it to look at a
+buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
+placeholder, filled, and invalid; a hint; a textarea; the toggle on and off; a select; the notice
+tones; `sending`; a form with its inline text and a value with its link; the directory's section
+and rows; and the centered screen as the sign-in's two steps and as the workspace picker, each in a
+frame of fixed height. The toggles, fields, and select take input. Open it to look at a
 piece before a page composes it. It follows the browser's light or dark preference. A browser tab
 that is hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible
 tab. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
@@ -37,7 +39,7 @@ stylesheet imports the theme, and its `index.html` links that stylesheet:
 ```
 
 The theme scans this package's sources for classes itself, so an app adds no `@source`. A view
-imports a renderer by module, `@amends-dev/design/control` or `@amends-dev/design/centered`, and
+imports a renderer by module, such as `@amends-dev/design/control` or `@amends-dev/design/form`, and
 passes it the builder it was given.
 
 ## Tokens
@@ -85,17 +87,22 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 ### `@amends-dev/design/control`
 
 - `button(h, label, onClick, options?)` sends `onClick`. `options.variant` is `"secondary"` (the
-  default, a bordered button), `"primary"` (filled, for the action a form exists for), or `"quiet"`
-  (text only, for a row's actions such as Remove and Cancel). `options.size` is `"large"` for the
-  44px, item-size button of a centered screen. `options.wide` fills the container, and
-  `options.isDisabled` marks it `aria-disabled` and sends nothing. A button is 36px tall, a quiet one
-  32px, and every one 44px on touch.
+  default, a bordered button), `"primary"` (filled, for the action a form exists for), `"quiet"`
+  (text only, for a row's actions such as Remove and Cancel), or `"link"` (underlined text in `ink`,
+  at the size of the line around it with no padding or border, for a link in a sentence such as
+  Change email). `options.size` is `"large"` for the 44px, item-size button of a centered screen; a
+  link ignores it. `options.wide` fills the container, and `options.isDisabled` marks it
+  `aria-disabled` and sends nothing. A button is 36px tall, a quiet one 32px, and every one but a
+  link 44px on touch.
 - `submit(h, label, options?)` is a button of `type="submit"`, primary unless `options.variant`
   says otherwise.
-- `field(h, { id, label, type, value, onInput, isAutofocus? }, error)` is a label over a 42px
-  bordered input with the error, an `Option<string>`, below it as a `notice` that describes the
-  input. A field with an error is `aria-invalid` with a danger border. It takes focus as it shows
+- `field(h, { id, label, type, value, onInput, placeholder?, isAutofocus? }, error)` is a label
+  over a 42px bordered input with the error, an `Option<string>`, below it as a `notice` that
+  describes the input. A field with an error is `aria-invalid` with a danger border. The
+  `placeholder` shows an example of what to enter while it is empty. It takes focus as it shows
   unless `isAutofocus` is `false`.
+- `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the
+  control next to it.
 - `textarea(h, { id, label, value, onInput, rows? })` is the input's look over `rows` lines, three
   unless given.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
@@ -116,13 +123,38 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
   and `"directory"` starts an 800px column near the top. An ancestor that sets
   `--amends-screen-height` shows the card at that height instead of the viewport's, as the
   workshop does to show both widths on one page.
-- `heading(h, text)` is the screen's `h1`, at display size.
+- `heading(h, text)` is the screen's `h1`, at display size, with 12px below it for what follows.
 - `copy(h, text)` is a line of secondary text under the heading.
+
+### `@amends-dev/design/form`
+
+What a form screen is made of beside its controls.
+
+- `form(h, { onSubmit, label? }, children)` is the `form` element sending `onSubmit`, its children
+  in a column with a 16px gap, 36px below the text above it. A `label` becomes its `aria-label`,
+  which makes it a form landmark.
+- `inline(h, children)` is a row of text and links with a 4px gap, at hint size in `ink-secondary`,
+  such as "Need a new code?" beside its Send again link. A child is an `Html` or a string.
+- `valueWithAction(h, value, action)` is what the person entered, in `ink`, with the link that
+  changes it at the right, such as an email and Change email.
+
+### `@amends-dev/design/directory`
+
+What a directory screen lists.
+
+- `section(h, { label, count? })` is the label as an `h2`, the count in a 20px `subtle` badge, and a
+  dashed line in `stitch` running to the right edge, 36px below what is above it.
+- `row(h, { mark, title, meta?, action?, onClick })` is one button the width of its container, at
+  least 76px tall: a 40px square mark holding the `mark` letter on `avatar-neutral`, the `title` at
+  body size over the `meta` at hint size in `ink-secondary`, and the `action` at the right in
+  `ink-secondary`. The row is `hover` on hover. The button is named by the title and described by
+  the meta through `aria-description`, and the mark and the action are hidden from assistive
+  technology. A page lists rows as `li` items of a `ul`.
 
 ## Tests
 
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`, `aria-invalid`,
-and description, a switch by its label, a select's change, and the centered screen's landmarks.
-They query no class.
+and description, a switch by its label, a select's change, the centered screen's landmarks, a form
+by its label, and a row by its title. They query no class.
