@@ -9,10 +9,13 @@
   "exports": {
     "./styles.css": "./src/styles.css",
     "./centered": "./src/centered.ts",
+    "./composer": "./src/composer.ts",
     "./control": "./src/control.ts",
     "./directory": "./src/directory.ts",
     "./form": "./src/form.ts",
     "./icon": "./src/icon.ts",
+    "./mark": "./src/mark.ts",
+    "./message": "./src/message.ts",
     "./pane": "./src/pane.ts",
     "./rail": "./src/rail.ts",
     "./shell": "./src/shell.ts",

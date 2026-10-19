@@ -6,6 +6,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
+import { mark } from "./mark.ts"
 
 const sidebarColumn = "flex w-66 flex-none flex-col overflow-hidden bg-panel"
 
@@ -16,9 +17,6 @@ const sectionsColumn = "flex flex-none flex-col gap-5.5"
 const headerColumn = "flex min-h-24 flex-none flex-col gap-3.5 border-b border-divider px-4.5 pt-4.25 pb-1.75"
 
 const headerRow = "flex h-7 items-center gap-2.5"
-
-const workspaceMark =
-  "grid size-6 flex-none place-items-center bg-avatar-neutral-bg text-hint font-medium text-avatar-neutral-fg uppercase"
 
 const workspaceName = "min-w-0 flex-1 truncate text-body font-medium text-ink"
 
@@ -45,9 +43,6 @@ const itemRow =
   "relative flex h-9.5 w-full cursor-pointer items-center gap-2.5 bg-transparent px-3 text-start text-item text-ink-secondary focus-ring-inset hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium aria-[current=page]:text-ink aria-[current=page]:indicator-bar"
 
 const itemIcon = "flex flex-none text-ink-secondary"
-
-const itemMark =
-  "grid size-5 flex-none place-items-center bg-avatar-neutral-bg text-[0.5625rem] font-medium text-avatar-neutral-fg uppercase"
 
 const itemLabel = "min-w-0 flex-1 truncate"
 
@@ -138,7 +133,7 @@ const renderItemLeading = <Message, Requirements>(
     return h.span([h.Class(itemIcon)], [icon(h, leading.icon, { size: "sm" })])
   }
 
-  return leading.mark === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(itemMark)], [leading.mark])
+  return leading.mark === undefined ? h.empty : mark(h, { text: leading.mark, size: "xs" })
 }
 
 /**
@@ -178,7 +173,7 @@ export const sidebarHeader = <Message, Requirements>(
       h.div(
         [h.Class(headerRow)],
         [
-          h.span([h.AriaHidden(true), h.Class(workspaceMark)], [config.mark]),
+          mark(h, { text: config.mark }),
           h.span([h.Class(workspaceName)], [config.name]),
           h.div([h.Class(headerActions)], config.actions ?? [])
         ]

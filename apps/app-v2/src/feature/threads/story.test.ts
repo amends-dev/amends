@@ -33,7 +33,7 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
   ComposerBinding.embedView({
     slotId: "composer",
     model: listing.composer,
-    viewInputs: { label: "Start a thread", submitLabel: "Start" }
+    viewInputs: { label: "Start a thread", submitLabel: "Start", placeholder: "Message General" }
   }).toParentMessage(message)
 
 describe("a group's threads", () => {

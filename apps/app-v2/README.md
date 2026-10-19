@@ -51,9 +51,12 @@ forms, fields, and rows from the design's `centered`, `control`, `form`, and `di
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups` renders the sidebar's sections, `feature/group`
 the main pane and the side pane, `feature/actions` the toasts, and every destination's view wraps
-its content in its own `pane`. What is inside the panes, the threads, messages, forms, and lists,
-is still built with `src/controls.ts` and switches to `@amends-dev/design/control` a Block at a
-time; a view that has not switched is plain semantic HTML under Tailwind's base styles.
+its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
+composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
+initials and the time of day from `src/seen.ts`. The inbox, connections, agents, settings, and
+channels, and the task and turns a thread embeds, are still built with `src/controls.ts` and switch
+to `@amends-dev/design/control` a Block at a time; a view that has not switched is plain semantic
+HTML under Tailwind's base styles.
 
 ## The program
 
@@ -66,13 +69,20 @@ the pages that compose them; the root composes the pages.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread or a new thread in a
   group, kept as a draft in their browser until they send it. It reports what it sends, and that
-  its text changed.
+  its text changed. Its view takes how the box is labelled, what it shows while it is empty, and what
+  its button says, and is the design's `composer`.
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
   part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
   composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
   reading it marks it read through its latest activity, once for each. The reply composer's changes
   say the person types, at once, then at most as often as typing lasts, by core's
-  `Presence.typingRepeats`, and sending says they stopped.
+  `Presence.typingRepeats`, and sending says they stopped. It has two views. `view`, its canonical
+  one, is the body of a side pane: Follow or Unfollow and Rename in a row, the form to rename it while
+  the person does, the task and the turns, then its messages as a list, the opening first, how many
+  replies follow it, and the replies, each by its author's initials, name, and time, with "Sending…"
+  or "edited" after the time, and Edit and Delete on the person's own, which the form to edit it
+  replaces while they do; and who else types, in a live region under them. It shows no title, which
+  the pane's header has. `replyView` is the reply composer, for the pane's footer.
 - `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
   while the thread tracks none, making it one, when they may create tasks in its group. The thread
@@ -85,16 +95,26 @@ the pages that compose them; the root composes the pages.
   it could not be followed, which says why and offers to follow it again; one log at a time. The
   thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
-  being started, and how much is new, and a composer to start one. It reports the thread picked.
+  being started, and how much is new, and a composer to start one. It reports the thread picked. It
+  has two views, which take the group's members, its name, and the thread open in it from their
+  parent. `view`, its canonical one, lists the threads as messages: each the opening's author, by
+  initials and name ("Someone" until the members are read, and "A thread" when the opening is not read
+  yet), their time, and the thread's title or its opening as the text that opens it, with "Sending…"
+  while it is being started, how much is new, and where its task stands; the thread open is the
+  current row. `composerView` is the composer to start one, for the pane's footer, whose box
+  shows "Message" and the group's name until the person writes.
 - `feature/group`: a group as the person has it open: its name, their part in it, a team's members,
   its threads, and the thread open among them, a keyed occurrence, so opening another makes a fresh
   one and a late result cannot land in the wrong one. It opens with a thread already open when its
   parent gives one. They rename a team, follow it or stop, join a public team or leave one, and,
   where they manage its members, admit and remove them. It has two views. `view`, its canonical one,
   is the group's main pane, titled by its name with its part in it as the header's buttons, its
-  members, and its threads; `threadView` is the thread open in it as a side pane, titled by the
-  thread, with a button that closes it, and nothing while none is open. The page embeds the Block
-  twice, `view` in the shell's main pane and `threadView` in its side pane.
+  members, and its threads, with the composer to start one in the footer, which a team the person
+  has not joined does not have; `threadView` is the thread open in it as a side pane, titled by the
+  thread, with a button that closes it, the thread's messages, and the reply composer in the footer,
+  and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
+  and `threadView` in its side pane. The main pane embeds the threads Block twice and the side pane
+  the thread Block twice, once for its content and once for its composer, each in a slot of its own.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to by name, their conversations by the other members in them, then the public teams they may join,
   to pick one from; and where they start a team, or a conversation with another member, in a form
@@ -311,15 +331,21 @@ browser's storage. Each Block's tests sit beside it:
   person does in them, opening a notification's thread in its group, naming the thread open in the
   group open, and asking the root to sign out; and the root signing in a step at a time, listing the
   workspaces, opening and closing one, and signing out, from the list or from the open workspace.
-- Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
-  on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
+- Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
+  and names and their times, the opening first, how many replies follow it, a reply on its way, an
+  edited one, who types, a reply written and sent, the title renamed from its form, and a message
+  edited from its form and deleted by the person who wrote it; a group's threads as messages by the
+  author of their opening, their time, how much is new and where their task stands, the one open
+  marked as current, the thread picked reported, why they could not be read, and a thread started
+  from the composer, whose box is named for the group; a task changed by someone who may, read as a
   line by someone who may not, and made by someone who may create tasks; a thread's turns by their
   agents' names and how they stand, stopped and run again by someone who may use the agent and not
   otherwise, a turn's log followed as it is written, until the turn ends or it could not be
   followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
   a conversation's other member, with the person's part in it, its members with removing for the
   others, admitting, renaming, and joining in place of the threads of a team they do not belong to,
-  and its side pane for the thread open in it, closed by its button; the groups listed in the
+  with the composer to start a thread in its footer, and its side pane for the thread open in it,
+  with the composer to reply in its footer, closed by its button; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, with the
   thread open under the group picked, and a new team taken only from someone who may create one, a
   conversation started with the member chosen; the inbox's notifications by the message and thread they are about, marked all
@@ -348,8 +374,10 @@ browser's storage. Each Block's tests sit beside it:
   shows, then showing the inbox, the connections, the agents, the settings, or the channels, which
   it reads whichever destination shows, each in a main pane named for it, with the rail marking the
   destination open, Home from the inbox and the groups too, the sidebar naming the workspace with
-  who is signed in and the way out in its footer, the thread open in a group in the side pane and
-  under the group in the sidebar, and what the server refused as toasts. The root's own scenes show
+  who is signed in and the way out in its footer, the group's threads as messages in the main pane
+  with the composer to start one, the thread picked opened in the side pane with its messages and the
+  composer to reply, marked in the list and under the group in the sidebar, and what the server
+  refused as toasts. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way

@@ -46,7 +46,11 @@ const received = message(
 
 /** What the threads report, as the group receives it. */
 const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
-  ThreadsBinding.embedView({ slotId: "threads", model: opened.threads }).toParentMessage(message)
+  ThreadsBinding.embedView({
+    slotId: "threads",
+    model: opened.threads,
+    viewInputs: { members: [], groupName: "Design", openThreadId: Option.none() }
+  }).toParentMessage(message)
 
 describe("a group", () => {
   it("is renamed from the name the person saw, and followed or left as they say", () => {

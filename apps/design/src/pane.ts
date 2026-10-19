@@ -7,6 +7,7 @@ import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { iconButton } from "./control.ts"
 import { type IconName, icon } from "./icon.ts"
+import { mark } from "./mark.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
 
@@ -25,9 +26,6 @@ const titleMain = "m-0 min-w-0 truncate text-title font-medium text-ink"
 const titleSide = "m-0 min-w-0 truncate text-body font-medium text-ink"
 
 const titleIcon = { main: "flex flex-none text-ink", side: "flex flex-none text-ink-secondary" }
-
-const titleMark =
-  "grid size-6 flex-none place-items-center bg-avatar-neutral-bg text-hint font-medium text-avatar-neutral-fg uppercase"
 
 const titleContext = "min-w-0 truncate text-control text-ink-secondary"
 
@@ -87,7 +85,7 @@ const renderTitleLeading = <Message, Requirements>(
     return h.span([h.Class(titleIcon[variant])], [icon(h, header.icon, { size: variant === "main" ? "md" : "sm" })])
   }
 
-  return header.mark === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(titleMark)], [header.mark])
+  return header.mark === undefined ? h.empty : mark(h, { text: header.mark })
 }
 
 const renderTitle = <Message, Requirements>(

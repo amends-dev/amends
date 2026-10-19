@@ -1,7 +1,7 @@
 /**
- * What the person sees of the workspace's records: what a member and a group are called, who wrote
- * a message and what it says, how a thread is titled, whether anyone may join a group, and how a
- * task's status and priority and a turn's status read.
+ * What the person sees of the workspace's records: what a member and a group are called and what
+ * letters mark them, who wrote a message and when and what it says, how a thread is titled, whether
+ * anyone may join a group, and how a task's status and priority and a turn's status read.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -10,7 +10,22 @@ import type { Task } from "@amends-dev/core/task"
 import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
+import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
+
+/** The uppercase first letters of the first two words of `name`, or of its first word alone. */
+export const initials = (name: string): string =>
+  name
+    .split(/\s+/)
+    .filter((word) => word !== "")
+    .slice(0, 2)
+    .map((word) => Array.from(word).at(0) ?? "")
+    .join("")
+    .toUpperCase()
+
+/** The time of day `dateTime` was, in the person's own time zone, as they read it: "10:02 AM". */
+export const timeOf = (dateTime: DateTime.DateTime): string =>
+  DateTime.formatLocal(dateTime, { hour: "numeric", minute: "2-digit" })
 
 /** `memberId` by their name among `members`, or their ID until names are read. */
 export const memberName = (members: ReadonlyArray<Member.Member>, memberId: MemberId.MemberId): string =>

@@ -1,3 +1,4 @@
+import type { Block } from "foldkit"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { StartThread } from "./command.ts"
@@ -28,3 +29,4 @@ export const ComposerBinding = ThreadsDefinition.bindChild(ComposerBlock, {
 })
 
 export const ThreadsComposition = ThreadsDefinition.makeComposition({ bindings: [ComposerBinding] })
+export type ThreadsViewBuilder = Block.ViewBuilderFor<typeof ThreadsComposition>

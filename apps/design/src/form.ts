@@ -5,7 +5,9 @@
 
 import type { Html, HtmlBuilder } from "foldkit/html"
 
-const formColumn = "mt-9 flex flex-col gap-4"
+const formColumn = "flex flex-col gap-4"
+
+const screenSpacing = "mt-9"
 
 const inlineRow = "flex items-baseline gap-1 text-hint text-ink-secondary"
 
@@ -15,18 +17,19 @@ const valueText = "min-w-0 text-item text-ink wrap-anywhere"
 
 /**
  * A form that sends `onSubmit`, its `children` in a column. A `label` names it, so assistive technology
- * finds it as a form.
+ * finds it as a form. A `screen` form (the default) sits 36px below the text above it; a `pane` form, for
+ * one inside a pane or a message, has no space above it.
  */
 export const form = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ onSubmit: Message; label?: string }>,
+  config: Readonly<{ onSubmit: Message; label?: string; variant?: "screen" | "pane" }>,
   children: ReadonlyArray<Html>
 ): Html =>
   h.form(
     [
       h.OnSubmit(config.onSubmit),
       ...(config.label === undefined ? [] : [h.AriaLabel(config.label)]),
-      h.Class(formColumn)
+      h.Class(config.variant === "pane" ? formColumn : `${screenSpacing} ${formColumn}`)
     ],
     children
   )

@@ -1,8 +1,10 @@
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { centered, copy, heading } from "../src/centered.ts"
+import { composer } from "../src/composer.ts"
 import {
   button,
+  buttonRow,
   choiceSelect,
   field,
   hint,
@@ -16,6 +18,8 @@ import {
 import { row, section } from "../src/directory.ts"
 import { form, inline, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
+import { mark } from "../src/mark.ts"
+import { divider, message, messageList } from "../src/message.ts"
 import { pane, paneClose, paneColumn, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
@@ -57,6 +61,10 @@ const shellFrame = "h-176 outline outline-outline [--amends-screen-height:44rem]
 const toastFrame = "relative h-64 bg-canvas outline outline-outline"
 
 const iconSizeRow = "flex items-end gap-4"
+
+const conversationColumn = "flex max-w-xl flex-col px-3"
+
+const composerColumn = "flex max-w-md flex-col"
 
 const iconGrid = "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4"
 
@@ -466,6 +474,187 @@ const iconGroup = (h: ApplicationViewBuilder): Html =>
     sample(h, "Named, which makes it an image", [icon(h, "alert-triangle", { label: "Needs attention" })])
   ])
 
+const markGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Marks", [
+    sample(
+      h,
+      "Sizes",
+      [mark(h, { text: "AM", size: "xs" }), mark(h, { text: "AM", size: "sm" }), mark(h, { text: "AM", size: "md" })],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "One letter",
+      [mark(h, { text: "Y", size: "xs" }), mark(h, { text: "Y", size: "sm" }), mark(h, { text: "Y", size: "md" })],
+      iconSizeRow
+    )
+  ])
+
+const openableThreads: ReadonlyArray<
+  Readonly<{ key: string; mark: string; author: string; time: string; text: string; replies?: string }>
+> = [
+  {
+    key: "preview-ready",
+    mark: "AM",
+    author: "Alex",
+    time: "Yesterday",
+    text: "The preview is ready for another look. I've linked the latest notes in the task."
+  },
+  { key: "deploy-clean", mark: "S", author: "Sara", time: "9:44 AM", text: "deploy went out clean last night!" },
+  {
+    key: "composer-paste-crash",
+    mark: "AJ",
+    author: "AJ",
+    time: "10:02 AM",
+    text: "found a bug. composer crashes when I paste an image from clipboard lol",
+    replies: "4 replies"
+  }
+]
+
+const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: string): Html => {
+  const press = Message.ClickedButton()
+
+  return group(h, "Messages", [
+    sample(
+      h,
+      "A list with a current row, whose text opens the thread",
+      [
+        messageList(h, {
+          label: "Threads",
+          children: openableThreads.map((thread) =>
+            message(h, {
+              key: thread.key,
+              mark: thread.mark,
+              author: thread.author,
+              time: thread.time,
+              text: thread.text,
+              onOpen: Message.OpenedThread({ key: thread.key }),
+              isCurrent: thread.key === openThread,
+              ...(thread.replies === undefined ? {} : { meta: [h.span([], [thread.replies])] })
+            })
+          )
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A note, actions at the end of the author line, and meta under the text",
+      [
+        messageList(h, {
+          label: "Replies",
+          children: [
+            message(h, {
+              key: "reproduced",
+              mark: "Y",
+              author: "Yumi",
+              time: "10:05 AM",
+              note: "edited",
+              text: "Reproduced on both. Images over 5 MB hit the crash.",
+              actions: [
+                button(h, "Edit", press, { variant: "quiet" }),
+                button(h, "Delete", press, { variant: "quiet" })
+              ],
+              meta: [h.span([], ["2 new"]), h.span([], ["Doing"])]
+            }),
+            message(h, {
+              key: "sending",
+              mark: "AJ",
+              author: "AJ",
+              note: "Sending…",
+              text: "Thanks! I'll attach the image to the task."
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A body in place of the text",
+      [
+        messageList(h, {
+          label: "Editing",
+          children: [
+            message(h, {
+              key: "editing",
+              mark: "Y",
+              author: "Yumi",
+              time: "10:05 AM",
+              text: editText,
+              body: form(h, { onSubmit: press, label: "Edit message", variant: "pane" }, [
+                textarea(h, {
+                  id: "edit-message",
+                  label: "Edit",
+                  value: editText,
+                  onInput: (value) => Message.TypedEdit({ value })
+                }),
+                buttonRow(h, [submit(h, "Save"), button(h, "Cancel", press, { variant: "quiet" })])
+              ])
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A divider, centered and at the start",
+      [
+        messageList(h, {
+          label: "Days",
+          children: [
+            divider(h, "Yesterday"),
+            message(h, { key: "alex", mark: "AM", author: "Alex", time: "Yesterday", text: "Looks good." }),
+            divider(h, "4 replies", { align: "start" }),
+            message(h, { key: "sara", mark: "S", author: "Sara", time: "9:44 AM", text: "I can pick this up." })
+          ]
+        })
+      ],
+      conversationColumn
+    )
+  ])
+}
+
+const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: string): Html => {
+  const press = Message.ClickedButton()
+
+  return group(h, "Composer", [
+    sample(
+      h,
+      "Empty",
+      [
+        composer(h, {
+          id: "draft",
+          label: "Start a thread",
+          placeholder: "Message #general",
+          value: draft,
+          onInput: (value) => Message.TypedDraft({ value }),
+          onSubmit: press,
+          submitLabel: "Start"
+        })
+      ],
+      composerColumn
+    ),
+    sample(
+      h,
+      "Filled",
+      [
+        composer(h, {
+          id: "filled-draft",
+          label: "Reply",
+          placeholder: "Reply in thread",
+          value: filledDraft,
+          onInput: (value) => Message.TypedFilledDraft({ value }),
+          onSubmit: press,
+          submitLabel: "Reply"
+        })
+      ],
+      composerColumn
+    )
+  ])
+}
+
 const labelledLines = (h: ApplicationViewBuilder, lines: ReadonlyArray<readonly [string, string]>): Html =>
   h.div(
     [h.Class(lineColumn)],
@@ -548,7 +737,69 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
   })
 }
 
-const groupPane = (h: ApplicationViewBuilder, paneTab: PaneTab, composer: string): Html => {
+const groupThreads = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return messageList(h, {
+    label: "Threads",
+    children: [
+      divider(h, "Yesterday"),
+      message(h, {
+        key: "preview-ready",
+        mark: "AM",
+        author: "Alex",
+        time: "Yesterday",
+        text: "The preview is ready for another look. I've linked the latest notes in the task.",
+        onOpen: press
+      }),
+      message(h, {
+        key: "release-morning",
+        mark: "S",
+        author: "Sara",
+        time: "Yesterday",
+        text: "Looks good. I'll keep an eye on the release this morning.",
+        onOpen: press
+      }),
+      divider(h, "Today"),
+      message(h, {
+        key: "morning-all",
+        mark: "O",
+        author: "Oliver",
+        time: "9:41 AM",
+        text: "morning all! ☕",
+        onOpen: press
+      }),
+      message(h, {
+        key: "deploy-clean",
+        mark: "S",
+        author: "Sara",
+        time: "9:44 AM",
+        text: "deploy went out clean last night! 🎉",
+        onOpen: press
+      }),
+      message(h, {
+        key: "composer-paste-crash",
+        mark: "AJ",
+        author: "AJ",
+        time: "10:02 AM",
+        text: "found a bug. composer crashes when I paste an image from clipboard lol",
+        onOpen: press,
+        isCurrent: true,
+        meta: [h.span([], ["4 replies"])]
+      }),
+      message(h, {
+        key: "coffee",
+        mark: "G",
+        author: "Graeme",
+        time: "10:08 AM",
+        text: "@Caleb Let's grab some coffee",
+        onOpen: press
+      })
+    ]
+  })
+}
+
+const groupPane = (h: ApplicationViewBuilder, paneTab: PaneTab, composerText: string): Html => {
   const press = Message.ClickedButton()
 
   return pane(h, {
@@ -579,56 +830,94 @@ const groupPane = (h: ApplicationViewBuilder, paneTab: PaneTab, composer: string
     },
     body: [
       paneTab === "threads"
-        ? labelledLines(h, [
-            ["Alex", "The preview is ready for another look. I've linked the latest notes in the task."],
-            ["Sara", "Looks good. I'll keep an eye on the release this morning."],
-            ["Oliver", "morning all!"],
-            ["AJ", "found a bug. composer crashes when I paste an image from clipboard lol"],
-            ["Graeme", "@Caleb Let's grab some coffee"]
-          ])
+        ? groupThreads(h)
         : labelledLines(h, [
             ["Composer paste crash", "AND-214 · In progress"],
             ["Retry keeps the original request", "AND-209 · Ready for another look"]
           ])
     ],
     footer: [
-      textarea(h, {
+      composer(h, {
         id: "composer",
-        label: "Message #general",
-        value: composer,
-        onInput: (value) => Message.TypedComposer({ value })
+        label: "Start a thread",
+        placeholder: "Message #general",
+        value: composerText,
+        onInput: (value) => Message.TypedComposer({ value }),
+        onSubmit: press,
+        submitLabel: "Start"
       })
     ]
   })
 }
 
-const threadPane = (h: ApplicationViewBuilder, reply: string): Html =>
-  pane(h, {
+const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
+  const press = Message.ClickedButton()
+
+  return pane(h, {
     variant: "side",
     label: "Composer paste crash",
     header: {
       title: "Composer paste crash",
       icon: "message",
       subtitle: "Thread in #general",
-      actions: [paneClose(h, Message.ClickedButton())]
+      actions: [paneClose(h, press)]
     },
     body: [
-      labelledLines(h, [
-        ["AJ", "found a bug. composer crashes when I paste an image from clipboard lol"],
-        ["Alex", "uh oh — repro on mac or everywhere?"],
-        ["Yumi", "Reproduced on both — images over 5 MB hit the crash. Filed it and tagged the composer team."],
-        ["AJ", "Thanks! I'll attach the image to the task."]
-      ])
+      messageList(h, {
+        label: "Messages",
+        children: [
+          message(h, {
+            key: "composer-paste-crash",
+            mark: "AJ",
+            author: "AJ",
+            time: "10:02 AM",
+            text: "found a bug. composer crashes when I paste an image from clipboard lol"
+          }),
+          divider(h, "4 replies", { align: "start" }),
+          message(h, {
+            key: "repro",
+            mark: "AM",
+            author: "Alex",
+            time: "10:03 AM",
+            text: "uh oh — repro on mac or everywhere?"
+          }),
+          message(h, {
+            key: "reproduced",
+            mark: "Y",
+            author: "Yumi",
+            time: "10:05 AM",
+            text: "Reproduced on both — images over 5 MB hit the crash. Filed it and tagged the composer team."
+          }),
+          message(h, {
+            key: "attach",
+            mark: "AJ",
+            author: "AJ",
+            time: "10:07 AM",
+            text: "Thanks! I'll attach the image to the task."
+          }),
+          message(h, {
+            key: "pick-up",
+            mark: "S",
+            author: "Sara",
+            time: "10:09 AM",
+            text: "I can pick this up after the release check."
+          })
+        ]
+      })
     ],
     footer: [
-      textarea(h, {
+      composer(h, {
         id: "reply",
-        label: "Reply in thread",
+        label: "Reply",
+        placeholder: "Reply in thread",
         value: reply,
-        onInput: (value) => Message.TypedReply({ value })
+        onInput: (value) => Message.TypedReply({ value }),
+        onSubmit: press,
+        submitLabel: "Reply"
       })
     ]
   })
+}
 
 const agentPane = (h: ApplicationViewBuilder): Html =>
   pane(h, {
@@ -737,6 +1026,9 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           noticeGroup(h),
           toastGroup(h),
           iconGroup(h),
+          markGroup(h),
+          messageGroup(h, model.openThread, model.editText),
+          composerGroup(h, model.draft, model.filledDraft),
           formGroup(h),
           directoryGroup(h),
           centeredGroup(h, model.signInEmail, model.code)

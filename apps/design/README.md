@@ -23,11 +23,16 @@ buttons by variant, disabled, large, and wide, with the link in a sentence; a fi
 placeholder, filled, and invalid; a hint; a textarea; the toggle on and off; a select; the notice
 tones; `sending`; a form with its inline text and a value with its link; the directory's section
 and rows; the centered screen as the sign-in's two steps and as the workspace picker; the toast
-alone, with a detail, and as a stack of two, each in a frame of its own; the shell twice, with
-and without its side pane, each in a frame of fixed height, its groups and direct messages
-through `sidebarSections`, the first with the open thread as a plain row under its group and the
-second with its notices; and the icons by size, as the shell draws them, and with a label. The toggles, fields, and select take input, and so do the
-shell's rail and tabs, whose current item follows a click. The shell's side pane sits beside the
+alone, with a detail, and as a stack of two, each in a frame of its own; the marks by size; a
+conversation's messages as a list with a current row whose text opens the thread, with a note,
+actions, and meta, with a form in place of the text, and set apart by dividers, centered and at the
+start; the composer empty and filled; the shell twice, with and without its side pane, each in a
+frame of fixed height, its groups and direct messages through `sidebarSections`, its threads,
+replies, and composers made of `message`, `divider`, and `composer`, the first with the open
+thread as a plain row under its group and the second with its notices; and the icons by size, as
+the shell draws them, and with a label. The toggles, fields, composers, and select take input, and
+so do the shell's rail and tabs, whose current item follows a click, and the list of threads, whose
+current row follows a click. The shell's side pane sits beside the
 main pane from a window of 80rem; narrow the window to between 64rem and 80rem to see it float over
 a scrim. Open it to look at a piece before a page composes it. It follows the browser's light or dark preference. A browser tab
 that is hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible
@@ -113,8 +118,14 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `textarea(h, { id, label, value, onInput, rows? })` is the input's look over `rows` lines, three
   unless given.
 - `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
-  `label`, which is all it says to assistive technology: the icon is hidden. It is 32px, and 44px on
-  touch; `options.size` is `"compact"` for the 24px button along a list's heading.
+  `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
+  that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
+  textarea labelled Reply. It is 32px, and 44px on touch; `options.size` is `"compact"` for the 24px
+  button along a list's heading.
+- `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
+  such as the composer's send button.
+- `buttonRow(h, children)` is a row of controls with an 8px gap, wrapping onto a new line when they do
+  not fit, such as a thread's Follow and Rename or a form's Save and Cancel.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
   named by its label.
 - `choiceSelect(h, { id, label, choices, value, onChange })` is a select over `choices`, each a
@@ -133,6 +144,15 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   size. An icon is decorative and `aria-hidden`; an `options.label` makes it an image named by that
   label, with a `title`, for one that stands alone with no text beside it.
 
+### `@amends-dev/design/mark`
+
+- `mark(h, { text, size? })` is the square that stands for a person, a workspace, or an agent: the
+  `text` letters in capitals on `avatar-neutral`. `size` is `"xs"` (20px, 9px text, as a sidebar row
+  shows a person), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a pane's title
+  show it), or `"md"` (32px, `hint` text, as a message shows its author). A mark is `aria-hidden`: the
+  name it abbreviates is always beside it. `sidebarHeader`, `sidebarItem`, `pane`, and `message` draw
+  their marks with it.
+
 ### `@amends-dev/design/centered`
 
 The sixth layout pattern, for screens outside a workspace such as sign-in and the workspace picker.
@@ -150,9 +170,10 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
 
 What a form screen is made of beside its controls.
 
-- `form(h, { onSubmit, label? }, children)` is the `form` element sending `onSubmit`, its children
-  in a column with a 16px gap, 36px below the text above it. A `label` becomes its `aria-label`,
-  which makes it a form landmark.
+- `form(h, { onSubmit, label?, variant? }, children)` is the `form` element sending `onSubmit`, its
+  children in a column with a 16px gap. A `label` becomes its `aria-label`, which makes it a form
+  landmark. `variant` is `"screen"` (the default), 36px below the text above it, or `"pane"`, with no
+  space above it, for a form inside a pane or a message, such as renaming a thread.
 - `inline(h, children)` is a row of text and links with a 4px gap, at hint size in `ink-secondary`,
   such as "Need a new code?" beside its Send again link. A child is an `Html` or a string.
 - `valueWithAction(h, value, action)` is what the person entered, in `ink`, with the link that
@@ -202,7 +223,7 @@ The frame of the first four layout patterns, which the modules below fill.
 - `sidebar(h, { label, header, children, footer? })` is a `nav` named by `label`, 264px on `panel`:
   the `header` above the `children`, which scroll, and the `footer` below them.
 - `sidebarHeader(h, { mark, name, actions?, search? })` is the 96px header, as tall as a pane's, with
-  a line under it: a 24px `avatar-neutral` square holding the `mark` letter, the workspace's `name`
+  a line under it: a 24px `mark` holding the `mark` letters, the workspace's `name`
   at body size in medium weight, `actions` at the right such as an `iconButton` that opens the
   workspace menu, and, when there is a `search`, `{ label, shortcut?, onClick }`, a full-width button
   in `search` under them, named by `label`, with the `shortcut` shown at its end and hidden from
@@ -212,7 +233,7 @@ The frame of the first four layout patterns, which the modules below fill.
   `iconButton`s; a group without one is the list alone, as a sidebar's first is. Sections sit 22px
   apart. `children` are `sidebarItem`s or a `sidebarEmpty`.
 - `sidebarItem(h, { icon?, mark?, label, count?, isCurrent, onClick, children? })` is a 38px row,
-  one button: an `icon`, or a `mark` letter on a 20px `avatar-neutral` square for a person, then the
+  one button: an `icon`, or a `mark` letter on a 20px `mark` square for a person, then the
   `label` in `ink-secondary` and a `count` in a badge at the end. The button is named by the label
   and described by the count. The current row is `aria-current="page"`, filled `selected`, in `ink`
   and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick? }`
@@ -250,6 +271,40 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
   header's `actions`.
 
+### `@amends-dev/design/message`
+
+What a conversation is made of.
+
+- `messageList(h, { label, children })` is an `ol` named by `label`, a column with no list style, of
+  `message`s and `divider`s.
+- `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
+  then a column of the author line, the text, and the meta row. The author line is the `author` at
+  item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already formatted, and
+  a `note` after that as ` · ${note}`, such as "edited" or "Sending…"; `actions` are quiet buttons at its
+  end, such as Edit and Delete. The `text` is at body size; with `onOpen` it is a button named by the
+  text that sends `onOpen`, aligned to the start, underlined on hover, for a message that is the start
+  of a thread, and `body` takes its place, such as the form that edits it. `meta` is a row of quiet
+  facts under the text at hint size, such as "2 new" and a task's status. `isCurrent` fills the row
+  with `selected`, draws the `indicator-bar` at its start as the sidebar's current row has, and makes it
+  `aria-current="true"`. A row has 10px of space above and below and reaches 12px into the pane's
+  gutter, so the fill of the current row reaches past the text.
+- `divider(h, label, options?)` is an item of the list with a dashed `stitch` rule and the `label` in
+  capitals at `meta` size in `ink-muted`: `options.align` is `"center"` (the default), the label between
+  two rules, as a day sets apart the messages after it, or `"start"`, the label before one rule that
+  runs on, as "4 replies" sets apart the replies to the opening message. The rules are hidden from
+  assistive technology; the label is read as an item of the list.
+
+### `@amends-dev/design/composer`
+
+- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel })` is where the person
+  writes a message: a form named by `label` (through `aria-labelledby`, so a lookup by `label` finds
+  the textarea and not the form), a box with a border that darkens while the person writes in it,
+  holding a textarea for `id` and, under it, the send button at the end. The textarea has the
+  `label` for assistive technology and does not show it, shows the `placeholder` while it is empty, has
+  no border of its own, and grows with what is typed between 2.5rem and 15rem. The button is an
+  `iconSubmit` named `submitLabel` showing the `mark-send` icon; it submits the form, which sends
+  `onSubmit`. Enter adds a line.
+
 ### `@amends-dev/design/toast`
 
 What floats over the shell's corner, for something that went wrong and the one thing to do about it.
@@ -270,10 +325,12 @@ What floats over the shell's corner, for something that went wrong and the one t
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`, `aria-invalid`,
 and description, a switch by its label, a select's change, the centered screen's landmarks, a form
-by its label, and a row by its title; an icon by `role("img", { name })` when it has a label and as
+by its label, with the pane variant of a form the same; a row by its title; an icon by `role("img", { name })` when it has a label and as
 `aria-hidden` when it has none; a rail destination by `role("button", { name })` with
 `aria-current`; a sidebar item by its name with `aria-current` and its count, the row under it as a
 button or as a plain row, and the sections of `sidebarSections` among the sidebar's own; a tab by
 `role("tab")` with `aria-selected`; a toast by `role("alert")` with its text, detail, and button, in
-the stack's live region; and the shell's landmarks by role and name: `navigation` for the rail and
+the stack's live region; a message by its text button, `aria-current`, its note, actions, meta, and body,
+and a divider by its label in the list; a composer by its form, the textarea found by the same label,
+the placeholder, and the send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for the rail and
 the sidebar, `main`, and `complementary`, with its notices. They query no class.

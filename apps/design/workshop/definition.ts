@@ -1,6 +1,6 @@
 /**
- * What the workshop remembers: the text of its fields and boxes, which switches are on, the plan chosen,
- * which rail destination and pane tab are current, and how often a button was pressed.
+ * What the workshop remembers: the text of its fields, boxes, and composers, which switches are on, the plan
+ * chosen, which rail destination, pane tab, and thread are current, and how often a button was pressed.
  */
 
 import * as Schema from "effect/Schema"
@@ -25,6 +25,10 @@ export const Model = Schema.Struct({
   notes: Schema.String,
   composer: Schema.String,
   reply: Schema.String,
+  draft: Schema.String,
+  filledDraft: Schema.String,
+  editText: Schema.String,
+  openThread: Schema.String,
   destination: Destination,
   paneTab: PaneTab,
   isNotificationsOn: Schema.Boolean,
@@ -44,6 +48,10 @@ export const Message = defineMessageUnion({
   TypedNotes: { value: Schema.String },
   TypedComposer: { value: Schema.String },
   TypedReply: { value: Schema.String },
+  TypedDraft: { value: Schema.String },
+  TypedFilledDraft: { value: Schema.String },
+  TypedEdit: { value: Schema.String },
+  OpenedThread: { key: Schema.String },
   ChangedDestination: { destination: Destination },
   ChangedPaneTab: { tab: PaneTab },
   ToggledNotifications: { isOn: Schema.Boolean },

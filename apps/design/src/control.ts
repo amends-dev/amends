@@ -1,8 +1,8 @@
 /**
- * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons, labelled
- * fields and boxes, a labelled switch, a choice from a list, a line of hint, why an entry was
- * refused, and that an action is on its way. Each renders with the caller's builder and messages,
- * and carries the look.
+ * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row
+ * they lie in, labelled fields and boxes, a labelled switch, a choice from a list, a line of hint,
+ * why an entry was refused, and that an action is on its way. Each renders with the caller's builder
+ * and messages, and carries the look.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -41,10 +41,14 @@ const buttonWide = "w-full"
 const iconButtonBase =
   "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring hover:bg-subtle hover:text-ink"
 
+const iconButtonLabel = "sr-only"
+
 const iconButtonSizes = {
   regular: "size-8 max-desktop:size-11",
   compact: "size-6"
 }
+
+const buttonRowLook = "flex flex-wrap items-center gap-2"
 
 const fieldColumn = "flex flex-col gap-2"
 
@@ -154,27 +158,43 @@ export const submit = <Message, Requirements>(
   options: ButtonOptions = {}
 ) => renderButton(h, label, { type: "submit" }, options, "primary")
 
+const renderIconButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ icon: IconName; label: string }>,
+  behavior: Readonly<{ type: "button" | "submit"; onClick?: Message }>,
+  options: IconButtonOptions
+) =>
+  Button.view(
+    {
+      ...behavior,
+      toView: (attributes) =>
+        h.button(
+          [...attributes.button, h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))],
+          [icon(h, config.icon, { size: "sm" }), h.span([h.Class(iconButtonLabel)], [config.label])]
+        )
+    },
+    h
+  )
+
 /** A quiet square button of one icon, named by `label`, that sends `onClick`. */
 export const iconButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ icon: IconName; label: string; onClick: Message }>,
   options: IconButtonOptions = {}
-) =>
-  Button.view(
-    {
-      onClick: config.onClick,
-      toView: (attributes) =>
-        h.button(
-          [
-            ...attributes.button,
-            h.AriaLabel(config.label),
-            h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))
-          ],
-          [icon(h, config.icon, { size: "sm" })]
-        )
-    },
-    h
-  )
+) => renderIconButton(h, config, { type: "button", onClick: config.onClick }, options)
+
+/** The button of one icon, named by `label`, that sends its form, in the look of `iconButton`. */
+export const iconSubmit = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ icon: IconName; label: string }>,
+  options: IconButtonOptions = {}
+) => renderIconButton(h, config, { type: "submit" }, options)
+
+/** Controls side by side, 8px apart, wrapping onto a new line when they do not fit. */
+export const buttonRow = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  children: ReadonlyArray<Html>
+): Html => h.div([h.Class(buttonRowLook)], children)
 
 /** Why what the person entered was refused, or what to know about it, as an alert, when there is one. */
 export const notice = <Message, Requirements>(

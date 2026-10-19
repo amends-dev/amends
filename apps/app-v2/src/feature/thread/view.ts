@@ -1,129 +1,150 @@
 import { ThreadMessage } from "@amends-dev/core/thread"
+import { button, buttonRow, field, hint, notice, sending, submit, textarea } from "@amends-dev/design/control"
+import { form } from "@amends-dev/design/form"
+import { divider, message, messageList } from "@amends-dev/design/message"
+import { paneColumn } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { button, errorView, field, sending, submit, textarea } from "../../controls.ts"
-import { authorName, messageText } from "../../seen.ts"
+import { authorName, initials, messageText, timeOf } from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
-import { Message, type MessageItem, type Model, titleOf, typingIn } from "./definition.ts"
+import { Message, type MessageItem, type Model, typingIn } from "./definition.ts"
 
-/** The thread's title, or its opening message, and the form to change it while the person renames it. */
-const titleView = (model: Model, h: ThreadViewBuilder): Html =>
+/** The form to change the thread's title, while the person renames it. */
+const renamingView = (model: Model, h: ThreadViewBuilder): Html =>
   Option.match(model.renaming, {
-    onNone: () => h.div([], [h.h4([], [titleOf(model)]), button(h, "Rename", Message.ClickedRename())]),
+    onNone: () => h.empty,
     onSome: (draft) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedRename())],
-        [
-          field(
-            h,
-            {
-              id: "title",
-              label: "Title",
-              type: "text",
-              value: draft,
-              onInput: (title) => Message.TypedTitle({ title })
-            },
-            Option.none()
-          ),
-          submit(h, "Save"),
-          button(h, "Cancel", Message.ClickedCancelRename())
-        ]
-      )
+      form(h, { onSubmit: Message.SubmittedRename(), variant: "pane" }, [
+        field(
+          h,
+          {
+            id: "title",
+            label: "Title",
+            type: "text",
+            value: draft,
+            onInput: (title) => Message.TypedTitle({ title })
+          },
+          Option.none()
+        ),
+        buttonRow(h, [submit(h, "Save"), button(h, "Cancel", Message.ClickedCancelRename(), { variant: "quiet" })])
+      ])
   })
 
 /** The person's part in the thread: following it, or not, and whether a change to that is on its way. */
-const followView = (model: Model, h: ThreadViewBuilder): Html =>
+const followAction = (model: Model, h: ThreadViewBuilder): Html =>
   Option.match(model.following, {
-    onNone: () => button(h, "Follow", Message.ClickedFollow()),
+    onNone: () => button(h, "Follow", Message.ClickedFollow(), { variant: "quiet" }),
     onSome: ({ active, pending }) =>
       pending
-        ? h.span([], ["Updating…"])
+        ? sending(h, true)
         : active
-          ? button(h, "Unfollow", Message.ClickedUnfollow())
-          : button(h, "Follow", Message.ClickedFollow())
+          ? button(h, "Unfollow", Message.ClickedUnfollow(), { variant: "quiet" })
+          : button(h, "Follow", Message.ClickedFollow(), { variant: "quiet" })
   })
 
+/** Renaming the thread, until the person starts. */
+const renameAction = (model: Model, h: ThreadViewBuilder): Html =>
+  Option.isNone(model.renaming) ? button(h, "Rename", Message.ClickedRename(), { variant: "quiet" }) : h.empty
+
+/** What to say after a message's time: that it is on its way, or that it was changed. */
+const noteOf = (pending: boolean, edited: boolean): string | undefined => {
+  if (pending) {
+    return "Sending…"
+  }
+
+  return edited ? "edited" : undefined
+}
+
 /** A message, with editing and deleting for the person's own, and the form to change it while they edit it. */
-const messageView = ({ message, pending }: MessageItem, model: Model, h: ThreadViewBuilder): Html => {
+const messageView = ({ message: item, pending }: MessageItem, model: Model, h: ThreadViewBuilder): Html => {
   const own =
     ThreadMessage.Author.matchOrElse(
-      message.author,
+      item.author,
       { Member: ({ memberId }) => memberId === model.memberId },
       () => false
-    ) && ThreadMessage.Content.matchOrElse(message.content, { Text: () => true }, () => false)
-  const editing = Option.filter(model.editing, ({ messageId }) => messageId === message.id)
+    ) && ThreadMessage.Content.matchOrElse(item.content, { Text: () => true }, () => false)
+  const editing = Option.filter(model.editing, ({ messageId }) => messageId === item.id)
   const edited = ThreadMessage.Content.matchOrElse(
-    message.content,
+    item.content,
     { Text: ({ editedAt }) => editedAt !== null },
     () => false
   )
-  return h.keyed("li")(
-    message.id,
-    [],
-    [
-      h.p(
-        [],
-        [
-          h.strong([], [authorName(message, model.members, model.contacts)]),
-          sending(pending, h),
-          edited ? h.span([], [" · edited"]) : h.empty
-        ]
-      ),
-      Option.match(editing, {
-        onSome: ({ draft }) =>
-          h.form(
-            [h.OnSubmit(Message.SubmittedEdit())],
-            [
-              textarea(h, { id: "edit", label: "Edit", value: draft, onInput: (text) => Message.TypedEdit({ text }) }),
-              submit(h, "Save"),
-              button(h, "Cancel", Message.ClickedCancelEdit())
-            ]
-          ),
-        onNone: () =>
-          h.div(
-            [],
-            [
-              h.p([], [messageText(message)]),
-              ...(own && !pending
-                ? [
-                    button(h, "Edit", Message.ClickedEdit({ messageId: message.id })),
-                    button(h, "Delete", Message.ClickedDelete({ messageId: message.id }))
-                  ]
-                : [])
-            ]
-          )
-      })
-    ]
-  )
+  const author = authorName(item, model.members, model.contacts)
+
+  return message(h, {
+    key: item.id,
+    mark: initials(author),
+    author,
+    time: timeOf(item.publishedAt),
+    note: noteOf(pending, edited),
+    text: messageText(item),
+    body: Option.getOrUndefined(
+      Option.map(editing, ({ draft }) =>
+        form(h, { onSubmit: Message.SubmittedEdit(), variant: "pane" }, [
+          textarea(h, { id: "edit", label: "Edit", value: draft, onInput: (text) => Message.TypedEdit({ text }) }),
+          buttonRow(h, [submit(h, "Save"), button(h, "Cancel", Message.ClickedCancelEdit(), { variant: "quiet" })])
+        ])
+      )
+    ),
+    actions:
+      own && !pending && Option.isNone(editing)
+        ? [
+            button(h, "Edit", Message.ClickedEdit({ messageId: item.id }), { variant: "quiet" }),
+            button(h, "Delete", Message.ClickedDelete({ messageId: item.id }), { variant: "quiet" })
+          ]
+        : []
+  })
 }
 
-/** Who types in the thread now, besides the person. */
-const typingView = (names: ReadonlyArray<string>, h: ThreadViewBuilder): Html =>
-  names.length === 0
-    ? h.empty
-    : h.p([h.AriaLive("polite")], [`${names.join(" and ")} ${names.length === 1 ? "is" : "are"} typing…`])
+/** The opening message, then, when there are replies, how many, and the replies. */
+const messagesView = (model: Model, h: ThreadViewBuilder): Html => {
+  const [opening, ...replies] = model.messages
+  const heading = `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`
 
+  return messageList(h, {
+    label: "Messages",
+    children: [
+      ...(opening === undefined ? [] : [messageView(opening, model, h)]),
+      ...(replies.length === 0 ? [] : [divider(h, heading, { align: "start" })]),
+      ...replies.map((reply) => messageView(reply, model, h))
+    ]
+  })
+}
+
+/** Who types in the thread now, besides the person, in a live region so that it is announced as it appears. */
+const typingView = (names: ReadonlyArray<string>, h: ThreadViewBuilder): Html =>
+  h.div(
+    [h.AriaLive("polite")],
+    [names.length === 0 ? h.empty : hint(h, `${names.join(" and ")} ${names.length === 1 ? "is" : "are"} typing…`)]
+  )
+
+/**
+ * The thread as the side pane's body: the person's part in it, the task it tracks and its agents' turns, and
+ * its messages, the opening first and the replies after it.
+ */
 export const view = ThreadComposition.makeView((model, h) =>
   h.section(
     [h.AriaLabel("Thread")],
     [
-      titleView(model, h),
-      followView(model, h),
-      h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
-      h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
-      errorView(model.notice, h),
-      h.ol(
-        [h.AriaLabel("Messages")],
-        model.messages.map((item) => messageView(item, model, h))
-      ),
-      typingView(typingIn(model), h),
-      h.block(
-        ReplyBinding.embedView({
-          slotId: "reply",
-          model: model.reply,
-          viewInputs: { label: "Reply", submitLabel: "Reply" }
-        })
-      )
+      paneColumn(h, [
+        buttonRow(h, [followAction(model, h), renameAction(model, h)]),
+        renamingView(model, h),
+        h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
+        h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
+        notice(h, model.notice),
+        h.div([], [messagesView(model, h), typingView(typingIn(model), h)])
+      ])
     ]
+  )
+)
+
+/** The composer to reply in the thread, for a pane's footer. */
+export const replyView = ThreadComposition.makeView((model, h) =>
+  h.block(
+    ReplyBinding.embedView({
+      slotId: "reply",
+      model: model.reply,
+      viewInputs: { label: "Reply", submitLabel: "Reply", placeholder: "Reply in thread" }
+    })
   )
 )

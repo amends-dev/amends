@@ -7,10 +7,12 @@ import { change, click, expect, given, label, role, scene, selector, submit, tex
 import { modifyFields } from "foldkit/struct"
 import {
   button,
+  buttonRow,
   choiceSelect,
   field,
   hint,
   iconButton,
+  iconSubmit,
   notice,
   sending,
   submit as submitButton,
@@ -372,6 +374,48 @@ describe("sending", () => {
       { update, view: viewOf((_, h) => [h.p([], ["Rename workspace", sending(h, false)])]) },
       given(initial),
       expect(text("Sending…", { exact: false })).toBeAbsent()
+    )
+  })
+})
+
+describe("iconSubmit", () => {
+  it("is a submit button named by its label, with an icon that assistive technology does not read", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          h.form(
+            [h.AriaLabel("Reply"), h.OnSubmit(Message.SubmittedForm())],
+            [iconSubmit(h, { icon: "mark-send", label: "Send" })]
+          )
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Send" })).toHaveAttr("type", "submit"),
+      expect(within(role("button", { name: "Send" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      click(role("button", { name: "Send" })),
+      expect(role("status")).toHaveText("Saved 0, removed 0, submitted 1")
+    )
+  })
+})
+
+describe("buttonRow", () => {
+  it("holds its controls, each one working", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          buttonRow(h, [
+            button(h, "Follow", Message.ClickedSave(), { variant: "quiet" }),
+            button(h, "Rename", Message.ClickedRemove(), { variant: "quiet" })
+          ])
+        ])
+      },
+      given(initial),
+      click(role("button", { name: "Follow" })),
+      click(role("button", { name: "Rename" })),
+      click(role("button", { name: "Rename" })),
+      expect(role("status")).toHaveText("Saved 1, removed 2, submitted 0")
     )
   })
 })

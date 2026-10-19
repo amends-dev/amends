@@ -81,6 +81,21 @@ describe("form", () => {
       expect(role("button", { name: "Continue" })).toHaveAttr("type", "submit")
     )
   })
+
+  it("is the same form inside a pane, found by its label, and submitting sends its message", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          form(h, { onSubmit: Message.SubmittedCode(), label: "Rename", variant: "pane" }, [submitButton(h, "Save")])
+        ])
+      },
+      given(initial),
+      click(role("button", { name: "Save" })),
+      expect(role("form", { name: "Rename" })).toExist(),
+      expect(role("status")).toHaveText("Submitted 1, resent 0, changed 0")
+    )
+  })
 })
 
 describe("inline", () => {

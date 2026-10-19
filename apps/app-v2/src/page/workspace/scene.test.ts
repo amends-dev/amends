@@ -10,6 +10,7 @@ import {
   expectOutMessage,
   given,
   inside,
+  label,
   role,
   scene,
   selector,
@@ -86,6 +87,40 @@ const withThread = modifyFields(opened, {
         }))
       })
     })
+})
+
+/** The thread open in general with Alice's opening and Bob's reply, and the group's threads listing it. */
+const withConversation = modifyFields(withThread, {
+  open: (open) =>
+    Open.matchOrElse(
+      open,
+      {
+        Group: ({ groupId, model: group }) =>
+          Open.Group({
+            groupId,
+            model: modifyFields(group, {
+              members: () => [member, bob],
+              threads: (threads) =>
+                modifyFields(threads, {
+                  threads: () => [
+                    { thread, opening: Option.some(opening), task: Option.none(), pending: false, unread: 0 }
+                  ]
+                }),
+              thread: Option.map((openThread) => ({
+                ...openThread,
+                model: modifyFields(openThread.model, {
+                  messages: () => [
+                    { message: opening, pending: false },
+                    { message: reply, pending: false }
+                  ],
+                  members: () => [member, bob]
+                })
+              }))
+            })
+          })
+      },
+      () => open
+    )
 })
 
 /** A reply the server refused, with the text it carried. */
@@ -454,6 +489,68 @@ describe("a workspace", () => {
           role("navigation", { name: "Studio" }),
           within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))
         )
+      ).toExist()
+    )
+  })
+
+  it("lists the group's threads as messages in the main pane, with the composer to start one in its footer", () => {
+    scene(
+      { update, view: sceneView },
+      given(withConversation),
+      inside(
+        role("main", { name: "General" }),
+        expect(within(role("list", { name: "Threads" }), text("Alice"))).toExist(),
+        expect(role("button", { name: "Plans for the week" })).toExist(),
+        expect(role("form", { name: "Start a thread" })).toExist(),
+        expect(label("Start a thread")).toHaveAttr("placeholder", "Message General"),
+        expect(role("button", { name: "Start" })).toExist()
+      ),
+      expect(
+        within(role("list", { name: "Threads" }), within(selector('[aria-current="true"]'), text("Plans for the week")))
+      ).toExist()
+    )
+  })
+
+  it("shows the thread's messages in the side pane, the opening first, with the composer to reply in its footer", () => {
+    scene(
+      { update, view: sceneView },
+      given(withConversation),
+      inside(
+        role("complementary", { name: "Thread" }),
+        expect(role("list", { name: "Messages" })).toExist(),
+        expect(within(role("list", { name: "Messages" }), text("Plans for the week"))).toExist(),
+        expect(within(role("list", { name: "Messages" }), text("1 reply"))).toExist(),
+        expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist(),
+        expect(role("form", { name: "Reply" })).toExist(),
+        expect(label("Reply")).toHaveAttr("placeholder", "Reply in thread"),
+        expect(role("button", { name: "Reply" })).toExist()
+      )
+    )
+  })
+
+  it("opens a thread picked in the main pane in the side pane, marking it in the list", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(withConversation, {
+          open: (open) =>
+            Open.matchOrElse(
+              open,
+              {
+                Group: ({ groupId, model: group }) =>
+                  Open.Group({ groupId, model: modifyFields(group, { thread: () => Option.none() }) })
+              },
+              () => open
+            )
+        })
+      ),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(role("list", { name: "Threads" }), selector('[aria-current="true"]'))).toBeAbsent(),
+      click(role("button", { name: "Plans for the week" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(
+        within(role("list", { name: "Threads" }), within(selector('[aria-current="true"]'), text("Plans for the week")))
       ).toExist()
     )
   })

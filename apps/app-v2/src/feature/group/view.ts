@@ -9,6 +9,8 @@ import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may } from "../../permissions.ts"
 import { groupName, isJoinable, memberName } from "../../seen.ts"
 import { titleOf } from "../thread/definition.ts"
+import { replyView } from "../thread/view.ts"
+import { composerView } from "../threads/view.ts"
 import { GroupComposition, type GroupViewBuilder, ThreadBinding, ThreadsBinding } from "./composition.ts"
 import { admitted, belongs, Message, type Model, teamName } from "./definition.ts"
 
@@ -149,10 +151,19 @@ const membersView = (model: Model, h: GroupViewBuilder): Html => {
 
 /**
  * The group's main pane: its name, titled by its mark, with the person's part in it, then, for a team, its
- * members, and its threads, or the line that says to join the team to read them.
+ * members, and its threads, with the composer to start one in the footer, or the line that says to join the
+ * team to read them.
  */
 export const view = GroupComposition.makeView((model, h) => {
   const name = nameOf(model)
+  // Until the group is read, its threads list as they would for a member.
+  const isReadable = Option.isNone(model.group) || belongs(model)
+  const threadsInputs = {
+    members: model.members,
+    groupName: name,
+    openThreadId: Option.map(model.thread, ({ threadId }) => threadId)
+  }
+
   return pane(h, {
     variant: "main",
     label: name,
@@ -161,11 +172,24 @@ export const view = GroupComposition.makeView((model, h) => {
       notice(h, model.notice),
       renamingView(model, h),
       Option.isSome(teamName(model)) ? membersView(model, h) : h.empty,
-      // Until the group is read, its threads list as they would for a member.
-      Option.isNone(model.group) || belongs(model)
-        ? h.block(ThreadsBinding.embedView({ slotId: "threads", model: model.threads }))
+      isReadable
+        ? h.block(ThreadsBinding.embedView({ slotId: "threads", model: model.threads, viewInputs: threadsInputs }))
         : h.p([], ["Join this team to read its threads."])
-    ]
+    ],
+    ...(isReadable
+      ? {
+          footer: [
+            h.block(
+              ThreadsBinding.embedView({
+                slotId: "threads-composer",
+                model: model.threads,
+                viewInputs: threadsInputs,
+                view: composerView
+              })
+            )
+          ]
+        }
+      : {})
   })
 })
 
@@ -183,7 +207,10 @@ export const threadView = GroupComposition.makeView((model, h) =>
           subtitle: `Thread in ${nameOf(model)}`,
           actions: [paneClose(h, Message.ClickedAllThreads())]
         },
-        body: [h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open }))]
+        body: [h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open }))],
+        footer: [
+          h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView }))
+        ]
       })
   })
 )

@@ -3,9 +3,9 @@ import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from
 import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { Command, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
+import { Command, click, expect, given, label, role, scene, selector, text, type, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, bob, bobInDesign, design, membership } from "../../../test/fixtures.ts"
+import { aliceInDesign, bob, bobInDesign, design, membership, opening, thread } from "../../../test/fixtures.ts"
 import { RenameGroup } from "./command.ts"
 import { Message } from "./definition.ts"
 import { init } from "./init.ts"
@@ -95,6 +95,40 @@ describe("a group's main pane", () => {
     )
   })
 
+  it("holds the composer to start a thread in its footer, named for the group", () => {
+    scene(
+      { update, view },
+      given(opened),
+      expect(within(role("main", { name: "Design" }), role("form", { name: "Start a thread" }))).toExist(),
+      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Design"),
+      expect(within(role("main", { name: "Design" }), role("button", { name: "Start" }))).toExist()
+    )
+  })
+
+  it("lists the group's threads as messages, the thread open in it marked as current", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(withThread, {
+          threads: (threads) =>
+            modifyFields(threads, {
+              threads: () => [
+                {
+                  thread: { ...thread, groupId: design.id },
+                  opening: Option.some(opening),
+                  task: Option.none(),
+                  pending: false,
+                  unread: 0
+                }
+              ]
+            })
+        })
+      ),
+      expect(within(role("list", { name: "Threads" }), role("button", { name: "Plans for the week" }))).toExist(),
+      expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist()
+    )
+  })
+
   it("offers joining a public team the person does not belong to, in place of its threads", () => {
     scene(
       { update, view },
@@ -107,7 +141,8 @@ describe("a group's main pane", () => {
       expect(role("heading", { name: "Announcements", level: 1 })).toExist(),
       expect(role("button", { name: "Join" })).toExist(),
       expect(role("button", { name: "Follow" })).toBeAbsent(),
-      expect(text("Join this team to read its threads.")).toExist()
+      expect(text("Join this team to read its threads.")).toExist(),
+      expect(role("form", { name: "Start a thread" })).toBeAbsent()
     )
   })
 
@@ -132,7 +167,8 @@ describe("a group's main pane", () => {
       expect(role("heading", { name: "Bob", level: 1 })).toExist(),
       expect(within(role("main", { name: "Bob" }), text("B"))).toExist(),
       expect(role("heading", { name: "Members" })).toBeAbsent(),
-      expect(role("button", { name: "Leave" })).toBeAbsent()
+      expect(role("button", { name: "Leave" })).toBeAbsent(),
+      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Bob")
     )
   })
 
@@ -196,6 +232,17 @@ describe("a group's side pane", () => {
       ).toExist(),
       expect(within(role("complementary", { name: "Thread" }), text("Thread in Design"))).toExist(),
       expect(within(role("complementary", { name: "Thread" }), role("region", { name: "Thread" }))).toExist()
+    )
+  })
+
+  it("holds the composer to reply in its footer, beside the thread's messages", () => {
+    scene(
+      { update, view: threadView },
+      given(withThread),
+      expect(within(role("complementary", { name: "Thread" }), role("form", { name: "Reply" }))).toExist(),
+      expect(label("Reply")).toHaveAttr("placeholder", "Reply in thread"),
+      expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Reply" }))).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), role("list", { name: "Messages" }))).toExist()
     )
   })
 
