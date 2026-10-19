@@ -18,6 +18,7 @@ import {
   reply,
   scoutAgent,
   support,
+  task,
   testApi,
   thread
 } from "../../../test/fixtures.ts"
@@ -37,6 +38,8 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import { Result } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
+import { TasksBlock } from "../../feature/tasks/block.ts"
+import { triageCount } from "../../feature/tasks/definition.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { LoadIntegrations } from "./command.ts"
@@ -50,7 +53,8 @@ import {
   InboxBinding,
   MenuBinding,
   SearchBinding,
-  SettingsBinding
+  SettingsBinding,
+  TasksBinding
 } from "./composition.ts"
 import { isThreadOpen, Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
 import { init } from "./init.ts"
@@ -83,6 +87,10 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
 /** What the inbox reports, as the workspace receives it. */
 const fromInbox = (message: typeof InboxBlock.Message.Type) =>
   InboxBinding.embedView({ slotId: "inbox", model: opened.inbox, viewInputs: { now } }).toParentMessage(message)
+
+/** What the tasks report, as the workspace receives it. */
+const fromTasks = (message: typeof TasksBlock.Message.Type) =>
+  TasksBinding.embedView({ slotId: "tasks", model: opened.tasks, viewInputs: { now } }).toParentMessage(message)
 
 /** What the search reports, as the workspace receives it. */
 const fromSearch = (message: typeof SearchBlock.Message.Type) =>
@@ -145,6 +153,25 @@ const receivedNotification = message(
   fromInbox(
     InboxBlock.Message.ReceivedInbox({
       items: [{ notification, thread: Option.some(thread), opening: Option.some(opening), message: Option.some(reply) }]
+    })
+  )
+)
+
+/** The task of a thread of general, in triage, read by the tasks. */
+const receivedTask = message(
+  fromTasks(
+    TasksBlock.Message.ReceivedTasks({
+      items: [
+        {
+          task,
+          thread,
+          groupName: "General",
+          opening: Option.some(opening),
+          replies: 0,
+          pending: false,
+          lastActiveAt: opening.publishedAt
+        }
+      ]
     })
   )
 )
@@ -290,6 +317,8 @@ describe("a workspace", () => {
     for (const navigation of [
       Message.ClickedHome(),
       Message.ClickedInbox(),
+      Message.ClickedTriage(),
+      Message.ClickedTasks(),
       Message.ClickedConnections(),
       Message.ClickedAgents(),
       Message.ClickedSettings(),
@@ -403,6 +432,108 @@ describe("a workspace", () => {
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("shows the tasks in triage, and then every open task, in place of the open group, and counts those in triage", () => {
+    story(
+      update,
+      given(opened),
+      receivedTask,
+      model((model) => {
+        expect(triageCount(model.tasks.items)).toBe(1)
+      }),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedTriage()),
+      model((model) => {
+        expect(Open.isAnyOf(["Triage"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      message(Message.ClickedTasks()),
+      model((model) => {
+        expect(Open.isAnyOf(["Tasks"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      // With the tasks shown, picking the group opens it again.
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("keeps what the person narrowed the tasks to while they go from Triage to Tasks and back", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedTasks()),
+      message(fromTasks(TasksBlock.Message.TypedQuery({ query: "ship" }))),
+      message(Message.ClickedTriage()),
+      message(Message.ClickedTasks()),
+      model((model) => {
+        expect(model.tasks.filter.query).toBe("ship")
+      })
+    )
+  })
+
+  it("opens the group of a task's thread with the thread open, and marks the group in the list", () => {
+    for (const destination of [Message.ClickedTriage(), Message.ClickedTasks()]) {
+      story(
+        update,
+        given(opened),
+        receivedTask,
+        message(destination),
+        message(Message.ClickedMenu()),
+        dialogShown,
+        message(fromTasks(TasksBlock.Message.ClickedTask({ groupId, threadId: thread.id }))),
+        dialogClosed,
+        ...draftsRead,
+        model((model) => {
+          expect(
+            Open.isAnyOf(["Group"])(model.open) && [
+              model.open.groupId,
+              Option.map(model.open.model.thread, (open) => [open.threadId, open.model.threadId])
+            ]
+          ).toEqual([groupId, Option.some([thread.id, thread.id])])
+          expect(model.groups.selected).toEqual(Option.some(groupId))
+          expect(model.menu.isOpen).toBe(false)
+        })
+      )
+    }
+  })
+
+  it("opens the side pane's dialog for the thread of a task where the pane is one, and not at Split", () => {
+    const taskOpened = [
+      receivedTask,
+      message(Message.ClickedTasks()),
+      message(fromTasks(TasksBlock.Message.ClickedTask({ groupId, threadId: thread.id })))
+    ] as const
+
+    for (const viewport of ["Phone", "Tablet", "Desktop"] as const) {
+      story(
+        update,
+        given(init(workspaceId, memberId, "Studio", viewport).model),
+        ...taskOpened,
+        dialogShown,
+        ...draftsRead,
+        model((model) => {
+          expect(model.aside.isOpen).toBe(true)
+          expect(isThreadOpen(model.open)).toBe(true)
+        })
+      )
+    }
+    story(
+      update,
+      given(opened),
+      ...taskOpened,
+      ...draftsRead,
+      Command.expectNone(),
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(true)
       })
     )
   })
@@ -739,6 +870,8 @@ describe("a workspace", () => {
     for (const navigation of [
       Message.ClickedHome(),
       Message.ClickedInbox(),
+      Message.ClickedTriage(),
+      Message.ClickedTasks(),
       Message.ClickedConnections(),
       Message.ClickedAgents(),
       Message.ClickedSettings(),

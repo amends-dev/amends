@@ -9,6 +9,8 @@ import type { Html } from "foldkit/html"
 import { threadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
+import { triageCount } from "../../feature/tasks/definition.ts"
+import { tasksView, triageView } from "../../feature/tasks/view.ts"
 import {
   ActionsBinding,
   AgentsBinding,
@@ -21,6 +23,7 @@ import {
   MenuBinding,
   SearchBinding,
   SettingsBinding,
+  TasksBinding,
   WorkspaceComposition,
   type WorkspaceViewBuilder
 } from "./composition.ts"
@@ -37,7 +40,7 @@ const railItems = (model: Model) => [
   {
     icon: "mark-home" as const,
     label: "Home",
-    isCurrent: Open.isAnyOf(["Nothing", "Inbox", "Groups", "Group"])(model.open),
+    isCurrent: Open.isAnyOf(["Nothing", "Inbox", "Triage", "Tasks", "Groups", "Group"])(model.open),
     onClick: Message.ClickedHome()
   },
   {
@@ -60,9 +63,10 @@ const railItems = (model: Model) => [
   }
 ]
 
-/** The sidebar: the workspace's name, the inbox, the groups, and who is signed in. */
+/** The sidebar: the workspace's name, the inbox, the tasks, the groups, and who is signed in. */
 const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html => {
   const waiting = waitingCount(model.inbox)
+  const inTriage = triageCount(model.tasks.items)
   const name = nameOf(model)
   return sidebar(h, {
     label: name,
@@ -87,6 +91,19 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
             ...(waiting > 0 ? { count: waiting } : {}),
             isCurrent: Open.isAnyOf(["Inbox"])(model.open),
             onClick: Message.ClickedInbox()
+          }),
+          sidebarItem(h, {
+            icon: "mark-triage",
+            label: "Triage",
+            ...(inTriage > 0 ? { count: inTriage } : {}),
+            isCurrent: Open.isAnyOf(["Triage"])(model.open),
+            onClick: Message.ClickedTriage()
+          }),
+          sidebarItem(h, {
+            icon: "mark-tasks",
+            label: "Tasks",
+            isCurrent: Open.isAnyOf(["Tasks"])(model.open),
+            onClick: Message.ClickedTasks()
           })
         ]
       }),
@@ -104,7 +121,7 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
 
 /**
  * The main pane: the destination the person opened, or, while they have opened none, the way to pick one. The
- * inbox and the open group are given the time now.
+ * inbox, the tasks, and the open group are given the time now.
  */
 const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Html =>
   Open.match(model.open, {
@@ -118,6 +135,10 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       })
     },
     Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),
+    Triage: () =>
+      h.block(TasksBinding.embedView({ slotId: "triage", model: model.tasks, view: triageView, viewInputs: { now } })),
+    Tasks: () =>
+      h.block(TasksBinding.embedView({ slotId: "tasks", model: model.tasks, view: tasksView, viewInputs: { now } })),
     Groups: () => h.block(GroupsBinding.embedView({ slotId: "browse", model: model.groups, view: browseView })),
     Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),

@@ -43,6 +43,7 @@ import {
   scout,
   scoutAgent,
   support,
+  task,
   testApi,
   thread
 } from "../../../test/fixtures.ts"
@@ -61,6 +62,7 @@ import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Search } from "../../feature/search/command.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { TasksBlock } from "../../feature/tasks/block.ts"
 import { timeOf } from "../../seen.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { LoadIntegrations } from "./command.ts"
@@ -232,6 +234,36 @@ const withNotification = modifyFields(opened, {
     })
 })
 
+const shippingId = ThreadId.ThreadId.make("thread-2")
+
+/** The tasks read: one in triage, in general, and one to do, in design, titled Ship the release. */
+const withTasks = modifyFields(opened, {
+  tasks: (tasks) =>
+    modifyFields(tasks, {
+      items: () => [
+        {
+          task,
+          thread,
+          groupName: "General",
+          opening: Option.some(opening),
+          replies: 0,
+          pending: false,
+          lastActiveAt: opening.publishedAt
+        },
+        {
+          task: { ...task, threadId: shippingId, groupId: design.id, status: "todo" as const },
+          thread: { ...thread, id: shippingId, groupId: design.id, title: "Ship the release" },
+          groupName: "Design",
+          opening: Option.none(),
+          replies: 0,
+          pending: false,
+          lastActiveAt: reply.publishedAt
+        }
+      ],
+      members: () => [member, bob]
+    })
+})
+
 /** The connections as an owner of the workspace sees them, once the host listed the test API. */
 const asOwner = modifyFields(opened, {
   connections: (connections) =>
@@ -329,6 +361,57 @@ describe("a workspace", () => {
       ),
       expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1"),
       expect(role("main", { name: "Inbox" })).toBeAbsent()
+    )
+  })
+
+  it("shows how many tasks wait in triage beside Triage, and shows them and every open task on request", () => {
+    const triaged = role("main", { name: "Triage" })
+    const open = role("main", { name: "Tasks" })
+
+    scene(
+      { update, view: sceneView },
+      given(withTasks),
+      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "1"),
+      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-description"),
+      expect(triaged).toBeAbsent(),
+      expect(open).toBeAbsent(),
+      click(role("button", { name: "Triage" })),
+      expect(triaged).toExist(),
+      expect(within(triaged, role("button", { name: "Plans for the week" }))).toExist(),
+      expect(within(triaged, text("General"))).toExist(),
+      expect(within(triaged, role("button", { name: "Ship the release" }))).toBeAbsent(),
+      click(role("button", { name: "Tasks" })),
+      expect(open).toExist(),
+      expect(triaged).toBeAbsent(),
+      expect(within(open, role("button", { name: "Plans for the week" }))).toExist(),
+      expect(within(open, role("button", { name: "Ship the release" }))).toExist(),
+      expect(within(open, text("Design"))).toExist()
+    )
+  })
+
+  it("says nothing waits in triage, and that no task is open, while none is read", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("button", { name: "Triage" })).not.toHaveAttr("aria-description"),
+      click(role("button", { name: "Triage" })),
+      expect(role("heading", { name: "Nothing to triage", level: 2 })).toExist(),
+      click(role("button", { name: "Tasks" })),
+      expect(role("heading", { name: "No open tasks", level: 2 })).toExist()
+    )
+  })
+
+  it("reads the tasks whichever destination shows them", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(opened),
+      expect(role("main", { name: "Triage" })).toBeAbsent(),
+      Subscription.emit(
+        workspaceSubscriptions["tasks/tasks"],
+        TasksBlock.Message.ReceivedTasks({ items: withTasks.tasks.items })
+      ),
+      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "1"),
+      expect(role("main", { name: "Triage" })).toBeAbsent()
     )
   })
 
@@ -540,6 +623,27 @@ describe("a workspace", () => {
       expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
       expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page"),
       expect(role("button", { name: "Settings" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("marks Triage or Tasks in the sidebar while it shows, with Home in the rail, and neither anywhere else", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("button", { name: "Triage" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "Triage" })),
+      expect(role("button", { name: "Triage" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
+      click(role("button", { name: "Tasks" })),
+      expect(role("button", { name: "Tasks" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Triage" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
+      click(role("button", { name: "Connections" })),
+      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Home" })).not.toHaveAttr("aria-current")
     )
   })
 

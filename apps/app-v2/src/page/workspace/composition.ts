@@ -14,6 +14,7 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
 import { isAsideFloating, type Model, Open, WorkspaceDefinition } from "./definition.ts"
 
@@ -41,6 +42,16 @@ export const showNothing = WorkspaceDefinition.step((model: Model) => ({
 /** Show the inbox in the main content. */
 export const showInbox = WorkspaceDefinition.step((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Inbox() })
+}))
+
+/** Show the tasks in triage in the main content. */
+export const showTriage = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Triage() })
+}))
+
+/** Show every open task in the main content. */
+export const showTasks = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Tasks() })
 }))
 
 /** Show the groups to browse in the main content. */
@@ -107,6 +118,11 @@ const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
 
 /** Opening a notification's thread opens it in its group. */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
+  OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId)
+})
+
+/** Opening a task's thread opens it in its group. */
+const foldTasksOutMessage = TasksBlock.OutMessage.match({
   OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId)
 })
 
@@ -187,6 +203,12 @@ export const InboxBinding = WorkspaceDefinition.bindChild(InboxBlock, {
   outMessage: { fold: foldInboxOutMessage }
 })
 
+export const TasksBinding = WorkspaceDefinition.bindChild(TasksBlock, {
+  field: "tasks",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: foldTasksOutMessage }
+})
+
 export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
   field: "search",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
@@ -244,6 +266,7 @@ export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
     GroupsBinding,
     ActionsBinding,
     InboxBinding,
+    TasksBinding,
     SearchBinding,
     ConnectionsBinding,
     AgentsBinding,

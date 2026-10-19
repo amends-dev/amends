@@ -17,7 +17,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { dayLabel, dayOf, foldAccents, messageWords } from "../../seen.ts"
+import { dayLabel, dayOf, isOpen, threadContains } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**
@@ -111,12 +111,6 @@ export type TaskItem = Readonly<{ item: ThreadItem; task: Task.Task }>
 
 const byLastActive = Order.mapInput(Order.flip(DateTime.Order), ({ item }: TaskItem) => item.lastActiveAt)
 
-/** Whether the thread's title, or its opening's words as the person reads them among `members`, contain `wanted`. */
-const titleOrOpeningContains = (item: ThreadItem, members: ReadonlyArray<Member.Member>, wanted: string): boolean =>
-  [item.thread.title, ...Option.toArray(Option.map(item.opening, (opening) => messageWords(opening, members)))].some(
-    (words) => words !== null && foldAccents(words).includes(wanted)
-  )
-
 /**
  * The threads that track a task, latest active first, kept to the status the filter chose, every one for All, and
  * to those whose title or opening contains what the filter searches for, in any case and whatever the accents,
@@ -124,15 +118,14 @@ const titleOrOpeningContains = (item: ThreadItem, members: ReadonlyArray<Member.
  */
 export const tasksOf = (model: Model, members: ReadonlyArray<Member.Member>): ReadonlyArray<TaskItem> => {
   const { status, query } = model.taskFilter
-  const wanted = foldAccents(query.trim())
   const tracked = model.threads.flatMap((item) => Option.toArray(Option.map(item.task, (task) => ({ item, task }))))
 
   return Array.sort(tracked, byLastActive).filter(
     ({ item, task }) =>
-      (status === "All" || task.status === status) && (wanted === "" || titleOrOpeningContains(item, members, wanted))
+      (status === "All" || task.status === status) && threadContains(item.thread, item.opening, members, query)
   )
 }
 
 /** How many of `items` track a task that is neither done nor dismissed. */
 export const openTaskCount = (items: ReadonlyArray<ThreadItem>): number =>
-  items.filter(({ task }) => Option.exists(task, ({ status }) => status !== "done" && status !== "dismissed")).length
+  items.filter(({ task }) => Option.exists(task, ({ status }) => isOpen(status))).length

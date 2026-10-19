@@ -9,11 +9,13 @@ import {
   dayOf,
   foldAccents,
   initials,
+  isOpen,
   messageRuns,
   messageWords,
   pluralize,
   repliesLabel,
   textRuns,
+  threadContains,
   threadRuns,
   threadWords,
   timeOf,
@@ -242,6 +244,46 @@ describe("threadWords", () => {
 
   it("is A thread while the opening is not read", () => {
     expect(threadWords(thread, Option.none(), members)).toBe("A thread")
+  })
+})
+
+describe("threadContains", () => {
+  const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check the café menu?`)
+  const contains = (query: string, titled: string | null = null) =>
+    threadContains({ ...thread, title: titled }, Option.some(asked), members, query)
+
+  it("is whether the title has the letters, or the opening's words do, in any case and whatever the accents", () => {
+    expect(contains("RETRO", "Retro")).toBe(true)
+    expect(contains("check")).toBe(true)
+    expect(contains("CAFE")).toBe(true)
+    expect(contains("retro")).toBe(false)
+  })
+
+  it("finds a title and an opening alike, as the person reads the opening's mention: the member's current name", () => {
+    expect(contains("retro", "Retro")).toBe(true)
+    expect(contains("check", "Retro")).toBe(true)
+    expect(contains("@bob")).toBe(true)
+    expect(contains("robert")).toBe(false)
+  })
+
+  it("leaves out the spaces around the letters, and keeps every thread for none", () => {
+    expect(contains("  menu ")).toBe(true)
+    expect(contains("")).toBe(true)
+    expect(contains("   ")).toBe(true)
+    expect(contains("  nothing like it ")).toBe(false)
+  })
+
+  it("has no words to find while the opening is not read and the thread has no title", () => {
+    expect(threadContains(thread, Option.none(), members, "check")).toBe(false)
+    expect(threadContains(thread, Option.none(), members, "")).toBe(true)
+    expect(threadContains({ ...thread, title: "Retro" }, Option.none(), members, "retro")).toBe(true)
+  })
+})
+
+describe("isOpen", () => {
+  it("is true for a task that is not done or dismissed, and false for one that is", () => {
+    expect((["triage", "todo", "doing", "held"] as const).map(isOpen)).toEqual([true, true, true, true])
+    expect((["done", "dismissed"] as const).map(isOpen)).toEqual([false, false])
   })
 })
 

@@ -1,8 +1,9 @@
 /**
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
- * actions, their inbox, their connections, their agents, their settings, and their channels, and
- * what the main content shows: nothing yet, the inbox, the groups to browse, the connections, the
- * agents, the settings, the channels, or a group, with its threads and the thread open among them. It lays itself out by the
+ * actions, their inbox, the tasks they can see, their connections, their agents, their settings, and their
+ * channels, and what the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the
+ * groups to browse, the connections, the agents, the settings, the channels, or a group, with its threads and
+ * the thread open among them. It lays itself out by the
  * window's width, which its parent informs it of: below 64rem the sidebar is in a navigation drawer, a
  * dialog that every navigation closes, and below 80rem the thread is in a dialog of its own, which
  * follows the thread opening and closing. It lists the host's integrations once, as it opens, informs the
@@ -32,15 +33,18 @@ import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { workspaceName } from "../../feature/settings/definition.ts"
+import { TasksBlock } from "../../feature/tasks/block.ts"
 import { titleOf } from "../../feature/thread/definition.ts"
 
 /**
- * What the main content shows: nothing yet, the inbox, the groups to browse, the connections, the
- * agents, the settings, the channels, or the group open in the workspace.
+ * What the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the groups to
+ * browse, the connections, the agents, the settings, the channels, or the group open in the workspace.
  */
 export const Open = defineTaggedUnion({
   Nothing: {},
   Inbox: {},
+  Triage: {},
+  Tasks: {},
   Groups: {},
   Connections: {},
   Agents: {},
@@ -57,6 +61,7 @@ export const Model = Schema.Struct({
   groups: GroupsBlock.Model,
   actions: ActionsBlock.Model,
   inbox: InboxBlock.Model,
+  tasks: TasksBlock.Model,
   connections: ConnectionsBlock.Model,
   agents: AgentsBlock.Model,
   settings: SettingsBlock.Model,
@@ -95,7 +100,7 @@ export const isThreadOpen = (open: Open): boolean => Option.isSome(openThreadTit
 /** Whether the side pane is in a dialog at `viewport`, not beside the main pane, which is from `Split` alone. */
 export const isAsideFloating = (viewport: Viewport): boolean => viewport !== "Split"
 
-/** What the groups, actions, inbox, connections, agents, settings, channels, and search are made from: the workspace, as the member. */
+/** What the groups, actions, inbox, tasks, connections, agents, settings, channels, and search are made from: the workspace, as the member. */
 export const ChildInitContext = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId })
 
 export const Message = defineMessageUnion({
@@ -103,6 +108,8 @@ export const Message = defineMessageUnion({
   ClickedSignOut: {},
   ClickedHome: {},
   ClickedInbox: {},
+  ClickedTriage: {},
+  ClickedTasks: {},
   ClickedConnections: {},
   ClickedAgents: {},
   ClickedSettings: {},

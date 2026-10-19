@@ -9,7 +9,9 @@ messages, where they reply, rename the thread, edit or delete their own messages
 stop following it, which opening reads through its latest activity; their inbox, their
 notifications under the days they came, all of them or only those waiting, each by who wrote what it
 is about, what they did, where it comes from, and how long ago, to open, or to mark seen one at a
-time or all at once; the workspace's settings, its name and their own, its members and their roles,
+time or all at once; the tasks they can see across their groups, those waiting in triage and every
+open one, as a table to narrow by assignee, by status, and by search, each to open in its group;
+the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
 rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, to
 add, rename, and set up again; and its channels, which bring in conversations from them, to add,
@@ -196,8 +198,9 @@ the pages that compose them; the root composes the pages.
   thread's title or its opening's words (`threadWords`), "Started by Alice · 3 replies" under it, with
   "Sending…" while the thread is being started, a badge of the status, a success for done and a caution
   for held, how long ago the thread was last written in (`ageLabel`), and "Open →", the row opening the
-  thread as a row of the list does. The search finds the letters in the thread's title or in its
-  opening's words, whatever their case and accents; a mention in it is the member's current name. With
+  thread as a row of the list does; the table is `taskTable.ts`'s, which `feature/tasks` draws too. The
+  search finds the letters in the thread's title or in its
+  opening's words, whatever their case and accents (`threadContains`); a mention in it is the member's current name. With
   no task the tab says "No tasks yet" and to start one from the composer, and with a search or a
   status that leaves none, "No tasks match". `composerView` is the composer to start one, for the
   pane's footer, whose box shows "Message" and the group's name until the person writes. On the Tasks
@@ -306,6 +309,29 @@ the pages that compose them; the root composes the pages.
   waits, from the header. It reports the thread opened, and offers a count of what waits for its
   parent to show. It lacks "Show older", the mock's page of older notifications: the store gives
   every notification the person has at once, and paging them waits for the store to page.
+- `feature/tasks`: the tasks the person can see across their groups, from the store's `tasks`: each
+  with its thread, its group's name, how many replies the thread has, and when it was last active,
+  and the members and contacts that name who started a thread and who is assigned to it. It is made
+  from the workspace as the member, writes nothing, and has two views, each a main pane that takes
+  the time now from its parent. `triageView` is titled Triage, "Tasks waiting for a decision.", and
+  lists the tasks in triage (`triage`); `tasksView`, the Block's canonical view, is titled Tasks,
+  "Every open task you can see.", and lists every task that is neither done nor dismissed (`open`).
+  Under the title are a search field, whose label is hidden and whose placeholder says "Search
+  tasks…", beside a select of whom a task is assigned to, Anyone, Me, or No one, and, on Tasks
+  alone, a select of the status, All statuses or one of the statuses of an open task, with its label
+  hidden too. A line says "Tasks in triage across your groups." or "Open tasks across your groups."
+  with how many tasks the filters leave at its end, "12 tasks", over the labels of the columns,
+  Task, Group, Status, and Activity, and a row for each, latest active first (`matching`): the same
+  row as the group's Tasks tab has (`taskTable.ts`), with the name of the task's group as its first
+  cell, "General · To do · Sep 20" described after "Started by Alice · 3 replies", and "Open →". The
+  row reports `OpenedThread` with the thread and its group, which its parent opens in that group,
+  where the task's controls are. The search finds the letters in the thread's title or in its
+  opening's words as the group's Tasks tab does (`threadContains`), Me is the member the Block is
+  made for, and No one a task with no assignee. The filters are the Block's, one for both views,
+  except that Triage leaves out the status (`withAnyStatus`), since it shows no choice of one. With
+  no task the pane says "Nothing to triage" or "No open tasks" and that the tasks the person can see
+  will be listed there, and with filters that leave none, "No tasks match" and to try different
+  ones. `triageCount` is how many tasks wait in triage, for the sidebar to show.
 - `feature/settings`: the workspace's name and the person's own, each renamed in place from the name
   seen, one at a time; the workspace's members with their roles, where, for each member the
   delegation rule, by core's `Delegation.recipientDenial`, lets them act on, they change the role
@@ -376,15 +402,19 @@ the pages that compose them; the root composes the pages.
   members it has and the name the person goes by in it; it reports the one picked.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
   rail has "Home", "Connections", "Agents", and "Channels" buttons and, below them, "Settings", each
-  marked while its destination is open; Home is open while nothing, the inbox, the groups to browse,
-  or a group is. The
+  marked while its destination is open; Home is open while nothing, the inbox, the tasks in triage,
+  every open task, the groups to browse, or a group is. The
   sidebar, named by the workspace, has the workspace's name over a button to all workspaces, an
-  "Inbox" item with how many notifications wait, the groups' sections, and, in its footer, who is
+  "Inbox" item with how many notifications wait, a "Triage" item with how many tasks wait in
+  triage (`triageCount`), a "Tasks" item, the groups' sections, and, in its footer, who is
   signed in with a Sign out button. Over them, the sidebar's header has a button, Find anything…, with
   the shortcut ⌘K beside it, hidden from assistive technology, which sends `ClickedSearch`; it reads
   ⌘K on every platform, though off an Apple platform the key is Control+K. The main pane shows one destination: nothing yet, titled by the
-  workspace, the inbox, the groups to browse, the connections, the agents, the settings, or the
-  channels, which are always read, or the open group, a keyed occurrence. The groups to browse are
+  workspace, the inbox, the tasks in triage, every open task, the groups to browse, the connections,
+  the agents, the settings, or the channels, which are always read, or the open group, a keyed
+  occurrence. The tasks Block, which the page binds as `tasks` (`TasksBinding`), is the same child
+  under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened
+  there is opened in its group, as a notification's is. The groups to browse are
   the groups Block's `browseView`, the same child as the sidebar's under a second slot, which the
   Block asks for with `RequestedBrowse`: the page goes there as it goes to any destination, closing
   the drawer and the side pane's dialog and marking no group open, and picking a group on that page
@@ -401,23 +431,24 @@ the pages that compose them; the root composes the pages.
   workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
-  view inputs, and gives the inbox and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
-  marked in the list; opening a notification's thread opens its group with the thread already open,
+  view inputs, and gives the inbox, the tasks, and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
+  marked in the list; opening a notification's or a task's thread opens its group with the thread already open,
   and marks the group. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
   button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
   `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
-  Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox
-  and Browse groups, a group picked, and a notification's thread opened, asks it to close (a close of a closed dialog does
+  Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox,
+  Triage, Tasks, and Browse groups, a group picked, and a notification's or a task's thread opened,
+  asks it to close (a close of a closed dialog does
   nothing). The thread's side pane is in the shell's card beside the main pane only from 80rem
   (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
   the toasts come inside whichever dialog is open, where they can be read and dismissed. The page
   binds another `DialogBlock` for it as `aside` (`AsideBinding`, id `workspace-aside`) and lends the
   shell the pane's view with the dialog's, and whether the dialog is open. `isAsideFloating(viewport)`
   decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
-  at `Split`) as the open group reports `OpenedThread`, and as a notification's thread opens its
-  group, and closes it (`hideAside`) as the group reports `ClosedThread` and in every navigation,
+  at `Split`) as the open group reports `OpenedThread`, and as a notification's or a task's thread opens
+  its group, and closes it (`hideAside`) as the group reports `ClosedThread` and in every navigation,
   since the thread goes with its group. When the dialog closes by itself, by Escape or its scrim, the
   page closes the thread with the group's `requestCloseThread`, except at `Split`, where its closing
   is the pane moving beside the main pane and the thread stays open. When the window's width changes
@@ -465,6 +496,9 @@ offers an agent.
 
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
 feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
+`taskTable.ts`, tasks as the design's `directory` rows under the labels of its columns, with the badge
+of each status and the choices of a status to narrow them to, is the threads feature's Tasks tab's and
+the tasks feature's, which adds a column for the group.
 `memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
 conversation form's, the group's admit form's, and the task's assignee, each saying what its empty
 choice is.
@@ -597,7 +631,12 @@ browser's storage. Each Block's tests sit beside it:
   saying why the person is told, who wrote what and what they did, where it comes from, and what it
   says, grouping the notifications by the day they came on, listing every one or those waiting, newest
   first, as its tab chooses, reporting the thread of the notification opened, marking one seen or all
-  through the newest that waits, and why a write could not be kept; the connections keeping the integrations the page
+  through the newest that waits, and why a write could not be kept; the tasks keeping the tasks and
+  the people they are told of, or why they could not be read, telling the tasks in triage and the open
+  ones apart and counting those in triage, keeping those a status, an assignee, with Me the member the
+  Block is made for and No one a task with none, and a search keep, latest active first, however they
+  are given, leaving out the status for a list that has no choice of it, and reporting the thread of
+  the task picked with its group; the connections keeping the integrations the page
   informs them of or why they could not be listed, asking the page to list them again, adding a connection over
   HTTP once its integration, name, required settings, and key are in, once while it sends, and
   refused with why, renaming, changing the settings of, and removing one as actions from what was
@@ -622,13 +661,14 @@ browser's storage. Each Block's tests sit beside it:
   members; a workspace listing the integrations once as it opens, informing its connections, agents,
   and channels of them or of why they could not be listed, and listing them again when one asks,
   opening the group picked, showing
-  the inbox, the groups to browse, the connections, the agents, the settings, or the channels in its
+  the inbox, the tasks in triage, every open task, the groups to browse, the connections, the agents, the settings, or the channels in its
   place with no group marked, and opening a group from the groups to browse, going home from a group or a destination, handing the settings and the channels what the
-  person does in them, opening a notification's thread in its group, naming the thread open in the
+  person does in them, keeping what the tasks were narrowed to between Triage and Tasks, opening a
+  notification's or a task's thread in its group, naming the thread open in the
   group open, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
   asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
   place; the thread opening the side pane's dialog where the pane is one, from a notification, from a
-  thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing
+  task, from a thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing
   with the thread, with every navigation, and as the window widens to `Split`, which leaves the thread
   open; and the thread closing as its dialog closes by itself, below `Split`; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
@@ -683,7 +723,14 @@ browser's storage. Each Block's tests sit beside it:
   activity alone while the thread is, the unread ones with a dot and a way to mark them seen, the seen
   ones on All with neither and not on Unread, the tabs counted and chosen, all marked seen, one seen
   with its failure shown, and one's thread opened by its text, and an empty All saying there is
-  nothing yet and an empty Unread saying all is caught up; the connections added by an owner
+  nothing yet and an empty Unread saying all is caught up; the tasks in triage as a main pane titled
+  Triage, and every open task as one titled Tasks, each task by its group, its assignee's initials,
+  who started it or the contact who did, its replies, where it stands, and how long ago, as a row
+  under the labels of its columns, on its way while its thread is being started, listing the tasks in
+  triage alone, or those neither done nor dismissed, latest active first, narrowed by an assignee, by
+  a status of an open task, which Triage has no choice of and ignores, and by a search, in any case,
+  and together, saying there are none to triage, no open tasks, or that none match, why they could
+  not be read, and opening a task's thread by its row; the connections added by an owner
   to an integration, with a key field only for the method that takes one, then checked, with their
   settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
   member without the controls until the person is given the role that manages them, marked as
@@ -706,10 +753,12 @@ browser's storage. Each Block's tests sit beside it:
   moved and removed with a failure shown, read by an ordinary member without the controls until the
   person is given the role that manages them, marked as sending with none while a change is on its
   way, with why the integrations could not be listed and a way to ask again, and why they could not
-  be read; and a workspace on the shell: counting what waits beside "Inbox" whichever destination
-  shows, then showing the inbox, the connections, the agents, the settings, or the channels, which
+  be read; and a workspace on the shell: counting what waits beside "Inbox", and the tasks that wait
+  beside "Triage", whichever destination shows, then showing the inbox, the tasks in triage, every open
+  task, the connections, the agents, the settings, or the channels, which
   it reads whichever destination shows, each in a main pane named for it, with the rail marking the
-  destination open, Home from the inbox and the groups too, the groups to browse opened from the
+  destination open, Home from the inbox, the tasks, and the groups too, and the sidebar marking Triage
+  or Tasks while it shows, the groups to browse opened from the
   sidebar's button, from an open group and its thread, and from the drawer, which it closes, with
   a group opened from its row and a team started from Create group, also at `Phone` where the sidebar is
   in the shut drawer, the sidebar naming the workspace with
@@ -787,7 +836,7 @@ browser's storage. Each Block's tests sit beside it:
   but the person by name, whatever the case or accents, and at most eight of each in the order given,
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
-  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and a count with the word for one or many, and the runs of a text and of a message and of a thread's row,
+  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the runs of a text and of a message and of a thread's row,
   a mention as "@" and the member's current name or the name it recorded, and the rest of the
   markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a

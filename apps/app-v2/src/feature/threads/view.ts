@@ -2,36 +2,16 @@ import { Task } from "@amends-dev/core/task"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
 import { choiceSelect, column, field, fieldGrid, hint, notice } from "@amends-dev/design/control"
-import { type BadgeTone, badge } from "@amends-dev/design/details"
-import { columns, row, summary } from "@amends-dev/design/directory"
+import { summary } from "@amends-dev/design/directory"
 import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
 import { paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import {
-  ageLabel,
-  authorName,
-  initials,
-  memberName,
-  pluralize,
-  repliesLabel,
-  statusLabel,
-  threadRuns,
-  threadWords,
-  whenLabel
-} from "../../seen.ts"
+import { authorName, initials, pluralize, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
+import { statusChoices, taskTable } from "../../taskTable.ts"
 import { ComposerBinding, ThreadsComposition, type ThreadsViewBuilder } from "./composition.ts"
-import {
-  byDay,
-  Message,
-  type Model,
-  openTaskCount,
-  type TaskItem,
-  type TaskStatusFilter,
-  type ThreadItem,
-  tasksOf
-} from "./definition.ts"
+import { byDay, Message, type Model, openTaskCount, type ThreadItem, tasksOf } from "./definition.ts"
 
 /**
  * Who could have written the openings, what the group is called and whether it is a team, which of its threads is
@@ -45,21 +25,8 @@ export type ViewInputs = Readonly<{
   now: DateTime.Utc
 }>
 
-/** How a task's status shows as a badge: done a success, held a caution, and the rest quietly. */
-const statusTones: Readonly<Record<Task.Status, BadgeTone>> = {
-  triage: "neutral",
-  todo: "neutral",
-  doing: "neutral",
-  held: "caution",
-  done: "success",
-  dismissed: "neutral"
-}
-
 /** The statuses the Tasks tab narrows to: every one, then each as the person reads it. */
-const statusChoices: ReadonlyArray<readonly [TaskStatusFilter, string]> = [
-  ["All", "All statuses"],
-  ...Task.Status.literals.map((status) => [status, statusLabel[status]] as const)
-]
+const taskStatusChoices = statusChoices(Task.Status.literals)
 
 /** The tabs under the group's title: its threads, and those that track a task, counted while any is open. */
 export const tabsView = ThreadsComposition.makeView((model, h) => {
@@ -140,36 +107,6 @@ const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): H
   ])
 
 /**
- * A task as a row of the table: its assignee's initials, or a dash for no one, its thread's title or opening,
- * who started the thread and how many replies it has, where the task stands, and how long ago the thread was last
- * written in, to open the thread.
- */
-const taskRow = ({ item, task }: TaskItem, { members, now }: ViewInputs, h: ThreadsViewBuilder): Html => {
-  const status = statusLabel[task.status]
-  const activity = ageLabel(item.lastActiveAt, now)
-
-  return h.keyed("li")(
-    item.thread.id,
-    [],
-    [
-      row(h, {
-        mark: task.assignee === null ? "–" : initials(memberName(members, task.assignee)),
-        title: threadWords(item.thread, item.opening, members),
-        meta: [
-          `Started by ${authorName(item.thread.createdBy, members, [])}`,
-          repliesLabel(item.replies),
-          ...(item.pending ? ["Sending…"] : [])
-        ].join(" · "),
-        cells: [badge(h, { label: status, tone: statusTones[task.status] }), h.span([], [activity])],
-        cellsText: `${status} · ${activity}`,
-        action: "Open →",
-        onClick: Message.ClickedThread({ threadId: item.thread.id })
-      })
-    ]
-  )
-}
-
-/**
  * The threads that track a task, latest active first, as a table under a search and a choice of status that
  * narrow it, with how many it lists, or why it lists none.
  */
@@ -203,7 +140,7 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
         {
           id: "task-status",
           label: "Status",
-          choices: statusChoices,
+          choices: taskStatusChoices,
           value: status,
           onChange: (status) => Message.ChoseTaskStatus({ status })
         },
@@ -213,13 +150,20 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
     summary(h, { copy: "Threads that track a task.", count: pluralize(shown.length, "task", "tasks") }),
     ...(shown.length === 0
       ? [paneEmpty(h, { icon: "mark-tasks", ...none })]
-      : [
-          columns(h, { label: "Task", cells: ["Status", "Activity"] }),
-          h.ul(
-            [h.AriaLabel("Tasks")],
-            shown.map((taskItem) => taskRow(taskItem, inputs, h))
-          )
-        ])
+      : taskTable(
+          h,
+          shown.map(({ item, task }) => ({
+            task,
+            thread: item.thread,
+            opening: item.opening,
+            replies: item.replies,
+            pending: item.pending,
+            lastActiveAt: item.lastActiveAt,
+            groupName: inputs.groupName,
+            onClick: Message.ClickedThread({ threadId: item.thread.id })
+          })),
+          { members: inputs.members, contacts: [], now: inputs.now, hasGroupColumn: false }
+        ))
   ])
 }
 
