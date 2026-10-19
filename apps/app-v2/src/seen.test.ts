@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
-import { ageLabel, dayLabel, dayOf, initials, timeOf } from "./seen.ts"
+import { ageLabel, dayLabel, dayOf, initials, timeOf, whenLabel } from "./seen.ts"
 
 describe("initials", () => {
   it("is the first letters of the first two words of a name, in capitals", () => {
@@ -100,6 +100,31 @@ describe("dayLabel", () => {
 
     expect(label).toBe(spelled(local(2025, 12, 25), { year: "numeric", month: "long", day: "numeric" }))
     expect(label).toContain("2025")
+  })
+})
+
+describe("whenLabel", () => {
+  it("is the time of day for a time today, from the start of the day to a later one a clock a little ahead can record", () => {
+    expect(whenLabel(local(2026, 10, 19, 0, 5), now)).toBe(timeOf(local(2026, 10, 19, 0, 5)))
+    expect(whenLabel(local(2026, 10, 19, 9, 41), now)).toBe(timeOf(local(2026, 10, 19, 9, 41)))
+    expect(whenLabel(now, now)).toBe(timeOf(now))
+    expect(whenLabel(local(2026, 10, 20, 0, 5), now)).toBe(timeOf(local(2026, 10, 20, 0, 5)))
+  })
+
+  it("is Yesterday for any time of the day before, from either side of midnight", () => {
+    expect(whenLabel(local(2026, 10, 18, 23, 59), now)).toBe("Yesterday")
+    expect(whenLabel(local(2026, 10, 18, 0, 0), now)).toBe("Yesterday")
+    expect(whenLabel(local(2026, 10, 18, 23, 59), local(2026, 10, 19, 0, 1))).toBe("Yesterday")
+  })
+
+  it("is the weekday's name, in full, within the six days before, and the date after that", () => {
+    expect(whenLabel(local(2026, 10, 15, 9, 0), now)).toBe(spelled(local(2026, 10, 15), { weekday: "long" }))
+    expect(whenLabel(local(2026, 10, 12, 9, 0), now)).toBe(
+      spelled(local(2026, 10, 12), { month: "long", day: "numeric" })
+    )
+    expect(whenLabel(local(2025, 12, 25, 9, 0), now)).toBe(
+      spelled(local(2025, 12, 25), { year: "numeric", month: "long", day: "numeric" })
+    )
   })
 })
 

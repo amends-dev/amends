@@ -6,7 +6,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { aliceInDesign, bobInDesign, design, membership } from "../../../test/fixtures.ts"
+import { aliceInDesign, bobInDesign, design, membership, now } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { ReadDraft } from "../composer/command.ts"
 import { ThreadsBlock } from "../threads/block.ts"
@@ -72,7 +72,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
   ThreadsBinding.embedView({
     slotId: "threads",
     model: opened.threads,
-    viewInputs: { members: [], groupName: "Design", openThreadId: Option.none() }
+    viewInputs: { members: [], groupName: "Design", openThreadId: Option.none(), now }
   }).toParentMessage(message)
 
 describe("a group", () => {

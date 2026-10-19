@@ -57,6 +57,7 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { timeOf } from "../../seen.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { LoadIntegrations } from "./command.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
@@ -691,13 +692,15 @@ describe("a workspace", () => {
     )
   })
 
-  it("lists the group's threads as messages in the main pane, with the composer to start one in its footer", () => {
+  it("lists the group's threads as messages under their day in the main pane, with the composer to start one in its footer", () => {
     scene(
       { update, view: sceneView },
       given(withConversation),
       inside(
         role("main", { name: "General" }),
+        expect(within(role("list", { name: "Threads" }), text("Today"))).toExist(),
         expect(within(role("list", { name: "Threads" }), text("Alice"))).toExist(),
+        expect(within(role("list", { name: "Threads" }), text(timeOf(opening.publishedAt)))).toExist(),
         expect(role("button", { name: "Plans for the week" })).toExist(),
         expect(role("form", { name: "Start a thread" })).toExist(),
         expect(label("Start a thread")).toHaveAttr("placeholder", "Message General"),
@@ -719,6 +722,7 @@ describe("a workspace", () => {
         expect(within(role("list", { name: "Messages" }), text("Plans for the week"))).toExist(),
         expect(within(role("list", { name: "Messages" }), text("1 reply"))).toExist(),
         expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist(),
+        expect(within(role("list", { name: "Messages" }), text(timeOf(reply.publishedAt)))).toExist(),
         expect(role("form", { name: "Reply" })).toExist(),
         expect(label("Reply")).toHaveAttr("placeholder", "Reply in thread"),
         expect(role("button", { name: "Reply" })).toExist()

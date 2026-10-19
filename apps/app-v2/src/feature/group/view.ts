@@ -16,6 +16,7 @@ import { form, settingRow } from "@amends-dev/design/form"
 import { type ModalConfig, modal } from "@amends-dev/design/modal"
 import { pane, paneBack, paneClose, paneColumn, paneTabs } from "@amends-dev/design/pane"
 import type { RenderInfo } from "@foldkit/ui/dialog"
+import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
@@ -26,6 +27,9 @@ import { replyView } from "../thread/view.ts"
 import { composerView } from "../threads/view.ts"
 import { DialogBinding, GroupComposition, type GroupViewBuilder, ThreadBinding, ThreadsBinding } from "./composition.ts"
 import { admitted, belongs, mayRename, Message, type Model } from "./definition.ts"
+
+/** The time now, which the days the threads and their messages were published on are read from. */
+export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
 /** Whether `memberId` has the workspace open now. */
 const isPresent = (model: Model, memberId: MemberId.MemberId): boolean =>
@@ -256,14 +260,15 @@ const settingsModal = (render: RenderInfo, model: Model, h: GroupViewBuilder): H
  * settings, and its threads, with the composer to start one in the footer, or the line that says to join the
  * team to read them; and the settings' modal.
  */
-export const view = GroupComposition.makeView((model, h) => {
+export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { now }, h) => {
   const name = nameOf(model)
   // Until the group is read, its threads list as they would for a member.
   const isReadable = Option.isNone(model.group) || belongs(model)
   const threadsInputs = {
     members: model.members,
     groupName: name,
-    openThreadId: Option.map(model.thread, ({ threadId }) => threadId)
+    openThreadId: Option.map(model.thread, ({ threadId }) => threadId),
+    now
   }
 
   return pane(h, {
@@ -306,7 +311,7 @@ export const view = GroupComposition.makeView((model, h) => {
  * The thread open in the group as the side pane, with the button that closes it, Close beside the title and
  * Back before it on a phone, and nothing while none is open.
  */
-export const threadView = GroupComposition.makeView((model, h) =>
+export const threadView = GroupComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   Option.match(model.thread, {
     onNone: () => h.empty,
     onSome: ({ threadId, model: open }) =>
@@ -320,7 +325,7 @@ export const threadView = GroupComposition.makeView((model, h) =>
           leading: paneBack(h, Message.ClickedAllThreads()),
           actions: [paneClose(h, Message.ClickedAllThreads())]
         },
-        body: [h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open }))],
+        body: [h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open, viewInputs: { now } }))],
         footer: [
           h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView }))
         ]

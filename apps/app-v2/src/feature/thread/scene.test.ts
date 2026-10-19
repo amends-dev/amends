@@ -1,7 +1,7 @@
 import { ThreadId, ThreadMessage, ThreadMessageId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
-import { Option, Schema } from "effect"
+import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   Subscription,
@@ -14,9 +14,10 @@ import {
   selector,
   text,
   type,
+  withViewInputs,
   within
 } from "foldkit/scene"
-import { scout, turnOf } from "../../../test/fixtures.ts"
+import { now, scout, turnOf } from "../../../test/fixtures.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -74,9 +75,11 @@ const reply = Schema.decodeSync(ThreadMessage.ThreadMessage)({
 const savingDraft = (text: string) =>
   SaveDraft({ workspaceId, memberId, place: Drafts.Place.cases.Reply.make({ threadId }), text })
 
+const sceneView = withViewInputs(view, { now })()
+
 /** The side pane's body and its footer, as the group's side pane puts them. */
-const sidePane = (model: Parameters<typeof view>[0], h: Parameters<typeof view>[1]) =>
-  h.div([], [view(model, h), replyView(model, h)])
+const sidePane = (model: Parameters<typeof sceneView>[0], h: Parameters<typeof sceneView>[1]) =>
+  h.div([], [sceneView(model, h), replyView(model, h)])
 
 /** The thread read with `messages`, written by alice and bob, whose names are read. */
 const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.ThreadMessage; pending: boolean }>>) => [
@@ -133,9 +136,22 @@ describe("a thread", () => {
     )
   })
 
+  it("says when each message was by its time of day today, and by its day before today", () => {
+    const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: yesterday, pending: false }, { message: reply, pending: false }),
+      expect(text("Yesterday")).toExist(),
+      expect(text(timeOf(yesterday.publishedAt))).toBeAbsent(),
+      expect(text(timeOf(reply.publishedAt))).toExist()
+    )
+  })
+
   it("lists its agents' turns, whose log the person follows", () => {
     scene(
-      { update, view, subscriptions: ThreadBlock.subscriptions },
+      { update, view: sceneView, subscriptions: ThreadBlock.subscriptions },
       given(init(workspaceId, memberId, threadId).model),
       expect(role("region", { name: "Turns" })).toBeAbsent(),
       Subscription.emit(

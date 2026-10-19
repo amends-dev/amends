@@ -1,7 +1,7 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called and what
  * letters mark them, who wrote a message and what it says, when a time was, by its time of day, its day,
- * and how long ago it was, how a thread is titled, whether anyone may join a group, and how a task's
+ * either as a message shows it, and how long ago it was, how a thread is titled, whether anyone may join a group, and how a task's
  * status and priority and a turn's status read.
  */
 
@@ -55,6 +55,15 @@ const readDay = (day: DateTime.Zoned, today: DateTime.Zoned, style: "long" | "sh
 
 /** The day `day` began, as a divider names it from `now`: "Today", "Yesterday", "Tuesday", "September 20". */
 export const dayLabel = (day: DateTime.Zoned, now: DateTime.DateTime): string => readDay(day, dayOf(now), "long")
+
+/**
+ * When `at` was, as a message shows it: its time of day when it was today, as "9:41 AM", otherwise the name
+ * of its day from `now`, as `dayLabel` gives it: "Yesterday", "Tuesday", "September 20".
+ */
+export const whenLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
+  const day = dayOf(at)
+  return daysBefore(day, dayOf(now)) <= 0 ? timeOf(at) : dayLabel(day, now)
+}
 
 /**
  * How long before `now` it was `at`: "Just now", "12m ago", and "3h ago" within the day, then, by the day,

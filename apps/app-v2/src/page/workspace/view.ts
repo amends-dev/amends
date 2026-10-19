@@ -101,7 +101,7 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
 
 /**
  * The main pane: the destination the person opened, or, while they have opened none, the way to pick one. The
- * inbox is given the time now.
+ * inbox and the open group are given the time now.
  */
 const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Html =>
   Open.match(model.open, {
@@ -119,18 +119,27 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
     Settings: () => h.block(SettingsBinding.embedView({ slotId: "settings", model: model.settings })),
     Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
-    Group: ({ groupId, model: open }) => h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open }))
+    Group: ({ groupId, model: open }) =>
+      h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open, viewInputs: { now } }))
   })
 
-/** The side pane: the thread open in the group open, while there is one. */
-const asideView = (model: Model, h: WorkspaceViewBuilder): Option.Option<Html> =>
+/** The side pane: the thread open in the group open, while there is one, given the time now. */
+const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Option.Option<Html> =>
   Open.matchOrElse(
     model.open,
     {
       Group: ({ groupId, model: open }) =>
         Option.isSome(open.thread)
           ? Option.some(
-              h.block(GroupBinding.embedView({ key: groupId, slotId: "group-thread", model: open, view: threadView }))
+              h.block(
+                GroupBinding.embedView({
+                  key: groupId,
+                  slotId: "group-thread",
+                  model: open,
+                  view: threadView,
+                  viewInputs: { now }
+                })
+              )
             )
           : Option.none()
     },
@@ -143,7 +152,7 @@ const asideView = (model: Model, h: WorkspaceViewBuilder): Option.Option<Html> =
  * pane lent to the shell.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email, now }, h) => {
-  const aside = asideView(model, h)
+  const aside = asideView(model, now, h)
 
   return shell(h, {
     viewport: model.viewport,

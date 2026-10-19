@@ -1,15 +1,18 @@
 import { GroupId } from "@amends-dev/core/group"
-import { ThreadId } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
-import { Option } from "effect"
+import { DateTime, Option } from "effect"
 import {
   Command,
+  all,
   click,
   expect,
+  expectAll,
   expectOutMessage,
   given,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -19,7 +22,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, membership, opening, task, thread } from "../../../test/fixtures.ts"
+import { bob, membership, now, opening, task, thread } from "../../../test/fixtures.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -36,7 +39,12 @@ const memberId = MemberId.MemberId.make("member-1")
 const groupId = GroupId.GroupId.make("general")
 const openedId = ThreadId.ThreadId.make("thread-1")
 
-const inputs = { members: [member, bob], groupName: "General", openThreadId: Option.none<ThreadId.ThreadId>() }
+const inputs = {
+  members: [member, bob],
+  groupName: "General",
+  openThreadId: Option.none<ThreadId.ThreadId>(),
+  now
+}
 
 const sceneView = withViewInputs(view, inputs)()
 
@@ -45,15 +53,35 @@ const retro = { ...thread, id: ThreadId.ThreadId.make("thread-2"), title: "Retro
 
 const empty = init(workspaceId, memberId, groupId).model
 
-/** The group's threads read: one opened by alice, in triage, with two messages new, and one that is being started. */
-const listed = modifyFields(empty, {
-  threads: () => [
-    { thread, opening: Option.some(opening), task: Option.some(task), pending: false, unread: 2 },
-    { thread: retro, opening: Option.none(), task: Option.none(), pending: true, unread: 0 }
-  ]
-})
+/** A thread opened by alice, in triage, with two messages new. */
+const alices = { thread, opening: Option.some(opening), task: Option.some(task), pending: false, unread: 2 }
+
+/** The thread that is being started. */
+const starting = { thread: retro, opening: Option.none(), task: Option.none(), pending: true, unread: 0 }
+
+/** The group's threads read: alice's, and the one being started. */
+const listed = modifyFields(empty, { threads: () => [alices, starting] })
 
 const place = Drafts.Place.cases.Thread.make({ groupId })
+
+/** The item of the list at `index`, a day's divider or a thread. */
+const item = (index: number) => nth(all.role("listitem"), index)
+
+/** Bob's thread, which opened a day before the time now. */
+const yesterdays = {
+  thread: { ...thread, id: ThreadId.ThreadId.make("thread-3") },
+  opening: Option.some({
+    ...opening,
+    author: ThreadMessage.Author.cases.Member.make({ memberId: bob.id }),
+    publishedAt: DateTime.subtract(now, { days: 1 })
+  }),
+  task: Option.none(),
+  pending: false,
+  unread: 0
+}
+
+/** The threads read: `threads`, in the order the list holds them. */
+const listing = (...threads: typeof empty.threads) => modifyFields(empty, { threads: () => threads })
 
 describe("a group's threads", () => {
   it("lists each as a message of the person who opened it, with its time, and its opening as the text that opens it", () => {
@@ -67,6 +95,43 @@ describe("a group's threads", () => {
       expect(role("button", { name: "Plans for the week" })).toExist(),
       click(role("button", { name: "Plans for the week" })),
       expectOutMessage(OutMessage.SelectedThread({ threadId: openedId }))
+    )
+  })
+
+  it("sets the threads apart by the day they opened on, and says when each did by its time of day or its day", () => {
+    scene(
+      { update, view: sceneView },
+      given(listing(yesterdays, alices)),
+      expectAll(all.role("listitem")).toHaveCount(4),
+      expect(within(item(0), text("Yesterday"))).toExist(),
+      expect(within(item(1), text("Bob"))).toExist(),
+      expect(within(item(1), text("Yesterday"))).toExist(),
+      expect(within(item(2), text("Today"))).toExist(),
+      expect(within(item(3), text("Alice"))).toExist(),
+      expect(within(item(3), text(timeOf(opening.publishedAt)))).toExist()
+    )
+  })
+
+  it("puts a thread whose opening is not read yet first under the newest day, wherever the list holds it", () => {
+    scene(
+      { update, view: sceneView },
+      given(listing(alices, yesterdays, starting)),
+      expectAll(all.role("listitem")).toHaveCount(5),
+      expect(within(item(0), text("Today"))).toExist(),
+      expect(within(item(1), text("A thread"))).toExist(),
+      expect(within(item(2), text("Alice"))).toExist(),
+      expect(within(item(3), text("Yesterday"))).toExist(),
+      expect(within(item(4), text("Bob"))).toExist()
+    )
+  })
+
+  it("puts a thread whose opening is not read yet under today while no thread has a day", () => {
+    scene(
+      { update, view: sceneView },
+      given(listing(starting)),
+      expectAll(all.role("listitem")).toHaveCount(2),
+      expect(within(item(0), text("Today"))).toExist(),
+      expect(within(item(1), text("A thread"))).toExist()
     )
   })
 

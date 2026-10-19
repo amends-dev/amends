@@ -1,27 +1,32 @@
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
 import { hint, notice } from "@amends-dev/design/control"
-import { message, messageList } from "@amends-dev/design/message"
+import { divider, message, messageList } from "@amends-dev/design/message"
+import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { authorName, initials, statusLabel, threadLabel, timeOf } from "../../seen.ts"
+import { authorName, initials, statusLabel, threadLabel, whenLabel } from "../../seen.ts"
 import { ComposerBinding, ThreadsComposition, type ThreadsViewBuilder } from "./composition.ts"
-import { Message, type ThreadItem } from "./definition.ts"
+import { byDay, Message, type ThreadItem } from "./definition.ts"
 
-/** Who could have written the openings, what the group is called, and which of its threads is open. */
+/**
+ * Who could have written the openings, what the group is called, which of its threads is open, and the time
+ * now, which the days the threads opened on and when each did are read from.
+ */
 export type ViewInputs = Readonly<{
   members: ReadonlyArray<Member.Member>
   groupName: string
   openThreadId: Option.Option<ThreadId.ThreadId>
+  now: DateTime.Utc
 }>
 
-/** A thread as a message: its opening's author and time, its title or opening, and what is new in it. */
-const threadRow = (item: ThreadItem, { members, openThreadId }: ViewInputs, h: ThreadsViewBuilder): Html => {
+/** A thread as a message: its opening's author and when, its title or opening, and what is new in it. */
+const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs, h: ThreadsViewBuilder): Html => {
   const author = Option.match(item.opening, {
     onNone: () => ({ name: "A thread", mark: "?", time: undefined }),
     onSome: (opening) => {
       const name = authorName(opening, members, [])
-      return { name, mark: initials(name), time: timeOf(opening.publishedAt) }
+      return { name, mark: initials(name), time: whenLabel(opening.publishedAt, now) }
     }
   })
 
@@ -41,7 +46,7 @@ const threadRow = (item: ThreadItem, { members, openThreadId }: ViewInputs, h: T
   })
 }
 
-/** The group's threads, each as a message of the person who opened it, the open one marked. */
+/** The group's threads under the days they opened on, each as a message of whoever opened it, the open one marked. */
 export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   h.div(
     [],
@@ -49,7 +54,13 @@ export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, i
       notice(h, model.notice),
       model.threads.length === 0
         ? hint(h, "No threads yet.")
-        : messageList(h, { label: "Threads", children: model.threads.map((item) => threadRow(item, inputs, h)) })
+        : messageList(h, {
+            label: "Threads",
+            children: byDay(model.threads, inputs.now).flatMap((day) => [
+              divider(h, day.label),
+              ...day.items.map((item) => threadRow(item, inputs, h))
+            ])
+          })
     ]
   )
 )

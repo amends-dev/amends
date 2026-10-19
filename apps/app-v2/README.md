@@ -55,7 +55,7 @@ and the pane of each destination, `feature/groups` renders the sidebar's section
 a team or a conversation is started, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
-initials and the time of day from `src/seen.ts`. The task and the turns a thread embeds are the
+initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`. The task and the turns a thread embeds are the
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
 a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
 each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
@@ -106,10 +106,11 @@ the pages that compose them; the root composes the pages.
   reading it marks it read through its latest activity, once for each. The reply composer's changes
   say the person types, at once, then at most as often as typing lasts, by core's
   `Presence.typingRepeats`, and sending says they stopped. It has two views. `view`, its canonical
-  one, is the body of a side pane: Follow or Unfollow and Rename in a row, the form to rename it while
+  one, is the body of a side pane, which takes the time now as its view input: Follow or Unfollow and Rename in a row, the form to rename it while
   the person does, the task and the turns, then its messages as a list, the opening first, how many
-  replies follow it, and the replies, each by its author's initials, name, and time, with "Sending…"
-  or "edited" after the time, and Edit and Delete on the person's own, which the form to edit it
+  replies follow it, and the replies, each by its author's initials, name, and when it was published
+  (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with "Sending…" or
+  "edited" after it, and Edit and Delete on the person's own, which the form to edit it
   replaces while they do; and who else types, in a live region under them. It shows no title, which
   the pane's header has. `replyView` is the reply composer, for the pane's footer.
 - `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
@@ -133,12 +134,16 @@ the pages that compose them; the root composes the pages.
   not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
   being started, and how much is new, and a composer to start one. It reports the thread picked. It
-  has two views, which take the group's members, its name, and the thread open in it from their
-  parent. `view`, its canonical one, lists the threads as messages: each the opening's author, by
+  has two views, which take the group's members, its name, the thread open in it, and the time now from
+  their parent. `view`, its canonical one, lists the threads as messages, in the order the list holds
+  them, under a `divider` for each run of them that opened on one day by the person's own clock, named
+  as it is from the time now (`dayLabel`): each the opening's author, by
   initials and name ("Someone" until the members are read, and "A thread" when the opening is not read
-  yet), their time, and the thread's title or its opening as the text that opens it, with "Sending…"
+  yet), when the opening was published (`whenLabel`: its time of day today, "Yesterday" or the day's name
+  before), and the thread's title or its opening as the text that opens it, with "Sending…"
   while it is being started, how much is new, and where its task stands; the thread open is the
-  current row. `composerView` is the composer to start one, for the pane's footer, whose box
+  current row. A thread whose opening is not read yet has no day, so it is first under the newest day, or
+  under Today while no thread has a day. `composerView` is the composer to start one, for the pane's footer, whose box
   shows "Message" and the group's name until the person writes.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
@@ -166,7 +171,8 @@ the pages that compose them; the root composes the pages.
   thread, with a button that closes it, Close, and, below 48rem where the pane is full screen over
   the main pane, Back before the title, both sending `ClickedAllThreads`, the thread's messages, and
   the reply composer in the footer, and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
-  and `threadView` in its side pane. The main pane embeds the threads Block twice and the side pane
+  and `threadView` in its side pane, giving both the time now, which they give on to the threads Block
+  and the thread Block. The main pane embeds the threads Block twice and the side pane
   the thread Block twice, once for its content and once for its composer, each in a slot of its own.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to by name, their conversations by the other members in them, then the public teams they may join,
@@ -274,7 +280,7 @@ the pages that compose them; the root composes the pages.
   only while one is, and the actions' toasts come over both. The workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
-  view inputs, and gives the inbox the time now. Picking a group opens it; Home or any other destination leaves no group
+  view inputs, and gives the inbox and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a notification's thread opens its group with the thread already open,
   and marks the group. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
@@ -321,7 +327,7 @@ the pages that compose them; the root composes the pages.
   `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
   Nothing acts on the time, so it goes no further than views: the root's view gives the open
   workspace's view the time now beside the email, as a view input and not a message, and the page
-  gives it on to the inbox, the one destination that shows ages and days. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
+  gives it on to the inbox and the open group, the destinations that show ages and days. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
   session, and the browser's services beneath them.
 
 A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
@@ -582,7 +588,7 @@ browser's storage. Each Block's tests sit beside it:
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant
   to rename it. `Store.viewTurns` is
   tested apart: which turns may run again, and `seen.ts`: the initials of a name, the time of day, the
-  start of a day in the person's own time zone, and the labels of a day and of how long ago it was, from
+  start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`'

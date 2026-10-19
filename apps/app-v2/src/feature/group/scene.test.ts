@@ -3,22 +3,26 @@ import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from
 import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Option, Schema } from "effect"
+import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   Mount,
+  all,
   change,
   click,
   expect,
+  expectAll,
   given,
   inside,
   label,
+  nth,
   role,
   scene,
   selector,
   submit,
   text,
   type,
+  withViewInputs,
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
@@ -30,16 +34,21 @@ import {
   design,
   general,
   membership,
+  now,
   opening,
+  reply,
   thread
 } from "../../../test/fixtures.ts"
 import { AdmitMember, JoinGroup, LeaveGroup, RemoveMember, RenameGroup } from "./command.ts"
 import { Message, type Model } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { threadView, view } from "./view.ts"
+import * as GroupView from "./view.ts"
 
 const { workspace, member } = membership
+
+const view = withViewInputs(GroupView.view, { now })()
+const threadView = withViewInputs(GroupView.threadView, { now })()
 const threadId = ThreadId.ThreadId.make("thread-1")
 
 /** A public team the person does not belong to. */
@@ -216,6 +225,30 @@ describe("a group's main pane", () => {
       ),
       expect(within(role("list", { name: "Threads" }), role("button", { name: "Plans for the week" }))).toExist(),
       expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist()
+    )
+  })
+
+  it("sets the group's threads apart by the day they opened on, by the time now", () => {
+    const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
+    const listed = (id: string, openingMessage: typeof opening) => ({
+      thread: { ...thread, id: ThreadId.ThreadId.make(id), groupId: design.id },
+      opening: Option.some(openingMessage),
+      task: Option.none(),
+      pending: false,
+      unread: 0
+    })
+
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          threads: (threads) =>
+            modifyFields(threads, { threads: () => [listed("thread-2", yesterday), listed("thread-1", opening)] })
+        })
+      ),
+      expectAll(all.role("listitem")).toHaveCount(4),
+      expect(within(nth(all.role("listitem"), 0), text("Yesterday"))).toExist(),
+      expect(within(nth(all.role("listitem"), 2), text("Today"))).toExist()
     )
   })
 
@@ -597,6 +630,28 @@ describe("a group's side pane", () => {
       ).toExist(),
       expect(within(role("complementary", { name: "Thread" }), text("Thread in Design"))).toExist(),
       expect(within(role("complementary", { name: "Thread" }), role("region", { name: "Thread" }))).toExist()
+    )
+  })
+
+  it("says when the thread's messages were by the day before today, by the time now", () => {
+    const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
+
+    scene(
+      { update, view: threadView },
+      given(
+        modifyFields(withThread, {
+          thread: Option.map((open) => ({
+            ...open,
+            model: modifyFields(open.model, {
+              messages: () => [
+                { message: yesterday, pending: false },
+                { message: reply, pending: false }
+              ]
+            })
+          }))
+        })
+      ),
+      expect(within(role("list", { name: "Messages" }), text("Yesterday"))).toExist()
     )
   })
 

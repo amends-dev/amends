@@ -3,11 +3,15 @@ import { button, buttonRow, field, hint, notice, sending, submit, textarea } fro
 import { form } from "@amends-dev/design/form"
 import { divider, message, messageList } from "@amends-dev/design/message"
 import { paneColumn } from "@amends-dev/design/pane"
+import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { authorName, initials, messageText, timeOf } from "../../seen.ts"
+import { authorName, initials, messageText, whenLabel } from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, typingIn } from "./definition.ts"
+
+/** The time now, which the days the messages were published on are read from. */
+export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
 /** The form to change the thread's title, while the person renames it. */
 const renamingView = (model: Model, h: ThreadViewBuilder): Html =>
@@ -56,7 +60,12 @@ const noteOf = (pending: boolean, edited: boolean): string | undefined => {
 }
 
 /** A message, with editing and deleting for the person's own, and the form to change it while they edit it. */
-const messageView = ({ message: item, pending }: MessageItem, model: Model, h: ThreadViewBuilder): Html => {
+const messageView = (
+  { message: item, pending }: MessageItem,
+  model: Model,
+  now: DateTime.Utc,
+  h: ThreadViewBuilder
+): Html => {
   const own =
     ThreadMessage.Author.matchOrElse(
       item.author,
@@ -75,7 +84,7 @@ const messageView = ({ message: item, pending }: MessageItem, model: Model, h: T
     key: item.id,
     mark: initials(author),
     author,
-    time: timeOf(item.publishedAt),
+    time: whenLabel(item.publishedAt, now),
     note: noteOf(pending, edited),
     text: messageText(item),
     body: Option.getOrUndefined(
@@ -97,16 +106,16 @@ const messageView = ({ message: item, pending }: MessageItem, model: Model, h: T
 }
 
 /** The opening message, then, when there are replies, how many, and the replies. */
-const messagesView = (model: Model, h: ThreadViewBuilder): Html => {
+const messagesView = (model: Model, now: DateTime.Utc, h: ThreadViewBuilder): Html => {
   const [opening, ...replies] = model.messages
   const heading = `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`
 
   return messageList(h, {
     label: "Messages",
     children: [
-      ...(opening === undefined ? [] : [messageView(opening, model, h)]),
+      ...(opening === undefined ? [] : [messageView(opening, model, now, h)]),
       ...(replies.length === 0 ? [] : [divider(h, heading, { align: "start" })]),
-      ...replies.map((reply) => messageView(reply, model, h))
+      ...replies.map((reply) => messageView(reply, model, now, h))
     ]
   })
 }
@@ -122,7 +131,7 @@ const typingView = (names: ReadonlyArray<string>, h: ThreadViewBuilder): Html =>
  * The thread as the side pane's body: the person's part in it, the task it tracks and its agents' turns, and
  * its messages, the opening first and the replies after it.
  */
-export const view = ThreadComposition.makeView((model, h) =>
+export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   h.section(
     [h.AriaLabel("Thread")],
     [
@@ -132,7 +141,7 @@ export const view = ThreadComposition.makeView((model, h) =>
         h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
         h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
         notice(h, model.notice),
-        h.div([], [messagesView(model, h), typingView(typingIn(model), h)])
+        h.div([], [messagesView(model, now, h), typingView(typingIn(model), h)])
       ])
     ]
   )
