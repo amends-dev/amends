@@ -466,6 +466,17 @@ choice is.
   `Turn.whyNotRetryable`, from where its agent stands among the thread's turns, by
   `TurnStore.latestOf`, and who takes part in it. `get` and `getActions` read a record and the
   actions once, for an action being written.
+- `search(query)` is an Effect and not a stream, since a search runs when it is asked: it reads the
+  groups, the members, the threads, and their messages once, as the person's unfinished actions leave
+  them, and `findMatches` decides what has the query in it. It gives `SearchResults`: the groups whose
+  names, as the person reads them (a conversation by the other members), contain it; the threads
+  whose title, or whose opening message's words, a mention as the member's current name, contain it,
+  each with the name of its group and the words the person reads it by, its title or its opening's;
+  and the active members, other than the person, whose names contain it. Each kind is at most eight
+  (`maxSearchResults`), in the order of the records, and the query is matched whatever its case or
+  accents (`foldAccents` in `seen.ts`, which the composer's list of members compares names with too).
+  An empty query, or one of spaces, finds nothing. A thread whose group the replica lacks is left
+  out, since it could not be opened, and so is one whose only words are a deleted message's.
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
   a store opens, reads, and takes actions offline. Each time its connection drops, the store builds
@@ -670,9 +681,16 @@ browser's storage. Each Block's tests sit beside it:
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
   and its move shows at once; and the settings' reads, as the settings Block reads them together,
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant
-  to rename it. `Store.viewTurns` is
+  to rename it; and a search finds a team, a thread, and a conversation the person started, and
+  the member they are with, before the server has them and after, whatever the case or accents of
+  the query, and not the person themselves. `Store.viewTurns` is
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
-  replier once in the order of their first reply, and `seen.ts`: the initials of a name, the time of day, the
+  replier once in the order of their first reply, and so is `Store.findMatches`: nothing for an empty
+  query or one of spaces, a group by the name the person reads and a conversation by the other member,
+  a thread by its title or its opening's words and shown by its title, a mention in an opening as
+  the member's current name, no thread by a deleted opening or without its group, the active members
+  but the person by name, whatever the case or accents, and at most eight of each in the order given,
+  and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and a count with the word for one or many, and the runs of a text and of a message and of a thread's row,
   a mention as "@" and the member's current name or the name it recorded, and the rest of the

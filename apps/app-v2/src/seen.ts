@@ -2,8 +2,8 @@
  * What the person sees of the workspace's records: what a member and a group are called and what
  * letters mark them, who wrote a message and what it says, with a mention in it as its member's current
  * name, when a time was, by its time of day, its day, either as a message shows it, and how long ago it
- * was, how a thread is titled and how many replies it has, whether anyone may join a group, and how a
- * task's status and priority and a turn's status read.
+ * was, how a thread is titled and how many replies it has, whether anyone may join a group, how two texts
+ * are compared when the person searches, and how a task's status and priority and a turn's status read.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -163,6 +163,9 @@ export const threadRuns = (
 
 /** Whether anyone in the workspace may join `group`: a public team. */
 export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"
+
+/** `text` in lower case with its accents taken off, so that "José" and "jose" are the same when searched for. */
+export const foldAccents = (text: string): string => text.normalize("NFD").replaceAll(/\p{M}/gu, "").toLowerCase()
 
 /** A task's status, as the person reads it. */
 export const statusLabel: Readonly<Record<Task.Status, string>> = {

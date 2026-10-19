@@ -7,6 +7,7 @@ import {
   ageLabel,
   dayLabel,
   dayOf,
+  foldAccents,
   initials,
   messageRuns,
   messageWords,
@@ -287,5 +288,13 @@ describe("ageLabel", () => {
     expect(thisYear).not.toContain("2026")
     expect(lastYear).toBe(spelled(local(2025, 9, 20), { year: "numeric", month: "short", day: "numeric" }))
     expect(lastYear).toContain("2025")
+  })
+})
+
+describe("foldAccents", () => {
+  it("is the text in lower case with its accents taken off", () => {
+    expect(foldAccents("José Ñandú")).toBe("jose nandu")
+    expect(foldAccents("ZOË")).toBe("zoe")
+    expect(foldAccents("plain")).toBe("plain")
   })
 })

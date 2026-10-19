@@ -11,6 +11,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { foldAccents } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 
 /**
@@ -64,8 +65,6 @@ export const completeTail = (text: string, mention: string): string =>
 
 /** The most members the list suggests. */
 export const maxSuggestions = 6
-
-const foldAccents = (text: string) => text.normalize("NFD").replaceAll(/\p{M}/gu, "").toLowerCase()
 
 /**
  * The active members, other than `memberId`, whose names contain `query` whatever its case or accents, in

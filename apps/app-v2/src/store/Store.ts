@@ -11,7 +11,7 @@
 
 import { type Grant, GrantResolver } from "@amends-dev/core/authorization"
 import type { CoreError } from "@amends-dev/core/error"
-import type { GroupId } from "@amends-dev/core/group"
+import type { Group, GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { Presence } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
@@ -19,7 +19,7 @@ import { Request } from "@amends-dev/core/request"
 import type { Task } from "@amends-dev/core/task"
 import { type Thread, type ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import { Turn, TurnStore } from "@amends-dev/core/turn"
-import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import type { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
 import * as ChannelSync from "@amends-dev/sync/ChannelSync"
 import * as ConnectionSync from "@amends-dev/sync/ConnectionSync"
@@ -54,6 +54,7 @@ import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Api from "../api.ts"
+import { foldAccents, groupName, messageWords } from "../seen.ts"
 import * as Drafts from "./Drafts.ts"
 import * as Pending from "./Pending.ts"
 import * as Replica from "./Replica.ts"
@@ -136,6 +137,98 @@ const countMembers = (
         ? group.record.value.memberIds.length
         : (admitted.get(group.record.value.id) ?? 0)
   }))
+}
+
+/** The most groups, threads, and people a search gives each. */
+export const maxSearchResults = 8
+
+/** A group a search found, with its name as the person reads it. */
+export interface GroupMatch {
+  readonly group: Group.Group
+  readonly name: string
+}
+
+/** A thread a search found, with the name of its group and the words the person reads it by: its title, or its opening's. */
+export interface ThreadMatch {
+  readonly thread: Thread.Thread
+  readonly groupName: string
+  readonly words: string
+}
+
+/**
+ * What a search found in the workspace: the groups by their names, the threads by their titles and their
+ * openings' words, and the active members, other than the person, by their names, each at most
+ * `maxSearchResults`, in the order of the records.
+ */
+export interface SearchResults {
+  readonly groups: ReadonlyArray<GroupMatch>
+  readonly threads: ReadonlyArray<ThreadMatch>
+  readonly people: ReadonlyArray<Member.Member>
+}
+
+/** What a search reads of the replica, as the person's unfinished actions leave it. */
+export interface Searched {
+  readonly memberId: MemberId.MemberId
+  readonly groups: ReadonlyArray<Group.Group>
+  readonly members: ReadonlyArray<Member.Member>
+  readonly threads: ReadonlyArray<Thread.Thread>
+  readonly messages: ReadonlyArray<ThreadMessage.ThreadMessage>
+}
+
+const noMatches: SearchResults = { groups: [], threads: [], people: [] }
+
+/** The first message published in each thread among `messages`. */
+const openingsOf = (
+  messages: ReadonlyArray<ThreadMessage.ThreadMessage>
+): ReadonlyMap<ThreadId.ThreadId, ThreadMessage.ThreadMessage> => {
+  const openings = new Map<ThreadId.ThreadId, ThreadMessage.ThreadMessage>()
+  for (const message of messages) {
+    const opening = openings.get(message.threadId)
+    if (opening === undefined || DateTime.isLessThan(message.publishedAt, opening.publishedAt))
+      openings.set(message.threadId, message)
+  }
+  return openings
+}
+
+/** What the message says, as a reader hears it, while it has text to read; a deleted one has none. */
+const wordsOfText = (message: ThreadMessage.ThreadMessage | undefined, members: ReadonlyArray<Member.Member>) =>
+  message !== undefined && ThreadMessage.Content.isAnyOf(["Text"])(message.content)
+    ? messageWords(message, members)
+    : undefined
+
+/**
+ * What in `searched` has `query` in it, whatever its case or accents, and nothing for a query of spaces: the
+ * groups whose names the person reads, the threads whose titles or whose openings' words, a mention as the
+ * member's current name, and the active members, other than the person, whose names. A thread whose group
+ * the replica lacks is left out, since it could not be opened.
+ */
+export const findMatches = (
+  query: string,
+  { memberId, groups, members, threads, messages }: Searched
+): SearchResults => {
+  const wanted = foldAccents(query.trim())
+  if (wanted === "") return noMatches
+
+  const contains = (text: string | null | undefined) => text != null && foldAccents(text).includes(wanted)
+  const openings = openingsOf(messages)
+  const named = groups.map((group): GroupMatch => ({ group, name: groupName(group, members, memberId) }))
+
+  return {
+    groups: named.filter(({ name }) => contains(name)).slice(0, maxSearchResults),
+    threads: threads
+      .flatMap((thread): ReadonlyArray<ThreadMatch> => {
+        const openingWords = wordsOfText(openings.get(thread.id), members)
+        const group = named.find((match) => match.group.id === thread.groupId)
+        const words = thread.title ?? openingWords
+        return group === undefined || words === undefined || !(contains(thread.title) || contains(openingWords))
+          ? []
+          : [{ thread, groupName: group.name, words }]
+      })
+      .slice(0, maxSearchResults),
+    people: members
+      .filter((member) => member.id !== memberId && member.status === "active" && contains(member.name))
+      .slice(0, maxSearchResults)
+  }
 }
 
 /**
@@ -262,6 +355,8 @@ export class Store extends Context.Service<
     readonly grants: Stream.Stream<ReadonlyArray<Grant.Grant>, QueryError>
     /** The person's notifications as their inbox shows them, and again after each change. */
     readonly inbox: Stream.Stream<ReadonlyArray<InboxEntry>, QueryError>
+    /** What matches `query` in the workspace as the person sees it now, nothing for an empty one. */
+    readonly search: (query: string) => Effect.Effect<SearchResults, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<ActionView>, QueryError>
     /** Who has the workspace open and where they type, while the host can be reached; no one while it can't. */
@@ -273,6 +368,10 @@ export class Store extends Context.Service<
     readonly saveDraft: Drafts.Drafts["Service"]["save"]
   }
 >()("@amends-dev/app-v2/store/Store") {}
+
+/** The first value `stream` gives, for a read made once; a read of the replica always gives one. */
+const readOnce = <A, E>(stream: Stream.Stream<A, E>): Effect.Effect<A, E> =>
+  Effect.flatMap(Stream.runHead(stream), (head) => Effect.orDie(Effect.fromOption(head)))
 
 /** The prefix of every database the person's stores keep on the host at `apiUrl`. */
 const databasePrefix = (apiUrl: string, humanId: Identity.HumanId) => `amends/${apiUrl}/${humanId}/`
@@ -559,6 +658,25 @@ export const layer = (options: Options) =>
                 }
               })
             ),
+            search: (query) =>
+              readOnce(
+                Stream.zipLatestAll(
+                  list("Group", workspace),
+                  list("Member", workspace),
+                  every("Thread"),
+                  every("ThreadMessage")
+                )
+              ).pipe(
+                Effect.map(([groups, members, threads, messages]) =>
+                  findMatches(query, {
+                    memberId: options.memberId,
+                    groups: groups.map(({ record }) => record.value),
+                    members: members.map(({ record }) => record.value),
+                    threads: threads.map(({ record }) => record.value),
+                    messages: messages.map(({ record }) => record.value)
+                  })
+                )
+              ),
             actions: untilFailed(
               Stream.mapEffect(replica.actions, (actions) =>
                 Effect.forEach(actions, ({ key, tag, payload, rejection }) =>
