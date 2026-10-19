@@ -120,7 +120,7 @@ const mayCreateTeam = (model: Model): boolean =>
 
 /**
  * The sidebar's sections of the groups: the teams the person belongs to, their conversations, and the public
- * teams they may join, with the modal for starting a team or a conversation after them.
+ * teams they may join. The buttons that start a team or a conversation open the dialog `dialogView` renders.
  */
 export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread }, h) => {
   const own = yours(model)
@@ -175,16 +175,24 @@ export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { 
       : sidebarSection(h, {
           label: "Other teams",
           children: joinable.map((item) => groupRow(item, model, openThread, h))
-        }),
-    h.block(
-      DialogBinding.embedView({
-        slotId: "starting",
-        model: model.dialog,
-        viewInputs: { toView: (render) => startingModal(render, model, h) }
-      })
-    )
+        })
   ])
 })
+
+/**
+ * The dialog for what the person is starting, a team or a conversation, which the page lends the shell: it
+ * renders its `dialog` element, with nothing in it while it is closed, wherever the page puts the buttons that
+ * open it, the sidebar's and the browse page's, whether or not the sidebar is on the page.
+ */
+export const dialogView = GroupsComposition.makeView((model, h) =>
+  h.block(
+    DialogBinding.embedView({
+      slotId: "starting",
+      model: model.dialog,
+      viewInputs: { toView: (render) => startingModal(render, model, h) }
+    })
+  )
+)
 
 /** What each tab of the browse page says over its groups, and when it has none to list. */
 const browseTabs = {
@@ -233,7 +241,7 @@ const browseRow = ({ group, pending, members }: GroupItem, model: Model, h: Grou
 /**
  * The browse page, the main pane's whole content: the groups the person belongs to and the public teams they
  * may join on a tab each, with how many, the button to start a team where they may, a search that narrows the
- * tab, and a row for each group, to open. The modal for starting a team is the sidebar's.
+ * tab, and a row for each group, to open. The button opens the dialog `dialogView` renders.
  */
 export const browseView = GroupsComposition.makeView((model, h) => {
   const { tab, query } = model.browse

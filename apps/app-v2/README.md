@@ -239,10 +239,12 @@ the pages that compose them; the root composes the pages.
   keeps the groups whose name contains what was typed, in any case, ignoring spaces at either end;
   the tabs keep one search between them. A search that finds none says "No groups match" with what was
   typed, and a tab with no groups says so: Discover, "Nothing to discover", since every public team is
-  one the person is in, and Your groups, "No groups yet". The dialog for a new team is the sidebar's,
-  embedded once, since both views read one model, so Create group works where the sidebar is on
-  the page, from 64rem. Below that the sidebar is on the page only while the navigation drawer is
-  open, and Create group has no dialog to open: that is not solved yet.
+  one the person is in, and Your groups, "No groups yet". The dialog for a new team or a conversation
+  is `dialogView`, a view of its own that renders only that dialog, with nothing in it while it is
+  closed, and neither the sidebar's view nor the browse page holds it: below 64rem the sidebar is on
+  the page only while the navigation drawer is open, and a dialog the framework shows has to be in the
+  document. The page lends it to the shell's `dialogs`, so the sidebar's "+" and Create group open it
+  at every width.
 - `feature/inbox`: the person's notifications, newest first, on two tabs: All, every notification
   the store gives, waiting or seen, and Unread, those still waiting, counted while any wait, All at first. Each
   tab's notifications sit under a divider for each day they came on by the person's own clock, named
@@ -340,7 +342,9 @@ the pages that compose them; the root composes the pages.
   Block asks for with `RequestedBrowse`: the page goes there as it goes to any destination, closing
   the drawer and the side pane's dialog and marking no group open, and picking a group on that page
   opens it, which leaves the page. The side pane shows the thread open in that group,
-  only while one is, and the actions' toasts come over both. The workspace's name in the sidebar and
+  only while one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
+  under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width. The
+  workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
   view inputs, and gives the inbox and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
@@ -591,12 +595,12 @@ browser's storage. Each Block's tests sit beside it:
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
-  a dialog of its own, and the same team taken from the workspace's sidebar, and the groups to
-  browse: the button in the sidebar's header asking for them, the tabs counted and chosen, each
+  a dialog of its own, both in a view apart from the sidebar's, with the sidebar's buttons that open
+  them and the same team taken from the workspace's sidebar, and the groups to browse: the button in the sidebar's header asking for them, the tabs counted and chosen, each
   group's mark, visibility, and members, a team and a conversation told apart, the search narrowing
   either tab in any case and with spaces ignored, nothing matching, nothing to discover, no groups yet, a
   team on its way, a group opened from its row, and Create group only for someone who may create
-  one, opening the sidebar's dialog; the inbox's notifications under the day they came, by their
+  one, opening the dialog with no sidebar on the page; the inbox's notifications under the day they came, by their
   author and what they did, the place they come from, how long ago, and what they say, with a mention
   in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
@@ -631,7 +635,8 @@ browser's storage. Each Block's tests sit beside it:
   it reads whichever destination shows, each in a main pane named for it, with the rail marking the
   destination open, Home from the inbox and the groups too, the groups to browse opened from the
   sidebar's button, from an open group and its thread, and from the drawer, which it closes, with
-  a group opened from its row and a team started from Create group, the sidebar naming the workspace with
+  a group opened from its row and a team started from Create group, also at `Phone` where the sidebar is
+  in the shut drawer, the sidebar naming the workspace with
   who is signed in and the way out in its footer, the group's threads as messages in the main pane
   with the composer to start one, the thread picked opened in the side pane with its messages and the
   composer to reply, marked in the list and under the group in the sidebar, the group's settings

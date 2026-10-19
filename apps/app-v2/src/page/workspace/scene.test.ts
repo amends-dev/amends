@@ -961,7 +961,31 @@ describe("a workspace", () => {
     )
   })
 
-  it("takes a new team from Create group on the browse page, in the dialog the sidebar holds", () => {
+  it("takes a new team from Create group on the browse page below 64rem, with the sidebar in the shut drawer", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(onPhone, {
+          groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) }),
+          open: () => Open.Groups()
+        })
+      ),
+      expect(role("navigation", { name: "Studio" })).toBeAbsent(),
+      click(within(role("main", { name: "Groups" }), role("button", { name: "Create group" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "New team" })).toExist(),
+      type(label("Team name"), "Research"),
+      click(role("button", { name: "Create team" })),
+      Command.resolve(CreateTeam, GroupsBlock.Message.WroteAction()),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "New team" })).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toExist()
+    )
+  })
+
+  it("takes a new team from Create group on the browse page, in the dialog the shell keeps", () => {
     scene(
       { update, view: sceneView },
       given(

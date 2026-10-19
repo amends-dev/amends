@@ -6,9 +6,11 @@ import { Option, Schema } from "effect"
 import {
   Command,
   Mount,
+  all,
   change,
   click,
   expect,
+  expectAll,
   expectOutMessage,
   given,
   label,
@@ -26,11 +28,14 @@ import { CreateTeam, StartConversation } from "./command.ts"
 import { Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { browseView, view } from "./view.ts"
+import { browseView, dialogView, view } from "./view.ts"
 
 const { workspace, member } = membership
 
 const sceneView = withViewInputs(view, { openThread: Option.none() })
+
+/** The sidebar's groups and the dialog for starting a team or a conversation, which the shell keeps beside them. */
+const withDialog: ReturnType<typeof sceneView> = (model, h) => h.div([], [sceneView()(model, h), dialogView(model, h)])
 
 /** The dialog acknowledged open: its element shown, and the resources it holds acquired. */
 const dialogOpened = () =>
@@ -97,6 +102,16 @@ describe("the groups", () => {
     )
   })
 
+  it("keep the dialog for starting something out of the sidebar's view, in a view of its own", () => {
+    scene({ update, view: sceneView() }, given(listed), expectAll(all.selector("dialog")).toHaveCount(0))
+    scene(
+      { update, view: dialogView },
+      given(listed),
+      expectAll(all.selector("dialog")).toHaveCount(1),
+      expect(role("dialog", { name: "New team" })).toBeAbsent()
+    )
+  })
+
   it("mark a team still on its way as sending in its row, and no other", () => {
     scene(
       { update, view: sceneView() },
@@ -118,7 +133,7 @@ describe("the groups", () => {
 
   it("take a new team in a dialog named for it, the name field holding the focus, and close it when written", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: withDialog },
       given(listed),
       click(role("button", { name: "New team" })),
       ...dialogOpened(),
@@ -140,7 +155,7 @@ describe("the groups", () => {
 
   it("take a team that anyone in the workspace can join, when the person says so", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: withDialog },
       given(listed),
       click(role("button", { name: "New team" })),
       ...dialogOpened(),
@@ -158,7 +173,7 @@ describe("the groups", () => {
 
   it("close the dialog with Cancel, and open a fresh form the next time", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: withDialog },
       given(listed),
       click(role("button", { name: "New team" })),
       ...dialogOpened(),
@@ -175,7 +190,7 @@ describe("the groups", () => {
 
   it("close the dialog with its Close button", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: withDialog },
       given(listed),
       click(role("button", { name: "New conversation" })),
       ...dialogOpened(),
@@ -188,7 +203,7 @@ describe("the groups", () => {
 
   it("offer a new team only to someone who may create one", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: withDialog },
       given(modifyFields(listed, { grants: () => [] })),
       expect(role("button", { name: "New team" })).toBeAbsent(),
       expect(role("button", { name: "New conversation" })).toExist(),
@@ -221,7 +236,7 @@ describe("the groups", () => {
 
   it("start a conversation with the member chosen, the first message written, in a dialog", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: withDialog },
       given(listed),
       click(role("button", { name: "New conversation" })),
       ...dialogOpened(),
@@ -274,8 +289,9 @@ describe("the groups", () => {
   })
 })
 
-/** The sidebar's groups and the browse page together, as the workspace shows them side by side. */
-const withBrowse: ReturnType<typeof sceneView> = (model, h) => h.div([], [sceneView()(model, h), browseView(model, h)])
+/** The browse page and the dialog for starting a team, which the shell keeps beside the page whether or not the sidebar is. */
+const browsingWithDialog: ReturnType<typeof sceneView> = (model, h) =>
+  h.div([], [browseView(model, h), dialogView(model, h)])
 
 describe("the sidebar's way to browse", () => {
   it("is a button in the groups' header, for everyone, that asks to browse", () => {
@@ -451,9 +467,9 @@ describe("the browse page", () => {
     )
   })
 
-  it("opens the dialog for a new team from Create group, where the sidebar holds it", () => {
+  it("opens the dialog for a new team from Create group, with no sidebar on the page", () => {
     scene(
-      { update, view: withBrowse },
+      { update, view: browsingWithDialog },
       given(listed),
       expect(role("button", { name: "Create group" })).toExist(),
       expect(role("dialog", { name: "New team" })).toBeAbsent(),

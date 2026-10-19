@@ -184,6 +184,12 @@ const sidePaneDialog = <Message, Requirements>(
  * The `notices`, a `toastStack`, are pinned to the window's bottom end corner over everything. While a
  * dialog is open the rest of the window is inert, so they are inside it, after its panel, and in the frame,
  * last, when neither is open.
+ *
+ * The `dialogs` are dialogs of the page's own that are not the shell's, such as a search or a form in a modal,
+ * each the view of a `DialogBlock` the page binds, which renders nothing while it is closed. The shell renders
+ * them last in the frame, after the notices and so over the drawer and the side pane, at every viewport, since
+ * a dialog the framework opens has to be in the document whether or not the sidebar or the main pane that
+ * asks for it is. The notices do not move into them: the rest of the window is inert while one is open.
  */
 export const shell = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -195,6 +201,7 @@ export const shell = <Message, Requirements>(
     aside?: ShellAside<Message, Requirements>
     notices?: Html
     menu?: ShellMenu<Message, Requirements>
+    dialogs?: ReadonlyArray<Html>
   }>
 ): Html => {
   const { hasRail, hasSidebar, asideLayout } = frames[config.viewport]
@@ -241,7 +248,8 @@ export const shell = <Message, Requirements>(
               notices: noticesIn("Aside")
             })
           ),
-      noticesIn("Frame")
+      noticesIn("Frame"),
+      ...(config.dialogs ?? [])
     ]
   )
 }

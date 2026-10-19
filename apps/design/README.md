@@ -271,7 +271,7 @@ What a directory screen lists.
 
 The frame of the first four layout patterns, which the modules below fill.
 
-- `shell(h, { viewport, rail, sidebar, main, aside?, notices?, menu? })` puts the `rail` on the
+- `shell(h, { viewport, rail, sidebar, main, aside?, notices?, menu?, dialogs? })` puts the `rail` on the
   canvas, then one `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is
   an `aside`, its `view`, the side pane, at 440px at `Split`. Each is what its module renders. The
   `notices`, a `toastStack`, are pinned to the window's bottom end corner, last in the frame or, while
@@ -337,6 +337,15 @@ The frame of the first four layout patterns, which the modules below fill.
   differs: the stack is fixed, so it is in the same corner of the window in both places. The shell
   decides from the `isOpen` of the two dialogs, which it reads from the page and not from the
   render it hands the dialog's view, because it builds the frame outside that render.
+
+  The `dialogs` are dialogs of the page's own that are not the shell's, such as a search or a form
+  in a modal: each is the view of a `DialogBlock` the page binds, embedded with its own `toView`,
+  which renders its `dialog` element with nothing in it while it is closed. The shell renders them
+  last in the frame, after the notices and so over the drawer and the side pane, at every viewport.
+  A dialog the framework opens has to be in the document, and a page that embedded one in the
+  sidebar or in a main pane would have none to open whenever the sidebar is in the drawer and shut,
+  or the pane is not the one shown. The notices do not move into these dialogs: the rest of the
+  window is inert while one is open, so a toast that arrives waits in the frame until it closes.
 
   The workshop's frames pass `viewport: "Split"` and a side pane whose `dialog` renders nothing, so
   they show the rail, the sidebar, and the side pane in place, and no dialog: both are window-level
@@ -623,5 +632,7 @@ the rail and the sidebar, `main`, and `complementary`, with its notices, and by 
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere
 before; the side pane in place at `Split` and otherwise inside the dialog named Thread once it is
-visible and nowhere before; and the notices' live region once, inside the dialog that is visible and
-in the frame otherwise. They query no class. The viewport's decision, `viewportOf`, is a plain test.
+visible and nowhere before; the notices' live region once, inside the dialog that is visible and
+in the frame otherwise; and the dialogs it is lent, in the frame at every viewport and last, after the
+drawer's and the side pane's, empty while closed, with the notices left in the frame while one is
+open. They query no class. The viewport's decision, `viewportOf`, is a plain test.

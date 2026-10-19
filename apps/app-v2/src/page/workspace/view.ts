@@ -7,7 +7,7 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { threadView } from "../../feature/group/view.ts"
-import { browseView } from "../../feature/groups/view.ts"
+import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import {
   ActionsBinding,
@@ -151,7 +151,8 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
 /**
  * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane,
  * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
- * pane lent to the shell.
+ * pane lent to the shell, and the groups' dialog for starting a team or a conversation, which the shell keeps
+ * in the frame whether or not the sidebar or the browse page that opens it is on the page.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email, now }, h) => {
   const aside = asideView(model, now, h)
@@ -187,6 +188,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
       onOpen: Message.ClickedMenu(),
       isOpen: model.menu.isOpen,
       dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
-    }
+    },
+    dialogs: [h.block(GroupsBinding.embedView({ slotId: "groups-dialog", model: model.groups, view: dialogView }))]
   })
 })

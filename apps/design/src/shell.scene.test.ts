@@ -2,7 +2,7 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, last, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
 import { pane, paneBack, paneClose } from "./pane.ts"
@@ -14,10 +14,12 @@ import type { Viewport } from "./viewport.ts"
 
 const Message = defineMessageUnion({
   ClickedHome: {},
+  ClosedSearch: {},
   ClosedThread: {},
   DismissedRefusal: {},
   OpenedAside: {},
-  OpenedMenu: {}
+  OpenedMenu: {},
+  OpenedSearch: {}
 })
 type Message = typeof Message.Type
 
@@ -27,6 +29,7 @@ type Model = Readonly<{
   isAsideOpen: boolean
   isRefused: boolean
   isMenuOpen: boolean
+  isSearchOpen: boolean
   homes: number
 }>
 
@@ -36,105 +39,127 @@ const initial: Model = {
   isAsideOpen: false,
   isRefused: false,
   isMenuOpen: false,
+  isSearchOpen: false,
   homes: 0
 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ClickedHome: () => ({ model: modifyFields(model, { homes: (homes) => homes + 1 }) }),
+    ClosedSearch: () => ({ model: modifyFields(model, { isSearchOpen: () => false }) }),
     ClosedThread: () => ({ model: modifyFields(model, { isThreadOpen: () => false, isAsideOpen: () => false }) }),
     DismissedRefusal: () => ({ model: modifyFields(model, { isRefused: () => false }) }),
     OpenedAside: () => ({ model: modifyFields(model, { isAsideOpen: () => true }) }),
-    OpenedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) })
+    OpenedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
+    OpenedSearch: () => ({ model: modifyFields(model, { isSearchOpen: () => true }) })
   })
 
-const viewWithMenu = (hasMenu: boolean) => (model: Model, h: HtmlBuilder<Message>) =>
-  shell(h, {
-    viewport: model.viewport,
-    rail: rail(h, {
-      brand: { letter: "A", label: "amends" },
-      items: [{ icon: "mark-home", label: "Home", isCurrent: true, onClick: Message.ClickedHome() }],
-      footer: []
-    }),
-    sidebar: sidebar(h, {
-      label: "Workspace",
-      header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
-      children: [
-        sidebarSection(h, {
-          children: [
-            sidebarItem(h, { icon: "mark-mail", label: "Inbox", isCurrent: true, onClick: Message.ClickedHome() })
-          ]
-        })
-      ]
-    }),
-    main: pane(h, {
-      variant: "main",
-      header: { title: "general", icon: "mark-channel" },
-      body: [h.p([], [`Home ${model.homes}`]), button(h, "Open thread", Message.OpenedAside())]
-    }),
-    ...(model.isThreadOpen
-      ? {
-          aside: {
-            view: pane(h, {
-              variant: "side",
-              label: "Composer paste crash",
-              header: {
-                title: "Composer paste crash",
-                subtitle: "Thread in #general",
-                leading: paneBack(h, Message.ClosedThread()),
-                actions: [paneClose(h, Message.ClosedThread())]
-              },
-              body: []
-            }),
-            isOpen: model.isAsideOpen,
-            // What a dialog publishes, with no attribute but those that show it and name it while it is open.
-            dialog: (toView) =>
-              toView({
-                dialog: model.isAsideOpen ? [h.Open(true), h.AriaLabel("Thread")] : [],
-                backdrop: [],
-                panel: [],
-                title: [],
-                description: [],
-                initialFocus: [],
-                closeButton: [],
-                isVisible: model.isAsideOpen
-              })
+const viewWith =
+  (lent: Readonly<{ hasMenu: boolean; hasSearch: boolean }>) => (model: Model, h: HtmlBuilder<Message>) =>
+    shell(h, {
+      viewport: model.viewport,
+      rail: rail(h, {
+        brand: { letter: "A", label: "amends" },
+        items: [{ icon: "mark-home", label: "Home", isCurrent: true, onClick: Message.ClickedHome() }],
+        footer: []
+      }),
+      sidebar: sidebar(h, {
+        label: "Workspace",
+        header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+        children: [
+          sidebarSection(h, {
+            children: [
+              sidebarItem(h, { icon: "mark-mail", label: "Inbox", isCurrent: true, onClick: Message.ClickedHome() })
+            ]
+          })
+        ]
+      }),
+      main: pane(h, {
+        variant: "main",
+        header: { title: "general", icon: "mark-channel" },
+        body: [
+          h.p([], [`Home ${model.homes}`]),
+          button(h, "Open thread", Message.OpenedAside()),
+          button(h, "Open search", Message.OpenedSearch())
+        ]
+      }),
+      ...(model.isThreadOpen
+        ? {
+            aside: {
+              view: pane(h, {
+                variant: "side",
+                label: "Composer paste crash",
+                header: {
+                  title: "Composer paste crash",
+                  subtitle: "Thread in #general",
+                  leading: paneBack(h, Message.ClosedThread()),
+                  actions: [paneClose(h, Message.ClosedThread())]
+                },
+                body: []
+              }),
+              isOpen: model.isAsideOpen,
+              // What a dialog publishes, with no attribute but those that show it and name it while it is open.
+              dialog: (toView) =>
+                toView({
+                  dialog: model.isAsideOpen ? [h.Open(true), h.AriaLabel("Thread")] : [],
+                  backdrop: [],
+                  panel: [],
+                  title: [],
+                  description: [],
+                  initialFocus: [],
+                  closeButton: [],
+                  isVisible: model.isAsideOpen
+                })
+            }
           }
-        }
-      : {}),
-    ...(model.isRefused
-      ? {
-          notices: toastStack(h, [
-            toast(h, {
-              text: "Couldn't post the reply: You may not.",
-              action: { label: "Dismiss", onClick: Message.DismissedRefusal() }
-            })
-          ])
-        }
-      : {}),
-    ...(hasMenu
-      ? {
-          menu: {
-            onOpen: Message.OpenedMenu(),
-            isOpen: model.isMenuOpen,
-            // What a dialog publishes, with no attribute but those that show it and name it while it is open.
-            dialog: (toView) =>
-              toView({
-                dialog: model.isMenuOpen ? [h.Open(true), h.AriaLabel("Navigation")] : [],
-                backdrop: [],
-                panel: [],
-                title: [],
-                description: [],
-                initialFocus: [],
-                closeButton: [],
-                isVisible: model.isMenuOpen
+        : {}),
+      ...(model.isRefused
+        ? {
+            notices: toastStack(h, [
+              toast(h, {
+                text: "Couldn't post the reply: You may not.",
+                action: { label: "Dismiss", onClick: Message.DismissedRefusal() }
               })
+            ])
           }
-        }
-      : {})
-  })
+        : {}),
+      ...(lent.hasMenu
+        ? {
+            menu: {
+              onOpen: Message.OpenedMenu(),
+              isOpen: model.isMenuOpen,
+              // What a dialog publishes, with no attribute but those that show it and name it while it is open.
+              dialog: (toView) =>
+                toView({
+                  dialog: model.isMenuOpen ? [h.Open(true), h.AriaLabel("Navigation")] : [],
+                  backdrop: [],
+                  panel: [],
+                  title: [],
+                  description: [],
+                  initialFocus: [],
+                  closeButton: [],
+                  isVisible: model.isMenuOpen
+                })
+            }
+          }
+        : {}),
+      ...(lent.hasSearch
+        ? {
+            // A dialog of the page's own, which renders its element with nothing in it while it is closed.
+            dialogs: [
+              h.dialog(
+                model.isSearchOpen ? [h.Open(true), h.AriaLabel("Search")] : [],
+                model.isSearchOpen
+                  ? [h.p([], ["Find anything"]), button(h, "Close search", Message.ClosedSearch())]
+                  : []
+              )
+            ]
+          }
+        : {})
+    })
 
-const view = viewWithMenu(true)
+const view = viewWith({ hasMenu: true, hasSearch: false })
+const viewWithSearch = viewWith({ hasMenu: true, hasSearch: true })
 
 const inWindow = (viewport: Viewport, extra: Partial<Model> = {}): Model => ({ ...initial, viewport, ...extra })
 
@@ -286,7 +311,7 @@ describe("shell", () => {
   it("has no Menu button or dialog when it is given no menu, and no sidebar below Desktop", () => {
     for (const viewport of ["Phone", "Tablet"] as const) {
       scene(
-        { update, view: viewWithMenu(false) },
+        { update, view: viewWith({ hasMenu: false, hasSearch: false }) },
         given(inWindow(viewport, { isMenuOpen: true })),
         expect(role("button", { name: "Menu" })).toBeAbsent(),
         expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
@@ -346,6 +371,48 @@ describe("shell", () => {
         expect(role("main")).toExist()
       )
     }
+  })
+
+  it("renders the dialogs it is lent in the frame at every viewport, empty while they are closed", () => {
+    for (const viewport of ["Phone", "Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view: viewWithSearch },
+        given(inWindow(viewport)),
+        expect(role("dialog", { name: "Search" })).toBeAbsent(),
+        expect(last(all.selector("dialog"))).toExist(),
+        click(within(role("main"), role("button", { name: "Open search" }))),
+        expect(within(role("dialog", { name: "Search" }), text("Find anything"))).toExist(),
+        expect(role("main")).toExist(),
+        click(within(role("dialog", { name: "Search" }), role("button", { name: "Close search" }))),
+        expect(role("dialog", { name: "Search" })).toBeAbsent(),
+        expect(last(all.selector("dialog"))).toExist()
+      )
+    }
+  })
+
+  it("renders the dialogs it is lent last in the frame, after the drawer's and the side pane's", () => {
+    scene(
+      { update, view: viewWithSearch },
+      given(inWindow("Desktop", { isAsideOpen: true, isSearchOpen: true })),
+      expect(last(all.selector("dialog"))).toHaveAttr("aria-label", "Search"),
+      expect(nth(all.selector("dialog"), 0)).toHaveAttr("aria-label", "Thread")
+    )
+    scene(
+      { update, view: viewWithSearch },
+      given(inWindow("Phone", { isMenuOpen: true, isSearchOpen: true })),
+      expect(last(all.selector("dialog"))).toHaveAttr("aria-label", "Search"),
+      expect(nth(all.selector("dialog"), 0)).toHaveAttr("aria-label", "Navigation")
+    )
+  })
+
+  it("keeps its notices in the frame while a dialog it is lent is open, to be read once it closes", () => {
+    scene(
+      { update, view: viewWithSearch },
+      given(inWindow("Desktop", { isRefused: true, isSearchOpen: true })),
+      expectAll(all.selector('[aria-live="polite"]')).toHaveCount(1),
+      expect(within(role("dialog", { name: "Search" }), role("alert"))).toBeAbsent(),
+      expect(role("alert")).toExist()
+    )
   })
 
   it("has no side pane dialog when it is given no side pane", () => {
