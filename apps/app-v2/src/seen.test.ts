@@ -9,7 +9,7 @@ import {
   dayOf,
   initials,
   messageRuns,
-  messageText,
+  messageWords,
   repliesLabel,
   textRuns,
   threadRuns,
@@ -181,15 +181,6 @@ describe("textRuns", () => {
   })
 })
 
-describe("messageText", () => {
-  it("is the words as written, mention and all, or that the message was deleted", () => {
-    const written = saying(reply, `${ThreadMessage.mentionText(bob.id, "Bob")} Sounds good`)
-
-    expect(messageText(written)).toBe("[@Bob](member:member-2) Sounds good")
-    expect(messageText(deleted(reply))).toBe("This message was deleted.")
-  })
-})
-
 describe("messageRuns", () => {
   it("is the runs of what a message says, a mention as the name its member has now", () => {
     const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check this?`)
@@ -200,6 +191,25 @@ describe("messageRuns", () => {
 
   it("is one run saying a deleted message was deleted", () => {
     expect(messageRuns(deleted(reply), members)).toEqual([{ text: "This message was deleted." }])
+  })
+})
+
+describe("messageWords", () => {
+  it("is the words of what a message says in one line, a mention as the name its member has now", () => {
+    const asked = saying(opening, `Hey ${ThreadMessage.mentionText(bob.id, "Robert")}, look`)
+
+    expect(messageWords(asked, members)).toBe("Hey @Bob, look")
+    expect(messageWords(reply, members)).toBe("Sounds good")
+  })
+
+  it("is the name a mention recorded while its member is not among the members", () => {
+    const asked = saying(opening, `Hey ${ThreadMessage.mentionText(bob.id, "Robert")}, look`)
+
+    expect(messageWords(asked, [membership.member])).toBe("Hey @Robert, look")
+  })
+
+  it("says a deleted message was deleted", () => {
+    expect(messageWords(deleted(reply), members)).toBe("This message was deleted.")
   })
 })
 

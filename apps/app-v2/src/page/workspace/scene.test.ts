@@ -38,6 +38,7 @@ import {
   opening,
   reply,
   roles,
+  saying,
   scout,
   scoutAgent,
   support,
@@ -133,6 +134,36 @@ const withConversation = modifyFields(withThread, {
                     { message: reply, pending: false }
                   ],
                   members: () => [member, bob]
+                })
+              }))
+            })
+          })
+      },
+      () => open
+    )
+})
+
+/** The thread open in general with no title, whose opening mentions Ada, who was named Adeline when mentioned. */
+const withMentioningOpening = modifyFields(withThread, {
+  open: (open) =>
+    Open.matchOrElse(
+      open,
+      {
+        Group: ({ groupId, model: group }) =>
+          Open.Group({
+            groupId,
+            model: modifyFields(group, {
+              thread: Option.map((openThread) => ({
+                ...openThread,
+                model: modifyFields(openThread.model, {
+                  title: () => Option.none(),
+                  messages: () => [
+                    {
+                      message: saying(opening, `Hey ${ThreadMessage.mentionText(bob.id, "Adeline")}, look`),
+                      pending: false
+                    }
+                  ],
+                  members: () => [{ ...bob, name: "Ada" }]
                 })
               }))
             })
@@ -695,6 +726,22 @@ describe("a workspace", () => {
         within(
           role("navigation", { name: "Studio" }),
           within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))
+        )
+      ).toExist()
+    )
+  })
+
+  it("titles a thread with no title by the words of its opening, a mention as the member's name, in both places", () => {
+    scene(
+      { update, view: sceneView },
+      given(withMentioningOpening),
+      expect(
+        within(role("complementary", { name: "Thread" }), role("heading", { name: "Hey @Ada, look", level: 2 }))
+      ).toExist(),
+      expect(
+        within(
+          role("navigation", { name: "Studio" }),
+          within(selector('[aria-current="page"]:not(button)'), text("Hey @Ada, look"))
         )
       ).toExist()
     )

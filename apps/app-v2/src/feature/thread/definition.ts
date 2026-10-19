@@ -13,7 +13,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { messageText } from "../../seen.ts"
+import { messageWords } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
@@ -101,12 +101,15 @@ export type Message = typeof Message.Type
 
 export const ThreadDefinition = Block.makeDefinition("Thread", { Model, Message, ChildInitContext })
 
-/** The thread's title, or the text of its opening message, or "A thread" while it has neither. */
+/**
+ * The thread's title, or the words of its opening message as a reader hears them, a mention as the member's
+ * current name, or "A thread" while it has neither.
+ */
 export const titleOf = (model: Model): string =>
   Option.getOrElse(model.title, () =>
     Option.match(Option.fromUndefinedOr(model.messages.at(0)), {
       onNone: () => "A thread",
-      onSome: ({ message }) => messageText(message)
+      onSome: ({ message }) => messageWords(message, model.members)
     })
   )
 

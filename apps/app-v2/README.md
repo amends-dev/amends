@@ -64,9 +64,10 @@ shown, in a thread, in a group's list of threads, and in the inbox, `seen.ts` re
 design shows each mention as a chip of "@" and the member's current name among the members the view
 has, or the name the mention recorded while they are not among them, inline with the words. The
 text shows nothing else of its markdown yet: emphasis, links, lists, and code appear as written, with
-their marks, and the form that edits a message shows its text as written, mentions too, as does a
-title taken from a thread's opening, in the pane's header and under the group in the sidebar
-(`titleOf`, by `messageText`). The composers cannot write a mention yet.
+their marks, and the form that edits a message shows its text as written, mentions too. A title taken
+from a thread's opening is its words as a reader hears them, a mention as "@" and the member's
+current name (`titleOf`, by `messageWords`), in the pane's header and under the group in the
+sidebar. The composers cannot write a mention yet.
 
 The task and the turns a thread embeds are the
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or

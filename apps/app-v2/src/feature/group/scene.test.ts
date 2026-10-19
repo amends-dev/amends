@@ -1,6 +1,6 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
-import { ThreadId } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
@@ -37,6 +37,7 @@ import {
   now,
   opening,
   reply,
+  saying,
   thread
 } from "../../../test/fixtures.ts"
 import { AdmitMember, JoinGroup, LeaveGroup, RemoveMember, RenameGroup } from "./command.ts"
@@ -634,6 +635,32 @@ describe("a group's side pane", () => {
       ).toExist(),
       expect(within(role("complementary", { name: "Thread" }), text("Thread in Design"))).toExist(),
       expect(within(role("complementary", { name: "Thread" }), role("region", { name: "Thread" }))).toExist()
+    )
+  })
+
+  it("is titled by the words of its opening when it has no title, a mention as the member's current name", () => {
+    scene(
+      { update, view: threadView },
+      given(
+        modifyFields(withThread, {
+          thread: Option.map((open) => ({
+            ...open,
+            model: modifyFields(open.model, {
+              title: () => Option.none(),
+              messages: () => [
+                {
+                  message: saying(opening, `Hey ${ThreadMessage.mentionText(bob.id, "Adeline")}, look`),
+                  pending: false
+                }
+              ],
+              members: () => [{ ...bob, name: "Ada" }]
+            })
+          }))
+        })
+      ),
+      expect(
+        within(role("complementary", { name: "Thread" }), role("heading", { name: "Hey @Ada, look", level: 2 }))
+      ).toExist()
     )
   })
 

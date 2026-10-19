@@ -110,10 +110,6 @@ export const authorName = (
 
 const deletedText = "This message was deleted."
 
-/** What `message` says as plain words, or that it was deleted. */
-export const messageText = (message: ThreadMessage.ThreadMessage): string =>
-  ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => deletedText })
-
 /**
  * `text` as the runs a view shows: its words as written, and each mention as "@" and the name the member has
  * now among `members`, or the name the mention recorded while they are not among them.
@@ -138,6 +134,12 @@ export const messageRuns = (
     Text: ({ text }) => textRuns(text, members),
     Deleted: (): ReadonlyArray<TextRun> => [{ text: deletedText }]
   })
+
+/** What `message` says as the words a reader hears, its runs joined: a mention as "@" and the member's current name. */
+export const messageWords = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>): string =>
+  messageRuns(message, members)
+    .map((run) => run.text)
+    .join("")
 
 /** How many replies a thread has, as the person reads it: "1 reply", "4 replies". */
 export const repliesLabel = (replies: number): string => `${replies} ${replies === 1 ? "reply" : "replies"}`
