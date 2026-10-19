@@ -76,8 +76,9 @@ describe("the agents", () => {
     scene(
       { update, view, subscriptions: AgentsBlock.subscriptions },
       given(modifyFields(opened, { agents: () => [] })),
-      expect(text("No agents yet.")).toExist(),
+      expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
       click(role("button", { name: "Add an agent" })),
+      expect(role("region", { name: "Add an agent" })).toExist(),
       inside(
         role("form", { name: "Add an agent" }),
         type(label("Name"), "Reviewer"),
@@ -251,8 +252,12 @@ describe("the agents", () => {
     scene(
       { update, view, subscriptions: AgentsBlock.subscriptions },
       given(modifyFields(opened, { grants: () => memberGrants })),
-      expect(text("Scout")).toExist(),
-      expect(text(" · Ready")).toExist(),
+      inside(
+        role("list", { name: "Agents" }),
+        expect(text("Scout")).toExist(),
+        expect(text("Ready")).toExist(),
+        expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist()
+      ),
       expect(role("button", { name: "Add an agent" })).toBeAbsent(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("button", { name: "Change setup" })).toBeAbsent(),
@@ -278,8 +283,8 @@ describe("the agents", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { agents: () => [{ agent: scoutAgent, pending: true }] })),
-      expect(text(" · Sending…")).toExist(),
-      expect(text(" · Ready")).toBeAbsent(),
+      inside(role("list", { name: "Agents" }), expect(text("Scout")).toExist(), expect(text(" · Sending…")).toExist()),
+      expect(text("Ready")).toBeAbsent(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("button", { name: "Change setup" })).toBeAbsent()
     )
@@ -330,13 +335,14 @@ describe("the agents", () => {
       ),
       expect(text("Builder")).toExist(),
       expect(text("Runs test-model on Models, the Harness harness, sandboxes on Sandbox.")).toExist(),
-      expect(text(" · Ready")).toExist(),
+      expect(text("Ready")).toExist(),
       expect(text("Stranded")).toExist(),
       expect(text("Runs old-model on a removed connection, any harness, no sandbox.")).toExist(),
+      expect(text("Can't run")).toExist(),
       expect(
         text(
           [
-            " · Can't run: its model's connection was removed",
+            "its model's connection was removed",
             "its harness's integration is no longer installed",
             "its sandbox: It takes no sandboxes",
             "its harness works only in a sandbox",
@@ -351,7 +357,7 @@ describe("the agents", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { members: () => [alice, { ...scout, status: "removed" }] })),
-      expect(text("No agents yet.")).toExist(),
+      expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
       expect(text("Scout")).toBeAbsent()
     )
   })

@@ -261,9 +261,13 @@ describe("a workspace", () => {
       expect(role("button", { name: "Connections" })).toExist(),
       expect(role("main", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
-      expect(role("main", { name: "Connections" })).toExist(),
-      expect(text(" · Test API · Ready")).toExist(),
-      expect(role("button", { name: "Add a connection" })).toExist()
+      inside(
+        role("main", { name: "Connections" }),
+        expect(text("Models")).toExist(),
+        expect(text("Test API")).toExist(),
+        expect(text("Ready")).toExist(),
+        expect(role("button", { name: "Add a connection" })).toExist()
+      )
     )
   })
 
@@ -277,7 +281,7 @@ describe("a workspace", () => {
       ),
       expect(role("main", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
-      expect(text(" · Test API · Ready")).toExist()
+      inside(role("list", { name: "Connections" }), expect(text("Models")).toExist(), expect(text("Ready")).toExist())
     )
   })
 
@@ -363,7 +367,8 @@ describe("a workspace", () => {
       click(role("button", { name: "Channels" })),
       inside(
         role("main", { name: "Channels" }),
-        expect(text(" · from Chat into General · opens tasks")).toExist(),
+        expect(text("From Chat into General")).toExist(),
+        expect(text("Opens tasks")).toExist(),
         expect(role("button", { name: "Add a channel" })).toExist()
       )
     )
@@ -379,7 +384,7 @@ describe("a workspace", () => {
       ),
       expect(role("main", { name: "Channels" })).toBeAbsent(),
       click(role("button", { name: "Channels" })),
-      expect(text("No channels yet.")).toExist()
+      expect(role("heading", { name: "No channels yet", level: 2 })).toExist()
     )
   })
 

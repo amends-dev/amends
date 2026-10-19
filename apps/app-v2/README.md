@@ -65,9 +65,22 @@ line of what it is for, and a secondary button to change it, which a `form` of a
 and a quiet Cancel replaces while the person does; the members and the invitations waiting are
 `entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
 quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its email and role. The
-connections, agents, and channels are still built with `src/controls.ts` and switch to
-`@amends-dev/design/control` a Block at a time; a view that has not switched is plain semantic HTML
-under Tailwind's base styles.
+connections, the agents, and the channels are each a `paneColumn` of what failed, the list, and the
+form open among it: the list is an `entryList` of `entry`s, or a `paneEmpty` that says what adding
+one does, and the form is a `paneSection` titled as the form is named, holding a `form` of the
+design's fields, selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of
+its submit and a quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit while the
+host answers. Adding is the secondary button among the header's actions, shown only when the person
+may, the host's integrations are listed, and a connection gives what the thing needs; the line
+that says the integrations are loading, or that no connection gives models or channels, is a
+`hint` in the body, and a failure to list them a `notice` with a quiet Try again. Each connection is
+an entry of its name, its integration and how ready it is as `badge`s, a hint of why it can't be
+used, what its last check found, and its quiet buttons; each agent an entry of its initials and
+name, a badge of whether it can run, a hint of why not and of what it runs on, and its quiet
+buttons; each channel an entry of its name, a badge when it opens tasks, a hint of where its
+conversations come from and open, and its quiet buttons. The group's members are a `paneSection` of
+an `entryList` with each member's initials, name, and an Online `badge` while they have the
+workspace open, and the admit form below it.
 
 ## The program
 
@@ -126,8 +139,9 @@ the pages that compose them; the root composes the pages.
   one and a late result cannot land in the wrong one. It opens with a thread already open when its
   parent gives one. They rename a team, follow it or stop, join a public team or leave one, and,
   where they manage its members, admit and remove them. It has two views. `view`, its canonical one,
-  is the group's main pane, titled by its name with its part in it as the header's buttons, its
-  members, and its threads, with the composer to start one in the footer, which a team the person
+  is the group's main pane, titled by its name with its part in it as the header's buttons, one
+  column of the form to rename a team, its members, each marked Online while they have the workspace
+  open, and its threads, with the composer to start one in the footer, which a team the person
   has not joined does not have; `threadView` is the thread open in it as a side pane, titled by the
   thread, with a button that closes it, the thread's messages, and the reply composer in the footer,
   and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
@@ -371,8 +385,9 @@ browser's storage. Each Block's tests sit beside it:
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
   may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends
   or it could not be followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
-  a conversation's other member, with the person's part in it, its members with removing for the
-  others, admitting, renaming, and joining in place of the threads of a team they do not belong to,
+  a conversation's other member, with the person's part in it, its members, those present marked
+  Online and one on its way marked sending, with removing for the others, admitting, offered only to
+  someone who manages them, renaming, and joining in place of the threads of a team they do not belong to,
   with the composer to start a thread in its footer, and its side pane for the thread open in it,
   with the composer to reply in its footer, closed by its button; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, with the

@@ -84,8 +84,9 @@ describe("the channels", () => {
     scene(
       { update, view, subscriptions: ChannelsBlock.subscriptions },
       given(opened),
-      expect(text("No channels yet.")).toExist(),
+      expect(role("heading", { name: "No channels yet", level: 2 })).toExist(),
       click(role("button", { name: "Add a channel" })),
+      expect(role("region", { name: "Add a channel" })).toExist(),
       inside(
         role("form", { name: "Add a channel" }),
         expect(role("option", { name: "Chat" })).toExist(),
@@ -95,7 +96,7 @@ describe("the channels", () => {
         change(label("Connection"), chat.id),
         change(label("Opens conversations in"), general.id),
         type(label("Name"), "Sales"),
-        click(role("checkbox", { name: "Each conversation is a task in triage" })),
+        click(role("switch", { name: "Each conversation is a task in triage" })),
         click(role("button", { name: "Add" }))
       ),
       Command.expectExact(
@@ -104,7 +105,12 @@ describe("the channels", () => {
       Command.resolve(CreateChannel, Message.WroteAction()),
       expect(role("form", { name: "Add a channel" })).toBeAbsent(),
       Subscription.emit(subscriptions.channels, Message.ReceivedChannels({ channels: withSupport.channels })),
-      expect(text(" · from Chat into General · opens tasks")).toExist()
+      inside(
+        role("list", { name: "Channels" }),
+        expect(text("Support")).toExist(),
+        expect(text("Opens tasks")).toExist(),
+        expect(text("From Chat into General")).toExist()
+      )
     )
   })
 
@@ -150,7 +156,7 @@ describe("the channels", () => {
     scene(
       { update, view },
       given(modifyFields(withSupport, { memberships: () => [aliceInGeneral, aliceInDesign] })),
-      expect(text(" · from Chat into General · opens tasks")).toExist(),
+      expect(text("From Chat into General")).toExist(),
       click(role("button", { name: "Move" })),
       inside(
         role("form", { name: "Move the channel" }),
@@ -186,7 +192,12 @@ describe("the channels", () => {
     scene(
       { update, view, subscriptions: ChannelsBlock.subscriptions },
       given(modifyFields(withSupport, { grants: () => memberGrants })),
-      expect(text(" · from Chat into General · opens tasks")).toExist(),
+      inside(
+        role("list", { name: "Channels" }),
+        expect(text("Support")).toExist(),
+        expect(text("Opens tasks")).toExist(),
+        expect(text("From Chat into General")).toExist()
+      ),
       expect(role("button", { name: "Add a channel" })).toBeAbsent(),
       expect(role("button", { name: "Move" })).toBeAbsent(),
       expect(role("button", { name: "Remove" })).toBeAbsent(),
@@ -202,7 +213,7 @@ describe("the channels", () => {
     scene(
       { update, view },
       given(modifyFields(withSupport, { connections: () => [], groups: () => [] })),
-      expect(text(" · from a removed connection into a group you don't see · opens tasks")).toExist()
+      expect(text("From a removed connection into a group you don't see")).toExist()
     )
   })
 
@@ -215,7 +226,7 @@ describe("the channels", () => {
           channels: () => [{ channel: Channel.change(support, { groupId: withBob.id }), pending: false }]
         })
       ),
-      expect(text(" · from Chat into Bob · opens tasks")).toExist()
+      expect(text("From Chat into Bob")).toExist()
     )
   })
 
@@ -223,7 +234,11 @@ describe("the channels", () => {
     scene(
       { update, view },
       given(modifyFields(withSupport, { channels: () => [{ channel: support, pending: true }] })),
-      expect(text(" · Sending…")).toExist(),
+      inside(
+        role("list", { name: "Channels" }),
+        expect(text("Support")).toExist(),
+        expect(text(" · Sending…")).toExist()
+      ),
       expect(role("button", { name: "Move" })).toBeAbsent(),
       expect(role("button", { name: "Remove" })).toBeAbsent()
     )
@@ -262,7 +277,7 @@ describe("the channels", () => {
       { update, view },
       given(modifyFields(init(workspace.id, member.id).model, { grants: () => memberGrants })),
       expect(text("Loading the integrations…")).toBeAbsent(),
-      expect(text("No channels yet.")).toExist()
+      expect(role("heading", { name: "No channels yet", level: 2 })).toExist()
     )
   })
 

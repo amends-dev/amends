@@ -1,9 +1,21 @@
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection, ConnectionPermissions } from "@amends-dev/core/connection"
-import { pane } from "@amends-dev/design/pane"
+import {
+  button,
+  buttonRow,
+  choiceSelect,
+  field,
+  hint,
+  notice,
+  sending,
+  submit,
+  toggle
+} from "@amends-dev/design/control"
+import { badge, entry, entryList } from "@amends-dev/design/details"
+import { form } from "@amends-dev/design/form"
+import { pane, paneColumn, paneEmpty, paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { button, choiceSelect, errorView, field, sending, submit, toggle } from "../../controls.ts"
 import { connectionTarget, may, workspaceTarget } from "../../permissions.ts"
 import * as SettingsForm from "../../settingsForm.ts"
 import { ConnectionsComposition, type ConnectionsViewBuilder } from "./composition.ts"
@@ -20,12 +32,20 @@ import {
   type Model
 } from "./definition.ts"
 
-/** How ready a connection is, as the person reads it. */
-const readinessText = (readiness: Connection.Readiness) =>
+/** How ready a connection is, as the badge beside its name says it and is toned. */
+const readinessBadge = (readiness: Connection.Readiness, h: ConnectionsViewBuilder): Html =>
   Connection.Readiness.match(readiness, {
-    Ready: () => "Ready",
-    Invalid: ({ description }) => `Can't be used: ${description}`,
-    Uninstalled: () => "Its integration is no longer installed"
+    Ready: () => badge(h, { label: "Ready", tone: "success" }),
+    Invalid: () => badge(h, { label: "Can't be used", tone: "danger" }),
+    Uninstalled: () => badge(h, { label: "Integration uninstalled", tone: "caution" })
+  })
+
+/** Why a connection can't be used, when it can't. */
+const readinessNotes = (readiness: Connection.Readiness, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
+  Connection.Readiness.match(readiness, {
+    Ready: () => [],
+    Invalid: ({ description }) => [hint(h, description)],
+    Uninstalled: () => []
   })
 
 /** What a check found, as the person reads it. */
@@ -65,14 +85,21 @@ const settingsFields = (
     })
   })
 
+/** A section titled `title` holding the form of that name, whose `children` are its fields and buttons. */
+const formSection = (title: string, children: ReadonlyArray<Html>, h: ConnectionsViewBuilder): Html =>
+  paneSection(h, {
+    title,
+    children: [form(h, { onSubmit: Message.SubmittedForm(), label: title, variant: "pane" }, children)]
+  })
+
 /** The form open among the connections. */
-const formView = (form: Form, model: Model, h: ConnectionsViewBuilder): Html => {
-  const cancel = button(h, "Cancel", Message.ClickedCancelForm())
-  return Form.match(form, {
+const formView = (open: Form, model: Model, h: ConnectionsViewBuilder): Html => {
+  const cancel = button(h, "Cancel", Message.ClickedCancelForm(), { variant: "quiet" })
+  return Form.match(open, {
     Adding: ({ integrationId, name, auth, apiKey, settings, sending: isSending, error }) => {
       const integration = Option.getOrUndefined(findIntegration(model, integrationId))
-      return h.form(
-        [h.OnSubmit(Message.SubmittedForm()), h.AriaLabel("Add a connection")],
+      return formSection(
+        "Add a connection",
         [
           choiceSelect(h, {
             id: "connection-integration",
@@ -122,15 +149,15 @@ const formView = (form: Form, model: Model, h: ConnectionsViewBuilder): Html => 
                   : h.empty,
                 ...settingsFields(integration.settings, settings, h)
               ]),
-          errorView(error, h),
-          isSending ? h.p([], ["Adding…"]) : submit(h, "Add"),
-          cancel
-        ]
+          notice(h, error),
+          buttonRow(h, [isSending ? hint(h, "Adding…") : submit(h, "Add"), cancel])
+        ],
+        h
       )
     },
     Renaming: ({ name }) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedForm()), h.AriaLabel("Rename the connection")],
+      formSection(
+        "Rename the connection",
         [
           field(
             h,
@@ -143,9 +170,9 @@ const formView = (form: Form, model: Model, h: ConnectionsViewBuilder): Html => 
             },
             Option.none()
           ),
-          submit(h, "Save"),
-          cancel
-        ]
+          buttonRow(h, [submit(h, "Save"), cancel])
+        ],
+        h
       ),
     Configuring: ({ connectionId, settings, error }) => {
       const integration = Option.getOrUndefined(
@@ -153,19 +180,19 @@ const formView = (form: Form, model: Model, h: ConnectionsViewBuilder): Html => 
           findIntegration(model, connection.integration)
         )
       )
-      return h.form(
-        [h.OnSubmit(Message.SubmittedForm()), h.AriaLabel("Change the connection's settings")],
+      return formSection(
+        "Change the connection's settings",
         [
           ...(integration === undefined ? [] : settingsFields(integration.settings, settings, h)),
-          errorView(error, h),
-          submit(h, "Save"),
-          cancel
-        ]
+          notice(h, error),
+          buttonRow(h, [submit(h, "Save"), cancel])
+        ],
+        h
       )
     },
     ReplacingKey: ({ apiKey, sending: isSending, error }) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedForm()), h.AriaLabel("Replace the connection's key")],
+      formSection(
+        "Replace the connection's key",
         [
           field(
             h,
@@ -178,84 +205,115 @@ const formView = (form: Form, model: Model, h: ConnectionsViewBuilder): Html => 
             },
             Option.none()
           ),
-          errorView(error, h),
-          isSending ? h.p([], ["Replacing…"]) : submit(h, "Replace"),
-          cancel
-        ]
+          notice(h, error),
+          buttonRow(h, [isSending ? hint(h, "Replacing…") : submit(h, "Replace"), cancel])
+        ],
+        h
       )
   })
 }
 
-/** A connection, with how ready it is, what the last check found, and what the person may do with it. */
-const connectionView = ({ connection, pending }: ConnectionItem, model: Model, h: ConnectionsViewBuilder): Html => {
+/** What the last check of a connection found, while the person has one. */
+const checkViews = (model: Model, item: ConnectionItem, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
+  Option.match(checkOf(model, item.connection.id), {
+    onNone: () => [],
+    onSome: Check.match({
+      Checking: () => [hint(h, "Checking…")],
+      Checked: ({ health }) => [hint(h, healthText(health))],
+      Failed: ({ error }) => [notice(h, Option.some(error))]
+    })
+  })
+
+/** A connection, with its integration, how ready it is, what the last check found, and what the person may do with it. */
+const connectionEntry = (item: ConnectionItem, model: Model, h: ConnectionsViewBuilder): Html => {
+  const { connection, pending } = item
   const integration = Option.getOrUndefined(findIntegration(model, connection.integration))
   const hasSettings = integration !== undefined && SettingsForm.fieldsOf(integration.settings).length > 0
   const manageable = may(model.grants, ConnectionPermissions.Manage, connectionTarget(model.workspaceId, connection.id))
-  return h.keyed("li")(
-    connection.id,
-    [],
-    [
-      h.p(
+  const buttons =
+    manageable && !pending
+      ? [
+          button(h, "Rename", Message.ClickedRename({ connectionId: connection.id }), { variant: "quiet" }),
+          ...(hasSettings
+            ? [
+                button(h, "Change settings", Message.ClickedConfigure({ connectionId: connection.id }), {
+                  variant: "quiet"
+                })
+              ]
+            : []),
+          ...(connection.auth === "apiKey"
+            ? [
+                button(h, "Replace key", Message.ClickedReplaceKey({ connectionId: connection.id }), {
+                  variant: "quiet"
+                })
+              ]
+            : []),
+          button(h, "Check", Message.ClickedCheck({ connectionId: connection.id }), { variant: "quiet" }),
+          button(h, "Remove", Message.ClickedRemove({ connectionId: connection.id }), { variant: "quiet" })
+        ]
+      : []
+
+  return entry(h, {
+    key: connection.id,
+    title: connection.name,
+    trailing: [
+      badge(h, { label: integration?.name ?? connection.integration }),
+      readinessBadge(connection.readiness, h),
+      sending(h, pending)
+    ],
+    children: [
+      ...readinessNotes(connection.readiness, h),
+      ...checkViews(model, item, h),
+      ...(buttons.length === 0 ? [] : [buttonRow(h, buttons)])
+    ]
+  })
+}
+
+/** The host's integrations while the person waits for them, or why they could not be listed, with a way to ask again. */
+const integrationsView = (model: Model, h: ConnectionsViewBuilder): Html =>
+  Integrations.match(model.integrations, {
+    Loading: () => hint(h, "Loading the integrations…"),
+    Loaded: () => h.empty,
+    Failed: ({ error }) =>
+      h.div(
         [],
         [
-          h.strong([], [connection.name]),
-          ` · ${integration?.name ?? connection.integration} · ${readinessText(connection.readiness)}`,
-          sending(pending, h)
+          notice(h, Option.some(error)),
+          buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
         ]
-      ),
-      Option.match(checkOf(model, connection.id), {
-        onNone: () => h.empty,
-        onSome: Check.match({
-          Checking: () => h.p([], ["Checking…"]),
-          Checked: ({ health }) => h.p([], [healthText(health)]),
-          Failed: ({ error }) => h.p([h.Role("alert")], [error])
-        })
-      }),
-      ...(manageable && !pending
-        ? [
-            button(h, "Rename", Message.ClickedRename({ connectionId: connection.id })),
-            hasSettings
-              ? button(h, "Change settings", Message.ClickedConfigure({ connectionId: connection.id }))
-              : h.empty,
-            connection.auth === "apiKey"
-              ? button(h, "Replace key", Message.ClickedReplaceKey({ connectionId: connection.id }))
-              : h.empty,
-            button(h, "Check", Message.ClickedCheck({ connectionId: connection.id })),
-            button(h, "Remove", Message.ClickedRemove({ connectionId: connection.id }))
-          ]
-        : [])
-    ]
-  )
-}
+      )
+  })
+
+/** Adding a connection, for a person who may, once the host listed its integrations, until a form opens. */
+const addActions = (model: Model, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
+  Option.isNone(model.form) &&
+  may(model.grants, ConnectionPermissions.Create, workspaceTarget(model.workspaceId)) &&
+  integrationsOf(model).length > 0
+    ? [button(h, "Add a connection", Message.ClickedAdd(), { variant: "secondary" })]
+    : []
 
 /** The workspace's connections, the form open among them, and adding one, for a person who may. */
 export const view = ConnectionsComposition.makeView((model, h) =>
   pane(h, {
     variant: "main",
     label: "Connections",
-    header: { title: "Connections", icon: "mark-connections" },
+    header: { title: "Connections", icon: "mark-connections", actions: addActions(model, h) },
     body: [
-      errorView(model.notice, h),
-      Integrations.match(model.integrations, {
-        Loading: () => h.p([], ["Loading the integrations…"]),
-        Loaded: () => h.empty,
-        Failed: ({ error }) =>
-          h.div([], [h.p([h.Role("alert")], [error]), button(h, "Try again", Message.ClickedReloadIntegrations())])
-      }),
-      model.connections.length === 0
-        ? h.p([], ["No connections yet."])
-        : h.ul(
-            [],
-            model.connections.map((item) => connectionView(item, model, h))
-          ),
-      Option.match(model.form, {
-        onSome: (form) => formView(form, model, h),
-        onNone: () =>
-          may(model.grants, ConnectionPermissions.Create, workspaceTarget(model.workspaceId)) &&
-          integrationsOf(model).length > 0
-            ? button(h, "Add a connection", Message.ClickedAdd())
-            : h.empty
-      })
+      paneColumn(h, [
+        notice(h, model.notice),
+        integrationsView(model, h),
+        model.connections.length === 0
+          ? paneEmpty(h, {
+              icon: "mark-connections",
+              title: "No connections yet",
+              copy: "Connections give the workspace models, tools, sandboxes, harnesses, and channels."
+            })
+          : entryList(h, {
+              label: "Connections",
+              children: model.connections.map((item) => connectionEntry(item, model, h))
+            }),
+        Option.match(model.form, { onNone: () => h.empty, onSome: (open) => formView(open, model, h) })
+      ])
     ]
   })
 )

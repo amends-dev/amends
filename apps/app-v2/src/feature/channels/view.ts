@@ -1,16 +1,35 @@
 import { ChannelPermissions } from "@amends-dev/core/channel"
-import { pane } from "@amends-dev/design/pane"
+import {
+  button,
+  buttonRow,
+  choiceSelect,
+  field,
+  hint,
+  notice,
+  sending,
+  submit,
+  toggle
+} from "@amends-dev/design/control"
+import { badge, entry, entryList } from "@amends-dev/design/details"
+import { form } from "@amends-dev/design/form"
+import { pane, paneColumn, paneEmpty, paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { button, choiceSelect, errorView, field, sending, submit, toggle } from "../../controls.ts"
 import { channelTarget, may, workspaceTarget } from "../../permissions.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
 import { ChannelsComposition, type ChannelsViewBuilder } from "./composition.ts"
 import { type ChannelItem, destinations, Form, groupNameOf, Message, type Model } from "./definition.ts"
 
+/** A section titled `title` holding the form of that name, whose `children` are its fields and buttons. */
+const formSection = (title: string, children: ReadonlyArray<Html>, h: ChannelsViewBuilder): Html =>
+  paneSection(h, {
+    title,
+    children: [form(h, { onSubmit: Message.SubmittedForm(), label: title, variant: "pane" }, children)]
+  })
+
 /** The form open among the channels. */
-const formView = (form: Form, model: Model, h: ChannelsViewBuilder): Html => {
-  const cancel = button(h, "Cancel", Message.ClickedCancelForm())
+const formView = (open: Form, model: Model, h: ChannelsViewBuilder): Html => {
+  const cancel = button(h, "Cancel", Message.ClickedCancelForm(), { variant: "quiet" })
   const groupSelect = (groupId: string, label: string) =>
     choiceSelect(h, {
       id: "channel-group",
@@ -19,10 +38,10 @@ const formView = (form: Form, model: Model, h: ChannelsViewBuilder): Html => {
       value: groupId,
       onChange: (groupId) => Message.ChoseGroup({ groupId })
     })
-  return Form.match(form, {
+  return Form.match(open, {
     Adding: ({ connectionId, groupId, name, opensTasks, error }) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedForm()), h.AriaLabel("Add a channel")],
+      formSection(
+        "Add a channel",
         [
           choiceSelect(h, {
             id: "channel-connection",
@@ -49,78 +68,96 @@ const formView = (form: Form, model: Model, h: ChannelsViewBuilder): Html => {
             isOn: opensTasks,
             onToggle: (opensTasks) => Message.ToggledOpensTasks({ opensTasks })
           }),
-          errorView(error, h),
-          submit(h, "Add"),
-          cancel
-        ]
+          notice(h, error),
+          buttonRow(h, [submit(h, "Add"), cancel])
+        ],
+        h
       ),
     Redirecting: ({ groupId, error }) =>
-      h.form(
-        [h.OnSubmit(Message.SubmittedForm()), h.AriaLabel("Move the channel")],
-        [groupSelect(groupId, "Opens new conversations in"), errorView(error, h), submit(h, "Move"), cancel]
+      formSection(
+        "Move the channel",
+        [
+          groupSelect(groupId, "Opens new conversations in"),
+          notice(h, error),
+          buttonRow(h, [submit(h, "Move"), cancel])
+        ],
+        h
       )
   })
 }
 
 /** A channel, where its conversations come from and open, and what the person may do with it. */
-const channelView = ({ channel, pending }: ChannelItem, model: Model, h: ChannelsViewBuilder): Html => {
+const channelEntry = ({ channel, pending }: ChannelItem, model: Model, h: ChannelsViewBuilder): Html => {
   const connection = model.connections.find((item) => item.connection.id === channel.connectionId)?.connection
   const origin = connection?.name ?? "a removed connection"
-  const opens = channel.opensTasks ? " · opens tasks" : ""
   const manageable = may(model.grants, ChannelPermissions.Manage, channelTarget(model.workspaceId, channel.id))
-  return h.keyed("li")(
-    channel.id,
-    [],
-    [
-      h.p(
-        [],
-        [
-          h.strong([], [channel.name]),
-          ` · from ${origin} into ${groupNameOf(model, channel.groupId)}${opens}`,
-          sending(pending, h)
-        ]
-      ),
+  return entry(h, {
+    key: channel.id,
+    title: channel.name,
+    trailing: [...(channel.opensTasks ? [badge(h, { label: "Opens tasks" })] : []), sending(h, pending)],
+    children: [
+      hint(h, `From ${origin} into ${groupNameOf(model, channel.groupId)}`),
       ...(manageable && !pending
         ? [
-            button(h, "Move", Message.ClickedRedirect({ channelId: channel.id })),
-            button(h, "Remove", Message.ClickedRemove({ channelId: channel.id }))
+            buttonRow(h, [
+              button(h, "Move", Message.ClickedRedirect({ channelId: channel.id }), { variant: "quiet" }),
+              button(h, "Remove", Message.ClickedRemove({ channelId: channel.id }), { variant: "quiet" })
+            ])
           ]
         : [])
     ]
-  )
+  })
 }
 
-/** Adding a channel, for a person who may, once the host's integrations say which connections give channels. */
-const addView = (model: Model, h: ChannelsViewBuilder): Html =>
+/** What the host's integrations say while the person waits for them, or why they could not be listed, with a way to ask again. */
+const integrationsView = (model: Model, h: ChannelsViewBuilder): Html =>
   Integrations.match(model.integrations, {
-    Loading: () => h.p([], ["Loading the integrations…"]),
+    Loading: () => hint(h, "Loading the integrations…"),
     Loaded: () =>
       connectionsGiving(model, "channels").length === 0
-        ? h.p([], ["A channel needs a connection that gives channels."])
-        : button(h, "Add a channel", Message.ClickedAdd()),
+        ? hint(h, "A channel needs a connection that gives channels.")
+        : h.empty,
     Failed: ({ error }) =>
-      h.div([], [h.p([h.Role("alert")], [error]), button(h, "Try again", Message.ClickedReloadIntegrations())])
+      h.div(
+        [],
+        [
+          notice(h, Option.some(error)),
+          buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
+        ]
+      )
   })
 
 /** The workspace's channels, the form open among them, and adding one, for a person who may. */
-export const view = ChannelsComposition.makeView((model, h) =>
-  pane(h, {
+export const view = ChannelsComposition.makeView((model, h) => {
+  const mayAdd =
+    Option.isNone(model.form) && may(model.grants, ChannelPermissions.Create, workspaceTarget(model.workspaceId))
+  return pane(h, {
     variant: "main",
     label: "Channels",
-    header: { title: "Channels", icon: "mark-channel" },
+    header: {
+      title: "Channels",
+      icon: "mark-channel",
+      actions:
+        mayAdd && connectionsGiving(model, "channels").length > 0
+          ? [button(h, "Add a channel", Message.ClickedAdd(), { variant: "secondary" })]
+          : []
+    },
     body: [
-      errorView(model.notice, h),
-      model.channels.length === 0
-        ? h.p([], ["No channels yet."])
-        : h.ul(
-            [],
-            model.channels.map((item) => channelView(item, model, h))
-          ),
-      Option.match(model.form, {
-        onSome: (form) => formView(form, model, h),
-        onNone: () =>
-          may(model.grants, ChannelPermissions.Create, workspaceTarget(model.workspaceId)) ? addView(model, h) : h.empty
-      })
+      paneColumn(h, [
+        notice(h, model.notice),
+        mayAdd ? integrationsView(model, h) : h.empty,
+        model.channels.length === 0
+          ? paneEmpty(h, {
+              icon: "mark-channel",
+              title: "No channels yet",
+              copy: "Channels bring the conversations of a connection into a group."
+            })
+          : entryList(h, {
+              label: "Channels",
+              children: model.channels.map((item) => channelEntry(item, model, h))
+            }),
+        Option.match(model.form, { onNone: () => h.empty, onSome: (open) => formView(open, model, h) })
+      ])
     ]
   })
-)
+})

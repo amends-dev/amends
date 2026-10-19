@@ -3,11 +3,25 @@ import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from
 import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { Command, click, expect, given, label, role, scene, selector, text, type, within } from "foldkit/scene"
+import {
+  Command,
+  change,
+  click,
+  expect,
+  given,
+  inside,
+  label,
+  role,
+  scene,
+  selector,
+  text,
+  type,
+  within
+} from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, bob, bobInDesign, design, membership, opening, thread } from "../../../test/fixtures.ts"
-import { RenameGroup } from "./command.ts"
-import { Message } from "./definition.ts"
+import { AdmitMember, RemoveMember, RenameGroup } from "./command.ts"
+import { Message, type Model } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { threadView, view } from "./view.ts"
@@ -51,7 +65,7 @@ const followOfDesign = Schema.decodeSync(GroupFollow.GroupFollow)({
 const inWorkspace = Scope.Scope.cases.Workspace.make({ workspaceId: workspace.id })
 
 /** The team read, with alice and bob admitted, as a member who manages its members sees it. */
-const opened = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
+const opened: Model = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
   group: () => Option.some({ group: design, pending: false }),
   memberships: () => [
     { membership: aliceInDesign, pending: false },
@@ -87,11 +101,83 @@ describe("a group's main pane", () => {
       expect(within(role("main"), role("button", { name: "Follow" }))).toExist(),
       expect(within(role("main"), role("button", { name: "Leave" }))).toExist(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
-      expect(text("Alice")).toExist(),
-      expect(text("Bob")).toExist(),
-      expect(role("button", { name: "Remove" })).toExist(),
+      inside(
+        role("region", { name: "Members" }),
+        inside(
+          role("list", { name: "Members" }),
+          expect(text("Alice")).toExist(),
+          expect(text("Bob")).toExist(),
+          expect(role("button", { name: "Remove" })).toExist()
+        )
+      ),
       expect(text("Choose a member")).toBeAbsent(),
       expect(text("No threads yet.")).toExist()
+    )
+  })
+
+  it("marks a member who has the workspace open as online", () => {
+    scene(
+      { update, view },
+      given(opened),
+      inside(role("list", { name: "Members" }), expect(text("Online")).toBeAbsent())
+    )
+    scene(
+      { update, view },
+      given(modifyFields(opened, { present: () => [{ memberId: bob.id, typingIn: null }] })),
+      inside(role("list", { name: "Members" }), expect(text("Online")).toExist())
+    )
+  })
+
+  it("marks an admission that is on its way, and offers no button to remove it", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          memberships: () => [
+            { membership: aliceInDesign, pending: false },
+            { membership: bobInDesign, pending: true }
+          ]
+        })
+      ),
+      inside(
+        role("list", { name: "Members" }),
+        expect(text("Bob")).toExist(),
+        expect(text(" · Sending…")).toExist(),
+        expect(role("button", { name: "Remove" })).toBeAbsent()
+      )
+    )
+  })
+
+  it("removes a member and admits another, where the person manages them", () => {
+    const inDesign = { workspaceId: workspace.id, memberId: member.id, groupId: design.id }
+    scene(
+      { update, view },
+      given(modifyFields(opened, { memberships: () => [{ membership: aliceInDesign, pending: false }] })),
+      inside(role("list", { name: "Members" }), expect(text("Alice")).toExist()),
+      inside(
+        role("form", { name: "Add a member" }),
+        change(role("combobox", { name: "Add a member" }), bob.id),
+        click(role("button", { name: "Add" }))
+      ),
+      Command.expectExact(AdmitMember({ ...inDesign, admitMemberId: bob.id })),
+      Command.resolve(AdmitMember, Message.WroteAction())
+    )
+    scene(
+      { update, view },
+      given(opened),
+      inside(role("list", { name: "Members" }), click(role("button", { name: "Remove" }))),
+      Command.expectExact(RemoveMember({ ...inDesign, membershipId: bobInDesign.id })),
+      Command.resolve(RemoveMember, Message.WroteAction())
+    )
+  })
+
+  it("shows the members to someone who may not manage them, with no way to remove or add", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { grants: () => [] })),
+      inside(role("list", { name: "Members" }), expect(text("Bob")).toExist()),
+      expect(role("button", { name: "Remove" })).toBeAbsent(),
+      expect(role("form", { name: "Add a member" })).toBeAbsent()
     )
   })
 

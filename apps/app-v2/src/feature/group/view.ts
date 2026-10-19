@@ -1,13 +1,14 @@
 import { Group, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
 import type { MemberId } from "@amends-dev/core/workspace"
-import { button, field, notice, sending, submit } from "@amends-dev/design/control"
+import { button, buttonRow, field, fieldGrid, hint, notice, sending, submit } from "@amends-dev/design/control"
+import { badge, entry, entryList } from "@amends-dev/design/details"
 import { form } from "@amends-dev/design/form"
-import { pane, paneClose } from "@amends-dev/design/pane"
+import { pane, paneClose, paneColumn, paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may } from "../../permissions.ts"
-import { groupName, isJoinable, memberName } from "../../seen.ts"
+import { groupName, initials, isJoinable, memberName } from "../../seen.ts"
 import { titleOf } from "../thread/definition.ts"
 import { replyView } from "../thread/view.ts"
 import { composerView } from "../threads/view.ts"
@@ -47,7 +48,7 @@ const renamingView = (model: Model, h: GroupViewBuilder): Html =>
   Option.match(model.renaming, {
     onNone: () => h.empty,
     onSome: (draft) =>
-      form(h, { onSubmit: Message.SubmittedRename() }, [
+      form(h, { onSubmit: Message.SubmittedRename(), variant: "pane" }, [
         field(
           h,
           {
@@ -59,8 +60,7 @@ const renamingView = (model: Model, h: GroupViewBuilder): Html =>
           },
           Option.none()
         ),
-        submit(h, "Save"),
-        button(h, "Cancel", Message.ClickedCancelRename(), { variant: "quiet" })
+        buttonRow(h, [submit(h, "Save"), button(h, "Cancel", Message.ClickedCancelRename(), { variant: "quiet" })])
       ])
   })
 
@@ -110,44 +110,51 @@ const membersView = (model: Model, h: GroupViewBuilder): Html => {
       member.status === "active" &&
       !admissions.some(({ membership }) => membership.memberId === member.id)
   )
-  return h.section(
-    [h.AriaLabel("Members")],
-    [
-      h.h2([], ["Members"]),
-      h.ul(
-        [],
-        admissions.map(({ membership, pending }) =>
-          h.keyed("li")(
-            membership.id,
-            [],
-            [
-              memberName(model.members, membership.memberId),
-              isPresent(model, membership.memberId) ? " · online" : "",
-              sending(h, pending),
+  return paneSection(h, {
+    title: "Members",
+    children: [
+      entryList(h, {
+        label: "Members",
+        children: admissions.map(({ membership, pending }) => {
+          const name = memberName(model.members, membership.memberId)
+          return entry(h, {
+            key: membership.id,
+            mark: initials(name),
+            title: name,
+            trailing: [
+              isPresent(model, membership.memberId) ? badge(h, { label: "Online", tone: "success" }) : h.empty,
+              sending(h, pending)
+            ],
+            children:
               !isManaged || pending || membership.memberId === model.memberId
-                ? h.empty
-                : button(h, "Remove", Message.ClickedRemoveMember({ membershipId: membership.id }), {
-                    variant: "quiet"
-                  })
-            ]
-          )
-        )
-      ),
+                ? []
+                : [
+                    buttonRow(h, [
+                      button(h, "Remove", Message.ClickedRemoveMember({ membershipId: membership.id }), {
+                        variant: "quiet"
+                      })
+                    ])
+                  ]
+          })
+        })
+      }),
       !isManaged || admissible.length === 0
         ? h.empty
-        : form(h, { onSubmit: Message.SubmittedAdmit() }, [
-            memberChoice(h, {
-              id: "admit-member",
-              label: "Add a member",
-              none: "Choose a member",
-              members: admissible,
-              value: model.admitting,
-              onChange: (memberId) => Message.ChoseMemberToAdmit({ memberId })
-            }),
-            submit(h, "Add")
+        : form(h, { onSubmit: Message.SubmittedAdmit(), label: "Add a member", variant: "pane" }, [
+            fieldGrid(h, [
+              memberChoice(h, {
+                id: "admit-member",
+                label: "Add a member",
+                none: "Choose a member",
+                members: admissible,
+                value: model.admitting,
+                onChange: (memberId) => Message.ChoseMemberToAdmit({ memberId })
+              })
+            ]),
+            buttonRow(h, [submit(h, "Add")])
           ])
     ]
-  )
+  })
 }
 
 /**
@@ -170,12 +177,14 @@ export const view = GroupComposition.makeView((model, h) => {
     label: name,
     header: { title: name, ...markOf(model), actions: [...partActions(model, h), ...renameActions(model, h)] },
     body: [
-      notice(h, model.notice),
-      renamingView(model, h),
-      Option.isSome(teamName(model)) ? membersView(model, h) : h.empty,
-      isReadable
-        ? h.block(ThreadsBinding.embedView({ slotId: "threads", model: model.threads, viewInputs: threadsInputs }))
-        : h.p([], ["Join this team to read its threads."])
+      paneColumn(h, [
+        notice(h, model.notice),
+        renamingView(model, h),
+        Option.isSome(teamName(model)) ? membersView(model, h) : h.empty,
+        isReadable
+          ? h.block(ThreadsBinding.embedView({ slotId: "threads", model: model.threads, viewInputs: threadsInputs }))
+          : hint(h, "Join this team to read its threads.")
+      ])
     ],
     ...(isReadable
       ? {

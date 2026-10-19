@@ -58,8 +58,10 @@ describe("the connections", () => {
     scene(
       { update, view, subscriptions: ConnectionsBlock.subscriptions },
       given(opened),
-      expect(text("No connections yet.")).toExist(),
+      expect(role("heading", { name: "No connections yet", level: 2 })).toExist(),
+      expect(text("Connections give the workspace models, tools, sandboxes, harnesses, and channels.")).toExist(),
       click(role("button", { name: "Add a connection" })),
+      expect(role("region", { name: "Add a connection" })).toExist(),
       inside(
         role("form", { name: "Add a connection" }),
         change(label("Integration"), testApi.id),
@@ -80,13 +82,38 @@ describe("the connections", () => {
         })
       ),
       expect(text("Adding…")).toExist(),
+      expect(role("button", { name: "Add" })).toBeAbsent(),
       Command.resolve(AddConnection, Message.AddedConnection()),
       expect(role("form", { name: "Add a connection" })).toBeAbsent(),
       Subscription.emit(
         subscriptions.connections,
         Message.ReceivedConnections({ connections: withModels.connections })
       ),
-      expect(text(" · Test API · Ready")).toExist()
+      inside(
+        role("list", { name: "Connections" }),
+        expect(text("Models")).toExist(),
+        expect(text("Test API")).toExist(),
+        expect(text("Ready")).toExist()
+      )
+    )
+  })
+
+  it("offer adding from the header, until a form is open, and not before the integrations are", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { integrations: () => Integrations.Loading() })),
+      expect(text("Loading the integrations…")).toExist(),
+      expect(role("button", { name: "Add a connection" })).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(opened),
+      inside(role("main", { name: "Connections" }), expect(role("button", { name: "Add a connection" })).toExist()),
+      click(role("button", { name: "Add a connection" })),
+      expect(role("button", { name: "Add a connection" })).toBeAbsent(),
+      inside(role("form", { name: "Add a connection" }), click(role("button", { name: "Cancel" }))),
+      expect(role("form", { name: "Add a connection" })).toBeAbsent(),
+      expect(role("button", { name: "Add a connection" })).toExist()
     )
   })
 
@@ -144,7 +171,12 @@ describe("the connections", () => {
     scene(
       { update, view, subscriptions: ConnectionsBlock.subscriptions },
       given(modifyFields(withModels, { grants: () => memberGrants })),
-      expect(text(" · Test API · Ready")).toExist(),
+      inside(
+        role("list", { name: "Connections" }),
+        expect(text("Models")).toExist(),
+        expect(text("Test API")).toExist(),
+        expect(text("Ready")).toExist()
+      ),
       expect(role("button", { name: "Add a connection" })).toBeAbsent(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("button", { name: "Check" })).toBeAbsent(),
@@ -181,8 +213,12 @@ describe("the connections", () => {
           ]
         })
       ),
-      expect(text(" · Test API · Its integration is no longer installed")).toExist(),
-      expect(text(" · Test API · Can't be used: It takes no key")).toExist()
+      inside(
+        role("list", { name: "Connections" }),
+        expect(text("Integration uninstalled")).toExist(),
+        expect(text("Can't be used")).toExist(),
+        expect(text("It takes no key")).toExist()
+      )
     )
   })
 
