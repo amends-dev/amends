@@ -6,6 +6,6 @@ import { Open } from "./definition.ts"
 export const init = WorkspaceComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, name: string) => ({
     childInitContext: { workspaceId, memberId },
-    model: { workspaceId, memberId, name, open: Open.Nothing() }
+    model: { workspaceId, memberId, name, open: Open.Nothing(), isMenuOpen: false }
   })
 )

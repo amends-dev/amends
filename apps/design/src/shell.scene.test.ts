@@ -4,27 +4,35 @@ import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { pane, paneClose } from "./pane.ts"
+import { pane, paneBack, paneClose } from "./pane.ts"
 import { rail } from "./rail.ts"
 import { shell } from "./shell.ts"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "./sidebar.ts"
 import { toast, toastStack } from "./toast.ts"
 
-const Message = defineMessageUnion({ ClickedHome: {}, ClosedThread: {}, DismissedRefusal: {} })
+const Message = defineMessageUnion({
+  ClickedHome: {},
+  ClosedThread: {},
+  DismissedRefusal: {},
+  OpenedMenu: {},
+  ClosedMenu: {}
+})
 type Message = typeof Message.Type
 
-type Model = Readonly<{ isThreadOpen: boolean; isRefused: boolean; homes: number }>
+type Model = Readonly<{ isThreadOpen: boolean; isRefused: boolean; isMenuOpen: boolean; homes: number }>
 
-const initial: Model = { isThreadOpen: true, isRefused: false, homes: 0 }
+const initial: Model = { isThreadOpen: true, isRefused: false, isMenuOpen: false, homes: 0 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ClickedHome: () => ({ model: modifyFields(model, { homes: (homes) => homes + 1 }) }),
     ClosedThread: () => ({ model: modifyFields(model, { isThreadOpen: () => false }) }),
-    DismissedRefusal: () => ({ model: modifyFields(model, { isRefused: () => false }) })
+    DismissedRefusal: () => ({ model: modifyFields(model, { isRefused: () => false }) }),
+    OpenedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
+    ClosedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => false }) })
   })
 
-const view = (model: Model, h: HtmlBuilder<Message>) =>
+const viewWithMenu = (hasMenu: boolean) => (model: Model, h: HtmlBuilder<Message>) =>
   shell(h, {
     rail: rail(h, {
       brand: { letter: "A", label: "amends" },
@@ -55,6 +63,7 @@ const view = (model: Model, h: HtmlBuilder<Message>) =>
             header: {
               title: "Composer paste crash",
               subtitle: "Thread in #general",
+              leading: paneBack(h, Message.ClosedThread()),
               actions: [paneClose(h, Message.ClosedThread())]
             },
             body: []
@@ -70,8 +79,13 @@ const view = (model: Model, h: HtmlBuilder<Message>) =>
             })
           ])
         }
+      : {}),
+    ...(hasMenu
+      ? { menu: { onOpen: Message.OpenedMenu(), onClose: Message.ClosedMenu() }, isMenuOpen: model.isMenuOpen }
       : {})
   })
+
+const view = viewWithMenu(true)
 
 describe("shell", () => {
   it("frames the rail, the sidebar, the main pane, and the side pane, each by its landmark", () => {
@@ -98,7 +112,7 @@ describe("shell", () => {
     scene(
       { update, view },
       given(initial),
-      click(role("button", { name: "Close" })),
+      click(within(role("complementary"), role("button", { name: "Close" }))),
       expect(role("complementary")).toBeAbsent(),
       expect(role("main")).toExist()
     )
@@ -120,5 +134,59 @@ describe("shell", () => {
 
   it("has no live region for notices when it is given none", () => {
     scene({ update, view }, given(initial), expect(selector('[aria-live="polite"]')).toBeAbsent())
+  })
+
+  it("has a menu button named Menu that opens the drawer, and a scrim to close it only while it is open", () => {
+    scene(
+      { update, view },
+      given(initial),
+      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      click(role("button", { name: "Menu" })),
+      expect(role("button", { name: "Close menu" })).toExist()
+    )
+  })
+
+  it("sends the close of the menu when the scrim is clicked while the drawer is open", () => {
+    scene(
+      { update, view },
+      given({ ...initial, isMenuOpen: true }),
+      expect(role("button", { name: "Close menu" })).toExist(),
+      click(role("button", { name: "Close menu" })),
+      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      expect(role("navigation", { name: "Workspace" })).toExist()
+    )
+  })
+
+  it("keeps the rail and the sidebar working while the drawer is open", () => {
+    scene(
+      { update, view },
+      given({ ...initial, isMenuOpen: true }),
+      click(within(role("navigation", { name: "Destinations" }), role("button", { name: "Home" }))),
+      expect(within(role("main"), text("Home 1"))).toExist(),
+      click(within(role("navigation", { name: "Workspace" }), role("button", { name: "Inbox" }))),
+      expect(within(role("main"), text("Home 2"))).toExist()
+    )
+  })
+
+  it("has no menu button or scrim when it is given no menu, and the drawer stays shut", () => {
+    scene(
+      { update, view: viewWithMenu(false) },
+      given({ ...initial, isMenuOpen: true }),
+      expect(role("button", { name: "Menu" })).toBeAbsent(),
+      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      expect(role("navigation", { name: "Workspace" })).toExist()
+    )
+  })
+
+  it("puts Back before the side pane's title and Close among its actions, each sending its message", () => {
+    scene(
+      { update, view },
+      given(initial),
+      expect(within(role("complementary"), role("button", { name: "Back" }))).toExist(),
+      expect(within(role("complementary"), role("button", { name: "Close" }))).toExist(),
+      click(within(role("complementary"), role("button", { name: "Back" }))),
+      expect(role("complementary")).toBeAbsent()
+    )
   })
 })

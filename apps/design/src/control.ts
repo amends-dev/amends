@@ -45,7 +45,7 @@ const hiddenLabel = "sr-only"
 
 const iconButtonSizes = {
   regular: "size-8 max-desktop:size-11",
-  compact: "size-6"
+  compact: "size-6 max-desktop:size-11"
 }
 
 const buttonRowLook = "flex flex-wrap items-center gap-2"
@@ -72,12 +72,13 @@ const selectChevron = "chevron-down"
 const switchRow = "flex items-center gap-3 max-desktop:min-h-11"
 
 const switchTrack =
-  "group relative inline-flex h-5 w-9 flex-none cursor-pointer items-center border border-outline bg-subtle focus-ring data-checked:border-action data-checked:bg-action"
+  "group relative inline-flex h-5 w-9 flex-none cursor-pointer items-center border border-outline bg-subtle focus-ring data-checked:border-action data-checked:bg-action max-desktop:after:absolute max-desktop:after:-inset-x-1.25 max-desktop:after:-inset-y-3.25"
 
 const switchThumb =
   "block size-3.5 translate-x-0.5 bg-action transition-transform group-data-checked:translate-x-4.5 group-data-checked:bg-subtle motion-reduce:transition-none"
 
-const switchLabel = "cursor-pointer text-item text-ink select-none"
+const switchLabel =
+  "cursor-pointer text-item text-ink select-none max-desktop:flex max-desktop:min-h-11 max-desktop:items-center"
 
 const noticeBase = "text-hint"
 
@@ -107,7 +108,7 @@ export type ButtonOptions = Readonly<{
 }>
 
 export type IconButtonOptions = Readonly<{
-  /** `compact` is 24px, for the actions along a list's heading. The default is 32px, and 44px on touch. */
+  /** `compact` is 24px, for the actions along a list's heading, and the default 32px. Both are 44px on touch. */
   size?: "compact"
 }>
 

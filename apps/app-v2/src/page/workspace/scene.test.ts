@@ -441,6 +441,52 @@ describe("a workspace", () => {
     )
   })
 
+  it("opens the navigation drawer from the menu button, and closes it from the scrim", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("button", { name: "Menu" })).toExist(),
+      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      click(role("button", { name: "Menu" })),
+      expect(role("button", { name: "Close menu" })).toExist(),
+      click(role("button", { name: "Close menu" })),
+      expect(role("button", { name: "Close menu" })).toBeAbsent()
+    )
+  })
+
+  it("closes the navigation drawer when a link of the sidebar or the rail is followed", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      click(role("button", { name: "Menu" })),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Inbox" }))),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      expect(role("button", { name: "Close menu" })).toBeAbsent(),
+      click(role("button", { name: "Menu" })),
+      expect(role("button", { name: "Close menu" })).toExist(),
+      click(role("button", { name: "Connections" })),
+      expect(role("main", { name: "Connections" })).toExist(),
+      expect(role("button", { name: "Close menu" })).toBeAbsent()
+    )
+  })
+
+  it("closes the navigation drawer when a group is picked from the sidebar", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(opened, {
+          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false }] })
+        })
+      ),
+      click(role("button", { name: "Menu" })),
+      expect(role("button", { name: "Close menu" })).toExist(),
+      click(role("button", { name: "General" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Close menu" })).toBeAbsent()
+    )
+  })
+
   it("keeps the brand a mark and no button, and the workspaces one click away from the sidebar's header", () => {
     scene(
       { update, view: sceneView },

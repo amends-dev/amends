@@ -147,6 +147,8 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     sidebar: sidebarView(model, email, h),
     main: mainView(model, h),
     ...Option.match(asideView(model, h), { onNone: () => ({}), onSome: (aside) => ({ aside }) }),
-    notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions }))
+    notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
+    menu: { onOpen: Message.ClickedMenu(), onClose: Message.ClickedCloseMenu() },
+    isMenuOpen: model.isMenuOpen
   })
 )

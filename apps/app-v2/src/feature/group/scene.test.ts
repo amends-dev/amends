@@ -597,6 +597,18 @@ describe("a group's side pane", () => {
     )
   })
 
+  it("goes back to the group's threads with a button named Back, as it does with the one named Close", () => {
+    for (const name of ["Back", "Close"]) {
+      scene(
+        { update, view: sidePane },
+        given(withThread),
+        expect(within(role("complementary", { name: "Thread" }), role("button", { name }))).toExist(),
+        click(within(role("complementary", { name: "Thread" }), role("button", { name }))),
+        expect(role("complementary")).toBeAbsent()
+      )
+    }
+  })
+
   it("renders nothing while no thread is open", () => {
     scene({ update, view: sidePane }, given(opened), expect(role("complementary")).toBeAbsent())
   })

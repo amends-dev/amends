@@ -14,6 +14,11 @@ import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { type Model, Open, WorkspaceDefinition } from "./definition.ts"
 
+/** Close the navigation drawer, as going anywhere does. */
+export const closeMenu = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { isMenuOpen: () => false })
+}))
+
 /** Open the group `groupId` in the main content, with the thread `threadId` open in it, if there is one. */
 const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.ThreadId>) =>
   WorkspaceDefinition.step((model: Model) =>
@@ -24,15 +29,19 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
     })
   )
 
-/** Picking a group opens it. */
+/** Picking a group opens it, and closes the navigation drawer. */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
-  SelectedGroup: ({ groupId }) => openGroup(groupId, Option.none())
+  SelectedGroup: ({ groupId }) => Update.combine([closeMenu, openGroup(groupId, Option.none())])
 })
 
-/** Opening a notification's thread opens its group with the thread open, and marks the group open in the list. */
+/**
+ * Opening a notification's thread opens its group with the thread open, marks the group open in the list, and
+ * closes the navigation drawer.
+ */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
   OpenedThread: ({ groupId, threadId }) =>
     Update.combine([
+      closeMenu,
       GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
       openGroup(groupId, Option.some(threadId))
     ])

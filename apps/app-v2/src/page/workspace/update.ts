@@ -1,7 +1,7 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { GroupsBinding, WorkspaceComposition } from "./composition.ts"
+import { GroupsBinding, WorkspaceComposition, closeMenu } from "./composition.ts"
 import { Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Show nothing yet in the main content. */
@@ -34,14 +34,19 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
     ClickedSignOut: () => ({ model, outMessage: OutMessage.RequestedSignOut() }),
-    ClickedHome: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showNothing]),
-    ClickedInbox: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showInbox]),
+    ClickedHome: () =>
+      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showNothing]),
+    ClickedInbox: () =>
+      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showInbox]),
     ClickedConnections: () =>
-      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),
-    ClickedAgents: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showAgents]),
+      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),
+    ClickedAgents: () =>
+      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showAgents]),
     ClickedSettings: () =>
-      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings]),
+      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings]),
     ClickedChannels: () =>
-      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showChannels])
+      Update.combine(model, [closeMenu, GroupsBinding.informOpenGroup({ groupId: Option.none() }), showChannels]),
+    ClickedMenu: () => ({ model: modifyFields(model, { isMenuOpen: () => true }) }),
+    ClickedCloseMenu: () => Update.combine(model, [closeMenu])
   })
 )

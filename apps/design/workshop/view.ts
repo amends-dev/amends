@@ -24,7 +24,7 @@ import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
 import { divider, message, messageList } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
-import { pane, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "../src/pane.ts"
+import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
 import {
@@ -1067,6 +1067,7 @@ const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
       title: "Composer paste crash",
       icon: "message",
       subtitle: "Thread in #general",
+      leading: paneBack(h, press),
       actions: [paneClose(h, press)]
     },
     body: [

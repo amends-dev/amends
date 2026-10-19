@@ -124,6 +124,62 @@ describe("a workspace", () => {
     )
   })
 
+  it("opens the navigation drawer, and closes it again", () => {
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(model.isMenuOpen).toBe(false)
+      }),
+      message(Message.ClickedMenu()),
+      model((model) => {
+        expect(model.isMenuOpen).toBe(true)
+      }),
+      message(Message.ClickedCloseMenu()),
+      model((model) => {
+        expect(model.isMenuOpen).toBe(false)
+      })
+    )
+  })
+
+  it("closes the navigation drawer when the person goes home or to a destination", () => {
+    for (const navigation of [
+      Message.ClickedHome(),
+      Message.ClickedInbox(),
+      Message.ClickedConnections(),
+      Message.ClickedAgents(),
+      Message.ClickedSettings(),
+      Message.ClickedChannels()
+    ]) {
+      story(
+        update,
+        given(opened),
+        message(Message.ClickedMenu()),
+        model((model) => {
+          expect(model.isMenuOpen).toBe(true)
+        }),
+        message(navigation),
+        model((model) => {
+          expect(model.isMenuOpen).toBe(false)
+        })
+      )
+    }
+  })
+
+  it("closes the navigation drawer when the person picks a group", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedMenu()),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(model.isMenuOpen).toBe(false)
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
   it("names the thread open in the group open by its title, and none while there is none", () => {
     story(
       update,
@@ -312,6 +368,7 @@ describe("a workspace", () => {
       given(opened),
       receivedNotification,
       message(Message.ClickedInbox()),
+      message(Message.ClickedMenu()),
       message(fromInbox(InboxBlock.Message.ClickedOpen({ notificationId: notification.id }))),
       Command.resolve(
         ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Thread.make({ groupId }) }),
@@ -330,6 +387,7 @@ describe("a workspace", () => {
         ).toEqual([groupId, Option.some([thread.id, thread.id])])
         expect(openThreadTitle(model.open)).toEqual(Option.some("A thread"))
         expect(model.groups.selected).toEqual(Option.some(groupId))
+        expect(model.isMenuOpen).toBe(false)
       })
     )
   })

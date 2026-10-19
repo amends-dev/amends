@@ -6,22 +6,28 @@ import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { iconButton, sending } from "./control.ts"
-import { pane, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "./pane.ts"
+import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneSection, paneTabs } from "./pane.ts"
 
 const Tab = Schema.Literals(["threads", "tasks"])
 type Tab = typeof Tab.Type
 
-const Message = defineMessageUnion({ ChangedTab: { tab: Tab }, ClosedThread: {}, OpenedSettings: {} })
+const Message = defineMessageUnion({
+  ChangedTab: { tab: Tab },
+  ClosedThread: {},
+  WentBack: {},
+  OpenedSettings: {}
+})
 type Message = typeof Message.Type
 
-type Model = Readonly<{ tab: Tab; closings: number; settings: number }>
+type Model = Readonly<{ tab: Tab; closings: number; backs: number; settings: number }>
 
-const initial: Model = { tab: "threads", closings: 0, settings: 0 }
+const initial: Model = { tab: "threads", closings: 0, backs: 0, settings: 0 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ChangedTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
     ClosedThread: () => ({ model: modifyFields(model, { closings: (closings) => closings + 1 }) }),
+    WentBack: () => ({ model: modifyFields(model, { backs: (backs) => backs + 1 }) }),
     OpenedSettings: () => ({ model: modifyFields(model, { settings: (settings) => settings + 1 }) })
   })
 
@@ -30,6 +36,7 @@ const paneView = (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (m
     [],
     [
       h.p([h.Role("status")], [`Tab ${model.tab}, closed ${model.closings}, settings ${model.settings}`]),
+      h.p([h.Role("note")], [`Back ${model.backs}`]),
       render(model, h)
     ]
   )
@@ -65,6 +72,7 @@ const sidePane = (_: Model, h: HtmlBuilder<Message>) =>
       title: "Composer paste crash",
       icon: "message",
       subtitle: "Thread in #general",
+      leading: paneBack(h, Message.WentBack()),
       actions: [paneClose(h, Message.ClosedThread())]
     },
     body: [h.p([], ["found a bug."])],
@@ -114,8 +122,24 @@ describe("pane", () => {
       { update, view: paneView(sidePane) },
       given(initial),
       click(role("button", { name: "Close" })),
-      expect(role("status")).toHaveText("Tab threads, closed 1, settings 0")
+      expect(role("status")).toHaveText("Tab threads, closed 1, settings 0"),
+      expect(role("note")).toHaveText("Back 0")
     )
+  })
+
+  it("goes back from the side pane with a button named Back, which is not Close", () => {
+    scene(
+      { update, view: paneView(sidePane) },
+      given(initial),
+      expect(within(role("complementary"), role("button", { name: "Back" }))).toExist(),
+      click(role("button", { name: "Back" })),
+      expect(role("note")).toHaveText("Back 1"),
+      expect(role("status")).toHaveText("Tab threads, closed 0, settings 0")
+    )
+  })
+
+  it("has no Back in a pane that is given none", () => {
+    scene({ update, view: paneView(mainPane) }, given(initial), expect(role("button", { name: "Back" })).toBeAbsent())
   })
 
   it("shows no subtitle beside tabs, and shows one when it has no tabs", () => {

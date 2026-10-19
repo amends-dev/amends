@@ -2,8 +2,9 @@
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
  * actions, their inbox, their connections, their agents, their settings, and their channels, and
  * what the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
- * the channels, or a group, with its threads and the thread open among them. It reports when the
- * person leaves it, and when they ask to sign out.
+ * the channels, or a group, with its threads and the thread open among them, and whether the
+ * navigation drawer is open, which every navigation closes. It reports when the person leaves it,
+ * and when they ask to sign out.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -50,7 +51,9 @@ export const Model = Schema.Struct({
   agents: AgentsBlock.Model,
   settings: SettingsBlock.Model,
   channels: ChannelsBlock.Model,
-  open: Open
+  open: Open,
+  /** Whether the navigation drawer is open, which only shows below 64rem. */
+  isMenuOpen: Schema.Boolean
 })
 export type Model = typeof Model.Type
 
@@ -73,7 +76,9 @@ export const Message = defineMessageUnion({
   ClickedConnections: {},
   ClickedAgents: {},
   ClickedSettings: {},
-  ClickedChannels: {}
+  ClickedChannels: {},
+  ClickedMenu: {},
+  ClickedCloseMenu: {}
 })
 export type Message = typeof Message.Type
 

@@ -43,7 +43,8 @@ sign-in codes it sends.
 ## Styling
 
 The look is [`@amends-dev/design`](../design/README.md)'s. `vite.config.ts` runs Tailwind,
-`src/styles.css` imports the design's theme, and `index.html` links that stylesheet. A view carries
+`src/styles.css` imports the design's theme, and `index.html` links that stylesheet and sets
+`viewport-fit=cover`, so that the shell below 48rem can leave room for a phone's safe areas. A view carries
 no class: classes come from a renderer, and the renderers live in the design package. The screens
 outside a workspace are composed from it: the root view frames the sign-in page and the workspace
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
@@ -155,8 +156,9 @@ the pages that compose them; the root composes the pages.
   the tab. The dialog opens on General, and closing it, by Cancel, Close, Escape, a click on the
   scrim, Save changes, or Leave, drops the draft of the name and the member chosen to admit.
   `threadView` is the thread open in it as a side pane, titled by the
-  thread, with a button that closes it, the thread's messages, and the reply composer in the footer,
-  and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
+  thread, with a button that closes it, Close, and, below 48rem where the pane is full screen over
+  the main pane, Back before the title, both sending `ClickedAllThreads`, the thread's messages, and
+  the reply composer in the footer, and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
   and `threadView` in its side pane. The main pane embeds the threads Block twice and the side pane
   the thread Block twice, once for its content and once for its composer, each in a slot of its own.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
@@ -249,7 +251,12 @@ the pages that compose them; the root composes the pages.
   only while one is, and the actions' toasts come over both. The page's view takes the account's
   email as a view input. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a notification's thread opens its group with the thread already open,
-  and marks the group. Opening the workspace asks the host for the integrations its connections,
+  and marks the group. Below 64rem the sidebar is a drawer, and below 48rem the rail with it, which
+  the shell's Menu button opens: the page's model keeps `isMenuOpen`, a "Close menu" scrim over the
+  rest of the window closes it, and every navigation, the rail's, the sidebar's Inbox, a group picked,
+  and a notification's thread opened, closes it too (a `closeMenu` step among theirs). The drawer is
+  moved by CSS from that flag; it does not yet trap focus, make the rest of the window inert, or
+  close on Escape, which come in a later step. Opening the workspace asks the host for the integrations its connections,
   agents, and channels link to. It reports when the person leaves it and when they ask to sign out.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
@@ -393,7 +400,8 @@ browser's storage. Each Block's tests sit beside it:
   the inbox, the connections, the agents, the settings, or the channels in its place with no group
   marked, going home from a group or a destination, handing the settings and the channels what the
   person does in them, opening a notification's thread in its group, naming the thread open in the
-  group open, and asking the root to sign out; and the root signing in a step at a time, listing the
+  group open, opening the navigation drawer and closing it by every navigation, and asking the root
+  to sign out; and the root signing in a step at a time, listing the
   workspaces, opening and closing one, and signing out, from the list or from the open workspace.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
@@ -415,7 +423,8 @@ browser's storage. Each Block's tests sit beside it:
   visibility; its members, those present marked
   Online and one on its way marked sending, with removing for the others, admitting, offered only to
   someone who manages them; and its side pane for the thread open in it,
-  with the composer to reply in its footer, closed by its button; the groups listed in the
+  with the composer to reply in its footer, closed by its Close button or its Back, which send the
+  same message; the groups listed in the
   sidebar's sections apart from the teams to join, a conversation by its other member, with the
   thread open under the group picked, and a new team taken in a dialog named for it, with the name
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
@@ -454,7 +463,9 @@ browser's storage. Each Block's tests sit beside it:
   who is signed in and the way out in its footer, the group's threads as messages in the main pane
   with the composer to start one, the thread picked opened in the side pane with its messages and the
   composer to reply, marked in the list and under the group in the sidebar, the group's settings
-  opened in a dialog from its main pane, and what the server refused as toasts. The root's own scenes show
+  opened in a dialog from its main pane, the Menu button opening the drawer and its scrim, or a
+  link of the sidebar or the rail, a group picked among them, closing it, and what the server
+  refused as toasts. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through

@@ -14,7 +14,7 @@ import {
 import { badge, entry, entryList } from "@amends-dev/design/details"
 import { form, settingRow } from "@amends-dev/design/form"
 import { type ModalConfig, modal } from "@amends-dev/design/modal"
-import { pane, paneClose, paneColumn, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneBack, paneClose, paneColumn, paneTabs } from "@amends-dev/design/pane"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -299,7 +299,10 @@ export const view = GroupComposition.makeView((model, h) => {
   })
 })
 
-/** The thread open in the group as the side pane, with the button that closes it, and nothing while none is open. */
+/**
+ * The thread open in the group as the side pane, with the button that closes it, Close beside the title and
+ * Back before it on a phone, and nothing while none is open.
+ */
 export const threadView = GroupComposition.makeView((model, h) =>
   Option.match(model.thread, {
     onNone: () => h.empty,
@@ -311,6 +314,7 @@ export const threadView = GroupComposition.makeView((model, h) =>
           title: titleOf(open),
           icon: "mark-reply",
           subtitle: `Thread in ${nameOf(model)}`,
+          leading: paneBack(h, Message.ClickedAllThreads()),
           actions: [paneClose(h, Message.ClickedAllThreads())]
         },
         body: [h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open }))],

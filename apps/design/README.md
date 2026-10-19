@@ -42,7 +42,9 @@ as a plain row under its group and the second with its notices; and the icons by
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The shell's side pane sits beside the main pane from a window of 80rem; narrow
-the window to between 64rem and 80rem to see it float over a scrim. Open it to look at a piece
+the window to between 64rem and 80rem to see it float over a scrim. Below 64rem the sidebar leaves
+the frames, and below 48rem the rail with it and the side pane fills the frame; the frames pass the
+shell no menu, so the drawer is for the app to show. Open it to look at a piece
 before a page composes it. It follows the browser's light or dark preference. A browser tab that is
 hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. `bun
 run --filter @amends-dev/design build` bundles it, which CI builds too.
@@ -82,7 +84,8 @@ design, such as `bg-red-500` or `rounded-md`, does not exist. Spacing is Tailwin
 | Text scale  | `text-meta` 11/16, `hint` 12/18, `control` 13/20, `item` 14/21, `body` 15/23, `body-touch` 16/24, `title-touch` 17/24, `title` 18/27, `heading` 20/28, and `display` 28/36 |
 | Breakpoints | `tablet` 48rem, `desktop` 64rem, `split` 80rem                                                                                                                             |
 
-Below the desktop breakpoint is touch: controls grow to 44px, written `max-desktop:`. Below the
+Below the desktop breakpoint is touch: controls and the rows of the sidebar grow to 44px, and
+headers to 104px, written `max-desktop:`. Below the
 tablet breakpoint is a phone, where inputs use 16px text so the browser does not zoom the page,
 written `max-tablet:`.
 
@@ -135,7 +138,7 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
   that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
   textarea labelled Reply. It is 32px, and 44px on touch; `options.size` is `"compact"` for the 24px
-  button along a list's heading.
+  button along a list's heading, which is 44px on touch too.
 - `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
   such as the composer's send button.
 - `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
@@ -145,7 +148,7 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping
   onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
-  named by its label.
+  named by its label. On touch the switch and its label are each a 44px target.
 - `choiceSelect(h, { id, label, choices, value, onChange, attributes? }, options?)` is a select over
   `choices`, each a value and how the person reads it, in the input's look, with the `attributes` on
   the select as a field has them. With `options.isLabelHidden` the label is not shown above the
@@ -221,17 +224,42 @@ What a directory screen lists.
 
 The frame of the first four layout patterns, which the modules below fill.
 
-- `shell(h, { rail, sidebar, main, aside?, notices? })` puts the `rail` on the canvas, then one
-  `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is an `aside`, the
-  side pane at 440px. Each is what its module renders. The `notices`, a `toastStack`, come last in
-  the frame, over the card and the scrim. The frame is as tall as the viewport (`100dvh`, or
-  `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter
-  around the card. From 80rem the aside sits beside the main pane, a divider between them; from
-  64rem to there it floats over the right of the card with `shadow-popover`, above a `scrim` over
-  the rest of the shell. The floating pane does not trap focus, and Escape and a click on the scrim
-  close nothing: the pane's own close button is the way out. Below 64rem the shell is not designed
-  yet: it keeps the rail and sidebar in place, with no drawer, no touch sizes for the sidebar's rows,
-  and no full-screen pane, and the row overflows the window, scrolling sideways.
+- `shell(h, { rail, sidebar, main, aside?, notices?, menu?, isMenuOpen? })` puts the `rail` on the
+  canvas, then one `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is
+  an `aside`, the side pane at 440px. Each is what its module renders. The `notices`, a `toastStack`,
+  come last in the frame, over the card and the scrim. The frame is as tall as the viewport (`100dvh`,
+  or `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter
+  around the card. The layout follows the width of the window:
+
+  | Width       | Navigation                                                    | Side pane                                                      |
+  | ----------- | ------------------------------------------------------------- | -------------------------------------------------------------- |
+  | 80rem+      | Rail and sidebar in place                                     | Beside the main pane, a divider between them                   |
+  | 64 to 80rem | Rail and sidebar in place                                     | Floating over the right of the card, over a scrim              |
+  | 48 to 64rem | The rail stays; the menu button opens the sidebar as a drawer | Floating, as above                                             |
+  | below 48rem | The menu button opens the rail and sidebar together           | Full screen over the main pane, which keeps its state under it |
+
+  The floating pane has `shadow-popover` over a `scrim` that covers the rest of the shell, and the
+  pane's own close button is the way out of it. Below 48rem the frame has no gutter and no gap, so the
+  card is edge to edge, and its padding is the screen's safe-area insets (an app gets them with
+  `viewport-fit=cover` in its viewport meta); the side pane has no shadow or scrim, and `paneBack`
+  shows in its header in place of `paneClose`. Below 64rem the controls and pane headers have their
+  touch sizes (44px, and 104px for a header).
+
+  The drawer is the sidebar, and below 48rem the rail before it, moved out of the frame to `fixed`
+  positions at the start of the window, 264px wide for the sidebar with `shadow-modal`, and slid in
+  with a 150ms transition of `translate`. Each is one element the shell wraps, so the rail is not
+  rendered twice. While closed the drawer is `invisible`, so it takes no focus and is not read.
+  The `menu` is `{ onOpen, onClose }`: with it the shell draws the menu button, an `iconButton` named
+  Menu that sends `onOpen`, at the top start of the card over the main pane's header, hidden from
+  64rem; while `isMenuOpen`, it also draws a scrim, a button named Close menu that sends `onClose`,
+  over the rest of the window, and the drawer is in view. Without a `menu` the drawer stays shut, as
+  in the workshop's frames. The page owns whether the drawer is open, and closes it when a
+  destination is picked.
+
+  The drawer is driven by CSS from that flag alone. It does not yet trap focus, make the rest of
+  the window inert, or close on Escape, and neither does the floating pane; those come in a later
+  step. The widths are the window's, not the frame's, and the workshop's frames pass no `menu`, so
+  the workshop shows no drawer: resize the browser window around the app to see it.
 
 ### `@amends-dev/design/rail`
 
@@ -247,7 +275,8 @@ The frame of the first four layout patterns, which the modules below fill.
 
 - `sidebar(h, { label, header, children, footer? })` is a `nav` named by `label`, 264px on `panel`:
   the `header` above the `children`, which scroll, and the `footer` below them.
-- `sidebarHeader(h, { mark, name, actions?, search? })` is the 96px header, as tall as a pane's, with
+- `sidebarHeader(h, { mark, name, actions?, search? })` is the 96px header, 104px on touch, as tall as
+  a pane's, with
   a line under it: a 24px `mark` holding the `mark` letters, the workspace's `name`
   at body size in medium weight, `actions` at the right such as an `iconButton` that opens the
   workspace menu, and, when there is a `search`, `{ label, shortcut?, onClick }`, a full-width button
@@ -255,14 +284,15 @@ The frame of the first four layout patterns, which the modules below fill.
   assistive technology.
 - `sidebarSection(h, { label?, actions?, children })` is a group of items. A `label` is an `h2` in
   `meta` size, uppercase, in `ink-muted`, with icon-only `actions` at its right, such as compact
-  `iconButton`s; a group without one is the list alone, as a sidebar's first is. Sections sit 22px
-  apart. `children` are `sidebarItem`s or a `sidebarEmpty`.
+  `iconButton`s; on touch the heading is 44px tall, as they are. A group without a label is the list
+  alone, as a sidebar's first is. Sections sit 22px apart. `children` are `sidebarItem`s or a
+  `sidebarEmpty`.
 - `sidebarItem(h, { icon?, mark?, label, count?, isCurrent, onClick, children? })` is a 38px row,
-  one button: an `icon`, or a `mark` letter on a 20px `mark` square for a person, then the
+  44px on touch, one button: an `icon`, or a `mark` letter on a 20px `mark` square for a person, then the
   `label` in `ink-secondary` and a `count` in a badge at the end. The button is named by the label
   and described by the count. The current row is `aria-current="page"`, filled `selected`, in `ink`
   and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick? }`
-  rows under it at hint size, 32px, indented and joined to it by a dashed connector in `stitch`,
+  rows under it at hint size, 32px, 44px on touch, indented and joined to it by a dashed connector in `stitch`,
   such as a group's open thread. A row with an `onClick` is a button; one without is a plain row, a
   `span` with the same look and no hover, pointer, or focus ring, that says where the person is, and
   is `aria-current="page"` while it is current.
@@ -282,10 +312,12 @@ The third and fourth layout patterns share one structure.
   its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
   `h2` at body size, in medium weight. A `label` names the main landmark too.
 - The `header` is `{ title, icon?, mark?, context?, leading?, actions?, tabs?, subtitle? }`, 96px
-  tall on desktop so the main pane's, the side pane's, and the sidebar's line up: a 60px row, then
-  the `tabs` or a `subtitle`. In the row, `leading` is a control such as the button that opens the
-  sidebar, then the title with an `icon` or a `mark` letter before it and `context` after it in
-  `ink-secondary`, and `actions` at the right. The line under the header is drawn inside it, so the
+  tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
+  row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
+  spacing, such as `paneBack`, then the title with an `icon` or a `mark` letter before it and
+  `context` after it in `ink-secondary`, and `actions` at the right. The main pane's row starts 40px
+  further in below 64rem, for the shell's menu button over it; its tabs and subtitle keep the pane's
+  gutter, and the side pane's row is not moved. The line under the header is drawn inside it, so the
   current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`.
 - `paneTabs(h, { label, tabs })` is a `tablist` named by `label` of `{ label, count?, isCurrent,
 onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
@@ -302,7 +334,10 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
   its title: the title as an `h3` at item size in medium weight, with the `trailing` pieces after it on
   the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart.
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
-  header's `actions`.
+  header's `actions`. It shows from 48rem; below that the side pane is full screen and has `paneBack`.
+- `paneBack(h, onClick)` is the side pane's Back button, an `iconButton` named Back, for the header's
+  `leading`, pulled to the pane's edge. It shows below 48rem only. Page code gives the two the same
+  message, so each way out of the side pane does the same.
 
 ### `@amends-dev/design/details`
 

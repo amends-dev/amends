@@ -14,16 +14,17 @@ const sidebarBody = "flex min-h-0 flex-1 flex-col gap-5.5 overflow-y-auto oversc
 
 const sectionsColumn = "flex flex-none flex-col gap-5.5"
 
-const headerColumn = "flex min-h-24 flex-none flex-col gap-3.5 border-b border-divider px-4.5 pt-4.25 pb-1.75"
+const headerColumn =
+  "flex min-h-24 flex-none flex-col gap-3.5 border-b border-divider px-4.5 pt-4.25 pb-1.75 max-desktop:min-h-26"
 
-const headerRow = "flex h-7 items-center gap-2.5"
+const headerRow = "flex h-7 items-center gap-2.5 max-desktop:h-11"
 
 const workspaceName = "min-w-0 flex-1 truncate text-body font-medium text-ink"
 
 const headerActions = "flex flex-none items-center gap-1"
 
 const searchButton =
-  "flex h-7.5 w-full cursor-pointer items-center gap-2 bg-search px-2.5 text-start text-control text-ink-muted focus-ring hover:text-ink-secondary"
+  "flex h-7.5 w-full cursor-pointer items-center gap-2 bg-search px-2.5 text-start text-control text-ink-muted focus-ring hover:text-ink-secondary max-desktop:h-11"
 
 const searchLabel = "min-w-0 flex-1 truncate"
 
@@ -31,7 +32,7 @@ const searchShortcut = "flex-none text-meta"
 
 const sectionColumn = "flex flex-none flex-col gap-1.5"
 
-const sectionHeading = "flex h-7 items-center gap-1 ps-2"
+const sectionHeading = "flex h-7 items-center gap-1 ps-2 max-desktop:h-11"
 
 const sectionLabel = "min-w-0 flex-1 truncate text-meta font-medium text-ink-muted uppercase"
 
@@ -40,7 +41,7 @@ const sectionActions = "flex flex-none items-center gap-1"
 const itemList = "m-0 flex list-none flex-col gap-1 p-0"
 
 const itemRow =
-  "relative flex h-9.5 w-full cursor-pointer items-center gap-2.5 bg-transparent px-3 text-start text-item text-ink-secondary focus-ring-inset hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium aria-[current=page]:text-ink aria-[current=page]:indicator-bar"
+  "relative flex h-9.5 w-full cursor-pointer items-center gap-2.5 bg-transparent px-3 text-start text-item text-ink-secondary focus-ring-inset hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium aria-[current=page]:text-ink aria-[current=page]:indicator-bar max-desktop:h-11"
 
 const itemIcon = "flex flex-none text-ink-secondary"
 
@@ -54,13 +55,13 @@ const subItemList = "m-0 mt-1 flex list-none flex-col gap-1 p-0"
 const subItemColumn = "ms-9.25"
 
 const subItemLook =
-  "relative flex h-8 w-full items-center gap-2 bg-transparent px-2 text-start text-hint text-ink-secondary aria-[current=page]:bg-selected aria-[current=page]:text-ink aria-[current=page]:indicator-bar"
+  "relative flex h-8 w-full items-center gap-2 bg-transparent px-2 text-start text-hint text-ink-secondary aria-[current=page]:bg-selected aria-[current=page]:text-ink aria-[current=page]:indicator-bar max-desktop:h-11"
 
 const subItemButton = `${subItemLook} cursor-pointer focus-ring-inset hover:bg-hover`
 
 const subItemConnector = "pointer-events-none absolute -start-4.75 -top-1 h-[calc(50%+0.28125rem)] w-4.5 text-stitch"
 
-const emptyLine = "flex min-h-9.5 items-center px-3 text-control text-ink-muted"
+const emptyLine = "flex min-h-9.5 items-center px-3 text-control text-ink-muted max-desktop:min-h-11"
 
 const footerBar = "flex-none border-t border-divider p-3"
 

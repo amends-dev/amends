@@ -11,11 +11,17 @@ import { mark } from "./mark.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
 
-const headerBand = "flex min-h-24 flex-none flex-col px-6 shadow-[inset_0_-1px_0_var(--amends-divider)]"
+const headerBand =
+  "flex min-h-24 flex-none flex-col px-6 shadow-[inset_0_-1px_0_var(--amends-divider)] max-desktop:min-h-26"
 
-const titleRow = "flex h-15 flex-none items-center"
+const titleRows = {
+  main: "flex h-15 flex-none items-center max-desktop:ps-10",
+  side: "flex h-15 flex-none items-center"
+}
 
-const leadingSlot = "-ms-4 me-2 flex flex-none items-center"
+const backSlot = "-ms-4 me-2 flex flex-none items-center tablet:hidden"
+
+const closeSlot = "flex flex-none items-center max-tablet:hidden"
 
 const titleBlock = "flex min-w-0 flex-1 items-center gap-3"
 
@@ -71,7 +77,7 @@ export type PaneHeader = Readonly<{
   mark?: string
   /** A quieter word after the title, such as where it is. */
   context?: string
-  /** A control before the title, such as the button that opens the sidebar. */
+  /** A control before the title that brings its own spacing, such as `paneBack`. */
   leading?: Html
   /** Controls at the right, such as `iconButton`s, a `button`, and `paneClose`. */
   actions?: ReadonlyArray<Html>
@@ -129,12 +135,8 @@ const renderHeader = <Message, Requirements>(
     [h.Class(headerBand)],
     [
       h.div(
-        [h.Class(titleRow)],
-        [
-          header.leading === undefined ? h.empty : h.div([h.Class(leadingSlot)], [header.leading]),
-          renderTitle(h, variant, header),
-          h.div([h.Class(actionsRow)], header.actions ?? [])
-        ]
+        [h.Class(titleRows[variant])],
+        [header.leading ?? h.empty, renderTitle(h, variant, header), h.div([h.Class(actionsRow)], header.actions ?? [])]
       ),
       header.tabs === undefined ? h.empty : h.div([h.Class(tabsSlot)], [header.tabs]),
       header.tabs === undefined && header.subtitle !== undefined
@@ -145,7 +147,8 @@ const renderHeader = <Message, Requirements>(
 
 /**
  * The main content, the page's `main` landmark, or the side panel, an `aside` named by `label`: the
- * `header` (96px, so the two line up and the sidebar's header beside them), the `body` that scrolls,
+ * `header` (96px, 104px below 64rem, so the two line up and the sidebar's header beside them; the main
+ * pane's title starts after the shell's menu button there), the `body` that scrolls,
  * and the `footer`, such as the composer, that stays in place under it. The main title is an `h1` at
  * title size, the side title an `h2` at body size; a `label` also names the main landmark.
  */
@@ -246,6 +249,16 @@ export const paneSection = <Message, Requirements>(
     ]
   )
 
-/** The side panel's close button, named Close, for the header's `actions`. */
+/**
+ * The side panel's close button, named Close, for the header's `actions`. It shows from 48rem; below that the
+ * side panel is full screen and `paneBack` is its way out.
+ */
 export const paneClose = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, onClick: Message): Html =>
-  iconButton(h, { icon: "mark-close", label: "Close", onClick })
+  h.span([h.Class(closeSlot)], [iconButton(h, { icon: "mark-close", label: "Close", onClick })])
+
+/**
+ * The side panel's Back button, named Back, for the header's `leading`. It shows below 48rem, where the side
+ * panel is full screen over the main pane, and sends the same message as `paneClose` does.
+ */
+export const paneBack = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, onClick: Message): Html =>
+  h.span([h.Class(backSlot)], [iconButton(h, { icon: "mark-back", label: "Back", onClick })])
