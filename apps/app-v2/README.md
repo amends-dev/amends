@@ -52,6 +52,10 @@ the pages that compose them; the root composes the pages.
   and delete their own messages, and follow it or stop; reading it marks it read through its latest
   activity, once for each. The reply composer's changes say the person types, at once, then at most
   as often as typing lasts, by core's `Presence.typingRepeats`, and sending says they stopped.
+- `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
+  changes from what they saw, when they may, assigning an agent only when they may use it; or,
+  while the thread tracks none, making it one, when they may create tasks in its group. The thread
+  embeds it.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
   being started, and how much is new, and a composer to start one. It reports the thread picked.
 - `feature/group`: a group as the person has it open: its name, their part in it, a team's members,
@@ -168,7 +172,8 @@ browser's storage. Each Block's tests sit beside it:
 
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
-  is written and stopped once it is sent, and why a write could not be kept; a thread started from
+  is written and stopped once it is sent, and why a write could not be kept; a task made and changed
+  from what was seen, unless nothing changes; a thread started from
   the composer and the thread picked; a composer filling in its draft only while nothing was written,
   keeping what is written, and sending it once; a group renamed from the name seen, followed, left,
   or joined, a member admitted and an admission removed, and the thread picked opened and closed;
@@ -176,7 +181,8 @@ browser's storage. Each Block's tests sit beside it:
   opening the group picked; and the root signing in a step at a time, listing the workspaces,
   opening and closing one, and signing out.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
-  on its way, who types, and a reply written and sent; a group's name, the person's part in it,
+  on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
+  line by someone who may not, and made by someone who may create tasks; a group's name, the person's part in it,
   its members with removing for the others, and joining in place of the threads of a team they do
   not belong to; and the groups listed apart from the teams to join, with a new team taken only
   from someone who may create one.

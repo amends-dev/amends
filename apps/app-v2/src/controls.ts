@@ -1,7 +1,7 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: labelled inputs and
- * boxes, buttons, a choice of a member, a yes-or-no switch, why an entry was refused, and that an
- * action is on its way. Each renders with the caller's builder and messages.
+ * boxes, buttons, a choice of a member or of a list, a yes-or-no switch, why an entry was refused,
+ * and that an action is on its way. Each renders with the caller's builder and messages.
  */
 
 import type { Member } from "@amends-dev/core/workspace"
@@ -110,6 +110,37 @@ export const memberSelect = <Message, Requirements>(
               h.option([h.Value("")], [config.none]),
               ...config.members.map((member) => h.option([h.Value(member.id)], [member.name]))
             ])
+          ]
+        )
+    },
+    h
+  )
+
+/** A choice of one of `choices`, each a value and how the person reads it. */
+export const choiceSelect = <Choice extends string, Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    id: string
+    label: string
+    choices: ReadonlyArray<readonly [Choice, string]>
+    value: Choice
+    onChange: (value: Choice) => Message
+  }>
+) =>
+  Select.view(
+    {
+      id: config.id,
+      value: config.value,
+      onChange: (value) => config.onChange(config.choices.find(([choice]) => choice === value)?.[0] ?? config.value),
+      toView: (attributes) =>
+        h.div(
+          [],
+          [
+            h.label(attributes.label, [config.label]),
+            h.select(
+              attributes.select,
+              config.choices.map(([choice, label]) => h.option([h.Value(choice)], [label]))
+            )
           ]
         )
     },

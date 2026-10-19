@@ -1,18 +1,9 @@
-import type { Task } from "@amends-dev/core/task"
 import * as Button from "@foldkit/ui/button"
 import * as Option from "effect/Option"
 import { errorView, sending } from "../../controls.ts"
+import { statusLabel } from "../../seen.ts"
 import { ComposerBinding, ThreadsComposition } from "./composition.ts"
 import { labelOf, Message } from "./definition.ts"
-
-const statusLabels: Readonly<Record<Task.Status, string>> = {
-  triage: "Triage",
-  todo: "To do",
-  doing: "Doing",
-  held: "Held",
-  done: "Done",
-  dismissed: "Dismissed"
-}
 
 /** The group's threads, and the composer to start one. */
 export const view = ThreadsComposition.makeView((model, h) =>
@@ -38,7 +29,7 @@ export const view = ThreadsComposition.makeView((model, h) =>
                   ),
                   Option.match(item.task, {
                     onNone: () => h.empty,
-                    onSome: (task) => h.span([], [` · ${statusLabels[task.status]}`])
+                    onSome: (task) => h.span([], [` · ${statusLabel[task.status]}`])
                   }),
                   sending(item.pending, h),
                   item.unread > 0 ? h.span([], [` · ${item.unread} new`]) : h.empty

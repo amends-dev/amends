@@ -6,7 +6,8 @@
 
 import { Grant, type Permission, Requirement, Target } from "@amends-dev/core/authorization"
 import type { GroupId } from "@amends-dev/core/group"
-import type { WorkspaceId } from "@amends-dev/core/workspace"
+import type { ThreadId } from "@amends-dev/core/thread"
+import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 
 /** Whether `grants` hold `permission` on `target`. */
 export const may = <K extends Target.Kind>(
@@ -22,3 +23,11 @@ export const workspaceTarget = (workspaceId: WorkspaceId.WorkspaceId) =>
 /** The group `groupId` as a target of the permissions that act on it. */
 export const groupTarget = (workspaceId: WorkspaceId.WorkspaceId, groupId: GroupId.GroupId) =>
   Target.Reference.cases.Group.make({ workspaceId, groupId })
+
+/** The thread `threadId` as a target of the permissions that act on it. */
+export const threadTarget = (workspaceId: WorkspaceId.WorkspaceId, threadId: ThreadId.ThreadId) =>
+  Target.Reference.cases.Thread.make({ workspaceId, threadId })
+
+/** The member `memberId` as a target of the permissions that act on them. */
+export const memberTarget = (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) =>
+  Target.Reference.cases.Member.make({ workspaceId, memberId })

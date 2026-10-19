@@ -2,6 +2,7 @@ import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
+import { TaskBlock } from "../task/block.ts"
 import { PostReply, TellTyping } from "./command.ts"
 import { type Model, ThreadDefinition } from "./definition.ts"
 
@@ -40,5 +41,10 @@ export const ReplyBinding = ThreadDefinition.bindChild(ComposerBlock, {
   outMessage: { fold: foldReplyOutMessage }
 })
 
-export const ThreadComposition = ThreadDefinition.makeComposition({ bindings: [ReplyBinding] })
+export const TaskBinding = ThreadDefinition.bindChild(TaskBlock, {
+  field: "task",
+  init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] }
+})
+
+export const ThreadComposition = ThreadDefinition.makeComposition({ bindings: [ReplyBinding, TaskBinding] })
 export type ThreadViewBuilder = Block.ViewBuilderFor<typeof ThreadComposition>

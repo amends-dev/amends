@@ -1,9 +1,10 @@
 /**
- * What the person sees of the workspace's records: what a member and a group are called, and
- * whether anyone may join a group.
+ * What the person sees of the workspace's records: what a member and a group are called, whether
+ * anyone may join a group, and how a task's status and priority read.
  */
 
 import type { Group } from "@amends-dev/core/group"
+import type { Task } from "@amends-dev/core/task"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 
 /** `memberId` by their name among `members`, or their ID until names are read. */
@@ -25,3 +26,22 @@ export const groupName = (
 
 /** Whether anyone in the workspace may join `group`: a public team. */
 export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"
+
+/** A task's status, as the person reads it. */
+export const statusLabel: Readonly<Record<Task.Status, string>> = {
+  triage: "Triage",
+  todo: "To do",
+  doing: "Doing",
+  held: "Held",
+  done: "Done",
+  dismissed: "Dismissed"
+}
+
+/** A task's priority, as the person reads it. */
+export const priorityLabel: Readonly<Record<Task.Priority, string>> = {
+  none: "No priority",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent"
+}
