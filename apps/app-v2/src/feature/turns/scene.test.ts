@@ -136,8 +136,9 @@ describe("a thread's turns", () => {
       given(opened([itemOf(running)])),
       expect(role("list", { name: "Log" })).toBeAbsent(),
       click(role("button", { name: "Show log" })),
+      // While it opens the log has nothing to list, so its hint stands alone, with no empty box under it.
       expect(text("Opening the log…")).toExist(),
-      expect(role("list", { name: "Log" })).toExist(),
+      expect(role("list", { name: "Log" })).toBeAbsent(),
       Subscription.emit(
         subscriptions.log,
         Message.ReceivedLog({

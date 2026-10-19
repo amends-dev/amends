@@ -74,8 +74,8 @@ quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit w
 host answers. Adding is the secondary button among the header's actions, shown only when the person
 may, the host's integrations are listed, and a connection gives what the thing needs; the line
 that says the integrations are loading, or that no connection gives models or channels, is a
-`hint` in the body, and a failure to list them a `notice` with a quiet Try again. Each connection is
-an entry of its name, its integration and how ready it is as `badge`s, a hint of why it can't be
+`hint` in the body, and a failure to list them a `notice` over a quiet Try again in a `column`. Each
+connection is an entry of its name, its integration and how ready it is as `badge`s, a hint of why it can't be
 used, what its last check found, and its quiet buttons; each agent an entry of its initials and
 name, a badge of whether it can run, a hint of why not and of what it runs on, and its quiet
 buttons; each channel an entry of its name, a badge when it opens tasks, a hint of where its
@@ -126,7 +126,8 @@ the pages that compose them; the root composes the pages.
   that says how the turn stands (queued and stopped are neutral, running and stopping cautious,
   completed a success, failed a danger), with who ran it again and "Sending…" after it, then why it
   failed, the buttons Stop, Run again, and Show log or Hide log, and, while the log is shown, the log
-  as a list with where following it stands under it. A thread with no turns shows only why they could
+  as a list, once it has items, with where following it stands under it; a log still opening shows
+  that alone. A thread with no turns shows only why they could
   not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
   being started, and how much is new, and a composer to start one. It reports the thread picked. It

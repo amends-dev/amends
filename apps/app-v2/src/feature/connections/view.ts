@@ -4,6 +4,7 @@ import {
   button,
   buttonRow,
   choiceSelect,
+  column,
   field,
   hint,
   notice,
@@ -251,13 +252,10 @@ const integrationsView = (model: Model, h: ConnectionsViewBuilder): Html =>
     Loading: () => hint(h, "Loading the integrations…"),
     Loaded: () => h.empty,
     Failed: ({ error }) =>
-      h.div(
-        [],
-        [
-          notice(h, Option.some(error)),
-          buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
-        ]
-      )
+      column(h, [
+        notice(h, Option.some(error)),
+        buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
+      ])
   })
 
 /** Adding a connection, for a person who may, once the host listed its integrations, until a form opens. */

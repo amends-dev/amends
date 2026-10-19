@@ -7,6 +7,7 @@ import {
   button,
   buttonRow,
   choiceSelect,
+  column,
   field,
   fieldGrid,
   hint,
@@ -455,7 +456,22 @@ const noticeGroup = (h: ApplicationViewBuilder): Html =>
       ],
       sampleStack
     ),
-    sample(h, "Sending", [h.p([], ["Rename workspace", sending(h, true)])])
+    sample(h, "Sending", [h.p([], ["Rename workspace", sending(h, true)])]),
+    sample(
+      h,
+      "Column: a notice over a button, and over a Try again row",
+      [
+        column(h, [
+          notice(h, Option.some("You may not change this task.")),
+          button(h, "Make it a task", Message.ClickedButton())
+        ]),
+        column(h, [
+          notice(h, Option.some("The host could not be reached. Try again.")),
+          buttonRow(h, [button(h, "Try again", Message.ClickedButton(), { variant: "quiet" })])
+        ])
+      ],
+      sampleStack
+    )
   ])
 
 const emailScreen = (h: ApplicationViewBuilder, signInEmail: string): Html =>

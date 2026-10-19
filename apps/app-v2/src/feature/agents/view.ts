@@ -3,6 +3,7 @@ import {
   button,
   buttonRow,
   choiceSelect,
+  column,
   field,
   hint,
   notice,
@@ -211,13 +212,10 @@ const integrationsView = (model: Model, h: AgentsViewBuilder): Html =>
   Integrations.match(model.integrations, {
     Loading: () => hint(h, "Loading the integrations…"),
     Failed: ({ error }) =>
-      h.div(
-        [],
-        [
-          notice(h, Option.some(error)),
-          buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
-        ]
-      ),
+      column(h, [
+        notice(h, Option.some(error)),
+        buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
+      ]),
     Loaded: () =>
       connectionsGiving(model, "models").length === 0
         ? hint(h, "An agent needs a connection that gives models.")

@@ -1,5 +1,5 @@
 import { Task, TaskPermissions } from "@amends-dev/core/task"
-import { button, choiceSelect, fieldGrid, notice, sending } from "@amends-dev/design/control"
+import { button, choiceSelect, column, fieldGrid, notice, sending } from "@amends-dev/design/control"
 import { detailList } from "@amends-dev/design/details"
 import { paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
@@ -62,13 +62,10 @@ export const view = TaskComposition.makeView((model, h) =>
         onNone: () => h.empty,
         onSome: (groupId) =>
           may(model.grants, TaskPermissions.Create, groupTarget(model.workspaceId, groupId))
-            ? h.div(
-                [],
-                [
-                  notice(h, model.notice),
-                  button(h, "Make it a task", Message.ClickedMakeTask(), { variant: "secondary" })
-                ]
-              )
+            ? column(h, [
+                notice(h, model.notice),
+                button(h, "Make it a task", Message.ClickedMakeTask(), { variant: "secondary" })
+              ])
             : h.empty
       })
   })

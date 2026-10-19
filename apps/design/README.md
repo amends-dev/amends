@@ -23,7 +23,7 @@ buttons by variant, disabled, large, and wide, with the link in a sentence; a fi
 placeholder, filled, invalid, and with a hint under it; a hint; a textarea; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
 field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
-tones; `sending`; a form with its inline text and a value with its link, and setting rows with an
+tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows; the centered screen as the
 sign-in's two steps and as the workspace picker; the toast alone, with a detail, and as a stack of
@@ -152,6 +152,8 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   already give it its behavior, as `buttonWith` is for `button`.
 - `buttonRow(h, children)` is a row of controls with an 8px gap, wrapping onto a new line when they do
   not fit, such as a thread's Follow and Rename or a form's Save and Cancel.
+- `column(h, children)` is a few pieces that belong together inside a section, one under another and
+  12px apart, such as a notice over the button that answers it, or over a Try again row.
 - `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping
   onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is

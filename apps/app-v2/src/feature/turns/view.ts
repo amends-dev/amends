@@ -40,7 +40,7 @@ const logStateView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html
 
 /** A turn's log as the person follows it: what its agent was given, what it wrote, and where it stopped short. */
 const logView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html> => [
-  log(h, { label: "Log", items: turnLog.items.map(logItemText) }),
+  ...(turnLog.items.length === 0 ? [] : [log(h, { label: "Log", items: turnLog.items.map(logItemText) })]),
   ...logStateView(turnLog, h)
 ]
 

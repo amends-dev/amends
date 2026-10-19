@@ -1,8 +1,9 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row
  * they lie in, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a
- * list, a line of hint, why an entry was refused, and that an action is on its way. Each renders with
- * the caller's builder and messages, and carries the look.
+ * list, a line of hint, why an entry was refused, that an action is on its way, and the column that
+ * holds a few of these together. Each renders with the caller's builder and messages, and carries the
+ * look.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -51,6 +52,8 @@ const iconButtonSizes = {
 const buttonRowLook = "flex flex-wrap items-center gap-2"
 
 const fieldColumn = "flex flex-col gap-2"
+
+const columnLook = "flex flex-col gap-3"
 
 const fieldGridLook = "grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3"
 
@@ -235,6 +238,12 @@ export const buttonRow = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   children: ReadonlyArray<Html>
 ): Html => h.div([h.Class(buttonRowLook)], children)
+
+/** A few pieces that belong together inside a section, one under another, 12px apart, such as a notice and its button. */
+export const column = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  children: ReadonlyArray<Html>
+): Html => h.div([h.Class(columnLook)], children)
 
 /** Fields side by side in columns at least 9rem wide, 12px apart, wrapping onto new rows when they do not fit. */
 export const fieldGrid = <Message, Requirements>(

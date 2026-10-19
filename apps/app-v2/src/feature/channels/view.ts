@@ -3,6 +3,7 @@ import {
   button,
   buttonRow,
   choiceSelect,
+  column,
   field,
   hint,
   notice,
@@ -102,13 +103,10 @@ const integrationsView = (model: Model, h: ChannelsViewBuilder): Html =>
         ? hint(h, "A channel needs a connection that gives channels.")
         : h.empty,
     Failed: ({ error }) =>
-      h.div(
-        [],
-        [
-          notice(h, Option.some(error)),
-          buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
-        ]
-      )
+      column(h, [
+        notice(h, Option.some(error)),
+        buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
+      ])
   })
 
 /** The workspace's channels, the form open among them, and adding one, for a person who may. */

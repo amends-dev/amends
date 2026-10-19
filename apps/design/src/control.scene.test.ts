@@ -9,6 +9,7 @@ import {
   button,
   buttonRow,
   choiceSelect,
+  column,
   field,
   fieldGrid,
   hint,
@@ -538,6 +539,29 @@ describe("buttonRow", () => {
       click(role("button", { name: "Rename" })),
       click(role("button", { name: "Rename" })),
       expect(role("status")).toHaveText("Saved 1, removed 2, submitted 0")
+    )
+  })
+})
+
+describe("column", () => {
+  it("holds a notice over a button, a few pieces 12px apart, each one working", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          column(h, [
+            notice(h, Option.some("The host could not be reached. Try again.")),
+            buttonRow(h, [button(h, "Try again", Message.ClickedSave(), { variant: "quiet" })])
+          ])
+        ])
+      },
+      given(initial),
+      expect(selector(".flex-col.gap-3")).toExist(),
+      expect(within(selector(".flex-col.gap-3"), role("alert"))).toHaveText(
+        "The host could not be reached. Try again."
+      ),
+      click(within(selector(".flex-col.gap-3"), role("button", { name: "Try again" }))),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
     )
   })
 })
