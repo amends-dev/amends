@@ -216,6 +216,8 @@ describe("a group's main pane", () => {
                   thread: { ...thread, groupId: design.id },
                   opening: Option.some(opening),
                   task: Option.none(),
+                  replies: 0,
+                  repliers: [],
                   pending: false,
                   unread: 0
                 }
@@ -234,6 +236,8 @@ describe("a group's main pane", () => {
       thread: { ...thread, id: ThreadId.ThreadId.make(id), groupId: design.id },
       opening: Option.some(openingMessage),
       task: Option.none(),
+      replies: 0,
+      repliers: [],
       pending: false,
       unread: 0
     })

@@ -1,11 +1,11 @@
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
 import { hint, notice } from "@amends-dev/design/control"
-import { divider, message, messageList } from "@amends-dev/design/message"
+import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { authorName, initials, statusLabel, threadLabel, whenLabel } from "../../seen.ts"
+import { authorName, initials, repliesLabel, statusLabel, threadLabel, whenLabel } from "../../seen.ts"
 import { ComposerBinding, ThreadsComposition, type ThreadsViewBuilder } from "./composition.ts"
 import { byDay, Message, type ThreadItem } from "./definition.ts"
 
@@ -20,12 +20,30 @@ export type ViewInputs = Readonly<{
   now: DateTime.Utc
 }>
 
-/** A thread as a message: its opening's author and when, its title or opening, and what is new in it. */
+/** The line under a thread's row that says who replied and how many replies there are, or nothing while it has none. */
+const replyMeta = (
+  item: ThreadItem,
+  members: ReadonlyArray<Member.Member>,
+  h: ThreadsViewBuilder
+): ReadonlyArray<Html> =>
+  item.replies === 0
+    ? []
+    : [
+        replyLine(h, {
+          marks: item.repliers.map((author) => initials(authorName(author, members, []))),
+          label: repliesLabel(item.replies)
+        })
+      ]
+
+/**
+ * A thread as a message: its opening's author and when, its title or opening, who replied and how many times, and
+ * what is new in it.
+ */
 const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs, h: ThreadsViewBuilder): Html => {
   const author = Option.match(item.opening, {
     onNone: () => ({ name: "A thread", mark: "?", time: undefined }),
     onSome: (opening) => {
-      const name = authorName(opening, members, [])
+      const name = authorName(opening.author, members, [])
       return { name, mark: initials(name), time: whenLabel(opening.publishedAt, now) }
     }
   })
@@ -40,6 +58,7 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
     onOpen: Message.ClickedThread({ threadId: item.thread.id }),
     isCurrent: Option.exists(openThreadId, (threadId) => threadId === item.thread.id),
     meta: [
+      ...replyMeta(item, members, h),
       ...(item.unread > 0 ? [h.span([], [`${item.unread} new`])] : []),
       ...Option.toArray(Option.map(item.task, (task) => h.span([], [statusLabel[task.status]])))
     ]

@@ -6,7 +6,7 @@ import { paneColumn } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { authorName, initials, messageText, whenLabel } from "../../seen.ts"
+import { authorName, initials, messageText, repliesLabel, whenLabel } from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, typingIn } from "./definition.ts"
 
@@ -78,7 +78,7 @@ const messageView = (
     { Text: ({ editedAt }) => editedAt !== null },
     () => false
   )
-  const author = authorName(item, model.members, model.contacts)
+  const author = authorName(item.author, model.members, model.contacts)
 
   return message(h, {
     key: item.id,
@@ -108,13 +108,12 @@ const messageView = (
 /** The opening message, then, when there are replies, how many, and the replies. */
 const messagesView = (model: Model, now: DateTime.Utc, h: ThreadViewBuilder): Html => {
   const [opening, ...replies] = model.messages
-  const heading = `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`
 
   return messageList(h, {
     label: "Messages",
     children: [
       ...(opening === undefined ? [] : [messageView(opening, model, now, h)]),
-      ...(replies.length === 0 ? [] : [divider(h, heading, { align: "start" })]),
+      ...(replies.length === 0 ? [] : [divider(h, repliesLabel(replies.length), { align: "start" })]),
       ...replies.map((reply) => messageView(reply, model, now, h))
     ]
   })

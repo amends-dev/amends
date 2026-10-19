@@ -1,7 +1,7 @@
 /**
  * A group's threads, as the person lists them under the days they opened on: each with its opening
- * message, the task it tracks, and how much of it is new, and a composer to start one. It reports the
- * thread the person picks.
+ * message, who replied to it, the task it tracks, and how much of it is new, and a composer to start one.
+ * It reports the thread the person picks.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -18,11 +18,16 @@ import { defineMessageUnion } from "foldkit/message"
 import { dayLabel, dayOf } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
-/** A thread of the group, with its opening message, its task, whether it is still being started, and how much is unread. */
+/**
+ * A thread of the group, with its opening message, its task, how many messages follow the opening and who wrote
+ * them, whether it is still being started, and how much is unread.
+ */
 export const ThreadItem = Schema.Struct({
   thread: Thread.Thread,
   opening: Schema.Option(ThreadMessage.ThreadMessage),
   task: Schema.Option(Task.Task),
+  replies: Schema.Int,
+  repliers: Schema.Array(ThreadMessage.Author),
   pending: Schema.Boolean,
   unread: Schema.Int
 })

@@ -34,7 +34,8 @@ list, the four badge tones, entries with and without marks, with trailing badges
 a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
-actions, and meta, with a context line under the author and a quiet action, with a form in place of
+actions, and meta, with the replies under a row as one reply, three people, and more people than the
+line shows, with a context line under the author and a quiet action, with a form in place of
 the text, and set apart by dividers, centered and at the start, and notifications under the days
 Today and Yesterday, unread with a dot and a quiet action and read; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
@@ -200,10 +201,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 
 - `mark(h, { text, size? })` is the square that stands for a person, a workspace, or an agent: the
   `text` letters in capitals on `avatar-neutral`. `size` is `"xs"` (20px, 9px text, as a sidebar row
-  shows a person), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a pane's title
+  shows a person and a reply line those who replied), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a pane's title
   show it), or `"md"` (32px, `hint` text, as a message shows its author). A mark is `aria-hidden`: the
-  name it abbreviates is always beside it. `sidebarHeader`, `sidebarItem`, `pane`, and `message` draw
-  their marks with it.
+  name it abbreviates is always beside it. `sidebarHeader`, `sidebarItem`, `pane`, `message`, and
+  `replyLine` draw their marks with it.
 
 ### `@amends-dev/design/centered`
 
@@ -444,7 +445,7 @@ What a conversation is made of.
   `text` is at body size; with `onOpen` it is a button named by the
   text that sends `onOpen`, aligned to the start, underlined on hover, for a message that is the start
   of a thread, and `body` takes its place, such as the form that edits it. `meta` is a row of quiet
-  facts under the text at hint size, such as "2 new" and a task's status. `isCurrent` fills the row
+  facts under the text at hint size, such as a `replyLine`, "2 new", and a task's status. `isCurrent` fills the row
   with `selected`, draws the `indicator-bar` at its start as the sidebar's current row has, and makes it
   `aria-current="true"`. A row has 10px of space above and below and reaches 12px into the pane's
   gutter, so the fill of the current row reaches past the text.
@@ -463,6 +464,13 @@ What a conversation is made of.
   named by the author and the activity together, "Sara mentioned you", by an `aria-label`, with the
   text as its `aria-description`: the first line is where the row says what it is, and the text is what
   it says. The row has `message`'s spacing and reach into the pane's gutter, and no current state.
+- `replyLine(h, { marks, label })` is what the first message of a thread shows in its `meta`, under its
+  text: a short tree line that hangs from the row's mark, 12px by 12px with a border at its start and
+  its bottom in `outline`, then the `marks`, the letters of those who replied, as `xs` marks overlapping
+  by 4px, the first on top so that its letters stay whole, each with a 1px `outline` ring so that the
+  ones that overlap stay apart, up to three and then "+N" for the rest, then the `label`, such as
+  "4 replies", at `meta` size in `ink-muted`. The tree line, the marks, and the "+N" are hidden from
+  assistive technology, since the label says what the line is.
 - `divider(h, label, options?)` is an item of the list with a dashed `stitch` rule and the `label` in
   capitals at `meta` size in `ink-muted`: `options.align` is `"center"` (the default), the label between
   two rules, as a day sets apart the messages after it, or `"start"`, the label before one rule that
@@ -561,8 +569,9 @@ context, description, tabs, and footer, the control given `initialFocus` by its 
 Cancel by closing the dialog without sending the form; a message by
 its text button, `aria-current`, its note, context, actions, meta, and body, a notification by its
 text button named by its author and activity and described by its text, its place, age, and actions,
-and an unread one by its dot, hidden from assistive technology, and its "Unread", and a divider by its
-label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
+and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
+label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
+and a divider by its label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the

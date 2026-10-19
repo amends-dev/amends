@@ -166,7 +166,7 @@ export const notificationReason = (item: InboxItem, memberId: MemberId.MemberId)
 /** Who wrote the message a notification's activity is about, with their letters, while the store holds it. */
 const notificationAuthor = (item: InboxItem, model: Model): Option.Option<Readonly<{ name: string; mark: string }>> =>
   Option.map(item.message, (message) => {
-    const name = authorName(message, model.members, model.contacts)
+    const name = authorName(message.author, model.members, model.contacts)
     return { name, mark: initials(name) }
   })
 

@@ -1,5 +1,5 @@
 import { GrantResolver } from "@amends-dev/core/authorization"
-import { ThreadId } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
@@ -114,7 +114,15 @@ const withConversation = modifyFields(withThread, {
               threads: (threads) =>
                 modifyFields(threads, {
                   threads: () => [
-                    { thread, opening: Option.some(opening), task: Option.none(), pending: false, unread: 0 }
+                    {
+                      thread,
+                      opening: Option.some(opening),
+                      task: Option.none(),
+                      replies: 1,
+                      repliers: [ThreadMessage.Author.cases.Member.make({ memberId: bob.id })],
+                      pending: false,
+                      unread: 0
+                    }
                   ]
                 }),
               thread: Option.map((openThread) => ({
@@ -700,6 +708,7 @@ describe("a workspace", () => {
         role("main", { name: "General" }),
         expect(within(role("list", { name: "Threads" }), text("Today"))).toExist(),
         expect(within(role("list", { name: "Threads" }), text("Alice"))).toExist(),
+        expect(within(role("list", { name: "Threads" }), text("1 reply"))).toExist(),
         expect(within(role("list", { name: "Threads" }), text(timeOf(opening.publishedAt)))).toExist(),
         expect(role("button", { name: "Plans for the week" })).toExist(),
         expect(role("form", { name: "Start a thread" })).toExist(),

@@ -23,7 +23,7 @@ import { row, section } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
-import { divider, message, messageList, notification } from "../src/message.ts"
+import { divider, message, messageList, notification, replyLine } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
@@ -686,7 +686,14 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
   ])
 
 const openableThreads: ReadonlyArray<
-  Readonly<{ key: string; mark: string; author: string; time: string; text: string; replies?: string }>
+  Readonly<{
+    key: string
+    mark: string
+    author: string
+    time: string
+    text: string
+    replies?: Readonly<{ marks: ReadonlyArray<string>; label: string }>
+  }>
 > = [
   {
     key: "preview-ready",
@@ -702,7 +709,7 @@ const openableThreads: ReadonlyArray<
     author: "AJ",
     time: "10:02 AM",
     text: "found a bug. composer crashes when I paste an image from clipboard lol",
-    replies: "4 replies"
+    replies: { marks: ["AM", "Y", "S"], label: "4 replies" }
   }
 ]
 
@@ -725,7 +732,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               text: thread.text,
               onOpen: Message.OpenedThread({ key: thread.key }),
               isCurrent: thread.key === openThread,
-              ...(thread.replies === undefined ? {} : { meta: [h.span([], [thread.replies])] })
+              ...(thread.replies === undefined ? {} : { meta: [replyLine(h, thread.replies)] })
             })
           )
         })
@@ -758,6 +765,45 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "AJ",
               note: "Sending…",
               text: "Thanks! I'll attach the image to the task."
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A thread's replies under its row: one reply, three people, and more people than it shows",
+      [
+        messageList(h, {
+          label: "Threads with replies",
+          children: [
+            message(h, {
+              key: "one-reply",
+              mark: "S",
+              author: "Sara",
+              time: "9:44 AM",
+              text: "deploy went out clean last night!",
+              onOpen: press,
+              meta: [replyLine(h, { marks: ["O"], label: "1 reply" })]
+            }),
+            message(h, {
+              key: "three-people",
+              mark: "AJ",
+              author: "AJ",
+              time: "10:02 AM",
+              text: "found a bug. composer crashes when I paste an image from clipboard lol",
+              onOpen: press,
+              meta: [replyLine(h, { marks: ["AM", "Y", "S"], label: "4 replies" })]
+            }),
+            message(h, {
+              key: "many-people",
+              mark: "G",
+              author: "Graeme",
+              time: "10:08 AM",
+              text: "Can everyone look at the release notes before noon?",
+              onOpen: press,
+              meta: [replyLine(h, { marks: ["AM", "Y", "S", "O", "AJ"], label: "12 replies" }), h.span([], ["2 new"])]
             })
           ]
         })
@@ -1120,7 +1166,7 @@ const groupThreads = (h: ApplicationViewBuilder): Html => {
         text: "found a bug. composer crashes when I paste an image from clipboard lol",
         onOpen: press,
         isCurrent: true,
-        meta: [h.span([], ["4 replies"])]
+        meta: [replyLine(h, { marks: ["AM", "Y", "S"], label: "4 replies" })]
       }),
       message(h, {
         key: "coffee",

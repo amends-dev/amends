@@ -17,7 +17,7 @@ import type { Presence } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import type { Task } from "@amends-dev/core/task"
-import { type Thread, type ThreadId, type ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
+import { type Thread, type ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
 import { Turn, TurnStore } from "@amends-dev/core/turn"
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
@@ -51,6 +51,7 @@ import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
 import * as RpcClient from "effect/rpc/RpcClient"
 import * as Schedule from "effect/Schedule"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Api from "../api.ts"
 import * as Drafts from "./Drafts.ts"
@@ -78,13 +79,36 @@ const readThroughOf = (positions: ReadonlyArray<Pending.Held<Replica.RecordOf<"T
 /** Write an action, `write("ThreadMessagePosted", { threadId, text, mentions })`, as eventlog's client does. */
 export type Write = Effect.Success<typeof makeWrite>
 
-/** A thread as its group lists it for the person: its opening message, its task, and how much they have not read. */
+const sameAuthor = Schema.toEquivalence(ThreadMessage.Author)
+
+/**
+ * A thread as its group lists it for the person: its opening message, its task, how many messages follow the
+ * opening and who wrote them, and how much they have not read.
+ */
 export interface ThreadView {
   readonly thread: Pending.Held<Replica.RecordOf<"Thread">>
   readonly opening: Option.Option<ThreadMessage.ThreadMessage>
   readonly task: Option.Option<Task.Task>
+  /** How many of its messages come after the opening. */
+  readonly replies: number
+  /** The authors of those replies, each once, in the order of their first reply. */
+  readonly repliers: ReadonlyArray<ThreadMessage.Author>
   /** Its activities that count as new, past the member's position. */
   readonly unread: number
+}
+
+/** The replies among a thread's `messages`, oldest first: how many follow the opening, and who wrote them. */
+export const summarizeReplies = (
+  messages: ReadonlyArray<ThreadMessage.ThreadMessage>
+): Pick<ThreadView, "replies" | "repliers"> => {
+  const replies = Array.drop(messages, 1)
+  return {
+    replies: replies.length,
+    repliers: Array.dedupeWith(
+      replies.map(({ author }) => author),
+      sameAuthor
+    )
+  }
 }
 
 /**
@@ -405,21 +429,22 @@ export const layer = (options: Options) =>
                   const threadId = thread.record.value.id
                   const place = ReplicaRecord.Place.cases.Thread.make({ threadId })
                   const held = threads.find((records) => records.thread.value.id === threadId)
-                  const messages = Pending.overlay("ThreadMessage", place, held?.messages ?? [], pending)
+                  const messages = Array.sort(
+                    Pending.overlay("ThreadMessage", place, held?.messages ?? [], pending).map(
+                      ({ record }) => record.value
+                    ),
+                    byPublished
+                  )
                   const positions = Pending.overlay("ThreadPosition", place, held?.positions ?? [], pending)
                   const readThrough = readThroughOf(positions)
                   return {
                     thread,
-                    opening: Array.head(
-                      Array.sort(
-                        messages.map(({ record }) => record.value),
-                        byPublished
-                      )
-                    ),
+                    opening: Array.head(messages),
                     task: Option.map(
                       Array.head(Pending.overlay("Task", place, held?.tasks ?? [], pending)),
                       ({ record }) => record.value
                     ),
+                    ...summarizeReplies(messages),
                     unread: (held?.activities ?? []).filter(
                       ({ value }) => value.newActivity && value.sequence > readThrough
                     ).length

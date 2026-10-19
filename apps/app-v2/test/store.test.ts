@@ -252,6 +252,8 @@ describe("Store", () => {
       expect(Option.map(started!.opening, (message) => message.content)).toMatchObject(
         Option.some({ _tag: "Text", text: "Hello" })
       )
+      expect(started!.replies).toBe(0)
+      expect(started!.repliers).toEqual([])
       const threadId = started!.thread.record.value.id
       yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.thread.pending === false)
       const thread = ReplicaRecord.Place.cases.Thread.make({ threadId })
@@ -289,6 +291,9 @@ describe("Store", () => {
       yield* store.write("ThreadMessagePosted", { threadId, text: "While away", mentions: [] })
       const waiting = yield* firstWhere(store.list("ThreadMessage", thread), (held) => held.length === 2)
       expect(waiting.filter((message) => message.pending)).toHaveLength(1)
+      // The reply shows in its group's list at once, by who wrote it.
+      const [replied] = yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.replies === 1)
+      expect(replied!.repliers).toEqual([ThreadMessage.Author.cases.Member.make({ memberId: workspace.ownerMemberId })])
       yield* serve(services, yield* Effect.scope, Option.getOrThrow(port(address)))
       yield* firstWhere(store.list("ThreadMessage", thread), (held) => held.every((message) => !message.pending))
 
@@ -758,5 +763,43 @@ describe("Store.viewTurns", () => {
     expect(
       retryOpen(Store.viewTurns([turn("turn-1", "failed", 1)], [participation("participation-3", "ended")]))
     ).toEqual([["turn-1", false]])
+  })
+})
+
+describe("Store.summarizeReplies", () => {
+  const written = (id: string, author: typeof ThreadMessage.Author.Encoded, minute: number) =>
+    Schema.decodeSync(ThreadMessage.ThreadMessage)({
+      id,
+      workspaceId: "workspace-1",
+      threadId: "thread-1",
+      author,
+      via: null,
+      publishedAt: `2026-10-18T12:0${minute}:00Z`,
+      content: { _tag: "Text", text: id, mentions: [], revision: 1, editedAt: null }
+    })
+  const alice = { _tag: "Member", memberId: "member-1" } as const
+  const bob = { _tag: "Member", memberId: "member-2" } as const
+  const dana = { _tag: "Contact", contactId: "contact-1" } as const
+
+  it("finds no replies in a thread that has none, or no messages yet", () => {
+    expect(Store.summarizeReplies([])).toEqual({ replies: 0, repliers: [] })
+    expect(Store.summarizeReplies([written("message-1", alice, 0)])).toEqual({ replies: 0, repliers: [] })
+  })
+
+  it("counts the messages after the opening, and names their authors once each, in the order of their first reply", () => {
+    const messages = [
+      written("message-1", alice, 0),
+      written("message-2", bob, 1),
+      written("message-3", dana, 2),
+      written("message-4", bob, 3),
+      written("message-5", alice, 4)
+    ]
+
+    const decode = Schema.decodeSync(ThreadMessage.Author)
+
+    expect(Store.summarizeReplies(messages)).toEqual({
+      replies: 4,
+      repliers: [decode(bob), decode(dana), decode(alice)]
+    })
   })
 })

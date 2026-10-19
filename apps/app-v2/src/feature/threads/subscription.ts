@@ -20,10 +20,12 @@ export const subscriptions = ThreadsDefinition.subscriptions((entry) => ({
             .read(workspaceId, memberId, (store) =>
               Stream.map(store.threads(groupId), (threads) =>
                 Message.ReceivedThreads({
-                  threads: threads.map(({ thread, opening, task, unread }) => ({
+                  threads: threads.map(({ thread, opening, task, replies, repliers, unread }) => ({
                     thread: thread.record.value,
                     opening,
                     task,
+                    replies,
+                    repliers,
                     pending: thread.pending,
                     unread
                   }))

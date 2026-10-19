@@ -53,11 +53,27 @@ const retro = { ...thread, id: ThreadId.ThreadId.make("thread-2"), title: "Retro
 
 const empty = init(workspaceId, memberId, groupId).model
 
-/** A thread opened by alice, in triage, with two messages new. */
-const alices = { thread, opening: Option.some(opening), task: Option.some(task), pending: false, unread: 2 }
+/** A thread opened by alice, in triage, with two messages new and no replies. */
+const alices = {
+  thread,
+  opening: Option.some(opening),
+  task: Option.some(task),
+  replies: 0,
+  repliers: [],
+  pending: false,
+  unread: 2
+}
 
 /** The thread that is being started. */
-const starting = { thread: retro, opening: Option.none(), task: Option.none(), pending: true, unread: 0 }
+const starting = {
+  thread: retro,
+  opening: Option.none(),
+  task: Option.none(),
+  replies: 0,
+  repliers: [],
+  pending: true,
+  unread: 0
+}
 
 /** The group's threads read: alice's, and the one being started. */
 const listed = modifyFields(empty, { threads: () => [alices, starting] })
@@ -76,9 +92,15 @@ const yesterdays = {
     publishedAt: DateTime.subtract(now, { days: 1 })
   }),
   task: Option.none(),
+  replies: 0,
+  repliers: [],
   pending: false,
   unread: 0
 }
+
+/** Bob and a member the store does not know, as authors. */
+const bobAuthor = ThreadMessage.Author.cases.Member.make({ memberId: bob.id })
+const strangerAuthor = ThreadMessage.Author.cases.Member.make({ memberId: MemberId.MemberId.make("member-9") })
 
 /** The threads read: `threads`, in the order the list holds them. */
 const listing = (...threads: typeof empty.threads) => modifyFields(empty, { threads: () => threads })
@@ -133,6 +155,27 @@ describe("a group's threads", () => {
       expect(within(item(0), text("Today"))).toExist(),
       expect(within(item(1), text("A thread"))).toExist()
     )
+  })
+
+  it("shows under a thread who replied, by their marks, and how many replies there are", () => {
+    scene(
+      { update, view: sceneView },
+      given(listing({ ...alices, replies: 3, repliers: [bobAuthor, strangerAuthor] })),
+      expect(within(item(1), text("3 replies"))).toExist(),
+      expect(within(item(1), text("B"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(item(1), text("S"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(item(1), text("2 new"))).toExist()
+    )
+  })
+
+  it("says 1 reply for one reply, and shows no line for a thread that has none", () => {
+    scene(
+      { update, view: sceneView },
+      given(listing({ ...alices, replies: 1, repliers: [bobAuthor] })),
+      expect(within(item(1), text("1 reply"))).toExist(),
+      expect(text(/replies/)).toBeAbsent()
+    )
+    scene({ update, view: sceneView }, given(listing(alices)), expect(text(/repl/)).toBeAbsent())
   })
 
   it("says how much of a thread is new and where its task stands, under it", () => {

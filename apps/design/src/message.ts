@@ -1,6 +1,7 @@
 /**
- * What a conversation is made of: the list of messages, each by its author with its time, the notifications
- * that tell of them, and the rule that sets a part of the list apart, such as a day or the replies.
+ * What a conversation is made of: the list of messages, each by its author with its time and, under the first
+ * message of a thread, who replied to it, the notifications that tell of them, and the rule that sets a part of
+ * the list apart, such as a day or the replies.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -45,6 +46,21 @@ const ageLook = "flex flex-none items-center gap-1.5 text-meta text-ink-muted"
 const unreadDot = "size-1.5 flex-none rounded-full bg-ink"
 
 const unreadLabel = "sr-only"
+
+const replyLineLook = "relative flex items-center gap-3"
+
+const treeStub = "absolute -start-7 bottom-2.5 size-3 border-s border-b border-outline"
+
+const markStack = "flex items-center"
+
+const stackedMark = "-ms-1 flex flex-none ring-1 ring-outline first:ms-0 first:z-30 nth-2:z-20 nth-3:z-10"
+
+const moreMarks = "ms-1.5 text-meta text-ink-muted"
+
+const replyLabel = "text-meta text-ink-muted"
+
+/** How many marks a reply line shows before it counts the rest. */
+const shownMarks = 3
 
 const dividerLine = "flex items-center gap-3 py-2.5 text-meta text-ink-muted uppercase"
 
@@ -158,6 +174,36 @@ export const message = <Message, Requirements>(
           meta.length === 0 ? h.empty : h.div([h.Class(metaRow)], meta)
         ]
       )
+    ]
+  )
+}
+
+/**
+ * What the first message of a thread shows under its text, for the message's `meta`: a short tree line that
+ * hangs from the row's mark, then the `marks` of those who replied, the letters of each, small and overlapping by
+ * 4px, up to three and then "+N" for the rest, then the `label`, such as "4 replies". The line and the marks are
+ * hidden from assistive technology, since the label is what the line says.
+ */
+export const replyLine = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ marks: ReadonlyArray<string>; label: string }>
+): Html => {
+  const rest = config.marks.length - shownMarks
+
+  return h.div(
+    [h.Class(replyLineLook)],
+    [
+      h.span([h.AriaHidden(true), h.Class(treeStub)]),
+      h.span(
+        [h.Class(markStack)],
+        [
+          ...config.marks
+            .slice(0, shownMarks)
+            .map((text) => h.span([h.Class(stackedMark)], [mark(h, { text, size: "xs" })])),
+          rest > 0 ? h.span([h.AriaHidden(true), h.Class(moreMarks)], [`+${rest}`]) : h.empty
+        ]
+      ),
+      h.span([h.Class(replyLabel)], [config.label])
     ]
   )
 }

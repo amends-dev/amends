@@ -65,7 +65,9 @@ describe("a group's threads", () => {
       given(listing),
       message(
         Message.ReceivedThreads({
-          threads: [{ thread, opening: Option.none(), task: Option.none(), pending: false, unread: 2 }]
+          threads: [
+            { thread, opening: Option.none(), task: Option.none(), replies: 0, repliers: [], pending: false, unread: 2 }
+          ]
         })
       ),
       message(Message.ClickedThread({ threadId: ThreadId.ThreadId.make("thread-1") })),

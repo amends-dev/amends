@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
-import { ageLabel, dayLabel, dayOf, initials, timeOf, whenLabel } from "./seen.ts"
+import { ageLabel, dayLabel, dayOf, initials, repliesLabel, timeOf, whenLabel } from "./seen.ts"
 
 describe("initials", () => {
   it("is the first letters of the first two words of a name, in capitals", () => {
@@ -125,6 +125,14 @@ describe("whenLabel", () => {
     expect(whenLabel(local(2025, 12, 25, 9, 0), now)).toBe(
       spelled(local(2025, 12, 25), { year: "numeric", month: "long", day: "numeric" })
     )
+  })
+})
+
+describe("repliesLabel", () => {
+  it("says 1 reply for one, and the number of replies for any other number", () => {
+    expect(repliesLabel(1)).toBe("1 reply")
+    expect(repliesLabel(2)).toBe("2 replies")
+    expect(repliesLabel(12)).toBe("12 replies")
   })
 })
 

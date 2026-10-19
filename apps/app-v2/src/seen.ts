@@ -1,7 +1,7 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called and what
  * letters mark them, who wrote a message and what it says, when a time was, by its time of day, its day,
- * either as a message shows it, and how long ago it was, how a thread is titled, whether anyone may join a group, and how a task's
+ * either as a message shows it, and how long ago it was, how a thread is titled and how many replies it has, whether anyone may join a group, and how a task's
  * status and priority and a turn's status read.
  */
 
@@ -95,13 +95,13 @@ export const groupName = (
         .map((id) => memberName(members, id))
         .join(", ")
 
-/** Who wrote `message`, by their name here: a member's, or the name a channel's contact gave. */
+/** `author` by their name here: a member's, or the name a channel's contact gave. */
 export const authorName = (
-  message: ThreadMessage.ThreadMessage,
+  author: ThreadMessage.Author,
   members: ReadonlyArray<Member.Member>,
   contacts: ReadonlyArray<Contact.Contact>
 ): string =>
-  ThreadMessage.Author.match(message.author, {
+  ThreadMessage.Author.match(author, {
     Member: ({ memberId }) => members.find((member) => member.id === memberId)?.name ?? "Someone",
     Contact: ({ contactId }) => contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
   })
@@ -109,6 +109,9 @@ export const authorName = (
 /** What `message` says, or that it was deleted. */
 export const messageText = (message: ThreadMessage.ThreadMessage): string =>
   ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => "This message was deleted." })
+
+/** How many replies a thread has, as the person reads it: "1 reply", "4 replies". */
+export const repliesLabel = (replies: number): string => `${replies} ${replies === 1 ? "reply" : "replies"}`
 
 /** A thread as the person reads it in a list: its title, or its opening message. */
 export const threadLabel = (thread: Thread.Thread, opening: Option.Option<ThreadMessage.ThreadMessage>): string =>

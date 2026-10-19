@@ -6,7 +6,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { divider, message, messageList, notification } from "./message.ts"
+import { divider, message, messageList, notification, replyLine } from "./message.ts"
 
 const Message = defineMessageUnion({
   OpenedThread: { key: Schema.String },
@@ -348,6 +348,67 @@ describe("notification", () => {
       given(initial),
       click(role("button", { name: "Mark seen" })),
       expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 0")
+    )
+  })
+})
+
+describe("replyLine", () => {
+  const withReplies = (marks: ReadonlyArray<string>, label: string) => (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Threads",
+      children: [
+        message(h, {
+          key: "thread-1",
+          mark: "AJ",
+          author: "AJ",
+          time: "10:02 AM",
+          text: "found a bug. composer crashes when I paste an image",
+          meta: [replyLine(h, { marks, label })]
+        })
+      ]
+    })
+
+  it("shows the marks of those who replied and what it says of the replies, under the message's text", () => {
+    scene(
+      { update, view: viewOf(withReplies(["AM", "Y", "S"], "4 replies")) },
+      given(initial),
+      expect(within(role("listitem"), text("4 replies"))).toExist(),
+      expect(within(role("listitem"), text("AM"))).toExist(),
+      expect(within(role("listitem"), text("Y"))).toExist(),
+      expect(within(role("listitem"), text("S"))).toExist(),
+      expect(text(/^\+\d+$/)).toBeAbsent()
+    )
+  })
+
+  it("hides its tree line and its marks from assistive technology, and leaves its label to be read", () => {
+    scene(
+      { update, view: viewOf(withReplies(["AM", "Y", "S"], "4 replies")) },
+      given(initial),
+      expect(text("Y")).toHaveAttr("aria-hidden", "true"),
+      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(5),
+      expect(text("4 replies")).not.toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("shows the first three marks and counts the rest after them", () => {
+    scene(
+      { update, view: viewOf(withReplies(["AM", "Y", "S", "O", "G"], "9 replies")) },
+      given(initial),
+      expect(text("S")).toExist(),
+      expect(text("O")).toBeAbsent(),
+      expect(text("G")).toBeAbsent(),
+      expect(text("+2")).toHaveAttr("aria-hidden", "true"),
+      expect(text("9 replies")).toExist()
+    )
+  })
+
+  it("shows one mark for one reply", () => {
+    scene(
+      { update, view: viewOf(withReplies(["Y"], "1 reply")) },
+      given(initial),
+      expect(text("Y")).toExist(),
+      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(3),
+      expect(text("1 reply")).toExist()
     )
   })
 })

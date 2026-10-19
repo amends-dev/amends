@@ -4,7 +4,7 @@ The workspace app, being built on [Foldkit](https://foldkit.dev) Blocks: a brows
 people in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in
 sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write,
 offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
-pick one; a group's threads with how much of each is new, where they start a thread; and a thread's
+pick one; a group's threads with who replied to each and how much of it is new, where they start a thread; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
 stop following it, which opening reads through its latest activity; their inbox, their
 notifications under the days they came, all of them or only those waiting, each by who wrote what it
@@ -132,8 +132,9 @@ the pages that compose them; the root composes the pages.
   as a list, once it has items, with where following it stands under it; a log still opening shows
   that alone. A thread with no turns shows only why they could
   not be read. The thread embeds it.
-- `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
-  being started, and how much is new, and a composer to start one. It reports the thread picked. It
+- `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
+  who wrote them, its task, whether it is still being started, and how much is new, and a composer to
+  start one. It reports the thread picked. It
   has two views, which take the group's members, its name, the thread open in it, and the time now from
   their parent. `view`, its canonical one, lists the threads as messages, in the order the list holds
   them, under a `divider` for each run of them that opened on one day by the person's own clock, named
@@ -141,8 +142,9 @@ the pages that compose them; the root composes the pages.
   initials and name ("Someone" until the members are read, and "A thread" when the opening is not read
   yet), when the opening was published (`whenLabel`: its time of day today, "Yesterday" or the day's name
   before), and the thread's title or its opening as the text that opens it, with "Sending…"
-  while it is being started, how much is new, and where its task stands; the thread open is the
-  current row. A thread whose opening is not read yet has no day, so it is first under the newest day, or
+  while it is being started, under it, while the thread has replies, a reply line: the initials of those
+  who replied, in the order of their first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then
+  how much is new and where its task stands; the thread open is the current row. A thread whose opening is not read yet has no day, so it is first under the newest day, or
   under Today while no thread has a day. `composerView` is the composer to start one, for the pane's footer, whose box
   shows "Message" and the group's name until the person writes.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
@@ -390,7 +392,8 @@ choice is.
   entry and sends it again after a stop between the two; a reset applies at any position. It holds
   the server's records alone, and the person's unfinished actions beside them: `Completed` drops
   the action it names, and `Rejected` keeps it, with why, until `dismiss`. `list` reads the records
-  of a kind at a place, `threads` a group's threads with their messages, and `actions` the person's
+  of a kind at a place, `threads` a group's threads with their messages, and, for each thread, how many messages follow its
+  opening and who wrote them (`summarizeReplies`), and `actions` the person's
   unfinished actions, each again after every change, `every` the records of a kind wherever they
   sit, `inbox` the person's notifications with the threads they come from, which the store
   shows each by the message its activity is about, `thread` what a thread holds, with its task
@@ -484,8 +487,8 @@ browser's storage. Each Block's tests sit beside it:
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, who types, a reply written and sent, the title renamed from its form, and a message
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
-  author of their opening, their time, how much is new and where their task stands, the one open
-  marked as current, the thread picked reported, why they could not be read, and a thread started
+  author of their opening, their time, who replied and how many times, how much is new and where
+  their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
   from the composer, whose box is named for the group; a task changed by someone who may, read as
   rows by someone who may not, and made by someone who may create tasks; a thread's turns by their
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
@@ -587,9 +590,10 @@ browser's storage. Each Block's tests sit beside it:
   and its move shows at once; and the settings' reads, as the settings Block reads them together,
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant
   to rename it. `Store.viewTurns` is
-  tested apart: which turns may run again, and `seen.ts`: the initials of a name, the time of day, the
+  tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
+  replier once in the order of their first reply, and `seen.ts`: the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
-  times fixed on the clock of the machine the tests run on, and `settingsForm.ts`: the fields an
+  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
