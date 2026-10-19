@@ -56,6 +56,7 @@ import {
   opening,
   reply,
   saying,
+  task,
   thread
 } from "./fixtures.ts"
 
@@ -211,6 +212,10 @@ const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => bool
   stream.pipe(Stream.filter(holds), Stream.runHead, Effect.map(Option.getOrThrow), Effect.timeout("5 seconds"))
 
 const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
+
+/** The task listed under the group called `groupName` among `views`. */
+const taskIn = (views: ReadonlyArray<Store.TaskView>, groupName: string) =>
+  views.find((view) => view.groupName === groupName)!
 
 /** How many members the group `groupId` has among `views`. */
 const membersIn = (views: ReadonlyArray<Store.GroupView>, groupId: Group.Group["id"]) =>
@@ -417,6 +422,61 @@ describe("Store", () => {
       expect(made!.task).toMatchObject(Option.some({ status: "triage", assignee: null }))
       expect(made!.lastActiveAt).toEqual(Option.getOrThrow(made!.opening).publishedAt)
     }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live(
+    "a task lists with its thread, its group's name, and its replies, as it is written and once the host has it",
+    () =>
+      Effect.gen(function* () {
+        const services = yield* host
+        const gateway = Context.get(services, Gateway.Gateway)
+        const workspace = yield* gateway.createWorkspace(alice, {
+          name: "Studio",
+          memberName: Member.Name.make("Alice")
+        })
+        const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+        const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+        yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+
+        // A task in each of two groups, once the host has the team, and a thread that tracks none.
+        yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
+        const teams = yield* firstWhere(store.list("Group", everywhere), (held) =>
+          held.some(({ record, pending }) => !pending && record.value.kind === "Team" && record.value.name === "Design")
+        )
+        const teamId = teams.find(({ record }) => record.value.kind === "Team" && record.value.name === "Design")!
+          .record.value.id
+        yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plan the offsite", mentions: [] })
+        yield* store.write("ThreadStarted", {
+          groupId: Group.GeneralId,
+          text: "Ship the release",
+          mentions: [],
+          task: {}
+        })
+        yield* store.write("ThreadStarted", { groupId: teamId, text: "Review the logo", mentions: [], task: {} })
+
+        // Each lists at once, in triage, under the name of its group.
+        const written = yield* firstWhere(store.tasks, (views) => views.length === 2)
+        const shipping = taskIn(written, "general")
+        expect([shipping.task.status, taskIn(written, "Design").task.status]).toEqual(["triage", "triage"])
+        yield* store.write("ThreadMessagePosted", { threadId: shipping.thread.id, text: "On it", mentions: [] })
+        yield* firstWhere(store.tasks, (views) => views.some(({ replies }) => replies === 1))
+
+        // Once the host has them, the same tasks list with the replies each thread has.
+        const made = yield* firstWhere(
+          store.tasks,
+          (views) =>
+            views.length === 2 && views.every(({ pending }) => !pending) && views.some(({ replies }) => replies === 1)
+        )
+        expect(taskIn(made, "general")).toMatchObject({
+          replies: 1,
+          thread: { id: shipping.thread.id, groupId: Group.GeneralId }
+        })
+        expect(taskIn(made, "Design")).toMatchObject({
+          replies: 0,
+          thread: { groupId: teamId },
+          opening: Option.some({ content: { _tag: "Text", text: "Review the logo" } })
+        })
+      }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
   it.live("a team and a conversation started here are the ones the host makes, under the same IDs", () =>
@@ -975,6 +1035,78 @@ describe("Store.deriveLastActiveAt", () => {
     expect(Store.deriveLastActiveAt(thread, [opening])).toEqual(opening.publishedAt)
     expect(Store.deriveLastActiveAt(thread, [opening, reply])).toEqual(reply.publishedAt)
     expect(reply.publishedAt).not.toEqual(opening.publishedAt)
+  })
+})
+
+describe("Store.viewTasks", () => {
+  const person = membership.member
+  const heldThread = (value: typeof thread, pending = false) => ({
+    record: ReplicaRecord.ReplicaRecord.cases.Thread.make({ value }),
+    pending
+  })
+  /** A thread in design that tracks a task, with no messages. */
+  const logoThread = { ...thread, id: ThreadId.ThreadId.make("thread-2"), groupId: design.id }
+  const logoTask = { ...task, threadId: logoThread.id, groupId: design.id }
+  const records: Store.TaskRecords = {
+    memberId: person.id,
+    tasks: [task, logoTask],
+    threads: [heldThread(thread), heldThread(logoThread)],
+    messages: [reply, opening],
+    groups: [general, design],
+    members: [person, bob]
+  }
+
+  it("pairs each task with its thread, its group's name, its opening, its replies, and when it was last active", () => {
+    expect(Store.viewTasks(records)).toEqual([
+      {
+        task,
+        thread,
+        groupName: "General",
+        opening: Option.some(opening),
+        replies: 1,
+        lastActiveAt: reply.publishedAt,
+        pending: false
+      },
+      {
+        task: logoTask,
+        thread: logoThread,
+        groupName: "Design",
+        opening: Option.none(),
+        replies: 0,
+        lastActiveAt: logoThread.createdAt,
+        pending: false
+      }
+    ])
+  })
+
+  it("names a conversation's group by the other member", () => {
+    const talk = { ...thread, groupId: conversationWithBob.id }
+
+    expect(
+      Store.viewTasks({
+        ...records,
+        tasks: [{ ...task, groupId: talk.groupId }],
+        threads: [heldThread(talk)],
+        groups: [conversationWithBob]
+      }).map(({ groupName }) => groupName)
+    ).toEqual(["Bob"])
+  })
+
+  it("says whether the thread of a task is still being started", () => {
+    expect(
+      Store.viewTasks({ ...records, threads: [heldThread(thread, true), heldThread(logoThread)] }).map(
+        ({ pending }) => pending
+      )
+    ).toEqual([true, false])
+  })
+
+  it("leaves out a task whose thread or group the replica lacks", () => {
+    const among = (changed: Partial<Store.TaskRecords>) =>
+      Store.viewTasks({ ...records, ...changed }).map(({ thread }) => thread.id)
+
+    expect(among({ groups: [general] })).toEqual([thread.id])
+    expect(among({ threads: [heldThread(logoThread)] })).toEqual([logoThread.id])
+    expect(among({ groups: [], threads: [] })).toEqual([])
   })
 })
 

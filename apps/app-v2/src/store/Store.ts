@@ -124,6 +124,85 @@ export const deriveLastActiveAt = (
 ): DateTime.Utc =>
   Option.match(Array.last(messages), { onNone: () => thread.createdAt, onSome: (latest) => latest.publishedAt })
 
+/**
+ * A task as the workspace lists it: the task, the thread that tracks it with its opening message, its group's
+ * name, how many messages follow the opening, when the thread was last active, and whether it is still being
+ * started.
+ */
+export interface TaskView {
+  readonly task: Task.Task
+  readonly thread: Thread.Thread
+  /** Its group's name as the person reads it: a team's own, or a conversation's other members. */
+  readonly groupName: string
+  readonly opening: Option.Option<ThreadMessage.ThreadMessage>
+  /** How many of the thread's messages come after the opening. */
+  readonly replies: number
+  /** When the thread's latest message was published, or when it was created while it has none. */
+  readonly lastActiveAt: DateTime.Utc
+  /** Whether the thread is still being started. */
+  readonly pending: boolean
+}
+
+/** What the tasks of a workspace are made of, as the person's unfinished actions leave it. */
+export interface TaskRecords {
+  readonly memberId: MemberId.MemberId
+  readonly tasks: ReadonlyArray<Task.Task>
+  readonly threads: ReadonlyArray<Pending.Held<Replica.RecordOf<"Thread">>>
+  readonly messages: ReadonlyArray<ThreadMessage.ThreadMessage>
+  readonly groups: ReadonlyArray<Group.Group>
+  readonly members: ReadonlyArray<Member.Member>
+}
+
+/** The messages of each thread among `messages`, oldest first. */
+const messagesByThread = (
+  messages: ReadonlyArray<ThreadMessage.ThreadMessage>
+): ReadonlyMap<ThreadId.ThreadId, ReadonlyArray<ThreadMessage.ThreadMessage>> => {
+  const byThread = new Map<ThreadId.ThreadId, Array<ThreadMessage.ThreadMessage>>()
+  for (const message of Array.sort(messages, byPublished)) {
+    const earlier = byThread.get(message.threadId)
+    if (earlier === undefined) byThread.set(message.threadId, [message])
+    else earlier.push(message)
+  }
+  return byThread
+}
+
+/**
+ * The `tasks` in the order given, each with its thread, its group's name as the person reads it among `members`,
+ * and the summary of the thread's messages. A task whose thread or group the replica lacks is left out, since it
+ * could not be opened.
+ */
+export const viewTasks = ({
+  memberId,
+  tasks,
+  threads,
+  messages,
+  groups,
+  members
+}: TaskRecords): ReadonlyArray<TaskView> => {
+  const heldThreads = new Map(threads.map((held) => [held.record.value.id, held] as const))
+  const knownGroups = new Map(groups.map((group) => [group.id, group] as const))
+  const written = messagesByThread(messages)
+
+  return tasks.flatMap((task): ReadonlyArray<TaskView> => {
+    const held = heldThreads.get(task.threadId)
+    const group = held === undefined ? undefined : knownGroups.get(held.record.value.groupId)
+    if (held === undefined || group === undefined) return []
+    const thread = held.record.value
+    const threadMessages = written.get(thread.id) ?? []
+    return [
+      {
+        task,
+        thread,
+        groupName: groupName(group, members, memberId),
+        opening: Array.head(threadMessages),
+        replies: summarizeReplies(threadMessages).replies,
+        lastActiveAt: deriveLastActiveAt(thread, threadMessages),
+        pending: held.pending
+      }
+    ]
+  })
+}
+
 /** A group as the person sees it listed: the group, and how many members it has. */
 export interface GroupView {
   readonly group: Pending.Held<Replica.RecordOf<"Group">>
@@ -357,6 +436,8 @@ export class Store extends Context.Service<
     ) => Stream.Stream<ReadonlyArray<Pending.Held<Replica.RecordOf<Kind>>>, QueryError>
     /** The threads of `groupId`, each with its opening message, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
+    /** Every task the replica holds, with the thread that tracks it and its group's name, and again after each change. */
+    readonly tasks: Stream.Stream<ReadonlyArray<TaskView>, QueryError>
     /** The thread `threadId` as the person sees it open, and again after each change. */
     readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadDetail, QueryError>
     /** Every group the replica holds, each with how many members it has, and again after each change. */
@@ -591,6 +672,24 @@ export const layer = (options: Options) =>
                   }
                 })
               ),
+            tasks: Stream.map(
+              Stream.zipLatestAll(
+                every("Task"),
+                every("Thread"),
+                every("ThreadMessage"),
+                list("Group", workspace),
+                list("Member", workspace)
+              ),
+              ([tasks, threads, messages, groups, members]) =>
+                viewTasks({
+                  memberId: options.memberId,
+                  tasks: tasks.map(({ record }) => record.value),
+                  threads,
+                  messages: messages.map(({ record }) => record.value),
+                  groups: groups.map(({ record }) => record.value),
+                  members: members.map(({ record }) => record.value)
+                })
+            ),
             thread: (threadId) =>
               withPending(replica.thread(threadId), (contents, pending): ThreadDetail => {
                 const place = ReplicaRecord.Place.cases.Thread.make({ threadId })

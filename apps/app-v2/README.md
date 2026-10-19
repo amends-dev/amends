@@ -517,7 +517,11 @@ choice is.
   opening and who wrote them (`summarizeReplies`) and when it was last active (`deriveLastActiveAt`: when its
   latest message was published, or when the thread was created while it has none), and `actions` the person's
   unfinished actions, each again after every change, `every` the records of a kind wherever they
-  sit, `inbox` the person's notifications with the threads they come from, which the store
+  sit, `tasks` every task with the thread that tracks it, summarized as `threads` summarizes one, its
+  opening, its replies, and when it was last active, and the name of its group as the person reads
+  it, and whether the thread is still being started (`viewTasks`; a task whose thread or group the
+  replica lacks is left out, since it could not be opened), `inbox` the person's notifications with
+  the threads they come from, which the store
   shows each by the message its activity is about, `thread` what a thread holds, with its task
   and turns, `group` a group with its admissions and the person's follow of it, `groups` every group
   the replica holds with how many members it has, a team's admitted ones, which a removed
@@ -761,7 +765,8 @@ browser's storage. Each Block's tests sit beside it:
   inbox, which reading the thread settles at once and then on the server; and a thread made a task
   and changed shows at once and becomes the server's, while a change from a stale value comes back
   refused, and a thread started as a task shows its task in its group's list at once in triage and then as the
-  server made it; and a connection added over HTTP, to an integration the test host installs, reaches the
+  server made it, and a task in each of two groups lists with the name of its group and the replies its
+  thread has, as it is written and once the server has it; and a connection added over HTTP, to an integration the test host installs, reaches the
   store, and its rename and removal show at once, then as the server made them; and an agent added
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
@@ -772,7 +777,10 @@ browser's storage. Each Block's tests sit beside it:
   the query, and not the person themselves. `Store.viewTurns` is
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
-  with no messages, and the later of two messages, and so is `Store.findMatches`: nothing for an empty
+  with no messages, and the later of two messages, and so is `Store.viewTasks`: each task with its
+  thread, its group's name, and the summary of its messages, a conversation's group named by the other
+  member, a thread still being started, and no task whose thread or group the replica lacks, and so
+  is `Store.findMatches`: nothing for an empty
   query or one of spaces, a group by the name the person reads and a conversation by the other member,
   a thread by its title or its opening's words and shown by its title, a mention in an opening as
   the member's current name, no thread by a deleted opening or without its group, the active members
