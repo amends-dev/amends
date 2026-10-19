@@ -376,6 +376,49 @@ describe("Store", () => {
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
+  it.live("a thread started as a task shows its task at once in its group, then as the host made it", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+
+      yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plan the offsite", mentions: [] })
+      yield* store.write("ThreadStarted", {
+        groupId: Group.GeneralId,
+        text: "Ship the release",
+        mentions: [],
+        task: {}
+      })
+      const trackers = (threads: ReadonlyArray<Store.ThreadView>) => threads.filter(({ task }) => Option.isSome(task))
+
+      // The task shows with its thread, in triage, and the thread started without one tracks none.
+      const [tracking] = yield* firstWhere(
+        store.threads(Group.GeneralId),
+        (threads) => trackers(threads).length === 1
+      ).pipe(Effect.map(trackers))
+      expect(tracking!.thread.pending).toBe(true)
+      expect(Option.map(tracking!.opening, ({ content }) => content)).toMatchObject(
+        Option.some({ _tag: "Text", text: "Ship the release" })
+      )
+      expect(tracking!.task).toMatchObject(
+        Option.some({ threadId: tracking!.thread.record.value.id, groupId: Group.GeneralId, status: "triage" })
+      )
+
+      // Once the host has made them, the same thread tracks the same task, last active when its opening came.
+      const [made] = yield* firstWhere(
+        store.threads(Group.GeneralId),
+        (threads) =>
+          threads.length === 2 && threads.every(({ thread }) => !thread.pending) && trackers(threads).length === 1
+      ).pipe(Effect.map(trackers))
+      expect(made!.thread.record.value.id).toBe(tracking!.thread.record.value.id)
+      expect(made!.task).toMatchObject(Option.some({ status: "triage", assignee: null }))
+      expect(made!.lastActiveAt).toEqual(Option.getOrThrow(made!.opening).publishedAt)
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
   it.live("a team and a conversation started here are the ones the host makes, under the same IDs", () =>
     Effect.gen(function* () {
       const services = yield* host

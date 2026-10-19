@@ -38,9 +38,10 @@ import {
   opening,
   reply,
   saying,
+  task,
   thread
 } from "../../../test/fixtures.ts"
-import { AdmitMember, JoinGroup, LeaveGroup, RemoveMember, RenameGroup } from "./command.ts"
+import { AdmitMember, FollowGroup, JoinGroup, LeaveGroup, RemoveMember, RenameGroup, UnfollowGroup } from "./command.ts"
 import { Message, type Model } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -154,6 +155,25 @@ const openedAnnouncements = modifyFields(init(workspace.id, member.id, announcem
   members: () => [member, bob]
 })
 
+/** The team with a thread in it that tracks a task, in triage, which it started. */
+const withTaskThread = modifyFields(opened, {
+  threads: (threads) =>
+    modifyFields(threads, {
+      threads: () => [
+        {
+          thread: { ...thread, groupId: design.id },
+          opening: Option.some(opening),
+          task: Option.some({ ...task, groupId: design.id }),
+          replies: 2,
+          repliers: [],
+          lastActiveAt: opening.publishedAt,
+          pending: false,
+          unread: 0
+        }
+      ]
+    })
+})
+
 /** The conversation with Bob read. */
 const openedConversation = modifyFields(init(workspace.id, member.id, withBob.id, Option.none()).model, {
   group: () => Option.some({ group: withBob, pending: false }),
@@ -174,6 +194,103 @@ describe("a group's main pane", () => {
       expect(role("list", { name: "Members" })).toBeAbsent(),
       expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
       expect(text("No threads yet.")).toExist()
+    )
+  })
+
+  it("holds the tabs of its threads and its tasks in its header, the threads shown, and counts the tasks open", () => {
+    scene(
+      { update, view },
+      given(opened),
+      expect(within(role("main"), role("tablist", { name: "Group" }))).toExist(),
+      expect(role("tab", { name: "Threads" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "false"),
+      expect(role("tab", { name: "Tasks" })).not.toHaveAttr("aria-description"),
+      expect(role("list", { name: "Tasks" })).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(withTaskThread),
+      expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-description", "1")
+    )
+  })
+
+  it("shows its tasks under the Tasks tab, with the composer to start one, and its threads again under Threads", () => {
+    scene(
+      { update, view },
+      given(withTaskThread),
+      expect(role("list", { name: "Threads" })).toExist(),
+      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Design"),
+      click(role("tab", { name: "Tasks" })),
+      expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "true"),
+      expect(role("list", { name: "Threads" })).toBeAbsent(),
+      expect(within(role("list", { name: "Tasks" }), role("button", { name: "Plans for the week" }))).toExist(),
+      expect(label("New task")).toHaveAttr("placeholder", "New task in #Design"),
+      expect(within(role("main", { name: "Design" }), role("button", { name: "Create task" }))).toExist(),
+      click(role("tab", { name: "Threads" })),
+      expect(role("list", { name: "Threads" })).toExist(),
+      expect(role("list", { name: "Tasks" })).toBeAbsent(),
+      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Design")
+    )
+  })
+
+  it("offers a task started in a conversation without the # of a team", () => {
+    scene(
+      { update, view },
+      given(openedConversation),
+      click(role("tab", { name: "Tasks" })),
+      expect(label("New task")).toHaveAttr("placeholder", "New task in Bob")
+    )
+  })
+
+  it("shows who is in the team as a cluster of their marks before the person's part in it, named for how many", () => {
+    scene(
+      { update, view },
+      given(opened),
+      expect(within(role("main"), role("button", { name: "2 members" }))).toExist(),
+      expect(within(role("button", { name: "2 members" }), text("A"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "2 members" }), text("B"))).toHaveAttr("aria-hidden", "true"),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("2 members"),
+      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Follow"),
+      expect(nth(all.role("button"), 2)).toHaveAccessibleName("Group settings")
+    )
+  })
+
+  it("shows who is in a conversation the same way, and nothing of the members before the group is read", () => {
+    scene({ update, view }, given(openedConversation), expect(role("button", { name: "2 members" })).toExist())
+    scene(
+      { update, view },
+      given(init(workspace.id, member.id, design.id, Option.none()).model),
+      expect(role("button", { name: /member/ })).toBeAbsent()
+    )
+  })
+
+  it("shows the person's follow as a bell, not pressed until they follow, and sends the other way when it is clicked", () => {
+    scene(
+      { update, view },
+      given(opened),
+      expect(role("button", { name: "Follow" })).toHaveAttr("aria-pressed", "false"),
+      expect(role("button", { name: "Unfollow" })).toBeAbsent(),
+      click(role("button", { name: "Follow" })),
+      Command.expectExact(FollowGroup(inDesign)),
+      Command.resolve(FollowGroup, Message.WroteAction())
+    )
+    scene(
+      { update, view },
+      given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: false }) })),
+      expect(role("button", { name: "Unfollow" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Follow" })).toBeAbsent(),
+      click(role("button", { name: "Unfollow" })),
+      Command.expectExact(UnfollowGroup(inDesign)),
+      Command.resolve(UnfollowGroup, Message.WroteAction())
+    )
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          follow: () => Option.some({ follow: { ...followOfDesign, status: "ended" as const }, pending: false })
+        })
+      ),
+      expect(role("button", { name: "Follow" })).toHaveAttr("aria-pressed", "false")
     )
   })
 
@@ -259,10 +376,11 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("offers joining a public team the person does not belong to, in place of its threads", () => {
+  it("offers joining a public team the person does not belong to, in place of its threads and the tabs for them", () => {
     scene(
       { update, view },
       given(openedAnnouncements),
+      expect(role("tablist", { name: "Group" })).toBeAbsent(),
       expect(role("heading", { name: "Announcements", level: 1 })).toExist(),
       expect(role("button", { name: "Join" })).toExist(),
       expect(role("button", { name: "Follow" })).toBeAbsent(),
@@ -290,6 +408,39 @@ describe("a group's main pane", () => {
       expect(role("main", { name: "Design" })).toExist(),
       expect(role("complementary")).toBeAbsent(),
       expect(role("heading", { name: "Composer paste crash" })).toBeAbsent()
+    )
+  })
+})
+
+describe("a group's members", () => {
+  it("open in the settings' dialog on the Members section when the person asks for them from a team's cluster", () => {
+    scene(
+      { update, view },
+      given(opened),
+      click(role("button", { name: "2 members" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "Group settings" })).toExist(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("tab", { name: "Members" })).toHaveAttr("aria-selected", "true"),
+        expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "false"),
+        expect(role("list", { name: "Members" })).toExist()
+      )
+    )
+  })
+
+  it("open on General from a conversation's cluster, which has no Members section", () => {
+    scene(
+      { update, view },
+      given(openedConversation),
+      click(role("button", { name: "2 members" })),
+      ...dialogOpened(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("tablist", { name: "Group settings" })).toBeAbsent(),
+        expect(text("Membership")).toExist(),
+        expect(text("A conversation between its members.")).toExist()
+      )
     )
   })
 })

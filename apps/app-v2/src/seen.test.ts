@@ -15,6 +15,7 @@ import {
   repliesLabel,
   textRuns,
   threadRuns,
+  threadWords,
   timeOf,
   whenLabel
 } from "./seen.ts"
@@ -228,6 +229,19 @@ describe("threadRuns", () => {
       { text: " can you check this?" }
     ])
     expect(threadRuns(thread, Option.none(), members)).toEqual([{ text: "A thread" }])
+  })
+})
+
+describe("threadWords", () => {
+  const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check this?`)
+
+  it("is the title when the thread has one, and the words of the opening without, with a mention as its member's name", () => {
+    expect(threadWords({ ...thread, title: "Retro" }, Option.some(asked), members)).toBe("Retro")
+    expect(threadWords(thread, Option.some(asked), members)).toBe("@Bob can you check this?")
+  })
+
+  it("is A thread while the opening is not read", () => {
+    expect(threadWords(thread, Option.none(), members)).toBe("A thread")
   })
 })
 

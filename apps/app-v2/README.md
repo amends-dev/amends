@@ -4,7 +4,7 @@ The workspace app, being built on [Foldkit](https://foldkit.dev) Blocks: a brows
 people in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in
 sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write,
 offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
-pick one or to browse, those they belong to and those they may join; a group's threads with who replied to each and how much of it is new, where they start a thread; and a thread's
+pick one or to browse, those they belong to and those they may join; a group's threads with who replied to each and how much of it is new, where they start a thread, and its tasks, the threads that track one, as a table to narrow by status and by search, where they start a task; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
 stop following it, which opening reads through its latest activity; their inbox, their
 notifications under the days they came, all of them or only those waiting, each by who wrote what it
@@ -171,8 +171,12 @@ the pages that compose them; the root composes the pages.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, when it was last active, its task, whether it is still being started, and how much is new, and a composer to
   start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
-  two views, which take the group's members, its name, the thread open in it, and the time now from
-  their parent. `view`, its canonical one, lists the
+  three views, and its tab, Threads or Tasks, Threads at first, says what `view` and `composerView` show.
+  `tabsView` is the tabs, a `paneTabs` named Group: Threads, and Tasks, counted by the tasks that are
+  neither done nor dismissed while there are any, for the group's header, which takes nothing from its
+  parent. The other two take the group's members, its name and whether it is a team, the thread open in
+  it, and the time now from their parent. `view`, its canonical one, shows the tab chosen. On the Threads
+  tab it lists the
   threads as messages, oldest first by when each thread was created (core's `Thread.createdAt`, the
   moment its opening was published), whatever order the store gives them, under a `divider` for each
   day they were created on by the person's own clock, named as it is from the time now (`dayLabel`):
@@ -183,8 +187,23 @@ the pages that compose them; the root composes the pages.
   that opens it, with "Sending…" while it is being started, under it,
   while the thread has replies, a reply line: the initials of those who replied, in the order of their
   first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then how much is new and where its
-  task stands; the thread open is the current row. `composerView` is the composer to start one, for the
-  pane's footer, whose box shows "Message" and the group's name until the person writes.
+  task stands; the thread open is the current row. On the Tasks tab it is the threads that track a
+  task as a table, latest active first by `lastActiveAt`: under a search field, whose label is hidden and
+  whose placeholder says "Search tasks…", beside a select of the status, All statuses or one by its name
+  (`statusLabel`), whose label is hidden too, a line says "Threads that track a task." with how many
+  tasks the search and the status leave at its end, "12 tasks", over the labels of the columns, Task,
+  Status, and Activity, and a row for each task: the initials of its assignee, or a dash for no one, the
+  thread's title or its opening's words (`threadWords`), "Started by Alice · 3 replies" under it, with
+  "Sending…" while the thread is being started, a badge of the status, a success for done and a caution
+  for held, how long ago the thread was last written in (`ageLabel`), and "Open →", the row opening the
+  thread as a row of the list does. The search finds the letters in the thread's title or in its
+  opening's words, whatever their case and accents; a mention in it is the member's current name. With
+  no task the tab says "No tasks yet" and to start one from the composer, and with a search or a
+  status that leaves none, "No tasks match". `composerView` is the composer to start one, for the
+  pane's footer, whose box shows "Message" and the group's name until the person writes. On the Tasks
+  tab it starts a thread that tracks a task, in triage: its box is named New task, shows "New task in"
+  and the group's name, with a `#` before a team's, and its button says Create task. The draft is the
+  same on both tabs.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
@@ -193,9 +212,14 @@ the pages that compose them; the root composes the pages.
   hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit and remove them. It
-  has two views. `view`, its canonical one, is the group's main pane, titled by its name with Follow
-  or Join, where they apply, and a gear that opens the settings as the header's buttons, and its
-  threads, with the composer to start one in the footer, which a team the person has not joined does
+  has two views. `view`, its canonical one, is the group's main pane, titled by its name, under the
+  tabs of the threads Block, Threads and Tasks, which a team the person has not joined does not have,
+  with, as the header's buttons, its members as a cluster of their marks named for how many there are
+  ("7 members", for a team its admitted ones and for a conversation both people), which opens the
+  settings on the Members tab, or on General for a conversation, which has none; Follow as a bell,
+  which is filled, named Unfollow, and pressed while the person follows the group, or Join, where
+  they apply; and a gear that opens the settings; and under them the tab's content, threads or tasks,
+  with the composer to start one in the footer, which a team the person has not joined does
   not have. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
   beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
@@ -212,8 +236,9 @@ the pages that compose them; the root composes the pages.
   the main pane, Back before the title, both sending `ClickedAllThreads`, the thread's messages, and
   the reply composer in the footer, and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
   and `threadView` in its side pane, giving both the time now, which they give on to the threads Block
-  and the thread Block. The main pane embeds the threads Block twice and the side pane
-  the thread Block twice, once for its content and once for its composer, each in a slot of its own.
+  and the thread Block. The main pane embeds the threads Block three times, for the tabs in its header, for
+  its content, and for its composer, and the side pane the thread Block twice, once for its content and once for its
+  composer, each in a slot of its own.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to by name, their conversations by the other members in them, then the public teams they may join,
   to pick one from; and where they start a team, or a conversation with another member, in a modal
@@ -542,7 +567,9 @@ browser's storage. Each Block's tests sit beside it:
   from what was seen, unless nothing changes; a thread's turns stopped while they are active and run
   again only when nothing else keeps them from it, and a turn's log followed from showing it until
   the turn ends or the person hides it, passing over another turn's, and followed again after it
-  could not be; a thread started from the composer and the thread picked; a composer filling in its
+  could not be; a thread started from the composer, a task started on the Tasks tab, the tab and the task
+  filter chosen, the thread picked, and the tasks of a group's threads kept to a status and a search and
+  ordered, and counted while open; a composer filling in its
   draft only while nothing was written, keeping what is written, and sending it once, listing members for
   a mention typed at the end of the text and for no other, keeping the list closed for the letters it
   was dismissed for, opening none for a draft read, and writing the member picked as a link; a group
@@ -612,7 +639,10 @@ browser's storage. Each Block's tests sit beside it:
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
   author of their opening, their time, a mention in the opening as a chip, who replied and how many
   times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
-  from the composer, whose box is named for the group; a composer listing the members whose names
+  from the composer, whose box is named for the group; a group's tabs, Tasks counted while any task is
+  open and chosen to show the tasks as rows by their assignee, title, who started them, replies, status,
+  and age, latest active first, narrowed by status and by search, saying there are none yet or that none
+  match, opening a thread by its row, and a task started from the composer, named for the task; a composer listing the members whose names
   contain the letters after the "@" that ends the text, and not the person, saying which is active and
   what the textarea completes from, picking by a click, by Enter, and by Tab, moving around the list
   with the arrows, and closing on Escape until other letters are typed; a task changed by someone who may, read as
@@ -620,8 +650,9 @@ browser's storage. Each Block's tests sit beside it:
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
   may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends
   or it could not be followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
-  a conversation's other member, with the person's part in it and the gear to its settings, and
-  joining in place of the threads of a team they do not belong to,
+  a conversation's other member, with its tabs, its members as a cluster that opens them in the settings,
+  the person's part in it as a bell pressed while they follow, and the gear to its settings, and
+  joining in place of the threads and the tabs of a team they do not belong to,
   with the composer to start a thread in its footer; its settings in a dialog named for them, in a
   team's name beside the title, with General and Members as tabs, the name a field for someone who
   may rename the team, saved only once it differs, and text for everyone else, the visibility and
@@ -729,7 +760,8 @@ browser's storage. Each Block's tests sit beside it:
   server's under the ID the browser gave it; and another member's reply reaches the person's
   inbox, which reading the thread settles at once and then on the server; and a thread made a task
   and changed shows at once and becomes the server's, while a change from a stale value comes back
-  refused; and a connection added over HTTP, to an integration the test host installs, reaches the
+  refused, and a thread started as a task shows its task in its group's list at once in triage and then as the
+  server made it; and a connection added over HTTP, to an integration the test host installs, reaches the
   store, and its rename and removal show at once, then as the server made them; and an agent added
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,

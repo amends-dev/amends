@@ -161,6 +161,16 @@ export const threadRuns = (
       })
     : [{ text: thread.title }]
 
+/** A thread as the person reads it in a list, its runs joined: its title, or its opening's words, or "A thread". */
+export const threadWords = (
+  thread: Thread.Thread,
+  opening: Option.Option<ThreadMessage.ThreadMessage>,
+  members: ReadonlyArray<Member.Member>
+): string =>
+  threadRuns(thread, opening, members)
+    .map((run) => run.text)
+    .join("")
+
 /** Whether anyone in the workspace may join `group`: a public team. */
 export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"
 

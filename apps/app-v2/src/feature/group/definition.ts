@@ -84,6 +84,7 @@ export const Message = defineMessageUnion({
   ReceivedPresence: { present: Schema.Array(Presence.Present) },
   FailedRead: { error: Schema.String },
   ClickedSettings: {},
+  ClickedMembers: {},
   ChoseSettingsTab: { tab: SettingsTab },
   TypedName: { name: Schema.String },
   SubmittedRename: {},
@@ -112,6 +113,14 @@ export const GroupDefinition = Block.makeDefinition("Group", { Model, Message, O
 /** The admissions in force. */
 export const admitted = (model: Model): ReadonlyArray<MembershipItem> =>
   model.memberships.filter(({ membership }) => membership.status === "active")
+
+/** The members of the group: a team's admitted ones, and a conversation's own. */
+export const membersOf = (model: Model): ReadonlyArray<MemberId.MemberId> =>
+  Option.match(model.group, {
+    onNone: () => [],
+    onSome: ({ group }) =>
+      group.kind === "Team" ? admitted(model).map(({ membership }) => membership.memberId) : group.memberIds
+  })
 
 /** The person's own admission in force, if they have one. */
 export const ownAdmission = (model: Model): Option.Option<MembershipItem> =>

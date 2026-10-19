@@ -6,6 +6,7 @@ import { DateTime, Option } from "effect"
 import {
   Command,
   all,
+  change,
   click,
   expect,
   expectAll,
@@ -31,7 +32,7 @@ import { StartThread } from "./command.ts"
 import { Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { composerView, view } from "./view.ts"
+import { composerView, tabsView, view } from "./view.ts"
 
 const { member } = membership
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
@@ -42,6 +43,7 @@ const openedId = ThreadId.ThreadId.make("thread-1")
 const inputs = {
   members: [member, bob],
   groupName: "General",
+  isTeam: true,
   openThreadId: Option.none<ThreadId.ThreadId>(),
   now
 }
@@ -107,6 +109,43 @@ const strangerAuthor = ThreadMessage.Author.cases.Member.make({ memberId: Member
 
 /** The threads read: `threads`, in the order the store gives them. */
 const listing = (...threads: typeof empty.threads) => modifyFields(empty, { threads: () => threads })
+
+/** Bob's thread titled Ship the release, whose task is in doing, assigned to alice, with three replies. */
+const shipping = {
+  thread: { ...thread, id: ThreadId.ThreadId.make("thread-4"), title: "Ship the release", createdBy: bobAuthor },
+  opening: Option.some(saying(opening, "Ready to ship?")),
+  task: Option.some({
+    ...task,
+    threadId: ThreadId.ThreadId.make("thread-4"),
+    status: "doing" as const,
+    assignee: member.id
+  }),
+  replies: 3,
+  repliers: [bobAuthor],
+  lastActiveAt: DateTime.subtract(now, { minutes: 10 }),
+  pending: false,
+  unread: 0
+}
+
+/** `item` with its task in `status`. */
+const inStatus = <Item extends { readonly task: Option.Option<typeof task> }>(
+  item: Item,
+  status: "held" | "done" | "dismissed"
+): Item => ({ ...item, task: Option.map(item.task, (task) => ({ ...task, status })) })
+
+/** The Tasks tab with `threads` read. */
+const tasking = (...threads: typeof empty.threads) =>
+  modifyFields(empty, { threads: () => threads, tab: () => "Tasks" as const })
+
+/** The tabs over the threads, as a group's header holds them, and the tab shown. */
+const withTabs: typeof sceneView = (model, h) => h.div([], [tabsView(model, h), sceneView(model, h)])
+
+/** The tabs over the composer. */
+const withTabsAndComposer: typeof sceneView = (model, h) =>
+  h.div([], [tabsView(model, h), withViewInputs(composerView, inputs)()(model, h)])
+
+/** The row of the tasks table at `index`. */
+const taskRow = (index: number) => nth(all.role("listitem"), index)
 
 describe("a group's threads", () => {
   it("lists each as a message of the person who opened it, with its time, and its opening as the text that opens it", () => {
@@ -281,10 +320,245 @@ describe("a group's threads", () => {
       click(role("button", { name: "Start" })),
       Command.expectExact(
         SaveDraft({ workspaceId, memberId, place, text: "" }),
-        StartThread({ workspaceId, memberId, groupId, text: "Plans for the week" })
+        StartThread({ workspaceId, memberId, groupId, text: "Plans for the week", task: Option.none() })
       ),
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       Command.resolve(StartThread, Message.WroteAction())
+    )
+  })
+
+  it("starts a task from the composer on the Tasks tab, whose box and button are named for the task", () => {
+    scene(
+      { update, view: withTabsAndComposer },
+      given(empty),
+      expect(label("Start a thread")).toHaveAttr("placeholder", "Message General"),
+      expect(role("button", { name: "Start" })).toExist(),
+      click(role("tab", { name: "Tasks" })),
+      expect(role("form", { name: "New task" })).toExist(),
+      expect(role("form", { name: "Start a thread" })).toBeAbsent(),
+      expect(label("New task")).toHaveAttr("placeholder", "New task in #General"),
+      expect(role("button", { name: "Create task" })).toExist(),
+      type(label("New task"), "Ship the release"),
+      Command.expectExact(SaveDraft({ workspaceId, memberId, place, text: "Ship the release" })),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      click(role("button", { name: "Create task" })),
+      Command.expectExact(
+        SaveDraft({ workspaceId, memberId, place, text: "" }),
+        StartThread({ workspaceId, memberId, groupId, text: "Ship the release", task: Option.some({}) })
+      ),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(StartThread, Message.WroteAction()),
+      click(role("tab", { name: "Threads" })),
+      expect(label("Start a thread")).toHaveAttr("placeholder", "Message General")
+    )
+  })
+
+  it("names a task started in a conversation by the other member, without the # of a team", () => {
+    scene(
+      { update, view: withViewInputs(composerView, { ...inputs, groupName: "Bob", isTeam: false })() },
+      given(modifyFields(empty, { tab: () => "Tasks" as const })),
+      expect(label("New task")).toHaveAttr("placeholder", "New task in Bob")
+    )
+  })
+})
+
+describe("a group's tabs", () => {
+  it("are Threads and Tasks, named for the group, the first one selected", () => {
+    scene(
+      { update, view: tabsView },
+      given(empty),
+      expect(role("tablist", { name: "Group" })).toExist(),
+      expect(role("tab", { name: "Threads" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "false")
+    )
+  })
+
+  it("count the tasks that are not done or dismissed on the Tasks tab, and no count while there are none", () => {
+    scene(
+      { update, view: tabsView },
+      given(listing(alices, shipping, inStatus({ ...alices, thread: retro }, "done"), starting)),
+      expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-description", "2")
+    )
+    scene(
+      { update, view: tabsView },
+      given(listing(inStatus(alices, "done"), inStatus(shipping, "dismissed"), starting)),
+      expect(role("tab", { name: "Tasks" })).not.toHaveAttr("aria-description")
+    )
+    scene(
+      { update, view: tabsView },
+      given(empty),
+      expect(role("tab", { name: "Tasks" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("show the tab the person chooses, and the threads again when they choose Threads", () => {
+    scene(
+      { update, view: withTabs },
+      given(listing(alices, shipping)),
+      expect(role("list", { name: "Threads" })).toExist(),
+      expect(role("list", { name: "Tasks" })).toBeAbsent(),
+      click(role("tab", { name: "Tasks" })),
+      expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "Threads" })).toHaveAttr("aria-selected", "false"),
+      expect(role("list", { name: "Tasks" })).toExist(),
+      expect(role("list", { name: "Threads" })).toBeAbsent(),
+      click(role("tab", { name: "Threads" })),
+      expect(role("list", { name: "Threads" })).toExist(),
+      expect(role("list", { name: "Tasks" })).toBeAbsent()
+    )
+  })
+})
+
+describe("a group's tasks", () => {
+  it("lists the threads that track a task as rows, latest active first, and none of the threads that do not", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, starting, shipping)),
+      expect(role("list", { name: "Tasks" })).toExist(),
+      expect(role("list", { name: "Threads" })).toBeAbsent(),
+      expectAll(all.role("listitem")).toHaveCount(2),
+      expect(within(taskRow(0), role("button", { name: "Ship the release" }))).toExist(),
+      expect(within(taskRow(1), role("button", { name: "Plans for the week" }))).toExist(),
+      expect(role("button", { name: "Retro" })).toBeAbsent()
+    )
+  })
+
+  it("shows each by its assignee's initials or a dash, its thread's title or opening, who started it, and its replies", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, shipping)),
+      expect(within(role("button", { name: "Ship the release" }), text("A"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Plans for the week" }), text("–"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("button", { name: "Ship the release" })).toHaveAttr(
+        "aria-description",
+        "Started by Bob · 3 replies · Doing · 10m ago"
+      ),
+      expect(role("button", { name: "Plans for the week" })).toHaveAttr(
+        "aria-description",
+        "Started by Alice · 0 replies · Triage · 30m ago"
+      ),
+      expect(within(role("button", { name: "Ship the release" }), text("Doing"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), text("10m ago"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), text("Open →"))).toExist()
+    )
+  })
+
+  it("says that a task is on its way while its thread is being started", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking({ ...shipping, pending: true })),
+      expect(role("button", { name: "Ship the release" })).toHaveAttr(
+        "aria-description",
+        "Started by Bob · 3 replies · Sending… · Doing · 10m ago"
+      )
+    )
+  })
+
+  it("shows where each stands in a badge, and says how many tasks it lists", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(inStatus(alices, "done"), inStatus(shipping, "held"))),
+      expect(text("Threads that track a task.")).toExist(),
+      expect(text("2 tasks")).toExist(),
+      expect(within(role("button", { name: "Plans for the week" }), text("Done"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), text("Held"))).toExist()
+    )
+    scene({ update, view: sceneView }, given(tasking(shipping)), expect(text("1 task")).toExist())
+  })
+
+  it("opens the thread of the task the person picks, as a thread of the list opens", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, shipping)),
+      click(role("button", { name: "Plans for the week" })),
+      expectOutMessage(OutMessage.SelectedThread({ threadId: openedId })),
+      click(role("button", { name: "Ship the release" })),
+      expectOutMessage(OutMessage.SelectedThread({ threadId: ThreadId.ThreadId.make("thread-4") }))
+    )
+  })
+
+  it("narrows to the tasks in the status the person chooses, and back to all of them", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, shipping)),
+      expect(label("Status")).toHaveValue("All"),
+      change(label("Status"), "doing"),
+      expect(label("Status")).toHaveValue("doing"),
+      expectAll(all.role("listitem")).toHaveCount(1),
+      expect(role("button", { name: "Ship the release" })).toExist(),
+      expect(role("button", { name: "Plans for the week" })).toBeAbsent(),
+      expect(text("1 task")).toExist(),
+      change(label("Status"), "All"),
+      expectAll(all.role("listitem")).toHaveCount(2)
+    )
+  })
+
+  it("narrows to the tasks whose thread's title or opening has the letters typed, in any case", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, shipping)),
+      expect(label("Search tasks")).toHaveAttr("placeholder", "Search tasks…"),
+      type(label("Search tasks"), "SHIP"),
+      expect(label("Search tasks")).toHaveValue("SHIP"),
+      expectAll(all.role("listitem")).toHaveCount(1),
+      expect(role("button", { name: "Ship the release" })).toExist(),
+      type(label("Search tasks"), "plans"),
+      expect(role("button", { name: "Plans for the week" })).toExist(),
+      expect(role("button", { name: "Ship the release" })).toBeAbsent(),
+      type(label("Search tasks"), "ready"),
+      expect(role("button", { name: "Ship the release" })).toExist(),
+      expect(text("1 task")).toExist()
+    )
+  })
+
+  it("narrows by the status and the search together", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, shipping)),
+      change(label("Status"), "triage"),
+      type(label("Search tasks"), "ship"),
+      expect(role("list", { name: "Tasks" })).toBeAbsent(),
+      expect(text("0 tasks")).toExist(),
+      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      type(label("Search tasks"), "plans"),
+      expect(role("button", { name: "Plans for the week" })).toExist()
+    )
+  })
+
+  it("says there are none yet, and how to start one, while no thread tracks a task", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(starting)),
+      expect(role("heading", { name: "No tasks yet", level: 2 })).toExist(),
+      expect(text("Start one from the composer below.")).toExist(),
+      expect(role("list", { name: "Tasks" })).toBeAbsent(),
+      expect(text("0 tasks")).toExist()
+    )
+    scene({ update, view: sceneView }, given(tasking()), expect(role("heading", { name: "No tasks yet" })).toExist())
+  })
+
+  it("says that none match when a search or a status leaves none, and not that there are none yet", () => {
+    scene(
+      { update, view: sceneView },
+      given(tasking(alices, shipping)),
+      type(label("Search tasks"), "zzz"),
+      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      expect(text("Try a different search or status.")).toExist(),
+      expect(role("heading", { name: "No tasks yet" })).toBeAbsent(),
+      type(label("Search tasks"), "  "),
+      expectAll(all.role("listitem")).toHaveCount(2),
+      change(label("Status"), "done"),
+      expect(role("heading", { name: "No tasks match", level: 2 })).toExist()
+    )
+  })
+
+  it("says why the threads could not be read, over the tasks", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(tasking(alices), { notice: () => Option.some("This browser could not read that. Try again.") })
+      ),
+      expect(role("alert")).toHaveText("This browser could not read that. Try again.")
     )
   })
 })

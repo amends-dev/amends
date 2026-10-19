@@ -4,13 +4,25 @@ import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { AdmitMember, FollowGroup, JoinGroup, LeaveGroup, RemoveMember, RenameGroup, UnfollowGroup } from "./command.ts"
 import { DialogBinding, GroupComposition } from "./composition.ts"
-import { GroupDefinition, Message, type Model, mayRename, OutMessage, ownAdmission, teamName } from "./definition.ts"
+import {
+  GroupDefinition,
+  Message,
+  type Model,
+  mayRename,
+  OutMessage,
+  ownAdmission,
+  type SettingsTab,
+  teamName
+} from "./definition.ts"
 
 /** Whose store the action is written to, and the group it acts on. */
 const inGroup = ({ workspaceId, memberId, groupId }: Model) => ({ workspaceId, memberId, groupId })
 
-/** Show the settings' General section. */
-const showGeneralTab = GroupDefinition.stepFields(() => ({ settingsTab: () => "General" as const }))
+/** Show the settings' section `tab`. */
+const showSettingsTab = (tab: SettingsTab) => GroupDefinition.stepFields(() => ({ settingsTab: () => tab }))
+
+/** The settings section that lists the members: a team's Members tab, and General for a conversation, with none. */
+const membersTabOf = (model: Model): SettingsTab => (Option.isSome(teamName(model)) ? "Members" : "General")
 
 /** Close the thread open in the group. */
 const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Option.none() }))
@@ -42,7 +54,10 @@ export const update = GroupComposition.makeUpdate((model, message) =>
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     ReceivedPresence: ({ present }) => ({ model: modifyFields(model, { present: () => present }) }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
-    ClickedSettings: () => Update.combine(model, [showGeneralTab, startRenaming, DialogBinding.requestOpen()]),
+    ClickedSettings: () =>
+      Update.combine(model, [showSettingsTab("General"), startRenaming, DialogBinding.requestOpen()]),
+    ClickedMembers: () =>
+      Update.combine(model, [showSettingsTab(membersTabOf(model)), startRenaming, DialogBinding.requestOpen()]),
     ChoseSettingsTab: ({ tab }) => ({ model: modifyFields(model, { settingsTab: () => tab }) }),
     TypedName: ({ name }) => ({ model: modifyFields(model, { renaming: () => Option.some(name) }) }),
     SubmittedRename: () => Update.combine(model, [writeRenamingWhenChanged, DialogBinding.requestClose()]),

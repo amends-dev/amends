@@ -13,6 +13,7 @@ import {
 } from "@amends-dev/design/control"
 import { badge, entry, entryList } from "@amends-dev/design/details"
 import { form, settingRow } from "@amends-dev/design/form"
+import { markCluster } from "@amends-dev/design/mark"
 import { type ModalConfig, modal } from "@amends-dev/design/modal"
 import { pane, paneBack, paneClose, paneColumn, paneTabs } from "@amends-dev/design/pane"
 import type { RenderInfo } from "@foldkit/ui/dialog"
@@ -21,12 +22,12 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may } from "../../permissions.ts"
-import { groupName, initials, isJoinable, memberName } from "../../seen.ts"
+import { groupName, initials, isJoinable, memberName, pluralize } from "../../seen.ts"
 import { titleOf } from "../thread/definition.ts"
 import { replyView } from "../thread/view.ts"
-import { composerView } from "../threads/view.ts"
+import { composerView, tabsView } from "../threads/view.ts"
 import { DialogBinding, GroupComposition, type GroupViewBuilder, ThreadBinding, ThreadsBinding } from "./composition.ts"
-import { admitted, belongs, mayRename, Message, type Model } from "./definition.ts"
+import { admitted, belongs, mayRename, Message, type Model, membersOf, teamName } from "./definition.ts"
 
 /** The time now, which the days the threads and their messages were published on are read from. */
 export type ViewInputs = Readonly<{ now: DateTime.Utc }>
@@ -50,16 +51,20 @@ const markOf = (model: Model) =>
       group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: nameOf(model).slice(0, 1) }
   })
 
-/** The person's follow of the group: following it or not, and whether a change to that is on its way. */
+/** Follow, as a bell that is not pressed: following the group is one press away. */
+const followButton = (h: GroupViewBuilder): Html =>
+  iconButton(h, { icon: "bell", label: "Follow", onClick: Message.ClickedFollow() }, { isPressed: false })
+
+/** Unfollow, as a bell that is filled and pressed: the person follows the group. */
+const unfollowButton = (h: GroupViewBuilder): Html =>
+  iconButton(h, { icon: "bell-filled", label: "Unfollow", onClick: Message.ClickedUnfollow() }, { isPressed: true })
+
+/** The person's follow of the group as a bell, filled while they follow it, or that a change to it is on its way. */
 const followAction = (model: Model, h: GroupViewBuilder): Html =>
   Option.match(model.follow, {
-    onNone: () => button(h, "Follow", Message.ClickedFollow(), { variant: "quiet" }),
+    onNone: () => followButton(h),
     onSome: ({ follow, pending }) =>
-      pending
-        ? sending(h, true)
-        : follow.status === "active"
-          ? button(h, "Unfollow", Message.ClickedUnfollow(), { variant: "quiet" })
-          : button(h, "Follow", Message.ClickedFollow(), { variant: "quiet" })
+      pending ? sending(h, true) : follow.status === "active" ? unfollowButton(h) : followButton(h)
   })
 
 /** The person's part in the group: following it while they belong to it, joining a public team while they do not. */
@@ -73,6 +78,21 @@ const partActions = (model: Model, h: GroupViewBuilder): ReadonlyArray<Html> =>
           ? [button(h, "Join", Message.ClickedJoin(), { variant: "primary" })]
           : []
   })
+
+/** The members of the group as a cluster of their marks that opens them, once the group is read and has any. */
+const membersActions = (model: Model, h: GroupViewBuilder): ReadonlyArray<Html> => {
+  const memberIds = membersOf(model)
+
+  return memberIds.length === 0
+    ? []
+    : [
+        markCluster(h, {
+          marks: memberIds.map((memberId) => initials(memberName(model.members, memberId))),
+          label: pluralize(memberIds.length, "member", "members"),
+          onClick: Message.ClickedMembers()
+        })
+      ]
+}
 
 /** The button that opens the group's settings, once the group is read. */
 const settingsActions = (model: Model, h: GroupViewBuilder): ReadonlyArray<Html> =>
@@ -256,9 +276,9 @@ const settingsModal = (render: RenderInfo, model: Model, h: GroupViewBuilder): H
   })
 
 /**
- * The group's main pane: its name, titled by its mark, with the person's part in it and the button to open its
- * settings, and its threads, with the composer to start one in the footer, or the line that says to join the
- * team to read them; and the settings' modal.
+ * The group's main pane: its name, titled by its mark, with its members, the person's part in it, and the button
+ * to open its settings, under the tabs of its threads and its tasks, and the tab shown, with the composer to start
+ * one in the footer, or the line that says to join the team to read them; and the settings' modal.
  */
 export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { now }, h) => {
   const name = nameOf(model)
@@ -267,6 +287,7 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
   const threadsInputs = {
     members: model.members,
     groupName: name,
+    isTeam: Option.isSome(teamName(model)),
     openThreadId: Option.map(model.thread, ({ threadId }) => threadId),
     now
   }
@@ -274,7 +295,14 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
   return pane(h, {
     variant: "main",
     label: name,
-    header: { title: name, ...markOf(model), actions: [...partActions(model, h), ...settingsActions(model, h)] },
+    header: {
+      title: name,
+      ...markOf(model),
+      actions: [...membersActions(model, h), ...partActions(model, h), ...settingsActions(model, h)],
+      ...(isReadable
+        ? { tabs: h.block(ThreadsBinding.embedView({ slotId: "tabs", model: model.threads, view: tabsView })) }
+        : {})
+    },
     body: [
       paneColumn(h, [
         notice(h, model.notice),

@@ -31,6 +31,16 @@ const announcements = Schema.decodeSync(Group.Group)({
   createdAt: "2026-10-18T12:00:00Z"
 })
 
+/** The conversation between the person and Bob. */
+const conversation = Schema.decodeSync(Group.Group)({
+  id: "direct-1",
+  workspaceId: "workspace-1",
+  kind: "Direct",
+  memberIds: ["member-1", "member-2"],
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
 const opened = init(workspace.id, member.id, design.id, Option.none()).model
 const inDesign = { workspaceId: workspace.id, memberId: member.id, groupId: design.id }
 
@@ -72,7 +82,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
   ThreadsBinding.embedView({
     slotId: "threads",
     model: opened.threads,
-    viewInputs: { members: [], groupName: "Design", openThreadId: Option.none(), now }
+    viewInputs: { members: [], groupName: "Design", isTeam: true, openThreadId: Option.none(), now }
   }).toParentMessage(message)
 
 describe("a group", () => {
@@ -90,6 +100,38 @@ describe("a group", () => {
         expect(model.settingsTab).toBe("Members")
       }),
       message(Message.ClickedSettings()),
+      dialogOpened,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.settingsTab).toBe("General")
+      })
+    )
+  })
+
+  it("opens its settings on the Members section for a team, and on General for a conversation, from its members", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      message(Message.ClickedMembers()),
+      dialogOpened,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.settingsTab).toBe("Members")
+      })
+    )
+    story(
+      update,
+      given(init(workspace.id, member.id, conversation.id, Option.none()).model),
+      message(
+        Message.ReceivedGroup({
+          group: Option.some({ group: conversation, pending: false }),
+          memberships: [],
+          follow: Option.none()
+        })
+      ),
+      message(Message.ChoseSettingsTab({ tab: "Members" })),
+      message(Message.ClickedMembers()),
       dialogOpened,
       model((model) => {
         expect(model.dialog.isOpen).toBe(true)

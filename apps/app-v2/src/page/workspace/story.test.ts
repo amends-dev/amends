@@ -131,7 +131,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: { members: [], groupName: "General", openThreadId: Option.none(), now }
+      viewInputs: { members: [], groupName: "General", isTeam: true, openThreadId: Option.none(), now }
     }).toParentMessage(message)
   )
 
