@@ -141,6 +141,14 @@ describe("a thread's turns", () => {
       expect(role("list", { name: "Log" })).toBeAbsent(),
       Subscription.emit(
         subscriptions.log,
+        Message.ReceivedLog({ turnId: running.id, logMessage: Turn.LogMessage.cases.Opened.make({ items: [] }) })
+      ),
+      // Followed with nothing written, the hint says where it stands.
+      expect(text("Opening the log…")).toBeAbsent(),
+      expect(text("Nothing written yet.")).toExist(),
+      expect(role("list", { name: "Log" })).toBeAbsent(),
+      Subscription.emit(
+        subscriptions.log,
         Message.ReceivedLog({
           turnId: running.id,
           logMessage: Turn.LogMessage.cases.Opened.make({
@@ -148,7 +156,7 @@ describe("a thread's turns", () => {
           })
         })
       ),
-      expect(text("Opening the log…")).toBeAbsent(),
+      expect(text("Nothing written yet.")).toBeAbsent(),
       expect(within(role("list", { name: "Log" }), text("Read 1 message"))).toExist(),
       Subscription.emit(
         subscriptions.log,

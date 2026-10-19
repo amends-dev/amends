@@ -30,7 +30,7 @@ const logItemText = (item: Turn.LogItem) =>
 const logStateView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html> =>
   LogState.match(turnLog.state, {
     Opening: () => [hint(h, "Opening the log…")],
-    Following: () => [],
+    Following: () => (turnLog.items.length === 0 ? [hint(h, "Nothing written yet.")] : []),
     Ended: () => [hint(h, "The turn has ended.")],
     Failed: ({ error }) => [
       notice(h, Option.some(error)),

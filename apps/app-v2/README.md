@@ -143,8 +143,9 @@ the pages that compose them; the root composes the pages.
   that says how the turn stands (queued and stopped are neutral, running and stopping cautious,
   completed a success, failed a danger), with who ran it again and "Sending…" after it, then why it
   failed, the buttons Stop, Run again, and Show log or Hide log, and, while the log is shown, the log
-  as a list, once it has items, with where following it stands under it; a log still opening shows
-  that alone. A thread with no turns shows only why they could
+  as a list, once it has items, with where following it stands under it (still opening, nothing
+  written yet while it is followed with no items, the turn ended, or why it failed); a log still
+  opening shows that alone. A thread with no turns shows only why they could
   not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, its task, whether it is still being started, and how much is new, and a composer to
