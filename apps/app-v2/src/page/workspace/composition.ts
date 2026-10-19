@@ -1,23 +1,20 @@
 import { GroupId } from "@amends-dev/core/group"
-import { ThreadId } from "@amends-dev/core/thread"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import { ActionsBlock } from "../../feature/actions/block.ts"
+import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
-import { ThreadBlock } from "../../feature/thread/block.ts"
-import { ThreadsBlock } from "../../feature/threads/block.ts"
 import { type Model, WorkspaceDefinition } from "./definition.ts"
 
-/** Picking a group opens it, listing its threads, with none open. */
+/** Picking a group opens it. */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: ({ groupId }) =>
     WorkspaceDefinition.step((model: Model) =>
-      ThreadsBinding.init({
+      GroupBinding.init({
         key: groupId,
         args: [model.workspaceId, model.memberId, groupId],
-        toParentModel: (threads) =>
-          modifyFields(model, { pane: () => Option.some({ groupId, threads, thread: Option.none() }) })
+        toParentModel: (group) => modifyFields(model, { group: () => Option.some({ groupId, model: group }) })
       })
     )
 })
@@ -33,52 +30,19 @@ export const ActionsBinding = WorkspaceDefinition.bindChild(ActionsBlock, {
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
 })
 
-/** Picking a thread opens it in the group. */
-const foldThreadsOutMessage = (groupId: GroupId.GroupId, outMessage: typeof ThreadsBlock.OutMessage.Type) =>
-  ThreadsBlock.OutMessage.match(outMessage, {
-    SelectedThread: ({ threadId }) =>
-      WorkspaceDefinition.step((model: Model) =>
-        ThreadBinding.init({
-          key: threadId,
-          args: [model.workspaceId, model.memberId, threadId],
-          toParentModel: (thread) =>
-            modifyFields(model, {
-              pane: Option.map((pane) =>
-                pane.groupId === groupId ? { ...pane, thread: Option.some({ threadId, model: thread }) } : pane
-              )
-            })
-        })
-      )
-  })
-
-export const ThreadsBinding = WorkspaceDefinition.bindChild(ThreadsBlock, {
-  readAll: (model) => Option.toArray(model.pane),
-  key: (pane) => pane.groupId,
+/** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
+export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
+  readAll: (model) => Option.toArray(model.group),
+  key: (open) => open.groupId,
   keySchema: GroupId.GroupId,
-  read: (pane) => pane.threads,
-  writeAt: (model, groupId, nextThreads) =>
-    modifyFields(model, {
-      pane: Option.map((pane) => (pane.groupId === groupId ? { ...pane, threads: nextThreads } : pane))
-    }),
-  outMessage: { fold: foldThreadsOutMessage }
-})
-
-export const ThreadBinding = WorkspaceDefinition.bindChild(ThreadBlock, {
-  readAll: (model) => Option.toArray(Option.flatMap(model.pane, (pane) => pane.thread)),
-  key: (open) => open.threadId,
-  keySchema: ThreadId.ThreadId,
   read: (open) => open.model,
-  writeAt: (model, threadId, nextThread) =>
+  writeAt: (model, groupId, nextGroup) =>
     modifyFields(model, {
-      pane: Option.map((pane) =>
-        modifyFields(pane, {
-          thread: Option.map((open) => (open.threadId === threadId ? { threadId, model: nextThread } : open))
-        })
-      )
+      group: Option.map((open) => (open.groupId === groupId ? { groupId, model: nextGroup } : open))
     })
 })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
-  bindings: [GroupsBinding, ActionsBinding, ThreadsBinding, ThreadBinding]
+  bindings: [GroupsBinding, ActionsBinding, GroupBinding]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

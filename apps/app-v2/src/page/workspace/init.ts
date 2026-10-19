@@ -6,6 +6,6 @@ import { WorkspaceComposition } from "./composition.ts"
 export const init = WorkspaceComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, name: string) => ({
     childInitContext: { workspaceId, memberId },
-    model: { workspaceId, memberId, name, pane: Option.none() }
+    model: { workspaceId, memberId, name, group: Option.none() }
   })
 )

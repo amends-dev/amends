@@ -6,42 +6,31 @@
 import { Presence } from "@amends-dev/core/presence"
 import { ReadState } from "@amends-dev/core/read-state"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
-import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
-import type * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { Message, ThreadDefinition } from "./definition.ts"
 
-/** Whose store the action is written to. */
-const asMember = { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId }
-type AsMember = { readonly workspaceId: WorkspaceId.WorkspaceId; readonly memberId: MemberId.MemberId }
-
-/** Write with `to` to the member's store, and say so, or why it could not be kept. */
-const writing =
-  (stores: Stores.Stores["Service"]) =>
-  <E>({ workspaceId, memberId }: AsMember, to: (store: Store.Store["Service"]) => Effect.Effect<unknown, E>) =>
-    stores.write(workspaceId, memberId, to).pipe(
-      Effect.as(Message.WroteAction()),
-      Effect.catchCause(() => Effect.succeed(Message.FailedWriteAction({ error: Stores.unwritable })))
-    )
-
-/** `input` decoded by `schema`, or why it was refused, as the person reads it. */
-const decoded = <S extends Schema.Top>(schema: S, input: S["Encoded"], refused: string) =>
-  Schema.decodeEffect(schema)(input).pipe(Effect.mapError(() => Message.FailedWriteAction({ error: refused })))
-
 const posted = [Message.WroteAction, Message.FailedWriteAction]
+
+/** Why `error` kept the action from being written, as the person reads it. */
+const failed = (error: string) => Message.FailedWriteAction({ error })
 
 /** Reply in `threadId` with `text`. */
 export const PostReply = ThreadDefinition.command("PostReply", {
-  args: { ...asMember, threadId: ThreadId.ThreadId, text: Schema.String },
+  args: { ...Stores.AsMember, threadId: ThreadId.ThreadId, text: Schema.String },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ threadId, text, ...member }) =>
-      decoded(ThreadMessage.PublishInput, { threadId, text, mentions: [] }, "A reply needs some text.").pipe(
+      Stores.decoded(
+        ThreadMessage.PublishInput,
+        { threadId, text, mentions: [] },
+        failed("A reply needs some text.")
+      ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadMessagePosted", input))),
         Effect.catch(Effect.succeed)
       )
@@ -50,12 +39,21 @@ export const PostReply = ThreadDefinition.command("PostReply", {
 
 /** Rename `threadId` to `title`, from the title the person saw. */
 export const RenameThread = ThreadDefinition.command("RenameThread", {
-  args: { ...asMember, threadId: ThreadId.ThreadId, title: Schema.String, expectedTitle: Schema.NullOr(Schema.String) },
+  args: {
+    ...Stores.AsMember,
+    threadId: ThreadId.ThreadId,
+    title: Schema.String,
+    expectedTitle: Schema.NullOr(Schema.String)
+  },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ threadId, title, expectedTitle, ...member }) =>
-      decoded(Thread.RenameInput, { threadId, title, expectedTitle }, "A thread's title needs some text.").pipe(
+      Stores.decoded(
+        Thread.RenameInput,
+        { threadId, title, expectedTitle },
+        failed("A thread's title needs some text.")
+      ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadRenamed", input))),
         Effect.catch(Effect.succeed)
       )
@@ -64,15 +62,20 @@ export const RenameThread = ThreadDefinition.command("RenameThread", {
 
 /** Change the text of `messageId`, from the revision the person saw. */
 export const EditMessage = ThreadDefinition.command("EditMessage", {
-  args: { ...asMember, messageId: ThreadMessageId.ThreadMessageId, text: Schema.String, expectedRevision: Schema.Int },
+  args: {
+    ...Stores.AsMember,
+    messageId: ThreadMessageId.ThreadMessageId,
+    text: Schema.String,
+    expectedRevision: Schema.Int
+  },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ messageId, text, expectedRevision, ...member }) =>
-      decoded(
+      Stores.decoded(
         ThreadMessage.EditInput,
         { messageId, text, mentions: [], expectedRevision },
-        "A message needs some text."
+        failed("A message needs some text.")
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("ThreadMessageEdited", input))),
         Effect.catch(Effect.succeed)
@@ -82,30 +85,34 @@ export const EditMessage = ThreadDefinition.command("EditMessage", {
 
 /** Delete `messageId`. */
 export const DeleteMessage = ThreadDefinition.command("DeleteMessage", {
-  args: { ...asMember, messageId: ThreadMessageId.ThreadMessageId },
+  args: { ...Stores.AsMember, messageId: ThreadMessageId.ThreadMessageId },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ messageId, ...member }) => write(member, (store) => store.write("ThreadMessageDeleted", { messageId }))
   }
 })
 
 /** Follow `threadId`. */
 export const FollowThread = ThreadDefinition.command("FollowThread", {
-  args: { ...asMember, threadId: ThreadId.ThreadId },
+  args: { ...Stores.AsMember, threadId: ThreadId.ThreadId },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ threadId, ...member }) => write(member, (store) => store.write("ThreadFollowed", { threadId }))
   }
 })
 
 /** Stop following `threadId`, ending the person's participation in it. */
 export const UnfollowThread = ThreadDefinition.command("UnfollowThread", {
-  args: { ...asMember, threadId: ThreadId.ThreadId, participationId: ThreadParticipationId.ThreadParticipationId },
+  args: {
+    ...Stores.AsMember,
+    threadId: ThreadId.ThreadId,
+    participationId: ThreadParticipationId.ThreadParticipationId
+  },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ threadId, participationId, ...member }) =>
       write(member, (store) => store.write("ThreadUnfollowed", { threadId, participationId }))
   }
@@ -113,10 +120,10 @@ export const UnfollowThread = ThreadDefinition.command("UnfollowThread", {
 
 /** Note that the person read `threadId` through `throughSequence`. */
 export const MarkThreadRead = ThreadDefinition.command("MarkThreadRead", {
-  args: { ...asMember, threadId: ThreadId.ThreadId, throughSequence: Schema.Int },
+  args: { ...Stores.AsMember, threadId: ThreadId.ThreadId, throughSequence: Schema.Int },
   messages: posted,
   handler: function* () {
-    const write = writing(yield* Stores.Stores)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
     return ({ threadId, throughSequence, ...member }) =>
       Schema.decodeEffect(ReadState.MarkThreadReadInput)({ threadId, throughSequence }).pipe(
         Effect.matchEffect({

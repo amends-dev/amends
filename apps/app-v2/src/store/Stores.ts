@@ -5,12 +5,13 @@
  */
 
 import type { Identity } from "@amends-dev/core/identity"
-import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as RcMap from "effect/RcMap"
+import * as Schema from "effect/Schema"
 import type * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
 import * as Session from "../session.ts"
@@ -96,3 +97,23 @@ export const layer = Layer.effect(
     })
   })
 )
+
+/** Whose store an action is written to: the member, in their workspace. */
+export const AsMember = { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId }
+export type AsMember = { readonly workspaceId: WorkspaceId.WorkspaceId; readonly memberId: MemberId.MemberId }
+
+/** `input` decoded by `schema`, or `refused`, what the person reads when it does not decode. */
+export const decoded = <S extends Schema.Top, Refused>(schema: S, input: S["Encoded"], refused: Refused) =>
+  Schema.decodeEffect(schema)(input).pipe(Effect.mapError(() => refused))
+
+/**
+ * Writing to a member's store through `stores`: each write ends in `wrote`, or in what `failed`
+ * makes of why it could not be kept.
+ */
+export const writer =
+  <Wrote, Failed>(stores: Stores["Service"], wrote: Wrote, failed: (error: string) => Failed) =>
+  <E>(member: AsMember, to: (store: Store.Store["Service"]) => Effect.Effect<unknown, E>) =>
+    stores.write(member.workspaceId, member.memberId, to).pipe(
+      Effect.as(wrote),
+      Effect.catchCause(() => Effect.succeed(failed(unwritable)))
+    )

@@ -9,6 +9,7 @@
  * the host, the person, and the workspace, since positions and entry IDs are only unique within one.
  */
 
+import { type Grant, GrantResolver } from "@amends-dev/core/authorization"
 import type { CoreError } from "@amends-dev/core/error"
 import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
@@ -84,6 +85,16 @@ export interface ThreadView {
   readonly task: Option.Option<Task.Task>
   /** Its activities that count as new, past the member's position. */
   readonly unread: number
+}
+
+/**
+ * A group as the person sees it open: the group, while the replica holds it, its admissions, and the
+ * person's own follow of it, when they have one.
+ */
+export interface GroupDetail {
+  readonly group: Option.Option<Pending.Held<Replica.RecordOf<"Group">>>
+  readonly memberships: ReadonlyArray<Pending.Held<Replica.RecordOf<"GroupMembership">>>
+  readonly follow: Option.Option<Pending.Held<Replica.RecordOf<"GroupFollow">>>
 }
 
 /** One of a thread's turns, and whether nothing but who may direct its agent keeps it from running again. */
@@ -192,6 +203,10 @@ export class Store extends Context.Service<
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
     /** The thread `threadId` as the person sees it open, and again after each change. */
     readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadDetail, QueryError>
+    /** The group `groupId` as the person sees it open, and again after each change. */
+    readonly group: (groupId: GroupId.GroupId) => Stream.Stream<GroupDetail, QueryError>
+    /** What the person may do, from their active assignments and the workspace's roles, and again after each change. */
+    readonly grants: Stream.Stream<ReadonlyArray<Grant.Grant>, QueryError>
     /** The person's notifications as their inbox shows them, and again after each change. */
     readonly inbox: Stream.Stream<ReadonlyArray<InboxEntry>, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
@@ -369,12 +384,12 @@ export const layer = (options: Options) =>
             view: (records: A, pending: ReadonlyArray<Pending.Unfinished>) => B
           ) =>
             untilFailed(Stream.map(Stream.zipLatest(read, unfinished), ([records, pending]) => view(records, pending)))
+          const list = <Kind extends ReplicaRecord.Kind>(kind: Kind, place: ReplicaRecord.Place) =>
+            withPending(replica.list(kind, place), (records, pending) => Pending.overlay(kind, place, records, pending))
+          const workspace = ReplicaRecord.Place.cases.Workspace.make({})
           return Store.of({
             write: yield* makeWrite,
-            list: (kind, place) =>
-              withPending(replica.list(kind, place), (records, pending) =>
-                Pending.overlay(kind, place, records, pending)
-              ),
+            list,
             every: (kind) =>
               withPending(replica.every(kind), (records, pending) =>
                 Pending.overlay(kind, undefined, records, pending)
@@ -444,6 +459,30 @@ export const layer = (options: Options) =>
                   )
                 }
               }),
+            group: (groupId) => {
+              const place = ReplicaRecord.Place.cases.Group.make({ groupId })
+              return Stream.map(
+                Stream.zipLatest(
+                  list("Group", workspace),
+                  Stream.zipLatest(list("GroupMembership", place), list("GroupFollow", place))
+                ),
+                ([groups, [memberships, follows]]): GroupDetail => ({
+                  group: Array.findFirst(groups, ({ record }) => record.value.id === groupId),
+                  memberships,
+                  follow: Array.findFirst(follows, ({ record }) => record.value.memberId === options.memberId)
+                })
+              )
+            },
+            grants: Stream.map(
+              Stream.zipLatest(list("Role", workspace), list("Assignment", workspace)),
+              ([roles, assignments]) =>
+                GrantResolver.grantsOf(
+                  assignments.flatMap(({ record }) =>
+                    record.value.memberId === options.memberId && record.value.status === "active" ? [record.value] : []
+                  ),
+                  (roleId) => roles.find(({ record }) => record.value.id === roleId)?.record.value
+                )
+            ),
             inbox: withPending(replica.inbox, ({ notifications, threads }, pending) =>
               Pending.overlay("Notification", undefined, notifications, pending).map((notification): InboxEntry => {
                 const source = notification.record.value.thread

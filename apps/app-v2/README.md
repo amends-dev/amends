@@ -54,8 +54,14 @@ the pages that compose them; the root composes the pages.
   as often as typing lasts, by core's `Presence.typingRepeats`, and sending says they stopped.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
   being started, and how much is new, and a composer to start one. It reports the thread picked.
-- `feature/groups`: the groups the person can see, teams by name and conversations by their other
-  members, to pick one from. It reports the group picked.
+- `feature/group`: a group as the person has it open: its name, their part in it, a team's members,
+  its threads, and the thread open among them, a keyed occurrence, so opening another makes a fresh
+  one and a late result cannot land in the wrong one. They rename a team, follow it or stop, join a
+  public team or leave one, and, where they manage its members, admit and remove them.
+- `feature/groups`: the groups the person can see, the teams they belong to by name and their
+  conversations by the other members in them, then the public teams they may join, to pick one
+  from; and where they start a team, or a conversation with another member. It reports the group
+  picked.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it.
 - `page/signIn`: signing in, a step at a time; it keeps the session a right code gives, and reports
@@ -63,9 +69,7 @@ the pages that compose them; the root composes the pages.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP; it reports the one
   picked.
 - `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
-  the open group's threads, and the thread open among them, each a keyed occurrence, so opening
-  another makes a fresh one and a late result cannot land in the wrong one. It reports when the
-  person leaves it.
+  and the open group, a keyed occurrence. It reports when the person leaves it.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
   the one open. Signing in lists the workspaces; signing out, `command.ts`,
@@ -132,8 +136,10 @@ settings, connections, agents, and channels. Each returns as a Block by the same
   of a kind at a place, `threads` a group's threads with their messages, and `actions` the person's
   unfinished actions, each again after every change, `every` the records of a kind wherever they
   sit, `inbox` the person's notifications with the threads they come from, which the store
-  shows each by the message its activity is about, and `thread` what a thread holds, with its task
-  and turns; the store reads each through `overlay`, and offers each turn's retry by core's
+  shows each by the message its activity is about, `thread` what a thread holds, with its task
+  and turns, `group` a group with its admissions and the person's follow of it, and `grants` what
+  the person may do, resolved by core's `GrantResolver` from their active assignments and the
+  workspace's roles; the store reads each through `overlay`, and offers each turn's retry by core's
   `Turn.whyNotRetryable`, from where its agent stands among the thread's turns, by
   `TurnStore.latestOf`, and who takes part in it. `get` and `getActions` read a record and the
   actions once, for an action being written.
@@ -164,11 +170,16 @@ browser's storage. Each Block's tests sit beside it:
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
   is written and stopped once it is sent, and why a write could not be kept; a thread started from
   the composer and the thread picked; a composer filling in its draft only while nothing was written,
-  keeping what is written, and sending it once; a workspace opening the group picked, then the thread
-  picked in it, and closing each; and the root signing in a step at a time, listing the workspaces,
+  keeping what is written, and sending it once; a group renamed from the name seen, followed, left,
+  or joined, a member admitted and an admission removed, and the thread picked opened and closed;
+  the groups starting a team or a conversation and reporting the group picked once; a workspace
+  opening the group picked; and the root signing in a step at a time, listing the workspaces,
   opening and closing one, and signing out.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
-  on its way, who types, and a reply written and sent.
+  on its way, who types, and a reply written and sent; a group's name, the person's part in it,
+  its members with removing for the others, and joining in place of the threads of a team they do
+  not belong to; and the groups listed apart from the teams to join, with a new team taken only
+  from someone who may create one.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and

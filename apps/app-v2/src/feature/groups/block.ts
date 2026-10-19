@@ -1,3 +1,5 @@
+import * as Layer from "effect/Layer"
+import { EffectsLayer } from "./command.ts"
 import { GroupsComposition } from "./composition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
@@ -9,5 +11,5 @@ export const GroupsBlock = GroupsComposition.assembleBlock({
   update,
   view,
   subscriptions,
-  EffectsLayer: subscriptions.layer
+  EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })

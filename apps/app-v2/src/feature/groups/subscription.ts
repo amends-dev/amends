@@ -1,4 +1,7 @@
-/** The workspace's groups and members, read from the person's store as they change. */
+/**
+ * The workspace's groups and members, the person's own admissions, and what they may do, read from
+ * their store as they change.
+ */
 
 import { Group } from "@amends-dev/core/group"
 import { ReplicaRecord } from "@amends-dev/core/replica"
@@ -21,7 +24,13 @@ export const subscriptions = GroupsDefinition.subscriptions((entry) => ({
     "ReadGroups",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
     {
-      messages: [Message.ReceivedGroups, Message.ReceivedMembers, Message.FailedRead],
+      messages: [
+        Message.ReceivedGroups,
+        Message.ReceivedMembers,
+        Message.ReceivedMemberships,
+        Message.ReceivedGrants,
+        Message.FailedRead
+      ],
       modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
       handler: function* () {
         const stores = yield* Stores.Stores
@@ -29,16 +38,28 @@ export const subscriptions = GroupsDefinition.subscriptions((entry) => ({
           stores
             .read(workspaceId, memberId, (store) =>
               Stream.merge(
-                Stream.map(store.list("Group", workspace), (groups) =>
-                  Message.ReceivedGroups({
-                    groups: Array.sort(
-                      groups.map(({ record, pending }) => ({ group: record.value, pending })),
-                      byName
-                    )
-                  })
+                Stream.merge(
+                  Stream.map(store.list("Group", workspace), (groups) =>
+                    Message.ReceivedGroups({
+                      groups: Array.sort(
+                        groups.map(({ record, pending }) => ({ group: record.value, pending })),
+                        byName
+                      )
+                    })
+                  ),
+                  Stream.map(store.list("Member", workspace), (members) =>
+                    Message.ReceivedMembers({ members: members.map(({ record }) => record.value) })
+                  )
                 ),
-                Stream.map(store.list("Member", workspace), (members) =>
-                  Message.ReceivedMembers({ members: members.map(({ record }) => record.value) })
+                Stream.merge(
+                  Stream.map(store.every("GroupMembership"), (memberships) =>
+                    Message.ReceivedMemberships({
+                      memberships: memberships.flatMap(({ record }) =>
+                        record.value.memberId === memberId && record.value.status === "active" ? [record.value] : []
+                      )
+                    })
+                  ),
+                  Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants }))
                 )
               )
             )

@@ -5,7 +5,7 @@ import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
-import { Group } from "@amends-dev/core/group"
+import { Group, GroupPermissions } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
@@ -354,6 +354,12 @@ describe("Store", () => {
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
       yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)
 
+      // The person may create teams, as the workspace's owner.
+      expect(
+        (yield* firstWhere(store.grants, (grants) => grants.length > 0)).some(
+          ({ permission }) => permission === GroupPermissions.Create.name
+        )
+      ).toBe(true)
       yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
       const team = (yield* firstWhere(store.list("Group", everywhere), (held) =>
         held.some(({ pending }) => pending)
@@ -363,6 +369,11 @@ describe("Store", () => {
         held.some(({ record }) => record.value.groupId === teamId)
       )).find(({ record }) => record.value.groupId === teamId)
       expect(admission).toMatchObject({ pending: true, record: { value: { memberId: workspace.ownerMemberId } } })
+      // The team opens with its admission, whether or not the server holds them yet.
+      expect(yield* firstWhere(store.group(teamId), ({ group }) => Option.isSome(group))).toMatchObject({
+        group: { value: { record: { value: { name: "Design" } } } },
+        memberships: [{ record: { value: { memberId: workspace.ownerMemberId } } }]
+      })
       // The server's own team and admission arrive under the IDs the browser gave them.
       yield* firstWhere(store.list("Group", everywhere), (held) =>
         held.some(({ record, pending }) => record.value.id === teamId && !pending)
