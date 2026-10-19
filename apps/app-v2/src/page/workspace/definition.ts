@@ -24,6 +24,7 @@ import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { workspaceName } from "../../feature/settings/definition.ts"
 import { titleOf } from "../../feature/thread/definition.ts"
 
 /**
@@ -58,6 +59,15 @@ export const Model = Schema.Struct({
   isMenuOpen: Schema.Boolean
 })
 export type Model = typeof Model.Type
+
+/**
+ * The workspace's name as the person sees it: the one the settings hold, which follows a rename, once the
+ * replica has the workspace, and the one it was opened with until then.
+ */
+export const nameOf = (model: Model): string => {
+  const settingsName = workspaceName(model.settings)
+  return settingsName === "" ? model.name : settingsName
+}
 
 /** The title of the thread open in the group open, while there is one. */
 export const openThreadTitle = (open: Open): Option.Option<string> =>

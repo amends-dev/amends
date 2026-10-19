@@ -194,7 +194,8 @@ the pages that compose them; the root composes the pages.
   them. Each invitation waiting is an entry of the address's first letter and the address, the
   role's name as a badge, "until" and the day it ends, and Revoke until it is on its way; with none
   waiting, the section says so. The invite form's email field does not take focus, since the form is there as the page opens.
-  It reports nothing: the workspace page's own header keeps the name it was opened with.
+  It reports nothing: the workspace page reads the workspace's name from it, so a rename shows in the
+  page's sidebar and home pane.
 - `feature/connections`: the workspace's connections, each by its name with its integration and how
   ready it is, as the store holds it, marked as sending while a change to it is on its way. The
   host's integrations are listed by the workspace page, once, which informs the Block of them or of
@@ -250,8 +251,9 @@ the pages that compose them; the root composes the pages.
   signed in with a Sign out button. The main pane shows one destination: nothing yet, titled by the
   workspace, the inbox, the connections, the agents, the settings, or the channels, which are always
   read, or the open group, a keyed occurrence; the side pane shows the thread open in that group,
-  only while one is, and the actions' toasts come over both. The page's view takes the account's
-  email as a view input. Picking a group opens it; Home or any other destination leaves no group
+  only while one is, and the actions' toasts come over both. The workspace's name in the sidebar and
+  the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
+  the workspace was opened with until then. The page's view takes the account's email as a view input. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a notification's thread opens its group with the thread already open,
   and marks the group. Below 64rem the sidebar is a drawer, and below 48rem the rail with it, which
   the shell's Menu button opens: the page's model keeps `isMenuOpen`, a "Close menu" scrim over the

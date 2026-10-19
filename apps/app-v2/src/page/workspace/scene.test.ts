@@ -432,6 +432,24 @@ describe("a workspace", () => {
     )
   })
 
+  it("names the workspace as the settings hold it, so the sidebar and the main pane follow a rename", () => {
+    const renamed = modifyFields(opened, {
+      settings: (settings) =>
+        modifyFields(settings, {
+          workspace: () => Option.some({ workspace: { ...workspace, name: "Atelier" }, pending: false })
+        })
+    })
+    scene(
+      { update, view: sceneView },
+      given(renamed),
+      expect(role("navigation", { name: "Atelier" })).toExist(),
+      expect(within(role("navigation", { name: "Atelier" }), text("Atelier"))).toExist(),
+      expect(within(role("main", { name: "Atelier" }), role("heading", { name: "Atelier", level: 1 }))).toExist(),
+      expect(role("navigation", { name: "Studio" })).toBeAbsent(),
+      expect(role("main", { name: "Studio" })).toBeAbsent()
+    )
+  })
+
   it("marks the destination shown in the rail, with Home for the inbox and the groups too", () => {
     scene(
       { update, view: sceneView },

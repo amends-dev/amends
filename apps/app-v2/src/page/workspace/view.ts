@@ -19,7 +19,7 @@ import {
   WorkspaceComposition,
   type WorkspaceViewBuilder
 } from "./composition.ts"
-import { Message, type Model, Open, openThreadTitle } from "./definition.ts"
+import { Message, type Model, nameOf, Open, openThreadTitle } from "./definition.ts"
 
 /** Who is signed in, which the sidebar's footer shows beside the way to sign out. */
 export type ViewInputs = Readonly<{ email: string }>
@@ -55,11 +55,12 @@ const railItems = (model: Model) => [
 /** The sidebar: the workspace's name, the inbox, the groups, and who is signed in. */
 const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html => {
   const waiting = waitingCount(model.inbox)
+  const name = nameOf(model)
   return sidebar(h, {
-    label: model.name,
+    label: name,
     header: sidebarHeader(h, {
-      mark: model.name.slice(0, 1),
-      name: model.name,
+      mark: name.slice(0, 1),
+      name,
       actions: [
         iconButton(
           h,
@@ -95,17 +96,15 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
 /** The main pane: the destination the person opened, or, while they have opened none, the way to pick one. */
 const mainView = (model: Model, h: WorkspaceViewBuilder): Html =>
   Open.match(model.open, {
-    Nothing: () =>
-      pane(h, {
+    Nothing: () => {
+      const name = nameOf(model)
+      return pane(h, {
         variant: "main",
-        label: model.name,
-        header: {
-          title: model.name,
-          mark: model.name.slice(0, 1),
-          subtitle: "Pick a group, or open your inbox."
-        },
+        label: name,
+        header: { title: name, mark: name.slice(0, 1), subtitle: "Pick a group, or open your inbox." },
         body: []
-      }),
+      })
+    },
     Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox })),
     Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
