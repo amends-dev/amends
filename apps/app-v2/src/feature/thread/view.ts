@@ -1,4 +1,4 @@
-import { ThreadMessage } from "@amends-dev/core/thread"
+import { ThreadMessage, type ThreadMessageId } from "@amends-dev/core/thread"
 import { button, buttonRow, column, field, hint, notice, sending, submit, textarea } from "@amends-dev/design/control"
 import { form } from "@amends-dev/design/form"
 import { divider, message, messageList } from "@amends-dev/design/message"
@@ -10,8 +10,14 @@ import { authorName, initials, messageRuns, repliesLabel, whenLabel } from "../.
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, typingIn } from "./definition.ts"
 
-/** The time now, which the days the messages were published on are read from. */
-export type ViewInputs = Readonly<{ now: DateTime.Utc }>
+/**
+ * The time now, which the days the messages were published on are read from, and, when a notification opened the
+ * thread, the message it is about, drawn current so that the person sees what it was about.
+ */
+export type ViewInputs = Readonly<{
+  now: DateTime.Utc
+  highlightedMessageId?: Option.Option<ThreadMessageId.ThreadMessageId>
+}>
 
 /** The form to change the thread's title, while the person renames it. */
 const renamingView = (model: Model, h: ThreadViewBuilder): Html =>
@@ -59,11 +65,14 @@ const noteOf = (pending: boolean, edited: boolean): string | undefined => {
   return edited ? "edited" : undefined
 }
 
-/** A message, with editing and deleting for the person's own, and the form to change it while they edit it. */
+/**
+ * A message, with editing and deleting for the person's own, and the form to change it while they edit it, drawn
+ * current while it is the one highlighted.
+ */
 const messageView = (
   { message: item, pending }: MessageItem,
   model: Model,
-  now: DateTime.Utc,
+  { now, highlightedMessageId = Option.none() }: ViewInputs,
   h: ThreadViewBuilder
 ): Html => {
   const own =
@@ -87,6 +96,7 @@ const messageView = (
     time: whenLabel(item.publishedAt, now),
     note: noteOf(pending, edited),
     text: messageRuns(item, model.members),
+    isCurrent: Option.contains(highlightedMessageId, item.id),
     body: Option.getOrUndefined(
       Option.map(editing, ({ draft }) =>
         form(h, { onSubmit: Message.SubmittedEdit(), variant: "pane" }, [
@@ -106,15 +116,15 @@ const messageView = (
 }
 
 /** The opening message, then, when there are replies, how many, and the replies. */
-const messagesView = (model: Model, now: DateTime.Utc, h: ThreadViewBuilder): Html => {
+const messagesView = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html => {
   const [opening, ...replies] = model.messages
 
   return messageList(h, {
     label: "Messages",
     children: [
-      ...(opening === undefined ? [] : [messageView(opening, model, now, h)]),
+      ...(opening === undefined ? [] : [messageView(opening, model, inputs, h)]),
       ...(replies.length === 0 ? [] : [divider(h, repliesLabel(replies.length), { align: "start" })]),
-      ...replies.map((reply) => messageView(reply, model, now, h))
+      ...replies.map((reply) => messageView(reply, model, inputs, h))
     ]
   })
 }
@@ -130,7 +140,7 @@ const typingView = (names: ReadonlyArray<string>, h: ThreadViewBuilder): Html =>
  * The thread as the side pane's body: the person's part in it, the task it tracks and its agents' turns, and
  * its messages, the opening first and the replies after it.
  */
-export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
+export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   h.section(
     [h.AriaLabel("Thread")],
     [
@@ -140,7 +150,7 @@ export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, { 
         h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
         h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
         notice(h, model.notice),
-        column(h, [messagesView(model, now, h), typingView(typingIn(model), h)])
+        column(h, [messagesView(model, inputs, h), typingView(typingIn(model), h)])
       ])
     ]
   )

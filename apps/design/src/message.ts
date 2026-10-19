@@ -10,9 +10,8 @@ import { mark } from "./mark.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
 
-const rowLook = "relative -mx-3 flex gap-3 px-3 py-2.5"
-
-const currentRowLook = `${rowLook} aria-[current=true]:bg-selected aria-[current=true]:indicator-bar`
+const rowLook =
+  "relative -mx-3 flex gap-3 px-3 py-2.5 aria-[current=true]:bg-selected aria-[current=true]:indicator-bar"
 
 const rowColumn = "flex min-w-0 flex-1 flex-col gap-0.5"
 
@@ -170,7 +169,7 @@ export const message = <Message, Requirements>(
 
   return h.keyed("li")(
     config.key,
-    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(currentRowLook)],
+    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(rowLook)],
     [
       mark(h, { text: config.mark, size: "md" }),
       h.div(
@@ -245,7 +244,8 @@ const renderAge = <Message, Requirements>(
  * age replaces; a row that is not unread has its text in `ink-secondary`, quieter than the first line. `onOpen`
  * makes the text a button that sends it, named by the author and the activity together, "Sara mentioned you",
  * with the text's words as its description, by an `aria-label` and an `aria-description`, since the first line
- * is where the row says what it is.
+ * is where the row says what it is. The current row, the notification whose thread is open, is filled with the
+ * 2px bar and `aria-current="true"`, as a message's is.
  */
 export const notification = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -260,13 +260,14 @@ export const notification = <Message, Requirements>(
     isUnread?: boolean
     onOpen?: Message
     actions?: ReadonlyArray<Html>
+    isCurrent?: boolean
   }>
 ): Html => {
   const isUnread = config.isUnread === true
 
   return h.keyed("li")(
     config.key,
-    [h.Class(rowLook)],
+    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(rowLook)],
     [
       mark(h, { text: config.mark, size: "md" }),
       h.div(

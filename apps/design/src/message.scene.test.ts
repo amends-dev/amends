@@ -286,6 +286,7 @@ describe("notification", () => {
     isUnread?: boolean
     isOpenable?: boolean
     isActionable?: boolean
+    isCurrent?: boolean
   }>
 
   const sara = (h: HtmlBuilder<Message>, options: Options) =>
@@ -298,6 +299,7 @@ describe("notification", () => {
       text: options.text ?? mention,
       age: "2m ago",
       ...(options.isUnread === true ? { isUnread: true } : {}),
+      ...(options.isCurrent === true ? { isCurrent: true } : {}),
       ...(options.isOpenable === false ? {} : { onOpen: Message.OpenedThread({ key: "notification-1" }) }),
       ...(options.isActionable === true
         ? { actions: [button(h, "Mark seen", Message.ClickedEdit({ key: "notification-1" }), { variant: "quiet" })] }
@@ -410,6 +412,45 @@ describe("notification", () => {
       given(initial),
       click(role("button", { name: "Mark seen" })),
       expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 0")
+    )
+  })
+
+  it("marks the current row with aria-current, as a message's, and no other", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Notifications",
+            children: [
+              sara(h, { isCurrent: true }),
+              notification(h, {
+                key: "notification-2",
+                mark: "A",
+                author: "Alex",
+                activity: "replied",
+                text: "Looks good.",
+                age: "1h ago"
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expectAll(all.selector('[aria-current="true"]')).toHaveCount(1),
+      expect(within(selector('[aria-current="true"]'), text("Sara"))).toExist(),
+      expect(within(selector('[aria-current="true"]'), text("Alex"))).toBeAbsent()
+    )
+  })
+
+  it("marks no row current unless it is, and keeps its text and dot when it is", () => {
+    scene({ update, view: viewOf(notifications()) }, given(initial), expect(selector("[aria-current]")).toBeAbsent())
+    scene(
+      { update, view: viewOf(notifications({ isCurrent: true, isUnread: true })) },
+      given(initial),
+      expect(within(selector('[aria-current="true"]'), text("Unread"))).toExist(),
+      click(within(selector('[aria-current="true"]'), role("button", { name: "Sara mentioned you" }))),
+      expect(role("status")).toHaveText("Current notification-1, edits 0, deletions 0")
     )
   })
 })

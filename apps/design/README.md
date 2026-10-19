@@ -40,7 +40,7 @@ actions, and meta, with the replies under a row as one reply, three people, and 
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with a form in place of the text, and set apart by dividers, centered and at the
 start, and notifications under the days Today and Yesterday, unread with a dot and a quiet action and
-read; a pane's empty state with a title
+read, and with the notification whose thread is open as the current row among them; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
@@ -515,7 +515,8 @@ What a conversation is made of.
   underlined on hover, and it is named by the author and the activity together, "Sara mentioned you", by
   an `aria-label`, with the text's words as its `aria-description`: the first line is where the row says
   what it is, and the text is what it says. The row has `message`'s spacing and reach into the pane's
-  gutter, and no current state.
+  gutter. `isCurrent`, for the notification whose thread is open, fills it with `selected`, draws the
+  `indicator-bar` at its start, and makes it `aria-current="true"`, as `message`'s current row is.
 - `TextRun` is `{ text, isMention? }`, one run of the `text` of a `message` or a `notification`, which
   takes a string or the runs in order. A run is its `text` as it stands; a run with `isMention` is a
   chip: a `span` on `mention`, with 4px of space each side and medium weight, in the ink of the row's

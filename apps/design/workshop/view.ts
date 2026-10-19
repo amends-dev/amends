@@ -1004,6 +1004,51 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
+      "The current notification: the one whose thread is open, in its place among the others",
+      [
+        messageList(h, {
+          label: "Inbox with a thread open",
+          children: [
+            divider(h, "Today"),
+            notification(h, {
+              key: "current-sara",
+              mark: "S",
+              author: "Sara",
+              activity: "mentioned you",
+              place: "#general",
+              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
+              age: "2m ago",
+              isUnread: true,
+              onOpen: press
+            }),
+            notification(h, {
+              key: "current-alex",
+              mark: "AM",
+              author: "Alex",
+              activity: "replied",
+              place: "#engineering",
+              text: "The retry now keeps the original request. Ready for another look.",
+              age: "12m ago",
+              onOpen: press,
+              isCurrent: true
+            }),
+            notification(h, {
+              key: "current-oliver",
+              mark: "O",
+              author: "Oliver",
+              activity: "replied",
+              place: "#product",
+              text: "The empty state copy is updated. I've attached the latest version.",
+              age: "1h ago",
+              onOpen: press
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
       "A body in place of the text",
       [
         messageList(h, {

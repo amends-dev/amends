@@ -144,7 +144,9 @@ the pages that compose them; the root composes the pages.
   reading it marks it read through its latest activity, once for each. The reply composer's changes
   say the person types, at once, then at most as often as typing lasts, by core's
   `Presence.typingRepeats`, and sending says they stopped. It has two views. `view`, its canonical
-  one, is the body of a side pane, which takes the time now as its view input: Follow or Unfollow and Rename in a row, the form to rename it while
+  one, is the body of a side pane, which takes the time now as its view input, and, optionally, the
+  id of a message to highlight (`highlightedMessageId`), which it draws as the current row, so the
+  person sees what a notification was about, and the group gives none: Follow or Unfollow and Rename in a row, the form to rename it while
   the person does, the task and the turns, then its messages as a list, the opening first, how many
   replies follow it, and the replies, each by its author's initials, name, and when it was published
   (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with "Sending…" or
@@ -682,7 +684,7 @@ browser's storage. Each Block's tests sit beside it:
   with the members their text mentions, and with none when it mentions no one.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
-  edited one, a mention as a chip with its member's current name, a deleted one, who types, a reply written and sent, the title renamed from its form, and a message
+  edited one, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
   author of their opening, their time, a mention in the opening as a chip, who replied and how many
   times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started

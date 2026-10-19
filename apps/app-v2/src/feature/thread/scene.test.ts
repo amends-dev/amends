@@ -284,4 +284,50 @@ describe("a thread", () => {
       expect(within(selector("li"), text("Plans for next week"))).toExist()
     )
   })
+
+  it("draws no message current unless one is highlighted", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(selector("[aria-current]")).toBeAbsent()
+    )
+  })
+
+  it("draws the highlighted message current, and no other, as the notification's thread opens at it", () => {
+    const highlighted = (messageId: ThreadMessageId.ThreadMessageId) =>
+      withViewInputs(view, { now, highlightedMessageId: Option.some(messageId) })()
+
+    scene(
+      { update, view: highlighted(reply.id), subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(selector('[aria-current="true"]')).toExist(),
+      expect(within(selector('[aria-current="true"]'), text("Sounds good"))).toExist(),
+      expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toBeAbsent()
+    )
+    scene(
+      { update, view: highlighted(opening.id), subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist(),
+      expect(within(selector('[aria-current="true"]'), text("Sounds good"))).toBeAbsent()
+    )
+  })
+
+  it("draws nothing current while the highlighted message is not in the thread", () => {
+    scene(
+      {
+        update,
+        view: withViewInputs(view, {
+          now,
+          highlightedMessageId: Option.some(ThreadMessageId.ThreadMessageId.make("message-9"))
+        })(),
+        subscriptions: ThreadBlock.subscriptions
+      },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(selector("[aria-current]")).toBeAbsent()
+    )
+  })
 })
