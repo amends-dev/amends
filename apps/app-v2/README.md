@@ -6,8 +6,9 @@ sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, a
 offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
 pick one; a group's threads with how much of each is new, where they start a thread; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
-stop following it, which opening reads through its latest activity; their inbox, the
-notifications waiting for them, each as the message it is about, to open, or to mark seen one at a
+stop following it, which opening reads through its latest activity; their inbox, their
+notifications under the days they came, all of them or only those waiting, each by who wrote what it
+is about, what they did, where it comes from, and how long ago, to open, or to mark seen one at a
 time or all at once; the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
 rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, to
@@ -58,10 +59,11 @@ initials and the time of day from `src/seen.ts`. The task and the turns a thread
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
 a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
 each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
-and its `log`. The inbox lists its notifications as `message`s in a `messageList`, each its author's
-initials and name, its thread and group as the `context` line, its text, which opens the thread, and
-a quiet Mark seen, with Mark all seen among the header's actions, and `paneEmpty` when nothing
-waits. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
+and its `log`. The inbox has `paneTabs` of All and Unread, counted, under its title, and lists its
+notifications as `notification`s in a `messageList`, under a `divider` for each day, each its
+author's initials and name and what they did, its place, its text, which opens the thread, how long
+ago it came, a dot while it waits, and a quiet Mark seen, with Mark all seen among the header's
+actions, and `paneEmpty` when a tab has nothing. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
 line of what it is for, and a secondary button to change it, which a `form` of a `field` with Save
 and a quiet Cancel replaces while the person does; the members and the invitations waiting are
 `entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
@@ -177,11 +179,22 @@ the pages that compose them; the root composes the pages.
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group.
-- `feature/inbox`: the notifications waiting for the person, newest first, each as the message it is
-  about: who wrote the message its activity is about, with its text, and the thread it comes from, by
-  its title or opening message, in its group, as far as the store holds them. Their text opens a
-  notification's thread, and they mark one seen, or every one up to the newest that waits. It reports
-  the thread opened, and offers a count of what waits for its parent to show.
+- `feature/inbox`: the person's notifications, newest first, on two tabs: All, every notification
+  the store gives, waiting or seen, and Unread, those still waiting, counted, All at first. Each
+  tab's notifications sit under a divider for each day they came on by the person's own clock, named
+  as it is from the time now (`dayLabel`), and each is a row of its own: who wrote the message its
+  activity is about, by their name and initials, and what they did, which is why the person is told
+  (`notificationReason`): the message mentions them ("mentioned you"), it opens the thread ("started
+  a thread"), or it replies ("replied"); where it comes from, a team as `#` and its name, a
+  conversation as the others in it and "Direct message", and "Unavailable thread" while the store
+  lacks the thread, with no place while it lacks the thread's group; what the message says; and how
+  long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
+  first line says "Activity in a thread" under the mark "?", and the text says what it can. The time
+  now is its view input, as the page gives it, so the days and ages follow the clock. A notification's
+  text opens its thread, and the person marks a waiting one seen, or every one up to the newest that
+  waits, from the header. It reports the thread opened, and offers a count of what waits for its
+  parent to show. It lacks "Show older", the mock's page of older notifications: the store gives
+  every notification the person has at once, and paging them waits for the store to page.
 - `feature/settings`: the workspace's name and the person's own, each renamed in place from the name
   seen, one at a time; the workspace's members with their roles, where, for each member the
   delegation rule, by core's `Delegation.recipientDenial`, lets them act on, they change the role
@@ -261,7 +274,7 @@ the pages that compose them; the root composes the pages.
   only while one is, and the actions' toasts come over both. The workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
-  view inputs. Picking a group opens it; Home or any other destination leaves no group
+  view inputs, and gives the inbox the time now. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a notification's thread opens its group with the thread already open,
   and marks the group. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
@@ -307,7 +320,8 @@ the pages that compose them; the root composes the pages.
   time now, which enters the same way: the flags read it with `DateTime.now`, and the subscription
   `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
   Nothing acts on the time, so it goes no further than views: the root's view gives the open
-  workspace's view the time now beside the email, as a view input and not a message. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
+  workspace's view the time now beside the email, as a view input and not a message, and the page
+  gives it on to the inbox, the one destination that shows ages and days. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
   session, and the browser's services beneath them.
 
 A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
@@ -419,9 +433,10 @@ browser's storage. Each Block's tests sit beside it:
   report, or closed as its parent asks, without one; the groups starting a
   team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
   or the dialog closes, dropping what was being started, and reporting the group picked once; the inbox
-  listing what waits, newest
-  first, reporting the thread of the notification opened, marking one seen or all through the newest
-  that waits, and why a write could not be kept; the connections keeping the integrations the page
+  saying why the person is told, who wrote what and what they did, where it comes from, and what it
+  says, grouping the notifications by the day they came on, listing every one or those waiting, newest
+  first, as its tab chooses, reporting the thread of the notification opened, marking one seen or all
+  through the newest that waits, and why a write could not be kept; the connections keeping the integrations the page
   informs them of or why they could not be listed, asking the page to list them again, adding a connection over
   HTTP once its integration, name, required settings, and key are in, once while it sends, and
   refused with why, renaming, changing the settings of, and removing one as actions from what was
@@ -485,11 +500,13 @@ browser's storage. Each Block's tests sit beside it:
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
-  a dialog of its own, and the same team taken from the workspace's sidebar; the inbox's notifications by their author, the
-  thread and group they come from, and the message they are about, with the thread alone while the
-  group is unknown and the activity alone while the thread is, marked all seen, one seen with its
-  failure shown, and one's thread opened by its text, and an empty inbox saying it is all caught up;
-  the connections added by an owner
+  a dialog of its own, and the same team taken from the workspace's sidebar; the inbox's notifications under the day they came, by their
+  author and what they did, the place they come from, how long ago, and what they say, a mention, the
+  opening of a thread, and a reply told apart, with no place while the group is unknown and the
+  activity alone while the thread is, the unread ones with a dot and a way to mark them seen, the seen
+  ones on All with neither and not on Unread, the tabs counted and chosen, all marked seen, one seen
+  with its failure shown, and one's thread opened by its text, and an empty All saying there is
+  nothing yet and an empty Unread saying all is caught up; the connections added by an owner
   to an integration, with a key field only for the method that takes one, then checked, with their
   settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
   member without the controls until the person is given the role that manages them, marked as
@@ -530,7 +547,8 @@ browser's storage. Each Block's tests sit beside it:
   the open workspace with no header of its own, signing out from its sidebar, its Menu button
   appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse,
   and the thread open moving from its place beside the main pane into its dialog as the window narrows
-  to `Desktop`, staying there at `Phone`, and back as it widens to `Split`.
+  to `Desktop`, staying there at `Phone`, and back as it widens to `Split`, and the open inbox's
+  notifications growing older as the subscription reports each minute.
   A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through

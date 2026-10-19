@@ -247,9 +247,11 @@ describe("a workspace", () => {
       expect(role("main", { name: "Inbox" })).toBeAbsent(),
       click(role("button", { name: "Inbox" })),
       expect(role("main", { name: "Inbox" })).toExist(),
+      expect(within(role("main", { name: "Inbox" }), text("Today"))).toExist(),
       expect(within(role("main", { name: "Inbox" }), text("Bob"))).toExist(),
-      expect(within(role("main", { name: "Inbox" }), text("Plans for the week in General"))).toExist(),
-      expect(within(role("main", { name: "Inbox" }), role("button", { name: "Sounds good" }))).toExist()
+      expect(within(role("main", { name: "Inbox" }), text("#General"))).toExist(),
+      expect(within(role("main", { name: "Inbox" }), text("25m ago"))).toExist(),
+      expect(within(role("main", { name: "Inbox" }), role("button", { name: "Bob replied" }))).toExist()
     )
   })
 
@@ -259,7 +261,7 @@ describe("a workspace", () => {
       given(opened),
       expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-description"),
       click(role("button", { name: "Inbox" })),
-      expect(text("Nothing new.")).toExist()
+      expect(text("Notifications about your threads arrive here.")).toExist()
     )
   })
 

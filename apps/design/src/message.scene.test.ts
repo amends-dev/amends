@@ -3,10 +3,10 @@ import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { divider, message, messageList } from "./message.ts"
+import { divider, message, messageList, notification } from "./message.ts"
 
 const Message = defineMessageUnion({
   OpenedThread: { key: Schema.String },
@@ -238,6 +238,116 @@ describe("message", () => {
       expect(role("form", { name: "Edit message" })).toExist(),
       expect(text("Reproduced on both.")).toBeAbsent(),
       expect(role("button", { name: "Save" })).toExist()
+    )
+  })
+})
+
+describe("notification", () => {
+  const mention = "@Jamie can you check the composer fix before we ship?"
+
+  type Options = Readonly<{ place?: string; isUnread?: boolean; isOpenable?: boolean; isActionable?: boolean }>
+
+  const sara = (h: HtmlBuilder<Message>, options: Options) =>
+    notification(h, {
+      key: "notification-1",
+      mark: "S",
+      author: "Sara",
+      activity: "mentioned you",
+      ...(options.place === undefined ? {} : { place: options.place }),
+      text: mention,
+      age: "2m ago",
+      ...(options.isUnread === true ? { isUnread: true } : {}),
+      ...(options.isOpenable === false ? {} : { onOpen: Message.OpenedThread({ key: "notification-1" }) }),
+      ...(options.isActionable === true
+        ? { actions: [button(h, "Mark seen", Message.ClickedEdit({ key: "notification-1" }), { variant: "quiet" })] }
+        : {})
+    })
+
+  const notifications =
+    (options: Options = {}) =>
+    (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, { label: "Notifications", children: [sara(h, options)] })
+
+  it("is an item of the list under a divider, with the author, what they did, and the text", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => messageList(h, { label: "Notifications", children: [divider(h, "Today"), sara(h, {})] }))
+      },
+      given(initial),
+      expect(within(role("list", { name: "Notifications" }), text("Today"))).toExist(),
+      expect(within(role("list", { name: "Notifications" }), text("Sara"))).toExist(),
+      expect(text(" mentioned you")).toExist(),
+      expect(text(mention)).toExist()
+    )
+  })
+
+  it("hides the mark from assistive technology", () => {
+    scene(
+      { update, view: viewOf(notifications()) },
+      given(initial),
+      expect(within(selector("li"), text("S"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("shows its age at the end of the first line", () => {
+    scene({ update, view: viewOf(notifications()) }, given(initial), expect(text("2m ago")).toExist())
+  })
+
+  it("shows its place under the first line, and nothing without one", () => {
+    scene(
+      { update, view: viewOf(notifications({ place: "#general" })) },
+      given(initial),
+      expect(text("#general")).toExist()
+    )
+    scene({ update, view: viewOf(notifications()) }, given(initial), expect(text("#general")).toBeAbsent())
+  })
+
+  it("makes its text a button named by the author and the activity and described by the text, which sends onOpen", () => {
+    scene(
+      { update, view: viewOf(notifications()) },
+      given(initial),
+      expect(role("button", { name: "Sara mentioned you" })).toExist(),
+      expect(role("button", { name: "Sara mentioned you" })).toHaveAttr("aria-description", mention),
+      expect(role("button", { name: mention })).toBeAbsent(),
+      click(role("button", { name: "Sara mentioned you" })),
+      expect(role("status")).toHaveText("Current notification-1, edits 0, deletions 0")
+    )
+  })
+
+  it("is plain text, not a button, without onOpen", () => {
+    scene(
+      { update, view: viewOf(notifications({ isOpenable: false })) },
+      given(initial),
+      expect(role("button", { name: "Sara mentioned you" })).toBeAbsent(),
+      expect(text(mention)).toExist()
+    )
+  })
+
+  it("shows an unread one with a dot hidden from assistive technology, and Unread said before the age", () => {
+    scene(
+      { update, view: viewOf(notifications({ isUnread: true })) },
+      given(initial),
+      expect(text("Unread")).toExist(),
+      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(2)
+    )
+  })
+
+  it("shows one that is not unread with neither the dot nor Unread", () => {
+    scene(
+      { update, view: viewOf(notifications()) },
+      given(initial),
+      expect(text("Unread")).toBeAbsent(),
+      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(1)
+    )
+  })
+
+  it("has its actions as buttons at the end of the first line", () => {
+    scene(
+      { update, view: viewOf(notifications({ isActionable: true })) },
+      given(initial),
+      click(role("button", { name: "Mark seen" })),
+      expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 0")
     )
   })
 })

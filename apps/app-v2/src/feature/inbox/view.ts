@@ -1,42 +1,75 @@
 import { button, notice } from "@amends-dev/design/control"
-import { message, messageList } from "@amends-dev/design/message"
-import { pane, paneEmpty } from "@amends-dev/design/pane"
+import { divider, messageList, notification } from "@amends-dev/design/message"
+import { pane, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { timeOf } from "../../seen.ts"
+import { ageLabel } from "../../seen.ts"
 import { InboxComposition, type InboxViewBuilder } from "./composition.ts"
 import {
+  byDay,
   type InboxItem,
-  type Model,
+  isWaiting,
   Message,
-  notificationAuthor,
-  notificationContext,
+  type Model,
+  notificationHeadline,
+  notificationPlace,
   notificationText,
-  waitingNewestFirst
+  shownNewestFirst,
+  type Tab,
+  waitingCount
 } from "./definition.ts"
 
-/** A notification as a message of the person who wrote what it is about, whose text opens its thread, if it has one. */
-const notificationRow = (item: InboxItem, model: Model, h: InboxViewBuilder): Html => {
-  const { notification } = item
-  const author = notificationAuthor(item, model)
+/** The time now, which the days the notifications came on and how long ago they came are read from. */
+export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
-  return message(h, {
-    key: notification.id,
-    mark: author.mark,
-    author: author.name,
-    time: timeOf(notification.recordedAt),
-    context: Option.getOrUndefined(notificationContext(item, model)),
-    text: notificationText(item),
-    ...(notification.thread === undefined ? {} : { onOpen: Message.ClickedOpen({ notificationId: notification.id }) }),
-    actions: [
-      button(h, "Mark seen", Message.ClickedMarkSeen({ notificationId: notification.id }), { variant: "quiet" })
+/** What the body says when a tab has nothing to list. */
+const nothingToList = {
+  All: { icon: "mark-mail", title: "Nothing here yet", copy: "Notifications about your threads arrive here." },
+  Unread: { icon: "mark-done", title: "You're all caught up", copy: "Nothing new." }
+} as const satisfies Record<Tab, Parameters<typeof paneEmpty>[1]>
+
+/** The tabs under the title: every notification, and those waiting, counted. */
+const tabs = (model: Model, h: InboxViewBuilder): Html =>
+  paneTabs(h, {
+    label: "Inbox",
+    tabs: [
+      { label: "All", isCurrent: model.tab === "All", onClick: Message.ChoseTab({ tab: "All" }) },
+      {
+        label: "Unread",
+        count: waitingCount(model),
+        isCurrent: model.tab === "Unread",
+        onClick: Message.ChoseTab({ tab: "Unread" })
+      }
     ]
+  })
+
+/**
+ * A notification as the design's row: the author of what its activity is about and what they did, where it
+ * comes from, and what it says, which opens its thread, if it has one, how long ago it came, and, while it
+ * waits, unread, with the way to mark it seen.
+ */
+const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: InboxViewBuilder): Html => {
+  const { id, recordedAt, thread } = item.notification
+  const isUnread = isWaiting(item)
+
+  return notification(h, {
+    key: id,
+    ...notificationHeadline(item, model),
+    place: Option.getOrUndefined(notificationPlace(item, model)),
+    text: notificationText(item),
+    age: ageLabel(recordedAt, now),
+    isUnread,
+    ...(thread === undefined ? {} : { onOpen: Message.ClickedOpen({ notificationId: id }) }),
+    actions: isUnread
+      ? [button(h, "Mark seen", Message.ClickedMarkSeen({ notificationId: id }), { variant: "quiet" })]
+      : []
   })
 }
 
-/** The notifications still waiting for the person, newest first, to open, or to mark seen one or all at once. */
-export const view = InboxComposition.makeView((model, h) => {
-  const items = waitingNewestFirst(model)
+/** The notifications the tab shows, newest first, under the days they came, to open or to mark seen. */
+export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) => {
+  const items = shownNewestFirst(model)
 
   return pane(h, {
     variant: "main",
@@ -44,13 +77,20 @@ export const view = InboxComposition.makeView((model, h) => {
     header: {
       title: "Inbox",
       icon: "mark-mail",
-      actions: items.length === 0 ? [] : [button(h, "Mark all seen", Message.ClickedMarkAllSeen())]
+      tabs: tabs(model, h),
+      actions: waitingCount(model) === 0 ? [] : [button(h, "Mark all seen", Message.ClickedMarkAllSeen())]
     },
     body: [
       notice(h, model.notice),
       items.length === 0
-        ? paneEmpty(h, { icon: "mark-done", title: "You're all caught up", copy: "Nothing new." })
-        : messageList(h, { label: "Notifications", children: items.map((item) => notificationRow(item, model, h)) })
+        ? paneEmpty(h, nothingToList[model.tab])
+        : messageList(h, {
+            label: "Notifications",
+            children: byDay(items, now).flatMap((day) => [
+              divider(h, day.label),
+              ...day.items.map((item) => notificationRow(item, model, now, h))
+            ])
+          })
     ]
   })
 })

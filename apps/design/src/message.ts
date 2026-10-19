@@ -1,6 +1,6 @@
 /**
- * What a conversation is made of: the list of messages, each by its author with its time, and the
- * rule that sets a part of the list apart, such as a day or the replies.
+ * What a conversation is made of: the list of messages, each by its author with its time, the notifications
+ * that tell of them, and the rule that sets a part of the list apart, such as a day or the replies.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -9,8 +9,9 @@ import { mark } from "./mark.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
 
-const rowLook =
-  "relative -mx-3 flex gap-3 px-3 py-2.5 aria-[current=true]:bg-selected aria-[current=true]:indicator-bar"
+const rowLook = "relative -mx-3 flex gap-3 px-3 py-2.5"
+
+const currentRowLook = `${rowLook} aria-[current=true]:bg-selected aria-[current=true]:indicator-bar`
 
 const rowColumn = "flex min-w-0 flex-1 flex-col gap-0.5"
 
@@ -24,12 +25,26 @@ const contextLine = "m-0 text-meta text-ink-muted"
 
 const actionsRow = "-my-1.5 ms-auto flex flex-none items-center gap-1 self-center"
 
-const textLook = "m-0 text-body wrap-break-word text-ink"
+type Ink = "text-ink" | "text-ink-secondary"
 
-const textButton =
-  "cursor-pointer self-start bg-transparent p-0 text-start text-body wrap-break-word text-ink focus-ring hover:underline"
+const textLook = (ink: Ink) => `m-0 text-body wrap-break-word ${ink}`
+
+const textButton = (ink: Ink) =>
+  `cursor-pointer self-start bg-transparent p-0 text-start text-body wrap-break-word ${ink} focus-ring hover:underline`
 
 const metaRow = "mt-1 flex flex-wrap items-center gap-3 text-hint text-ink-muted"
+
+const headline = "min-w-0 truncate text-item text-ink"
+
+const headlineAuthor = "font-medium"
+
+const trailingRow = "-my-1.5 ms-auto flex flex-none items-center gap-3 self-center"
+
+const ageLook = "flex flex-none items-center gap-1.5 text-meta text-ink-muted"
+
+const unreadDot = "size-1.5 flex-none rounded-full bg-ink"
+
+const unreadLabel = "sr-only"
 
 const dividerLine = "flex items-center gap-3 py-2.5 text-meta text-ink-muted uppercase"
 
@@ -65,18 +80,27 @@ const renderTime = <Message, Requirements>(
         ]
       )
 
+/** The text, a button when `onOpen` is given, which is named `name` and described by the text when it has one. */
 const renderText = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ text: string; onOpen?: Message }>
+  config: Readonly<{ text: string; ink: Ink; onOpen?: Message; name?: string }>
 ): Html => {
-  const { onOpen } = config
+  const { onOpen, name } = config
 
   return onOpen === undefined
-    ? h.p([h.Class(textLook)], [config.text])
+    ? h.p([h.Class(textLook(config.ink))], [config.text])
     : Button.view(
         {
           onClick: onOpen,
-          toView: (attributes) => h.button([...attributes.button, h.Class(textButton)], [config.text])
+          toView: (attributes) =>
+            h.button(
+              [
+                ...attributes.button,
+                ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(config.text)]),
+                h.Class(textButton(config.ink))
+              ],
+              [config.text]
+            )
         },
         h
       )
@@ -115,7 +139,7 @@ export const message = <Message, Requirements>(
 
   return h.keyed("li")(
     config.key,
-    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(rowLook)],
+    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(currentRowLook)],
     [
       mark(h, { text: config.mark, size: "md" }),
       h.div(
@@ -130,8 +154,76 @@ export const message = <Message, Requirements>(
             ]
           ),
           config.context === undefined ? h.empty : h.p([h.Class(contextLine)], [config.context]),
-          config.body ?? renderText(h, config),
+          config.body ?? renderText(h, { ...config, ink: "text-ink" }),
           meta.length === 0 ? h.empty : h.div([h.Class(metaRow)], meta)
+        ]
+      )
+    ]
+  )
+}
+
+const renderAge = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ age: string; isUnread: boolean }>
+): Html =>
+  h.span(
+    [h.Class(ageLook)],
+    [
+      config.isUnread ? h.span([h.AriaHidden(true), h.Class(unreadDot)]) : h.empty,
+      config.isUnread ? h.span([h.Class(unreadLabel)], ["Unread"]) : h.empty,
+      h.span([], [config.age])
+    ]
+  )
+
+/**
+ * One notification, a row of a `messageList` beside `message`, keyed by `key` and set like it: the `mark` letters,
+ * then a first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
+ * as "Sara" and "mentioned you", under it the `place` it comes from, at `meta` size in `ink-muted`, and the
+ * `text`. At the end of the first line are the `actions`, quiet buttons such as Mark seen, and then the `age`,
+ * already formatted, such as "2m ago". While `isUnread`, a 6px dot of `ink` comes before the age, hidden from
+ * assistive technology, which an `sr-only` "Unread" before the age replaces; a row that is not unread has its
+ * text in `ink-secondary`, quieter than the first line. `onOpen` makes the text a button that sends it, named
+ * by the author and the activity together, "Sara mentioned you", with the text as its description, by an
+ * `aria-label` and an `aria-description`, since the first line is where the row says what it is.
+ */
+export const notification = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    key: string
+    mark: string
+    author: string
+    activity: string
+    place?: string | undefined
+    text: string
+    age: string
+    isUnread?: boolean
+    onOpen?: Message
+    actions?: ReadonlyArray<Html>
+  }>
+): Html => {
+  const isUnread = config.isUnread === true
+
+  return h.keyed("li")(
+    config.key,
+    [h.Class(rowLook)],
+    [
+      mark(h, { text: config.mark, size: "md" }),
+      h.div(
+        [h.Class(rowColumn)],
+        [
+          h.div(
+            [h.Class(authorLine)],
+            [
+              h.span([h.Class(headline)], [h.span([h.Class(headlineAuthor)], [config.author]), ` ${config.activity}`]),
+              h.div([h.Class(trailingRow)], [...(config.actions ?? []), renderAge(h, { age: config.age, isUnread })])
+            ]
+          ),
+          config.place === undefined ? h.empty : h.p([h.Class(contextLine)], [config.place]),
+          renderText(h, {
+            ...config,
+            ink: isUnread ? "text-ink" : "text-ink-secondary",
+            name: `${config.author} ${config.activity}`
+          })
         ]
       )
     ]

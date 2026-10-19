@@ -99,8 +99,11 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
   })
 }
 
-/** The main pane: the destination the person opened, or, while they have opened none, the way to pick one. */
-const mainView = (model: Model, h: WorkspaceViewBuilder): Html =>
+/**
+ * The main pane: the destination the person opened, or, while they have opened none, the way to pick one. The
+ * inbox is given the time now.
+ */
+const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Html =>
   Open.match(model.open, {
     Nothing: () => {
       const name = nameOf(model)
@@ -111,7 +114,7 @@ const mainView = (model: Model, h: WorkspaceViewBuilder): Html =>
         body: []
       })
     },
-    Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox })),
+    Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),
     Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
     Settings: () => h.block(SettingsBinding.embedView({ slotId: "settings", model: model.settings })),
@@ -139,7 +142,7 @@ const asideView = (model: Model, h: WorkspaceViewBuilder): Option.Option<Html> =
  * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
  * pane lent to the shell.
  */
-export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email }, h) => {
+export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email, now }, h) => {
   const aside = asideView(model, h)
 
   return shell(h, {
@@ -157,7 +160,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
       ]
     }),
     sidebar: sidebarView(model, email, h),
-    main: mainView(model, h),
+    main: mainView(model, now, h),
     ...(Option.isSome(aside)
       ? {
           aside: {

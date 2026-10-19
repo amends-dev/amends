@@ -13,6 +13,7 @@ export const update = InboxComposition.makeUpdate((model, message) => {
       model: modifyFields(model, { members: () => members, contacts: () => contacts })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
     // Opening the thread reads it, which settles its notifications.
     ClickedOpen: ({ notificationId }) =>
       Option.match(threadOfNotification(model, notificationId), {

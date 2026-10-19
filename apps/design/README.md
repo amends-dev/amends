@@ -35,7 +35,8 @@ a log short and long, a pane's sections as a task to change, a task to read, and
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
 actions, and meta, with a context line under the author and a quiet action, with a form in place of
-the text, and set apart by dividers, centered and at the start; a pane's empty state with a title
+the text, and set apart by dividers, centered and at the start, and notifications under the days
+Today and Yesterday, unread with a dot and a quiet action and read; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
 own; the composer empty and filled; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups, one of them still on its way, and direct messages through
@@ -433,7 +434,7 @@ What a pane says about one thing.
 What a conversation is made of.
 
 - `messageList(h, { label, children })` is an `ol` named by `label`, a column with no list style, of
-  `message`s and `divider`s.
+  `message`s, `notification`s, and `divider`s.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
   then a column of the author line, the context, the text, and the meta row. The author line is the
   `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
@@ -447,6 +448,21 @@ What a conversation is made of.
   with `selected`, draws the `indicator-bar` at its start as the sidebar's current row has, and makes it
   `aria-current="true"`. A row has 10px of space above and below and reaches 12px into the pane's
   gutter, so the fill of the current row reaches past the text.
+- `notification(h, config)` is a row of the same list for a notification, keyed by `config.key` and set
+  like `message`: the `mark` letters at 32px, then a column of a first line, the place, and the text.
+  The first line is the `author` at item size in medium weight, then the `activity` after it in the
+  same size, weight, and `ink`, such as "Sara" and "mentioned you", and at its end the `actions`, quiet
+  buttons such as Mark seen, then the `age`, already formatted, such as "2m ago" or "Yesterday", at
+  `meta` size in `ink-muted`. While `isUnread`, a round 6px dot of `ink`, hidden from assistive
+  technology, comes before the age, and an `sr-only` "Unread" takes its place for it, so the row is
+  read as unread;
+  a row that is not unread has its `text` in `ink-secondary`, quieter than the first line. The
+  `place` is a line under it at `meta` size in `ink-muted`, saying where the notification comes from,
+  such as "#general" or "Caleb · Direct message", and shows only when given. The `text` is at body size;
+  with `onOpen` it is a button that sends `onOpen`, aligned to the start, underlined on hover, and it is
+  named by the author and the activity together, "Sara mentioned you", by an `aria-label`, with the
+  text as its `aria-description`: the first line is where the row says what it is, and the text is what
+  it says. The row has `message`'s spacing and reach into the pane's gutter, and no current state.
 - `divider(h, label, options?)` is an item of the list with a dashed `stitch` rule and the `label` in
   capitals at `meta` size in `ink-muted`: `options.align` is `"center"` (the default), the label between
   two rules, as a day sets apart the messages after it, or `"start"`, the label before one rule that
@@ -543,8 +559,10 @@ toast by `role("alert")` with its text, detail, and button, in the stack's live 
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and
 Cancel by closing the dialog without sending the form; a message by
-its text button, `aria-current`, its note, context, actions, meta, and body, and a divider by its label in
-the list; a composer by its form, the textarea found by the same label, the placeholder, and the
+its text button, `aria-current`, its note, context, actions, meta, and body, a notification by its
+text button named by its author and activity and described by its text, its place, age, and actions,
+and an unread one by its dot, hidden from assistive technology, and its "Unread", and a divider by its
+label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the

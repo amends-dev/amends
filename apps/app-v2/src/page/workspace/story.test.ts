@@ -8,6 +8,7 @@ import {
   connectionOf,
   keylessConnection,
   notificationOf,
+  now,
   opening,
   reply,
   scoutAgent,
@@ -73,7 +74,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
 
 /** What the inbox reports, as the workspace receives it. */
 const fromInbox = (message: typeof InboxBlock.Message.Type) =>
-  InboxBinding.embedView({ slotId: "inbox", model: opened.inbox }).toParentMessage(message)
+  InboxBinding.embedView({ slotId: "inbox", model: opened.inbox, viewInputs: { now } }).toParentMessage(message)
 
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>

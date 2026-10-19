@@ -151,6 +151,27 @@ export const reply = Schema.decodeSync(ThreadMessage.ThreadMessage)({
   content: { _tag: "Text", text: "Sounds good", mentions: [], revision: 1, editedAt: null }
 })
 
+/** Bob's message in the thread that addresses alice. */
+export const mention = Schema.decodeSync(ThreadMessage.ThreadMessage)({
+  id: "message-3",
+  workspaceId: "workspace-1",
+  threadId: "thread-1",
+  author: { _tag: "Member", memberId: "member-2" },
+  via: null,
+  publishedAt: "2026-10-18T12:06:00Z",
+  content: { _tag: "Text", text: "Can you take a look?", mentions: ["member-1"], revision: 1, editedAt: null }
+})
+
+/** The conversation between alice and bob. */
+export const conversationWithBob = Schema.decodeSync(Group.Group)({
+  id: "alice-and-bob",
+  workspaceId: "workspace-1",
+  kind: "Direct",
+  memberIds: ["member-1", "member-2"],
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
 /** Alice's notification of activity in the thread at `sequence`, recorded at `minute` past noon. */
 export const notificationOf = (id: string, sequence: number, minute: number) =>
   Schema.decodeSync(Notification.Notification)({

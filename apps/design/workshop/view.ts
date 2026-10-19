@@ -23,7 +23,7 @@ import { row, section } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
-import { divider, message, messageList } from "../src/message.ts"
+import { divider, message, messageList, notification } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
@@ -788,6 +788,72 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               time: "9:30 AM",
               text: "New activity",
               actions: [button(h, "Mark seen", press, { variant: "quiet" })]
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "Notifications under their days: unread, with a dot and a quiet action, and read",
+      [
+        messageList(h, {
+          label: "Inbox",
+          children: [
+            divider(h, "Today"),
+            notification(h, {
+              key: "sara",
+              mark: "S",
+              author: "Sara",
+              activity: "mentioned you",
+              place: "#general",
+              text: "@Jamie can you check the composer fix before we ship?",
+              age: "2m ago",
+              isUnread: true,
+              onOpen: press,
+              actions: [button(h, "Mark seen", press, { variant: "quiet" })]
+            }),
+            notification(h, {
+              key: "alex",
+              mark: "AM",
+              author: "Alex",
+              activity: "replied",
+              place: "#engineering",
+              text: "The retry now keeps the original request. Ready for another look.",
+              age: "12m ago",
+              isUnread: true,
+              onOpen: press
+            }),
+            notification(h, {
+              key: "oliver",
+              mark: "O",
+              author: "Oliver",
+              activity: "replied",
+              place: "#product",
+              text: "The empty state copy is updated. I've attached the latest version.",
+              age: "1h ago",
+              onOpen: press
+            }),
+            divider(h, "Yesterday"),
+            notification(h, {
+              key: "caleb",
+              mark: "C",
+              author: "Caleb",
+              activity: "mentioned you",
+              place: "Caleb · Direct message",
+              text: "@Jamie let's grab coffee after the rollout.",
+              age: "Yesterday",
+              onOpen: press
+            }),
+            notification(h, {
+              key: "activity",
+              mark: "?",
+              author: "Activity",
+              activity: "in a thread",
+              place: "Unavailable thread",
+              text: "You can no longer see this thread.",
+              age: "Yesterday"
             })
           ]
         })

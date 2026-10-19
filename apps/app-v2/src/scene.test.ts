@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Option } from "effect"
+import { DateTime, Option } from "effect"
 import {
   Command,
   Mount,
@@ -16,7 +16,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { general, membership, now, session, thread } from "../test/fixtures.ts"
+import { bob, general, membership, notificationOf, now, opening, reply, session, thread } from "../test/fixtures.ts"
 import { SignOut } from "./command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { Message } from "./message.ts"
@@ -59,35 +59,55 @@ const inWorkspace: Model = {
   now
 }
 
+/** Signed in as alice, with her opened workspace as `change` leaves it. */
+const inWorkspaceChanged = (
+  change: (workspace: typeof WorkspaceBlock.Model.Type) => typeof WorkspaceBlock.Model.Type
+) =>
+  ({
+    ...inWorkspace,
+    page: Page.matchOrElse(
+      inWorkspace.page,
+      {
+        SignedIn: (signedIn) =>
+          Page.SignedIn({
+            ...signedIn,
+            workspace: Option.map(signedIn.workspace, (opened) => ({ ...opened, model: change(opened.model) }))
+          })
+      },
+      (page) => page
+    )
+  }) satisfies Model
+
 /** Signed in as alice, with the thread of general open in her opened workspace. */
-const withThread: Model = {
-  ...inWorkspace,
-  page: Page.matchOrElse(
-    inWorkspace.page,
-    {
-      SignedIn: (signedIn) =>
-        Page.SignedIn({
-          ...signedIn,
-          workspace: Option.map(signedIn.workspace, (opened) => ({
-            ...opened,
-            model: modifyFields(opened.model, {
-              open: () =>
-                Open.Group({
-                  groupId: general.id,
-                  model: GroupBlock.init(
-                    membership.workspace.id,
-                    membership.member.id,
-                    general.id,
-                    Option.some(thread.id)
-                  ).model
-                })
-            })
-          }))
-        })
-    },
-    (page) => page
-  )
-}
+const withThread = inWorkspaceChanged((workspace) =>
+  modifyFields(workspace, {
+    open: () =>
+      Open.Group({
+        groupId: general.id,
+        model: GroupBlock.init(membership.workspace.id, membership.member.id, general.id, Option.some(thread.id)).model
+      })
+  })
+)
+
+/** Signed in as alice, with her opened workspace showing the inbox, which holds Bob's reply of 25 minutes ago. */
+const withInbox = inWorkspaceChanged((workspace) =>
+  modifyFields(workspace, {
+    open: () => Open.Inbox(),
+    inbox: (inbox) =>
+      modifyFields(inbox, {
+        items: () => [
+          {
+            notification: notificationOf("notification-1", 2, 5),
+            thread: Option.some(thread),
+            opening: Option.some(opening),
+            message: Option.some(reply)
+          }
+        ],
+        groups: () => [general],
+        members: () => [membership.member, bob]
+      })
+  })
+)
 
 describe("the app", () => {
   it("shows the sign-in form under the brand while signed out, and asks for a code to the address entered", () => {
@@ -139,6 +159,19 @@ describe("the app", () => {
       expect(role("main", { name: "Studio" })).toExist(),
       expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
       expect(role("heading", { name: "Sign in to amends" })).toBeAbsent()
+    )
+  })
+
+  it("ages the notifications of the open inbox as the minutes pass, from the time now it gives the workspace", () => {
+    scene(
+      { update, view, subscriptions },
+      given(withInbox),
+      expect(within(role("main", { name: "Inbox" }), text("25m ago"))).toExist(),
+      Subscription.emit(subscriptions.tick, Message.Ticked({ now: DateTime.add(now, { minutes: 1 }) })),
+      expect(within(role("main", { name: "Inbox" }), text("26m ago"))).toExist(),
+      expect(text("25m ago")).toBeAbsent(),
+      Subscription.emit(subscriptions.tick, Message.Ticked({ now: DateTime.add(now, { minutes: 34 }) })),
+      expect(within(role("main", { name: "Inbox" }), text("59m ago"))).toExist()
     )
   })
 
