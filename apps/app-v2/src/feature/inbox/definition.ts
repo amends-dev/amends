@@ -11,6 +11,7 @@ import { Group, GroupId } from "@amends-dev/core/group"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import type { TextRun } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -18,7 +19,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorName, dayLabel, dayOf, groupName, initials, messageText } from "../../seen.ts"
+import { authorName, dayLabel, dayOf, groupName, initials, messageRuns } from "../../seen.ts"
 
 /**
  * A notification, the thread it comes from with its opening message, and the message its activity
@@ -201,10 +202,18 @@ export const notificationPlace = (item: InboxItem, model: Model): Option.Option<
           )
       })
 
-/** What the message a notification's activity is about says, or why there is nothing to read. */
-export const notificationText = (item: InboxItem): string =>
+/**
+ * What the message a notification's activity is about says, with a mention as the name its member has now, or
+ * why there is nothing to read.
+ */
+export const notificationText = (item: InboxItem, model: Model): ReadonlyArray<TextRun> =>
   Option.match(item.message, {
-    onNone: () =>
-      Option.isSome(item.thread) ? "Open the thread to see what happened." : "You can no longer see this thread.",
-    onSome: messageText
+    onNone: () => [
+      {
+        text: Option.isSome(item.thread)
+          ? "Open the thread to see what happened."
+          : "You can no longer see this thread."
+      }
+    ],
+    onSome: (message) => messageRuns(message, model.members)
   })

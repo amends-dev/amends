@@ -23,7 +23,7 @@ import { row, section } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
-import { divider, message, messageList, notification, replyLine } from "../src/message.ts"
+import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
@@ -713,6 +713,12 @@ const openableThreads: ReadonlyArray<
   }
 ]
 
+/** A text that opens with a mention, `name` as it shows, and goes on with `words`. */
+const mentionRuns = (name: string, words: string): ReadonlyArray<TextRun> => [
+  { text: name, isMention: true },
+  { text: words }
+]
+
 const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: string): Html => {
   const press = Message.ClickedButton()
 
@@ -773,6 +779,48 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
+      "A mention in the text as a chip: in plain text, in a row that opens a thread, and in the current row",
+      [
+        messageList(h, {
+          label: "Mentions",
+          children: [
+            message(h, {
+              key: "plain-mention",
+              mark: "G",
+              author: "Graeme",
+              time: "10:08 AM",
+              text: mentionRuns("@Caleb", " Let's grab some coffee")
+            }),
+            message(h, {
+              key: "openable-mention",
+              mark: "S",
+              author: "Sara",
+              time: "10:12 AM",
+              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
+              onOpen: press
+            }),
+            message(h, {
+              key: "current-mention",
+              mark: "AJ",
+              author: "AJ",
+              time: "10:15 AM",
+              text: [
+                { text: "Thanks " },
+                { text: "@Sara", isMention: true },
+                { text: " and " },
+                { text: "@Yumi", isMention: true },
+                { text: ", both fixes are in." }
+              ],
+              onOpen: press,
+              isCurrent: true
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
       "A thread's replies under its row: one reply, three people, and more people than it shows",
       [
         messageList(h, {
@@ -823,7 +871,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Sara",
               time: "10:02 AM",
               context: "Composer paste crash in general",
-              text: "@Jamie can you check the composer fix before we ship?",
+              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
               onOpen: press,
               actions: [button(h, "Mark seen", press, { variant: "quiet" })]
             }),
@@ -854,7 +902,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Sara",
               activity: "mentioned you",
               place: "#general",
-              text: "@Jamie can you check the composer fix before we ship?",
+              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
               age: "2m ago",
               isUnread: true,
               onOpen: press,
@@ -888,7 +936,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
-              text: "@Jamie let's grab coffee after the rollout.",
+              text: mentionRuns("@Jamie", " let's grab coffee after the rollout."),
               age: "Yesterday",
               onOpen: press
             }),

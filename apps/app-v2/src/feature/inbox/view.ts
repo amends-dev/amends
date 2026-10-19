@@ -57,7 +57,7 @@ const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: In
     key: id,
     ...notificationHeadline(item, model),
     place: Option.getOrUndefined(notificationPlace(item, model)),
-    text: notificationText(item),
+    text: notificationText(item, model),
     age: ageLabel(recordedAt, now),
     isUnread,
     ...(thread === undefined ? {} : { onOpen: Message.ClickedOpen({ notificationId: id }) }),

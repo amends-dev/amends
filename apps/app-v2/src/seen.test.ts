@@ -1,6 +1,21 @@
+import { ThreadMessage } from "@amends-dev/core/thread"
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
-import { ageLabel, dayLabel, dayOf, initials, repliesLabel, timeOf, whenLabel } from "./seen.ts"
+import * as Option from "effect/Option"
+import { bob, deleted, membership, opening, reply, saying, thread } from "../test/fixtures.ts"
+import {
+  ageLabel,
+  dayLabel,
+  dayOf,
+  initials,
+  messageRuns,
+  messageText,
+  repliesLabel,
+  textRuns,
+  threadRuns,
+  timeOf,
+  whenLabel
+} from "./seen.ts"
 
 describe("initials", () => {
   it("is the first letters of the first two words of a name, in capitals", () => {
@@ -125,6 +140,82 @@ describe("whenLabel", () => {
     expect(whenLabel(local(2025, 12, 25, 9, 0), now)).toBe(
       spelled(local(2025, 12, 25), { year: "numeric", month: "long", day: "numeric" })
     )
+  })
+})
+
+/** Alice and bob, who a text can mention. */
+const members = [membership.member, bob]
+
+describe("textRuns", () => {
+  const mentionOf = (member: typeof bob, label = member.name) => ThreadMessage.mentionText(member.id, label)
+
+  it("is the words as written in one run, and no runs for none", () => {
+    expect(textRuns("Let's grab some coffee", members)).toEqual([{ text: "Let's grab some coffee" }])
+    expect(textRuns("", members)).toEqual([])
+  })
+
+  it("shows a mention as @ and the name the member has now, a chip among the words", () => {
+    expect(textRuns(`Thanks ${mentionOf(bob, "Robert")}, see you there`, members)).toEqual([
+      { text: "Thanks " },
+      { text: "@Bob", isMention: true },
+      { text: ", see you there" }
+    ])
+    expect(textRuns(`${mentionOf(membership.member)} and ${mentionOf(bob)}`, members)).toEqual([
+      { text: "@Alice", isMention: true },
+      { text: " and " },
+      { text: "@Bob", isMention: true }
+    ])
+  })
+
+  it("shows a mention of someone who is not among the members by the name it recorded", () => {
+    expect(textRuns(`${mentionOf(bob, "Robert")} let's grab coffee`, [membership.member])).toEqual([
+      { text: "@Robert", isMention: true },
+      { text: " let's grab coffee" }
+    ])
+  })
+
+  it("leaves the rest of the markdown as written", () => {
+    expect(textRuns("*Ship* it, [the notes](https://example.com)", members)).toEqual([
+      { text: "*Ship* it, [the notes](https://example.com)" }
+    ])
+  })
+})
+
+describe("messageText", () => {
+  it("is the words as written, mention and all, or that the message was deleted", () => {
+    const written = saying(reply, `${ThreadMessage.mentionText(bob.id, "Bob")} Sounds good`)
+
+    expect(messageText(written)).toBe("[@Bob](member:member-2) Sounds good")
+    expect(messageText(deleted(reply))).toBe("This message was deleted.")
+  })
+})
+
+describe("messageRuns", () => {
+  it("is the runs of what a message says, a mention as the name its member has now", () => {
+    const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check this?`)
+
+    expect(messageRuns(asked, members)).toEqual([{ text: "@Bob", isMention: true }, { text: " can you check this?" }])
+    expect(messageRuns(reply, members)).toEqual([{ text: "Sounds good" }])
+  })
+
+  it("is one run saying a deleted message was deleted", () => {
+    expect(messageRuns(deleted(reply), members)).toEqual([{ text: "This message was deleted." }])
+  })
+})
+
+describe("threadRuns", () => {
+  const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check this?`)
+
+  it("is the title as one run when the thread has one", () => {
+    expect(threadRuns({ ...thread, title: "Retro" }, Option.some(asked), members)).toEqual([{ text: "Retro" }])
+  })
+
+  it("is the runs of the opening without a title, and A thread while the opening is not read", () => {
+    expect(threadRuns(thread, Option.some(asked), members)).toEqual([
+      { text: "@Bob", isMention: true },
+      { text: " can you check this?" }
+    ])
+    expect(threadRuns(thread, Option.none(), members)).toEqual([{ text: "A thread" }])
   })
 })
 

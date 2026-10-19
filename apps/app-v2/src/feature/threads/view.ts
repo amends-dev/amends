@@ -5,7 +5,7 @@ import { divider, message, messageList, replyLine } from "@amends-dev/design/mes
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { authorName, initials, repliesLabel, statusLabel, threadLabel, whenLabel } from "../../seen.ts"
+import { authorName, initials, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
 import { ComposerBinding, ThreadsComposition, type ThreadsViewBuilder } from "./composition.ts"
 import { byDay, Message, type ThreadItem } from "./definition.ts"
 
@@ -54,7 +54,7 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
     author: author.name,
     time: whenLabel(item.thread.createdAt, now),
     note: item.pending ? "Sending…" : undefined,
-    text: threadLabel(item.thread, item.opening),
+    text: threadRuns(item.thread, item.opening, members),
     onOpen: Message.ClickedThread({ threadId: item.thread.id }),
     isCurrent: Option.exists(openThreadId, (threadId) => threadId === item.thread.id),
     meta: [

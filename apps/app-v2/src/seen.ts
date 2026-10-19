@@ -1,8 +1,9 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called and what
- * letters mark them, who wrote a message and what it says, when a time was, by its time of day, its day,
- * either as a message shows it, and how long ago it was, how a thread is titled and how many replies it
- * has, whether anyone may join a group, and how a task's status and priority and a turn's status read.
+ * letters mark them, who wrote a message and what it says, with a mention in it as its member's current
+ * name, when a time was, by its time of day, its day, either as a message shows it, and how long ago it
+ * was, how a thread is titled and how many replies it has, whether anyone may join a group, and how a
+ * task's status and priority and a turn's status read.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -11,6 +12,7 @@ import type { Task } from "@amends-dev/core/task"
 import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
+import type { TextRun } from "@amends-dev/design/message"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 
@@ -106,16 +108,52 @@ export const authorName = (
     Contact: ({ contactId }) => contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
   })
 
-/** What `message` says, or that it was deleted. */
+const deletedText = "This message was deleted."
+
+/** What `message` says as plain words, or that it was deleted. */
 export const messageText = (message: ThreadMessage.ThreadMessage): string =>
-  ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => "This message was deleted." })
+  ThreadMessage.Content.match(message.content, { Text: ({ text }) => text, Deleted: () => deletedText })
+
+/**
+ * `text` as the runs a view shows: its words as written, and each mention as "@" and the name the member has
+ * now among `members`, or the name the mention recorded while they are not among them.
+ */
+export const textRuns = (text: string, members: ReadonlyArray<Member.Member>): ReadonlyArray<TextRun> =>
+  ThreadMessage.parts(text).map((part) =>
+    ThreadMessage.Part.match(part, {
+      Text: ({ text }) => ({ text }),
+      Mention: ({ memberId, label }) => ({
+        text: `@${members.find((member) => member.id === memberId)?.name ?? label}`,
+        isMention: true
+      })
+    })
+  )
+
+/** What `message` says as the runs a view shows, or that it was deleted. */
+export const messageRuns = (
+  message: ThreadMessage.ThreadMessage,
+  members: ReadonlyArray<Member.Member>
+): ReadonlyArray<TextRun> =>
+  ThreadMessage.Content.match(message.content, {
+    Text: ({ text }) => textRuns(text, members),
+    Deleted: (): ReadonlyArray<TextRun> => [{ text: deletedText }]
+  })
 
 /** How many replies a thread has, as the person reads it: "1 reply", "4 replies". */
 export const repliesLabel = (replies: number): string => `${replies} ${replies === 1 ? "reply" : "replies"}`
 
-/** A thread as the person reads it in a list: its title, or its opening message. */
-export const threadLabel = (thread: Thread.Thread, opening: Option.Option<ThreadMessage.ThreadMessage>): string =>
-  thread.title ?? Option.match(opening, { onNone: () => "A thread", onSome: messageText })
+/** A thread as the person reads it in a list: its title, or its opening message as runs, or "A thread". */
+export const threadRuns = (
+  thread: Thread.Thread,
+  opening: Option.Option<ThreadMessage.ThreadMessage>,
+  members: ReadonlyArray<Member.Member>
+): ReadonlyArray<TextRun> =>
+  thread.title === null
+    ? Option.match(opening, {
+        onNone: (): ReadonlyArray<TextRun> => [{ text: "A thread" }],
+        onSome: (message) => messageRuns(message, members)
+      })
+    : [{ text: thread.title }]
 
 /** Whether anyone in the workspace may join `group`: a public team. */
 export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"

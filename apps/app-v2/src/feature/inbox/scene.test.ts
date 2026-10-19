@@ -1,5 +1,6 @@
 import { GroupId } from "@amends-dev/core/group"
 import { Notification } from "@amends-dev/core/notification"
+import { ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { DateTime, Option, Struct } from "effect"
 import {
@@ -22,6 +23,7 @@ import { modifyFields } from "foldkit/struct"
 import {
   bob,
   conversationWithBob,
+  deleted,
   general,
   membership,
   mention,
@@ -29,6 +31,7 @@ import {
   now,
   opening,
   reply,
+  saying,
   thread
 } from "../../../test/fixtures.ts"
 import { InboxBlock } from "./block.ts"
@@ -170,6 +173,30 @@ describe("the inbox", () => {
       { update, view: sceneView },
       given(modifyFields(opened, { items: () => [{ ...bobsReply, message: Option.some(opening) }] })),
       expect(role("button", { name: "Alice started a thread" })).toExist()
+    )
+  })
+
+  it("shows a mention in what a notification says as a chip with the name the member has now, and describes its button by the words", () => {
+    const asked = saying(mention, `${ThreadMessage.mentionText(member.id, "Al")} can you take a look?`)
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [{ ...bobsReply, message: Option.some(asked) }] })),
+      expect(within(notifications, text("@Alice"))).toHaveText("@Alice"),
+      expect(within(notifications, text(" can you take a look?"))).toExist(),
+      expect(text("@Al")).toBeAbsent(),
+      expect(role("button", { name: "Bob mentioned you" })).toHaveAttr(
+        "aria-description",
+        "@Alice can you take a look?"
+      )
+    )
+  })
+
+  it("says that a message was deleted where it would say what it said", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [{ ...bobsReply, message: Option.some(deleted(reply)) }] })),
+      expect(role("button", { name: "Bob replied" })).toHaveAttr("aria-description", "This message was deleted.")
     )
   })
 

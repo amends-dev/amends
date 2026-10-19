@@ -35,7 +35,8 @@ a log short and long, a pane's sections as a task to change, a task to read, and
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
-line shows, with a context line under the author and a quiet action, with a form in place of
+line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
+the current row, with a context line under the author and a quiet action, with a form in place of
 the text, and set apart by dividers, centered and at the start, and notifications under the days
 Today and Yesterday, unread with a dot and a quiet action and read; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
@@ -442,7 +443,7 @@ What a conversation is made of.
   formatted, and a `note` after that as ` · ${note}`, such as "edited" or "Sending…"; `actions` are
   quiet buttons at its end, such as Edit and Delete. The `context` is a line under it at `meta` size in
   `ink-muted`, saying where the message comes from, such as a notification's thread and group. The
-  `text` is at body size; with `onOpen` it is a button named by the
+  `text` is at body size, a string or `TextRun`s (below); with `onOpen` it is a button named by the
   text that sends `onOpen`, aligned to the start, underlined on hover, for a message that is the start
   of a thread, and `body` takes its place, such as the form that edits it. `meta` is a row of quiet
   facts under the text at hint size, such as a `replyLine`, "2 new", and a task's status. `isCurrent` fills the row
@@ -459,11 +460,21 @@ What a conversation is made of.
   read as unread;
   a row that is not unread has its `text` in `ink-secondary`, quieter than the first line. The
   `place` is a line under it at `meta` size in `ink-muted`, saying where the notification comes from,
-  such as "#general" or "Caleb · Direct message", and shows only when given. The `text` is at body size;
-  with `onOpen` it is a button that sends `onOpen`, aligned to the start, underlined on hover, and it is
-  named by the author and the activity together, "Sara mentioned you", by an `aria-label`, with the
-  text as its `aria-description`: the first line is where the row says what it is, and the text is what
-  it says. The row has `message`'s spacing and reach into the pane's gutter, and no current state.
+  such as "#general" or "Caleb · Direct message", and shows only when given. The `text` is at body size,
+  a string or `TextRun`s (below); with `onOpen` it is a button that sends `onOpen`, aligned to the start,
+  underlined on hover, and it is named by the author and the activity together, "Sara mentioned you", by
+  an `aria-label`, with the text's words as its `aria-description`: the first line is where the row says
+  what it is, and the text is what it says. The row has `message`'s spacing and reach into the pane's
+  gutter, and no current state.
+- `TextRun` is `{ text, isMention? }`, one run of the `text` of a `message` or a `notification`, which
+  takes a string or the runs in order. A run is its `text` as it stands; a run with `isMention` is a
+  chip: a `span` on `mention`, with 4px of space each side and medium weight, in the ink of the row's
+  text, with square corners like every surface here, inline with the words around it, which gain no
+  space. The chip is a surface of its own, so it shows in the current row, whose fill is `selected`.
+  A text of runs reads as the runs' texts joined, "@Jamie can you check the composer fix": the
+  paragraph's text, a button's name when it has no other, and a notification's `aria-description`. A
+  caller gives runs for the words it has already shaped, such as a mention's current name; the design
+  knows nothing of mentions beyond how a run shows.
 - `replyLine(h, { marks, label })` is what the first message of a thread shows in its `meta`, under its
   text: a short tree line that hangs from the row's mark, 12px by 12px with a border at its start and
   its bottom in `outline`, then the `marks`, the letters of those who replied, as `xs` marks overlapping
@@ -567,7 +578,8 @@ toast by `role("alert")` with its text, detail, and button, in the stack's live 
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and
 Cancel by closing the dialog without sending the form; a message by
-its text button, `aria-current`, its note, context, actions, meta, and body, a notification by its
+its text button, `aria-current`, its note, context, actions, meta, and body, a mention in its text by the
+chip that holds it and a button by the words joined, a notification by its
 text button named by its author and activity and described by its text, its place, age, and actions,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,

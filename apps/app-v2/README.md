@@ -55,7 +55,20 @@ and the pane of each destination, `feature/groups` renders the sidebar's section
 a team or a conversation is started, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
-initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`. The task and the turns a thread embeds are the
+initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`.
+
+A message's text is markdown as the person wrote it, and a mention in it is a link to the member,
+`[@Ada](member:<id>)`, labelled with the name they had when mentioned. Wherever a message's text is
+shown, in a thread, in a group's list of threads, and in the inbox, `seen.ts` reads it as runs
+(`textRuns`, `messageRuns`, `threadRuns`; core's `ThreadMessage.parts` finds the mentions) and the
+design shows each mention as a chip of "@" and the member's current name among the members the view
+has, or the name the mention recorded while they are not among them, inline with the words. The
+text shows nothing else of its markdown yet: emphasis, links, lists, and code appear as written, with
+their marks, and the form that edits a message shows its text as written, mentions too, as does a
+title taken from a thread's opening, in the pane's header and under the group in the sidebar
+(`titleOf`, by `messageText`). The composers cannot write a mention yet.
+
+The task and the turns a thread embeds are the
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
 a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
 each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
@@ -110,8 +123,9 @@ the pages that compose them; the root composes the pages.
   the person does, the task and the turns, then its messages as a list, the opening first, how many
   replies follow it, and the replies, each by its author's initials, name, and when it was published
   (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with "Sending…" or
-  "edited" after it, and Edit and Delete on the person's own, which the form to edit it
-  replaces while they do; and who else types, in a live region under them. It shows no title, which
+  "edited" after it, its text with each mention a chip (`messageRuns`, by the thread's members),
+  and Edit and Delete on the person's own, which the form to edit it replaces while they do; and who
+  else types, in a live region under them. It shows no title, which
   the pane's header has. `replyView` is the reply composer, for the pane's footer.
 - `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
@@ -142,7 +156,8 @@ the pages that compose them; the root composes the pages.
   each the opening's author, by initials and name ("Someone" until the members are read, and "A thread"
   when the opening is not read yet), when the thread was created (`whenLabel`: its time of day today,
   "Yesterday" or the day's name before), which it says before the opening is read too, and the thread's
-  title or its opening as the text that opens it, with "Sending…" while it is being started, under it,
+  title or its opening, each mention in it a chip (`threadRuns`, by the group's members), as the text
+  that opens it, with "Sending…" while it is being started, under it,
   while the thread has replies, a reply line: the initials of those who replied, in the order of their
   first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then how much is new and where its
   task stands; the thread open is the current row. `composerView` is the composer to start one, for the
@@ -195,8 +210,8 @@ the pages that compose them; the root composes the pages.
   (`notificationReason`): the message mentions them ("mentioned you"), it opens the thread ("started
   a thread"), or it replies ("replied"); where it comes from, a team as `#` and its name, a
   conversation as the others in it and "Direct message", and "Unavailable thread" while the store
-  lacks the thread, with no place while it lacks the thread's group; what the message says; and how
-  long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
+  lacks the thread, with no place while it lacks the thread's group; what the message says, each
+  mention in it a chip (`notificationText`, by the inbox's members); and how long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
   first line says "Activity in a thread" under the mark "?", and the text says what it can. The time
   now is its view input, as the page gives it, so the days and ages follow the clock. A notification's
   text opens its thread, and the person marks a waiting one seen, or every one up to the newest that
@@ -485,10 +500,10 @@ browser's storage. Each Block's tests sit beside it:
   one.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
-  edited one, who types, a reply written and sent, the title renamed from its form, and a message
+  edited one, a mention as a chip with its member's current name, a deleted one, who types, a reply written and sent, the title renamed from its form, and a message
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
-  author of their opening, their time, who replied and how many times, how much is new and where
-  their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
+  author of their opening, their time, a mention in the opening as a chip, who replied and how many
+  times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
   from the composer, whose box is named for the group; a task changed by someone who may, read as
   rows by someone who may not, and made by someone who may create tasks; a thread's turns by their
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
@@ -510,8 +525,9 @@ browser's storage. Each Block's tests sit beside it:
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
   a dialog of its own, and the same team taken from the workspace's sidebar; the inbox's notifications under the day they came, by their
-  author and what they did, the place they come from, how long ago, and what they say, a mention, the
-  opening of a thread, and a reply told apart, with no place while the group is unknown and the
+  author and what they did, the place they come from, how long ago, and what they say, with a mention
+  in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
+  apart, with no place while the group is unknown and the
   activity alone while the thread is, the unread ones with a dot and a way to mark them seen, the seen
   ones on All with neither and not on Unread, the tabs counted and chosen, all marked seen, one seen
   with its failure shown, and one's thread opened by its text, and an empty All saying there is
@@ -593,7 +609,9 @@ browser's storage. Each Block's tests sit beside it:
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and `seen.ts`: the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
-  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and `settingsForm.ts`: the fields an
+  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and the runs of a text and of a message and of a thread's row,
+  a mention as "@" and the member's current name or the name it recorded, and the rest of the
+  markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.

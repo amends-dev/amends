@@ -6,7 +6,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { divider, message, messageList, notification, replyLine } from "./message.ts"
+import { divider, message, messageList, notification, replyLine, type TextRun } from "./message.ts"
 
 const Message = defineMessageUnion({
   OpenedThread: { key: Schema.String },
@@ -34,6 +34,14 @@ const viewOf = (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (mod
       render(model, h)
     ]
   )
+
+const mention = "@Jamie can you check the composer fix before we ship?"
+
+/** The words of `mention` as runs: a mention of Jamie, then the words that follow it. */
+const mentionRuns: ReadonlyArray<TextRun> = [
+  { text: "@Jamie", isMention: true },
+  { text: " can you check the composer fix before we ship?" }
+]
 
 const threads = (model: Model, h: HtmlBuilder<Message>) =>
   messageList(h, {
@@ -119,6 +127,67 @@ describe("message", () => {
       given(initial),
       expect(role("button", { name: "The preview is ready for another look." })).toExist(),
       click(role("button", { name: "The preview is ready for another look." })),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+
+  it("shows a mention in its text as a chip among the words, which read as one line", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Messages",
+            children: [message(h, { key: "message-1", mark: "S", author: "Sara", text: mentionRuns })]
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("listitem"), text("@Jamie"))).toHaveClass("bg-mention"),
+      expect(text(" can you check the composer fix before we ship?")).not.toHaveClass("bg-mention"),
+      expect(text(mention)).toExist()
+    )
+  })
+
+  it("shows runs of words alone as the text of a string, with no chip", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Messages",
+            children: [message(h, { key: "message-1", mark: "A", author: "Alex", text: [{ text: "Looks good." }] })]
+          })
+        )
+      },
+      given(initial),
+      expect(text("Looks good.")).toExist(),
+      expect(text("Looks good.")).not.toHaveClass("bg-mention")
+    )
+  })
+
+  it("makes text with a mention a button named by its words, with the mention a chip in it", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Threads",
+            children: [
+              message(h, {
+                key: "thread-1",
+                mark: "S",
+                author: "Sara",
+                text: mentionRuns,
+                onOpen: Message.OpenedThread({ key: "thread-1" })
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("button", { name: mention }), text("@Jamie"))).toHaveClass("bg-mention"),
+      click(role("button", { name: mention })),
       expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
     )
   })
@@ -243,9 +312,13 @@ describe("message", () => {
 })
 
 describe("notification", () => {
-  const mention = "@Jamie can you check the composer fix before we ship?"
-
-  type Options = Readonly<{ place?: string; isUnread?: boolean; isOpenable?: boolean; isActionable?: boolean }>
+  type Options = Readonly<{
+    place?: string
+    text?: string | ReadonlyArray<TextRun>
+    isUnread?: boolean
+    isOpenable?: boolean
+    isActionable?: boolean
+  }>
 
   const sara = (h: HtmlBuilder<Message>, options: Options) =>
     notification(h, {
@@ -254,7 +327,7 @@ describe("notification", () => {
       author: "Sara",
       activity: "mentioned you",
       ...(options.place === undefined ? {} : { place: options.place }),
-      text: mention,
+      text: options.text ?? mention,
       age: "2m ago",
       ...(options.isUnread === true ? { isUnread: true } : {}),
       ...(options.isOpenable === false ? {} : { onOpen: Message.OpenedThread({ key: "notification-1" }) }),
@@ -312,6 +385,27 @@ describe("notification", () => {
       expect(role("button", { name: mention })).toBeAbsent(),
       click(role("button", { name: "Sara mentioned you" })),
       expect(role("status")).toHaveText("Current notification-1, edits 0, deletions 0")
+    )
+  })
+
+  it("shows a mention in its text as a chip, and describes the button that opens it by the words joined", () => {
+    scene(
+      { update, view: viewOf(notifications({ text: mentionRuns })) },
+      given(initial),
+      expect(within(role("button", { name: "Sara mentioned you" }), text("@Jamie"))).toHaveClass("bg-mention"),
+      expect(role("button", { name: "Sara mentioned you" })).toHaveAttr("aria-description", mention),
+      expect(text(mention)).toExist(),
+      click(role("button", { name: "Sara mentioned you" })),
+      expect(role("status")).toHaveText("Current notification-1, edits 0, deletions 0")
+    )
+  })
+
+  it("shows a mention as a chip in the text of one that is not a button", () => {
+    scene(
+      { update, view: viewOf(notifications({ text: mentionRuns, isOpenable: false })) },
+      given(initial),
+      expect(within(role("listitem"), text("@Jamie"))).toHaveClass("bg-mention"),
+      expect(text(mention)).toExist()
     )
   })
 

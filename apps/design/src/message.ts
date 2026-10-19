@@ -28,6 +28,8 @@ const actionsRow = "-my-1.5 ms-auto flex flex-none items-center gap-1 self-cente
 
 type Ink = "text-ink" | "text-ink-secondary"
 
+const mentionChip = "bg-mention px-1 font-medium"
+
 const textLook = (ink: Ink) => `m-0 text-body wrap-break-word ${ink}`
 
 const textButton = (ink: Ink) =>
@@ -96,15 +98,30 @@ const renderTime = <Message, Requirements>(
         ]
       )
 
+/** One run of a message's text: words as written, or, with `isMention`, a mention, which shows as a chip. */
+export type TextRun = Readonly<{ text: string; isMention?: boolean }>
+
+/** The words of a text as one line, a mention in them as the words it is: what a reader hears. */
+const wordsOf = (text: string | ReadonlyArray<TextRun>): string =>
+  typeof text === "string" ? text : text.map((run) => run.text).join("")
+
+const renderRuns = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  text: string | ReadonlyArray<TextRun>
+): ReadonlyArray<Html | string> =>
+  typeof text === "string"
+    ? [text]
+    : text.map((run) => (run.isMention === true ? h.span([h.Class(mentionChip)], [run.text]) : run.text))
+
 /** The text, a button when `onOpen` is given, which is named `name` and described by the text when it has one. */
 const renderText = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ text: string; ink: Ink; onOpen?: Message; name?: string }>
+  config: Readonly<{ text: string | ReadonlyArray<TextRun>; ink: Ink; onOpen?: Message; name?: string }>
 ): Html => {
   const { onOpen, name } = config
 
   return onOpen === undefined
-    ? h.p([h.Class(textLook(config.ink))], [config.text])
+    ? h.p([h.Class(textLook(config.ink))], renderRuns(h, config.text))
     : Button.view(
         {
           onClick: onOpen,
@@ -112,10 +129,10 @@ const renderText = <Message, Requirements>(
             h.button(
               [
                 ...attributes.button,
-                ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(config.text)]),
+                ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(wordsOf(config.text))]),
                 h.Class(textButton(config.ink))
               ],
-              [config.text]
+              renderRuns(h, config.text)
             )
         },
         h
@@ -124,14 +141,14 @@ const renderText = <Message, Requirements>(
 
 /**
  * One message, a row of a `messageList` keyed by `key`: the author's `mark` letters, then the `author`
- * with the `time` after it and a `note` after that, such as "edited" or "Sending…", and the `text`. Under
- * the author line, a `context` is a quieter line saying where the message comes from, such as the thread
- * and the group of a notification. Under the text, `meta` is a row of quiet facts, such as how much is
- * new, and at the end of the author line, `actions` are quiet buttons, such as Edit and Delete. `onOpen`
- * makes the text a button named by it that sends `onOpen`, for a message that is the start of a thread;
- * `body` takes the text's place, for the form that changes it. The current row is filled with the 2px bar
- * and `aria-current="true"`, and a row reaches 12px into the pane's gutter so its fill reaches past the
- * text.
+ * with the `time` after it and a `note` after that, such as "edited" or "Sending…", and the `text`, a
+ * string or `TextRun`s, in which a mention is a chip. Under the author line, a `context` is a quieter line
+ * saying where the message comes from, such as the thread and the group of a notification. Under the
+ * text, `meta` is a row of quiet facts, such as how much is new, and at the end of the author line,
+ * `actions` are quiet buttons, such as Edit and Delete. `onOpen` makes the text a button named by it that
+ * sends `onOpen`, for a message that is the start of a thread; `body` takes the text's place, for the
+ * form that changes it. The current row is filled with the 2px bar and `aria-current="true"`, and a row
+ * reaches 12px into the pane's gutter so its fill reaches past the text.
  */
 export const message = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -142,7 +159,7 @@ export const message = <Message, Requirements>(
     time?: string | undefined
     note?: string | undefined
     context?: string | undefined
-    text: string
+    text: string | ReadonlyArray<TextRun>
     onOpen?: Message
     body?: Html | undefined
     actions?: ReadonlyArray<Html>
@@ -225,12 +242,13 @@ const renderAge = <Message, Requirements>(
  * One notification, a row of a `messageList` beside `message`, keyed by `key` and set like it: the `mark` letters,
  * then a first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
  * as "Sara" and "mentioned you", under it the `place` it comes from, at `meta` size in `ink-muted`, and the
- * `text`. At the end of the first line are the `actions`, quiet buttons such as Mark seen, and then the `age`,
- * already formatted, such as "2m ago". While `isUnread`, a 6px dot of `ink` comes before the age, hidden from
- * assistive technology, which an `sr-only` "Unread" before the age replaces; a row that is not unread has its
- * text in `ink-secondary`, quieter than the first line. `onOpen` makes the text a button that sends it, named
- * by the author and the activity together, "Sara mentioned you", with the text as its description, by an
- * `aria-label` and an `aria-description`, since the first line is where the row says what it is.
+ * `text`, a string or `TextRun`s, in which a mention is a chip. At the end of the first line are the `actions`,
+ * quiet buttons such as Mark seen, and then the `age`, already formatted, such as "2m ago". While `isUnread`, a
+ * 6px dot of `ink` comes before the age, hidden from assistive technology, which an `sr-only` "Unread" before the
+ * age replaces; a row that is not unread has its text in `ink-secondary`, quieter than the first line. `onOpen`
+ * makes the text a button that sends it, named by the author and the activity together, "Sara mentioned you",
+ * with the text's words as its description, by an `aria-label` and an `aria-description`, since the first line
+ * is where the row says what it is.
  */
 export const notification = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -240,7 +258,7 @@ export const notification = <Message, Requirements>(
     author: string
     activity: string
     place?: string | undefined
-    text: string
+    text: string | ReadonlyArray<TextRun>
     age: string
     isUnread?: boolean
     onOpen?: Message

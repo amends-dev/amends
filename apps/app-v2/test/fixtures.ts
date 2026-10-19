@@ -162,6 +162,22 @@ export const mention = Schema.decodeSync(ThreadMessage.ThreadMessage)({
   content: { _tag: "Text", text: "Can you take a look?", mentions: ["member-1"], revision: 1, editedAt: null }
 })
 
+/** `message` saying `text` instead, in which `ThreadMessage.mentionText` writes a mention, and addressing whom it did. */
+export const saying = (message: typeof opening, text: string): typeof opening => ({
+  ...message,
+  content: ThreadMessage.Content.matchOrElse(
+    message.content,
+    { Text: (content) => ({ ...content, text }) },
+    (content) => content
+  )
+})
+
+/** `message` after it was deleted, when it was published. */
+export const deleted = (message: typeof opening): typeof opening => ({
+  ...message,
+  content: ThreadMessage.Content.cases.Deleted.make({ deletedAt: message.publishedAt })
+})
+
 /** The conversation between alice and bob. */
 export const conversationWithBob = Schema.decodeSync(Group.Group)({
   id: "alice-and-bob",

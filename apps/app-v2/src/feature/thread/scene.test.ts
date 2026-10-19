@@ -17,7 +17,7 @@ import {
   withViewInputs,
   within
 } from "foldkit/scene"
-import { now, scout, turnOf } from "../../../test/fixtures.ts"
+import { deleted, now, saying, scout, turnOf } from "../../../test/fixtures.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -233,6 +233,34 @@ describe("a thread", () => {
       click(role("button", { name: "Delete" })),
       Command.expectExact(DeleteMessage({ workspaceId, memberId, messageId: opening.id })),
       Command.resolve(DeleteMessage, Message.WroteAction())
+    )
+  })
+
+  it("shows a mention in a message as a chip with the name the member has now, among the words around it", () => {
+    const asked = saying(
+      opening,
+      `${ThreadMessage.mentionText(bob.id, "Robert")} can you check the plans? Dana too: ${ThreadMessage.mentionText("member-9", "Dana")}`
+    )
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: asked, pending: false }),
+      expect(within(role("list", { name: "Messages" }), text("@Bob"))).toHaveText("@Bob"),
+      expect(text("@Robert")).toBeAbsent(),
+      expect(text(" can you check the plans? Dana too: ")).toExist(),
+      // A member the thread's people do not hold keeps the name the mention recorded.
+      expect(text("@Dana")).toHaveText("@Dana"),
+      expect(text("@Bob can you check the plans? Dana too: @Dana")).toExist()
+    )
+  })
+
+  it("says a message was deleted in its place", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: deleted(reply), pending: false }),
+      expect(within(role("list", { name: "Messages" }), text("This message was deleted."))).toExist()
     )
   })
 

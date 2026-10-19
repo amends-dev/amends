@@ -15,6 +15,7 @@ import {
   now,
   opening,
   reply,
+  saying,
   thread
 } from "../../../test/fixtures.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
@@ -151,9 +152,24 @@ describe("the inbox", () => {
   })
 
   it("tells what a notification says, or why there is nothing to read", () => {
-    expect(notificationText(itemOf(older))).toBe("Sounds good")
-    expect(notificationText({ ...itemOf(older), message: Option.none() })).toBe("Open the thread to see what happened.")
-    expect(notificationText(withoutThread(older))).toBe("You can no longer see this thread.")
+    expect(notificationText(itemOf(older), known)).toEqual([{ text: "Sounds good" }])
+    expect(notificationText({ ...itemOf(older), message: Option.none() }, known)).toEqual([
+      { text: "Open the thread to see what happened." }
+    ])
+    expect(notificationText(withoutThread(older), known)).toEqual([{ text: "You can no longer see this thread." }])
+  })
+
+  it("tells a mention in what a notification says by the name its member has now", () => {
+    const asked = saying(mention, `${ThreadMessage.mentionText(member.id, "Al")} can you take a look?`)
+
+    expect(notificationText({ ...itemOf(older), message: Option.some(asked) }, known)).toEqual([
+      { text: "@Alice", isMention: true },
+      { text: " can you take a look?" }
+    ])
+    expect(notificationText({ ...itemOf(older), message: Option.some(asked) }, listed)).toEqual([
+      { text: "@Al", isMention: true },
+      { text: " can you take a look?" }
+    ])
   })
 
   it("lists every notification, or the ones still waiting, newest first, and counts those waiting", () => {

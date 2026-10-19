@@ -22,7 +22,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, membership, now, opening, task, thread } from "../../../test/fixtures.ts"
+import { bob, membership, now, opening, saying, task, thread } from "../../../test/fixtures.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -117,6 +117,32 @@ describe("a group's threads", () => {
       expect(role("button", { name: "Plans for the week" })).toExist(),
       click(role("button", { name: "Plans for the week" })),
       expectOutMessage(OutMessage.SelectedThread({ threadId: openedId }))
+    )
+  })
+
+  it("shows a mention in an opening as a chip with the name the member has now, in the one line that opens the thread", () => {
+    const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check the plans?`)
+
+    scene(
+      { update, view: sceneView },
+      given(listing({ ...alices, opening: Option.some(asked) })),
+      expect(within(item(1), text("@Bob"))).toHaveText("@Bob"),
+      expect(within(item(1), text(" can you check the plans?"))).toExist(),
+      expect(text("@Robert")).toBeAbsent(),
+      expect(role("button", { name: "@Bob can you check the plans?" })).toExist(),
+      click(role("button", { name: "@Bob can you check the plans?" })),
+      expectOutMessage(OutMessage.SelectedThread({ threadId: openedId }))
+    )
+  })
+
+  it("shows a thread's title in place of its opening, mention and all, as one run", () => {
+    const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check the plans?`)
+
+    scene(
+      { update, view: sceneView },
+      given(listing({ ...alices, thread: { ...thread, title: "Retro" }, opening: Option.some(asked) })),
+      expect(role("button", { name: "Retro" })).toExist(),
+      expect(text("@Bob")).toBeAbsent()
     )
   })
 

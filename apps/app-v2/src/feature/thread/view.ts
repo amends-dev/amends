@@ -6,7 +6,7 @@ import { paneColumn } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { authorName, initials, messageText, repliesLabel, whenLabel } from "../../seen.ts"
+import { authorName, initials, messageRuns, repliesLabel, whenLabel } from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, typingIn } from "./definition.ts"
 
@@ -86,7 +86,7 @@ const messageView = (
     author,
     time: whenLabel(item.publishedAt, now),
     note: noteOf(pending, edited),
-    text: messageText(item),
+    text: messageRuns(item, model.members),
     body: Option.getOrUndefined(
       Option.map(editing, ({ draft }) =>
         form(h, { onSubmit: Message.SubmittedEdit(), variant: "pane" }, [
