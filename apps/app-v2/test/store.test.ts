@@ -199,6 +199,10 @@ const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => bool
 
 const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
 
+/** How many members the group `groupId` has among `views`. */
+const membersIn = (views: ReadonlyArray<Store.GroupView>, groupId: Group.Group["id"]) =>
+  views.find(({ group }) => group.record.value.id === groupId)?.members
+
 describe("Store", () => {
   it.live("a store keeps its replica in sync with the host, and reads it again offline", () =>
     Effect.gen(function* () {
@@ -411,6 +415,60 @@ describe("Store", () => {
         )).filter(({ record }) => record.value.kind === "Direct")
       ).toHaveLength(1)
       expect(yield* firstWhere(store.actions, () => true)).toEqual([])
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live("a group lists with its members: a team's admitted ones, and a conversation's", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const bob = yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
+      const carol = yield* admit(gateway, workspace, Identity.HumanId.make("carol"))
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+
+      // Everyone who joined the workspace is in its general group.
+      yield* firstWhere(store.groups, (views) => membersIn(views, Group.GeneralId) === 3)
+
+      // A team counts the admissions it is created with at once, and the same ones once the server makes them.
+      yield* store.write("TeamCreated", {
+        name: "Design",
+        memberIds: [workspace.ownerMemberId, bob.id, carol.id]
+      })
+      const team = (yield* firstWhere(store.groups, (views) => views.some(({ group }) => group.pending))).find(
+        ({ group }) => group.pending
+      )!
+      const teamId = team.group.record.value.id
+      expect(team.members).toBe(3)
+      const admissions = (yield* firstWhere(
+        store.every("GroupMembership"),
+        (held) =>
+          held.filter(({ record }) => record.value.groupId === teamId).length === 3 &&
+          held.every(({ pending }) => !pending)
+      )).filter(({ record }) => record.value.groupId === teamId)
+      yield* firstWhere(store.groups, (views) => membersIn(views, teamId) === 3)
+
+      // A member removed from it is no longer counted, as the person removes them and once the server has.
+      const carolsAdmission = admissions.find(({ record }) => record.value.memberId === carol.id)!
+      yield* store.write("GroupMemberRemoved", { groupId: teamId, membershipId: carolsAdmission.record.value.id })
+      yield* firstWhere(store.groups, (views) => membersIn(views, teamId) === 2)
+      yield* firstWhere(store.every("GroupMembership"), (held) =>
+        held.some(
+          ({ record, pending }) =>
+            record.value.id === carolsAdmission.record.value.id && record.value.status === "removed" && !pending
+        )
+      )
+      expect(membersIn(yield* firstWhere(store.groups, () => true), teamId)).toBe(2)
+
+      // A conversation counts the members it is made with, before the server holds it and after.
+      yield* store.write("DirectThreadStarted", { memberIds: [bob.id], text: "Got a minute?", mentions: [] })
+      const isDirect = ({ group }: Store.GroupView) => group.record.value.kind === "Direct"
+      expect((yield* firstWhere(store.groups, (views) => views.some(isDirect))).find(isDirect)?.members).toBe(2)
+      const settled = yield* firstWhere(store.groups, (views) =>
+        views.some((view) => isDirect(view) && !view.group.pending)
+      )
+      expect(settled.find(isDirect)?.members).toBe(2)
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 

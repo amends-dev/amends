@@ -111,6 +111,33 @@ export const summarizeReplies = (
   }
 }
 
+/** A group as the person sees it listed: the group, and how many members it has. */
+export interface GroupView {
+  readonly group: Pending.Held<Replica.RecordOf<"Group">>
+  readonly members: number
+}
+
+/**
+ * `groups` with how many members each has: a direct group has the ones it was made with, and a team the
+ * admitted ones among the `memberships` at its place.
+ */
+const countMembers = (
+  groups: ReadonlyArray<Pending.Held<Replica.RecordOf<"Group">>>,
+  memberships: ReadonlyArray<Pending.Held<Replica.RecordOf<"GroupMembership">>>
+): ReadonlyArray<GroupView> => {
+  const admitted = new Map<GroupId.GroupId, number>()
+  for (const { record } of memberships)
+    if (record.value.status === "active")
+      admitted.set(record.value.groupId, (admitted.get(record.value.groupId) ?? 0) + 1)
+  return groups.map((group) => ({
+    group,
+    members:
+      group.record.value.kind === "Direct"
+        ? group.record.value.memberIds.length
+        : (admitted.get(group.record.value.id) ?? 0)
+  }))
+}
+
 /**
  * A group as the person sees it open: the group, while the replica holds it, its admissions, and the
  * person's own follow of it, when they have one.
@@ -227,6 +254,8 @@ export class Store extends Context.Service<
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
     /** The thread `threadId` as the person sees it open, and again after each change. */
     readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadDetail, QueryError>
+    /** Every group the replica holds, each with how many members it has, and again after each change. */
+    readonly groups: Stream.Stream<ReadonlyArray<GroupView>, QueryError>
     /** The group `groupId` as the person sees it open, and again after each change. */
     readonly group: (groupId: GroupId.GroupId) => Stream.Stream<GroupDetail, QueryError>
     /** What the person may do, from their active assignments and the workspace's roles, and again after each change. */
@@ -410,14 +439,13 @@ export const layer = (options: Options) =>
             untilFailed(Stream.map(Stream.zipLatest(read, unfinished), ([records, pending]) => view(records, pending)))
           const list = <Kind extends ReplicaRecord.Kind>(kind: Kind, place: ReplicaRecord.Place) =>
             withPending(replica.list(kind, place), (records, pending) => Pending.overlay(kind, place, records, pending))
+          const every = <Kind extends ReplicaRecord.Kind>(kind: Kind) =>
+            withPending(replica.every(kind), (records, pending) => Pending.overlay(kind, undefined, records, pending))
           const workspace = ReplicaRecord.Place.cases.Workspace.make({})
           return Store.of({
             write: yield* makeWrite,
             list,
-            every: (kind) =>
-              withPending(replica.every(kind), (records, pending) =>
-                Pending.overlay(kind, undefined, records, pending)
-              ),
+            every,
             threads: (groupId) =>
               withPending(replica.threads(groupId), (threads, pending) =>
                 Pending.overlay(
@@ -484,6 +512,10 @@ export const layer = (options: Options) =>
                   )
                 }
               }),
+            groups: Stream.map(
+              Stream.zipLatest(list("Group", workspace), every("GroupMembership")),
+              ([groups, memberships]) => countMembers(groups, memberships)
+            ),
             group: (groupId) => {
               const place = ReplicaRecord.Place.cases.Group.make({ groupId })
               return Stream.map(

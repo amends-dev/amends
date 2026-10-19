@@ -83,7 +83,7 @@ const threadId = ThreadId.ThreadId.make("thread-1")
 const withThread = modifyFields(opened, {
   groups: (groups) =>
     modifyFields(groups, {
-      groups: () => [{ group: general, pending: false }],
+      groups: () => [{ group: general, pending: false, members: 1 }],
       selected: () => Option.some(general.id)
     }),
   open: () =>
@@ -609,7 +609,7 @@ describe("a workspace", () => {
       { update, view: sceneView },
       given(
         modifyFields(onPhone, {
-          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false }] })
+          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false, members: 1 }] })
         })
       ),
       click(role("button", { name: "Menu" })),
@@ -651,7 +651,7 @@ describe("a workspace", () => {
       { update, view: sceneView },
       given(
         modifyFields(opened, {
-          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false }] })
+          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false, members: 1 }] })
         })
       ),
       expect(within(role("navigation", { name: "Studio" }), role("heading", { name: "Groups", level: 2 }))).toExist(),

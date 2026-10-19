@@ -39,10 +39,14 @@ export const subscriptions = GroupsDefinition.subscriptions((entry) => ({
             .read(workspaceId, memberId, (store) =>
               Stream.merge(
                 Stream.merge(
-                  Stream.map(store.list("Group", workspace), (groups) =>
+                  Stream.map(store.groups, (groups) =>
                     Message.ReceivedGroups({
                       groups: Array.sort(
-                        groups.map(({ record, pending }) => ({ group: record.value, pending })),
+                        groups.map(({ group: { record, pending }, members }) => ({
+                          group: record.value,
+                          pending,
+                          members
+                        })),
                         byName
                       )
                     })

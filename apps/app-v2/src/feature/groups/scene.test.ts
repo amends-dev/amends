@@ -69,9 +69,9 @@ const withBob = Schema.decodeSync(Group.Group)({
 /** The groups read, as a member who may create teams sees them. */
 const listed = modifyFields(init(workspace.id, member.id).model, {
   groups: () => [
-    { group: general, pending: false },
-    { group: design, pending: false },
-    { group: announcements, pending: false }
+    { group: general, pending: false, members: 2 },
+    { group: design, pending: false, members: 1 },
+    { group: announcements, pending: false, members: 3 }
   ],
   members: () => [bob],
   memberships: () => [aliceInGeneral, aliceInDesign],
@@ -80,7 +80,7 @@ const listed = modifyFields(init(workspace.id, member.id).model, {
 
 /** The same, with the conversation with Bob read too. */
 const withConversation = modifyFields(listed, {
-  groups: (groups) => [...groups, { group: withBob, pending: false }]
+  groups: (groups) => [...groups, { group: withBob, pending: false, members: 2 }]
 })
 
 describe("the groups", () => {
@@ -102,8 +102,8 @@ describe("the groups", () => {
       given(
         modifyFields(init(workspace.id, member.id).model, {
           groups: () => [
-            { group: general, pending: false },
-            { group: design, pending: true }
+            { group: general, pending: false, members: 2 },
+            { group: design, pending: true, members: 1 }
           ],
           memberships: () => [aliceInGeneral, aliceInDesign]
         })

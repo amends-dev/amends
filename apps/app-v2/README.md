@@ -434,7 +434,9 @@ choice is.
   unfinished actions, each again after every change, `every` the records of a kind wherever they
   sit, `inbox` the person's notifications with the threads they come from, which the store
   shows each by the message its activity is about, `thread` what a thread holds, with its task
-  and turns, `group` a group with its admissions and the person's follow of it, and `grants` what
+  and turns, `group` a group with its admissions and the person's follow of it, `groups` every group
+  the replica holds with how many members it has, a team's admitted ones, which a removed
+  admission leaves out, and a conversation's own, and `grants` what
   the person may do, resolved by core's `GrantResolver` from their active assignments and the
   workspace's roles; the store reads each through `overlay`, and offers each turn's retry by core's
   `Turn.whyNotRetryable`, from where its agent stands among the thread's turns, by

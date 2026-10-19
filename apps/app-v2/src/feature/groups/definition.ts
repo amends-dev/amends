@@ -14,8 +14,8 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
 
-/** A group the person can see, and whether it is still being created. */
-export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean })
+/** A group the person can see, whether it is still being created, and how many members it has. */
+export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
 export type GroupItem = typeof GroupItem.Type
 
 /** What the person is starting: a team, by name, or a conversation with another member. */
