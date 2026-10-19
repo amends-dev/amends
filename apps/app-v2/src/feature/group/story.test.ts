@@ -5,14 +5,14 @@ import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
-import { Command, given, message, model, story } from "foldkit/story"
+import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { aliceInDesign, bobInDesign, design, membership } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { ReadDraft } from "../composer/command.ts"
 import { ThreadsBlock } from "../threads/block.ts"
 import { AdmitMember, FollowGroup, JoinGroup, LeaveGroup, RemoveMember, RenameGroup, UnfollowGroup } from "./command.ts"
 import { DialogBinding, ThreadsBinding } from "./composition.ts"
-import { Message } from "./definition.ts"
+import { Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -259,11 +259,12 @@ describe("a group", () => {
     )
   })
 
-  it("opens the thread picked among its threads, and closes it", () => {
+  it("opens the thread picked among its threads and reports it, then closes it and reports that", () => {
     story(
       update,
       given(opened),
       message(fromThreads(ThreadsBlock.Message.ClickedThread({ threadId }))),
+      expectOutMessage(OutMessage.OpenedThread()),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(Option.map(model.thread, (open) => [open.threadId, open.model.threadId])).toEqual(
@@ -271,22 +272,42 @@ describe("a group", () => {
         )
       }),
       message(Message.ClickedAllThreads()),
+      expectOutMessage(OutMessage.ClosedThread()),
       model((model) => {
         expect(model.thread).toEqual(Option.none())
       })
     )
   })
 
-  it("opens with the thread it is given, which reads its reply draft, and closes it", () => {
+  it("opens with the thread it is given, which reads its reply draft, without reporting it, and closes it", () => {
     const withThread = init(workspace.id, member.id, design.id, Option.some(threadId))
     expect(Option.map(withThread.model.thread, (open) => [open.threadId, open.model.threadId])).toEqual(
       Option.some([threadId, threadId])
     )
     expect(withThread.commands?.map(({ name }) => name)).toContain('Thread["thread-1"]/reply/ReadDraft')
+    expect("outMessage" in withThread).toBe(false)
     story(
       update,
       given(withThread.model),
       message(Message.ClickedAllThreads()),
+      expectOutMessage(OutMessage.ClosedThread()),
+      model((model) => {
+        expect(model.thread).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("closes its thread when its parent asks, which the parent already knows", () => {
+    story(
+      update,
+      given(init(workspace.id, member.id, design.id, Option.some(threadId)).model),
+      message(Message.RequestedCloseThread()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.thread).toEqual(Option.none())
+      }),
+      message(Message.RequestedCloseThread()),
+      expectNoOutMessage(),
       model((model) => {
         expect(model.thread).toEqual(Option.none())
       })

@@ -141,7 +141,10 @@ the pages that compose them; the root composes the pages.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
-  open when its parent gives one. They follow a group or stop, join a public team, and, in its
+  open when its parent gives one, and reports nothing for it. It reports `OpenedThread` when the
+  person picks a thread and `ClosedThread` when they close it, by Close or Back, so its parent can
+  hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
+  which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit and remove them. It
   has two views. `view`, its canonical one, is the group's main pane, titled by its name with Follow
   or Join, where they apply, and a gear that opens the settings as the header's buttons, and its
@@ -395,7 +398,8 @@ browser's storage. Each Block's tests sit beside it:
   may rename it, renamed from the name seen, writing nothing when the name is unchanged, and closing
   its settings, which drop their drafts, whichever way they close; followed, left from its settings,
   or joined, a member admitted and an admission removed,
-  and the thread picked opened and closed, or open already as the group opens; the groups starting a
+  and the thread picked opened and closed, each reported, open already as the group opens without a
+  report, or closed as its parent asks, without one; the groups starting a
   team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
   or the dialog closes, dropping what was being started, and reporting the group picked once; the inbox
   listing what waits, newest

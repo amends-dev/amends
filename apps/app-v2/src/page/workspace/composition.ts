@@ -103,6 +103,13 @@ export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
 
+/** The open group reporting that its thread opened or closed changes nothing yet. */
+const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
+  GroupBlock.OutMessage.match(outMessage, {
+    OpenedThread: () => WorkspaceDefinition.stepNoop(),
+    ClosedThread: () => WorkspaceDefinition.stepNoop()
+  })
+
 /** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
   readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
@@ -113,7 +120,8 @@ export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
     modifyFields(model, {
       open: (open) =>
         Open.isAnyOf(["Group"])(open) && open.groupId === groupId ? Open.Group({ groupId, model: nextGroup }) : open
-    })
+    }),
+  outMessage: { fold: foldGroupOutMessage }
 })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({

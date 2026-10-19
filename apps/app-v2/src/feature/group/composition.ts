@@ -5,7 +5,7 @@ import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
-import { GroupDefinition, type Model } from "./definition.ts"
+import { GroupDefinition, type Model, OutMessage } from "./definition.ts"
 
 /** Open the thread `threadId` in the group. */
 export const openThread = (threadId: ThreadId.ThreadId) =>
@@ -22,10 +22,15 @@ const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
   SelectedThread: ({ threadId }) => openThread(threadId)
 })
 
+/** Picking a thread, which opens it, is reported to the group's parent as the thread opening. */
+const forwardThreadsOutMessage = ThreadsBlock.OutMessage.match({
+  SelectedThread: () => OutMessage.OpenedThread()
+})
+
 export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {
   field: "threads",
   init: { contextToArgs: ({ workspaceId, memberId, groupId }) => [workspaceId, memberId, groupId] },
-  outMessage: { fold: foldThreadsOutMessage }
+  outMessage: { forward: forwardThreadsOutMessage, fold: foldThreadsOutMessage }
 })
 
 /** The dialog closing, by the person or by the settings' own submit, drops the drafts it held. */

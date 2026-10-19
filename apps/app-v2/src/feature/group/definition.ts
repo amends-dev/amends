@@ -2,7 +2,8 @@
  * A group as the person has it open: its name, their part in it, its threads, and the thread open
  * among them, and its settings in a modal: a team's name and members, and the person's membership.
  * They follow a group or stop, rename a team, join a public team or leave one, and, where they manage
- * its members, admit and remove them.
+ * its members, admit and remove them. It reports when its thread opens and when the person closes it, and
+ * closes the thread when its parent asks.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -94,12 +95,19 @@ export const Message = defineMessageUnion({
   SubmittedAdmit: {},
   ClickedRemoveMember: { membershipId: GroupMembership.GroupMembershipId },
   ClickedAllThreads: {},
+  RequestedCloseThread: {},
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })
 export type Message = typeof Message.Type
 
-export const GroupDefinition = Block.makeDefinition("Group", { Model, Message, ChildInitContext })
+export const OutMessage = defineMessageUnion({
+  OpenedThread: {},
+  ClosedThread: {}
+})
+export type OutMessage = typeof OutMessage.Type
+
+export const GroupDefinition = Block.makeDefinition("Group", { Model, Message, OutMessage, ChildInitContext })
 
 /** The admissions in force. */
 export const admitted = (model: Model): ReadonlyArray<MembershipItem> =>
