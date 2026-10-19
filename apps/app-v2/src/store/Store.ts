@@ -694,13 +694,15 @@ export const layer = (options: Options) =>
               ),
             tasks: Stream.map(
               Stream.zipLatestAll(
-                every("Task"),
-                every("Thread"),
-                every("ThreadMessage"),
+                withPending(replica.tasks, (contents, pending) => ({
+                  tasks: Pending.overlay("Task", undefined, contents.tasks, pending),
+                  threads: Pending.overlay("Thread", undefined, contents.threads, pending),
+                  messages: Pending.overlay("ThreadMessage", undefined, contents.messages, pending)
+                })),
                 list("Group", workspacePlace),
                 members
               ),
-              ([tasks, threads, messages, groups, members]) =>
+              ([{ tasks, threads, messages }, groups, members]) =>
                 viewTasks({
                   memberId: options.memberId,
                   tasks: tasks.map(({ record }) => record.value),

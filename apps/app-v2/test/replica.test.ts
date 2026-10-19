@@ -122,6 +122,61 @@ describe("Replica", () => {
     )
   )
 
+  it.effect("the tasks come with the threads that track them and those threads' messages, and no other thread's", () =>
+    withReplica(
+      Effect.gen(function* () {
+        const replica = yield* Replica.Replica
+        const tracked = yield* sample("Thread", { id: "thread-1" })
+        const plain = yield* sample("Thread", { id: "thread-2" })
+        const promised = yield* sample("Thread", { id: "thread-3" })
+        const refused = yield* sample("Thread", { id: "thread-4" })
+        const task = yield* sample("Task", { threadId: "thread-1" })
+        const trackedMessage = yield* sample("ThreadMessage", { id: "message-1", threadId: "thread-1" })
+        const plainMessage = yield* sample("ThreadMessage", { id: "message-2", threadId: "thread-2" })
+        const promisedMessage = yield* sample("ThreadMessage", { id: "message-3", threadId: "thread-3" })
+        const refusedMessage = yield* sample("ThreadMessage", { id: "message-4", threadId: "thread-4" })
+        yield* replica.apply(
+          batch(1, [
+            cases.Reset.make({}),
+            ...[
+              tracked,
+              plain,
+              promised,
+              refused,
+              task,
+              trackedMessage,
+              plainMessage,
+              promisedMessage,
+              refusedMessage
+            ].map((record) => cases.Changed.make({ record }))
+          ])
+        )
+        const keysOf = (list: ReadonlyArray<ReplicaRecord.ReplicaRecord>) => list.map(keyOf).toSorted()
+        const read = Effect.map(now(replica.tasks), ({ tasks, threads, messages }) => ({
+          tasks: keysOf(tasks),
+          threads: keysOf(threads),
+          messages: keysOf(messages)
+        }))
+        expect(yield* read).toEqual({
+          tasks: [keyOf(task)],
+          threads: [keyOf(tracked)],
+          messages: [keyOf(trackedMessage)]
+        })
+
+        // The thread of a task an unfinished action creates is read too, until the server refuses the action.
+        yield* replica.hold(action("promised", [yield* sample("Task", { threadId: "thread-3" })]))
+        yield* replica.hold(action("refused", [yield* sample("Task", { threadId: "thread-4" })]))
+        const error = new CoreError.NotFound({ resource: "Thread", id: "thread-4" })
+        yield* replica.apply(batch(2, [cases.Rejected.make({ key: "refused" as never, error })]))
+        expect(yield* read).toEqual({
+          tasks: [keyOf(task)],
+          threads: keysOf([tracked, promised]),
+          messages: keysOf([trackedMessage, promisedMessage])
+        })
+      })
+    )
+  )
+
   it.effect("a reset leaves the person's actions as they are", () =>
     withReplica(
       Effect.gen(function* () {

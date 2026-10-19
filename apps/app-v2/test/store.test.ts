@@ -353,6 +353,10 @@ describe("Store", () => {
       expect(made.task).toMatchObject(
         Option.some({ pending: true, record: { value: { groupId: Group.GeneralId, status: "triage" } } })
       )
+      // The tasks list it too, with the opening of the thread the replica already held.
+      expect(yield* firstWhere(store.tasks, (views) => views.length === 1)).toMatchObject([
+        { thread: { id: threadId }, opening: Option.some({ content: { _tag: "Text", text: "Ship the release" } }) }
+      ])
       yield* firstWhere(store.thread(threadId), ({ task }) => Option.exists(task, ({ pending }) => !pending))
 
       yield* store.write("TaskUpdated", { threadId, change: { _tag: "Status", from: "triage", to: "doing" } })

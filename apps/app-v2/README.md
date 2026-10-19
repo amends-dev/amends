@@ -595,8 +595,11 @@ choice is.
   sit, `tasks` every task with the thread that tracks it, summarized as `threads` summarizes one, its
   opening, its replies, and when it was last active, and the name of its group as the person reads
   it, and whether the thread is still being started (`viewTasks`; a task whose thread or group the
-  replica lacks is left out, since it could not be opened), `inbox` the person's notifications with
-  the threads they come from, which the store
+  replica lacks is left out, since it could not be opened; the replica reads the threads that track
+  tasks and their messages alone, each by the place it sits at, in one transaction, so that what it
+  reads follows the number of tasks and not of threads, and reads those of the tasks the person's
+  unfinished actions create too, since their actions hold the tasks), `inbox` the person's
+  notifications with the threads they come from, which the store
   shows each by the message its activity is about, `thread` what a thread holds, with its task
   and turns, `group` a group with its admissions and the person's follow of it, `groups` every group
   the replica holds with how many members it has, a team's admitted ones, which a removed
@@ -616,9 +619,9 @@ choice is.
   assignments, connections, and channels.
 - `search(query)` is an Effect and not a stream, since a search runs when it is asked: it reads the
   groups, the members, the threads, and their messages once, as the person's unfinished actions leave
-  them, and `findMatches` decides what has the query in it. It gives `SearchResults`: the groups whose
-  names, as the person reads them (a conversation by the other members), contain it; the threads
-  whose title, or whose opening message's words, a mention as the member's current name, contain it,
+  them, and `findMatches` decides what has the query in it. It reads every message, since the replica
+  keeps no index of a thread's opening. It gives `SearchResults`: the groups whose names, as the
+  person reads them (a conversation by the other members), contain it; the threads whose title, or whose opening message's words, a mention as the member's current name, contain it,
   each with the name of its group and the words the person reads it by, its title or its opening's;
   and the active members, other than the person, whose names contain it. Each kind is at most eight
   (`maxSearchResults`), in the order of the records, and the query is matched whatever its case or
@@ -856,9 +859,11 @@ browser's storage. Each Block's tests sit beside it:
   `userAgentData.platform` where the browser has it, over `navigator.platform`, and by the latter where it
   has not, and `namesApplePlatform` takes the names macOS, iOS, and iPadOS give and no other system's.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
-  rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
-  to the server's, its changes over the server's records, actions applied in order, edits and
-  deletes, a team renamed, members removed and leaving, a group's follow ended and taken up, the
+  rejected, dismissed, and kept through a reset, and the tasks it reads with the threads that track
+  them and those threads' messages, and no other thread's, and with the threads of the tasks its
+  unfinished actions create, until the server rejects the action. `overlay`'s cover what an action
+  creates giving way to the server's, its changes over the server's records, actions applied in
+  order, edits and deletes, a team renamed, members removed and leaving, a group's follow ended and taken up, the
   workspace renamed and handed over, the person renamed, a member removed, roles replaced, a
   connection renamed, configured, and removed, an agent added under the IDs the server gives, set
   up again, and renamed, a channel added under its ID, moved, and removed, an
