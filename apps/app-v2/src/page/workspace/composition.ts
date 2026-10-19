@@ -80,28 +80,38 @@ export const showChannels = WorkspaceDefinition.step((model: Model) => ({
 }))
 
 /**
- * Go to a destination: close the navigation drawer and the side pane's dialog, leave no group marked in the
- * sidebar, and `show` it.
+ * Go to a destination: close the navigation drawer, the side pane's dialog, and the thread beside the inbox, leave
+ * no group marked in the sidebar, and `show` it.
  */
 export const goTo = (show: typeof showNothing) =>
   Update.combine([
     MenuBinding.requestClose(),
     hideAside,
+    InboxBinding.requestCloseThread(),
     GroupsBinding.informOpenGroup({ groupId: Option.none() }),
     show
   ])
 
-/** Open the group `groupId` without a thread, and close the navigation drawer and the side pane's dialog. */
+/**
+ * Open the group `groupId` without a thread, and close the navigation drawer, the side pane's dialog, and the
+ * thread beside the inbox.
+ */
 const openGroupAlone = (groupId: GroupId.GroupId) =>
-  Update.combine([MenuBinding.requestClose(), hideAside, openGroup(groupId, Option.none())])
+  Update.combine([
+    MenuBinding.requestClose(),
+    hideAside,
+    InboxBinding.requestCloseThread(),
+    openGroup(groupId, Option.none())
+  ])
 
 /**
  * Open the group `groupId` with the thread `threadId` open in it, mark the group open in the list, close the
- * navigation drawer, and open the side pane's dialog where the pane is one.
+ * navigation drawer and the thread beside the inbox, and open the side pane's dialog where the pane is one.
  */
 const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.ThreadId) =>
   Update.combine([
     MenuBinding.requestClose(),
+    InboxBinding.requestCloseThread(),
     GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
     openGroup(groupId, Option.some(threadId)),
     showAside
@@ -116,9 +126,13 @@ const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
   RequestedBrowse: () => goTo(showGroups)
 })
 
-/** Opening a notification's thread opens it in its group. */
+/**
+ * A notification's thread opening beside the inbox opens the side pane's dialog where the pane is one, and
+ * closing it closes the dialog.
+ */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
-  OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId)
+  OpenedThread: () => showAside,
+  ClosedThread: () => hideAside
 })
 
 /** Opening a task's thread opens it in its group. */
@@ -127,7 +141,7 @@ const foldTasksOutMessage = TasksBlock.OutMessage.match({
 })
 
 /**
- * What the search found opens as it would from the sidebar and the inbox, except that the groups do not hear of a
+ * What the search found opens as it would from the sidebar and the tasks, except that the groups do not hear of a
  * group the search opened, so they are told which is open. A person is opened as a conversation, which the groups
  * find or start.
  */
@@ -179,10 +193,15 @@ export const showAside = WorkspaceDefinition.step((model: Model) =>
 /** Close the side pane's dialog; closing one that is closed does nothing. */
 export const hideAside = AsideBinding.requestClose()
 
-/** Close the thread open in the group open, if there is one. */
+/** Close the thread open, in the group open or beside the inbox, if there is one. */
 const closeOpenThread = WorkspaceDefinition.step((model: Model) =>
-  Open.matchOrElse(model.open, { Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId) }, () =>
-    WorkspaceDefinition.stepNoop()
+  Open.matchOrElse(
+    model.open,
+    {
+      Inbox: () => InboxBinding.requestCloseThread(),
+      Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId)
+    },
+    () => WorkspaceDefinition.stepNoop()
   )
 )
 

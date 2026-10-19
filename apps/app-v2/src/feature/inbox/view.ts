@@ -1,22 +1,26 @@
 import { button, notice } from "@amends-dev/design/control"
 import { divider, messageList, notification } from "@amends-dev/design/message"
-import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { ageLabel } from "../../seen.ts"
-import { InboxComposition, type InboxViewBuilder } from "./composition.ts"
+import { titleOf } from "../thread/definition.ts"
+import { replyView } from "../thread/view.ts"
+import { InboxComposition, type InboxViewBuilder, ThreadBinding } from "./composition.ts"
 import {
   byDay,
   type InboxItem,
+  isSelected,
   isWaiting,
   Message,
   type Model,
   notificationHeadline,
   notificationPlace,
   notificationText,
-  shownNewestFirst,
+  shownItems,
   type Tab,
+  threadSubtitle,
   waitingCount
 } from "./definition.ts"
 
@@ -50,11 +54,10 @@ const tabs = (model: Model, h: InboxViewBuilder): Html => {
 /**
  * A notification as the design's row: the author of what its activity is about and what they did, where it
  * comes from, and what it says, which opens its thread, if it has one, how long ago it came, and, while it
- * waits, unread, with the way to mark it seen.
+ * waits, unread, and current while it is the one whose thread is open.
  */
 const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: InboxViewBuilder): Html => {
   const { id, recordedAt, thread } = item.notification
-  const isUnread = isWaiting(item)
 
   return notification(h, {
     key: id,
@@ -62,17 +65,18 @@ const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: In
     place: Option.getOrUndefined(notificationPlace(item, model)),
     text: notificationText(item, model),
     age: ageLabel(recordedAt, now),
-    isUnread,
-    ...(thread === undefined ? {} : { onOpen: Message.ClickedOpen({ notificationId: id }) }),
-    actions: isUnread
-      ? [button(h, "Mark seen", Message.ClickedMarkSeen({ notificationId: id }), { variant: "quiet" })]
-      : []
+    isUnread: isWaiting(item),
+    isCurrent: isSelected(model, item),
+    ...(thread === undefined ? {} : { onOpen: Message.ClickedOpen({ notificationId: id }) })
   })
 }
 
-/** The notifications the tab shows, newest first, under the days they came, to open or to mark seen. */
+/**
+ * The notifications the tab lists, newest first, under the days they came, to open beside the inbox, with the one
+ * open kept in its place, or what a tab says when it has none.
+ */
 export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) => {
-  const items = shownNewestFirst(model)
+  const items = shownItems(model)
 
   return pane(h, {
     variant: "main",
@@ -103,3 +107,46 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
     ]
   })
 })
+
+/**
+ * The thread of the notification the person opened as the side pane, with the message the notification is about
+ * highlighted in it, and the button that closes it, Close beside the title and Back before it on a phone, and
+ * nothing while none is open.
+ */
+export const threadView = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
+  Option.match(model.selected, {
+    onNone: () => h.empty,
+    onSome: (selected) =>
+      pane(h, {
+        variant: "side",
+        label: "Thread",
+        header: {
+          title: titleOf(selected.model),
+          icon: "mark-reply",
+          subtitle: threadSubtitle(model, selected.groupId),
+          leading: paneBack(h, Message.ClickedClose()),
+          actions: [paneClose(h, Message.ClickedClose())]
+        },
+        body: [
+          h.block(
+            ThreadBinding.embedView({
+              key: selected.threadId,
+              slotId: "thread",
+              model: selected.model,
+              viewInputs: { now, highlightedMessageId: selected.messageId }
+            })
+          )
+        ],
+        footer: [
+          h.block(
+            ThreadBinding.embedView({
+              key: selected.threadId,
+              slotId: "thread-reply",
+              model: selected.model,
+              view: replyView
+            })
+          )
+        ]
+      })
+  })
+)

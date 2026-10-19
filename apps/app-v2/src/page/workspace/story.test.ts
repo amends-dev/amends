@@ -33,6 +33,7 @@ import { ThreadsBinding } from "../../feature/group/composition.ts"
 import { init as initGroup } from "../../feature/group/init.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Result } from "../../feature/search/definition.ts"
@@ -199,11 +200,17 @@ const threadPicked = [
   Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
 ] as const
 
-/** The thread of the notification opened from the inbox. */
+/** The thread of the notification opened from the inbox, which opens beside it. */
 const notificationOpened = [
   receivedNotification,
   message(Message.ClickedInbox()),
   message(fromInbox(InboxBlock.Message.ClickedOpen({ notificationId: notification.id })))
+] as const
+
+/** The write that marks the notification seen acknowledged, and the thread's reply draft read, as its thread opens. */
+const threadBesideInboxOpened = [
+  Command.resolve(MarkNotificationSeen, InboxBlock.Message.WroteAction()),
+  Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
 ] as const
 
 describe("a workspace", () => {
@@ -398,16 +405,16 @@ describe("a workspace", () => {
       update,
       given(opened),
       model((model) => {
-        expect(openThreadTitle(model.open)).toEqual(Option.none())
+        expect(openThreadTitle(model)).toEqual(Option.none())
       }),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
-        expect(openThreadTitle(model.open)).toEqual(Option.none())
+        expect(openThreadTitle(model)).toEqual(Option.none())
       }),
       message(Message.ClickedInbox()),
       model((model) => {
-        expect(openThreadTitle(model.open)).toEqual(Option.none())
+        expect(openThreadTitle(model)).toEqual(Option.none())
       })
     )
   })
@@ -521,7 +528,7 @@ describe("a workspace", () => {
         ...draftsRead,
         model((model) => {
           expect(model.aside.isOpen).toBe(true)
-          expect(isThreadOpen(model.open)).toBe(true)
+          expect(isThreadOpen(model)).toBe(true)
         })
       )
     }
@@ -533,7 +540,7 @@ describe("a workspace", () => {
       Command.expectNone(),
       model((model) => {
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
       })
     )
   })
@@ -717,27 +724,34 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens the group of a notification's thread with the thread open, and marks the group in the list", () => {
+  it("opens a notification's thread beside the inbox, which stays open and marks no group, and closes it again", () => {
     story(
       update,
-      given(opened),
-      receivedNotification,
-      message(Message.ClickedInbox()),
-      message(Message.ClickedMenu()),
+      given(atDesktop),
+      ...notificationOpened,
       dialogShown,
-      message(fromInbox(InboxBlock.Message.ClickedOpen({ notificationId: notification.id }))),
-      dialogClosed,
-      ...draftsRead,
+      ...threadBesideInboxOpened,
       model((model) => {
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
         expect(
-          Open.isAnyOf(["Group"])(model.open) && [
-            model.open.groupId,
-            Option.map(model.open.model.thread, (open) => [open.threadId, open.model.threadId])
-          ]
-        ).toEqual([groupId, Option.some([thread.id, thread.id])])
-        expect(openThreadTitle(model.open)).toEqual(Option.some("A thread"))
-        expect(model.groups.selected).toEqual(Option.some(groupId))
-        expect(model.menu.isOpen).toBe(false)
+          Option.map(model.inbox.selected, ({ notificationId, threadId, groupId }) => [
+            notificationId,
+            threadId,
+            groupId
+          ])
+        ).toEqual(Option.some([notification.id, thread.id, groupId]))
+        expect(openThreadTitle(model)).toEqual(Option.some("A thread"))
+        expect(isThreadOpen(model)).toBe(true)
+        expect(model.aside.isOpen).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      message(fromInbox(InboxBlock.Message.ClickedClose())),
+      dialogClosed,
+      model((model) => {
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
+        expect(model.inbox.selected).toEqual(Option.none())
+        expect(isThreadOpen(model)).toBe(false)
+        expect(model.aside.isOpen).toBe(false)
       })
     )
   })
@@ -749,10 +763,10 @@ describe("a workspace", () => {
         given(init(workspaceId, memberId, "Studio", viewport).model),
         ...notificationOpened,
         dialogShown,
-        ...draftsRead,
+        ...threadBesideInboxOpened,
         model((model) => {
           expect(model.aside.isOpen).toBe(true)
-          expect(isThreadOpen(model.open)).toBe(true)
+          expect(isThreadOpen(model)).toBe(true)
         })
       )
     }
@@ -760,11 +774,98 @@ describe("a workspace", () => {
       update,
       given(opened),
       ...notificationOpened,
-      ...draftsRead,
+      ...threadBesideInboxOpened,
       Command.expectNone(),
       model((model) => {
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
+      })
+    )
+  })
+
+  it("closes a notification's thread as the side pane's dialog closes by itself, as by Escape or its scrim", () => {
+    story(
+      update,
+      given(atDesktop),
+      ...notificationOpened,
+      dialogShown,
+      ...threadBesideInboxOpened,
+      message(fromAside(DialogBlock.Message.RequestedClose())),
+      dialogClosed,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(model.inbox.selected).toEqual(Option.none())
+        expect(isThreadOpen(model)).toBe(false)
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("closes the thread beside the inbox with every navigation that leaves the inbox, so returning shows none", () => {
+    for (const navigation of [
+      Message.ClickedHome(),
+      Message.ClickedTriage(),
+      Message.ClickedTasks(),
+      Message.ClickedConnections(),
+      Message.ClickedAgents(),
+      Message.ClickedSettings(),
+      Message.ClickedChannels(),
+      fromGroups(GroupsBlock.Message.ClickedBrowse())
+    ]) {
+      story(
+        update,
+        given(opened),
+        ...notificationOpened,
+        ...threadBesideInboxOpened,
+        message(navigation),
+        model((model) => {
+          expect(model.inbox.selected).toEqual(Option.none())
+          expect(isThreadOpen(model)).toBe(false)
+        }),
+        message(Message.ClickedInbox()),
+        model((model) => {
+          expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
+          expect(model.inbox.selected).toEqual(Option.none())
+          expect(isThreadOpen(model)).toBe(false)
+        })
+      )
+    }
+    story(
+      update,
+      given(opened),
+      ...notificationOpened,
+      ...threadBesideInboxOpened,
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(model.inbox.selected).toEqual(Option.none())
+        expect(Open.isAnyOf(["Group"])(model.open) && Option.isNone(model.open.model.thread)).toBe(true)
+      }),
+      message(Message.ClickedInbox()),
+      model((model) => {
+        expect(model.inbox.selected).toEqual(Option.none())
+        expect(isThreadOpen(model)).toBe(false)
+      })
+    )
+  })
+
+  it("closes the thread beside the inbox as a task's or the search's thread opens in its group", () => {
+    story(
+      update,
+      given(opened),
+      receivedTask,
+      ...notificationOpened,
+      ...threadBesideInboxOpened,
+      message(fromTasks(TasksBlock.Message.ClickedTask({ groupId, threadId: thread.id }))),
+      ...draftsRead,
+      model((model) => {
+        expect(model.inbox.selected).toEqual(Option.none())
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
+      }),
+      message(Message.ClickedInbox()),
+      model((model) => {
+        expect(isThreadOpen(model)).toBe(false)
       })
     )
   })
@@ -776,13 +877,13 @@ describe("a workspace", () => {
       ...threadPicked,
       model((model) => {
         expect(model.aside.isOpen).toBe(true)
-        expect(isThreadOpen(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
       }),
       message(fromGroup(GroupBlock.Message.ClickedAllThreads())),
       dialogClosed,
       model((model) => {
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(false)
+        expect(isThreadOpen(model)).toBe(false)
       })
     )
   })
@@ -798,12 +899,12 @@ describe("a workspace", () => {
       Command.expectNone(),
       model((model) => {
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
       }),
       message(fromGroup(GroupBlock.Message.ClickedAllThreads())),
       Command.expectNone(),
       model((model) => {
-        expect(isThreadOpen(model.open)).toBe(false)
+        expect(isThreadOpen(model)).toBe(false)
       })
     )
   })
@@ -817,7 +918,7 @@ describe("a workspace", () => {
       dialogClosed,
       model((model) => {
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(false)
+        expect(isThreadOpen(model)).toBe(false)
         expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
       })
     )
@@ -828,12 +929,12 @@ describe("a workspace", () => {
       update,
       given(opened),
       ...notificationOpened,
-      ...draftsRead,
+      ...threadBesideInboxOpened,
       message(Message.InformedOfViewport({ viewport: "Desktop" })),
       dialogShown,
       model((model) => {
         expect(model.aside.isOpen).toBe(true)
-        expect(isThreadOpen(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
       }),
       message(Message.InformedOfViewport({ viewport: "Tablet" })),
       Command.expectNone(),
@@ -847,7 +948,7 @@ describe("a workspace", () => {
       model((model) => {
         expect(model.viewport).toBe("Split")
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(true)
+        expect(isThreadOpen(model)).toBe(true)
       })
     )
   })
@@ -886,7 +987,7 @@ describe("a workspace", () => {
         dialogClosed,
         model((model) => {
           expect(model.aside.isOpen).toBe(false)
-          expect(isThreadOpen(model.open)).toBe(false)
+          expect(isThreadOpen(model)).toBe(false)
         })
       )
     }
@@ -899,7 +1000,7 @@ describe("a workspace", () => {
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(model.aside.isOpen).toBe(false)
-        expect(isThreadOpen(model.open)).toBe(false)
+        expect(isThreadOpen(model)).toBe(false)
         expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(otherGroupId)
       })
     )
@@ -935,7 +1036,7 @@ describe("a workspace", () => {
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(otherGroupId)
-        expect(isThreadOpen(model.open)).toBe(false)
+        expect(isThreadOpen(model)).toBe(false)
         expect(model.groups.selected).toEqual(Option.some(otherGroupId))
         expect(model.search.dialog.isOpen).toBe(false)
         expect(model.aside.isOpen).toBe(false)
@@ -961,7 +1062,7 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens the thread the search found in its group, as the inbox does, with the side pane's dialog where it is one", () => {
+  it("opens the thread the search found in its group, as a task does, with the side pane's dialog where it is one", () => {
     for (const viewport of ["Desktop", "Split"] as const) {
       story(
         update,

@@ -2,14 +2,16 @@
  * The person's inbox: their notifications, every one or only those waiting, newest first, under the
  * days they came, each by the author of the message its activity is about, what they did, the group
  * it comes from, and what the message says, as far as the store holds them. They open a
- * notification's thread, or mark notifications seen, one at a time or all at once. It reports the
- * thread the person opens.
+ * notification's thread beside the inbox, which marks that notification seen, and the row stays
+ * selected, in its place, while the thread is open; or they mark every notification seen at once. It
+ * reports when the thread opens and when the person closes it, and closes the thread when its parent
+ * asks.
  */
 
 import { Contact } from "@amends-dev/core/channel"
 import { Group, GroupId } from "@amends-dev/core/group"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
-import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { Thread, ThreadId, ThreadMessage, ThreadMessageId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import type { TextRun } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
@@ -20,6 +22,7 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { authorName, dayLabel, dayOf, groupName, initials, messageRuns } from "../../seen.ts"
+import { ThreadBlock } from "../thread/block.ts"
 
 /**
  * A notification, the thread it comes from with its opening message, and the message its activity
@@ -38,14 +41,28 @@ export const Tab = Schema.Literals(["All", "Unread"])
 export type Tab = typeof Tab.Type
 
 /**
- * The person's notifications, which of them the inbox shows, the groups and the people that name where
- * they come from and who wrote them, and why the last read or write failed.
+ * The notification the person opened, the thread it comes from, in its group, the message its activity is
+ * about, while the store holds it, and the thread Block that shows the thread beside the inbox.
+ */
+export const Selected = Schema.Struct({
+  notificationId: Notification.NotificationId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
+  messageId: Schema.Option(ThreadMessageId.ThreadMessageId),
+  model: ThreadBlock.Model
+})
+export type Selected = typeof Selected.Type
+
+/**
+ * The person's notifications, which of them the inbox shows, the one they opened with its thread, the groups and
+ * the people that name where they come from and who wrote them, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   tab: Tab,
   items: Schema.Array(InboxItem),
+  selected: Schema.Option(Selected),
   groups: Schema.Array(Group.Group),
   members: Schema.Array(Member.Member),
   contacts: Schema.Array(Contact.Contact),
@@ -60,15 +77,17 @@ export const Message = defineMessageUnion({
   FailedRead: { error: Schema.String },
   ChoseTab: { tab: Tab },
   ClickedOpen: { notificationId: Notification.NotificationId },
-  ClickedMarkSeen: { notificationId: Notification.NotificationId },
+  ClickedClose: {},
   ClickedMarkAllSeen: {},
+  RequestedCloseThread: {},
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
-  OpenedThread: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId }
+  OpenedThread: {},
+  ClosedThread: {}
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -80,18 +99,22 @@ export const isWaiting = ({ notification }: InboxItem): boolean =>
 
 const byNewest = Order.mapInput(Order.flip(DateTime.Order), ({ notification }: InboxItem) => notification.recordedAt)
 
-/** Every notification the person has, waiting or seen, newest first. */
-export const allNewestFirst = (model: Model): ReadonlyArray<InboxItem> => model.items.toSorted(byNewest)
+/** Whether `item` is the notification the person opened, whose thread is open. */
+export const isSelected = (model: Model, { notification }: InboxItem): boolean =>
+  Option.exists(model.selected, ({ notificationId }) => notificationId === notification.id)
 
-/** The notifications still waiting for the person, newest first. */
-export const waitingNewestFirst = (model: Model): ReadonlyArray<InboxItem> =>
-  model.items.filter(isWaiting).toSorted(byNewest)
+/**
+ * The notifications the tab lists, newest first: on All every one, on Unread those still waiting and the one
+ * the person opened, which stays in its place while its thread is open, though it is no longer waiting.
+ */
+export const shownItems = (model: Model): ReadonlyArray<InboxItem> => {
+  const items =
+    model.tab === "All" ? model.items : model.items.filter((item) => isWaiting(item) || isSelected(model, item))
 
-/** The notifications the tab shows, newest first. */
-export const shownNewestFirst = (model: Model): ReadonlyArray<InboxItem> =>
-  model.tab === "All" ? allNewestFirst(model) : waitingNewestFirst(model)
+  return items.toSorted(byNewest)
+}
 
-/** How many notifications wait for the person. */
+/** How many notifications wait for the person, which counts none that was only kept in place. */
 export const waitingCount = (model: Model): number => model.items.filter(isWaiting).length
 
 /** The newest notification still waiting, in the inbox order core marks them seen by. */
@@ -106,14 +129,39 @@ export const newestWaiting = (model: Model): Option.Option<Notification.Notifica
       Option.none()
     )
 
+/** The notification `notificationId`, with what the store holds of its thread and message. */
+const itemOfNotification = (model: Model, notificationId: Notification.NotificationId): Option.Option<InboxItem> =>
+  Option.fromUndefinedOr(model.items.find(({ notification }) => notification.id === notificationId))
+
+/** Whether notification `notificationId` still waits for the person to see it. */
+export const isNotificationWaiting = (model: Model, notificationId: Notification.NotificationId): boolean =>
+  Option.exists(itemOfNotification(model, notificationId), isWaiting)
+
 /** The thread notification `notificationId` comes from, when it comes from one. */
 export const threadOfNotification = (
   model: Model,
   notificationId: Notification.NotificationId
 ): Option.Option<Notification.ThreadReference> =>
-  Option.fromUndefinedOr(
-    model.items.find(({ notification }) => notification.id === notificationId)?.notification.thread
+  Option.flatMap(itemOfNotification(model, notificationId), ({ notification }) =>
+    Option.fromUndefinedOr(notification.thread)
   )
+
+/** The message notification `notificationId`'s activity is about, while the store holds it. */
+export const messageOfNotification = (
+  model: Model,
+  notificationId: Notification.NotificationId
+): Option.Option<ThreadMessageId.ThreadMessageId> =>
+  Option.flatMap(itemOfNotification(model, notificationId), ({ message }) => Option.map(message, ({ id }) => id))
+
+/**
+ * Where the thread opened beside the inbox is, as the pane's subtitle says it: a team as `#` and its name, a
+ * conversation by the others in it, or only that it is a thread while the store lacks its group.
+ */
+export const threadSubtitle = (model: Model, groupId: GroupId.GroupId): string =>
+  Option.match(Option.fromUndefinedOr(model.groups.find(({ id }) => id === groupId)), {
+    onNone: () => "Thread",
+    onSome: (group) => `Thread in ${group.kind === "Team" ? "#" : ""}${groupName(group, model.members, model.memberId)}`
+  })
 
 /** The notifications that came on one local day, newest first, under what that day is called. */
 export type InboxDay = Readonly<{ label: string; items: ReadonlyArray<InboxItem> }>

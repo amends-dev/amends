@@ -18,10 +18,12 @@ import {
   saying,
   thread
 } from "../../../test/fixtures.ts"
+import { ComposerBlock } from "../composer/block.ts"
+import { ReadDraft } from "../composer/command.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
 import {
-  allNewestFirst,
   byDay,
+  type InboxItem,
   Message,
   newestWaiting,
   notificationHeadline,
@@ -29,9 +31,9 @@ import {
   notificationReason,
   notificationText,
   OutMessage,
-  shownNewestFirst,
-  waitingCount,
-  waitingNewestFirst
+  shownItems,
+  threadSubtitle,
+  waitingCount
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -71,6 +73,15 @@ const withoutThread = (notification: Notification.Notification) => ({
   thread: Option.none<Thread.Thread>(),
   opening: Option.none<ThreadMessage.ThreadMessage>(),
   message: Option.none<ThreadMessage.ThreadMessage>()
+})
+
+/** The ids of the notifications of `items`, in their order. */
+const idsOf = (items: ReadonlyArray<InboxItem>) => items.map(({ notification }) => notification.id)
+
+/** `item` once the store reports it seen. */
+const markedSeen = (item: InboxItem): InboxItem => ({
+  ...item,
+  notification: { ...item.notification, state: Notification.State.cases.Seen.make({ seenAt: newer.recordedAt }) }
 })
 
 const listed = init(workspace.id, member.id).model
@@ -178,27 +189,24 @@ describe("the inbox", () => {
       given(listed),
       message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(seen), itemOf(newer)] })),
       model((model) => {
-        expect(allNewestFirst(model).map(({ notification }) => notification.id)).toEqual([seen.id, newer.id, older.id])
-        expect(waitingNewestFirst(model).map(({ notification }) => notification.id)).toEqual([newer.id, older.id])
-        expect(shownNewestFirst(model)).toEqual(allNewestFirst(model))
+        expect(idsOf(shownItems(model))).toEqual([seen.id, newer.id, older.id])
         expect(waitingCount(model)).toBe(2)
         expect(Option.map(newestWaiting(model), ({ id }) => id)).toEqual(Option.some(newer.id))
       }),
       message(Message.ChoseTab({ tab: "Unread" })),
       model((model) => {
         expect(model.tab).toBe("Unread")
-        expect(shownNewestFirst(model)).toEqual(waitingNewestFirst(model))
+        expect(idsOf(shownItems(model))).toEqual([newer.id, older.id])
       }),
       message(Message.ReceivedInbox({ items: [itemOf(seen)] })),
       model((model) => {
         expect(waitingCount(model)).toBe(0)
-        expect(shownNewestFirst(model)).toEqual([])
-        expect(allNewestFirst(model).length).toBe(1)
+        expect(shownItems(model)).toEqual([])
       }),
       message(Message.ChoseTab({ tab: "All" })),
       model((model) => {
         expect(model.tab).toBe("All")
-        expect(shownNewestFirst(model).length).toBe(1)
+        expect(shownItems(model).length).toBe(1)
       }),
       message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
       model((model) => {
@@ -228,34 +236,179 @@ describe("the inbox", () => {
     expect(byDay([yesterday], now).map(({ label }) => label)).toEqual(["Yesterday"])
   })
 
-  it("reports the thread of the notification opened, and opens nothing for one without a thread", () => {
+  it("opens the thread of a waiting notification beside the inbox, marks it seen, and reports it", () => {
     story(
       update,
-      given(listed),
+      given(known),
       message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(newer), itemOf(apart)] })),
+      model((model) => {
+        expect(model.selected).toEqual(Option.none())
+      }),
       message(Message.ClickedOpen({ notificationId: older.id })),
-      expectOutMessage(OutMessage.OpenedThread({ groupId: general.id, threadId: thread.id })),
-      Command.expectNone(),
-      message(Message.ClickedOpen({ notificationId: apart.id })),
-      expectNoOutMessage(),
-      message(Message.ClickedOpen({ notificationId: seen.id })),
-      expectNoOutMessage()
+      Command.expectExact(MarkNotificationSeen({ ...asMember, notificationId: older.id }), ReadDraft),
+      expectOutMessage(OutMessage.OpenedThread()),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(
+          Option.map(model.selected, ({ notificationId, threadId, groupId, messageId, model: open }) => [
+            notificationId,
+            threadId,
+            groupId,
+            messageId,
+            open.threadId
+          ])
+        ).toEqual(Option.some([older.id, thread.id, general.id, Option.some(reply.id), thread.id]))
+      })
     )
   })
 
-  it("marks one notification seen, and every one through the newest that waits", () => {
+  it("opens the thread of a notification that was seen without writing it seen again", () => {
     story(
       update,
-      given(listed),
-      message(Message.ReceivedInbox({ items: [itemOf(newer), itemOf(older)] })),
-      message(Message.ClickedMarkSeen({ notificationId: older.id })),
-      Command.expectExact(MarkNotificationSeen({ ...asMember, notificationId: older.id })),
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(seen), itemOf(newer)] })),
+      message(Message.ClickedOpen({ notificationId: seen.id })),
+      Command.expectExact(ReadDraft),
+      expectOutMessage(OutMessage.OpenedThread()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Option.map(model.selected, ({ notificationId }) => notificationId)).toEqual(Option.some(seen.id))
+      })
+    )
+  })
+
+  it("opens nothing for a notification from no thread, or one the inbox does not hold", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(apart)] })),
+      message(Message.ClickedOpen({ notificationId: apart.id })),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      message(Message.ClickedOpen({ notificationId: seen.id })),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.selected).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("selects the notification opened next in place of the one opened before, and closing clears it, reporting that", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(newer)] })),
+      message(Message.ClickedOpen({ notificationId: older.id })),
       Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedOpen({ notificationId: newer.id })),
+      expectOutMessage(OutMessage.OpenedThread()),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Option.map(model.selected, ({ notificationId }) => notificationId)).toEqual(Option.some(newer.id))
+      }),
+      message(Message.ClickedClose()),
+      expectOutMessage(OutMessage.ClosedThread()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.selected).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("closes the thread when its parent asks, which the parent already knows", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(older)] })),
+      message(Message.ClickedOpen({ notificationId: older.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.RequestedCloseThread()),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.selected).toEqual(Option.none())
+      }),
+      message(Message.RequestedCloseThread()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.selected).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("keeps the notification opened in its place on Unread while its thread is open, and counts only what waits", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(newer), itemOf(seen)] })),
+      message(Message.ChoseTab({ tab: "Unread" })),
+      message(Message.ClickedOpen({ notificationId: older.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      // Once the store reports it seen it no longer waits, yet it stays among those shown, where it was.
+      message(Message.ReceivedInbox({ items: [markedSeen(itemOf(older)), itemOf(newer), itemOf(seen)] })),
+      model((model) => {
+        expect(idsOf(shownItems(model))).toEqual([newer.id, older.id])
+        expect(waitingCount(model)).toBe(1)
+      }),
+      message(Message.ClickedOpen({ notificationId: newer.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ReceivedInbox({ items: [markedSeen(itemOf(older)), markedSeen(itemOf(newer)), itemOf(seen)] })),
+      model((model) => {
+        expect(idsOf(shownItems(model))).toEqual([newer.id])
+        expect(waitingCount(model)).toBe(0)
+      }),
+      message(Message.ClickedClose()),
+      model((model) => {
+        expect(shownItems(model)).toEqual([])
+      })
+    )
+  })
+
+  it("keeps the notification opened on All among every one, and in its place by when it came", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(seen), itemOf(newer)] })),
+      message(Message.ClickedOpen({ notificationId: newer.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(idsOf(shownItems(model))).toEqual([seen.id, newer.id, older.id])
+      })
+    )
+  })
+
+  it("says where the thread opened beside the inbox is: a team by its name, a conversation by the others, or only a thread", () => {
+    expect(threadSubtitle(known, general.id)).toBe("Thread in #General")
+    expect(threadSubtitle(modifyFields(known, { groups: () => [conversationWithBob] }), conversationWithBob.id)).toBe(
+      "Thread in Bob"
+    )
+    expect(threadSubtitle(listed, general.id), "while the store lacks the group").toBe("Thread")
+  })
+
+  it("marks every notification seen through the newest that waits, which keeps the thread open", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(newer), itemOf(older)] })),
+      message(Message.ClickedOpen({ notificationId: older.id })),
+      Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       message(Message.ClickedMarkAllSeen()),
       Command.expectExact(
         MarkAllNotificationsSeen({ ...asMember, through: { recordedAt: newer.recordedAt, id: newer.id } })
       ),
       Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
+      model((model) => {
+        expect(Option.map(model.selected, ({ notificationId }) => notificationId)).toEqual(Option.some(older.id))
+      }),
       message(Message.ReceivedInbox({ items: [itemOf(seen)] })),
       message(Message.ClickedMarkAllSeen()),
       Command.expectNone()
@@ -265,13 +418,14 @@ describe("the inbox", () => {
   it("says why a write could not be kept, until one is", () => {
     story(
       update,
-      given(listed),
+      given(known),
       message(Message.ReceivedInbox({ items: [itemOf(older)] })),
-      message(Message.ClickedMarkSeen({ notificationId: older.id })),
+      message(Message.ClickedOpen({ notificationId: older.id })),
       Command.resolve(
         MarkNotificationSeen,
         Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
       ),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(model.notice).toEqual(Option.some("This browser could not keep that. Try again."))
       }),
@@ -280,8 +434,9 @@ describe("the inbox", () => {
         MarkAllNotificationsSeen,
         Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
       ),
-      message(Message.ClickedMarkSeen({ notificationId: older.id })),
+      message(Message.ClickedOpen({ notificationId: older.id })),
       Command.resolve(MarkNotificationSeen, Message.WroteAction()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(model.notice).toEqual(Option.none())
       })

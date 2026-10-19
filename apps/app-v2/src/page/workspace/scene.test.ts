@@ -59,6 +59,7 @@ import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Search } from "../../feature/search/command.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
@@ -233,6 +234,15 @@ const withNotification = modifyFields(opened, {
       members: () => [member, bob]
     })
 })
+
+/** The same, with the inbox shown. */
+const withInbox = modifyFields(withNotification, { open: () => Open.Inbox() })
+
+/** The write that marks the notification seen acknowledged, and the thread's reply draft read, as its thread opens. */
+const notificationThreadOpened = [
+  Command.resolve(MarkNotificationSeen, InboxBlock.Message.WroteAction()),
+  Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
+] as const
 
 const shippingId = ThreadId.ThreadId.make("thread-2")
 
@@ -1009,6 +1019,108 @@ describe("a workspace", () => {
       expect(role("complementary")).toBeAbsent(),
       expect(role("main", { name: "General" })).toExist(),
       expect(text("Composer paste crash")).toBeAbsent()
+    )
+  })
+
+  it("opens a notification's thread in a side pane beside the inbox, which stays, its row current, with no dialog", () => {
+    const inbox = role("main", { name: "Inbox" })
+    const pane = role("complementary", { name: "Thread" })
+
+    scene(
+      { update, view: sceneView },
+      given(withInbox),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(inbox, selector('[aria-current="true"]'))).toBeAbsent(),
+      click(role("button", { name: "Bob replied" })),
+      ...notificationThreadOpened,
+      Command.expectNone(),
+      expect(inbox).toExist(),
+      expect(pane).toExist(),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(within(pane, text("Thread in #General"))).toExist(),
+      expect(within(pane, role("heading", { name: "A thread", level: 2 }))).toExist(),
+      expect(
+        within(inbox, within(selector('[aria-current="true"]'), role("button", { name: "Bob replied" })))
+      ).toExist(),
+      expect(within(inbox, pane)).toBeAbsent()
+    )
+  })
+
+  it("closes the thread beside the inbox with its button, which clears the row selected and leaves the inbox", () => {
+    const inbox = role("main", { name: "Inbox" })
+
+    scene(
+      { update, view: sceneView },
+      given(withInbox),
+      click(role("button", { name: "Bob replied" })),
+      ...notificationThreadOpened,
+      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close" }))),
+      expect(role("complementary")).toBeAbsent(),
+      expect(inbox).toExist(),
+      expect(within(inbox, selector('[aria-current="true"]'))).toBeAbsent(),
+      expect(within(inbox, role("button", { name: "Bob replied" }))).toExist()
+    )
+  })
+
+  it("opens a notification's thread in the side pane's dialog below Split, closed with the pane's Close", () => {
+    const inbox = role("main", { name: "Inbox" })
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withInbox, { viewport: () => "Desktop" })),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      click(role("button", { name: "Bob replied" })),
+      ...notificationThreadOpened,
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      inside(
+        role("dialog", { name: "Thread" }),
+        expect(role("heading", { name: "Thread", level: 2 })).toExist(),
+        expect(role("complementary", { name: "Thread" })).toExist(),
+        expect(role("heading", { name: "A thread", level: 2 })).toExist()
+      ),
+      expect(within(inbox, selector('[aria-current="true"]'))).toExist(),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Close" }))),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(inbox, selector('[aria-current="true"]'))).toBeAbsent(),
+      expect(inbox).toExist()
+    )
+  })
+
+  it("closes a notification's thread when the side pane's dialog closes from its scrim", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withInbox, { viewport: () => "Desktop" })),
+      click(role("button", { name: "Bob replied" })),
+      ...notificationThreadOpened,
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      // The scrim has no role to find it by; it is the first element in the dialog.
+      click(selector("#workspace-aside div")),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(within(role("main", { name: "Inbox" }), selector('[aria-current="true"]'))).toBeAbsent()
+    )
+  })
+
+  it("leaves no thread beside the inbox when the person leaves it and comes back", () => {
+    scene(
+      { update, view: sceneView },
+      given(withInbox),
+      click(role("button", { name: "Bob replied" })),
+      ...notificationThreadOpened,
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Tasks" }))),
+      expect(role("main", { name: "Tasks" })).toExist(),
+      expect(role("complementary")).toBeAbsent(),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Inbox" }))),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(role("main", { name: "Inbox" }), selector('[aria-current="true"]'))).toBeAbsent()
     )
   })
 

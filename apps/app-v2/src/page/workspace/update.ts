@@ -29,7 +29,7 @@ const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() =
  * opens, or beside the main pane, which closes the dialog without closing the thread.
  */
 const placeAside = WorkspaceDefinition.step((model) => {
-  if (!isThreadOpen(model.open)) {
+  if (!isThreadOpen(model)) {
     return WorkspaceDefinition.stepNoop()
   }
 

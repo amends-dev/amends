@@ -8,8 +8,8 @@ pick one or to browse, those they belong to and those they may join; a group's t
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
 stop following it, which opening reads through its latest activity; their inbox, their
 notifications under the days they came, all of them or only those waiting, each by who wrote what it
-is about, what they did, where it comes from, and how long ago, to open, or to mark seen one at a
-time or all at once; the tasks they can see across their groups, those waiting in triage and every
+is about, what they did, where it comes from, and how long ago, to open its thread beside the inbox,
+which marks it seen, or to mark all of them seen at once; the tasks they can see across their groups, those waiting in triage and every
 open one, as a table to narrow by assignee, by status, and by search, each to open in its group;
 the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
@@ -93,8 +93,8 @@ each its agent's initials and name with a `badge` for how it stands, its buttons
 and its `log`. The inbox has `paneTabs` of All and Unread, which counts those waiting while any wait, under its title, and lists its
 notifications as `notification`s in a `messageList`, under a `divider` for each day, each its
 author's initials and name and what they did, its place, its text, which opens the thread, how long
-ago it came, a dot while it waits, and a quiet Mark seen, with Mark all seen among the header's
-actions, and `paneEmpty` when a tab has nothing. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
+ago it came, and a dot while it waits, the row of the notification whose thread is open drawn
+current, with Mark all seen among the header's actions, and `paneEmpty` when a tab has nothing. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
 line of what it is for, and a secondary button to change it, which a `form` of a `field` with Save
 and a quiet Cancel replaces while the person does; the members and the invitations waiting are
 `entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
@@ -310,10 +310,26 @@ the pages that compose them; the root composes the pages.
   mention in it a chip (`notificationText`, by the inbox's members); and how long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
   first line says "Activity in a thread" under the mark "?", and the text says what it can. The time
   now is its view input, as the page gives it, so the days and ages follow the clock. A notification's
-  text opens its thread, and the person marks a waiting one seen, or every one up to the newest that
-  waits, from the header. It reports the thread opened, and offers a count of what waits for its
-  parent to show. It lacks "Show older", the mock's page of older notifications: the store gives
-  every notification the person has at once, and paging them waits for the store to page.
+  text opens its thread beside the inbox, which marks it seen at once, if it waits, and selects it:
+  the row stays selected, in its place, with `aria-current` and the design's current look, while its
+  thread is open, even on Unread, where a seen notification would otherwise leave, and selecting
+  another row moves the selection. The selection (`selected`) is the notification, its thread and
+  group, the message its activity is about, and the thread Block that shows the thread, bound as a
+  keyed occurrence as the group binds its own, so opening another makes a fresh one. There is no way
+  to mark one notification seen but to open it; Mark all seen, in the header while any wait, marks
+  every one up to the newest that waits and keeps the selection. The Unread count and Mark all seen
+  follow what waits alone (`waitingCount`), so the count can be none while the selected row is still
+  listed (`shownItems`), and the caught-up state shows only once the thread is closed and nothing
+  waits. `threadView` is the thread open as a side pane, as the group's is: titled by the thread,
+  "Thread in #General" or "Thread in Bob" under it, or only "Thread" while the store lacks the group
+  (`threadSubtitle`), with Close beside the title and, below 48rem, Back before it, both sending
+  `ClickedClose`, the thread's messages, with the one the notification is about drawn current, and
+  the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
+  when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
+  pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
+  nothing, since it asked. The Block offers a count of what waits for its parent to show. It lacks
+  "Show older", the mock's page of older notifications: the store gives every notification the
+  person has at once, and paging them waits for the store to page.
 - `feature/tasks`: the tasks the person can see across their groups, from the store's `tasks`: each
   with its thread, its group's name, how many replies the thread has, and when it was last active,
   and the members and contacts that name who started a thread and who is assigned to it. It is made
@@ -419,32 +435,34 @@ the pages that compose them; the root composes the pages.
   the agents, the settings, or the channels, which are always read, or the open group, a keyed
   occurrence. The tasks Block, which the page binds as `tasks` (`TasksBinding`), is the same child
   under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened
-  there is opened in its group, as a notification's is. The groups to browse are
+  there is opened in its group, which a notification's is not: its thread opens beside the inbox,
+  which stays. The groups to browse are
   the groups Block's `browseView`, the same child as the sidebar's under a second slot, which the
   Block asks for with `RequestedBrowse`: the page goes there as it goes to any destination, closing
-  the drawer and the side pane's dialog and marking no group open, and picking a group on that page
-  opens it, which leaves the page. The side pane shows the thread open in that group,
-  only while one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
+  the drawer, the side pane's dialog, and the thread beside the inbox, and marking no group open, and
+  picking a group on that page opens it, which leaves the page. The side pane shows the thread open
+  in the open group, or beside the open inbox (`inbox-thread`, the inbox's `threadView`), only while
+  one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
   under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width, and
   so is the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
   the drawer and the side pane's dialog, so the one opened last is over the rest. `ClickedSearch` and
   `RequestedSearch`, which the root sends, ask the search to open. The search reports what was opened
   and the page folds it as it folds the same thing from elsewhere: a group is opened alone, as a group
-  picked is, and marked; a thread is opened in its group, as the inbox's is; and a person is a
+  picked is, and marked; a thread is opened in its group, as a task's is; and a person is a
   conversation with them, which the groups Block selects or starts. A group or a thread opened closes the navigation drawer, as any
   navigation does. The
   workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
   view inputs, and gives the inbox, the tasks, and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
-  marked in the list; opening a notification's or a task's thread opens its group with the thread already open,
-  and marks the group. The shell lays itself out by the window's width: below 64rem the sidebar is
+  marked in the list; opening a task's thread opens its group with the thread already open,
+  and marks the group, while opening a notification's leaves the inbox where it is. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
   button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
   `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
   Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox,
-  Triage, Tasks, and Browse groups, a group picked, and a notification's or a task's thread opened,
+  Triage, Tasks, and Browse groups, a group picked, and a task's thread opened,
   asks it to close (a close of a closed dialog does
   nothing). The thread's side pane is in the shell's card beside the main pane only from 80rem
   (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
@@ -452,11 +470,14 @@ the pages that compose them; the root composes the pages.
   binds another `DialogBlock` for it as `aside` (`AsideBinding`, id `workspace-aside`) and lends the
   shell the pane's view with the dialog's, and whether the dialog is open. `isAsideFloating(viewport)`
   decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
-  at `Split`) as the open group reports `OpenedThread`, and as a notification's or a task's thread opens
-  its group, and closes it (`hideAside`) as the group reports `ClosedThread` and in every navigation,
-  since the thread goes with its group. When the dialog closes by itself, by Escape or its scrim, the
-  page closes the thread with the group's `requestCloseThread`, except at `Split`, where its closing
-  is the pane moving beside the main pane and the thread stays open. When the window's width changes
+  at `Split`) as the open group or the inbox reports `OpenedThread`, and as a task's thread opens
+  its group, and closes it (`hideAside`) as the group or the inbox reports `ClosedThread` and in every
+  navigation, since the thread goes with its group. Every navigation that leaves the inbox, those that
+  hide the dialog and a group or a task's thread opened, also asks the inbox to close its thread
+  (`requestCloseThread`), since the inbox keeps its state while another destination shows, so that
+  coming back shows no stale pane. When the dialog closes by itself, by Escape or its scrim, the
+  page closes the thread with the open group's or the open inbox's `requestCloseThread`, except at
+  `Split`, where its closing is the pane moving beside the main pane and the thread stays open. When the window's width changes
   with a thread open, the page puts the pane where the width wants it: crossing 80rem either way
   moves the pane between its dialog and the card without closing the thread. Opening the workspace lists the host's integrations
   once, over HTTP, and informs its connections, agents, and channels of them, or of why they could
@@ -634,9 +655,12 @@ browser's storage. Each Block's tests sit beside it:
   or a person, closing the dialog and forgetting the search, and opening none while there is nothing
   found or the rows shown are for an earlier query; the inbox
   saying why the person is told, who wrote what and what they did, where it comes from, and what it
-  says, grouping the notifications by the day they came on, listing every one or those waiting, newest
-  first, as its tab chooses, reporting the thread of the notification opened, marking one seen or all
-  through the newest that waits, and why a write could not be kept; the tasks keeping the tasks and
+  says, grouping the notifications by the day they came on, listing every one or those waiting, and the
+  one opened in its place, newest first, as its tab chooses, opening the thread of a notification,
+  which writes it seen only while it waits, selects it, and reports it, opening none for a notification
+  from no thread, moving the selection to the next one opened, clearing it with Close and reporting
+  that, or as its parent asks and reporting nothing, naming where the thread is, marking all through
+  the newest that waits while the thread stays open, and why a write could not be kept; the tasks keeping the tasks and
   the people they are told of, or why they could not be read, telling the tasks in triage and the open
   ones apart and counting those in triage, keeping those a status, an assignee, with Me the member the
   Block is made for and No one a task with none, and a search keep, latest active first, however they
@@ -669,13 +693,14 @@ browser's storage. Each Block's tests sit beside it:
   the inbox, the tasks in triage, every open task, the groups to browse, the connections, the agents, the settings, or the channels in its
   place with no group marked, and opening a group from the groups to browse, going home from a group or a destination, handing the settings and the channels what the
   person does in them, keeping what the tasks were narrowed to between Triage and Tasks, opening a
-  notification's or a task's thread in its group, naming the thread open in the
-  group open, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
+  task's thread in its group, and a notification's beside the inbox, which stays, naming the thread
+  open in the group open or beside the inbox, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
   asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
   place; the thread opening the side pane's dialog where the pane is one, from a notification, from a
   task, from a thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing
   with the thread, with every navigation, and as the window widens to `Split`, which leaves the thread
-  open; and the thread closing as its dialog closes by itself, below `Split`; and
+  open; the thread closing as its dialog closes by itself, below `Split`; the thread beside the inbox
+  closing with every navigation that leaves the inbox, so that coming back shows none; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
   from the list or from the open workspace, and following the window's width, for the workspace it
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
@@ -725,10 +750,14 @@ browser's storage. Each Block's tests sit beside it:
   author and what they did, the place they come from, how long ago, and what they say, with a mention
   in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
-  activity alone while the thread is, the unread ones with a dot and a way to mark them seen, the seen
-  ones on All with neither and not on Unread, the tabs counted and chosen, all marked seen, one seen
-  with its failure shown, and one's thread opened by its text, and an empty All saying there is
-  nothing yet and an empty Unread saying all is caught up; the tasks in triage as a main pane titled
+  activity alone while the thread is, the unread ones with a dot and no button to mark one seen, the
+  seen ones on All without the dot and not on Unread, the tabs counted and chosen, all marked seen,
+  which keeps the thread open, one's thread opened by its text, which marks it seen unless it was and
+  fails visibly, its row current and moving as another is opened, kept on Unread once seen with only
+  what waits counted, and an empty All saying there is nothing yet and an empty Unread saying all is
+  caught up, only once the thread is closed; the inbox's side pane, titled by the thread under the
+  group it is in, with the message the notification is about drawn current, the reply composer in
+  its footer, closed by its Close or its Back, and absent while no thread is open; the tasks in triage as a main pane titled
   Triage, and every open task as one titled Tasks, each task by its group, its assignee's initials,
   who started it or the contact who did, its replies, where it stands, and how long ago, as a row
   under the labels of its columns, on its way while its thread is being started, listing the tasks in
@@ -775,7 +804,9 @@ browser's storage. Each Block's tests sit beside it:
   sidebar, its scrim closing it, or a link of the sidebar or the rail, a group picked among them,
   closing it, the thread picked opened beside the main pane at `Split` with no dialog, and below it in
   a dialog named Thread that holds the pane, closed by the pane's Close, by its Back on a phone, or by
-  the scrim, which also closes the thread, and what the server refused as toasts, over the shell and
+  the scrim, which also closes the thread, a notification's thread opened the same way beside the inbox,
+  which stays with its row current and loses both as the thread closes or the person leaves the inbox,
+  and what the server refused as toasts, over the shell and
   inside the side pane's dialog while it is open, and the connections listing the integrations
   again after the host could not be reached. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar, its Menu button

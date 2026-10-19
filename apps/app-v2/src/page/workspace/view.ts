@@ -6,9 +6,10 @@ import { sidebar, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } fr
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { threadView } from "../../feature/group/view.ts"
+import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
+import { threadView as inboxThreadView } from "../../feature/inbox/view.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../feature/tasks/view.ts"
 import {
@@ -111,7 +112,7 @@ const sidebarView = (model: Model, email: string, h: WorkspaceViewBuilder): Html
         GroupsBinding.embedView({
           slotId: "groups",
           model: model.groups,
-          viewInputs: { openThread: openThreadTitle(model.open) }
+          viewInputs: { openThread: openThreadTitle(model) }
         })
       )
     ],
@@ -148,11 +149,24 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open, viewInputs: { now } }))
   })
 
-/** The side pane: the thread open in the group open, while there is one, given the time now. */
+/** The side pane: the thread open, in the group open or beside the inbox, while there is one, given the time now. */
 const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Option.Option<Html> =>
   Open.matchOrElse(
     model.open,
     {
+      Inbox: () =>
+        Option.isSome(model.inbox.selected)
+          ? Option.some(
+              h.block(
+                InboxBinding.embedView({
+                  slotId: "inbox-thread",
+                  model: model.inbox,
+                  viewInputs: { now },
+                  view: inboxThreadView
+                })
+              )
+            )
+          : Option.none(),
       Group: ({ groupId, model: open }) =>
         Option.isSome(open.thread)
           ? Option.some(
@@ -161,7 +175,7 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
                   key: groupId,
                   slotId: "group-thread",
                   model: open,
-                  view: threadView,
+                  view: groupThreadView,
                   viewInputs: { now }
                 })
               )

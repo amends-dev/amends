@@ -3,7 +3,8 @@
  * actions, their inbox, the tasks they can see, their connections, their agents, their settings, and their
  * channels, and what the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the
  * groups to browse, the connections, the agents, the settings, the channels, or a group, with its threads and
- * the thread open among them. It lays itself out by the
+ * the thread open among them. A thread opens in the side pane, beside the group's threads or beside the
+ * inbox, which stays. It lays itself out by the
  * window's width, which its parent informs it of: below 64rem the sidebar is in a navigation drawer, a
  * dialog that every navigation closes, and below 80rem the thread is in a dialog of its own, which
  * follows the thread opening and closing. It lists the host's integrations once, as it opens, informs the
@@ -86,16 +87,19 @@ export const nameOf = (model: Model): string => {
   return settingsName === "" ? model.name : settingsName
 }
 
-/** The title of the thread open in the group open, while there is one. */
-export const openThreadTitle = (open: Open): Option.Option<string> =>
+/** The title of the thread open, in the group open or beside the inbox, while there is one. */
+export const openThreadTitle = (model: Model): Option.Option<string> =>
   Open.matchOrElse(
-    open,
-    { Group: ({ model }) => Option.map(model.thread, ({ model: thread }) => titleOf(thread)) },
+    model.open,
+    {
+      Inbox: () => Option.map(model.inbox.selected, ({ model: thread }) => titleOf(thread)),
+      Group: ({ model: group }) => Option.map(group.thread, ({ model: thread }) => titleOf(thread))
+    },
     () => Option.none()
   )
 
-/** Whether a thread is open in the group open. */
-export const isThreadOpen = (open: Open): boolean => Option.isSome(openThreadTitle(open))
+/** Whether a thread is open, in the group open or beside the inbox. */
+export const isThreadOpen = (model: Model): boolean => Option.isSome(openThreadTitle(model))
 
 /** Whether the side pane is in a dialog at `viewport`, not beside the main pane, which is from `Split` alone. */
 export const isAsideFloating = (viewport: Viewport): boolean => viewport !== "Split"

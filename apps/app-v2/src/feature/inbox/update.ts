@@ -1,8 +1,31 @@
+import type { Notification } from "@amends-dev/core/notification"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
+import * as Update from "foldkit/update"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
-import { InboxComposition } from "./composition.ts"
-import { Message, newestWaiting, OutMessage, threadOfNotification } from "./definition.ts"
+import { InboxComposition, selectNotification } from "./composition.ts"
+import {
+  InboxDefinition,
+  isNotificationWaiting,
+  Message,
+  type Model,
+  messageOfNotification,
+  newestWaiting,
+  OutMessage,
+  threadOfNotification
+} from "./definition.ts"
+
+/** Close the thread opened beside the inbox, which leaves no notification selected. */
+const closeThread = InboxDefinition.stepFields(() => ({ selected: () => Option.none() }))
+
+/** Mark the notification `notificationId` seen, unless it already is. */
+const writeSeenWhenWaiting = (notificationId: Notification.NotificationId) =>
+  InboxDefinition.step((model: Model) => ({
+    model,
+    commands: isNotificationWaiting(model, notificationId)
+      ? [MarkNotificationSeen({ workspaceId: model.workspaceId, memberId: model.memberId, notificationId })]
+      : []
+  }))
 
 export const update = InboxComposition.makeUpdate((model, message) => {
   const { workspaceId, memberId } = model
@@ -14,16 +37,19 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
-    // Opening the thread reads it, which settles its notifications.
     ClickedOpen: ({ notificationId }) =>
       Option.match(threadOfNotification(model, notificationId), {
         onNone: () => ({ model }),
-        onSome: ({ groupId, threadId }) => ({ model, outMessage: OutMessage.OpenedThread({ groupId, threadId }) })
+        onSome: ({ groupId, threadId }) =>
+          Update.withOutMessage(
+            Update.combine(model, [
+              writeSeenWhenWaiting(notificationId),
+              selectNotification(notificationId, groupId, threadId, messageOfNotification(model, notificationId))
+            ]),
+            OutMessage.OpenedThread()
+          )
       }),
-    ClickedMarkSeen: ({ notificationId }) => ({
-      model,
-      commands: [MarkNotificationSeen({ workspaceId, memberId, notificationId })]
-    }),
+    ClickedClose: () => Update.withOutMessage(Update.combine(model, [closeThread]), OutMessage.ClosedThread()),
     ClickedMarkAllSeen: () =>
       Option.match(newestWaiting(model), {
         onNone: () => ({ model }),
@@ -32,6 +58,7 @@ export const update = InboxComposition.makeUpdate((model, message) => {
           commands: [MarkAllNotificationsSeen({ workspaceId, memberId, through: { recordedAt, id } })]
         })
       }),
+    RequestedCloseThread: () => Update.combine(model, [closeThread]),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
   })
