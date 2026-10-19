@@ -260,7 +260,8 @@ the pages that compose them; the root composes the pages.
   read, or the open group, a keyed occurrence; the side pane shows the thread open in that group,
   only while one is, and the actions' toasts come over both. The workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
-  the workspace was opened with until then. The page's view takes the account's email as a view input. Picking a group opens it; Home or any other destination leaves no group
+  the workspace was opened with until then. The page's view takes the account's email and the time now as
+  view inputs. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a notification's thread opens its group with the thread already open,
   and marks the group. The shell lays itself out by the window's width: below 64rem the sidebar is
   not in the frame but in a navigation drawer, and below 48rem the rail with it, which the shell's Menu
@@ -290,7 +291,7 @@ the pages that compose them; the root composes the pages.
   to sign out.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
-  workspaces, and the one open, and the width of the window. Signing in lists the workspaces; signing
+  workspaces, and the one open, the width of the window, and the time now. Signing in lists the workspaces; signing
   out, from the workspace list or from the open workspace's sidebar, which asks the root, is one step
   in `composition.ts`, and its command, `command.ts`, forgets the session, the person's stores, and
   their sync identity first, so it works offline, then removes the browser's sync key and ends the
@@ -302,7 +303,11 @@ the pages that compose them; the root composes the pages.
   subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries,
   drops a width that did not change, and sends `ChangedViewport`, whose update sets the width and
   informs the open workspace of it, and a workspace opened later starts from the width the root has
-  then. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
+  then. What the clock decides, such as which day a time falls on and how long ago it was, needs the
+  time now, which enters the same way: the flags read it with `DateTime.now`, and the subscription
+  `Tick` sends `Ticked` each minute (the first at once, a moment after the flags read it), whose update sets it.
+  Nothing acts on the time, so it goes no further than views: the root's view gives the open
+  workspace's view the time now beside the email, as a view input and not a message. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
   session, and the browser's services beneath them.
 
 A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
@@ -452,7 +457,8 @@ browser's storage. Each Block's tests sit beside it:
   open; and the thread closing as its dialog closes by itself, below `Split`; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
   from the list or from the open workspace, and following the window's width, for the workspace it
-  opens too.
+  opens too, and keeping the time now from the flags and from each minute's report, which informs no
+  one.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, who types, a reply written and sent, the title renamed from its form, and a message
@@ -557,9 +563,11 @@ browser's storage. Each Block's tests sit beside it:
   and its move shows at once; and the settings' reads, as the settings Block reads them together,
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant
   to rename it. `Store.viewTurns` is
-  tested apart: which turns may run again, and `settingsForm.ts`: the fields an integration's form
-  gives, a draft from its defaults or a connection's settings, and the settings a draft makes, and
-  `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`' tests keep a
-  draft for each place, the last one written, through being closed and opened again.
+  tested apart: which turns may run again, and `seen.ts`: the initials of a name, the time of day, the
+  start of a day in the person's own time zone, and the labels of a day and of how long ago it was, from
+  times fixed on the clock of the machine the tests run on, and `settingsForm.ts`: the fields an
+  integration's form gives, a draft from its defaults or a connection's settings, and the settings a
+  draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`'
+  tests keep a draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

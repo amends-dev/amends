@@ -16,7 +16,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { general, membership, session, thread } from "../test/fixtures.ts"
+import { general, membership, now, session, thread } from "../test/fixtures.ts"
 import { SignOut } from "./command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { Message } from "./message.ts"
@@ -31,7 +31,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split" }
+const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split", now }
 
 /** Signed in as alice, who belongs to one workspace, with none of them opened. */
 const choosing: Model = {
@@ -40,7 +40,8 @@ const choosing: Model = {
     workspaces: WorkspacesBlock.Model.make({ workspaces: Workspaces.Loaded({ memberships: [membership] }) }),
     workspace: Option.none()
   }),
-  viewport: "Split"
+  viewport: "Split",
+  now
 }
 
 /** Signed in as alice, with her workspace opened. */
@@ -54,7 +55,8 @@ const inWorkspace: Model = {
         .model
     })
   }),
-  viewport: "Split"
+  viewport: "Split",
+  now
 }
 
 /** Signed in as alice, with the thread of general open in her opened workspace. */

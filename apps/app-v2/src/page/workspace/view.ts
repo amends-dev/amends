@@ -3,6 +3,7 @@ import { pane } from "@amends-dev/design/pane"
 import { rail } from "@amends-dev/design/rail"
 import { shell } from "@amends-dev/design/shell"
 import { sidebar, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } from "@amends-dev/design/sidebar"
+import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { threadView } from "../../feature/group/view.ts"
@@ -23,8 +24,11 @@ import {
 } from "./composition.ts"
 import { Message, type Model, nameOf, Open, openThreadTitle } from "./definition.ts"
 
-/** Who is signed in, which the sidebar's footer shows beside the way to sign out. */
-export type ViewInputs = Readonly<{ email: string }>
+/**
+ * Who is signed in, which the sidebar's footer shows beside the way to sign out, and the time now, which the
+ * destinations that show ages and days follow.
+ */
+export type ViewInputs = Readonly<{ email: string; now: DateTime.Utc }>
 
 /** The destinations of the rail, as the open workspace shows them. */
 const railItems = (model: Model) => [

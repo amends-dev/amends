@@ -1,7 +1,8 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called and what
- * letters mark them, who wrote a message and when and what it says, how a thread is titled, whether
- * anyone may join a group, and how a task's status and priority and a turn's status read.
+ * letters mark them, who wrote a message and what it says, when a time was, by its time of day, its day,
+ * and how long ago it was, how a thread is titled, whether anyone may join a group, and how a task's
+ * status and priority and a turn's status read.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -26,6 +27,47 @@ export const initials = (name: string): string =>
 /** The time of day `dateTime` was, in the person's own time zone, as they read it: "10:02 AM". */
 export const timeOf = (dateTime: DateTime.DateTime): string =>
   DateTime.formatLocal(dateTime, { hour: "numeric", minute: "2-digit" })
+
+const millisPerMinute = 60_000
+const millisPerHour = 3_600_000
+const millisPerDay = 86_400_000
+
+/** The start of the day `at` fell on, in the person's own time zone, to group times by. */
+export const dayOf = (at: DateTime.DateTime): DateTime.Zoned =>
+  DateTime.startOf(DateTime.setZone(at, DateTime.zoneMakeLocal()), "day")
+
+/** How many days before the day `today` the day `day` is, which a day with 23 or 25 hours does not change. */
+const daysBefore = (day: DateTime.Zoned, today: DateTime.Zoned): number =>
+  Math.round((DateTime.toEpochMillis(today) - DateTime.toEpochMillis(day)) / millisPerDay)
+
+/**
+ * `day` as the person reads it from `today`: "Today", "Yesterday", the weekday's name within the six days before,
+ * then the date, with the year when it is not this one. `style` is how long the weekday and the month are spelled.
+ */
+const readDay = (day: DateTime.Zoned, today: DateTime.Zoned, style: "long" | "short"): string => {
+  const daysAgo = daysBefore(day, today)
+  if (daysAgo <= 0) return "Today"
+  if (daysAgo === 1) return "Yesterday"
+  if (daysAgo <= 6) return DateTime.formatLocal(day, { weekday: style })
+  const isThisYear = DateTime.toParts(day).year === DateTime.toParts(today).year
+  return DateTime.formatLocal(day, { month: style, day: "numeric", year: isThisYear ? undefined : "numeric" })
+}
+
+/** The day `day` began, as a divider names it from `now`: "Today", "Yesterday", "Tuesday", "September 20". */
+export const dayLabel = (day: DateTime.Zoned, now: DateTime.DateTime): string => readDay(day, dayOf(now), "long")
+
+/**
+ * How long before `now` it was `at`: "Just now", "12m ago", and "3h ago" within the day, then, by the day,
+ * "Yesterday", "Tue", and "Sep 20", with the year when it is not this one.
+ */
+export const ageLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
+  const elapsed = DateTime.toEpochMillis(now) - DateTime.toEpochMillis(at)
+  if (elapsed < millisPerMinute) return "Just now"
+  if (elapsed < millisPerHour) return `${Math.floor(elapsed / millisPerMinute)}m ago`
+  const day = dayOf(at)
+  const today = dayOf(now)
+  return daysBefore(day, today) <= 0 ? `${Math.floor(elapsed / millisPerHour)}h ago` : readDay(day, today, "short")
+}
 
 /** `memberId` by their name among `members`, or their ID until names are read. */
 export const memberName = (members: ReadonlyArray<Member.Member>, memberId: MemberId.MemberId): string =>

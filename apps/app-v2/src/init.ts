@@ -5,21 +5,22 @@ import { Page } from "./model.ts"
 
 /**
  * Start from the session kept from the last visit, listing the person's workspaces, or signed out, in the
- * window's width at the start.
+ * window's width and at the time now at the start.
  */
 export const init = ApplicationComposition.makeInit((flags: Flags) =>
   Option.match(flags.session, {
     onNone: () =>
       SignInBinding.init({
         args: [""],
-        toParentModel: (signIn) => ({ page: Page.SignedOut({ signIn }), viewport: flags.viewport })
+        toParentModel: (signIn) => ({ page: Page.SignedOut({ signIn }), viewport: flags.viewport, now: flags.now })
       }),
     onSome: (session) =>
       WorkspacesBinding.init({
         args: [],
         toParentModel: (workspaces) => ({
           page: Page.SignedIn({ account: session.account, workspaces, workspace: Option.none() }),
-          viewport: flags.viewport
+          viewport: flags.viewport,
+          now: flags.now
         })
       })
   })

@@ -1,8 +1,9 @@
 import { Identity } from "@amends-dev/core/identity"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
-import { Option, Schema } from "effect"
+import { DateTime, Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
+import { now } from "../test/fixtures.ts"
 import { SignOut } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
 import { init } from "./init.ts"
@@ -33,7 +34,7 @@ const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
   people: 1
 })
 
-const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split" }
+const signedOut: Model = { page: Page.SignedOut({ signIn: SignInBlock.init("").model }), viewport: "Split", now }
 
 /** What the sign-in form reports, as the root receives it. */
 const fromSignIn = (model: Model, message: typeof SignInBlock.Message.Type) =>
@@ -52,7 +53,7 @@ const fromWorkspace = (message: typeof WorkspaceBlock.Message.Type) =>
     key: membership.workspace.id,
     slotId: "workspace",
     model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio", "Split").model,
-    viewInputs: { email: session.account.email }
+    viewInputs: { email: session.account.email, now }
   }).toParentMessage(message)
 
 /** The workspace the person opened, if any. */
@@ -104,7 +105,7 @@ describe("the app", () => {
   it("signs out when the open workspace asks to, the same way as from the workspace list", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Split" }).model),
+      given(init({ session: Option.some(session), viewport: "Split", now }).model),
       message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
@@ -124,7 +125,7 @@ describe("the app", () => {
   })
 
   it("starts from a kept session, listing the workspaces", () => {
-    const started = init({ session: Option.some(session), viewport: "Split" })
+    const started = init({ session: Option.some(session), viewport: "Split", now })
     expect(Page.isAnyOf(["SignedIn"])(started.model.page)).toBe(true)
     expect((started.commands ?? []).map(({ name }) => name)).toEqual([LoadWorkspaces.name])
   })
@@ -132,7 +133,7 @@ describe("the app", () => {
   it("starts in the window's width, follows it as it changes, and opens a workspace in the width it has then", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Phone" }).model),
+      given(init({ session: Option.some(session), viewport: "Phone", now }).model),
       model((model) => {
         expect(model.viewport).toBe("Phone")
       }),
@@ -147,10 +148,36 @@ describe("the app", () => {
     )
   })
 
+  it("starts at the time now, and keeps the time each minute reports, informing no one of it", () => {
+    const later = DateTime.add(now, { minutes: 1 })
+    const latest = DateTime.add(now, { minutes: 2 })
+
+    story(
+      update,
+      given(init({ session: Option.some(session), viewport: "Split", now }).model),
+      model((model) => {
+        expect(model.now).toEqual(now)
+      }),
+      message(Message.Ticked({ now: later })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.now).toEqual(later)
+      }),
+      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      message(Message.Ticked({ now: latest })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.now).toEqual(latest)
+      })
+    )
+  })
+
   it("informs the open workspace when the window changes width, and has no one to inform before one is open", () => {
     story(
       update,
-      given(init({ session: Option.some(session), viewport: "Split" }).model),
+      given(init({ session: Option.some(session), viewport: "Split", now }).model),
       message(Message.ChangedViewport({ viewport: "Desktop" })),
       model((model) => {
         expect(model.viewport).toBe("Desktop")

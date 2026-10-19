@@ -17,6 +17,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
             WorkspaceBinding.informViewport(workspaceId, { viewport })
           )
         )
-      ])
+      ]),
+    Ticked: ({ now }) => Update.combine(model, [ApplicationDefinition.stepFields(() => ({ now: () => now }))])
   })
 )

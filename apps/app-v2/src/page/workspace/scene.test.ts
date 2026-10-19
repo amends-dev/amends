@@ -34,6 +34,7 @@ import {
   keylessConnection,
   membership,
   notificationOf,
+  now,
   opening,
   reply,
   roles,
@@ -72,7 +73,7 @@ const onPhone = modifyFields(opened, { viewport: () => "Phone" })
 
 const workspaceSubscriptions = WorkspaceBlock.subscriptions
 
-const sceneView = withViewInputs(view, { email: "alice@example.com" })()
+const sceneView = withViewInputs(view, { email: "alice@example.com", now })()
 
 const threadId = ThreadId.ThreadId.make("thread-1")
 

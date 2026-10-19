@@ -12,9 +12,12 @@ import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import { Invitation, Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
-import { Effect, Schema } from "effect"
+import { DateTime, Effect, Schema } from "effect"
 
 export const apiUrl = "http://127.0.0.1:8787"
+
+/** The time now, half past noon on the day the records below were made. */
+export const now = DateTime.makeUnsafe("2026-10-18T12:30:00Z")
 
 export const session: SignIn.Session = {
   token: "alice",
