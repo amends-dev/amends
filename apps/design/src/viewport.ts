@@ -25,5 +25,18 @@ export const viewportOf = ({
   isTablet,
   isDesktop,
   isSplit
-}: Readonly<{ isTablet: boolean; isDesktop: boolean; isSplit: boolean }>): Viewport =>
-  isSplit ? "Split" : isDesktop ? "Desktop" : isTablet ? "Tablet" : "Phone"
+}: Readonly<{ isTablet: boolean; isDesktop: boolean; isSplit: boolean }>): Viewport => {
+  if (isSplit) {
+    return "Split"
+  }
+
+  if (isDesktop) {
+    return "Desktop"
+  }
+
+  if (isTablet) {
+    return "Tablet"
+  }
+
+  return "Phone"
+}

@@ -59,9 +59,17 @@ const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() =
  * Put the thread open, if there is one, where the window's width puts the side pane: in its dialog, which
  * opens, or beside the main pane, which closes the dialog without closing the thread.
  */
-const placeAside = WorkspaceDefinition.step((model) =>
-  !isThreadOpen(model.open) ? WorkspaceDefinition.stepNoop() : isAsideFloating(model.viewport) ? showAside : hideAside
-)
+const placeAside = WorkspaceDefinition.step((model) => {
+  if (!isThreadOpen(model.open)) {
+    return WorkspaceDefinition.stepNoop()
+  }
+
+  if (isAsideFloating(model.viewport)) {
+    return showAside
+  }
+
+  return hideAside
+})
 
 /** Whether the sidebar is in place at `viewport`, where there is no drawer to keep open. */
 const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop" || viewport === "Split"

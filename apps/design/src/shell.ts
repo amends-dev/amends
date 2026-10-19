@@ -87,8 +87,17 @@ export type ShellAside<Message, Requirements> = ShellDialog<Message, Requirement
 /** Where the notices go: in the open dialog, the only part of the window left to use, else in the frame. */
 type NoticesPlace = "Menu" | "Aside" | "Frame"
 
-const placeNotices = (dialogs: Readonly<{ isMenuOpen: boolean; isAsideOpen: boolean }>): NoticesPlace =>
-  dialogs.isMenuOpen ? "Menu" : dialogs.isAsideOpen ? "Aside" : "Frame"
+const placeNotices = (dialogs: Readonly<{ isMenuOpen: boolean; isAsideOpen: boolean }>): NoticesPlace => {
+  if (dialogs.isMenuOpen) {
+    return "Menu"
+  }
+
+  if (dialogs.isAsideOpen) {
+    return "Aside"
+  }
+
+  return "Frame"
+}
 
 /**
  * The dialog `render` describes, as a panel at the start of the window over a scrim while it is visible, and
