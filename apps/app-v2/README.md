@@ -188,7 +188,8 @@ the pages that compose them; the root composes the pages.
   sending. Its view is the settings pane, one column of sections titled Workspace name, Your name,
   Members, and, where they manage invitations, Invitations. A name shows as a row of the name and
   what it is for with the button to change it, or, while the person changes it, as a form of its
-  field with Save and Cancel; a section whose name is on its way says "Sending…" after its title.
+  field, whose label is the section's title and not shown again, with Save and Cancel; a section
+  whose name is on its way says "Sending…" after its title.
   Each member is an entry of their initials and name, with the role they hold as a badge, or, where
   the person may change it, as a select named "Role of" and the member's name, "Sending…" while
   they or their role is on its way, and under them Remove and Make owner, where the person may use

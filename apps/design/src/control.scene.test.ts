@@ -212,6 +212,39 @@ describe("field", () => {
     )
   })
 
+  it("shows its label above the input, unless the label is hidden, which still names the input", () => {
+    scene(
+      { update, view: viewOf((model, h) => [emailField(model, h, Option.none())]) },
+      given(initial),
+      expect(selector("label.sr-only")).toBeAbsent(),
+      expect(label("Email")).toExist()
+    )
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          field(
+            h,
+            {
+              id: "email",
+              label: "Email",
+              type: "email",
+              value: model.email,
+              isLabelHidden: true,
+              onInput: (value) => Message.TypedEmail({ value })
+            },
+            Option.none()
+          )
+        ])
+      },
+      given(initial),
+      expect(selector("label.sr-only")).toHaveText("Email"),
+      expect(role("textbox", { name: "Email" })).toExist(),
+      type(label("Email"), "ada@example.com"),
+      expect(label("Email")).toHaveValue("ada@example.com")
+    )
+  })
+
   it("shows why its value was refused as an alert that describes it, and marks it invalid", () => {
     scene(
       {

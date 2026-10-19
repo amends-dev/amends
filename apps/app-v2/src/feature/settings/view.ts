@@ -75,7 +75,14 @@ const nameSection = (
           form(h, { onSubmit: config.onSubmit, variant: "pane" }, [
             field(
               h,
-              { id: config.id, label: config.label, type: "text", value: draft, onInput: config.onInput },
+              {
+                id: config.id,
+                label: config.label,
+                type: "text",
+                value: draft,
+                onInput: config.onInput,
+                isLabelHidden: true
+              },
               Option.none()
             ),
             buttonRow(h, [submit(h, "Save"), button(h, "Cancel", config.onCancel, { variant: "quiet" })])

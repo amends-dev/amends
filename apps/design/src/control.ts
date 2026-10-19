@@ -276,8 +276,10 @@ const describeError = <Message, Requirements>(
 
 /**
  * A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if
- * it was. The `placeholder` shows an example of what to enter while it is empty. The `attributes` go onto the
- * input, such as a dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off.
+ * it was. The `placeholder` shows an example of what to enter while it is empty. With `isLabelHidden` the label
+ * does not show above the input and still names it, for a field in a section that already names it. The
+ * `attributes` go onto the input, such as a dialog's `initialFocus`, which a field in a dialog takes with
+ * `isAutofocus` off.
  */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -289,6 +291,7 @@ export const field = <Message, Requirements>(
     onInput: (value: string) => Message
     placeholder?: string
     isAutofocus?: boolean
+    isLabelHidden?: boolean
     attributes?: PublishedAttributes
   }>,
   error: Option.Option<string>
@@ -306,7 +309,10 @@ export const field = <Message, Requirements>(
         h.div(
           [h.Class(fieldColumn)],
           [
-            h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
+            h.label(
+              [...attributes.label, h.Class(config.isLabelHidden === true ? hiddenLabel : fieldLabel)],
+              [config.label]
+            ),
             h.input([
               ...attributes.input,
               ...(config.attributes ?? []),

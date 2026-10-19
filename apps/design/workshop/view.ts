@@ -354,6 +354,31 @@ const fieldGroup = (
         )
       ],
       sampleRow
+    ),
+    sample(
+      h,
+      "Field with its label hidden, in a section that names it",
+      [
+        paneSection(h, {
+          title: "Your name",
+          children: [
+            field(
+              h,
+              {
+                id: "section-name",
+                label: "Your name",
+                type: "text",
+                value: model.fullName,
+                onInput: (value) => Message.TypedFullName({ value }),
+                isAutofocus: false,
+                isLabelHidden: true
+              },
+              Option.none()
+            )
+          ]
+        })
+      ],
+      sampleStack
     )
   ])
 
