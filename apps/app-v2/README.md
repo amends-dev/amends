@@ -606,6 +606,14 @@ choice is.
   `Turn.whyNotRetryable`, from where its agent stands among the thread's turns, by
   `TurnStore.latestOf`, and who takes part in it. `get` and `getActions` read a record and the
   actions once, for an action being written.
+- `members`, `contacts`, and `people` are the workspace's members, its contacts, the people its channels
+  heard from, and the two together as `{ members, contacts }`, as values and not held records, each
+  again after each change to them or to the person's actions, as `list` is. The thread, the inbox, and
+  the tasks read `people`, to name who wrote what; the group, the groups, the turns, the channels, the
+  agents, and a thread's task, for the members of its group, read `members`. The settings list the
+  members with `list`, since they show which are unfinished. `workspacePlace` is the place of the
+  records the workspace holds itself, which a Block lists the other kinds at, such as groups, roles,
+  assignments, connections, and channels.
 - `search(query)` is an Effect and not a stream, since a search runs when it is asked: it reads the
   groups, the members, the threads, and their messages once, as the person's unfinished actions leave
   them, and `findMatches` decides what has the query in it. It gives `SearchResults`: the groups whose
@@ -878,9 +886,11 @@ browser's storage. Each Block's tests sit beside it:
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
   and its move shows at once; and the settings' reads, as the settings Block reads them together,
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant
-  to rename it; and a search finds a team, a thread, and a conversation the person started, and
-  the member they are with, before the server has them and after, whatever the case or accents of
-  the query, and not the person themselves. `Store.viewTurns` is
+  to rename it; and the members, the contacts, and the people together: a contact a channel heard
+  from reaches them, and a member renamed here shows at once, then as the host has it; and a search
+  finds a team, a thread, and a conversation the person started, and the member they are with,
+  before the server has them and after, whatever the case or accents of the query, and not the
+  person themselves. `Store.viewTurns` is
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
   with no messages, and the later of two messages, and so is `Store.viewTasks`: each task with its

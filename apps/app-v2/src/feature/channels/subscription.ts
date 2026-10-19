@@ -3,13 +3,11 @@
  * that name their conversations, and what the person may do, read from their store as they change.
  */
 
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Stream from "effect/Stream"
+import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { ChannelsDefinition, Message } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 export const subscriptions = ChannelsDefinition.subscriptions((entry) => ({
   channels: entry(
@@ -31,7 +29,7 @@ export const subscriptions = ChannelsDefinition.subscriptions((entry) => ({
         return ({ workspaceId, memberId }) =>
           stores
             .read(workspaceId, memberId, (store) =>
-              Stream.map(store.list("Channel", workspace), (channels) =>
+              Stream.map(store.list("Channel", Store.workspacePlace), (channels) =>
                 Message.ReceivedChannels({
                   channels: channels
                     .filter(({ record }) => record.value.status === "active")
@@ -39,7 +37,7 @@ export const subscriptions = ChannelsDefinition.subscriptions((entry) => ({
                 })
               ).pipe(
                 Stream.merge(
-                  Stream.map(store.list("Connection", workspace), (connections) =>
+                  Stream.map(store.list("Connection", Store.workspacePlace), (connections) =>
                     Message.ReceivedConnections({
                       connections: connections
                         .filter(({ record }) => record.value.status === "active")
@@ -48,7 +46,7 @@ export const subscriptions = ChannelsDefinition.subscriptions((entry) => ({
                   )
                 ),
                 Stream.merge(
-                  Stream.map(store.list("Group", workspace), (groups) =>
+                  Stream.map(store.list("Group", Store.workspacePlace), (groups) =>
                     Message.ReceivedGroups({ groups: groups.map(({ record }) => record.value) })
                   )
                 ),
@@ -61,11 +59,7 @@ export const subscriptions = ChannelsDefinition.subscriptions((entry) => ({
                     })
                   )
                 ),
-                Stream.merge(
-                  Stream.map(store.list("Member", workspace), (members) =>
-                    Message.ReceivedMembers({ members: members.map(({ record }) => record.value) })
-                  )
-                ),
+                Stream.merge(Stream.map(store.members, (members) => Message.ReceivedMembers({ members }))),
                 Stream.merge(Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants })))
               )
             )

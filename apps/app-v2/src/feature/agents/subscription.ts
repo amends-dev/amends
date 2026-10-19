@@ -3,31 +3,28 @@
  * the person may do, read from their store as they change.
  */
 
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
-import type * as Store from "../../store/Store.ts"
+import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { AgentsDefinition, Message } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 /** The agents as `store` holds them, each time any of what they are read from changes. */
 export const readAgents = (store: Store.Store["Service"]) =>
   Stream.zipLatestAll(
-    store.list("Agent", workspace),
-    store.list("Member", workspace),
-    store.list("Connection", workspace),
-    store.list("Role", workspace),
-    store.list("Workspace", workspace),
+    store.list("Agent", Store.workspacePlace),
+    store.members,
+    store.list("Connection", Store.workspacePlace),
+    store.list("Role", Store.workspacePlace),
+    store.list("Workspace", Store.workspacePlace),
     store.grants
   ).pipe(
     Stream.map(([agents, members, connections, roles, workspaces, grants]) =>
       Message.ReceivedAgents({
         agents: agents.map(({ record, pending }) => ({ agent: record.value, pending })),
-        members: members.map(({ record }) => record.value),
+        members,
         connections: connections
           .filter(({ record }) => record.value.status === "active")
           .map(({ record, pending }) => ({ connection: record.value, pending })),

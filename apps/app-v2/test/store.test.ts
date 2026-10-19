@@ -3,7 +3,7 @@ import { Integration } from "@amends-dev/connection"
 import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 // @vitest-environment node
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
-import { DeliveryJobs } from "@amends-dev/core/channel"
+import { ChannelIntake, DeliveryJobs } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupId, GroupPermissions } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
@@ -211,8 +211,6 @@ const admit = (gateway: Gateway.Gateway["Service"], workspace: Workspace.Workspa
 const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => boolean) =>
   stream.pipe(Stream.filter(holds), Stream.runHead, Effect.map(Option.getOrThrow), Effect.timeout("5 seconds"))
 
-const everywhere = ReplicaRecord.Place.cases.Workspace.make({})
-
 /** The task listed under the group called `groupName` among `views`. */
 const taskIn = (views: ReadonlyArray<Store.TaskView>, groupName: string) =>
   views.find((view) => view.groupName === groupName)!
@@ -233,8 +231,8 @@ describe("Store", () => {
       const opened = yield* Scope.make()
       const store = yield* openStore(apiUrl, workspace, opened)
       // The server resets the new replica with everything alice may see.
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
-      const groups = yield* firstWhere(store.list("Group", everywhere), (held) => held.length > 0)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
+      const groups = yield* firstWhere(store.list("Group", Store.workspacePlace), (held) => held.length > 0)
       // A group made elsewhere reaches it as its commit lands.
       const client = yield* HttpApiClient.make(Api.Api, { baseUrl: apiUrl }).pipe(
         Effect.provide([
@@ -246,13 +244,13 @@ describe("Store", () => {
         ])
       )
       yield* client.groups.create({ headers: {}, payload: { name: "Crew", memberIds: [workspace.ownerMemberId] } })
-      const grown = yield* firstWhere(store.list("Group", everywhere), (held) => held.length > groups.length)
+      const grown = yield* firstWhere(store.list("Group", Store.workspacePlace), (held) => held.length > groups.length)
       yield* Scope.close(opened, Exit.void)
 
       // With the host gone, the store opens and reads what it held.
       yield* Scope.close(serving, Exit.void)
       const reopened = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      expect(yield* firstWhere(reopened.list("Group", everywhere), () => true)).toEqual(grown)
+      expect(yield* firstWhere(reopened.list("Group", Store.workspacePlace), () => true)).toEqual(grown)
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
@@ -265,7 +263,7 @@ describe("Store", () => {
       const address = yield* serve(services, serving)
       const apiUrl = HttpServer.formatAddress(address)
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
 
       // A thread started shows at once, then as the server made it, under the same ID.
       yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Hello", mentions: [] })
@@ -341,7 +339,7 @@ describe("Store", () => {
       const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
       const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
       yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Ship the release", mentions: [] })
       const [started] = yield* firstWhere(
         store.threads(Group.GeneralId),
@@ -388,7 +386,7 @@ describe("Store", () => {
       const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
       const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
 
       yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plan the offsite", mentions: [] })
       yield* store.write("ThreadStarted", {
@@ -436,11 +434,11 @@ describe("Store", () => {
         })
         const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
         const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-        yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+        yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
 
         // A task in each of two groups, once the host has the team, and a thread that tracks none.
         yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
-        const teams = yield* firstWhere(store.list("Group", everywhere), (held) =>
+        const teams = yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
           held.some(({ record, pending }) => !pending && record.value.kind === "Team" && record.value.name === "Design")
         )
         const teamId = teams.find(({ record }) => record.value.kind === "Team" && record.value.name === "Design")!
@@ -487,7 +485,7 @@ describe("Store", () => {
       const bob = yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
       const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)
+      yield* firstWhere(store.list("Member", Store.workspacePlace), (held) => held.length === 2)
 
       // The person may create teams, as the workspace's owner.
       expect(
@@ -496,7 +494,7 @@ describe("Store", () => {
         )
       ).toBe(true)
       yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
-      const team = (yield* firstWhere(store.list("Group", everywhere), (held) =>
+      const team = (yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
         held.some(({ pending }) => pending)
       )).find(({ pending }) => pending)
       const teamId = team!.record.value.id
@@ -510,7 +508,7 @@ describe("Store", () => {
         memberships: [{ record: { value: { memberId: workspace.ownerMemberId } } }]
       })
       // The server's own team and admission arrive under the IDs the browser gave them.
-      yield* firstWhere(store.list("Group", everywhere), (held) =>
+      yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
         held.some(({ record, pending }) => record.value.id === teamId && !pending)
       )
       expect(
@@ -520,7 +518,7 @@ describe("Store", () => {
       ).toMatchObject([{ record: { value: { id: admission!.record.value.id } }, pending: false }])
 
       yield* store.write("DirectThreadStarted", { memberIds: [bob.id], text: "Got a minute?", mentions: [] })
-      const direct = (yield* firstWhere(store.list("Group", everywhere), (held) =>
+      const direct = (yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
         held.some(({ record, pending }) => record.value.kind === "Direct" && pending)
       )).find(({ record }) => record.value.kind === "Direct")!.record.value
       const [opened] = yield* firstWhere(store.threads(direct.id), (threads) => threads.length === 1)
@@ -528,7 +526,7 @@ describe("Store", () => {
       const [arrived] = yield* firstWhere(store.threads(direct.id), ([thread]) => thread?.thread.pending === false)
       expect(arrived!.thread.record.value.id).toBe(opened!.thread.record.value.id)
       expect(
-        (yield* firstWhere(store.list("Group", everywhere), (held) =>
+        (yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
           held.some(({ record, pending }) => record.value.id === direct.id && !pending)
         )).filter(({ record }) => record.value.kind === "Direct")
       ).toHaveLength(1)
@@ -650,16 +648,16 @@ describe("Store", () => {
         const bob = yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
         const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
         const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-        yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)
+        yield* firstWhere(store.list("Member", Store.workspacePlace), (held) => held.length === 2)
 
         const carol = Accounts.Email.make("carol@example.com")
         const expiresAt = DateTime.add(yield* DateTime.now, { days: 1 })
         yield* store.write("InvitationIssued", { email: carol, roleId: BuiltinRoles.MemberId, expiresAt })
         const isOpen = ({ record }: { readonly record: { readonly value: Invitation.Invitation } }) =>
           Invitation.State.isAnyOf(["Pending"])(record.value.state)
-        const invitation = (yield* firstWhere(store.list("Invitation", everywhere), (held) => held.some(isOpen))).find(
-          isOpen
-        )
+        const invitation = (yield* firstWhere(store.list("Invitation", Store.workspacePlace), (held) =>
+          held.some(isOpen)
+        )).find(isOpen)
         expect(invitation!.record.value.details).toMatchObject({
           recipientId: (yield* accounts.findOrCreate(carol)).id,
           recipientEmail: carol
@@ -667,16 +665,16 @@ describe("Store", () => {
 
         const isBobs = ({ record }: { readonly record: { readonly value: Assignment.Assignment } }) =>
           record.value.memberId === bob.id
-        const member = (yield* firstWhere(store.list("Assignment", everywhere), (held) => held.some(isBobs))).find(
-          isBobs
-        )
+        const member = (yield* firstWhere(store.list("Assignment", Store.workspacePlace), (held) =>
+          held.some(isBobs)
+        )).find(isBobs)
         yield* store.write("RolesReplaced", {
           memberId: bob.id,
           roleId: BuiltinRoles.AdministratorId,
           expectedAssignmentIds: [member!.record.value.id]
         })
         // The new role shows at once, and the one it replaces as revoked.
-        const changed = (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+        const changed = (yield* firstWhere(store.list("Assignment", Store.workspacePlace), (held) =>
           held.some((item) => isBobs(item) && item.pending)
         )).filter(isBobs)
         const given = changed.find(({ record }) => record.value.id !== member!.record.value.id)!
@@ -684,7 +682,7 @@ describe("Store", () => {
           "revoked"
         )
         // Then the server's, under the same ID.
-        const settled = (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+        const settled = (yield* firstWhere(store.list("Assignment", Store.workspacePlace), (held) =>
           held.filter(isBobs).every(({ pending }) => !pending)
         )).filter(isBobs)
         expect(
@@ -722,7 +720,7 @@ describe("Store", () => {
       yield* admit(gateway, workspace, bob)
       const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
 
       yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plans", mentions: [] })
       const [started] = yield* firstWhere(
@@ -778,13 +776,13 @@ describe("Store, for the workspace's connections", () => {
       const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
       const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
       const client = yield* memberClient(apiUrl, alice, workspace.id)
       const added = yield* client.connections.create({
         headers: {},
         payload: { integration: "test-api", name: "Models", settings: { url: "http://127.0.0.1:9" }, auth: "none" }
       })
-      const [arrived] = yield* firstWhere(store.list("Connection", everywhere), (held) => held.length === 1)
+      const [arrived] = yield* firstWhere(store.list("Connection", Store.workspacePlace), (held) => held.length === 1)
       expect(arrived).toMatchObject({
         pending: false,
         record: { value: { id: added.id, name: "Models", readiness: { _tag: "Ready" } } }
@@ -792,14 +790,14 @@ describe("Store, for the workspace's connections", () => {
       expect(yield* client.connections.check({ params: { connectionId: added.id } })).toEqual({ status: "healthy" })
 
       yield* store.write("ConnectionRenamed", { connectionId: added.id, name: "Local", expectedName: "Models" })
-      yield* firstWhere(store.list("Connection", everywhere), ([held]) => held?.pending === true)
+      yield* firstWhere(store.list("Connection", Store.workspacePlace), ([held]) => held?.pending === true)
       yield* firstWhere(
-        store.list("Connection", everywhere),
+        store.list("Connection", Store.workspacePlace),
         ([held]) => held?.pending === false && held.record.value.name === "Local"
       )
       yield* store.write("ConnectionRemoved", { connectionId: added.id })
       yield* firstWhere(
-        store.list("Connection", everywhere),
+        store.list("Connection", Store.workspacePlace),
         ([held]) => held?.pending === false && held.record.value.status === "removed"
       )
     }).pipe(Effect.scoped, Effect.provide(browser))
@@ -819,13 +817,13 @@ describe("Store, for the workspace's agents", () => {
         })
         const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
         const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-        yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+        yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
         const client = yield* memberClient(apiUrl, alice, workspace.id)
         const models = yield* client.connections.create({
           headers: {},
           payload: { integration: "test-models", name: "Models", settings: {}, auth: "none" }
         })
-        yield* firstWhere(store.list("Connection", everywhere), (held) => held.length === 1)
+        yield* firstWhere(store.list("Connection", Store.workspacePlace), (held) => held.length === 1)
 
         yield* store.write("AgentCreated", {
           name: "Scout",
@@ -835,16 +833,16 @@ describe("Store, for the workspace's agents", () => {
           model: { connectionId: models.id, id: "any-model" },
           sandbox: null
         })
-        const [made] = yield* firstWhere(store.list("Agent", everywhere), ([held]) => held?.pending === true)
+        const [made] = yield* firstWhere(store.list("Agent", Store.workspacePlace), ([held]) => held?.pending === true)
         const { id: agentId, memberId } = made!.record.value
         const admitted = <A extends { readonly record: { readonly value: { readonly memberId: string } } }>(
           memberships: ReadonlyArray<A>
         ) => memberships.find(({ record }) => record.value.memberId === memberId)
         const shown = {
-          member: (yield* firstWhere(store.list("Member", everywhere), (held) => held.length === 2)).find(
+          member: (yield* firstWhere(store.list("Member", Store.workspacePlace), (held) => held.length === 2)).find(
             ({ record }) => record.value.id === memberId
           ),
-          assignment: (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+          assignment: (yield* firstWhere(store.list("Assignment", Store.workspacePlace), (held) =>
             held.some(({ record }) => record.value.memberId === memberId)
           )).find(({ record }) => record.value.memberId === memberId),
           admission: admitted(yield* firstWhere(store.every("GroupMembership"), (held) => admitted(held) !== undefined))
@@ -855,15 +853,18 @@ describe("Store, for the workspace's agents", () => {
         })
 
         // The server's own records arrive under the IDs the browser gave them.
-        const [arrived] = yield* firstWhere(store.list("Agent", everywhere), ([held]) => held?.pending === false)
+        const [arrived] = yield* firstWhere(
+          store.list("Agent", Store.workspacePlace),
+          ([held]) => held?.pending === false
+        )
         expect(arrived!.record.value).toMatchObject({ id: agentId, memberId, model: { id: "any-model" } })
         // On Auto with no connection giving harnesses, the server finds it can't run yet.
         expect(arrived!.record.value.readiness).toMatchObject({ _tag: "Incomplete", issues: [{ _tag: "NoHarness" }] })
         const settled = {
-          member: (yield* firstWhere(store.list("Member", everywhere), (held) =>
+          member: (yield* firstWhere(store.list("Member", Store.workspacePlace), (held) =>
             held.some(({ record, pending }) => record.value.id === memberId && !pending)
           )).find(({ record }) => record.value.id === memberId),
-          assignment: (yield* firstWhere(store.list("Assignment", everywhere), (held) =>
+          assignment: (yield* firstWhere(store.list("Assignment", Store.workspacePlace), (held) =>
             held.some(({ record, pending }) => record.value.memberId === memberId && !pending)
           )).find(({ record }) => record.value.memberId === memberId),
           admission: admitted(
@@ -888,13 +889,13 @@ describe("Store, for the workspace's channels", () => {
       const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
       const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-      yield* firstWhere(store.list("Workspace", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
       const client = yield* memberClient(apiUrl, alice, workspace.id)
       const chat = yield* client.connections.create({
         headers: {},
         payload: { integration: "test-channels", name: "Chat", settings: {}, auth: "none" }
       })
-      yield* firstWhere(store.list("Connection", everywhere), (held) => held.length === 1)
+      yield* firstWhere(store.list("Connection", Store.workspacePlace), (held) => held.length === 1)
       const crew = yield* client.groups.create({
         headers: {},
         payload: { name: "Crew", memberIds: [workspace.ownerMemberId] }
@@ -906,8 +907,11 @@ describe("Store, for the workspace's channels", () => {
         name: "Support",
         opensTasks: true
       })
-      const [shown] = yield* firstWhere(store.list("Channel", everywhere), ([held]) => held?.pending === true)
-      const [arrived] = yield* firstWhere(store.list("Channel", everywhere), ([held]) => held?.pending === false)
+      const [shown] = yield* firstWhere(store.list("Channel", Store.workspacePlace), ([held]) => held?.pending === true)
+      const [arrived] = yield* firstWhere(
+        store.list("Channel", Store.workspacePlace),
+        ([held]) => held?.pending === false
+      )
       expect(arrived!.record.value).toMatchObject({
         id: shown!.record.value.id,
         groupId: Group.GeneralId,
@@ -916,14 +920,85 @@ describe("Store, for the workspace's channels", () => {
 
       yield* store.write("ChannelRedirected", { channelId: arrived!.record.value.id, groupId: crew.id })
       yield* firstWhere(
-        store.list("Channel", everywhere),
+        store.list("Channel", Store.workspacePlace),
         ([held]) => held?.pending === true && held.record.value.groupId === crew.id
       )
       yield* firstWhere(
-        store.list("Channel", everywhere),
+        store.list("Channel", Store.workspacePlace),
         ([held]) => held?.pending === false && held.record.value.groupId === crew.id
       )
       expect(yield* firstWhere(store.actions, () => true)).toEqual([])
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+})
+
+describe("Store, for the workspace's people", () => {
+  it.live("the members and the contacts are listed as values, and together as people, as they change", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+
+      // The members are the workspace's own, and no one has written from outside yet.
+      const members = yield* firstWhere(store.members, (listed) => listed.length === 2)
+      expect(members.map(({ name }) => name).toSorted()).toEqual(["Alice", "Bob"])
+      expect(yield* firstWhere(store.contacts, () => true)).toEqual([])
+      const people = yield* firstWhere(store.people, (listed) => listed.members.length === 2)
+      expect(people.contacts).toEqual([])
+      expect(people.members).toEqual(members)
+
+      // A contact the channel heard from reaches the contacts, and the people with the members.
+      const client = yield* memberClient(apiUrl, alice, workspace.id)
+      const chat = yield* client.connections.create({
+        headers: {},
+        payload: { integration: "test-channels", name: "Chat", settings: {}, auth: "none" }
+      })
+      yield* store.write("ChannelCreated", {
+        connectionId: chat.id,
+        groupId: Group.GeneralId,
+        name: "Support",
+        opensTasks: false
+      })
+      const [channel] = yield* firstWhere(
+        store.list("Channel", Store.workspacePlace),
+        ([held]) => held?.pending === false
+      )
+      yield* Effect.scoped(
+        gateway.inWorkspace(
+          workspace.id,
+          Effect.flatMap(ChannelIntake.ChannelIntake, (channelIntake) =>
+            Effect.flatMap(DateTime.now, (receivedAt) =>
+              channelIntake.intake(
+                channel!.record.value.id,
+                ChannelTransport.Event.cases.MessageReceived.make({
+                  conversation: { id: "conversation-1", details: {} },
+                  messageId: "message-1",
+                  sender: { id: "customer-1", name: "Dana Customer" },
+                  text: "I cannot log in.",
+                  receivedAt
+                })
+              )
+            )
+          )
+        )
+      )
+      const contacts = yield* firstWhere(store.contacts, (listed) => listed.length === 1)
+      expect(contacts[0]).toMatchObject({ name: "Dana Customer", externalId: "customer-1" })
+      expect(
+        yield* firstWhere(store.people, (listed) => listed.contacts.length === 1 && listed.members.length === 2)
+      ).toEqual({ members, contacts })
+
+      // A member renamed here shows at once in the members and the people, then as the host has it.
+      yield* store.write("MemberRenamed", { name: Member.NewName.make("Ali") })
+      const renamed = (listed: ReadonlyArray<Member.Member>) => listed.some(({ name }) => name === "Ali")
+      expect(renamed(yield* firstWhere(store.members, renamed))).toBe(true)
+      expect(
+        (yield* firstWhere(store.people, (listed) => renamed(listed.members))).contacts.map(({ name }) => name)
+      ).toEqual(["Dana Customer"])
+      expect(yield* firstWhere(store.actions, (held) => held.length === 0)).toEqual([])
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 })

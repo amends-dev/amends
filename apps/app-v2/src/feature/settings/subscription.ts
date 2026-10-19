@@ -3,25 +3,22 @@
  * do, read from their store as they change.
  */
 
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
-import type * as Store from "../../store/Store.ts"
+import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { Message, SettingsDefinition } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 /** The settings as `store` holds them, each time any of them changes. */
 export const readSettings = (store: Store.Store["Service"]) =>
   Stream.zipLatestAll(
-    store.list("Workspace", workspace),
-    store.list("Member", workspace),
-    store.list("Role", workspace),
-    store.list("Assignment", workspace),
-    store.list("Invitation", workspace),
+    store.list("Workspace", Store.workspacePlace),
+    store.list("Member", Store.workspacePlace),
+    store.list("Role", Store.workspacePlace),
+    store.list("Assignment", Store.workspacePlace),
+    store.list("Invitation", Store.workspacePlace),
     store.grants
   ).pipe(
     Stream.map(([workspaces, members, roles, assignments, invitations, grants]) =>

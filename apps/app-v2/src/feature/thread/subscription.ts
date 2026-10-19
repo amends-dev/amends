@@ -1,14 +1,11 @@
 /** The thread, who could have written in it, and who is present, read from the person's store as they change. */
 
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, ThreadDefinition } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 export const subscriptions = ThreadDefinition.subscriptions((entry) => ({
   thread: entry(
@@ -36,14 +33,7 @@ export const subscriptions = ThreadDefinition.subscriptions((entry) => ({
                     readThrough
                   })
                 ),
-                Stream.map(
-                  Stream.zipLatest(store.list("Member", workspace), store.list("Contact", workspace)),
-                  ([members, contacts]) =>
-                    Message.ReceivedPeople({
-                      members: members.map(({ record }) => record.value),
-                      contacts: contacts.map(({ record }) => record.value)
-                    })
-                )
+                Stream.map(store.people, (people) => Message.ReceivedPeople(people))
               )
             )
             .pipe(Stream.catchCause(() => Stream.make(Message.FailedRead({ error: Stores.unreadable }))))

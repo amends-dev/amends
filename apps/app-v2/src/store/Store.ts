@@ -10,6 +10,7 @@
  */
 
 import { type Grant, GrantResolver } from "@amends-dev/core/authorization"
+import type { Contact } from "@amends-dev/core/channel"
 import type { CoreError } from "@amends-dev/core/error"
 import type { Group, GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
@@ -70,6 +71,9 @@ export interface Options {
 }
 
 const makeWrite = EventLog.makeClient(SyncSchema.SyncSchema)
+
+/** The place of the records the workspace holds itself, such as its members, groups, and roles. */
+export const workspacePlace = ReplicaRecord.Place.cases.Workspace.make({})
 
 const byPublished = Order.mapInput(DateTime.Order, (message: ThreadMessage.ThreadMessage) => message.publishedAt)
 
@@ -201,6 +205,12 @@ export const viewTasks = ({
       }
     ]
   })
+}
+
+/** The people the workspace's records name: its members, and the contacts its channels heard from. */
+export interface People {
+  readonly members: ReadonlyArray<Member.Member>
+  readonly contacts: ReadonlyArray<Contact.Contact>
 }
 
 /** A group as the person sees it listed: the group, and how many members it has. */
@@ -434,6 +444,12 @@ export class Store extends Context.Service<
     readonly every: <Kind extends ReplicaRecord.Kind>(
       kind: Kind
     ) => Stream.Stream<ReadonlyArray<Pending.Held<Replica.RecordOf<Kind>>>, QueryError>
+    /** The workspace's members, and again after each change to them or to the person's actions. */
+    readonly members: Stream.Stream<ReadonlyArray<Member.Member>, QueryError>
+    /** The workspace's contacts, and again after each change to them or to the person's actions. */
+    readonly contacts: Stream.Stream<ReadonlyArray<Contact.Contact>, QueryError>
+    /** The workspace's members and contacts together, and again after each change to either. */
+    readonly people: Stream.Stream<People, QueryError>
     /** The threads of `groupId`, each with its opening message, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
     /** Every task the replica holds, with the thread that tracks it and its group's name, and again after each change. */
@@ -633,11 +649,15 @@ export const layer = (options: Options) =>
             withPending(replica.list(kind, place), (records, pending) => Pending.overlay(kind, place, records, pending))
           const every = <Kind extends ReplicaRecord.Kind>(kind: Kind) =>
             withPending(replica.every(kind), (records, pending) => Pending.overlay(kind, undefined, records, pending))
-          const workspace = ReplicaRecord.Place.cases.Workspace.make({})
+          const members = Stream.map(list("Member", workspacePlace), (held) => held.map(({ record }) => record.value))
+          const contacts = Stream.map(list("Contact", workspacePlace), (held) => held.map(({ record }) => record.value))
           return Store.of({
             write: yield* makeWrite,
             list,
             every,
+            members,
+            contacts,
+            people: Stream.zipLatestWith(members, contacts, (members, contacts): People => ({ members, contacts })),
             threads: (groupId) =>
               withPending(replica.threads(groupId), (threads, pending) =>
                 Pending.overlay(
@@ -677,8 +697,8 @@ export const layer = (options: Options) =>
                 every("Task"),
                 every("Thread"),
                 every("ThreadMessage"),
-                list("Group", workspace),
-                list("Member", workspace)
+                list("Group", workspacePlace),
+                members
               ),
               ([tasks, threads, messages, groups, members]) =>
                 viewTasks({
@@ -687,7 +707,7 @@ export const layer = (options: Options) =>
                   threads,
                   messages: messages.map(({ record }) => record.value),
                   groups: groups.map(({ record }) => record.value),
-                  members: members.map(({ record }) => record.value)
+                  members
                 })
             ),
             thread: (threadId) =>
@@ -724,14 +744,14 @@ export const layer = (options: Options) =>
                 }
               }),
             groups: Stream.map(
-              Stream.zipLatest(list("Group", workspace), every("GroupMembership")),
+              Stream.zipLatest(list("Group", workspacePlace), every("GroupMembership")),
               ([groups, memberships]) => countMembers(groups, memberships)
             ),
             group: (groupId) => {
               const place = ReplicaRecord.Place.cases.Group.make({ groupId })
               return Stream.map(
                 Stream.zipLatest(
-                  list("Group", workspace),
+                  list("Group", workspacePlace),
                   Stream.zipLatest(list("GroupMembership", place), list("GroupFollow", place))
                 ),
                 ([groups, [memberships, follows]]): GroupDetail => ({
@@ -742,7 +762,7 @@ export const layer = (options: Options) =>
               )
             },
             grants: Stream.map(
-              Stream.zipLatest(list("Role", workspace), list("Assignment", workspace)),
+              Stream.zipLatest(list("Role", workspacePlace), list("Assignment", workspacePlace)),
               ([roles, assignments]) =>
                 GrantResolver.grantsOf(
                   assignments.flatMap(({ record }) =>
@@ -772,18 +792,13 @@ export const layer = (options: Options) =>
             ),
             search: (query) =>
               readOnce(
-                Stream.zipLatestAll(
-                  list("Group", workspace),
-                  list("Member", workspace),
-                  every("Thread"),
-                  every("ThreadMessage")
-                )
+                Stream.zipLatestAll(list("Group", workspacePlace), members, every("Thread"), every("ThreadMessage"))
               ).pipe(
                 Effect.map(([groups, members, threads, messages]) =>
                   findMatches(query, {
                     memberId: options.memberId,
                     groups: groups.map(({ record }) => record.value),
-                    members: members.map(({ record }) => record.value),
+                    members,
                     threads: threads.map(({ record }) => record.value),
                     messages: messages.map(({ record }) => record.value)
                   })

@@ -4,14 +4,11 @@
  */
 
 import { GroupId } from "@amends-dev/core/group"
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { GroupDefinition, Message } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 export const subscriptions = GroupDefinition.subscriptions((entry) => ({
   group: entry(
@@ -34,9 +31,7 @@ export const subscriptions = GroupDefinition.subscriptions((entry) => ({
                   })
                 ),
                 Stream.merge(
-                  Stream.map(store.list("Member", workspace), (members) =>
-                    Message.ReceivedMembers({ members: members.map(({ record }) => record.value) })
-                  ),
+                  Stream.map(store.members, (members) => Message.ReceivedMembers({ members })),
                   Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants }))
                 )
               )

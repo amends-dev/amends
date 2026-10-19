@@ -4,15 +4,12 @@
  */
 
 import { Group } from "@amends-dev/core/group"
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as Order from "effect/Order"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { type GroupItem, GroupsDefinition, Message } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 /** General first, then by name; conversations by their members' IDs. */
 const byName = Order.mapInput(Order.String, ({ group }: GroupItem) =>
@@ -51,9 +48,7 @@ export const subscriptions = GroupsDefinition.subscriptions((entry) => ({
                       )
                     })
                   ),
-                  Stream.map(store.list("Member", workspace), (members) =>
-                    Message.ReceivedMembers({ members: members.map(({ record }) => record.value) })
-                  )
+                  Stream.map(store.members, (members) => Message.ReceivedMembers({ members }))
                 ),
                 Stream.merge(
                   Stream.map(store.every("GroupMembership"), (memberships) =>

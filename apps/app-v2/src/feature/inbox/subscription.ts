@@ -3,13 +3,11 @@
  * people that name them, read from their store as they change.
  */
 
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Stream from "effect/Stream"
+import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { InboxDefinition, Message } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 export const subscriptions = InboxDefinition.subscriptions((entry) => ({
   inbox: entry(
@@ -35,17 +33,10 @@ export const subscriptions = InboxDefinition.subscriptions((entry) => ({
                   })
                 ),
                 Stream.merge(
-                  Stream.map(store.list("Group", workspace), (groups) =>
+                  Stream.map(store.list("Group", Store.workspacePlace), (groups) =>
                     Message.ReceivedGroups({ groups: groups.map(({ record }) => record.value) })
                   ),
-                  Stream.map(
-                    Stream.zipLatest(store.list("Member", workspace), store.list("Contact", workspace)),
-                    ([members, contacts]) =>
-                      Message.ReceivedPeople({
-                        members: members.map(({ record }) => record.value),
-                        contacts: contacts.map(({ record }) => record.value)
-                      })
-                  )
+                  Stream.map(store.people, (people) => Message.ReceivedPeople(people))
                 )
               )
             )

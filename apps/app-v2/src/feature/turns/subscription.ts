@@ -4,7 +4,6 @@
  * replica holds it.
  */
 
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { TurnId } from "@amends-dev/core/turn"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -15,8 +14,6 @@ import * as Stream from "effect/Stream"
 import * as Api from "../../api.ts"
 import * as Stores from "../../store/Stores.ts"
 import { followed, Message, TurnsDefinition } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 /** How the person reads that a log could not be followed. */
 const unfollowable = "The log could not be followed. Check the connection."
@@ -44,9 +41,7 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
                   })
                 ),
                 Stream.merge(
-                  Stream.map(store.list("Member", workspace), (members) =>
-                    Message.ReceivedMembers({ members: members.map(({ record }) => record.value) })
-                  ),
+                  Stream.map(store.members, (members) => Message.ReceivedMembers({ members })),
                   Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants }))
                 )
               )

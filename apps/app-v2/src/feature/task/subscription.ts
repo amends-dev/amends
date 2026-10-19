@@ -4,7 +4,6 @@
  */
 
 import { GroupId } from "@amends-dev/core/group"
-import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
@@ -12,8 +11,6 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, TaskDefinition } from "./definition.ts"
-
-const workspace = ReplicaRecord.Place.cases.Workspace.make({})
 
 export const subscriptions = TaskDefinition.subscriptions((entry) => ({
   task: entry(
@@ -60,7 +57,7 @@ export const subscriptions = TaskDefinition.subscriptions((entry) => ({
             : stores
                 .read(workspaceId, memberId, (store) =>
                   Stream.map(
-                    Stream.zipLatest(store.group(groupId), store.list("Member", workspace)),
+                    Stream.zipLatest(store.group(groupId), store.members),
                     ([{ group, memberships }, members]) => {
                       const admitted: ReadonlyArray<MemberId.MemberId> = Option.match(group, {
                         onNone: () => [],
@@ -72,9 +69,7 @@ export const subscriptions = TaskDefinition.subscriptions((entry) => ({
                               )
                       })
                       return Message.ReceivedMembers({
-                        members: members.flatMap(({ record }) =>
-                          record.value.status === "active" && admitted.includes(record.value.id) ? [record.value] : []
-                        )
+                        members: members.filter(({ status, id }) => status === "active" && admitted.includes(id))
                       })
                     }
                   )
