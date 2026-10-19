@@ -1,10 +1,22 @@
 import { Turn } from "@amends-dev/core/turn"
+import { button, buttonRow, hint, notice, sending } from "@amends-dev/design/control"
+import { type BadgeTone, badge, entry, entryList, log } from "@amends-dev/design/details"
+import { paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { button, errorView, sending } from "../../controls.ts"
-import { memberName, turnStatusLabel } from "../../seen.ts"
+import { initials, memberName, turnStatusLabel } from "../../seen.ts"
 import { TurnsComposition, type TurnsViewBuilder } from "./composition.ts"
 import { directs, LogState, Message, type Model, type TurnItem, type TurnLog } from "./definition.ts"
+
+/** How a turn stands, as the badge that says so is toned: in flight is cautious, well over is success. */
+const turnStatusTone: Readonly<Record<Turn.Status, BadgeTone>> = {
+  queued: "neutral",
+  running: "caution",
+  cancelling: "caution",
+  completed: "success",
+  failed: "danger",
+  cancelled: "neutral"
+}
 
 /** One item of a turn's log, as the person reads it. */
 const logItemText = (item: Turn.LogItem) =>
@@ -14,27 +26,23 @@ const logItemText = (item: Turn.LogItem) =>
     Interrupted: ({ reason }) => `Stopped short: ${reason}`
   })
 
-/** A turn's log as the person follows it: what its agent was given, what it wrote, and where it stopped short. */
-const logView = (log: TurnLog, h: TurnsViewBuilder): Html =>
-  h.section(
-    [h.AriaLabel("Log")],
-    [
-      h.ol(
-        [],
-        log.items.map((item) => h.li([], [logItemText(item)]))
-      ),
-      LogState.match(log.state, {
-        Opening: () => h.p([], ["Opening the log…"]),
-        Following: () => h.empty,
-        Ended: () => h.p([], ["The turn has ended."]),
-        Failed: ({ error }) =>
-          h.div(
-            [h.Role("alert")],
-            [h.p([], [error]), button(h, "Try again", Message.ClickedShowLog({ turnId: log.turnId }))]
-          )
-      })
+/** Where following a turn's log stands, when the person has something to read or to do about it. */
+const logStateView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html> =>
+  LogState.match(turnLog.state, {
+    Opening: () => [hint(h, "Opening the log…")],
+    Following: () => [],
+    Ended: () => [hint(h, "The turn has ended.")],
+    Failed: ({ error }) => [
+      notice(h, Option.some(error)),
+      buttonRow(h, [button(h, "Try again", Message.ClickedShowLog({ turnId: turnLog.turnId }), { variant: "quiet" })])
     ]
-  )
+  })
+
+/** A turn's log as the person follows it: what its agent was given, what it wrote, and where it stopped short. */
+const logView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html> => [
+  log(h, { label: "Log", items: turnLog.items.map(logItemText) }),
+  ...logStateView(turnLog, h)
+]
 
 /**
  * A turn: its agent and how it stands, who ran it again, why it failed; for a person who may direct
@@ -43,46 +51,48 @@ const logView = (log: TurnLog, h: TurnsViewBuilder): Html =>
  */
 const turnView = ({ turn, pending, retryOpen }: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
   const mayDirect = directs(model, turn)
-  return h.keyed("li")(
-    turn.id,
-    [],
-    [
-      h.p(
-        [],
-        [
-          h.strong([], [memberName(model.members, turn.memberId)]),
-          ` · ${turnStatusLabel[turn.status]}`,
-          turn.retry === null ? h.empty : h.span([], [` · run again by ${memberName(model.members, turn.retry.by)}`]),
-          sending(pending, h)
-        ]
-      ),
-      turn.failure === null ? h.empty : h.p([], [turn.failure]),
-      mayDirect && Turn.stoppable(turn.status) ? button(h, "Stop", Message.ClickedStop({ turnId: turn.id })) : h.empty,
-      mayDirect && retryOpen ? button(h, "Run again", Message.ClickedRunAgain({ turnId: turn.id })) : h.empty,
-      Option.match(
-        Option.filter(model.log, ({ turnId }) => turnId === turn.id),
-        {
-          onNone: () => button(h, "Show log", Message.ClickedShowLog({ turnId: turn.id })),
-          onSome: (log) => h.div([], [button(h, "Hide log", Message.ClickedHideLog()), logView(log, h)])
-        }
-      )
+  const agent = memberName(model.members, turn.memberId)
+  const shownLog = Option.filter(model.log, ({ turnId }) => turnId === turn.id)
+
+  return entry(h, {
+    key: turn.id,
+    mark: initials(agent),
+    title: agent,
+    trailing: [
+      badge(h, { label: turnStatusLabel[turn.status], tone: turnStatusTone[turn.status] }),
+      turn.retry === null ? h.empty : hint(h, `run again by ${memberName(model.members, turn.retry.by)}`),
+      sending(h, pending)
+    ],
+    children: [
+      notice(h, Option.fromNullOr(turn.failure)),
+      buttonRow(h, [
+        mayDirect && Turn.stoppable(turn.status)
+          ? button(h, "Stop", Message.ClickedStop({ turnId: turn.id }), { variant: "quiet" })
+          : h.empty,
+        mayDirect && retryOpen
+          ? button(h, "Run again", Message.ClickedRunAgain({ turnId: turn.id }), { variant: "quiet" })
+          : h.empty,
+        Option.isNone(shownLog)
+          ? button(h, "Show log", Message.ClickedShowLog({ turnId: turn.id }), { variant: "quiet" })
+          : button(h, "Hide log", Message.ClickedHideLog(), { variant: "quiet" })
+      ]),
+      ...Option.match(shownLog, { onNone: () => [], onSome: (turnLog) => logView(turnLog, h) })
     ]
-  )
+  })
 }
 
 /** The thread's turns, oldest first: each agent's work on what was asked of it there. */
 export const view = TurnsComposition.makeView((model, h) =>
   model.turns.length === 0
-    ? errorView(model.notice, h)
-    : h.section(
-        [h.AriaLabel("Turns")],
-        [
-          h.p([], [h.strong([], ["Turns"])]),
-          errorView(model.notice, h),
-          h.ol(
-            [],
-            model.turns.map((item) => turnView(item, model, h))
-          )
+    ? notice(h, model.notice)
+    : paneSection(h, {
+        title: "Turns",
+        children: [
+          notice(h, model.notice),
+          entryList(h, {
+            label: "Turns",
+            children: model.turns.map((item) => turnView(item, model, h))
+          })
         ]
-      )
+      })
 )

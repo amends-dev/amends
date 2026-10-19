@@ -66,6 +66,7 @@ const startingView = (starting: Starting, model: Model, h: GroupsViewBuilder): H
         memberChoice(h, {
           id: "conversation-member",
           label: "With",
+          none: "Choose a member",
           members: others(model),
           value: memberId,
           onChange: (memberId) => Message.ChoseConversationMember({ memberId })

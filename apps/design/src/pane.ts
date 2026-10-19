@@ -49,6 +49,12 @@ const tabCount =
 
 const columnBody = "flex max-w-170 flex-col gap-10 pt-1"
 
+const sectionColumn = "flex flex-col gap-3"
+
+const sectionHeading = "flex flex-wrap items-baseline gap-x-2"
+
+const sectionTitle = "m-0 text-item font-medium text-ink"
+
 export type PaneVariant = "main" | "side"
 
 export type PaneHeader = Readonly<{
@@ -198,6 +204,23 @@ export const paneColumn = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   children: ReadonlyArray<Html>
 ): Html => h.div([h.Class(columnBody)], children)
+
+/**
+ * A section of a pane's column, a `section` named by `title`: the title as an `h3`, with the `trailing`
+ * pieces after it on the same line, such as `sending` or a `badge`, then the `children` in a column, 12px
+ * apart.
+ */
+export const paneSection = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ title: string; trailing?: ReadonlyArray<Html>; children: ReadonlyArray<Html> }>
+): Html =>
+  h.section(
+    [h.AriaLabel(config.title), h.Class(sectionColumn)],
+    [
+      h.div([h.Class(sectionHeading)], [h.h3([h.Class(sectionTitle)], [config.title]), ...(config.trailing ?? [])]),
+      ...config.children
+    ]
+  )
 
 /** The side panel's close button, named Close, for the header's `actions`. */
 export const paneClose = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, onClick: Message): Html =>

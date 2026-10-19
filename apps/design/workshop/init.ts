@@ -19,6 +19,9 @@ export const init = ApplicationComposition.makeInit(() => ({
     isNotificationsOn: true,
     isDigestOn: false,
     plan: "team",
+    taskStatus: "triage",
+    taskPriority: "none",
+    taskAssignee: "",
     pressCount: 0
   }
 }))

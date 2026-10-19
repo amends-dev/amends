@@ -34,20 +34,36 @@ describe("a thread's task", () => {
           grants: () => [Grant.make(TaskPermissions.Update, inWorkspace)]
         })
       ),
+      expect(role("region", { name: "Task" })).toExist(),
       expect(label("Status")).toExist(),
       expect(label("Priority")).toExist(),
+      expect(label("Assignee")).toExist(),
+      expect(role("option", { name: "No one" })).toExist(),
       expect(role("option", { name: "Bob" })).toExist(),
       expect(role("option", { name: "Scout" })).toBeAbsent()
     )
   })
 
-  it("reads as a line to someone who may not change it", () => {
+  it("reads as a section of its status, priority, and assignee to someone who may not change it", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { task: () => Option.some({ task, pending: true }) })),
-      expect(text("Triage · No priority · Assigned to no one")).toExist(),
+      expect(role("region", { name: "Task" })).toExist(),
+      expect(text("Triage")).toExist(),
+      expect(text("No priority")).toExist(),
+      expect(text("No one")).toExist(),
       expect(text(" · Sending…")).toExist(),
       expect(label("Status")).toBeAbsent()
+    )
+  })
+
+  it("reads its assignee by name", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { task: () => Option.some({ task: { ...task, assignee: bob.id }, pending: false }) })),
+      expect(text("Bob")).toExist(),
+      expect(text("No one")).toBeAbsent(),
+      expect(text(" · Sending…")).toBeAbsent()
     )
   })
 

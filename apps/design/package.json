@@ -11,6 +11,7 @@
     "./centered": "./src/centered.ts",
     "./composer": "./src/composer.ts",
     "./control": "./src/control.ts",
+    "./details": "./src/details.ts",
     "./directory": "./src/directory.ts",
     "./form": "./src/form.ts",
     "./icon": "./src/icon.ts",

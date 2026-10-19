@@ -139,6 +139,7 @@ const membersView = (model: Model, h: GroupViewBuilder): Html => {
             memberChoice(h, {
               id: "admit-member",
               label: "Add a member",
+              none: "Choose a member",
               members: admissible,
               value: model.admitting,
               onChange: (memberId) => Message.ChoseMemberToAdmit({ memberId })

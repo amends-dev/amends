@@ -147,7 +147,7 @@ describe("a thread", () => {
       Subscription.emit(turnsSubscriptions.turns, TurnsBlock.Message.ReceivedMembers({ members: [alice, bob, scout] })),
       expect(role("region", { name: "Turns" })).toExist(),
       expect(text("Scout")).toExist(),
-      expect(text(" · Running")).toExist(),
+      expect(text("Running")).toExist(),
       click(role("button", { name: "Show log" })),
       expect(text("Opening the log…")).toExist()
     )

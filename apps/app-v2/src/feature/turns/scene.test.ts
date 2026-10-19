@@ -4,7 +4,7 @@ import { ThreadId } from "@amends-dev/core/thread"
 import { Turn } from "@amends-dev/core/turn"
 import { describe, it } from "@effect/vitest"
 import { DateTime, Option } from "effect"
-import { Command, Subscription, click, expect, given, role, scene, text } from "foldkit/scene"
+import { Command, Subscription, click, expect, given, role, scene, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { bob, membership, scout, turnOf } from "../../../test/fixtures.ts"
 import { TurnsBlock } from "./block.ts"
@@ -52,17 +52,29 @@ describe("a thread's turns", () => {
       { update, view },
       given(opened([itemOf(running), itemOf(failed), itemOf(rerun, { pending: true })])),
       expect(role("region", { name: "Turns" })).toExist(),
+      expect(role("list", { name: "Turns" })).toExist(),
+      expect(within(role("list", { name: "Turns" }), role("listitem"))).toExist(),
       expect(text("Scout")).toExist(),
-      expect(text(" · Running")).toExist(),
-      expect(text(" · Failed")).toExist(),
+      expect(text("Running")).toExist(),
+      expect(text("Failed")).toExist(),
       expect(text("The model was unavailable.")).toExist(),
-      expect(text(" · Queued")).toExist(),
-      expect(text(" · run again by Bob")).toExist(),
+      expect(text("Queued")).toExist(),
+      expect(text("run again by Bob")).toExist(),
       expect(text(" · Sending…")).toExist(),
       // Without the grants to direct an agent, a turn is read and its log followed, and nothing more.
       expect(role("button", { name: "Stop" })).toBeAbsent(),
       expect(role("button", { name: "Run again" })).toBeAbsent(),
       expect(role("button", { name: "Show log" })).toExist()
+    )
+  })
+
+  it("mark each agent by its initials, which assistive technology does not read, and say why one failed as an alert", () => {
+    scene(
+      { update, view },
+      given(opened([itemOf(failed)])),
+      expect(text("S")).toHaveAttr("aria-hidden", "true"),
+      expect(role("alert")).toHaveText("The model was unavailable."),
+      expect(within(role("list", { name: "Turns" }), text("Failed"))).toExist()
     )
   })
 
@@ -93,7 +105,7 @@ describe("a thread's turns", () => {
     scene(
       { update, view },
       given(opened([itemOf({ ...running, status: "cancelling" })], mayUseAgents)),
-      expect(text(" · Stopping")).toExist(),
+      expect(text("Stopping")).toExist(),
       expect(role("button", { name: "Stop" })).toBeAbsent()
     )
   })
@@ -122,9 +134,10 @@ describe("a thread's turns", () => {
     scene(
       { update, view, subscriptions: TurnsBlock.subscriptions },
       given(opened([itemOf(running)])),
-      expect(role("region", { name: "Log" })).toBeAbsent(),
+      expect(role("list", { name: "Log" })).toBeAbsent(),
       click(role("button", { name: "Show log" })),
       expect(text("Opening the log…")).toExist(),
+      expect(role("list", { name: "Log" })).toExist(),
       Subscription.emit(
         subscriptions.log,
         Message.ReceivedLog({
@@ -135,7 +148,7 @@ describe("a thread's turns", () => {
         })
       ),
       expect(text("Opening the log…")).toBeAbsent(),
-      expect(text("Read 1 message")).toExist(),
+      expect(within(role("list", { name: "Log" }), text("Read 1 message"))).toExist(),
       Subscription.emit(
         subscriptions.log,
         Message.ReceivedLog({
@@ -156,14 +169,14 @@ describe("a thread's turns", () => {
           })
         })
       ),
-      expect(text("Replied: Looks good.")).toExist(),
+      expect(within(role("list", { name: "Log" }), text("Replied: Looks good."))).toExist(),
       Subscription.emit(
         subscriptions.log,
         Message.ReceivedLog({ turnId: running.id, logMessage: Turn.LogMessage.cases.Ended.make({}) })
       ),
       expect(text("The turn has ended.")).toExist(),
       click(role("button", { name: "Hide log" })),
-      expect(role("region", { name: "Log" })).toBeAbsent(),
+      expect(role("list", { name: "Log" })).toBeAbsent(),
       click(role("button", { name: "Show log" })),
       Subscription.emit(
         subscriptions.log,

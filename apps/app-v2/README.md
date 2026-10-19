@@ -53,10 +53,13 @@ and the pane of each destination, `feature/groups` renders the sidebar's section
 the main pane and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
-initials and the time of day from `src/seen.ts`. The inbox, connections, agents, settings, and
-channels, and the task and turns a thread embeds, are still built with `src/controls.ts` and switch
-to `@amends-dev/design/control` a Block at a time; a view that has not switched is plain semantic
-HTML under Tailwind's base styles.
+initials and the time of day from `src/seen.ts`. The task and the turns a thread embeds are the
+design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
+a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
+each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
+and its `log`. The inbox, connections, agents, settings, and channels are still built with
+`src/controls.ts` and switch to `@amends-dev/design/control` a Block at a time; a view that has not
+switched is plain semantic HTML under Tailwind's base styles.
 
 ## The program
 
@@ -85,15 +88,22 @@ the pages that compose them; the root composes the pages.
   the pane's header has. `replyView` is the reply composer, for the pane's footer.
 - `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
-  while the thread tracks none, making it one, when they may create tasks in its group. The thread
-  embeds it.
+  while the thread tracks none, making it one, when they may create tasks in its group. Its view is
+  a section titled Task, with "Sending…" after the title while a change is on its way: the three
+  selects side by side, with "No one" as the assignee's empty choice, or, for someone who may not
+  change it, the three as labelled rows, the assignee by name. The thread embeds it.
 - `feature/turns`: a thread's agents' turns, oldest first, each with its agent by name and how it
   stands, who ran it again, and why it failed. The person stops a turn while it is active and runs
   it again once nothing but who may direct its agent keeps it from running again, when they may
   use that agent, by core's `Turn.directRequirement`. They follow a turn's log, which opens with
   its items and then grows as the turn writes it, until the turn ends, or until they hide it or
-  it could not be followed, which says why and offers to follow it again; one log at a time. The
-  thread embeds it.
+  it could not be followed, which says why and offers to follow it again; one log at a time. Its
+  view is a section titled Turns, a list of entries: each the agent's initials, name, and a badge
+  that says how the turn stands (queued and stopped are neutral, running and stopping cautious,
+  completed a success, failed a danger), with who ran it again and "Sending…" after it, then why it
+  failed, the buttons Stop, Run again, and Show log or Hide log, and, while the log is shown, the log
+  as a list with where following it stands under it. A thread with no turns shows only why they could
+  not be read. The thread embeds it.
 - `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
   being started, and how much is new, and a composer to start one. It reports the thread picked. It
   has two views, which take the group's members, its name, and the thread open in it from their
@@ -214,7 +224,8 @@ replacing its key, checking it, and listing the models a connection offers an ag
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
 feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
 `memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
-conversation form's and the group's admit form's.
+conversation form's, the group's admit form's, and the task's assignee, each saying what its empty
+choice is.
 
 ## The store
 
@@ -337,11 +348,11 @@ browser's storage. Each Block's tests sit beside it:
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
   author of their opening, their time, how much is new and where their task stands, the one open
   marked as current, the thread picked reported, why they could not be read, and a thread started
-  from the composer, whose box is named for the group; a task changed by someone who may, read as a
-  line by someone who may not, and made by someone who may create tasks; a thread's turns by their
-  agents' names and how they stand, stopped and run again by someone who may use the agent and not
-  otherwise, a turn's log followed as it is written, until the turn ends or it could not be
-  followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
+  from the composer, whose box is named for the group; a task changed by someone who may, read as
+  rows by someone who may not, and made by someone who may create tasks; a thread's turns by their
+  agents' names and initials and the badges of how they stand, stopped and run again by someone who
+  may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends
+  or it could not be followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
   a conversation's other member, with the person's part in it, its members with removing for the
   others, admitting, renaming, and joining in place of the threads of a team they do not belong to,
   with the composer to start a thread in its footer, and its side pane for the thread open in it,

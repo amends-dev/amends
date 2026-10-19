@@ -20,23 +20,26 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
 buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
-placeholder, filled, and invalid; a hint; a textarea; the toggle on and off; a select; the notice
-tones; `sending`; a form with its inline text and a value with its link; the directory's section
-and rows; the centered screen as the sign-in's two steps and as the workspace picker; the toast
-alone, with a detail, and as a stack of two, each in a frame of its own; the marks by size; a
+placeholder, filled, and invalid; a hint; a textarea; a grid of selects, side by side and wrapping
+in a narrow column; the toggle on and off; a select; the notice tones; `sending`; a form with its
+inline text and a value with its link; the directory's section and rows; the centered screen as the
+sign-in's two steps and as the workspace picker; the toast alone, with a detail, and as a stack of
+two, each in a frame of its own; the marks by size; what a pane says about one thing, as a detail
+list, the four badge tones, entries with and without marks, with trailing badges, and with children,
+a log short and long, and a pane's sections as a task to change, a task to read, and the turns; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
 actions, and meta, with a form in place of the text, and set apart by dividers, centered and at the
 start; the composer empty and filled; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups and direct messages through `sidebarSections`, its threads,
-replies, and composers made of `message`, `divider`, and `composer`, the first with the open
-thread as a plain row under its group and the second with its notices; and the icons by size, as
-the shell draws them, and with a label. The toggles, fields, composers, and select take input, and
-so do the shell's rail and tabs, whose current item follows a click, and the list of threads, whose
-current row follows a click. The shell's side pane sits beside the
-main pane from a window of 80rem; narrow the window to between 64rem and 80rem to see it float over
-a scrim. Open it to look at a piece before a page composes it. It follows the browser's light or dark preference. A browser tab
-that is hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible
-tab. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
+replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
+as a plain row under its group and the second with its notices; and the icons by size, as the shell
+draws them, and with a label. The toggles, fields, composers, and select take input, and so do the
+shell's rail and tabs, whose current item follows a click, and the list of threads, whose current
+row follows a click. The shell's side pane sits beside the main pane from a window of 80rem; narrow
+the window to between 64rem and 80rem to see it float over a scrim. Open it to look at a piece
+before a page composes it. It follows the browser's light or dark preference. A browser tab that is
+hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. `bun
+run --filter @amends-dev/design build` bundles it, which CI builds too.
 
 ## Using it in an app
 
@@ -126,6 +129,8 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   such as the composer's send button.
 - `buttonRow(h, children)` is a row of controls with an 8px gap, wrapping onto a new line when they do
   not fit, such as a thread's Follow and Rename or a form's Save and Cancel.
+- `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping
+  onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
   named by its label.
 - `choiceSelect(h, { id, label, choices, value, onChange })` is a select over `choices`, each a
@@ -268,8 +273,33 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
   shows in a badge after it. Tabs are all in the tab order; arrow keys do not move between them.
 - `paneColumn(h, children)` is the one column of a page about one item: 680px at most, its sections
   40px apart, with nothing beside it.
+- `paneSection(h, { title, trailing?, children })` is a section of that column, a `section` named by
+  its title: the title as an `h3` at item size in medium weight, with the `trailing` pieces after it on
+  the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart.
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
   header's `actions`.
+
+### `@amends-dev/design/details`
+
+What a pane says about one thing.
+
+- `detailList(h, items)` is a definition list of `{ label, value }` items, the `value` text or any
+  `Html`: two columns, each `label` at hint size in `ink-muted` at least 5rem wide before its value at
+  item size in `ink`, rows 8px apart.
+- `badge(h, { label, tone? })` is a small inline mark of how something stands, 20px tall, at `meta`
+  size in medium weight. `tone` is `"neutral"` (the default) on `subtle`, or `"success"`, `"caution"`,
+  or `"danger"` on its own surface and text with a 1px border.
+- `entryList(h, { label, children })` is a `ul` named by `label`, a column with no list style, of
+  `entry`s. It is for lists of people or agents' work, such as a thread's turns and, later, a group's
+  members.
+- `entry(h, { key, mark?, title, trailing?, children? })` is one item of it, keyed by `key`: the `mark`
+  letters, the `sm` mark, at the start when it has them, then a column of the `title` at item size in
+  medium weight with the `trailing` pieces after it, wrapping onto a new line when they do not fit,
+  such as a `badge`, a `hint`, or `sending`, and under it the `children`, 8px apart, such as a failure,
+  a `buttonRow`, and a `log`. A row has 8px above and below.
+- `log(h, { label, items })` is an `ol` named by `label` on `subtle`, one `items` line each in the mono
+  font at hint size, wrapping long lines. It is 15rem tall at most and scrolls past that, and takes
+  keyboard focus so a keyboard can scroll it.
 
 ### `@amends-dev/design/message`
 
@@ -323,14 +353,19 @@ What floats over the shell's corner, for something that went wrong and the one t
 
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
-`role("button", { name })`, a field by its label, an invalid field's `role("alert")`, `aria-invalid`,
-and description, a switch by its label, a select's change, the centered screen's landmarks, a form
-by its label, with the pane variant of a form the same; a row by its title; an icon by `role("img", { name })` when it has a label and as
-`aria-hidden` when it has none; a rail destination by `role("button", { name })` with
-`aria-current`; a sidebar item by its name with `aria-current` and its count, the row under it as a
-button or as a plain row, and the sections of `sidebarSections` among the sidebar's own; a tab by
-`role("tab")` with `aria-selected`; a toast by `role("alert")` with its text, detail, and button, in
-the stack's live region; a message by its text button, `aria-current`, its note, actions, meta, and body,
-and a divider by its label in the list; a composer by its form, the textarea found by the same label,
-the placeholder, and the send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for the rail and
-the sidebar, `main`, and `complementary`, with its notices. They query no class.
+`role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
+`aria-invalid`, and description, a switch by its label, a select's change, the centered screen's
+landmarks, a form by its label, with the pane variant of a form the same; a row by its title; an
+icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
+destination by `role("button", { name })` with `aria-current`; a sidebar item by its name with
+`aria-current` and its count, the row under it as a button or as a plain row, and the sections of
+`sidebarSections` among the sidebar's own; a tab by `role("tab")` with `aria-selected`; a pane's
+section by `role("region")` and its `h3`, its trailing pieces and children; a detail list's labels
+and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
+entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
+and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
+toast by `role("alert")` with its text, detail, and button, in the stack's live region; a message by
+its text button, `aria-current`, its note, actions, meta, and body, and a divider by its label in
+the list; a composer by its form, the textarea found by the same label, the placeholder, and the
+send button; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
+the rail and the sidebar, `main`, and `complementary`, with its notices. They query no class.

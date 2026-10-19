@@ -10,6 +10,7 @@ import {
   buttonRow,
   choiceSelect,
   field,
+  fieldGrid,
   hint,
   iconButton,
   iconSubmit,
@@ -319,6 +320,35 @@ describe("choiceSelect", () => {
       expect(label("Plan")).toHaveValue("free"),
       change(label("Plan"), "team"),
       expect(label("Plan")).toHaveValue("team")
+    )
+  })
+})
+
+describe("fieldGrid", () => {
+  it("holds its fields, each one found by its label and working", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          fieldGrid(h, [
+            choiceSelect(h, {
+              id: "plan",
+              label: "Plan",
+              choices: plans,
+              value: model.plan,
+              onChange: (plan) => Message.ChangedPlan({ plan })
+            }),
+            emailField(model, h, Option.none())
+          ])
+        ])
+      },
+      given(initial),
+      expect(label("Plan")).toHaveValue("free"),
+      expect(label("Email")).toExist(),
+      change(label("Plan"), "team"),
+      type(label("Email"), "ada@example.com"),
+      expect(label("Plan")).toHaveValue("team"),
+      expect(label("Email")).toHaveValue("ada@example.com")
     )
   })
 })

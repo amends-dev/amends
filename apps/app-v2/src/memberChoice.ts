@@ -1,5 +1,5 @@
 /**
- * A choice of a workspace member, over the design's select: the empty choice, "Choose a member", is none.
+ * A choice of a workspace member, over the design's select: the empty choice, as `none` reads, is none.
  */
 
 import type { Member } from "@amends-dev/core/workspace"
@@ -13,6 +13,7 @@ export const memberChoice = <Message, Requirements>(
   config: Readonly<{
     id: string
     label: string
+    none: string
     members: ReadonlyArray<Member.Member>
     value: Option.Option<Member.Member["id"]>
     onChange: (memberId: Option.Option<Member.Member["id"]>) => Message
@@ -21,7 +22,7 @@ export const memberChoice = <Message, Requirements>(
   choiceSelect<string, Message, Requirements>(h, {
     id: config.id,
     label: config.label,
-    choices: [["", "Choose a member"], ...config.members.map((member) => [member.id, member.name] as const)],
+    choices: [["", config.none], ...config.members.map((member) => [member.id, member.name] as const)],
     value: Option.getOrElse(config.value, () => ""),
     onChange: (value) =>
       config.onChange(Option.fromUndefinedOr(config.members.find((member) => member.id === value)?.id))

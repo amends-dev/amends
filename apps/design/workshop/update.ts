@@ -21,6 +21,9 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     ChangedPaneTab: ({ tab }) => ({ model: modifyFields(model, { paneTab: () => tab }) }),
     ToggledNotifications: ({ isOn }) => ({ model: modifyFields(model, { isNotificationsOn: () => isOn }) }),
     ToggledDigest: ({ isOn }) => ({ model: modifyFields(model, { isDigestOn: () => isOn }) }),
-    ChangedPlan: ({ plan }) => ({ model: modifyFields(model, { plan: () => plan }) })
+    ChangedPlan: ({ plan }) => ({ model: modifyFields(model, { plan: () => plan }) }),
+    ChangedTaskStatus: ({ status }) => ({ model: modifyFields(model, { taskStatus: () => status }) }),
+    ChangedTaskPriority: ({ priority }) => ({ model: modifyFields(model, { taskPriority: () => priority }) }),
+    ChangedTaskAssignee: ({ assignee }) => ({ model: modifyFields(model, { taskAssignee: () => assignee }) })
   })
 )

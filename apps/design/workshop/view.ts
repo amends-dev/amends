@@ -7,6 +7,7 @@ import {
   buttonRow,
   choiceSelect,
   field,
+  fieldGrid,
   hint,
   iconButton,
   notice,
@@ -15,12 +16,13 @@ import {
   textarea,
   toggle
 } from "../src/control.ts"
+import { badge, detailList, entry, entryList, log } from "../src/details.ts"
 import { row, section } from "../src/directory.ts"
 import { form, inline, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark } from "../src/mark.ts"
 import { divider, message, messageList } from "../src/message.ts"
-import { pane, paneClose, paneColumn, paneTabs } from "../src/pane.ts"
+import { pane, paneClose, paneColumn, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
 import {
@@ -34,7 +36,16 @@ import {
 } from "../src/sidebar.ts"
 import { toast, toastStack } from "../src/toast.ts"
 import { type ApplicationViewBuilder, ApplicationComposition } from "./composition.ts"
-import { type Destination, Message, type Model, type PaneTab, type Plan } from "./definition.ts"
+import {
+  type Destination,
+  Message,
+  type Model,
+  type PaneTab,
+  type Plan,
+  type TaskAssignee,
+  type TaskPriority,
+  type TaskStatus
+} from "./definition.ts"
 
 const pageColumn = "mx-auto flex max-w-3xl flex-col px-6 py-8"
 
@@ -65,6 +76,8 @@ const iconSizeRow = "flex items-end gap-4"
 const conversationColumn = "flex max-w-xl flex-col px-3"
 
 const composerColumn = "flex max-w-md flex-col"
+
+const sidePaneColumn = "flex w-98 flex-col"
 
 const iconGrid = "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4"
 
@@ -110,6 +123,24 @@ const planChoices: ReadonlyArray<readonly [Plan, string]> = [
   ["free", "Free"],
   ["team", "Team"],
   ["enterprise", "Enterprise"]
+]
+
+const taskStatusChoices: ReadonlyArray<readonly [TaskStatus, string]> = [
+  ["triage", "Triage"],
+  ["todo", "To do"],
+  ["doing", "Doing"]
+]
+
+const taskPriorityChoices: ReadonlyArray<readonly [TaskPriority, string]> = [
+  ["none", "No priority"],
+  ["low", "Low"],
+  ["high", "High"]
+]
+
+const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
+  ["", "No one"],
+  ["alex", "Alex Morgan"],
+  ["yumi", "Yumi"]
 ]
 
 const workspaces: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
@@ -165,9 +196,47 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
   ])
 }
 
+const taskFields = (
+  h: ApplicationViewBuilder,
+  model: Readonly<{ taskStatus: TaskStatus; taskPriority: TaskPriority; taskAssignee: TaskAssignee }>,
+  idPrefix: string
+): Html =>
+  fieldGrid(h, [
+    choiceSelect(h, {
+      id: `${idPrefix}-status`,
+      label: "Status",
+      choices: taskStatusChoices,
+      value: model.taskStatus,
+      onChange: (status) => Message.ChangedTaskStatus({ status })
+    }),
+    choiceSelect(h, {
+      id: `${idPrefix}-priority`,
+      label: "Priority",
+      choices: taskPriorityChoices,
+      value: model.taskPriority,
+      onChange: (priority) => Message.ChangedTaskPriority({ priority })
+    }),
+    choiceSelect(h, {
+      id: `${idPrefix}-assignee`,
+      label: "Assignee",
+      choices: taskAssigneeChoices,
+      value: model.taskAssignee,
+      onChange: (assignee) => Message.ChangedTaskAssignee({ assignee })
+    })
+  ])
+
 const fieldGroup = (
   h: ApplicationViewBuilder,
-  model: Readonly<{ workspaceName: string; fullName: string; email: string; signInEmail: string; notes: string }>
+  model: Readonly<{
+    workspaceName: string
+    fullName: string
+    email: string
+    signInEmail: string
+    notes: string
+    taskStatus: TaskStatus
+    taskPriority: TaskPriority
+    taskAssignee: TaskAssignee
+  }>
 ): Html =>
   group(h, "Fields", [
     sample(
@@ -260,7 +329,9 @@ const fieldGroup = (
         })
       ],
       sampleStack
-    )
+    ),
+    sample(h, "In a grid, side by side", [taskFields(h, model, "grid")], "flex max-w-xl flex-col"),
+    sample(h, "In a grid, wrapping in a narrow column", [taskFields(h, model, "narrow")], sidePaneColumn)
   ])
 
 const toggleGroup = (h: ApplicationViewBuilder, isNotificationsOn: boolean, isDigestOn: boolean): Html =>
@@ -953,6 +1024,139 @@ const postRefusal = (h: ApplicationViewBuilder): Html =>
     action: { label: "Dismiss", onClick: Message.ClickedButton() }
   })
 
+const logLines: ReadonlyArray<string> = [
+  "Read 2 messages",
+  "Replied: Reproduced on both. Images over 5 MB hit the crash.",
+  "Stopped short: The model was unavailable."
+]
+
+const longLogLines: ReadonlyArray<string> = Array.from(
+  { length: 24 },
+  (_, index) => `Read ${index + 1} ${index === 0 ? "message" : "messages"}`
+)
+
+const turnEntries = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
+  const press = Message.ClickedButton()
+
+  return [
+    entry(h, {
+      key: "scout",
+      mark: "SC",
+      title: "Scout",
+      trailing: [badge(h, { label: "Running", tone: "caution" }), hint(h, "run again by Bob"), sending(h, true)],
+      children: [
+        buttonRow(h, [
+          button(h, "Stop", press, { variant: "quiet" }),
+          button(h, "Show log", press, { variant: "quiet" })
+        ])
+      ]
+    }),
+    entry(h, {
+      key: "yumi",
+      mark: "Y",
+      title: "Yumi",
+      trailing: [badge(h, { label: "Failed", tone: "danger" })],
+      children: [
+        notice(h, Option.some("The model was unavailable.")),
+        buttonRow(h, [
+          button(h, "Run again", press, { variant: "quiet" }),
+          button(h, "Hide log", press, { variant: "quiet" })
+        ]),
+        log(h, { label: "Log", items: logLines }),
+        hint(h, "The turn has ended.")
+      ]
+    }),
+    entry(h, {
+      key: "alex",
+      mark: "AM",
+      title: "Alex Morgan",
+      trailing: [badge(h, { label: "Completed", tone: "success" })]
+    }),
+    entry(h, { key: "sara", mark: "S", title: "Sara", trailing: [badge(h, { label: "Queued" })] })
+  ]
+}
+
+const detailsGroup = (
+  h: ApplicationViewBuilder,
+  model: Readonly<{ taskStatus: TaskStatus; taskPriority: TaskPriority; taskAssignee: TaskAssignee }>
+): Html =>
+  group(h, "Details", [
+    sample(
+      h,
+      "Detail list",
+      [
+        detailList(h, [
+          { label: "Status", value: "Triage" },
+          { label: "Priority", value: "No priority" },
+          { label: "Assignee", value: "No one" }
+        ])
+      ],
+      sidePaneColumn
+    ),
+    sample(
+      h,
+      "Badge tones",
+      [
+        badge(h, { label: "Queued" }),
+        badge(h, { label: "Completed", tone: "success" }),
+        badge(h, { label: "Running", tone: "caution" }),
+        badge(h, { label: "Failed", tone: "danger" })
+      ],
+      sampleRow
+    ),
+    sample(
+      h,
+      "Entries with marks, trailing badges, and children",
+      [entryList(h, { label: "Turns", children: turnEntries(h) })],
+      sidePaneColumn
+    ),
+    sample(
+      h,
+      "Entries without marks",
+      [
+        entryList(h, {
+          label: "Members",
+          children: [
+            entry(h, { key: "alex", title: "Alex Morgan", trailing: [badge(h, { label: "Owner" })] }),
+            entry(h, { key: "yumi", title: "Yumi", trailing: [badge(h, { label: "Agent" })] }),
+            entry(h, { key: "sara", title: "Sara" })
+          ]
+        })
+      ],
+      sidePaneColumn
+    ),
+    sample(h, "Log", [log(h, { label: "Log", items: logLines })], sidePaneColumn),
+    sample(h, "Log, scrolling past 15rem", [log(h, { label: "Long log", items: longLogLines })], sidePaneColumn),
+    sample(
+      h,
+      "Pane sections: a task to change, a task to read, and the turns",
+      [
+        paneColumn(h, [
+          paneSection(h, {
+            title: "Task",
+            trailing: [sending(h, true)],
+            children: [notice(h, Option.some("You may not change this task.")), taskFields(h, model, "section")]
+          }),
+          paneSection(h, {
+            title: "Task",
+            children: [
+              detailList(h, [
+                { label: "Status", value: "Triage" },
+                { label: "Priority", value: "No priority" },
+                { label: "Assignee", value: "No one" }
+              ])
+            ]
+          }),
+          paneSection(h, {
+            title: "Turns",
+            children: [entryList(h, { label: "Turns in a section", children: turnEntries(h).slice(0, 2) })]
+          })
+        ])
+      ],
+      sidePaneColumn
+    )
+  ])
+
 const toastGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Toast", [
     sample(h, "One toast", [h.div([h.Class(toastFrame)], [toastStack(h, [renameRefusal(h)])])], "flex flex-col"),
@@ -1027,6 +1231,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           toastGroup(h),
           iconGroup(h),
           markGroup(h),
+          detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
           composerGroup(h, model.draft, model.filledDraft),
           formGroup(h),

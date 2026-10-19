@@ -1,10 +1,9 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: labelled inputs and
- * boxes, buttons, a choice of a member or of a list, a yes-or-no switch, why an entry was refused,
- * and that an action is on its way. Each renders with the caller's builder and messages.
+ * boxes, buttons, a choice from a list, a yes-or-no switch, why an entry was refused, and that an
+ * action is on its way. Each renders with the caller's builder and messages.
  */
 
-import type { Member } from "@amends-dev/core/workspace"
 import * as Button from "@foldkit/ui/button"
 import * as Checkbox from "@foldkit/ui/checkbox"
 import * as Input from "@foldkit/ui/input"
@@ -79,39 +78,6 @@ export const toggle = <Message, Requirements>(
       onToggle: config.onToggle,
       toView: (attributes) =>
         h.div([], [h.button(attributes.checkbox, [config.isOn ? "✓" : ""]), h.label(attributes.label, [config.label])])
-    },
-    h
-  )
-
-/** A choice of one of `members`, or none, as `none` reads. */
-export const memberSelect = <Message, Requirements>(
-  h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{
-    id: string
-    label: string
-    none: string
-    members: ReadonlyArray<Member.Member>
-    value: Option.Option<Member.Member["id"]>
-    onChange: (memberId: Option.Option<Member.Member["id"]>) => Message
-  }>
-) =>
-  Select.view(
-    {
-      id: config.id,
-      value: Option.getOrElse(config.value, () => ""),
-      onChange: (value) =>
-        config.onChange(Option.fromUndefinedOr(config.members.find((member) => member.id === value)?.id)),
-      toView: (attributes) =>
-        h.div(
-          [],
-          [
-            h.label(attributes.label, [config.label]),
-            h.select(attributes.select, [
-              h.option([h.Value("")], [config.none]),
-              ...config.members.map((member) => h.option([h.Value(member.id)], [member.name]))
-            ])
-          ]
-        )
     },
     h
   )

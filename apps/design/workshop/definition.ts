@@ -1,6 +1,7 @@
 /**
  * What the workshop remembers: the text of its fields, boxes, and composers, which switches are on, the plan
- * chosen, which rail destination, pane tab, and thread are current, and how often a button was pressed.
+ * chosen, a task's status, priority, and assignee, which rail destination, pane tab, and thread are current,
+ * and how often a button was pressed.
  */
 
 import * as Schema from "effect/Schema"
@@ -9,6 +10,15 @@ import { defineMessageUnion } from "foldkit/message"
 
 export const Plan = Schema.Literals(["free", "team", "enterprise"])
 export type Plan = typeof Plan.Type
+
+export const TaskStatus = Schema.Literals(["triage", "todo", "doing"])
+export type TaskStatus = typeof TaskStatus.Type
+
+export const TaskPriority = Schema.Literals(["none", "low", "high"])
+export type TaskPriority = typeof TaskPriority.Type
+
+export const TaskAssignee = Schema.Literals(["", "alex", "yumi"])
+export type TaskAssignee = typeof TaskAssignee.Type
 
 export const Destination = Schema.Literals(["home", "connections", "agents", "channels", "settings"])
 export type Destination = typeof Destination.Type
@@ -34,6 +44,9 @@ export const Model = Schema.Struct({
   isNotificationsOn: Schema.Boolean,
   isDigestOn: Schema.Boolean,
   plan: Plan,
+  taskStatus: TaskStatus,
+  taskPriority: TaskPriority,
+  taskAssignee: TaskAssignee,
   pressCount: Schema.Finite
 })
 export type Model = typeof Model.Type
@@ -56,7 +69,10 @@ export const Message = defineMessageUnion({
   ChangedPaneTab: { tab: PaneTab },
   ToggledNotifications: { isOn: Schema.Boolean },
   ToggledDigest: { isOn: Schema.Boolean },
-  ChangedPlan: { plan: Plan }
+  ChangedPlan: { plan: Plan },
+  ChangedTaskStatus: { status: TaskStatus },
+  ChangedTaskPriority: { priority: TaskPriority },
+  ChangedTaskAssignee: { assignee: TaskAssignee }
 })
 export type Message = typeof Message.Type
 

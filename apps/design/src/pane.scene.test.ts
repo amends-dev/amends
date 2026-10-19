@@ -5,8 +5,8 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, role, scene, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { iconButton } from "./control.ts"
-import { pane, paneClose, paneColumn, paneTabs } from "./pane.ts"
+import { iconButton, sending } from "./control.ts"
+import { pane, paneClose, paneColumn, paneSection, paneTabs } from "./pane.ts"
 
 const Tab = Schema.Literals(["threads", "tasks"])
 type Tab = typeof Tab.Type
@@ -223,6 +223,35 @@ describe("paneColumn", () => {
       given(initial),
       expect(within(role("main"), text("Model"))).toExist(),
       expect(within(role("main"), text("Tools"))).toExist()
+    )
+  })
+})
+
+describe("paneSection", () => {
+  it("is a region named by its title, an h3, with its trailing pieces after the title and its children below", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          paneColumn(h, [
+            paneSection(h, {
+              title: "Task",
+              trailing: [sending(h, true)],
+              children: [h.p([], ["Triage"]), h.p([], ["No one"])]
+            }),
+            paneSection(h, { title: "Turns", children: [h.p([], ["Scout"])] })
+          ])
+        )
+      },
+      given(initial),
+      expect(role("region", { name: "Task" })).toExist(),
+      expect(within(role("region", { name: "Task" }), role("heading", { name: "Task", level: 3 }))).toExist(),
+      expect(within(role("region", { name: "Task" }), text(" · Sending…"))).toExist(),
+      expect(within(role("region", { name: "Task" }), text("Triage"))).toExist(),
+      expect(within(role("region", { name: "Task" }), text("No one"))).toExist(),
+      expect(within(role("region", { name: "Turns" }), text("Scout"))).toExist(),
+      expect(within(role("region", { name: "Turns" }), text(/Sending/))).toBeAbsent(),
+      expect(within(role("region", { name: "Turns" }), text("Triage"))).toBeAbsent()
     )
   })
 })
