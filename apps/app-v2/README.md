@@ -6,10 +6,12 @@ sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, a
 offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
 pick one; a group's threads with how much of each is new, where they start a thread; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
-stop following it, which opening reads through its latest activity; and their inbox, the
+stop following it, which opening reads through its latest activity; their inbox, the
 notifications waiting for them, each as the message it is about, to open, or to mark seen one at a
-time or all at once; and the workspace's connections to the integrations the host installs, to add,
-rename, set up, check, and remove. A reply or a new thread they have not sent is kept as a draft in their
+time or all at once; the workspace's settings, its name and their own, its members and their roles,
+and its invitations; and the workspace's connections to the integrations the host installs, to add,
+rename, set up, check, and remove. A reply or a new thread they have not sent is kept as a draft in
+their
 browser, through a reload and offline, until they send it. While the host can be reached, a thread
 shows who else is typing in it. What they do shows at once, marked as sending, even offline, and
 what the server refuses comes back with why. The features the earlier program had beyond these
@@ -82,6 +84,15 @@ the pages that compose them; the root composes the pages.
   opening message, in its group, as far as the store holds them. They open a notification's thread,
   or mark one seen, or every one up to the newest that waits. It reports the thread opened, and
   offers a count of what waits for its parent to show.
+- `feature/settings`: the workspace's name and the person's own, each renamed in place from the name
+  seen, one at a time; the workspace's members with their roles, where, for each member the
+  delegation rule, by core's `Delegation.recipientDenial`, lets them act on, they change the role
+  to Member, or to Administrator when they own the workspace, replacing the roles they saw the
+  member hold, and remove the member, and, when they own the workspace, hand it to another person,
+  from the owner's assignment they saw; and the invitations still waiting, which they revoke, with a
+  form to invite someone by email with a role, valid for seven days, where they manage
+  invitations. A control shows only when their grants allow it, and what is on its way is marked as
+  sending. It reports nothing: the workspace page's own header keeps the name it was opened with.
 - `feature/connections`: the workspace's connections, each by its name with its integration and how
   ready it is, as the store holds it, marked as sending while a change to it is on its way. The
   host's integrations are listed over HTTP as the Block opens, and again when the person asks after
@@ -101,12 +112,13 @@ the pages that compose them; the root composes the pages.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP; it reports the one
   picked.
 - `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
-  an "Inbox" button with how many notifications wait and a "Connections" button, and the main
-  content, which shows one destination: nothing yet, the inbox or the connections, which are always
-  read, or the open group, a keyed occurrence. Picking a group opens it; showing the inbox or the
-  connections leaves no group marked in the list; opening a notification's thread opens its group
-  with the thread already open, and marks the group. Opening the workspace asks the host for the
-  integrations its connections link to. It reports when the person leaves it.
+  an "Inbox" button with how many notifications wait, a "Connections" button, a "Settings" button,
+  and the main content, which shows one destination: nothing yet, the inbox, the connections, or the
+  settings, which are always read, or the open group, a keyed occurrence. Picking a group opens it;
+  showing the inbox, the connections, or the settings leaves no group marked in the list; opening a
+  notification's thread opens its group with the thread already open, and marks the group. Opening
+  the workspace asks the host for the integrations its connections link to. It reports when the
+  person leaves it.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
   the one open. Signing in lists the workspaces; signing out, `command.ts`,
@@ -123,10 +135,9 @@ the Block that needs it, `api.ts`: listing workspaces, saying the person types i
 following a turn's log, which its Block's subscription reads while the log is followed, and listing
 the host's integrations, adding a connection, replacing its key, and checking it.
 
-Features the earlier program had and this cut does not yet: the workspace's settings, agents, and
-channels. Each returns as a Block by the same template; `agentSetup.ts` waits for the agents
-feature. `settingsForm.ts`, an integration's settings form as the person fills it in, is the
-connections feature's.
+Features the earlier program had and this cut does not yet: agents and channels. Each returns as a
+Block by the same template; `agentSetup.ts` waits for the agents feature. `settingsForm.ts`, an
+integration's settings form as the person fills it in, is the connections feature's.
 
 ## The store
 
@@ -222,10 +233,15 @@ browser's storage. Each Block's tests sit beside it:
   required settings, and key are in, once while it sends, and refused with why, renaming, changing
   the settings of, and removing one as actions from what was seen, replacing a key and checking over
   HTTP, closing a form about a connection that is gone, naming the connections whose integration
-  gives a capability, and why a read or a write could not be kept; a workspace asking for the
-  integrations as it opens, opening the group picked, showing the inbox or the connections in its
-  place with no group marked, and opening a notification's thread in its group; and the root
-  signing in a step at a time, listing the workspaces, opening and closing one, and signing out.
+  gives a capability, and why a read or a write could not be kept; the settings renaming the
+  workspace from the name seen and the person, one name at a time, changing a member's role from the
+  assignments seen, removing a member, handing the workspace over from the owner's assignment seen,
+  inviting by email with the role chosen, revoking an invitation, and what an owner, an
+  administrator, and a member may do to the members; a workspace asking for the integrations as it
+  opens, opening the group picked, showing the inbox, the connections, or the settings in its place
+  with no group marked, handing the settings what the person does in them, and opening a
+  notification's thread in its group; and the root signing in a step at a time, listing the
+  workspaces, opening and closing one, and signing out.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
   on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
   line by someone who may not, and made by someone who may create tasks; a thread's turns by their
@@ -240,9 +256,12 @@ browser's storage. Each Block's tests sit beside it:
   with their settings shown, their key replaced, renamed with a failure shown, and removed; read by
   an ordinary member without the controls until the person is given the role that manages them,
   marked as sending with none while a change is on its way, by how ready each is, with why the
-  integrations could not be listed and a way to ask again, and why they could not be read; and a
-  workspace counting what waits beside "Inbox" whichever destination shows, then showing the inbox
-  or the connections.
+  integrations could not be listed and a way to ask again, and why they could not be read; the
+  settings' two names renamed, the members listed with their roles, changed, removed, and handed the
+  workspace by the owner, the invitations listed, revoked, and sent, what is on its way marked, a
+  member offered only their own name to change, and the store's changes and failure to read shown;
+  and a workspace counting what waits beside "Inbox" whichever destination shows, then showing the
+  inbox, the connections, or the settings, which it reads whichever destination shows.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and
@@ -268,7 +287,9 @@ browser's storage. Each Block's tests sit beside it:
   store, and its rename and removal show at once, then as the server made them; and an agent added
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
-  and its move shows at once. `Store.viewTurns` is
+  and its move shows at once; and the settings' reads, as the settings Block reads them together,
+  give the owner the workspace with its members, roles, assignments, and invitations, and the grant
+  to rename it. `Store.viewTurns` is
   tested apart: which turns may run again, and `settingsForm.ts`: the fields an integration's form
   gives, a draft from its defaults or a connection's settings, and the settings a draft makes, and
   `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`' tests keep a

@@ -1,6 +1,6 @@
 import { Integration } from "@amends-dev/connection"
 import { Core } from "@amends-dev/core"
-import { Assignment, BuiltinRoles, type Role, Scope } from "@amends-dev/core/authorization"
+import { Assignment, BuiltinRoles, GrantResolver, type Role, Scope } from "@amends-dev/core/authorization"
 import { Channel, Contact } from "@amends-dev/core/channel"
 import { Connection } from "@amends-dev/core/connection"
 import { Group, GroupMembership } from "@amends-dev/core/group"
@@ -10,7 +10,7 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
-import { Member, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { Effect, Schema } from "effect"
 
@@ -97,6 +97,25 @@ export const roleOf = (id: string, memberId: Member.Member["id"], roleId: Role.R
 /** Alice owns the workspace; bob is a member of it. */
 export const aliceOwns = roleOf("assignment-1", membership.member.id, BuiltinRoles.OwnerId)
 export const bobIsMember = roleOf("assignment-2", bob.id, BuiltinRoles.MemberId)
+
+/** What `assignments` let their member do, by the workspace's roles. */
+export const grantsOf = (assignments: ReadonlyArray<Assignment.Assignment>) =>
+  GrantResolver.grantsOf(assignments, (roleId) => roles.find((role) => role.id === roleId))
+
+/** An invitation of carol@example.com as a member, which alice issued and carol has not accepted. */
+export const invitation = Schema.decodeSync(Invitation.Invitation)({
+  details: {
+    id: "invitation-1",
+    workspaceId: "workspace-1",
+    recipientId: "carol",
+    recipientEmail: "carol@example.com",
+    roleId: BuiltinRoles.MemberId,
+    expiresAt: "2026-10-25T12:00:00Z",
+    inviterMemberId: "member-1",
+    issuedAt: "2026-10-18T12:00:00Z"
+  },
+  state: { _tag: "Pending" }
+})
 
 export const thread = Schema.decodeSync(Thread.Thread)({
   id: "thread-1",

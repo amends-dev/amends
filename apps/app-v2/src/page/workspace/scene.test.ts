@@ -1,13 +1,15 @@
 import { GrantResolver } from "@amends-dev/core/authorization"
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { Subscription, click, expect, given, role, scene, text } from "foldkit/scene"
+import { Subscription, click, expect, given, inside, role, scene, text } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
   bob,
+  bobIsMember,
   connectionOf,
   general,
+  grantsOf,
   membership,
   notificationOf,
   opening,
@@ -19,6 +21,7 @@ import {
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { Integrations } from "../../feature/connections/definition.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { SettingsBlock } from "../../feature/settings/block.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -61,6 +64,18 @@ const withConnection = modifyFields(asOwner, {
   connections: (connections) =>
     modifyFields(connections, {
       connections: () => [{ connection: connectionOf("connection-1", "Models"), pending: false }]
+    })
+})
+
+/** The settings read, as the owner of the workspace reads them, bob being a member of it. */
+const withSettings = modifyFields(opened, {
+  settings: (settings) =>
+    modifyFields(settings, {
+      workspace: () => Option.some({ workspace, pending: false }),
+      members: () => [member, bob].map((item) => ({ member: item, pending: false })),
+      roles: () => roles,
+      assignments: () => [aliceOwns, bobIsMember].map((assignment) => ({ assignment, pending: false })),
+      grants: () => grantsOf([aliceOwns])
     })
 })
 
@@ -125,6 +140,41 @@ describe("a workspace", () => {
       expect(role("region", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
       expect(text(" · Test API · Ready")).toExist()
+    )
+  })
+
+  it("shows the settings on request, as the owner reads them", () => {
+    scene(
+      { update, view },
+      given(withSettings),
+      expect(role("region", { name: "Settings" })).toBeAbsent(),
+      click(role("button", { name: "Settings" })),
+      inside(
+        role("region", { name: "Settings" }),
+        expect(role("button", { name: "Rename workspace" })).toExist(),
+        expect(text("Bob")).toExist()
+      )
+    )
+  })
+
+  it("reads the settings whichever destination it shows", () => {
+    scene(
+      { update, view, subscriptions: workspaceSubscriptions },
+      given(opened),
+      Subscription.emit(
+        workspaceSubscriptions["settings/settings"],
+        SettingsBlock.Message.ReceivedSettings({
+          workspace: withSettings.settings.workspace,
+          members: withSettings.settings.members,
+          roles: withSettings.settings.roles,
+          assignments: withSettings.settings.assignments,
+          invitations: withSettings.settings.invitations,
+          grants: withSettings.settings.grants
+        })
+      ),
+      expect(role("region", { name: "Settings" })).toBeAbsent(),
+      click(role("button", { name: "Settings" })),
+      inside(role("region", { name: "Settings" }), expect(role("button", { name: "Rename workspace" })).toExist())
     )
   })
 })

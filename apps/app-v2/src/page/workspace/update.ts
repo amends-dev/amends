@@ -12,11 +12,18 @@ const showConnections = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Connections() })
 }))
 
+/** Show the settings in the main content. */
+const showSettings = WorkspaceDefinition.step((model) => ({
+  model: modifyFields(model, { open: () => Open.Settings() })
+}))
+
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
     ClickedInbox: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showInbox]),
     ClickedConnections: () =>
-      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections])
+      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),
+    ClickedSettings: () =>
+      Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showSettings])
   })
 )

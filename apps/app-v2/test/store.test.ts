@@ -13,7 +13,13 @@ import { PresenceRelay } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId, ThreadMessage, ThreadMessageService, ThreadParticipation } from "@amends-dev/core/thread"
 import { type Turn, TurnJobs } from "@amends-dev/core/turn"
-import { Invitation, InvitationService, Member, type Workspace } from "@amends-dev/core/workspace"
+import {
+  Invitation,
+  InvitationService,
+  Member,
+  type Workspace,
+  WorkspaceSettingsPermissions
+} from "@amends-dev/core/workspace"
 import {
   Accounts,
   Gateway,
@@ -36,6 +42,8 @@ import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
 import { KeyValueStore } from "effect/persistence"
 import { Socket } from "effect/socket"
 import { memberClient } from "../src/api.ts"
+import { readSettings } from "../src/feature/settings/subscription.ts"
+import { may, workspaceTarget } from "../src/permissions.ts"
 import * as Store from "../src/store/Store.ts"
 
 const alice = Identity.HumanId.make("alice")
@@ -457,6 +465,25 @@ describe("Store", () => {
             ?.record.value.id
         ).toBe(given.record.value.id)
       }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
+  it.live("the settings read together: the workspace, its members, roles, assignments, and what the owner may do", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      yield* admit(gateway, workspace, Identity.HumanId.make("bob"))
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      const settings = yield* firstWhere(
+        readSettings(store),
+        ({ members, roles, assignments, grants }) =>
+          members.length === 2 && roles.length === 3 && assignments.length === 2 && grants.length > 0
+      )
+      expect(Option.map(settings.workspace, ({ workspace }) => workspace.name)).toEqual(Option.some("Studio"))
+      expect(settings.invitations.map(({ invitation }) => invitation.state._tag)).toEqual(["Accepted"])
+      expect(may(settings.grants, WorkspaceSettingsPermissions.Rename, workspaceTarget(workspace.id))).toBe(true)
+    }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
   it.live("a reply to the person's thread reaches their inbox, and reading the thread settles it", () =>

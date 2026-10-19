@@ -9,6 +9,7 @@ import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
+import { SettingsBlock } from "../../feature/settings/block.ts"
 import { type Model, Open, WorkspaceDefinition } from "./definition.ts"
 
 /** Open the group `groupId` in the main content, with the thread `threadId` open in it, if there is one. */
@@ -57,6 +58,11 @@ export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
 })
 
+export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
+  field: "settings",
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+})
+
 /** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
   readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
@@ -71,6 +77,6 @@ export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
 })
 
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
-  bindings: [GroupsBinding, ActionsBinding, InboxBinding, ConnectionsBinding, GroupBinding]
+  bindings: [GroupsBinding, ActionsBinding, InboxBinding, ConnectionsBinding, SettingsBinding, GroupBinding]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

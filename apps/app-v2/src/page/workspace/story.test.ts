@@ -10,8 +10,10 @@ import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
+import { SettingsBlock } from "../../feature/settings/block.ts"
+import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { ConnectionsBinding, GroupsBinding, InboxBinding } from "./composition.ts"
+import { ConnectionsBinding, GroupsBinding, InboxBinding, SettingsBinding } from "./composition.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -33,6 +35,10 @@ const fromInbox = (message: typeof InboxBlock.Message.Type) =>
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
   ConnectionsBinding.embedView({ slotId: "connections", model: opened.connections }).toParentMessage(message)
+
+/** What the settings report, as the workspace receives it. */
+const fromSettings = (message: typeof SettingsBlock.Message.Type) =>
+  SettingsBinding.embedView({ slotId: "settings", model: opened.settings }).toParentMessage(message)
 
 /** The notification of activity in a thread of general, read by the inbox. */
 const notification = notificationOf("notification-1", 2, 5)
@@ -119,6 +125,38 @@ describe("a workspace", () => {
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("shows the settings in place of the open group, with no group marked in the list", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedSettings()),
+      model((model) => {
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      // With the settings shown, picking the group opens it again.
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("hands the settings what the person does in them", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedSettings()),
+      message(fromSettings(SettingsBlock.Message.ClickedRenameSelf())),
+      model((model) => {
+        expect(model.settings.renaming).toEqual(Option.some(SettingsRenaming.OwnName({ name: "" })))
       })
     )
   })
