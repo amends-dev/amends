@@ -22,7 +22,7 @@ import { badge, detailList, entry, entryList, log } from "../src/details.ts"
 import { columns, row, section, summary } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
-import { mark } from "../src/mark.ts"
+import { mark, markCluster } from "../src/mark.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
@@ -205,6 +205,14 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
     sample(h, "Link", [
       h.p([], ["Wrong address? ", button(h, "Change email", press, { variant: "link" })]),
       button(h, "Disabled link", press, { variant: "link", isDisabled: true })
+    ]),
+    sample(h, "Icon buttons, regular and compact", [
+      iconButton(h, { icon: "mark-settings", label: "Settings", onClick: press }),
+      iconButton(h, { icon: "mark-new", label: "New", onClick: press }, { size: "compact" })
+    ]),
+    sample(h, "Icon buttons as a switch, off and pressed", [
+      iconButton(h, { icon: "bell", label: "Follow", onClick: press }, { isPressed: false }),
+      iconButton(h, { icon: "bell-filled", label: "Unfollow", onClick: press }, { isPressed: true })
     ])
   ])
 }
@@ -741,7 +749,16 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
       "One letter",
       [mark(h, { text: "Y", size: "xs" }), mark(h, { text: "Y", size: "sm" }), mark(h, { text: "Y", size: "md" })],
       iconSizeRow
-    )
+    ),
+    sample(h, "Cluster of two, three, and seven", [
+      markCluster(h, { marks: ["AM", "Y"], label: "2 members", onClick: Message.ClickedButton() }),
+      markCluster(h, { marks: ["AM", "Y", "S"], label: "3 members", onClick: Message.ClickedButton() }),
+      markCluster(h, {
+        marks: ["AM", "Y", "S", "OK", "AJ", "KL", "RT"],
+        label: "7 members",
+        onClick: Message.ClickedButton()
+      })
+    ])
   ])
 
 const openableThreads: ReadonlyArray<

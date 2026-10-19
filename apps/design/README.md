@@ -19,7 +19,7 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
 placeholder, filled, invalid, and with a hint under it; a hint; a textarea; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
 field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
@@ -31,7 +31,7 @@ sign-in's two steps and as the workspace picker, each with its pieces in `screen
 pages return them; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
-one with tabs and a description; the marks by size; what a pane says about one thing, as a detail
+one with tabs and a description; the marks by size, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -174,7 +174,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
   that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
   textarea labelled Reply. It is 32px, and 44px on touch; `options.size` is `"compact"` for the 24px
-  button along a list's heading, which is 44px on touch too.
+  button along a list's heading, which is 44px on touch too. `options.isPressed` makes it a switch: it
+  says `aria-pressed`, and shows it as `ink` while it is on. The caller draws the icon for the state, such
+  as `bell` and `bell-filled`, and a button given no `isPressed` says nothing of the kind.
 - `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
   such as the composer's send button.
 - `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
@@ -214,6 +216,11 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   show it), or `"md"` (32px, `hint` text, as a message shows its author). A mark is `aria-hidden`: the
   name it abbreviates is always beside it. `sidebarHeader`, `sidebarItem`, `pane`, `message`, and
   `replyLine` draw their marks with it.
+- `markCluster(h, { marks, label, onClick })` is a button named `label` that gathers the people a group
+  has: a bordered box, 1px in `outline` with 2px of padding, holding the first three `marks` as `xs` marks
+  2px apart, and, beyond three, "+4" for four more in `ink-secondary` at `meta` size. It is `hover` on
+  hover and 44px tall on touch. The marks and the count are hidden from assistive technology, as a mark is,
+  so the `label` says how many people it stands for, such as "7 members".
 
 ### `@amends-dev/design/centered`
 
@@ -616,7 +623,7 @@ The groups Block's form for a new team does all four.
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
-`aria-invalid`, and description, a switch by its label, a select's change, also when its label is
+`aria-invalid`, and description, a switch by its label, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, also when its label is
 hidden, a setting row's label, copy, and action, the centered screen's
 landmarks, a form by its label, with the pane variant of a form the same; a row by its title; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
@@ -642,7 +649,7 @@ label, its marks, and the count of the rest, the line and the marks hidden from 
 and a divider by its label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button, and its list of members by the listbox named for it, its options with the active one selected, the
 textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
-row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`; and the shell's landmarks by role and name: `navigation` for
+row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere

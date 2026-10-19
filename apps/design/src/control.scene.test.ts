@@ -675,4 +675,42 @@ describe("iconButton", () => {
       )
     }
   })
+
+  it("says whether it is pressed, as a switch does, and says nothing when it is not given", () => {
+    const isOdd = (saves: number) => saves % 2 === 1
+
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          iconButton(
+            h,
+            {
+              icon: isOdd(model.saves) ? "bell-filled" : "bell",
+              label: "Notifications",
+              onClick: Message.ClickedSave()
+            },
+            { isPressed: isOdd(model.saves) }
+          )
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Notifications" })).toHaveAttr("aria-pressed", "false"),
+      click(role("button", { name: "Notifications" })),
+      expect(role("button", { name: "Notifications" })).toHaveAttr("aria-pressed", "true"),
+      click(role("button", { name: "Notifications" })),
+      expect(role("button", { name: "Notifications" })).toHaveAttr("aria-pressed", "false")
+    )
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          iconButton(h, { icon: "bell", label: "Notifications", onClick: Message.ClickedSave() })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Notifications" })).toExist(),
+      expect(selector("[aria-pressed]")).toBeAbsent()
+    )
+  })
 })

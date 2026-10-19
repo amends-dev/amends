@@ -40,7 +40,7 @@ const buttonLargeSize = "min-h-11 px-5 text-item"
 const buttonWide = "w-full"
 
 const iconButtonBase =
-  "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring hover:bg-subtle hover:text-ink"
+  "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring hover:bg-subtle hover:text-ink aria-pressed:text-ink"
 
 const hiddenLabel = "sr-only"
 
@@ -113,6 +113,11 @@ export type ButtonOptions = Readonly<{
 export type IconButtonOptions = Readonly<{
   /** `compact` is 24px, for the actions along a list's heading, and the default 32px. Both are 44px on touch. */
   size?: "compact"
+  /**
+   * For a button that switches something on or off: whether it is on now, which it says as `aria-pressed` and
+   * shows in `ink`. A button without it is not a switch.
+   */
+  isPressed?: boolean
 }>
 
 /**
@@ -214,7 +219,11 @@ export const iconButtonWith = <Message, Requirements>(
   options: IconButtonOptions = {}
 ) =>
   h.button(
-    [...attributes, h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))],
+    [
+      ...attributes,
+      ...(options.isPressed === undefined ? [] : [h.AriaPressed(options.isPressed ? "true" : "false")]),
+      h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))
+    ],
     [icon(h, config.icon, { size: "sm" }), h.span([h.Class(hiddenLabel)], [config.label])]
   )
 
@@ -232,7 +241,10 @@ const renderIconButton = <Message, Requirements>(
     h
   )
 
-/** A quiet square button of one icon, named by `label`, that sends `onClick`. */
+/**
+ * A quiet square button of one icon, named by `label`, that sends `onClick`. Given `isPressed` it is a switch,
+ * and the caller draws the icon for the state it is in.
+ */
 export const iconButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ icon: IconName; label: string; onClick: Message }>,
