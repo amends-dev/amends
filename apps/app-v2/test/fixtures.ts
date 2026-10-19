@@ -12,9 +12,7 @@ import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import { Member, WorkspaceId } from "@amends-dev/core/workspace"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
-import { Effect, Option, Schema } from "effect"
-import type { Model } from "../src/model.ts"
-import { init } from "../src/update.ts"
+import { Effect, Schema } from "effect"
 
 export const apiUrl = "http://127.0.0.1:8787"
 
@@ -34,12 +32,6 @@ export const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
   },
   people: 1
 })
-
-/** Signed out, at an empty form. */
-export const signedOut: Model = init({ apiUrl, session: Option.none() }).model
-
-/** Signed in as alice, her workspaces not listed yet. */
-export const signedIn: Model = init({ apiUrl, session: Option.some(session) }).model
 
 export const general = Schema.decodeSync(Group.Group)({
   id: "general",

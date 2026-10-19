@@ -3,7 +3,7 @@ import { ThreadId } from "@amends-dev/core/thread"
 import { IndexedDb } from "@effect/platform-browser"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import * as Drafts from "../src/sync/Drafts.ts"
+import * as Drafts from "../src/store/Drafts.ts"
 
 /** Run `test` over drafts in a database of their own. */
 const withDrafts = <A, E>(test: Effect.Effect<A, E, Drafts.Drafts>, name = `drafts-${crypto.randomUUID()}`) =>

@@ -36,7 +36,7 @@ import { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
 import { KeyValueStore } from "effect/persistence"
 import { Socket } from "effect/socket"
 import { memberClient } from "../src/api.ts"
-import * as Store from "../src/sync/Store.ts"
+import * as Store from "../src/store/Store.ts"
 
 const alice = Identity.HumanId.make("alice")
 

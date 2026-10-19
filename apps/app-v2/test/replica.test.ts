@@ -3,7 +3,7 @@ import { ReplicaChange, ReplicaRecord } from "@amends-dev/core/replica"
 import { IndexedDb } from "@effect/platform-browser"
 import { describe, expect, it } from "@effect/vitest"
 import { Arbitrary, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
-import * as Replica from "../src/sync/Replica.ts"
+import * as Replica from "../src/store/Replica.ts"
 
 const { cases } = ReplicaChange.ReplicaChange
 const records = ReplicaRecord.ReplicaRecord.cases

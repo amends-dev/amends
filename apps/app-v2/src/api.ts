@@ -1,8 +1,7 @@
 /**
- * The host's HTTP API, as the app calls it: the contract's client at the host's address, sending
- * the session's token when there is one. The app calls what comes before a workspace over HTTP, and
- * in one only follows a turn's log, which no replica holds; what a member does in one goes through
- * their store.
+ * The host's HTTP API, as the app calls it: the contract's client at the host's address, as the
+ * session's bearer when there is one. The app calls what comes before a workspace over HTTP, and in
+ * one only what no replica holds; what a member does in one goes through their store.
  */
 
 import type { WorkspaceId } from "@amends-dev/core/workspace"
@@ -14,6 +13,7 @@ import * as HttpApiClient from "effect/http-api/HttpApiClient"
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import * as Layer from "effect/Layer"
+import * as Session from "./session.ts"
 
 /** Send `token` as the bearer of each request, when one is given. */
 const bearer = (token: string | undefined) =>
@@ -32,6 +32,21 @@ export const memberClient = (apiUrl: string, token: string, workspaceId: Workspa
   HttpApiClient.make(Api.Api, { baseUrl: apiUrl }).pipe(
     Effect.provide(Layer.merge(bearer(token), WorkspaceMember.layerClient(workspaceId)))
   )
+
+/** The API as the session's bearer, outside any workspace. */
+export const signedIn = Effect.gen(function* () {
+  const session = yield* Session.Session
+  const { token } = yield* session.required
+  return yield* client(session.apiUrl, token)
+})
+
+/** The API as the session's bearer, acting as their member of `workspaceId`. */
+export const asMember = (workspaceId: WorkspaceId.WorkspaceId) =>
+  Effect.gen(function* () {
+    const session = yield* Session.Session
+    const { token } = yield* session.required
+    return yield* memberClient(session.apiUrl, token, workspaceId)
+  })
 
 /** A client `client` makes. */
 export type Client = Effect.Success<ReturnType<typeof client>>

@@ -206,14 +206,14 @@
         "@amends-dev/http": "workspace:*",
         "@amends-dev/sync": "workspace:*",
         "@effect/platform-browser": "catalog:",
-        "@foldkit/ui": "0.168.0",
+        "@foldkit/ui": "0.168.0-canary.bfd880b1e6ca",
         "effect": "catalog:",
-        "foldkit": "0.168.0",
+        "foldkit": "0.168.0-canary.bfd880b1e6ca",
       },
       "devDependencies": {
         "@amends-dev/channel": "workspace:*",
         "@effect/platform-bun": "catalog:",
-        "@foldkit/vite-plugin": "0.27.1",
+        "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
         "fake-indexeddb": "6.2.5",
         "happy-dom": "^20.10.6",
         "vite": "8.3.4",
@@ -497,6 +497,9 @@
         "@effect/vitest",
       ],
     },
+  },
+  "patchedDependencies": {
+    "foldkit@0.168.0-canary.bfd880b1e6ca": "patches/foldkit@0.168.0-canary.bfd880b1e6ca.patch",
   },
   "overrides": {
     "@effect/platform-browser": "catalog:",
@@ -982,9 +985,9 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
-    "@foldkit/ui": ["@foldkit/ui@0.168.0", "", { "dependencies": { "@floating-ui/dom": "^1.8.0" }, "peerDependencies": { "effect": "4.0.0", "foldkit": ">=0.167.0" } }, "sha512-PZNtVorDO6O45txndwouI8fOFHYcdZ3OP9amJKIR9gWJ13+rx+HaDRHYVnBHNp7fom/7qPEWd25wAJCpQF5i6w=="],
+    "@foldkit/ui": ["@foldkit/ui@0.168.0-canary.bfd880b1e6ca", "", { "dependencies": { "@floating-ui/dom": "^1.8.0" }, "peerDependencies": { "effect": "4.0.0", "foldkit": "0.168.0-canary.bfd880b1e6ca" } }, "sha512-F75LiWS9/L9fLdYmH0Nmwf8LfXkqeC6Fj8D2eSUQabr/GR5Zl9vMJXW1P+to3qkv1ortlBcWMw1apw08XAh4IA=="],
 
-    "@foldkit/vite-plugin": ["@foldkit/vite-plugin@0.27.1", "", { "dependencies": { "@effect/platform-node": "4.0.0", "@effect/platform-node-shared": "4.0.0", "magic-string": "^1.4.2", "vitefu": "^1.1.3", "ws": "^8.21.3" }, "peerDependencies": { "effect": "4.0.0", "foldkit": ">=0.167.0", "vite": "^8.0.0" } }, "sha512-sQ8y2v7w21wTwm+NGxboGokbZULmH0kuAg2EV6JH+1rXDBATOCcXIToUmw9ZmaVR14/4SlZIygVnNCRRcDtfQQ=="],
+    "@foldkit/vite-plugin": ["@foldkit/vite-plugin@0.27.1-canary.bfd880b1e6ca", "", { "dependencies": { "@effect/platform-node": "4.0.0", "@effect/platform-node-shared": "4.0.0", "magic-string": "^1.4.2", "vitefu": "^1.1.3", "ws": "^8.21.3" }, "peerDependencies": { "effect": "4.0.0", "foldkit": "0.168.0-canary.bfd880b1e6ca", "vite": "^8.0.0" } }, "sha512-Xb5pB8N8z8imghejhnXYvavCJw3uPGhZTAdMCYNdCLeQ7Tf0U92YPMRg70gXYfumX9DAhSSEEnHdUne6CkxECQ=="],
 
     "@fontsource/figtree": ["@fontsource/figtree@5.3.0", "", {}, "sha512-/iTcTXL1eRBGhvD7NN9dnKzXzWqDLVZVEUFI9xIxAC1G/hXU8tCyYeXCAuPOuvSYPInFUP7H6KLGgygmDfy1SA=="],
 
@@ -2162,7 +2165,7 @@
 
     "flattie": ["flattie@1.1.1", "", {}, "sha512-9UbaD6XdAL97+k/n+N7JwX46K/M6Zc6KcFYskrYL8wbBV/Uyk0CTAMY0VT+qiK5PM7AIc9aTWYtq65U7T+aCNQ=="],
 
-    "foldkit": ["foldkit@0.168.0", "", { "dependencies": { "parse5": "^8.0.1" }, "peerDependencies": { "@effect/platform-browser": "4.0.0", "effect": "4.0.0" } }, "sha512-FyAY34MdmF1JwdKiPq12uKHBmLny3QxAJ6WdakbXCBh8KR1lQfvdKEygQ/XAlxb2ICSmpVaFga5RgDSnxZsFiw=="],
+    "foldkit": ["foldkit@0.168.0-canary.bfd880b1e6ca", "", { "dependencies": { "parse5": "^8.0.1" }, "peerDependencies": { "@effect/platform-browser": "4.0.0", "effect": "4.0.0" } }, "sha512-9ID225WgXzes3S7QZanTv2ngqyf0kEHAYLiA956o60T1B0n5bfuSVV/msabzqsrxpPvZN2y0Pl6gLvuHSe8/ug=="],
 
     "follow-redirects": ["follow-redirects@1.16.0", "", { "peerDependencies": { "debug": "*" }, "optionalPeers": ["debug"] }, "sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw=="],
 

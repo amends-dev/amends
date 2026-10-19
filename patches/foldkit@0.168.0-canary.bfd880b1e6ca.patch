@@ -1,0 +1,25 @@
+diff --git a/dist/block/keyedBinding.js b/dist/block/keyedBinding.js
+index ecf10855bd6c0b2fd67878cf949d85a52ef561fa..0844c8be9012a693712b58b4b7102dff80bcfd57 100644
+--- a/dist/block/keyedBinding.js
++++ b/dist/block/keyedBinding.js
+@@ -1,7 +1,7 @@
+ import { Array, Option, Predicate, Record, Schema } from 'effect';
+ import { mapMessages } from '../command/index.js';
+ import * as Update from '../update/index.js';
+-import { makeResultRecipe } from '../update/operationRecipe.js';
++import { makeResultRecipe, resolveOperationOutput } from '../update/operationRecipe.js';
+ import { assertValidBindingOperationNames } from './binding.js';
+ import { assertInitializedParentModel, registerBinding } from './composition.js';
+ import { defaultViewOf } from './defaultView.js';
+@@ -81,7 +81,10 @@ export const bindEach = (block, bindingConfig) => {
+         ...(config.outMessage?.fold === undefined
+             ? {}
+             : {
+-                foldOutMessage: (key, context) => (outMessage) => config.outMessage.fold(key, outMessage, liftContext(key, context, modelBeforeUpdate)),
++                foldOutMessage: (key, context) => (outMessage) => {
++                    const policyStep = config.outMessage.fold(key, outMessage, liftContext(key, context, modelBeforeUpdate));
++                    return (modelWithChild) => resolveOperationOutput(policyStep(modelWithChild), modelWithChild);
++                },
+             }),
+         ...(config.outMessage?.forward === undefined
+             ? {}

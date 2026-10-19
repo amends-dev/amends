@@ -1,32 +1,26 @@
 # @amends-dev/app-v2
 
-The workspace app, being built on [Foldkit](https://foldkit.dev): a browser app that signs people
-in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in sync
-through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write, offline.
-For now it signs in, lists the person's workspaces, and opens one: the groups they belong to and
-the public teams they may join, where they create a team, start a conversation with another
-member, rename a team, admit and remove its members, follow it, join it, or leave it; a group's
-threads with how much of each is new; a thread's messages, where the person starts a thread,
-replies, renames a thread, edits or deletes their own messages, and follows or stops following a
-thread, which opening reads through its latest activity; the task a thread tracks, which the
-person makes of it and whose status, priority, and assignee they change, and its agents' turns,
-which they stop or run again and whose logs they follow while online; the person's inbox, the notifications
-waiting for them, each as the message it is about, to open, or to mark seen one at a time or all
-at once; and the workspace's settings, where they
-rename the workspace and themselves, change a member's role, remove a member, hand the workspace
-to another person, and invite someone by address or revoke an invitation; and the workspace's
-connections to the integrations the host installs, where they add one, with its key and the
-settings its integration's form asks for, rename it, change its settings, replace its key, check it
-with its system, and remove it; and the workspace's agents, where they add one, with the role it
-starts with and how it is set up, on the harnesses, models, and sandboxes the connections give, and
-rename it or change its setup; and the workspace's channels, where they add one over a connection
-that gives channels, into a group they belong to, move one's conversations to come to another
-group, and remove one, and a channel's contacts are named on their messages. A reply or a new
-thread the person has not sent is kept as a draft in their browser, through a reload and offline,
-until they send it. While the host can be reached, a team's members and the workspace's show who
-has the workspace open, and a thread shows who else is typing in it. What they do shows at
-once, marked as sending, even offline, and what the server refuses comes back with why. A control
-shows only when the person may use it.
+The workspace app, being built on [Foldkit](https://foldkit.dev) Blocks: a browser app that signs
+people in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in
+sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write,
+offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
+pick one; a group's threads with how much of each is new, where they start a thread; and a thread's
+messages, where they reply, rename the thread, edit or delete their own messages, and follow or
+stop following it, which opening reads through its latest activity. A reply or a new thread they
+have not sent is kept as a draft in their browser, through a reload and offline, until they send
+it. While the host can be reached, a thread shows who else is typing in it. What they do shows at
+once, marked as sending, even offline, and what the server refuses comes back with why. The
+features the earlier program had beyond these return one Block at a time; [The
+program](#the-program) lists them.
+
+This cut runs on a Foldkit preview, the Blocks branch's canary build pinned in `package.json`,
+whose APIs its author says will change; upgrading it is a chore of its own. The root manifest's
+`patchedDependencies` applies `patches/foldkit@0.168.0-canary.bfd880b1e6ca.patch` to it: in the
+canary, a keyed Binding's OutMessage fold that opens another child, as picking a thread opens it,
+leaves the parent model undefined, because the keyed fold does not resolve the child init recipe a
+`Definition.step` returns, as a direct Binding's fold does. The patch resolves it the same way;
+the fix belongs upstream in `packages/foldkit/src/block/keyedBinding.ts`, and the patch goes when
+a build carries it.
 
 ## Run
 
@@ -43,67 +37,62 @@ sign-in codes it sends.
 
 ## The program
 
-The program follows Foldkit's architecture: a Schema-defined Model, fact-named Messages, an update
-that decides, and commands that act.
+The program follows Foldkit's architecture, cut into Blocks: each feature owns its state machine,
+its model, messages, update, view, commands, and subscriptions, and a parent decides where it
+lives and what its facts mean. A feature Block takes identities and reads its data from the
+person's store of the workspace, writes actions to it, and reports facts about identities to its
+parent, so it embeds wherever those identities are known. `feature/` holds the features and `page/`
+the pages that compose them; the root composes the pages.
 
-- `model.ts`: the host's address and the page. Signed out, the sign-in form, a step at a time;
-  signed in, the session, the person's workspaces, and the one open: its store's state, what its
-  replica holds of the workspace, its groups, members, roles and their assignments, invitations,
-  the person's notifications, group memberships, and the person's group follows, the person's
-  unfinished actions, the team or conversation they are starting, and the open pane: a group, with
-  its threads, the thread being started, the name being given it, the member chosen to admit, and
-  the open thread, with its messages, the reply, its task, its turns, and the log being followed;
-  the inbox; the settings, with the names
-  being given and the invitation being written; or the connections, with the form open among
-  them, adding, renaming, configuring, or replacing a key, and the last check; or the agents, with
-  the form open among them, adding, configuring, or renaming one, and the models the chosen
-  connection offers; or the channels, with the form open among them, adding or moving one. The
-  integrations the host installs are read once the person opens the connections, the agents, or
-  the channels.
-- `message.ts`, `update.ts`: what happens and what it changes. A message the page is past, such as
-  a code check finishing after the person left the form, changes nothing.
-- `command.ts`: the sign-in requests, keeping the session, listing workspaces, and signing out, each
-  ending in a message, failures worded for the person. Signing out forgets the session, the
-  person's stores, and their sync identity first, so it works offline, then removes the browser's
-  sync key and ends the session as far as the host can be reached. As a member of the open
-  workspace: listing the integrations the host installs and the models a connection offers, and
-  adding a connection, replacing its key, and checking it, over HTTP, since a key never enters an
-  action and no replica holds what a check finds; and saying the person types in a thread, at once,
-  then at most as often as typing lasts, by core's `Presence.typingRepeats`, and that they stopped
-  once they send their reply.
-- `store.ts`: the open workspace's store as a managed resource, open while a workspace is open and
-  closed when the person leaves it or signs out; what its replica holds as subscriptions, the
-  groups, members, memberships, follows, and actions, the open group's threads, and the open
-  thread's messages, task, and turns; the log of the turn the person follows, read over HTTP while
-  online, since no replica holds it; who is present in the workspace, followed over HTTP while it is
-  open, and no one while the host can't be reached; the drafts of the places open, each read once its place opens
-  and kept from then on as it changes; and the commands that write to it, an action each, and
-  dismissing a refused action.
-- `view.ts`: markup over `@foldkit/ui`'s headless components, with no styles yet, from the controls
-  `controls.ts` shares; `connectionsView.ts` is the connections pane, whose settings fields
-  `settingsForm.ts` reads from each integration's form: text, numbers, yes or no, and choices, the
-  draft the person writes, and the settings it makes, or which field it wants; and
-  `agentsView.ts` is the agents pane, whose setup `agentSetup.ts` drafts from an agent and makes
-  a configuration of, or says what it still wants; `channelsView.ts` is the channels pane; and
-  `opened.ts` is what the views read of the open workspace: what members and groups are called,
-  and whether the person belongs to a group.
-- `permissions.ts`: what the person may do, as core decides it from the replica's records: the
-  grants their own assignments confer through the workspace's roles, from core's
-  `GrantResolver.grantsOf`, and whose roles they may change, from `Delegation.recipientDenial`. The
-  view offers a control only when they allow it, such as stopping a turn only to someone who may
-  direct its agent, by core's `Turn.directRequirement`; the server decides again.
-- `flags.ts`, `session.ts`, `browser.ts`, `api.ts`: the address and the session kept from the last
-  visit, the browser's services the runtime gives commands, subscriptions, and stores, and the API's
-  client, outside a workspace or as a member of one.
+- `feature/composer`: what the person writes at a place, a reply in a thread or a new thread in a
+  group, kept as a draft in their browser until they send it. It reports what it sends, and that
+  its text changed.
+- `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
+  part in it, how far they have read, who types there, and a composer to reply. They rename it, edit
+  and delete their own messages, and follow it or stop; reading it marks it read through its latest
+  activity, once for each. The reply composer's changes say the person types, at once, then at most
+  as often as typing lasts, by core's `Presence.typingRepeats`, and sending says they stopped.
+- `feature/threads`: a group's threads, each with its opening message, its task, whether it is still
+  being started, and how much is new, and a composer to start one. It reports the thread picked.
+- `feature/groups`: the groups the person can see, teams by name and conversations by their other
+  members, to pick one from. It reports the group picked.
+- `feature/actions`: the person's actions the server has not finished, each with why it was
+  refused, until they dismiss it.
+- `page/signIn`: signing in, a step at a time; it keeps the session a right code gives, and reports
+  it.
+- `page/workspaces`: the workspaces the person belongs to, listed over HTTP; it reports the one
+  picked.
+- `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
+  the open group's threads, and the thread open among them, each a keyed occurrence, so opening
+  another makes a fresh one and a late result cannot land in the wrong one. It reports when the
+  person leaves it.
+- The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
+  the page the person is on, signed out at the form or signed in with their account, workspaces, and
+  the one open. Signing in lists the workspaces; signing out, `command.ts`,
+  forgets the session, the person's stores, and their sync identity first, so it works offline,
+  then removes the browser's sync key and ends the session as far as the host can be reached.
+  `entry.ts` assembles the application over `services.ts`, which supplies the stores, the session,
+  and the browser's services beneath them.
 
-## Sync
+A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
+it opens the person's store of a workspace on the first read or write, shares it among all of them,
+and closes it a while after the last one lets go. The session, `session.ts`, is a service too: the
+sign-in command keeps it, and no model carries the token. What no replica holds goes over HTTP from
+the Block that needs it, `api.ts`: listing workspaces, and saying the person types in a thread.
 
-`sync/Store.ts` opens one person's store of one workspace on one host, for as long as a scope lasts:
+Features the earlier program had and this cut does not yet: creating teams and conversations,
+joining, following, renaming, and administering groups, tasks and turns, the inbox, the workspace's
+settings, connections, agents, and channels. Each returns as a Block by the same template;
+`settingsForm.ts` and `agentSetup.ts` wait for the connections and agents features.
+
+## The store
+
+`store/Store.ts` opens one person's store of one workspace on one host, for as long as a scope lasts:
 
 - Its event log, Effect eventlog's, journals into an IndexedDB database of its own and applies each
   `ReplicaChanged` the server writes to the replica. `write` writes an action, which eventlog sends
   when it can; its local handler holds the action in the replica until the server completes it,
-  with the records `sync/Pending.ts` says it creates: a thread started in a group, with its opening
+  with the records `store/Pending.ts` says it creates: a thread started in a group, with its opening
   message and the task it starts as, a conversation's direct group, a reply, a team and its
   admissions, an admission, a role assignment, a thread's task, a turn run again, and an agent with
   its membership, role, and admission to the general group, and a channel, under the IDs
@@ -112,7 +101,7 @@ that decides, and commands that act.
   copies from, as a task copies its thread's group, finds that record as the person sees it: the
   replica's, as their unfinished actions leave it. A handler runs before eventlog journals the
   action, so one that fails fails the write.
-- `sync/Pending.ts` is what an unfinished action does to what the person sees: the records it
+- `store/Pending.ts` is what an unfinished action does to what the person sees: the records it
   creates, and how it changes records the replica holds: renaming a thread or a team, editing or
   deleting a message, ending the person's part in a thread or taking up one they ended, moving
   their position in a thread or a group, removing a member from a team, leaving, ending or taking
@@ -132,7 +121,7 @@ that decides, and commands that act.
   read, so whatever the server changes meanwhile shows through what an action leaves alone, and a
   record an action created gives way to the server's own under the same key. A completed or
   rejected action no longer applies.
-- `sync/Replica.ts` is the replica: the records the person may see, in another IndexedDB database,
+- `store/Replica.ts` is the replica: the records the person may see, in another IndexedDB database,
   each under its key with its kind and the place it sits, from core's `ReplicaRecord.placeOf`.
   `apply` writes a commit's batch in one transaction, and dropping a group or a thread drops what
   sits in it. The replica keeps the position of the last commit it applied and passes over a batch
@@ -154,10 +143,10 @@ that decides, and commands that act.
   the remote anew: eventlog's remote asks for changes from the position it first asked from for as
   long as it lives, which after a drop the server answers with a reset, and a reset leaves out how
   the actions committed before it ended.
-- `sync/Drafts.ts` is the person's drafts in the store, a reply in a thread or a new thread in a
+- `store/Drafts.ts` is the person's drafts in the store, a reply in a thread or a new thread in a
   group, in an IndexedDB database of their own beside the replica, which no server or other
   device sees; saves keep the order they were asked in.
-- `sync/SyncKey.ts` is the eventlog identity the browser syncs a person's stores with on a host,
+- `store/SyncKey.ts` is the eventlog identity the browser syncs a person's stores with on a host,
   made the first time and kept in the browser's storage. `Store.forgetPerson` deletes a person's
   stores and that identity, as signing out does.
 
@@ -169,29 +158,17 @@ with the error rather than leaving the replica silently behind.
 ## Tests
 
 `bun run test --project @amends-dev/app-v2` runs them in happy-dom, with `fake-indexeddb` as the
-browser's storage:
+browser's storage. Each Block's tests sit beside it:
 
-- Story tests drive `update`: signing in a step at a time, each failure going back a step with
-  why, a workspace opening to a group, a thread, and a reply, a thread started, a write that could
-  not be kept, a thread's actions, a team and a conversation started, a team's actions, the
-  workspace's settings, the inbox, a thread's task and turns, a turn's log followed until it ends
-  and again after it could not be, the connections, from listing the integrations through adding,
-  renaming, configuring, replacing a key, checking, and removing one, the agents, adding one on a
-  connection's model and changing and renaming one, the channels, adding one into a group the
-  person belongs to, moving, and removing one, a draft read into a place only while the person has
-  written nothing there and emptied once sent, typing said once while it is being told and stopped
-  once the reply is sent, and signing out.
-- Scene tests drive the view as a person does, from typing their address through a reply and a
-  refused action to signing out, from joining a team through creating one, seeing it at once, and
-  admitting and removing its members, and an owner managing the workspace's settings, then seeing
-  only their own name to change once another member owns it, an owner adding a connection from its
-  integration's form, checking it and opening its settings, then seeing it without the controls as
-  a member, an owner adding an agent on a connection's model and opening its setup, then reading
-  how it runs as a member, an owner adding and moving a channel, then reading where it opens as a
-  member, and a contact named on their message, who is online among a team's members and who types
-  in the open thread, the inbox's count, its
-  notifications, and opening one's thread, and a thread made a task and changed, its turns stopped
-  and retried, and a turn's log followed, then seen without the grants to change any of it.
+- Story tests drive a Block's update: the thread read through its latest activity, once, its title
+  and messages changed from what was seen, following and unfollowing, typing said once while a reply
+  is written and stopped once it is sent, and why a write could not be kept; a thread started from
+  the composer and the thread picked; a composer filling in its draft only while nothing was written,
+  keeping what is written, and sending it once; a workspace opening the group picked, then the thread
+  picked in it, and closing each; and the root signing in a step at a time, listing the workspaces,
+  opening and closing one, and signing out.
+- Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
+  on its way, who types, and a reply written and sent.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and
