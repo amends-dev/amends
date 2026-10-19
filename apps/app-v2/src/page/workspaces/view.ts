@@ -2,11 +2,9 @@ import { copy, heading, screenContent } from "@amends-dev/design/centered"
 import { notice } from "@amends-dev/design/control"
 import { row, section } from "@amends-dev/design/directory"
 import * as Option from "effect/Option"
+import { pluralize } from "../../seen.ts"
 import { WorkspacesComposition } from "./composition.ts"
 import { Message, Workspaces } from "./definition.ts"
-
-const pluralize = (count: number, singular: string, plural: string): string =>
-  `${count} ${count === 1 ? singular : plural}`
 
 const firstLetterOf = (name: string): string => Array.from(name).at(0) ?? ""
 

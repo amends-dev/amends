@@ -316,6 +316,42 @@ describe("a workspace", () => {
     )
   })
 
+  it("shows the groups to browse in place of the open group, leaving no group marked, and opens one picked there", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(fromGroups(GroupsBlock.Message.ClickedBrowse())),
+      model((model) => {
+        expect(Open.isAnyOf(["Groups"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      // Picking a group from the page opens it, which leaves the page.
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.some(groupId))
+      })
+    )
+  })
+
+  it("closes the navigation drawer when the person browses the groups", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedMenu()),
+      dialogShown,
+      message(fromGroups(GroupsBlock.Message.ClickedBrowse())),
+      dialogClosed,
+      model((model) => {
+        expect(model.menu.isOpen).toBe(false)
+        expect(Open.isAnyOf(["Groups"])(model.open)).toBe(true)
+      })
+    )
+  })
+
   it("names the thread open in the group open by its title, and none while there is none", () => {
     story(
       update,
@@ -694,7 +730,8 @@ describe("a workspace", () => {
       Message.ClickedConnections(),
       Message.ClickedAgents(),
       Message.ClickedSettings(),
-      Message.ClickedChannels()
+      Message.ClickedChannels(),
+      fromGroups(GroupsBlock.Message.ClickedBrowse())
     ]) {
       story(
         update,

@@ -101,6 +101,15 @@ const withThread = modifyFields(opened, {
     })
 })
 
+/** The general group read, which Alice belongs to, with three members, and nothing open. */
+const withBrowsableGroup = modifyFields(opened, {
+  groups: (groups) =>
+    modifyFields(groups, {
+      groups: () => [{ group: general, pending: false, members: 3 }],
+      memberships: () => [aliceInGeneral]
+    })
+})
+
 /** The thread open in general with Alice's opening and Bob's reply, and the group's threads listing it. */
 const withConversation = modifyFields(withThread, {
   open: (open) =>
@@ -892,6 +901,86 @@ describe("a workspace", () => {
       expect(role("complementary")).toBeAbsent(),
       expect(role("main", { name: "General" })).toExist(),
       expect(text("Composer paste crash")).toBeAbsent()
+    )
+  })
+
+  it("browses the groups from the sidebar's button in the main pane, with Home marked, and opens one from its row", () => {
+    scene(
+      { update, view: sceneView },
+      given(withBrowsableGroup),
+      expect(role("main", { name: "Groups" })).toBeAbsent(),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Browse groups" }))),
+      expect(role("main", { name: "Groups" })).toExist(),
+      expect(role("main", { name: "Studio" })).toBeAbsent(),
+      expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
+      expect(within(role("main", { name: "Groups" }), role("tab", { name: "Your groups" }))).toHaveAttr(
+        "aria-selected",
+        "true"
+      ),
+      expect(within(role("main", { name: "Groups" }), role("button", { name: "General" }))).toHaveAttr(
+        "aria-description",
+        "Public · 3 members"
+      ),
+      click(within(role("main", { name: "Groups" }), role("button", { name: "General" }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("main", { name: "Groups" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page")
+    )
+  })
+
+  it("leaves the group open, and its thread's side pane, to browse, marking no group in the sidebar", () => {
+    scene(
+      { update, view: sceneView },
+      given(withThread),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Browse groups" }))),
+      expect(role("main", { name: "Groups" })).toExist(),
+      expect(role("main", { name: "General" })).toBeAbsent(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "General" }))).not.toHaveAttr(
+        "aria-current"
+      ),
+      expect(text("Composer paste crash")).toBeAbsent()
+    )
+  })
+
+  it("closes the navigation drawer when the sidebar's button browses the groups", () => {
+    scene(
+      { update, view: sceneView },
+      given(onPhone),
+      click(role("button", { name: "Menu" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Navigation" })).toExist(),
+      click(role("button", { name: "Browse groups" })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toExist()
+    )
+  })
+
+  it("takes a new team from Create group on the browse page, in the dialog the sidebar holds", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(withBrowsableGroup, {
+          groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) })
+        })
+      ),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Browse groups" }))),
+      click(within(role("main", { name: "Groups" }), role("button", { name: "Create group" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "New team" })).toExist(),
+      type(label("Team name"), "Research"),
+      click(role("button", { name: "Create team" })),
+      Command.resolve(CreateTeam, GroupsBlock.Message.WroteAction()),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "New team" })).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toExist()
     )
   })
 

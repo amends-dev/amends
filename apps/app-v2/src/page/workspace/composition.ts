@@ -32,10 +32,61 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
     })
   )
 
-/** Picking a group opens it without a thread, and closes the navigation drawer and the side pane's dialog. */
+/** Show nothing yet in the main content. */
+export const showNothing = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Nothing() })
+}))
+
+/** Show the inbox in the main content. */
+export const showInbox = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Inbox() })
+}))
+
+/** Show the groups to browse in the main content. */
+export const showGroups = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Groups() })
+}))
+
+/** Show the connections in the main content. */
+export const showConnections = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Connections() })
+}))
+
+/** Show the agents in the main content. */
+export const showAgents = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Agents() })
+}))
+
+/** Show the settings in the main content. */
+export const showSettings = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Settings() })
+}))
+
+/** Show the channels in the main content. */
+export const showChannels = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Channels() })
+}))
+
+/**
+ * Go to a destination: close the navigation drawer and the side pane's dialog, leave no group marked in the
+ * sidebar, and `show` it.
+ */
+export const goTo = (show: typeof showNothing) =>
+  Update.combine([
+    MenuBinding.requestClose(),
+    hideAside,
+    GroupsBinding.informOpenGroup({ groupId: Option.none() }),
+    show
+  ])
+
+/**
+ * Picking a group opens it without a thread, and closes the navigation drawer and the side pane's dialog. Asking
+ * to browse goes to the groups.
+ */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: ({ groupId }) =>
-    Update.combine([MenuBinding.requestClose(), hideAside, openGroup(groupId, Option.none())])
+    Update.combine([MenuBinding.requestClose(), hideAside, openGroup(groupId, Option.none())]),
+  RequestedBrowse: () => goTo(showGroups)
 })
 
 /**

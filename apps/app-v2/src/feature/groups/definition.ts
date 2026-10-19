@@ -1,8 +1,10 @@
 /**
  * The groups the person can see in a workspace, as a list to pick one from: the teams they belong
  * to by name and their conversations by the other members in them, then the public teams they may
- * join; and the modal where they start a team, or a conversation with another member. It reports the
- * group the person picks, and its parent tells it which group is open.
+ * join; as a page to browse, the groups they belong to and the public teams they may join, on a tab
+ * each, narrowed by a search; and the modal where they start a team, or a conversation with another
+ * member. It reports the group the person picks and when they ask to browse, and its parent tells it
+ * which group is open.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -13,6 +15,7 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
+import { groupName, isJoinable } from "../../seen.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
@@ -25,9 +28,14 @@ export const Starting = defineTaggedUnion({
 })
 export type Starting = typeof Starting.Type
 
+/** Which groups the browse page lists: those the person belongs to, or the public teams they may join. */
+export const BrowseTab = Schema.Literals(["Yours", "Discover"])
+export type BrowseTab = typeof BrowseTab.Type
+
 /**
  * The groups, the workspace's members, the person's own admissions, what they may do, the group
- * picked, what they are starting and the dialog it is in, and why the last read or write failed.
+ * picked, the browse page's tab and search, what they are starting and the dialog it is in, and why
+ * the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -37,6 +45,7 @@ export const Model = Schema.Struct({
   memberships: Schema.Array(GroupMembership.GroupMembership),
   grants: Schema.Array(Grant.Grant),
   selected: Schema.Option(GroupId.GroupId),
+  browse: Schema.Struct({ tab: BrowseTab, query: Schema.String }),
   starting: Schema.Option(Starting),
   dialog: DialogBlock.Model,
   notice: Schema.Option(Schema.String)
@@ -51,6 +60,9 @@ export const Message = defineMessageUnion({
   FailedRead: { error: Schema.String },
   ClickedGroup: { groupId: GroupId.GroupId },
   InformedOfOpenGroup: { groupId: Schema.Option(GroupId.GroupId) },
+  ClickedBrowse: {},
+  ChoseBrowseTab: { tab: BrowseTab },
+  TypedBrowseQuery: { query: Schema.String },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
   ToggledTeamPublic: { isPublic: Schema.Boolean },
@@ -65,7 +77,8 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
-  SelectedGroup: { groupId: GroupId.GroupId }
+  SelectedGroup: { groupId: GroupId.GroupId },
+  RequestedBrowse: {}
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -76,6 +89,22 @@ export const belongsTo = (model: Model, group: Group.Group): boolean =>
   group.kind === "Team"
     ? model.memberships.some((membership) => membership.groupId === group.id)
     : group.memberIds.includes(model.memberId)
+
+/** The groups the person belongs to, as the sidebar lists them: their teams and their conversations. */
+export const yours = (model: Model): ReadonlyArray<GroupItem> =>
+  model.groups.filter(({ group }) => belongsTo(model, group))
+
+/** The public teams the person may join and does not belong to. */
+export const discoverable = (model: Model): ReadonlyArray<GroupItem> =>
+  model.groups.filter(({ group }) => isJoinable(group) && !belongsTo(model, group))
+
+/** The groups of `items` whose name, as the person reads it, contains `query` in any case: all of them for none. */
+export const matching = (model: Model, items: ReadonlyArray<GroupItem>, query: string): ReadonlyArray<GroupItem> => {
+  const wanted = query.trim().toLowerCase()
+  return wanted === ""
+    ? items
+    : items.filter(({ group }) => groupName(group, model.members, model.memberId).toLowerCase().includes(wanted))
+}
 
 /** The workspace's other active members, whom the person may start a conversation with. */
 export const others = (model: Model): ReadonlyArray<Member.Member> =>

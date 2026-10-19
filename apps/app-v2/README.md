@@ -4,7 +4,7 @@ The workspace app, being built on [Foldkit](https://foldkit.dev) Blocks: a brows
 people in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in
 sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write,
 offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
-pick one; a group's threads with who replied to each and how much of it is new, where they start a thread; and a thread's
+pick one or to browse, those they belong to and those they may join; a group's threads with who replied to each and how much of it is new, where they start a thread; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
 stop following it, which opening reads through its latest activity; their inbox, their
 notifications under the days they came, all of them or only those waiting, each by who wrote what it
@@ -51,7 +51,8 @@ outside a workspace are composed from it: the root view frames the sign-in page 
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, and rows from the design's `centered`, `control`, `form`, and `directory` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
-and the pane of each destination, `feature/groups` renders the sidebar's sections and the modal where
+and the pane of each destination, `feature/groups` renders the sidebar's sections, the pane where the
+groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
 a team or a conversation is started, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
@@ -223,7 +224,25 @@ the pages that compose them; the root composes the pages.
   dialog, which drops what was being started. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
-  parent, which it shows under the group.
+  parent, which it shows under the group. The Groups section's header has a button, Browse groups,
+  which reports `RequestedBrowse`, shown to everyone. `browseView` is the page it asks for, a main
+  pane titled Groups with two tabs, Your groups, the teams the person belongs to and their
+  conversations, as the sidebar lists them, and Discover, the public teams they may join and do not
+  belong to, each counted, Your groups at first, and Create group, the same as the sidebar's "+" for
+  a team, where they may start one. Under a search field, whose label is hidden and whose
+  placeholder follows the tab, and which takes no focus as the page opens, a line says what the tab
+  lists with how many groups the search leaves at its end, "4 groups", over the labels of the
+  columns, Group, Visibility, and Members, and a row for each group: `#` for a team and the other
+  members' initials for a conversation, the group's name as the person reads it, a badge of Public,
+  Private, or Direct, how many members it has, "12 members", "Sending…" under the name while it is
+  on its way, and Open →, which reports the group picked as the sidebar's row does. The search
+  keeps the groups whose name contains what was typed, in any case, ignoring spaces at either end;
+  the tabs keep one search between them. A search that finds none says "No groups match" with what was
+  typed, and a tab with no groups says so: Discover, "Nothing to discover", since every public team is
+  one the person is in, and Your groups, "No groups yet". The dialog for a new team is the sidebar's,
+  embedded once, since both views read one model, so Create group works where the sidebar is on
+  the page, from 64rem. Below that the sidebar is on the page only while the navigation drawer is
+  open, and Create group has no dialog to open: that is not solved yet.
 - `feature/inbox`: the person's notifications, newest first, on two tabs: All, every notification
   the store gives, waiting or seen, and Unread, those still waiting, counted while any wait, All at first. Each
   tab's notifications sit under a divider for each day they came on by the person's own clock, named
@@ -310,12 +329,17 @@ the pages that compose them; the root composes the pages.
   members it has and the name the person goes by in it; it reports the one picked.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
   rail has "Home", "Connections", "Agents", and "Channels" buttons and, below them, "Settings", each
-  marked while its destination is open; Home is open while nothing, the inbox, or a group is. The
+  marked while its destination is open; Home is open while nothing, the inbox, the groups to browse,
+  or a group is. The
   sidebar, named by the workspace, has the workspace's name over a button to all workspaces, an
   "Inbox" item with how many notifications wait, the groups' sections, and, in its footer, who is
   signed in with a Sign out button. The main pane shows one destination: nothing yet, titled by the
-  workspace, the inbox, the connections, the agents, the settings, or the channels, which are always
-  read, or the open group, a keyed occurrence; the side pane shows the thread open in that group,
+  workspace, the inbox, the groups to browse, the connections, the agents, the settings, or the
+  channels, which are always read, or the open group, a keyed occurrence. The groups to browse are
+  the groups Block's `browseView`, the same child as the sidebar's under a second slot, which the
+  Block asks for with `RequestedBrowse`: the page goes there as it goes to any destination, closing
+  the drawer and the side pane's dialog and marking no group open, and picking a group on that page
+  opens it, which leaves the page. The side pane shows the thread open in that group,
   only while one is, and the actions' toasts come over both. The workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email and the time now as
@@ -326,8 +350,8 @@ the pages that compose them; the root composes the pages.
   button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
   `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
-  Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox, a
-  group picked, and a notification's thread opened, asks it to close (a close of a closed dialog does
+  Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox
+  and Browse groups, a group picked, and a notification's thread opened, asks it to close (a close of a closed dialog does
   nothing). The thread's side pane is in the shell's card beside the main pane only from 80rem
   (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
   the toasts come inside whichever dialog is open, where they can be read and dismissed. The page
@@ -482,7 +506,8 @@ browser's storage. Each Block's tests sit beside it:
   and the thread picked opened and closed, each reported, open already as the group opens without a
   report, or closed as its parent asks, without one; the groups starting a
   team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
-  or the dialog closes, dropping what was being started, and reporting the group picked once; the inbox
+  or the dialog closes, dropping what was being started, and reporting the group picked once, asking
+  to browse each time, and keeping the browse page's tab and search; the inbox
   saying why the person is told, who wrote what and what they did, where it comes from, and what it
   says, grouping the notifications by the day they came on, listing every one or those waiting, newest
   first, as its tab chooses, reporting the thread of the notification opened, marking one seen or all
@@ -511,8 +536,8 @@ browser's storage. Each Block's tests sit beside it:
   members; a workspace listing the integrations once as it opens, informing its connections, agents,
   and channels of them or of why they could not be listed, and listing them again when one asks,
   opening the group picked, showing
-  the inbox, the connections, the agents, the settings, or the channels in its place with no group
-  marked, going home from a group or a destination, handing the settings and the channels what the
+  the inbox, the groups to browse, the connections, the agents, the settings, or the channels in its
+  place with no group marked, and opening a group from the groups to browse, going home from a group or a destination, handing the settings and the channels what the
   person does in them, opening a notification's thread in its group, naming the thread open in the
   group open, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
   asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
@@ -555,7 +580,12 @@ browser's storage. Each Block's tests sit beside it:
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
-  a dialog of its own, and the same team taken from the workspace's sidebar; the inbox's notifications under the day they came, by their
+  a dialog of its own, and the same team taken from the workspace's sidebar, and the groups to
+  browse: the button in the sidebar's header asking for them, the tabs counted and chosen, each
+  group's mark, visibility, and members, a team and a conversation told apart, the search narrowing
+  either tab in any case and with spaces ignored, nothing matching, nothing to discover, no groups yet, a
+  team on its way, a group opened from its row, and Create group only for someone who may create
+  one, opening the sidebar's dialog; the inbox's notifications under the day they came, by their
   author and what they did, the place they come from, how long ago, and what they say, with a mention
   in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
@@ -588,7 +618,9 @@ browser's storage. Each Block's tests sit beside it:
   be read; and a workspace on the shell: counting what waits beside "Inbox" whichever destination
   shows, then showing the inbox, the connections, the agents, the settings, or the channels, which
   it reads whichever destination shows, each in a main pane named for it, with the rail marking the
-  destination open, Home from the inbox and the groups too, the sidebar naming the workspace with
+  destination open, Home from the inbox and the groups too, the groups to browse opened from the
+  sidebar's button, from an open group and its thread, and from the drawer, which it closes, with
+  a group opened from its row and a team started from Create group, the sidebar naming the workspace with
   who is signed in and the way out in its footer, the group's threads as messages in the main pane
   with the composer to start one, the thread picked opened in the side pane with its messages and the
   composer to reply, marked in the list and under the group in the sidebar, the group's settings
@@ -626,7 +658,9 @@ browser's storage. Each Block's tests sit beside it:
   the server's under the same ID, a reply written with the host gone reaches it once it is back,
   and one to a thread that does not exist comes back rejected; a team and its admission, and a
   conversation, started in the browser come back as the server's under the IDs the browser gave
-  them; an invitation by address reaches that address's account, and a role change becomes the
+  them; the groups listed with their members, a team's counted by its admissions, one removed no
+  longer counted, and a conversation's by the members it was made with, before the server has them
+  and after; an invitation by address reaches that address's account, and a role change becomes the
   server's under the ID the browser gave it; and another member's reply reaches the person's
   inbox, which reading the thread settles at once and then on the server; and a thread made a task
   and changed shows at once and becomes the server's, while a change from a stale value comes back
@@ -640,7 +674,7 @@ browser's storage. Each Block's tests sit beside it:
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and `seen.ts`: the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
-  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and the runs of a text and of a message and of a thread's row,
+  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and a count with the word for one or many, and the runs of a text and of a message and of a thread's row,
   a mention as "@" and the member's current name or the name it recorded, and the rest of the
   markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a

@@ -128,6 +128,40 @@ describe("the groups", () => {
     })
   )
 
+  it("browse the groups they belong to, searching nothing, until the person says otherwise", () => {
+    story(
+      update,
+      given(listed),
+      model((model) => {
+        expect(model.browse).toEqual({ tab: "Yours", query: "" })
+      }),
+      message(Message.ChoseBrowseTab({ tab: "Discover" })),
+      message(Message.TypedBrowseQuery({ query: "ann" })),
+      model((model) => {
+        expect(model.browse).toEqual({ tab: "Discover", query: "ann" })
+      }),
+      message(Message.ChoseBrowseTab({ tab: "Yours" })),
+      model((model) => {
+        expect(model.browse).toEqual({ tab: "Yours", query: "ann" })
+      }),
+      expectNoOutMessage()
+    )
+  })
+
+  it("ask its parent to browse each time the person asks, without changing what it holds", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedBrowse()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      message(Message.ClickedBrowse()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      model((model) => {
+        expect(model).toEqual(listed)
+      })
+    )
+  })
+
   it("drop what the person was starting when the dialog closes, and report the group picked once", () => {
     story(
       update,

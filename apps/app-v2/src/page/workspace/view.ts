@@ -7,6 +7,7 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { threadView } from "../../feature/group/view.ts"
+import { browseView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import {
   ActionsBinding,
@@ -35,7 +36,7 @@ const railItems = (model: Model) => [
   {
     icon: "mark-home" as const,
     label: "Home",
-    isCurrent: Open.isAnyOf(["Nothing", "Inbox", "Group"])(model.open),
+    isCurrent: Open.isAnyOf(["Nothing", "Inbox", "Groups", "Group"])(model.open),
     onClick: Message.ClickedHome()
   },
   {
@@ -115,6 +116,7 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       })
     },
     Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),
+    Groups: () => h.block(GroupsBinding.embedView({ slotId: "browse", model: model.groups, view: browseView })),
     Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
     Settings: () => h.block(SettingsBinding.embedView({ slotId: "settings", model: model.settings })),

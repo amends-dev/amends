@@ -10,6 +10,7 @@ import {
   initials,
   messageRuns,
   messageWords,
+  pluralize,
   repliesLabel,
   textRuns,
   threadRuns,
@@ -226,6 +227,15 @@ describe("threadRuns", () => {
       { text: " can you check this?" }
     ])
     expect(threadRuns(thread, Option.none(), members)).toEqual([{ text: "A thread" }])
+  })
+})
+
+describe("pluralize", () => {
+  it("says the count with the singular for one, and with the plural for any other number", () => {
+    expect(pluralize(1, "member", "members")).toBe("1 member")
+    expect(pluralize(0, "member", "members")).toBe("0 members")
+    expect(pluralize(12, "member", "members")).toBe("12 members")
+    expect(pluralize(2, "reply", "replies")).toBe("2 replies")
   })
 })
 

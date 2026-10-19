@@ -9,6 +9,7 @@ import {
   change,
   click,
   expect,
+  expectOutMessage,
   given,
   label,
   role,
@@ -22,10 +23,10 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, aliceInGeneral, bob, design, general, membership } from "../../../test/fixtures.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
-import { Message } from "./definition.ts"
+import { Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { browseView, view } from "./view.ts"
 
 const { workspace, member } = membership
 
@@ -267,6 +268,205 @@ describe("the groups", () => {
   it("show why a read or a write failed", () => {
     scene(
       { update, view: sceneView() },
+      given(modifyFields(listed, { notice: () => Option.some("This browser could not read the groups.") })),
+      expect(role("alert")).toHaveText("This browser could not read the groups.")
+    )
+  })
+})
+
+/** The sidebar's groups and the browse page together, as the workspace shows them side by side. */
+const withBrowse: ReturnType<typeof sceneView> = (model, h) => h.div([], [sceneView()(model, h), browseView(model, h)])
+
+describe("the sidebar's way to browse", () => {
+  it("is a button in the groups' header, for everyone, that asks to browse", () => {
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(listed, { grants: () => [] })),
+      expect(role("button", { name: "Browse groups" })).toExist(),
+      click(role("button", { name: "Browse groups" })),
+      expectOutMessage(OutMessage.RequestedBrowse())
+    )
+  })
+})
+
+describe("the browse page", () => {
+  it("is the main pane, titled Groups, with the groups the person belongs to on its first tab", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      expect(role("main", { name: "Groups" })).toExist(),
+      expect(role("heading", { name: "Groups", level: 1 })).toExist(),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "false"),
+      expect(text("Public and private groups you've joined.")).toExist(),
+      expect(text("3 groups")).toExist()
+    )
+  })
+
+  it("counts each tab, the groups the person belongs to, and the public teams they may join", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "3"),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "1")
+    )
+  })
+
+  it("lists each group with its mark, its visibility, and its members, a team by # and a conversation by letters", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      expect(role("list", { name: "Groups" })).toExist(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-description", "Public · 2 members"),
+      expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "Private · 1 member"),
+      expect(role("button", { name: "Bob" })).toHaveAttr("aria-description", "Direct · 2 members"),
+      expect(within(role("button", { name: "Design" }), text("#"))).toExist(),
+      expect(within(role("button", { name: "Design" }), text("Private"))).toExist(),
+      expect(within(role("button", { name: "Design" }), text("1 member"))).toExist(),
+      expect(within(role("button", { name: "Design" }), text("Open →"))).toExist(),
+      expect(within(role("button", { name: "Bob" }), text("B"))).toExist(),
+      expect(within(role("button", { name: "Bob" }), text("Direct"))).toExist(),
+      expect(role("button", { name: "Announcements" })).toBeAbsent()
+    )
+  })
+
+  it("lists the public teams the person may join on the Discover tab", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      click(role("tab", { name: "Discover" })),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
+      expect(text("Public groups you can join.")).toExist(),
+      expect(text("1 group")).toExist(),
+      expect(role("button", { name: "Announcements" })).toHaveAttr("aria-description", "Public · 3 members"),
+      expect(role("button", { name: "General" })).toBeAbsent(),
+      expect(role("button", { name: "Bob" })).toBeAbsent()
+    )
+  })
+
+  it("names what the search is for by the tab", () => {
+    scene(
+      { update, view: browseView },
+      given(listed),
+      expect(label("Search groups")).toHaveAttr("placeholder", "Search your groups…"),
+      click(role("tab", { name: "Discover" })),
+      expect(label("Search groups")).toHaveAttr("placeholder", "Search groups to join…")
+    )
+  })
+
+  it("narrows the tab to the groups whose name has the letters typed, in any case, a conversation by its members", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      type(label("Search groups"), "DES"),
+      expect(role("button", { name: "Design" })).toExist(),
+      expect(role("button", { name: "General" })).toBeAbsent(),
+      expect(text("1 group")).toExist(),
+      type(label("Search groups"), "bo"),
+      expect(role("button", { name: "Bob" })).toExist(),
+      expect(role("button", { name: "Design" })).toBeAbsent(),
+      type(label("Search groups"), "  design "),
+      expect(role("button", { name: "Design" })).toExist(),
+      expect(text("1 group")).toExist(),
+      type(label("Search groups"), "  "),
+      expect(text("3 groups")).toExist()
+    )
+  })
+
+  it("narrows the Discover tab too, and keeps the tab's count whole", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      click(role("tab", { name: "Discover" })),
+      type(label("Search groups"), "gen"),
+      expect(role("button", { name: "Announcements" })).toBeAbsent(),
+      expect(text("0 groups")).toExist(),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "1")
+    )
+  })
+
+  it("says no group matches a search that finds none, with what was typed", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      type(label("Search groups"), "zzz"),
+      expect(role("heading", { name: "No groups match", level: 2 })).toExist(),
+      expect(text('Nothing matches "zzz".')).toExist(),
+      expect(role("list", { name: "Groups" })).toBeAbsent(),
+      expect(text("0 groups")).toExist()
+    )
+  })
+
+  it("says there is nothing to discover while every public team is one the person is in", () => {
+    scene(
+      { update, view: browseView },
+      given(modifyFields(listed, { groups: (groups) => groups.filter(({ group }) => group.id !== announcements.id) })),
+      click(role("tab", { name: "Discover" })),
+      expect(role("heading", { name: "Nothing to discover", level: 2 })).toExist(),
+      expect(text("Every public group is one you're in.")).toExist(),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "0")
+    )
+  })
+
+  it("says the person is in no groups while the list of their groups is empty", () => {
+    scene(
+      { update, view: browseView },
+      given(modifyFields(listed, { groups: () => [] })),
+      expect(role("heading", { name: "No groups yet", level: 2 })).toExist(),
+      expect(text("The groups you join are listed here.")).toExist()
+    )
+  })
+
+  it("marks a team still on its way as sending, in its row", () => {
+    scene(
+      { update, view: browseView },
+      given(
+        modifyFields(init(workspace.id, member.id).model, {
+          groups: () => [
+            { group: general, pending: false, members: 2 },
+            { group: design, pending: true, members: 1 }
+          ],
+          memberships: () => [aliceInGeneral, aliceInDesign]
+        })
+      ),
+      expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "Sending… · Private · 1 member"),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-description", "Public · 2 members")
+    )
+  })
+
+  it("opens a group from its row", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      click(role("button", { name: "Design" })),
+      expectOutMessage(OutMessage.SelectedGroup({ groupId: design.id }))
+    )
+  })
+
+  it("offers to create a group only to someone who may", () => {
+    scene(
+      { update, view: browseView },
+      given(modifyFields(listed, { grants: () => [] })),
+      expect(role("button", { name: "Create group" })).toBeAbsent()
+    )
+  })
+
+  it("opens the dialog for a new team from Create group, where the sidebar holds it", () => {
+    scene(
+      { update, view: withBrowse },
+      given(listed),
+      expect(role("button", { name: "Create group" })).toExist(),
+      expect(role("dialog", { name: "New team" })).toBeAbsent(),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "New team" })).toExist(),
+      expect(within(role("dialog", { name: "New team" }), label("Team name"))).toExist()
+    )
+  })
+
+  it("shows why a read or a write failed", () => {
+    scene(
+      { update, view: browseView },
       given(modifyFields(listed, { notice: () => Option.some("This browser could not read the groups.") })),
       expect(role("alert")).toHaveText("This browser could not read the groups.")
     )

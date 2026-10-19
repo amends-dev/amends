@@ -1,56 +1,22 @@
 import type { Viewport } from "@amends-dev/design/viewport"
-import * as Option from "effect/Option"
-import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import {
   AgentsBinding,
   ChannelsBinding,
   ConnectionsBinding,
-  GroupsBinding,
+  goTo,
   hideAside,
   MenuBinding,
+  showAgents,
   showAside,
+  showChannels,
+  showConnections,
+  showInbox,
+  showNothing,
+  showSettings,
   WorkspaceComposition
 } from "./composition.ts"
-import { isAsideFloating, isThreadOpen, Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
-
-/** Show nothing yet in the main content. */
-const showNothing = WorkspaceDefinition.step((model) => ({
-  model: modifyFields(model, { open: () => Open.Nothing() })
-}))
-
-/** Show the inbox in the main content. */
-const showInbox = WorkspaceDefinition.step((model) => ({ model: modifyFields(model, { open: () => Open.Inbox() }) }))
-
-/** Show the connections in the main content. */
-const showConnections = WorkspaceDefinition.step((model) => ({
-  model: modifyFields(model, { open: () => Open.Connections() })
-}))
-
-/** Show the agents in the main content. */
-const showAgents = WorkspaceDefinition.step((model) => ({ model: modifyFields(model, { open: () => Open.Agents() }) }))
-
-/** Show the settings in the main content. */
-const showSettings = WorkspaceDefinition.step((model) => ({
-  model: modifyFields(model, { open: () => Open.Settings() })
-}))
-
-/** Show the channels in the main content. */
-const showChannels = WorkspaceDefinition.step((model) => ({
-  model: modifyFields(model, { open: () => Open.Channels() })
-}))
-
-/**
- * Go to a destination: close the navigation drawer and the side pane's dialog, leave no group marked in the
- * sidebar, and `show` it.
- */
-const goTo = (show: typeof showNothing) =>
-  Update.combine([
-    MenuBinding.requestClose(),
-    hideAside,
-    GroupsBinding.informOpenGroup({ groupId: Option.none() }),
-    show
-  ])
+import { isAsideFloating, isThreadOpen, Message, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Lay the workspace out for a window of the width `viewport`. */
 const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))

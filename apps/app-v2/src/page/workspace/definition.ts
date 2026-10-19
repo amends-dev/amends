@@ -1,8 +1,8 @@
 /**
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
  * actions, their inbox, their connections, their agents, their settings, and their channels, and
- * what the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
- * the channels, or a group, with its threads and the thread open among them. It lays itself out by the
+ * what the main content shows: nothing yet, the inbox, the groups to browse, the connections, the
+ * agents, the settings, the channels, or a group, with its threads and the thread open among them. It lays itself out by the
  * window's width, which its parent informs it of: below 64rem the sidebar is in a navigation drawer, a
  * dialog that every navigation closes, and below 80rem the thread is in a dialog of its own, which
  * follows the thread opening and closing. It lists the host's integrations once, as it opens, informs the
@@ -32,13 +32,13 @@ import { workspaceName } from "../../feature/settings/definition.ts"
 import { titleOf } from "../../feature/thread/definition.ts"
 
 /**
- * What the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
- * the channels,
- * or the group open in the workspace.
+ * What the main content shows: nothing yet, the inbox, the groups to browse, the connections, the
+ * agents, the settings, the channels, or the group open in the workspace.
  */
 export const Open = defineTaggedUnion({
   Nothing: {},
   Inbox: {},
+  Groups: {},
   Connections: {},
   Agents: {},
   Settings: {},

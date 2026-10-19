@@ -67,6 +67,13 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
             outMessage: OutMessage.SelectedGroup({ groupId })
           },
     InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
+    ClickedBrowse: () => ({ model, outMessage: OutMessage.RequestedBrowse() }),
+    ChoseBrowseTab: ({ tab }) => ({
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) })
+    }),
+    TypedBrowseQuery: ({ query }) => ({
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })
+    }),
     ClickedNewTeam: () => Update.combine(model, [openTeamForm, DialogBinding.requestOpen()]),
     TypedTeamName: ({ name }) => ({
       model: atStarting(
