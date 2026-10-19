@@ -1,3 +1,4 @@
+import { pane } from "@amends-dev/design/pane"
 import { button, errorView } from "../../controls.ts"
 import { InboxComposition } from "./composition.ts"
 import { describeNotification, Message, waitingNewestFirst } from "./definition.ts"
@@ -5,10 +6,11 @@ import { describeNotification, Message, waitingNewestFirst } from "./definition.
 /** The notifications still waiting for the person, newest first, to open, or to mark seen one or all at once. */
 export const view = InboxComposition.makeView((model, h) => {
   const items = waitingNewestFirst(model)
-  return h.section(
-    [h.AriaLabel("Inbox")],
-    [
-      h.h3([], ["Inbox"]),
+  return pane(h, {
+    variant: "main",
+    label: "Inbox",
+    header: { title: "Inbox", icon: "mark-mail" },
+    body: [
       errorView(model.notice, h),
       items.length === 0
         ? h.p([], ["Nothing new."])
@@ -35,5 +37,5 @@ export const view = InboxComposition.makeView((model, h) => {
             ]
           )
     ]
-  )
+  })
 })

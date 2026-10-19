@@ -22,9 +22,11 @@ A small Foldkit app in `workshop/` that shows every renderer in every state unde
 buttons by variant, disabled, large, and wide, with the link in a sentence; a field empty, with a
 placeholder, filled, and invalid; a hint; a textarea; the toggle on and off; a select; the notice
 tones; `sending`; a form with its inline text and a value with its link; the directory's section
-and rows; the centered screen as the sign-in's two steps and as the workspace picker, and the shell
-twice, with and without its side pane, each in a frame of fixed height; and the icons by size, as
-the shell draws them, and with a label. The toggles, fields, and select take input, and so do the
+and rows; the centered screen as the sign-in's two steps and as the workspace picker; the toast
+alone, with a detail, and as a stack of two, each in a frame of its own; the shell twice, with
+and without its side pane, each in a frame of fixed height, its groups and direct messages
+through `sidebarSections`, the first with the open thread as a plain row under its group and the
+second with its notices; and the icons by size, as the shell draws them, and with a label. The toggles, fields, and select take input, and so do the
 shell's rail and tabs, whose current item follows a click. The shell's side pane sits beside the
 main pane from a window of 80rem; narrow the window to between 64rem and 80rem to see it float over
 a scrim. Open it to look at a piece before a page composes it. It follows the browser's light or dark preference. A browser tab
@@ -173,9 +175,10 @@ What a directory screen lists.
 
 The frame of the first four layout patterns, which the modules below fill.
 
-- `shell(h, { rail, sidebar, main, aside? })` puts the `rail` on the canvas, then one `panel` card
-  holding the `sidebar`, a divider, the `main` pane, and, when there is an `aside`, the side pane at
-  440px. Each is what its module renders. The frame is as tall as the viewport (`100dvh`, or
+- `shell(h, { rail, sidebar, main, aside?, notices? })` puts the `rail` on the canvas, then one
+  `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is an `aside`, the
+  side pane at 440px. Each is what its module renders. The `notices`, a `toastStack`, come last in
+  the frame, over the card and the scrim. The frame is as tall as the viewport (`100dvh`, or
   `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter
   around the card. From 80rem the aside sits beside the main pane, a divider between them; from
   64rem to there it floats over the right of the card with `shadow-popover`, above a `scrim` over
@@ -212,9 +215,15 @@ The frame of the first four layout patterns, which the modules below fill.
   one button: an `icon`, or a `mark` letter on a 20px `avatar-neutral` square for a person, then the
   `label` in `ink-secondary` and a `count` in a badge at the end. The button is named by the label
   and described by the count. The current row is `aria-current="page"`, filled `selected`, in `ink`
-  and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick }`
+  and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick? }`
   rows under it at hint size, 32px, indented and joined to it by a dashed connector in `stitch`,
-  such as a group's open thread.
+  such as a group's open thread. A row with an `onClick` is a button; one without is a plain row, a
+  `span` with the same look and no hover, pointer, or focus ring, that says where the person is, and
+  is `aria-current="page"` while it is current.
+- `sidebarSections(h, children)` is the column of `sidebarSection`s a Block renders for the sidebar,
+  with 22px between them, the gap the sidebar's own body puts between its sections, so a Block's
+  sections lie among the sidebar's own. `children` may also hold what comes with them, such as a
+  notice above them or a form below.
 - `sidebarEmpty(h, text)` is a quiet line for a section with no items, in the items' place.
 - `sidebarFooter(h, children)` is the strip at the bottom of the sidebar, under a line.
 
@@ -241,6 +250,20 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
   header's `actions`.
 
+### `@amends-dev/design/toast`
+
+What floats over the shell's corner, for something that went wrong and the one thing to do about it.
+
+- `toastStack(h, children)` is the column of toasts pinned to the bottom end corner of the shell's
+  frame, 16px from each edge and 25rem wide at most, with 8px between them, above the panes and the
+  scrim. It is an `aria-live="polite"` region, there before the first toast so each is announced as it
+  arrives. `children` are `toast`s, or a `notice`. The frame it sits in must be `relative`, as the
+  shell's is.
+- `toast(h, { text, detail?, action: { label, onClick } })` is a `role="alert"` card, `raised` with
+  a border and `shadow-toast`: the `text` at body size, the `detail` under it at hint size in
+  `ink-secondary`, clamped to three lines, such as the words an action carried, and at the right the
+  `action` as a quiet `button`, such as Dismiss.
+
 ## Tests
 
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
@@ -249,6 +272,8 @@ renderer family as a person does, through what the app's own tests query: a butt
 and description, a switch by its label, a select's change, the centered screen's landmarks, a form
 by its label, and a row by its title; an icon by `role("img", { name })` when it has a label and as
 `aria-hidden` when it has none; a rail destination by `role("button", { name })` with
-`aria-current`; a sidebar item by its name with `aria-current` and its count; a tab by `role("tab")`
-with `aria-selected`; and the shell's landmarks by role and name: `navigation` for the rail and the
-sidebar, `main`, and `complementary`. They query no class.
+`aria-current`; a sidebar item by its name with `aria-current` and its count, the row under it as a
+button or as a plain row, and the sections of `sidebarSections` among the sidebar's own; a tab by
+`role("tab")` with `aria-selected`; a toast by `role("alert")` with its text, detail, and button, in
+the stack's live region; and the shell's landmarks by role and name: `navigation` for the rail and
+the sidebar, `main`, and `complementary`, with its notices. They query no class.

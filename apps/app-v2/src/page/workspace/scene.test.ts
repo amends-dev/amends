@@ -1,7 +1,22 @@
 import { GrantResolver } from "@amends-dev/core/authorization"
+import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { Subscription, click, expect, given, inside, role, scene, text } from "foldkit/scene"
+import {
+  Command,
+  Subscription,
+  click,
+  expect,
+  expectOutMessage,
+  given,
+  inside,
+  role,
+  scene,
+  selector,
+  text,
+  withViewInputs,
+  within
+} from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
   aliceInGeneral,
@@ -24,13 +39,19 @@ import {
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { ActionsBlock } from "../../feature/actions/block.ts"
+import { Dismiss } from "../../feature/actions/command.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
+import { ComposerBlock } from "../../feature/composer/block.ts"
+import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { Integrations } from "../../feature/connections/definition.ts"
+import { GroupBlock } from "../../feature/group/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { WorkspaceBlock } from "./block.ts"
+import { Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -40,6 +61,48 @@ const { workspace, member } = membership
 const opened = init(workspace.id, member.id, workspace.name).model
 
 const workspaceSubscriptions = WorkspaceBlock.subscriptions
+
+const sceneView = withViewInputs(view, { email: "alice@example.com" })()
+
+const threadId = ThreadId.ThreadId.make("thread-1")
+
+/** The general group open, with a thread open in it that has a title, and general marked in the groups. */
+const withThread = modifyFields(opened, {
+  groups: (groups) =>
+    modifyFields(groups, {
+      groups: () => [{ group: general, pending: false }],
+      selected: () => Option.some(general.id)
+    }),
+  open: () =>
+    Open.Group({
+      groupId: general.id,
+      model: modifyFields(GroupBlock.init(workspace.id, member.id, general.id, Option.some(threadId)).model, {
+        group: () => Option.some({ group: general, pending: false }),
+        memberships: () => [{ membership: aliceInGeneral, pending: false }],
+        members: () => [member],
+        thread: Option.map((open) => ({
+          ...open,
+          model: modifyFields(open.model, { title: () => Option.some("Composer paste crash") })
+        }))
+      })
+    })
+})
+
+/** A reply the server refused, with the text it carried. */
+const withRefusal = modifyFields(opened, {
+  actions: (actions) =>
+    modifyFields(actions, {
+      actions: () => [
+        {
+          key: "action-1",
+          tag: "PostReply",
+          what: "post the reply",
+          text: Option.some("Thanks! I'll attach the image."),
+          rejection: Option.some("You may not reply here.")
+        }
+      ]
+    })
+})
 
 /** The inbox read, with a notification of Bob's reply in a thread of general. */
 const withNotification = modifyFields(opened, {
@@ -120,21 +183,21 @@ const withSettings = modifyFields(opened, {
 describe("a workspace", () => {
   it("shows how many notifications wait beside the inbox, which it shows on request", () => {
     scene(
-      { update, view },
+      { update, view: sceneView },
       given(withNotification),
-      expect(role("button", { name: "Inbox (1)" })).toExist(),
-      expect(role("region", { name: "Inbox" })).toBeAbsent(),
-      click(role("button", { name: "Inbox (1)" })),
-      expect(role("region", { name: "Inbox" })).toExist(),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1"),
+      expect(role("main", { name: "Inbox" })).toBeAbsent(),
+      click(role("button", { name: "Inbox" })),
+      expect(role("main", { name: "Inbox" })).toExist(),
       expect(text("Bob: Sounds good · Plans for the week in General")).toExist()
     )
   })
 
   it("names the inbox alone while nothing waits in it", () => {
     scene(
-      { update, view },
+      { update, view: sceneView },
       given(opened),
-      expect(role("button", { name: "Inbox" })).toExist(),
+      expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-description"),
       click(role("button", { name: "Inbox" })),
       expect(text("Nothing new.")).toExist()
     )
@@ -142,26 +205,26 @@ describe("a workspace", () => {
 
   it("reads the inbox whichever destination it shows", () => {
     scene(
-      { update, view, subscriptions: workspaceSubscriptions },
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(opened),
-      expect(role("region", { name: "Inbox" })).toBeAbsent(),
+      expect(role("main", { name: "Inbox" })).toBeAbsent(),
       Subscription.emit(
         workspaceSubscriptions["inbox/inbox"],
         InboxBlock.Message.ReceivedInbox({ items: withNotification.inbox.items })
       ),
-      expect(role("button", { name: "Inbox (1)" })).toExist(),
-      expect(role("region", { name: "Inbox" })).toBeAbsent()
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1"),
+      expect(role("main", { name: "Inbox" })).toBeAbsent()
     )
   })
 
   it("shows the connections on request, with what the person may do with them", () => {
     scene(
-      { update, view },
+      { update, view: sceneView },
       given(withConnection),
       expect(role("button", { name: "Connections" })).toExist(),
-      expect(role("region", { name: "Connections" })).toBeAbsent(),
+      expect(role("main", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
-      expect(role("region", { name: "Connections" })).toExist(),
+      expect(role("main", { name: "Connections" })).toExist(),
       expect(text(" · Test API · Ready")).toExist(),
       expect(role("button", { name: "Add a connection" })).toExist()
     )
@@ -169,13 +232,13 @@ describe("a workspace", () => {
 
   it("reads the connections whichever destination it shows", () => {
     scene(
-      { update, view, subscriptions: workspaceSubscriptions },
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(asOwner),
       Subscription.emit(
         workspaceSubscriptions["connections/connections"],
         ConnectionsBlock.Message.ReceivedConnections({ connections: withConnection.connections.connections })
       ),
-      expect(role("region", { name: "Connections" })).toBeAbsent(),
+      expect(role("main", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
       expect(text(" · Test API · Ready")).toExist()
     )
@@ -183,13 +246,13 @@ describe("a workspace", () => {
 
   it("shows the agents on request, with what they run on and what the person may do with them", () => {
     scene(
-      { update, view },
+      { update, view: sceneView },
       given(withAgent),
       expect(role("button", { name: "Agents" })).toExist(),
-      expect(role("region", { name: "Agents" })).toBeAbsent(),
+      expect(role("main", { name: "Agents" })).toBeAbsent(),
       click(role("button", { name: "Agents" })),
       inside(
-        role("region", { name: "Agents" }),
+        role("main", { name: "Agents" }),
         expect(text("Scout")).toExist(),
         expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist(),
         expect(role("button", { name: "Add an agent" })).toExist(),
@@ -200,7 +263,7 @@ describe("a workspace", () => {
 
   it("reads the agents whichever destination it shows", () => {
     scene(
-      { update, view, subscriptions: workspaceSubscriptions },
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(withAgent),
       Subscription.emit(
         workspaceSubscriptions["agents/agents"],
@@ -213,7 +276,7 @@ describe("a workspace", () => {
           grants: withAgent.agents.grants
         })
       ),
-      expect(role("region", { name: "Agents" })).toBeAbsent(),
+      expect(role("main", { name: "Agents" })).toBeAbsent(),
       click(role("button", { name: "Agents" })),
       expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist()
     )
@@ -221,12 +284,12 @@ describe("a workspace", () => {
 
   it("shows the settings on request, as the owner reads them", () => {
     scene(
-      { update, view },
+      { update, view: sceneView },
       given(withSettings),
-      expect(role("region", { name: "Settings" })).toBeAbsent(),
+      expect(role("main", { name: "Settings" })).toBeAbsent(),
       click(role("button", { name: "Settings" })),
       inside(
-        role("region", { name: "Settings" }),
+        role("main", { name: "Settings" }),
         expect(role("button", { name: "Rename workspace" })).toExist(),
         expect(text("Bob")).toExist()
       )
@@ -235,7 +298,7 @@ describe("a workspace", () => {
 
   it("reads the settings whichever destination it shows", () => {
     scene(
-      { update, view, subscriptions: workspaceSubscriptions },
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(opened),
       Subscription.emit(
         workspaceSubscriptions["settings/settings"],
@@ -248,21 +311,21 @@ describe("a workspace", () => {
           grants: withSettings.settings.grants
         })
       ),
-      expect(role("region", { name: "Settings" })).toBeAbsent(),
+      expect(role("main", { name: "Settings" })).toBeAbsent(),
       click(role("button", { name: "Settings" })),
-      inside(role("region", { name: "Settings" }), expect(role("button", { name: "Rename workspace" })).toExist())
+      inside(role("main", { name: "Settings" }), expect(role("button", { name: "Rename workspace" })).toExist())
     )
   })
 
   it("shows the channels on request, with what the person may do with them", () => {
     scene(
-      { update, view },
+      { update, view: sceneView },
       given(withChannel),
       expect(role("button", { name: "Channels" })).toExist(),
-      expect(role("region", { name: "Channels" })).toBeAbsent(),
+      expect(role("main", { name: "Channels" })).toBeAbsent(),
       click(role("button", { name: "Channels" })),
       inside(
-        role("region", { name: "Channels" }),
+        role("main", { name: "Channels" }),
         expect(text(" · from Chat into General · opens tasks")).toExist(),
         expect(role("button", { name: "Add a channel" })).toExist()
       )
@@ -271,15 +334,150 @@ describe("a workspace", () => {
 
   it("reads the channels whichever destination it shows", () => {
     scene(
-      { update, view, subscriptions: workspaceSubscriptions },
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(withChannel),
       Subscription.emit(
         workspaceSubscriptions["channels/channels"],
         ChannelsBlock.Message.ReceivedChannels({ channels: [] })
       ),
-      expect(role("region", { name: "Channels" })).toBeAbsent(),
+      expect(role("main", { name: "Channels" })).toBeAbsent(),
       click(role("button", { name: "Channels" })),
       expect(text("No channels yet.")).toExist()
+    )
+  })
+
+  it("opens on the workspace's own main pane, with Home current and the sidebar named by the workspace", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("main", { name: "Studio" })).toExist(),
+      expect(within(role("main", { name: "Studio" }), role("heading", { name: "Studio", level: 1 }))).toExist(),
+      expect(within(role("main", { name: "Studio" }), text("Pick a group, or open your inbox."))).toExist(),
+      expect(role("navigation", { name: "Studio" })).toExist(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Connections" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("marks the destination shown in the rail, with Home for the inbox and the groups too", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      click(role("button", { name: "Connections" })),
+      expect(role("button", { name: "Connections" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Home" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "Agents" })),
+      expect(role("button", { name: "Agents" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Connections" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "Channels" })),
+      expect(role("button", { name: "Channels" })).toHaveAttr("aria-current", "true"),
+      click(role("button", { name: "Settings" })),
+      expect(role("button", { name: "Settings" })).toHaveAttr("aria-current", "true"),
+      click(role("button", { name: "Inbox" })),
+      expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Settings" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("goes home from a destination, to the workspace's own pane with nothing marked in the sidebar", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      click(role("button", { name: "Connections" })),
+      expect(role("main", { name: "Connections" })).toExist(),
+      click(role("button", { name: "Home" })),
+      expect(role("main", { name: "Connections" })).toBeAbsent(),
+      expect(role("main", { name: "Studio" })).toExist(),
+      expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("keeps the brand a mark and no button, and the workspaces one click away from the sidebar's header", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("button", { name: "amends" })).toBeAbsent(),
+      expect(role("img", { name: "amends" })).toExist(),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "All workspaces" }))).toExist(),
+      click(role("button", { name: "All workspaces" })),
+      expectOutMessage(OutMessage.ClosedWorkspace())
+    )
+  })
+
+  it("shows who is signed in in the sidebar's footer, and asks to sign out from there", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toExist(),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))),
+      expectOutMessage(OutMessage.RequestedSignOut())
+    )
+  })
+
+  it("lists the groups in the sidebar's sections, and opens the one picked in the main pane", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(opened, {
+          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false }] })
+        })
+      ),
+      expect(within(role("navigation", { name: "Studio" }), role("heading", { name: "Groups", level: 2 }))).toExist(),
+      expect(within(role("navigation", { name: "Studio" }), text("No messages yet"))).toExist(),
+      expect(role("button", { name: "General" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "General" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      // The group is named by its own pane once the store has read it.
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(role("main", { name: "Studio" })).toBeAbsent(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
+      expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("shows the thread open in the group in a side pane beside its main pane, and under the group in the sidebar", () => {
+    scene(
+      { update, view: sceneView },
+      given(withThread),
+      expect(role("main", { name: "General" })).toExist(),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(
+        within(role("complementary", { name: "Thread" }), role("heading", { name: "Composer paste crash", level: 2 }))
+      ).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), text("Thread in General"))).toExist(),
+      expect(within(role("main", { name: "General" }), role("complementary"))).toBeAbsent(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
+      expect(
+        within(
+          role("navigation", { name: "Studio" }),
+          within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))
+        )
+      ).toExist()
+    )
+  })
+
+  it("closes the side pane, and the thread under the group in the sidebar, with its button", () => {
+    scene(
+      { update, view: sceneView },
+      given(withThread),
+      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close" }))),
+      expect(role("complementary")).toBeAbsent(),
+      expect(role("main", { name: "General" })).toExist(),
+      expect(text("Composer paste crash")).toBeAbsent()
+    )
+  })
+
+  it("shows what the server refused as toasts over the shell, which are dismissed from there", () => {
+    scene(
+      { update, view: sceneView },
+      given(withRefusal),
+      expect(within(role("alert"), text("Couldn't post the reply: You may not reply here."))).toExist(),
+      expect(within(role("alert"), text("Thanks! I'll attach the image."))).toExist(),
+      click(within(role("alert"), role("button", { name: "Dismiss" }))),
+      Command.expectExact(Dismiss({ workspaceId: workspace.id, memberId: member.id, key: "action-1" })),
+      Command.resolve(Dismiss, ActionsBlock.Message.CompletedDismiss())
     )
   })
 })

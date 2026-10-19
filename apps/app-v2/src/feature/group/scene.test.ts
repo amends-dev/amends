@@ -1,15 +1,19 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
-import { Group, GroupMembershipPermissions } from "@amends-dev/core/group"
+import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
+import { ThreadId } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { expect, given, role, scene, text } from "foldkit/scene"
+import { Command, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, bob, bobInDesign, design, membership } from "../../../test/fixtures.ts"
+import { RenameGroup } from "./command.ts"
+import { Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { threadView, view } from "./view.ts"
 
 const { workspace, member } = membership
+const threadId = ThreadId.ThreadId.make("thread-1")
 
 /** A public team the person does not belong to. */
 const announcements = Schema.decodeSync(Group.Group)({
@@ -22,6 +26,30 @@ const announcements = Schema.decodeSync(Group.Group)({
   createdAt: "2026-10-18T12:00:00Z"
 })
 
+/** The conversation between the person and Bob. */
+const withBob = Schema.decodeSync(Group.Group)({
+  id: "direct-1",
+  workspaceId: "workspace-1",
+  kind: "Direct",
+  memberIds: ["member-1", "member-2"],
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
+/** The person's follow of design, as it was before they unfollowed it. */
+const followOfDesign = Schema.decodeSync(GroupFollow.GroupFollow)({
+  id: "follow-1",
+  workspaceId: "workspace-1",
+  groupId: "design",
+  memberId: "member-1",
+  groupMembershipId: "membership-2",
+  followedAt: "2026-10-18T12:00:00Z",
+  status: "active",
+  endedAt: null
+})
+
+const inWorkspace = Scope.Scope.cases.Workspace.make({ workspaceId: workspace.id })
+
 /** The team read, with alice and bob admitted, as a member who manages its members sees it. */
 const opened = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
   group: () => Option.some({ group: design, pending: false }),
@@ -30,20 +58,35 @@ const opened = modifyFields(init(workspace.id, member.id, design.id, Option.none
     { membership: bobInDesign, pending: false }
   ],
   members: () => [member, bob],
-  grants: () => [
-    Grant.make(GroupMembershipPermissions.Manage, Scope.Scope.cases.Workspace.make({ workspaceId: workspace.id }))
-  ]
+  grants: () => [Grant.make(GroupMembershipPermissions.Manage, inWorkspace)]
 })
 
-describe("a group", () => {
-  it("shows its name, the person's part in it, and its members, with removing for the others", () => {
+/** The team with a thread open in it, titled. */
+const withThread = modifyFields(
+  modifyFields(init(workspace.id, member.id, design.id, Option.some(threadId)).model, {
+    group: () => opened.group,
+    memberships: () => opened.memberships,
+    members: () => opened.members,
+    grants: () => opened.grants
+  }),
+  {
+    thread: Option.map((open) => ({
+      ...open,
+      model: modifyFields(open.model, { title: () => Option.some("Composer paste crash") })
+    }))
+  }
+)
+
+describe("a group's main pane", () => {
+  it("is the main landmark titled by the group's name, with the person's part in it and its members", () => {
     scene(
       { update, view },
       given(opened),
-      expect(text("Design")).toExist(),
+      expect(role("main", { name: "Design" })).toExist(),
+      expect(role("heading", { name: "Design", level: 1 })).toExist(),
+      expect(within(role("main"), role("button", { name: "Follow" }))).toExist(),
+      expect(within(role("main"), role("button", { name: "Leave" }))).toExist(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
-      expect(role("button", { name: "Follow" })).toExist(),
-      expect(role("button", { name: "Leave" })).toExist(),
       expect(text("Alice")).toExist(),
       expect(text("Bob")).toExist(),
       expect(role("button", { name: "Remove" })).toExist(),
@@ -61,10 +104,111 @@ describe("a group", () => {
           members: () => [member, bob]
         })
       ),
-      expect(text("Announcements")).toExist(),
+      expect(role("heading", { name: "Announcements", level: 1 })).toExist(),
       expect(role("button", { name: "Join" })).toExist(),
       expect(role("button", { name: "Follow" })).toBeAbsent(),
       expect(text("Join this team to read its threads.")).toExist()
     )
+  })
+
+  it("offers admitting a member who is not in the team, from the members' choice", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { memberships: () => [{ membership: aliceInDesign, pending: false }] })),
+      expect(text("Choose a member")).toExist(),
+      expect(role("button", { name: "Add" })).toExist()
+    )
+  })
+
+  it("is titled by the other member of a conversation, marked by their first letter, with no members", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(init(workspace.id, member.id, withBob.id, Option.none()).model, {
+          group: () => Option.some({ group: withBob, pending: false }),
+          members: () => [member, bob]
+        })
+      ),
+      expect(role("heading", { name: "Bob", level: 1 })).toExist(),
+      expect(within(role("main", { name: "Bob" }), text("B"))).toExist(),
+      expect(role("heading", { name: "Members" })).toBeAbsent(),
+      expect(role("button", { name: "Leave" })).toBeAbsent()
+    )
+  })
+
+  it("renames a team from its header, in a form in the body, for someone who may", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, { grants: (grants) => [...grants, Grant.make(GroupPermissions.Rename, inWorkspace)] })
+      ),
+      click(role("button", { name: "Rename" })),
+      expect(role("button", { name: "Rename" })).toBeAbsent(),
+      type(label("Name"), "Design team"),
+      click(role("button", { name: "Save" })),
+      Command.expectExact(
+        RenameGroup({
+          workspaceId: workspace.id,
+          memberId: member.id,
+          groupId: design.id,
+          name: "Design team",
+          expectedName: "Design"
+        })
+      ),
+      Command.resolve(RenameGroup, Message.WroteAction()),
+      expect(label("Name")).toBeAbsent()
+    )
+  })
+
+  it("marks a change to the person's follow that is on its way, and offers no button for it", () => {
+    scene(
+      { update, view },
+      given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: true }) })),
+      expect(text(" · Sending…")).toExist(),
+      expect(role("button", { name: "Unfollow" })).toBeAbsent(),
+      expect(role("button", { name: "Follow" })).toBeAbsent()
+    )
+  })
+
+  it("holds no thread, which it shows in the side pane, while one is open", () => {
+    scene(
+      { update, view },
+      given(withThread),
+      expect(role("main", { name: "Design" })).toExist(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(role("heading", { name: "Composer paste crash" })).toBeAbsent()
+    )
+  })
+})
+
+/** The side pane in a page of its own, so that the scene has a view while no thread is open. */
+const sidePane = (model: Parameters<typeof threadView>[0], h: Parameters<typeof threadView>[1]) =>
+  h.div([], [threadView(model, h)])
+
+describe("a group's side pane", () => {
+  it("is the complementary landmark named Thread, titled by the thread, saying which group it is in", () => {
+    scene(
+      { update, view: threadView },
+      given(withThread),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(
+        within(role("complementary", { name: "Thread" }), role("heading", { name: "Composer paste crash", level: 2 }))
+      ).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), text("Thread in Design"))).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), role("region", { name: "Thread" }))).toExist()
+    )
+  })
+
+  it("closes with a button named Close, back to the group's threads", () => {
+    scene(
+      { update, view: sidePane },
+      given(withThread),
+      click(role("button", { name: "Close" })),
+      expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("renders nothing while no thread is open", () => {
+    scene({ update, view: sidePane }, given(opened), expect(role("complementary")).toBeAbsent())
   })
 })

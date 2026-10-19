@@ -19,7 +19,16 @@ import { type IconName, icon } from "../src/icon.ts"
 import { pane, paneClose, paneColumn, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
-import { sidebar, sidebarEmpty, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } from "../src/sidebar.ts"
+import {
+  sidebar,
+  sidebarEmpty,
+  sidebarFooter,
+  sidebarHeader,
+  sidebarItem,
+  sidebarSection,
+  sidebarSections
+} from "../src/sidebar.ts"
+import { toast, toastStack } from "../src/toast.ts"
 import { type ApplicationViewBuilder, ApplicationComposition } from "./composition.ts"
 import { type Destination, Message, type Model, type PaneTab, type Plan } from "./definition.ts"
 
@@ -44,6 +53,8 @@ const sampleStack = "flex max-w-sm flex-col gap-4"
 const screenFrame = "h-144 outline outline-outline [--amends-screen-height:36rem]"
 
 const shellFrame = "h-176 outline outline-outline [--amends-screen-height:44rem]"
+
+const toastFrame = "relative h-64 bg-canvas outline outline-outline"
 
 const iconSizeRow = "flex items-end gap-4"
 
@@ -479,7 +490,7 @@ const shellRail = (h: ApplicationViewBuilder, current: Destination): Html => {
   })
 }
 
-const shellSidebar = (h: ApplicationViewBuilder, isDirectMessagesEmpty: boolean): Html => {
+const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirectMessagesEmpty: boolean): Html => {
   const press = Message.ClickedButton()
 
   return sidebar(h, {
@@ -498,34 +509,40 @@ const shellSidebar = (h: ApplicationViewBuilder, isDirectMessagesEmpty: boolean)
           sidebarItem(h, { icon: "mark-tasks", label: "Tasks", isCurrent: false, onClick: press })
         ]
       }),
-      sidebarSection(h, {
-        label: "Groups",
-        actions: [
-          iconButton(h, { icon: "mark-search", label: "Search groups", onClick: press }, { size: "compact" }),
-          iconButton(h, { icon: "mark-new", label: "Create group", onClick: press }, { size: "compact" })
-        ],
-        children: [
-          sidebarItem(h, {
-            icon: "mark-channel",
-            label: "general",
-            isCurrent: true,
-            onClick: press,
-            children: [{ icon: "circle-frame", label: "Composer paste crash", isCurrent: false, onClick: press }]
-          }),
-          sidebarItem(h, { icon: "mark-channel", label: "design", isCurrent: false, onClick: press }),
-          sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press })
-        ]
-      }),
-      sidebarSection(h, {
-        label: "Direct messages",
-        actions: [iconButton(h, { icon: "mark-new", label: "New message", onClick: press }, { size: "compact" })],
-        children: isDirectMessagesEmpty
-          ? [sidebarEmpty(h, "No conversations yet")]
-          : [
-              sidebarItem(h, { mark: "AM", label: "Alex Morgan", isCurrent: false, onClick: press }),
-              sidebarItem(h, { mark: "Y", label: "Yumi", isCurrent: false, onClick: press })
-            ]
-      })
+      sidebarSections(h, [
+        sidebarSection(h, {
+          label: "Groups",
+          actions: [
+            iconButton(h, { icon: "mark-search", label: "Search groups", onClick: press }, { size: "compact" }),
+            iconButton(h, { icon: "mark-new", label: "Create group", onClick: press }, { size: "compact" })
+          ],
+          children: [
+            sidebarItem(h, {
+              icon: "mark-channel",
+              label: "general",
+              isCurrent: true,
+              onClick: press,
+              children: [
+                isThreadOpen
+                  ? { icon: "circle-frame", label: "Composer paste crash", isCurrent: true }
+                  : { icon: "circle-frame", label: "Composer paste crash", isCurrent: false, onClick: press }
+              ]
+            }),
+            sidebarItem(h, { icon: "mark-channel", label: "design", isCurrent: false, onClick: press }),
+            sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press })
+          ]
+        }),
+        sidebarSection(h, {
+          label: "Direct messages",
+          actions: [iconButton(h, { icon: "mark-new", label: "New message", onClick: press }, { size: "compact" })],
+          children: isDirectMessagesEmpty
+            ? [sidebarEmpty(h, "No conversations yet")]
+            : [
+                sidebarItem(h, { mark: "AM", label: "Alex Morgan", isCurrent: false, onClick: press }),
+                sidebarItem(h, { mark: "Y", label: "Yumi", isCurrent: false, onClick: press })
+              ]
+        })
+      ])
     ],
     footer: sidebarFooter(h, [hint(h, "12 members · as Alex")])
   })
@@ -634,6 +651,36 @@ const agentPane = (h: ApplicationViewBuilder): Html =>
     ]
   })
 
+const renameRefusal = (h: ApplicationViewBuilder): Html =>
+  toast(h, {
+    text: "Couldn't rename the thread: You may not rename this thread.",
+    action: { label: "Dismiss", onClick: Message.ClickedButton() }
+  })
+
+const postRefusal = (h: ApplicationViewBuilder): Html =>
+  toast(h, {
+    text: "Couldn't post the reply: This browser could not keep that. Try again.",
+    detail: "Thanks! I'll attach the image to the task.",
+    action: { label: "Dismiss", onClick: Message.ClickedButton() }
+  })
+
+const toastGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Toast", [
+    sample(h, "One toast", [h.div([h.Class(toastFrame)], [toastStack(h, [renameRefusal(h)])])], "flex flex-col"),
+    sample(
+      h,
+      "With the text it refused",
+      [h.div([h.Class(toastFrame)], [toastStack(h, [postRefusal(h)])])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A stack of two",
+      [h.div([h.Class(toastFrame)], [toastStack(h, [renameRefusal(h), postRefusal(h)])])],
+      "flex flex-col"
+    )
+  ])
+
 const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
   group(h, "Shell", [
     sample(
@@ -645,7 +692,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           [
             shell(h, {
               rail: shellRail(h, model.destination),
-              sidebar: shellSidebar(h, false),
+              sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
               aside: threadPane(h, model.reply)
             })
@@ -656,15 +703,16 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "Without the side pane: a page about one item, and a section with no items",
+      "Without the side pane: a page about one item, a section with no items, and notices",
       [
         h.div(
           [h.Class(shellFrame)],
           [
             shell(h, {
               rail: shellRail(h, model.destination),
-              sidebar: shellSidebar(h, true),
-              main: agentPane(h)
+              sidebar: shellSidebar(h, false, true),
+              main: agentPane(h),
+              notices: toastStack(h, [renameRefusal(h), postRefusal(h)])
             })
           ]
         )
@@ -687,6 +735,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           toggleGroup(h, model.isNotificationsOn, model.isDigestOn),
           selectGroup(h, model.plan),
           noticeGroup(h),
+          toastGroup(h),
           iconGroup(h),
           formGroup(h),
           directoryGroup(h),

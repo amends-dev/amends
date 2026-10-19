@@ -48,9 +48,12 @@ no class: classes come from a renderer, and the renderers live in the design pac
 outside a workspace are composed from it: the root view frames the sign-in page and the workspace
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, and rows from the design's `centered`, `control`, `form`, and `directory` modules.
-The other views build with `src/controls.ts` for now and switch to `@amends-dev/design/control` a
-Block at a time; a view that has not switched, and the open workspace's header, are plain semantic
-HTML under Tailwind's base styles.
+The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
+and the pane of each destination, `feature/groups` renders the sidebar's sections, `feature/group`
+the main pane and the side pane, `feature/actions` the toasts, and every destination's view wraps
+its content in its own `pane`. What is inside the panes, the threads, messages, forms, and lists,
+is still built with `src/controls.ts` and switches to `@amends-dev/design/control` a Block at a
+time; a view that has not switched is plain semantic HTML under Tailwind's base styles.
 
 ## The program
 
@@ -87,11 +90,17 @@ the pages that compose them; the root composes the pages.
   its threads, and the thread open among them, a keyed occurrence, so opening another makes a fresh
   one and a late result cannot land in the wrong one. It opens with a thread already open when its
   parent gives one. They rename a team, follow it or stop, join a public team or leave one, and,
-  where they manage its members, admit and remove them.
-- `feature/groups`: the groups the person can see, the teams they belong to by name and their
-  conversations by the other members in them, then the public teams they may join, to pick one
-  from; and where they start a team, or a conversation with another member. It reports the group
-  picked, and its parent tells it which group is open, so the one marked is the one shown.
+  where they manage its members, admit and remove them. It has two views. `view`, its canonical one,
+  is the group's main pane, titled by its name with its part in it as the header's buttons, its
+  members, and its threads; `threadView` is the thread open in it as a side pane, titled by the
+  thread, with a button that closes it, and nothing while none is open. The page embeds the Block
+  twice, `view` in the shell's main pane and `threadView` in its side pane.
+- `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
+  to by name, their conversations by the other members in them, then the public teams they may join,
+  to pick one from; and where they start a team, or a conversation with another member, in a form
+  after them. It reports the group picked, and its parent tells it which group is open, so the one
+  marked is the one shown. Its view takes the title of the thread open in that group, from its
+  parent, which it shows under the group.
 - `feature/inbox`: the notifications waiting for the person, newest first, each as the message it is
   about: who wrote the message its activity is about, and the thread it comes from, by its title or
   opening message, in its group, as far as the store holds them. They open a notification's thread,
@@ -145,25 +154,31 @@ the pages that compose them; the root composes the pages.
   give channels, by the connections feature's `connectionsGiving`. A form about a channel that is
   gone closes.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
-  refused, until they dismiss it.
+  refused, until they dismiss it, shown as toasts over the shell's corner.
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
   which the person can change the email or ask for a new code to the same address; it keeps the
   session a right code gives, and reports it.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
   members it has and the name the person goes by in it; it reports the one picked.
-- `page/workspace`: a workspace the person opened, as their member of it: its groups and actions,
-  an "Inbox" button with how many notifications wait, "Connections", "Agents", "Settings", and
-  "Channels" buttons, and the main content, which shows one destination: nothing yet, the inbox,
-  the connections, the agents, the settings, or the channels, which are always read, or the open
-  group, a keyed occurrence. Picking a group opens it; showing any other destination leaves no
-  group marked in the list; opening a notification's thread opens its group with the thread already
-  open, and marks the group. Opening the workspace asks the host for the integrations its
-  connections, agents, and channels link to. It reports when the person leaves it.
+- `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
+  rail has "Home", "Connections", "Agents", and "Channels" buttons and, below them, "Settings", each
+  marked while its destination is open; Home is open while nothing, the inbox, or a group is. The
+  sidebar, named by the workspace, has the workspace's name over a button to all workspaces, an
+  "Inbox" item with how many notifications wait, the groups' sections, and, in its footer, who is
+  signed in with a Sign out button. The main pane shows one destination: nothing yet, titled by the
+  workspace, the inbox, the connections, the agents, the settings, or the channels, which are always
+  read, or the open group, a keyed occurrence; the side pane shows the thread open in that group,
+  only while one is, and the actions' toasts come over both. The page's view takes the account's
+  email as a view input. Picking a group opens it; Home or any other destination leaves no group
+  marked in the list; opening a notification's thread opens its group with the thread already open,
+  and marks the group. Opening the workspace asks the host for the integrations its connections,
+  agents, and channels link to. It reports when the person leaves it and when they ask to sign out.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, and `view.ts`:
   the page the person is on, signed out at the form or signed in with their account, workspaces, and
-  the one open. Signing in lists the workspaces; signing out, `command.ts`,
-  forgets the session, the person's stores, and their sync identity first, so it works offline,
-  then removes the browser's sync key and ends the session as far as the host can be reached.
+  the one open. Signing in lists the workspaces; signing out, from the workspace list or from the
+  open workspace's sidebar, which asks the root, is one step in `composition.ts`, and its command,
+  `command.ts`, forgets the session, the person's stores, and their sync identity first, so it works
+  offline, then removes the browser's sync key and ends the session as far as the host can be reached.
   `entry.ts` assembles the application over `services.ts`, which supplies the stores, the session,
   and the browser's services beneath them.
 
@@ -178,6 +193,8 @@ replacing its key, checking it, and listing the models a connection offers an ag
 
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
 feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
+`memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
+conversation form's and the group's admit form's.
 
 ## The store
 
@@ -290,18 +307,22 @@ browser's storage. Each Block's tests sit beside it:
   chosen, revoking an invitation, and what an owner, an administrator, and a member may do to the
   members; a workspace asking for the integrations as it opens, opening the group picked, showing
   the inbox, the connections, the agents, the settings, or the channels in its place with no group
-  marked, handing the settings and the channels what the person does in them, and opening a
-  notification's thread in its group; and the root signing in a step at a time, listing the
-  workspaces, opening and closing one, and signing out.
+  marked, going home from a group or a destination, handing the settings and the channels what the
+  person does in them, opening a notification's thread in its group, naming the thread open in the
+  group open, and asking the root to sign out; and the root signing in a step at a time, listing the
+  workspaces, opening and closing one, and signing out, from the list or from the open workspace.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors, a reply
   on its way, who types, and a reply written and sent; a task changed by someone who may, read as a
   line by someone who may not, and made by someone who may create tasks; a thread's turns by their
   agents' names and how they stand, stopped and run again by someone who may use the agent and not
   otherwise, a turn's log followed as it is written, until the turn ends or it could not be
-  followed, and the thread listing its agents' turns; a group's name, the person's part in it, its
-  members with removing for the others, and joining in place of the threads of a team they do not
-  belong to; the groups listed apart from the teams to join, with a new team taken only from someone
-  who may create one; the inbox's notifications by the message and thread they are about, marked all
+  followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
+  a conversation's other member, with the person's part in it, its members with removing for the
+  others, admitting, renaming, and joining in place of the threads of a team they do not belong to,
+  and its side pane for the thread open in it, closed by its button; the groups listed in the
+  sidebar's sections apart from the teams to join, a conversation by its other member, with the
+  thread open under the group picked, and a new team taken only from someone who may create one, a
+  conversation started with the member chosen; the inbox's notifications by the message and thread they are about, marked all
   seen, one seen with its failure shown, and one's thread opened; the connections added by an owner
   to an integration, with a key field only for the method that takes one, then checked, with their
   settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
@@ -323,9 +344,13 @@ browser's storage. Each Block's tests sit beside it:
   moved and removed with a failure shown, read by an ordinary member without the controls until the
   person is given the role that manages them, marked as sending with none while a change is on its
   way, with why the integrations could not be listed and a way to ask again, and why they could not
-  be read; and a workspace counting what waits beside "Inbox" whichever destination shows, then
-  showing the inbox, the connections, the agents, the settings, or the channels, which it reads
-  whichever destination shows.
+  be read; and a workspace on the shell: counting what waits beside "Inbox" whichever destination
+  shows, then showing the inbox, the connections, the agents, the settings, or the channels, which
+  it reads whichever destination shows, each in a main pane named for it, with the rail marking the
+  destination open, Home from the inbox and the groups too, the sidebar naming the workspace with
+  who is signed in and the way out in its footer, the thread open in a group in the side pane and
+  under the group in the sidebar, and what the server refused as toasts. The root's own scenes show
+  the open workspace with no header of its own, signing out from its sidebar.
 - The replica's tests cover the cascade, its positions, and the actions it holds: completed,
   rejected, dismissed, and kept through a reset. `overlay`'s cover what an action creates giving way
   to the server's, its changes over the server's records, actions applied in order, edits and

@@ -56,7 +56,8 @@ const fromWorkspace = (message: typeof WorkspaceBlock.Message.Type) =>
   WorkspaceBinding.embedView({
     key: membership.workspace.id,
     slotId: "workspace",
-    model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio").model
+    model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio").model,
+    viewInputs: { email: session.account.email }
   }).toParentMessage(message)
 
 /** The workspace the person opened, if any. */
@@ -97,6 +98,30 @@ describe("the app", () => {
       Command.expectExact(SignOut()),
       Command.resolve(SignOut, Message.CompletedSignOut()),
       model((model) => {
+        expect(Page.matchOrElse(model.page, { SignedOut: ({ signIn }) => signIn.form }, () => undefined)).toMatchObject(
+          {
+            _tag: "EnteringEmail",
+            email: "alice@example.com"
+          }
+        )
+      })
+    )
+  })
+
+  it("signs out when the open workspace asks to, the same way as from the workspace list", () => {
+    story(
+      update,
+      given(init({ session: Option.some(session) }).model),
+      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
+      Command.resolve(LoadConnectionIntegrations, ConnectionsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      Command.resolve(LoadAgentIntegrations, AgentsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      Command.resolve(LoadChannelIntegrations, ChannelsBlock.Message.ReceivedIntegrations({ integrations: [] })),
+      message(fromWorkspace(WorkspaceBlock.Message.ClickedSignOut())),
+      Command.expectExact(SignOut()),
+      Command.resolve(SignOut, Message.CompletedSignOut()),
+      model((model) => {
+        expect(openedIn(model)).toEqual(Option.none())
         expect(Page.matchOrElse(model.page, { SignedOut: ({ signIn }) => signIn.form }, () => undefined)).toMatchObject(
           {
             _tag: "EnteringEmail",

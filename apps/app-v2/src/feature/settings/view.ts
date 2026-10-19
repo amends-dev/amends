@@ -1,5 +1,6 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { InvitationPermissions, WorkspaceSettingsPermissions } from "@amends-dev/core/workspace"
+import { pane } from "@amends-dev/design/pane"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -169,10 +170,11 @@ const invitationsView = (model: Model, h: SettingsViewBuilder): Html => {
 
 /** The workspace's settings: its name, the person's own, its members and their roles, and its invitations. */
 export const view = SettingsComposition.makeView((model, h) =>
-  h.section(
-    [h.AriaLabel("Settings")],
-    [
-      h.h3([], ["Settings"]),
+  pane(h, {
+    variant: "main",
+    label: "Settings",
+    header: { title: "Settings", icon: "mark-settings" },
+    body: [
       errorView(model.notice, h),
       h.h4([], ["Workspace name"]),
       renamable(h, {
@@ -207,5 +209,5 @@ export const view = SettingsComposition.makeView((model, h) =>
         ? invitationsView(model, h)
         : h.empty
     ]
-  )
+  })
 )

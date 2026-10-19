@@ -3,11 +3,12 @@
  * actions, their inbox, their connections, their agents, their settings, and their channels, and
  * what the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
  * the channels, or a group, with its threads and the thread open among them. It reports when the
- * person leaves it.
+ * person leaves it, and when they ask to sign out.
  */
 
 import { GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -20,6 +21,7 @@ import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { titleOf } from "../../feature/thread/definition.ts"
 
 /**
  * What the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
@@ -52,11 +54,21 @@ export const Model = Schema.Struct({
 })
 export type Model = typeof Model.Type
 
+/** The title of the thread open in the group open, while there is one. */
+export const openThreadTitle = (open: Open): Option.Option<string> =>
+  Open.matchOrElse(
+    open,
+    { Group: ({ model }) => Option.map(model.thread, ({ model: thread }) => titleOf(thread)) },
+    () => Option.none()
+  )
+
 /** What the groups, actions, inbox, connections, agents, settings, and channels are made from: the workspace, as the member. */
 export const ChildInitContext = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId })
 
 export const Message = defineMessageUnion({
   ClickedAllWorkspaces: {},
+  ClickedSignOut: {},
+  ClickedHome: {},
   ClickedInbox: {},
   ClickedConnections: {},
   ClickedAgents: {},
@@ -66,7 +78,8 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
-  ClosedWorkspace: {}
+  ClosedWorkspace: {},
+  RequestedSignOut: {}
 })
 export type OutMessage = typeof OutMessage.Type
 

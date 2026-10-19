@@ -1,4 +1,5 @@
 import { Agent, AgentPermissions } from "@amends-dev/core/agent"
+import { pane } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type * as AgentSetup from "../../agentSetup.ts"
@@ -202,10 +203,11 @@ const addView = (model: Model, h: AgentsViewBuilder): Html =>
 /** The workspace's agents, the form open among them, and adding one, for a person who may. */
 export const view = AgentsComposition.makeView((model, h) => {
   const listed = listedAgents(model)
-  return h.section(
-    [h.AriaLabel("Agents")],
-    [
-      h.h3([], ["Agents"]),
+  return pane(h, {
+    variant: "main",
+    label: "Agents",
+    header: { title: "Agents", icon: "mark-agents" },
+    body: [
       errorView(model.notice, h),
       listed.length === 0
         ? h.p([], ["No agents yet."])
@@ -218,5 +220,5 @@ export const view = AgentsComposition.makeView((model, h) => {
         onNone: () => addView(model, h)
       })
     ]
-  )
+  })
 })

@@ -1,4 +1,5 @@
 import { ChannelPermissions } from "@amends-dev/core/channel"
+import { pane } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { button, choiceSelect, errorView, field, sending, submit, toggle } from "../../controls.ts"
@@ -103,10 +104,11 @@ const addView = (model: Model, h: ChannelsViewBuilder): Html =>
 
 /** The workspace's channels, the form open among them, and adding one, for a person who may. */
 export const view = ChannelsComposition.makeView((model, h) =>
-  h.section(
-    [h.AriaLabel("Channels")],
-    [
-      h.h3([], ["Channels"]),
+  pane(h, {
+    variant: "main",
+    label: "Channels",
+    header: { title: "Channels", icon: "mark-channel" },
+    body: [
       errorView(model.notice, h),
       model.channels.length === 0
         ? h.p([], ["No channels yet."])
@@ -120,5 +122,5 @@ export const view = ChannelsComposition.makeView((model, h) =>
           may(model.grants, ChannelPermissions.Create, workspaceTarget(model.workspaceId)) ? addView(model, h) : h.empty
       })
     ]
-  )
+  })
 )

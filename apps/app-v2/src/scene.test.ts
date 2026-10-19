@@ -76,14 +76,28 @@ describe("the app", () => {
     )
   })
 
-  it("keeps its own header over an opened workspace", () => {
+  it("has no header over an opened workspace, which shows who is signed in and the way out in its sidebar", () => {
     scene(
       { update, view },
       given(inWorkspace),
-      expect(text("alice@example.com")).toExist(),
-      expect(role("button", { name: "Sign out" })).toExist(),
+      expect(role("banner")).toBeAbsent(),
+      expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toExist(),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))).toExist(),
+      expect(role("main", { name: "Studio" })).toExist(),
       expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
       expect(role("heading", { name: "Sign in to amends" })).toBeAbsent()
+    )
+  })
+
+  it("signs out from the sidebar of an opened workspace, back to the sign-in form with the address kept", () => {
+    scene(
+      { update, view },
+      given(inWorkspace),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))),
+      Command.expectExact(SignOut()),
+      Command.resolve(SignOut, Message.CompletedSignOut()),
+      expect(role("heading", { name: "Sign in to amends" })).toExist(),
+      expect(label("Email")).toHaveValue("alice@example.com")
     )
   })
 })

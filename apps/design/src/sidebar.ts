@@ -11,6 +11,8 @@ const sidebarColumn = "flex w-66 flex-none flex-col overflow-hidden bg-panel"
 
 const sidebarBody = "flex min-h-0 flex-1 flex-col gap-5.5 overflow-y-auto overscroll-contain px-3 pt-3.75 pb-4"
 
+const sectionsColumn = "flex flex-none flex-col gap-5.5"
+
 const headerColumn = "flex min-h-24 flex-none flex-col gap-3.5 border-b border-divider px-4.5 pt-4.25 pb-1.75"
 
 const headerRow = "flex h-7 items-center gap-2.5"
@@ -56,8 +58,10 @@ const subItemList = "m-0 mt-1 flex list-none flex-col gap-1 p-0"
 
 const subItemColumn = "ms-9.25"
 
-const subItemRow =
-  "relative flex h-8 w-full cursor-pointer items-center gap-2 bg-transparent px-2 text-start text-hint text-ink-secondary focus-ring-inset hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:text-ink aria-[current=page]:indicator-bar"
+const subItemLook =
+  "relative flex h-8 w-full items-center gap-2 bg-transparent px-2 text-start text-hint text-ink-secondary aria-[current=page]:bg-selected aria-[current=page]:text-ink aria-[current=page]:indicator-bar"
+
+const subItemButton = `${subItemLook} cursor-pointer focus-ring-inset hover:bg-hover`
 
 const subItemConnector = "pointer-events-none absolute -start-4.75 -top-1 h-[calc(50%+0.28125rem)] w-4.5 text-stitch"
 
@@ -69,7 +73,8 @@ export type SidebarSubItem<Message> = Readonly<{
   icon?: IconName
   label: string
   isCurrent: boolean
-  onClick: Message
+  /** The row is a button when it has one, and a plain row that only says where the person is otherwise. */
+  onClick?: Message
 }>
 
 const renderConnector = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>): Html =>
@@ -92,32 +97,38 @@ const renderConnector = <Message, Requirements>(h: HtmlBuilder<Message, Requirem
     ]
   )
 
+const renderSubItemContent = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  subItem: SidebarSubItem<Message>
+): ReadonlyArray<Html> => [
+  renderConnector(h),
+  subItem.icon === undefined ? h.empty : h.span([h.Class(itemIcon)], [icon(h, subItem.icon, { size: "xs" })]),
+  h.span([h.Class(itemLabel)], [subItem.label])
+]
+
 const renderSubItem = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   subItem: SidebarSubItem<Message>
-): Html =>
-  h.li(
+): Html => {
+  const current = subItem.isCurrent ? [h.AriaCurrent("page")] : []
+  const { onClick } = subItem
+
+  return h.li(
     [h.Class(subItemColumn)],
     [
-      Button.view(
-        {
-          onClick: subItem.onClick,
-          toView: (attributes) =>
-            h.button(
-              [...attributes.button, ...(subItem.isCurrent ? [h.AriaCurrent("page")] : []), h.Class(subItemRow)],
-              [
-                renderConnector(h),
-                subItem.icon === undefined
-                  ? h.empty
-                  : h.span([h.Class(itemIcon)], [icon(h, subItem.icon, { size: "xs" })]),
-                h.span([h.Class(itemLabel)], [subItem.label])
-              ]
-            )
-        },
-        h
-      )
+      onClick === undefined
+        ? h.span([...current, h.Class(subItemLook)], renderSubItemContent(h, subItem))
+        : Button.view(
+            {
+              onClick,
+              toView: (attributes) =>
+                h.button([...attributes.button, ...current, h.Class(subItemButton)], renderSubItemContent(h, subItem))
+            },
+            h
+          )
     ]
   )
+}
 
 const renderItemLeading = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -218,10 +229,21 @@ export const sidebarSection = <Message, Requirements>(
   )
 
 /**
+ * The sections a Block renders for the sidebar, in a column with the gap the sidebar's body puts between
+ * its own sections, so they lie among them as if the sidebar had made them. `children` are
+ * `sidebarSection`s.
+ */
+export const sidebarSections = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  children: ReadonlyArray<Html>
+): Html => h.div([h.Class(sectionsColumn)], children)
+
+/**
  * A row of the sidebar as one button that sends `onClick`: an `icon`, or a `mark` letter on a small square
  * for a person or a workspace, then the `label` and a `count` at the end. The button is named by the label
  * and described by the count. The current row is filled with the 2px bar and `aria-current="page"`.
- * `children` are the items under it, such as a group's open thread, joined to it by a dashed line.
+ * `children` are the items under it, such as a group's open thread, joined to it by a dashed line; one
+ * with no `onClick` is a plain row that says where the person is.
  */
 export const sidebarItem = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

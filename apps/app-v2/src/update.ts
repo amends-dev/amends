@@ -1,17 +1,10 @@
-import { SignOut } from "./command.ts"
-import { ApplicationComposition, SignInBinding } from "./composition.ts"
+import * as Update from "foldkit/update"
+import { ApplicationComposition, signOut } from "./composition.ts"
 import { Message } from "./message.ts"
-import { Page } from "./model.ts"
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    // Signing out leaves the address in the form.
-    ClickedSignOut: () =>
-      SignInBinding.init({
-        args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => "")],
-        toParentModel: (signIn) => ({ page: Page.SignedOut({ signIn }) }),
-        commands: [SignOut()]
-      }),
+    ClickedSignOut: () => Update.combine(model, [signOut]),
     CompletedSignOut: () => ({ model })
   })
 )

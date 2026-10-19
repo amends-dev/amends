@@ -16,7 +16,8 @@
     "./pane": "./src/pane.ts",
     "./rail": "./src/rail.ts",
     "./shell": "./src/shell.ts",
-    "./sidebar": "./src/sidebar.ts"
+    "./sidebar": "./src/sidebar.ts",
+    "./toast": "./src/toast.ts"
   },
   "scripts": {
     "workshop": "vite",

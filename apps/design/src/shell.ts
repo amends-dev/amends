@@ -19,13 +19,14 @@ const asideScrim = "absolute inset-0 z-10 hidden bg-scrim max-split:block"
 /**
  * The rail, then a card of the `sidebar`, the `main` pane, and, when given, the `aside`. Each is what its
  * module renders. From 80rem the aside sits beside the main pane at 440px; from 64rem to there it floats
- * over the right of the card with a shadow, above a scrim over the rest. The frame is as tall as the
+ * over the right of the card with a shadow, above a scrim over the rest. The `notices`, a `toastStack`,
+ * come last in the frame, over everything, pinned to its bottom end corner. The frame is as tall as the
  * viewport (`100dvh`, or `--amends-screen-height` where an ancestor sets it, as the workshop does).
  * Below 64rem the shell keeps the rail and sidebar in place and the row overflows, scrolling sideways.
  */
 export const shell = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ rail: Html; sidebar: Html; main: Html; aside?: Html }>
+  config: Readonly<{ rail: Html; sidebar: Html; main: Html; aside?: Html; notices?: Html }>
 ): Html =>
   h.div(
     [h.Class(shellFrame)],
@@ -40,6 +41,7 @@ export const shell = <Message, Requirements>(
           config.aside === undefined ? h.empty : h.div([h.Class(asideColumn)], [config.aside])
         ]
       ),
-      config.aside === undefined ? h.empty : h.div([h.AriaHidden(true), h.Class(asideScrim)])
+      config.aside === undefined ? h.empty : h.div([h.AriaHidden(true), h.Class(asideScrim)]),
+      config.notices ?? h.empty
     ]
   )

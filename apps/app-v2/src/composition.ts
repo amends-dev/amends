@@ -7,6 +7,7 @@ import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
+import { SignOut } from "./command.ts"
 import { ApplicationDefinition } from "./definition.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
@@ -41,6 +42,15 @@ export const SignInBinding = ApplicationDefinition.bindChild(SignInBlock, {
   outMessage: { fold: foldSignInOutMessage }
 })
 
+/** Signing out leaves the address in the form, and forgets the session, the person's stores, and their sync identity. */
+export const signOut = ApplicationDefinition.step((model: Model) =>
+  SignInBinding.init({
+    args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => "")],
+    toParentModel: (signIn) => ({ page: Page.SignedOut({ signIn }) }),
+    commands: [SignOut()]
+  })
+)
+
 const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
   OpenedWorkspace: ({ membership }) =>
     ApplicationDefinition.step((model: Model) =>
@@ -73,7 +83,8 @@ const foldWorkspaceOutMessage = (
     ClosedWorkspace: () =>
       ApplicationDefinition.step((model: Model) => ({
         model: atSignedIn(model, (page) => modifyFields(page, { workspace: () => Option.none() }))
-      }))
+      })),
+    RequestedSignOut: () => signOut
   })
 
 export const WorkspaceBinding = ApplicationDefinition.bindChild(WorkspaceBlock, {

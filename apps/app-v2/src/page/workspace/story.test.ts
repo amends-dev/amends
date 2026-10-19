@@ -33,7 +33,7 @@ import {
   InboxBinding,
   SettingsBinding
 } from "./composition.ts"
-import { Message, Open, OutMessage } from "./definition.ts"
+import { Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -45,7 +45,11 @@ const opened = init(workspaceId, memberId, "Studio").model
 
 /** What the groups report, as the workspace receives it. */
 const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
-  GroupsBinding.embedView({ slotId: "groups", model: opened.groups }).toParentMessage(message)
+  GroupsBinding.embedView({
+    slotId: "groups",
+    model: opened.groups,
+    viewInputs: { openThread: Option.none() }
+  }).toParentMessage(message)
 
 /** What the inbox reports, as the workspace receives it. */
 const fromInbox = (message: typeof InboxBlock.Message.Type) =>
@@ -94,6 +98,48 @@ describe("a workspace", () => {
       }),
       message(Message.ClickedAllWorkspaces()),
       expectOutMessage(OutMessage.ClosedWorkspace())
+    )
+  })
+
+  it("asks the root to sign the person out", () => {
+    story(update, given(opened), message(Message.ClickedSignOut()), expectOutMessage(OutMessage.RequestedSignOut()))
+  })
+
+  it("goes home from the group open or a destination, to nothing open and no group marked", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.ClickedHome()),
+      model((model) => {
+        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      message(Message.ClickedConnections()),
+      message(Message.ClickedHome()),
+      model((model) => {
+        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("names the thread open in the group open by its title, and none while there is none", () => {
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(openThreadTitle(model.open)).toEqual(Option.none())
+      }),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(openThreadTitle(model.open)).toEqual(Option.none())
+      }),
+      message(Message.ClickedInbox()),
+      model((model) => {
+        expect(openThreadTitle(model.open)).toEqual(Option.none())
+      })
     )
   })
 
@@ -282,6 +328,7 @@ describe("a workspace", () => {
             Option.map(model.open.model.thread, (open) => [open.threadId, open.model.threadId])
           ]
         ).toEqual([groupId, Option.some([thread.id, thread.id])])
+        expect(openThreadTitle(model.open)).toEqual(Option.some("A thread"))
         expect(model.groups.selected).toEqual(Option.some(groupId))
       })
     )

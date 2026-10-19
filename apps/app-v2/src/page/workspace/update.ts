@@ -4,6 +4,11 @@ import * as Update from "foldkit/update"
 import { GroupsBinding, WorkspaceComposition } from "./composition.ts"
 import { Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
+/** Show nothing yet in the main content. */
+const showNothing = WorkspaceDefinition.step((model) => ({
+  model: modifyFields(model, { open: () => Open.Nothing() })
+}))
+
 /** Show the inbox in the main content. */
 const showInbox = WorkspaceDefinition.step((model) => ({ model: modifyFields(model, { open: () => Open.Inbox() }) }))
 
@@ -28,6 +33,8 @@ const showChannels = WorkspaceDefinition.step((model) => ({
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
+    ClickedSignOut: () => ({ model, outMessage: OutMessage.RequestedSignOut() }),
+    ClickedHome: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showNothing]),
     ClickedInbox: () => Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showInbox]),
     ClickedConnections: () =>
       Update.combine(model, [GroupsBinding.informOpenGroup({ groupId: Option.none() }), showConnections]),

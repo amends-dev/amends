@@ -3,10 +3,18 @@ import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, text, within } from "foldkit/scene"
+import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { iconButton } from "./control.ts"
-import { sidebar, sidebarEmpty, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } from "./sidebar.ts"
+import {
+  sidebar,
+  sidebarEmpty,
+  sidebarFooter,
+  sidebarHeader,
+  sidebarItem,
+  sidebarSection,
+  sidebarSections
+} from "./sidebar.ts"
 
 const Message = defineMessageUnion({
   OpenedItem: { name: Schema.String },
@@ -197,6 +205,93 @@ describe("sidebar", () => {
       given(initial),
       expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
       expect(role("heading")).toBeAbsent()
+    )
+  })
+
+  it("shows a row under an item with no click as a plain row, not a button, that says where the person is", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((_, h) =>
+          sidebar(h, {
+            label: "Workspace",
+            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+            children: [
+              sidebarSection(h, {
+                label: "Groups",
+                children: [
+                  sidebarItem(h, {
+                    icon: "mark-channel",
+                    label: "general",
+                    isCurrent: true,
+                    onClick: open("general"),
+                    children: [
+                      { icon: "circle-frame", label: "Composer paste crash", isCurrent: true },
+                      { label: "Release notes", isCurrent: false }
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Composer paste crash" })).toBeAbsent(),
+      expect(role("button", { name: "Release notes" })).toBeAbsent(),
+      expect(within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))).toExist(),
+      expect(within(selector("li"), text("Release notes"))).toExist(),
+      expect(role("button", { name: "general" })).toHaveAttr("aria-current", "page")
+    )
+  })
+})
+
+describe("sidebarSections", () => {
+  const blockSections = (model: Model, h: HtmlBuilder<Message>) =>
+    sidebarSections(h, [
+      sidebarSection(h, {
+        label: "Groups",
+        children: [
+          sidebarItem(h, {
+            icon: "mark-channel",
+            label: "general",
+            isCurrent: model.current === "general",
+            onClick: open("general")
+          })
+        ]
+      }),
+      sidebarSection(h, { label: "Direct messages", children: [sidebarEmpty(h, "No messages yet")] })
+    ])
+
+  it("lies among the sidebar's own sections, whose headings, items, and empty lines all show in the one landmark", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((model, h) =>
+          sidebar(h, {
+            label: "Workspace",
+            header: sidebarHeader(h, { mark: "M", name: "Mercier & Co" }),
+            children: [
+              sidebarSection(h, {
+                children: [
+                  sidebarItem(h, { icon: "mark-mail", label: "Inbox", isCurrent: true, onClick: open("Inbox") })
+                ]
+              }),
+              blockSections(model, h)
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("navigation", { name: "Workspace" }), role("button", { name: "Inbox" }))).toExist(),
+      expect(
+        within(role("navigation", { name: "Workspace" }), role("heading", { name: "Groups", level: 2 }))
+      ).toExist(),
+      expect(role("heading", { name: "Direct messages", level: 2 })).toExist(),
+      expect(text("No messages yet")).toExist(),
+      click(role("button", { name: "general" })),
+      expect(role("button", { name: "general" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page")
     )
   })
 })

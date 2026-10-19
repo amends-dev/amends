@@ -1,28 +1,28 @@
+import { notice } from "@amends-dev/design/control"
+import { toast, toastStack } from "@amends-dev/design/toast"
 import * as Option from "effect/Option"
-import { button, errorView } from "../../controls.ts"
 import { ActionsComposition } from "./composition.ts"
 import { Message } from "./definition.ts"
 
-/** The actions the server refused, each with why, and a notice, when reading them failed. */
+/** The actions the server refused as toasts, each with why and a way to dismiss it, and a notice, when reading them failed. */
 export const view = ActionsComposition.makeView((model, h) => {
   const refused = model.actions.flatMap((action) =>
     Option.match(action.rejection, { onNone: () => [], onSome: (why) => [{ ...action, why }] })
   )
-  return h.div(
-    [h.AriaLive("polite")],
-    [
-      errorView(model.notice, h),
-      ...refused.map(({ key, what, text, why }) =>
-        h.keyed("div")(
-          key,
-          [h.Role("alert")],
-          [
-            h.p([], [`Couldn't ${what}: ${why}`]),
-            Option.match(text, { onNone: () => h.empty, onSome: (text) => h.blockquote([], [text]) }),
-            button(h, "Dismiss", Message.ClickedDismiss({ key }))
-          ]
-        )
+  return toastStack(h, [
+    notice(h, model.notice),
+    ...refused.map(({ key, what, text, why }) =>
+      h.keyed("div")(
+        key,
+        [],
+        [
+          toast(h, {
+            text: `Couldn't ${what}: ${why}`,
+            ...Option.match(text, { onNone: () => ({}), onSome: (detail) => ({ detail }) }),
+            action: { label: "Dismiss", onClick: Message.ClickedDismiss({ key }) }
+          })
+        ]
       )
-    ]
-  )
+    )
+  ])
 })

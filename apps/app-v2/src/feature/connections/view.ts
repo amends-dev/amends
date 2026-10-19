@@ -1,5 +1,6 @@
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection, ConnectionPermissions } from "@amends-dev/core/connection"
+import { pane } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { button, choiceSelect, errorView, field, sending, submit, toggle } from "../../controls.ts"
@@ -229,10 +230,11 @@ const connectionView = ({ connection, pending }: ConnectionItem, model: Model, h
 
 /** The workspace's connections, the form open among them, and adding one, for a person who may. */
 export const view = ConnectionsComposition.makeView((model, h) =>
-  h.section(
-    [h.AriaLabel("Connections")],
-    [
-      h.h3([], ["Connections"]),
+  pane(h, {
+    variant: "main",
+    label: "Connections",
+    header: { title: "Connections", icon: "mark-connections" },
+    body: [
       errorView(model.notice, h),
       Integrations.match(model.integrations, {
         Loading: () => h.p([], ["Loading the integrations…"]),
@@ -255,5 +257,5 @@ export const view = ConnectionsComposition.makeView((model, h) =>
             : h.empty
       })
     ]
-  )
+  })
 )

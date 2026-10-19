@@ -2,24 +2,26 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, text, within } from "foldkit/scene"
+import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { pane, paneClose } from "./pane.ts"
 import { rail } from "./rail.ts"
 import { shell } from "./shell.ts"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "./sidebar.ts"
+import { toast, toastStack } from "./toast.ts"
 
-const Message = defineMessageUnion({ ClickedHome: {}, ClosedThread: {} })
+const Message = defineMessageUnion({ ClickedHome: {}, ClosedThread: {}, DismissedRefusal: {} })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ isThreadOpen: boolean; homes: number }>
+type Model = Readonly<{ isThreadOpen: boolean; isRefused: boolean; homes: number }>
 
-const initial: Model = { isThreadOpen: true, homes: 0 }
+const initial: Model = { isThreadOpen: true, isRefused: false, homes: 0 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ClickedHome: () => ({ model: modifyFields(model, { homes: (homes) => homes + 1 }) }),
-    ClosedThread: () => ({ model: modifyFields(model, { isThreadOpen: () => false }) })
+    ClosedThread: () => ({ model: modifyFields(model, { isThreadOpen: () => false }) }),
+    DismissedRefusal: () => ({ model: modifyFields(model, { isRefused: () => false }) })
   })
 
 const view = (model: Model, h: HtmlBuilder<Message>) =>
@@ -58,6 +60,16 @@ const view = (model: Model, h: HtmlBuilder<Message>) =>
             body: []
           })
         }
+      : {}),
+    ...(model.isRefused
+      ? {
+          notices: toastStack(h, [
+            toast(h, {
+              text: "Couldn't post the reply: You may not.",
+              action: { label: "Dismiss", onClick: Message.DismissedRefusal() }
+            })
+          ])
+        }
       : {})
   })
 
@@ -90,5 +102,23 @@ describe("shell", () => {
       expect(role("complementary")).toBeAbsent(),
       expect(role("main")).toExist()
     )
+  })
+
+  it("shows its notices as alerts in a live region over the panes, and they go when the app drops them", () => {
+    scene(
+      { update, view },
+      given({ ...initial, isRefused: true }),
+      expect(
+        within(selector('[aria-live="polite"]'), within(role("alert"), text("Couldn't post the reply: You may not.")))
+      ).toExist(),
+      expect(role("complementary", { name: "Composer paste crash" })).toExist(),
+      click(role("button", { name: "Dismiss" })),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("main")).toExist()
+    )
+  })
+
+  it("has no live region for notices when it is given none", () => {
+    scene({ update, view }, given(initial), expect(selector('[aria-live="polite"]')).toBeAbsent())
   })
 })

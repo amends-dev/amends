@@ -57,7 +57,8 @@ describe("the settings", () => {
     scene(
       { update, view },
       given(owner),
-      expect(role("region", { name: "Settings" })).toExist(),
+      expect(role("main", { name: "Settings" })).toExist(),
+      expect(role("heading", { name: "Settings", level: 1 })).toExist(),
       expect(role("button", { name: "Rename workspace" })).toExist(),
       click(role("button", { name: "Rename workspace" })),
       expect(role("button", { name: "Rename workspace" })).toBeAbsent(),
