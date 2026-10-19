@@ -1,0 +1,19 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "*.ts",
+    "*.mts",
+    "fixtures/**/*.ts",
+    "../packages/foldkit/scripts/check-block-type-performance.ts",
+    "../packages/foldkit/scripts/check-emitted-declarations.ts",
+    "../packages/ui/scripts/check-emitted-declarations.ts"
+  ],
+  "exclude": ["fixtures/packed-ssr-consumer"]
+}
