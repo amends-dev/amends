@@ -11,6 +11,7 @@
   "dependencies": {
     "@amends-dev/connection": "workspace:*",
     "@amends-dev/core": "workspace:*",
+    "@amends-dev/design": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
     "@amends-dev/http": "workspace:*",
     "@amends-dev/sync": "workspace:*",
@@ -23,8 +24,10 @@
     "@amends-dev/channel": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@foldkit/vite-plugin": "0.27.1-canary.bfd880b1e6ca",
+    "@tailwindcss/vite": "^4.3.3",
     "fake-indexeddb": "6.2.5",
     "happy-dom": "^20.10.6",
+    "tailwindcss": "^4.3.3",
     "vite": "8.3.4"
   }
 }

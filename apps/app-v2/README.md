@@ -40,6 +40,14 @@ In development the app reaches the host at its own origin's `/api`, which Vite p
 reaches `VITE_AMENDS_API_URL` when it is set, and its own `/api` otherwise. The local host logs the
 sign-in codes it sends.
 
+## Styling
+
+The look is [`@amends-dev/design`](../design/README.md)'s. `vite.config.ts` runs Tailwind,
+`src/styles.css` imports the design's theme, and `index.html` links that stylesheet. A view carries
+no class: classes come from a renderer, and the renderers live in the design package. The views
+build with `src/controls.ts` for now and switch to `@amends-dev/design/control` a Block at a time;
+a view that has not switched is plain semantic HTML under Tailwind's base styles.
+
 ## The program
 
 The program follows Foldkit's architecture, cut into Blocks: each feature owns its state machine,

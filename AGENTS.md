@@ -123,8 +123,14 @@ runs them, and keeps `console` to tests and scripts.
   secrets. `app-v2` is the workspace app being built on Foldkit: a browser app that signs people in
   over the HTTP API and keeps each workspace they open in sync through `sync`, its replica in
   IndexedDB. It runs on the Foldkit Blocks preview, a canary the root manifest's `patchedDependencies`
-  patches from `patches/`; its README says what the patch fixes. Apps may install UI dependencies and
-  consume shared packages.
+  patches from `patches/`; its README says what the patch fixes. `design` is where `app-v2`'s look
+  lives, built from the same Lunacy mocks and importing nothing of `ui`: the tokens as a Tailwind v4
+  theme, and renderers, such as `button` and `field`, that take the caller's `h` builder and a
+  config and return `Html` carrying the Tailwind classes. Block and page views call the renderers
+  and carry no class; `h.Class` appears in `design` alone, so a headless build of the Blocks is
+  `design` with its classes emptied. Its workshop shows every renderer in every state, and a piece
+  is verified there before a page composes it. Apps may install UI dependencies and consume shared
+  packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no

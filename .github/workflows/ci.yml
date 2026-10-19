@@ -73,7 +73,7 @@ jobs:
           - suite: apps
             args: >-
               --project @amends-dev/icons --project @amends-dev/ui
-              --project @amends-dev/site --project @amends-dev/app-v2
+              --project @amends-dev/site --project @amends-dev/design --project @amends-dev/app-v2
     env:
       # Each PostgreSQL shard starts its own cluster from the runner's installation.
       AMENDS_POSTGRES_REQUIRED: "true"
@@ -98,6 +98,9 @@ jobs:
       # Generating the site's API reference also typechecks the examples in doc comments.
       - name: Site
         working-directory: apps/site
+        run: bun run build
+      - name: Design workshop
+        working-directory: apps/design
         run: bun run build
       - name: Workspace app
         working-directory: apps/app-v2

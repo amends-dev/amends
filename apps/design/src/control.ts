@@ -1,0 +1,277 @@
+/**
+ * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons, labelled
+ * fields and boxes, a labelled switch, a choice from a list, why an entry was refused, and that an
+ * action is on its way. Each renders with the caller's builder and messages, and carries the look.
+ */
+
+import * as Button from "@foldkit/ui/button"
+import * as Input from "@foldkit/ui/input"
+import * as Select from "@foldkit/ui/select"
+import * as Switch from "@foldkit/ui/switch"
+import * as Textarea from "@foldkit/ui/textarea"
+import * as Option from "effect/Option"
+import type { Attribute, Html, HtmlBuilder } from "foldkit/html"
+
+const buttonBase =
+  "inline-flex flex-none cursor-pointer items-center justify-center gap-2 border whitespace-nowrap focus-ring aria-disabled:cursor-default"
+
+const buttonLooks = {
+  primary:
+    "border-transparent bg-action font-medium text-on-action not-aria-disabled:hover:opacity-88 aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
+  secondary:
+    "border-outline bg-action-secondary font-medium text-ink not-aria-disabled:hover:border-outline-strong aria-disabled:border-transparent aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
+  quiet:
+    "border-transparent bg-transparent font-normal text-ink-secondary not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-disabled:text-ink-disabled"
+}
+
+const buttonRegularSizes = {
+  primary: "min-h-9 px-4 text-control max-desktop:min-h-11",
+  secondary: "min-h-9 px-4 text-control max-desktop:min-h-11",
+  quiet: "min-h-8 px-2.5 text-hint max-desktop:min-h-11"
+}
+
+const buttonLargeSize = "min-h-11 px-5 text-item"
+
+const buttonWide = "w-full"
+
+const fieldColumn = "flex flex-col gap-2"
+
+const fieldLabel = "block p-0 text-item font-medium text-ink"
+
+const fieldErrorSpacing = "mt-1"
+
+const controlBox =
+  "block w-full min-h-10.5 border border-outline bg-field text-body text-ink focus-ring focus:not-aria-invalid:border-outline-strong aria-invalid:border-outline-danger max-desktop:min-h-11 max-tablet:text-body-touch"
+
+const inputBox = `${controlBox} px-3 placeholder:text-ink-muted`
+
+const textareaBox = `${inputBox} resize-none py-2.5`
+
+const selectBox = `${controlBox} cursor-pointer appearance-none ps-3 pe-10`
+
+const selectChevron = "chevron-down"
+
+const switchRow = "flex items-center gap-3 max-desktop:min-h-11"
+
+const switchTrack =
+  "group relative inline-flex h-5 w-9 flex-none cursor-pointer items-center border border-outline bg-subtle focus-ring data-checked:border-action data-checked:bg-action"
+
+const switchThumb =
+  "block size-3.5 translate-x-0.5 bg-action transition-transform group-data-checked:translate-x-4.5 group-data-checked:bg-subtle motion-reduce:transition-none"
+
+const switchLabel = "cursor-pointer text-item text-ink select-none"
+
+const noticeBase = "text-hint"
+
+const noticeTones = {
+  danger: "text-danger-text",
+  caution: "text-caution-text",
+  success: "text-success-text"
+}
+
+const sendingMark = "text-meta text-ink-muted"
+
+export type ButtonVariant = keyof typeof buttonLooks
+
+export type ButtonOptions = Readonly<{
+  /** Filled for the action a form exists for, `secondary` (the default) beside it, `quiet` for a row's. */
+  variant?: ButtonVariant
+  /** `large` is 44px, for the centered screens. */
+  size?: "large"
+  /** Fill the container's width. */
+  wide?: boolean
+  isDisabled?: boolean
+}>
+
+export type NoticeTone = keyof typeof noticeTones
+
+export type NoticeOptions = Readonly<{
+  /** `danger` (the default) says what went wrong. */
+  tone?: NoticeTone
+}>
+
+const joinClasses = (...classes: ReadonlyArray<string | false>): string => classes.filter(Boolean).join(" ")
+
+const renderButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  behavior: Readonly<{ type: "button" | "submit"; onClick?: Message }>,
+  options: ButtonOptions,
+  defaultVariant: ButtonVariant
+) => {
+  const variant = options.variant ?? defaultVariant
+  const className = joinClasses(
+    buttonBase,
+    buttonLooks[variant],
+    options.size === "large" ? buttonLargeSize : buttonRegularSizes[variant],
+    options.wide === true && buttonWide
+  )
+
+  return Button.view(
+    {
+      ...behavior,
+      isDisabled: options.isDisabled ?? false,
+      toView: (attributes) => h.button([...attributes.button, h.Class(className)], [label])
+    },
+    h
+  )
+}
+
+/** A button that sends `onClick`. */
+export const button = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  onClick: Message,
+  options: ButtonOptions = {}
+) => renderButton(h, label, { type: "button", onClick }, options, "secondary")
+
+/** The button that sends its form, filled unless the options say otherwise. */
+export const submit = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  options: ButtonOptions = {}
+) => renderButton(h, label, { type: "submit" }, options, "primary")
+
+/** Why what the person entered was refused, or what to know about it, as an alert, when there is one. */
+export const notice = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  message: Option.Option<string>,
+  options: NoticeOptions = {}
+): Html =>
+  Option.match(message, {
+    onNone: () => h.empty,
+    onSome: (text) =>
+      h.p([h.Role("alert"), h.Class(joinClasses(noticeBase, noticeTones[options.tone ?? "danger"]))], [text])
+  })
+
+/** That what the person did is on its way to the server, while it is. */
+export const sending = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, pending: boolean): Html =>
+  pending ? h.span([h.Class(sendingMark)], [" · Sending…"]) : h.empty
+
+const describeError = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  descriptionAttributes: ReadonlyArray<Attribute<Message>>,
+  error: Option.Option<string>
+): Html => {
+  if (Option.isNone(error)) {
+    return h.empty
+  }
+
+  return h.div([...descriptionAttributes, h.Class(fieldErrorSpacing)], [notice(h, error)])
+}
+
+/** A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if it was. */
+export const field = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    id: string
+    label: string
+    type: string
+    value: string
+    onInput: (value: string) => Message
+    isAutofocus?: boolean
+  }>,
+  error: Option.Option<string>
+) =>
+  Input.view(
+    {
+      id: config.id,
+      type: config.type,
+      value: config.value,
+      onInput: config.onInput,
+      isInvalid: Option.isSome(error),
+      hasDescription: Option.isSome(error),
+      isAutofocus: config.isAutofocus ?? true,
+      toView: (attributes) =>
+        h.div(
+          [h.Class(fieldColumn)],
+          [
+            h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
+            h.input([...attributes.input, h.Class(inputBox)]),
+            describeError(h, attributes.description, error)
+          ]
+        )
+    },
+    h
+  )
+
+/** A labelled box for longer text, `rows` lines tall, three unless given. */
+export const textarea = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ id: string; label: string; value: string; onInput: (value: string) => Message; rows?: number }>
+) =>
+  Textarea.view(
+    {
+      id: config.id,
+      value: config.value,
+      rows: config.rows ?? 3,
+      onInput: config.onInput,
+      toView: (attributes) =>
+        h.div(
+          [h.Class(fieldColumn)],
+          [
+            h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
+            h.textarea([...attributes.textarea, h.Class(textareaBox)])
+          ]
+        )
+    },
+    h
+  )
+
+/** A labelled switch, on or off, with its label after it. */
+export const toggle = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ id: string; label: string; isOn: boolean; onToggle: (isOn: boolean) => Message }>
+) =>
+  Switch.view(
+    {
+      id: config.id,
+      isChecked: config.isOn,
+      onToggle: config.onToggle,
+      toView: (attributes) =>
+        h.div(
+          [h.Class(switchRow)],
+          [
+            h.button([...attributes.button, h.Class(switchTrack)], [h.span([h.Class(switchThumb)])]),
+            h.span([...attributes.label, h.Class(switchLabel)], [config.label])
+          ]
+        )
+    },
+    h
+  )
+
+/** A choice of one of `choices`, each a value and how the person reads it. */
+export const choiceSelect = <Choice extends string, Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    id: string
+    label: string
+    choices: ReadonlyArray<readonly [Choice, string]>
+    value: Choice
+    onChange: (value: Choice) => Message
+  }>
+) =>
+  Select.view(
+    {
+      id: config.id,
+      value: config.value,
+      onChange: (value) => config.onChange(config.choices.find(([choice]) => choice === value)?.[0] ?? config.value),
+      toView: (attributes) =>
+        h.div(
+          [h.Class(fieldColumn)],
+          [
+            h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
+            h.div(
+              [h.Class(selectChevron)],
+              [
+                h.select(
+                  [...attributes.select, h.Class(selectBox)],
+                  config.choices.map(([choice, label]) => h.option([h.Value(choice)], [label]))
+                )
+              ]
+            )
+          ]
+        )
+    },
+    h
+  )
