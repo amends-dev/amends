@@ -269,7 +269,19 @@ the pages that compose them; the root composes the pages.
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
   Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox, a
   group picked, and a notification's thread opened, asks it to close (a close of a closed dialog does
-  nothing). Opening the workspace lists the host's integrations
+  nothing). The thread's side pane is in the shell's card beside the main pane only from 80rem
+  (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
+  the toasts come inside whichever dialog is open, where they can be read and dismissed. The page
+  binds another `DialogBlock` for it as `aside` (`AsideBinding`, id `workspace-aside`) and lends the
+  shell the pane's view with the dialog's, and whether the dialog is open. `isAsideFloating(viewport)`
+  decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
+  at `Split`) as the open group reports `OpenedThread`, and as a notification's thread opens its
+  group, and closes it (`hideAside`) as the group reports `ClosedThread` and in every navigation,
+  since the thread goes with its group. When the dialog closes by itself, by Escape or its scrim, the
+  page closes the thread with the group's `requestCloseThread`, except at `Split`, where its closing
+  is the pane moving beside the main pane and the thread stays open. When the window's width changes
+  with a thread open, the page puts the pane where the width wants it: crossing 80rem either way
+  moves the pane between its dialog and the card without closing the thread. Opening the workspace lists the host's integrations
   once, over HTTP, and informs its connections, agents, and channels of them, or of why they could
   not be reached; it lists them again when one of the three asks. It keeps the window's width, which
   the root gives it as it opens and informs it of when the width changes (`informViewport`); once the
@@ -434,7 +446,10 @@ browser's storage. Each Block's tests sit beside it:
   person does in them, opening a notification's thread in its group, naming the thread open in the
   group open, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
   asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
-  place; and
+  place; the thread opening the side pane's dialog where the pane is one, from a notification, from a
+  thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing
+  with the thread, with every navigation, and as the window widens to `Split`, which leaves the thread
+  open; and the thread closing as its dialog closes by itself, below `Split`; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
   from the list or from the open workspace, and following the window's width, for the workspace it
   opens too.
@@ -501,10 +516,15 @@ browser's storage. Each Block's tests sit beside it:
   opened in a dialog from its main pane, the sidebar in place with no Menu button from `Desktop`, the
   Menu button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
   sidebar, its scrim closing it, or a link of the sidebar or the rail, a group picked among them,
-  closing it, and what the server refused as toasts, and the connections listing the integrations
+  closing it, the thread picked opened beside the main pane at `Split` with no dialog, and below it in
+  a dialog named Thread that holds the pane, closed by the pane's Close, by its Back on a phone, or by
+  the scrim, which also closes the thread, and what the server refused as toasts, over the shell and
+  inside the side pane's dialog while it is open, and the connections listing the integrations
   again after the host could not be reached. The root's own scenes show
-  the open workspace with no header of its own, signing out from its sidebar, and its Menu button
-  appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse.
+  the open workspace with no header of its own, signing out from its sidebar, its Menu button
+  appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse,
+  and the thread open moving from its place beside the main pane into its dialog as the window narrows
+  to `Desktop`, staying there at `Phone`, and back as it widens to `Split`.
   A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through

@@ -6,7 +6,7 @@
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { button } from "./control.ts"
 
-const stackColumn = "absolute end-4 bottom-4 z-30 flex w-100 max-w-[calc(100%-2rem)] flex-col gap-2"
+const stackColumn = "fixed end-4 bottom-4 z-30 flex w-100 max-w-[calc(100%-2rem)] flex-col gap-2"
 
 const toastCard = "flex items-start gap-3 border border-outline bg-raised py-3 ps-4 pe-2 shadow-toast"
 
@@ -17,9 +17,10 @@ const toastText = "m-0 text-body break-words text-ink"
 const toastDetail = "m-0 line-clamp-3 text-hint break-words text-ink-secondary"
 
 /**
- * The column of toasts pinned to the bottom end corner of the shell's frame, 25rem wide at most, above the
- * panes and the scrim. It is a polite live region, so it is there before the first toast and each one is
- * announced as it arrives. `children` are `toast`s, or a `notice`.
+ * The column of toasts pinned to the bottom end corner of the window, 25rem wide at most, above the panes and
+ * the scrim. It is fixed, so it stays in that corner wherever it renders, and the shell renders it inside an
+ * open dialog, since the rest of the window is inert. It is a polite live region, so it is there before the
+ * first toast and each one is announced as it arrives. `children` are `toast`s, or a `notice`.
  */
 export const toastStack = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

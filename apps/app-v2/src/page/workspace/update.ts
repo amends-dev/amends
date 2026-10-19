@@ -7,10 +7,12 @@ import {
   ChannelsBinding,
   ConnectionsBinding,
   GroupsBinding,
+  hideAside,
   MenuBinding,
+  showAside,
   WorkspaceComposition
 } from "./composition.ts"
-import { Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
+import { isAsideFloating, isThreadOpen, Message, Open, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Show nothing yet in the main content. */
 const showNothing = WorkspaceDefinition.step((model) => ({
@@ -38,12 +40,28 @@ const showChannels = WorkspaceDefinition.step((model) => ({
   model: modifyFields(model, { open: () => Open.Channels() })
 }))
 
-/** Go to a destination: close the navigation drawer, leave no group marked in the sidebar, and `show` it. */
+/**
+ * Go to a destination: close the navigation drawer and the side pane's dialog, leave no group marked in the
+ * sidebar, and `show` it.
+ */
 const goTo = (show: typeof showNothing) =>
-  Update.combine([MenuBinding.requestClose(), GroupsBinding.informOpenGroup({ groupId: Option.none() }), show])
+  Update.combine([
+    MenuBinding.requestClose(),
+    hideAside,
+    GroupsBinding.informOpenGroup({ groupId: Option.none() }),
+    show
+  ])
 
 /** Lay the workspace out for a window of the width `viewport`. */
 const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))
+
+/**
+ * Put the thread open, if there is one, where the window's width puts the side pane: in its dialog, which
+ * opens, or beside the main pane, which closes the dialog without closing the thread.
+ */
+const placeAside = WorkspaceDefinition.step((model) =>
+  !isThreadOpen(model.open) ? WorkspaceDefinition.stepNoop() : isAsideFloating(model.viewport) ? showAside : hideAside
+)
 
 /** Whether the sidebar is in place at `viewport`, where there is no drawer to keep open. */
 const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop" || viewport === "Split"
@@ -62,7 +80,8 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     InformedOfViewport: ({ viewport }) =>
       Update.combine(model, [
         showViewport(viewport),
-        ...(hasSidebarInPlace(viewport) ? [MenuBinding.requestClose()] : [])
+        ...(hasSidebarInPlace(viewport) ? [MenuBinding.requestClose()] : []),
+        placeAside
       ]),
     ReceivedIntegrations: ({ integrations }) =>
       Update.combine(model, [

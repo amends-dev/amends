@@ -14,7 +14,7 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { LoadIntegrations } from "./command.ts"
-import { type Model, Open, WorkspaceDefinition } from "./definition.ts"
+import { isAsideFloating, type Model, Open, WorkspaceDefinition } from "./definition.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
 const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
@@ -32,21 +32,23 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
     })
   )
 
-/** Picking a group opens it, and closes the navigation drawer. */
+/** Picking a group opens it without a thread, and closes the navigation drawer and the side pane's dialog. */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
-  SelectedGroup: ({ groupId }) => Update.combine([MenuBinding.requestClose(), openGroup(groupId, Option.none())])
+  SelectedGroup: ({ groupId }) =>
+    Update.combine([MenuBinding.requestClose(), hideAside, openGroup(groupId, Option.none())])
 })
 
 /**
- * Opening a notification's thread opens its group with the thread open, marks the group open in the list, and
- * closes the navigation drawer.
+ * Opening a notification's thread opens its group with the thread open, marks the group open in the list,
+ * closes the navigation drawer, and opens the side pane's dialog where the pane is one.
  */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
   OpenedThread: ({ groupId, threadId }) =>
     Update.combine([
       MenuBinding.requestClose(),
       GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
-      openGroup(groupId, Option.some(threadId))
+      openGroup(groupId, Option.some(threadId)),
+      showAside
     ])
 })
 
@@ -57,11 +59,46 @@ const foldMenuOutMessage = DialogBlock.OutMessage.match({
   CompletedClose: () => WorkspaceDefinition.stepNoop()
 })
 
+/**
+ * The side pane's dialog opening and finishing its close change nothing else. Its closing, by Escape, its scrim,
+ * or the page, closes the thread, except at `Split`: there it is the pane moving beside the main pane, not the
+ * person leaving the thread.
+ */
+const foldAsideOutMessage = DialogBlock.OutMessage.match({
+  Opened: () => WorkspaceDefinition.stepNoop(),
+  Closed: () =>
+    WorkspaceDefinition.step((model: Model) =>
+      isAsideFloating(model.viewport) ? closeOpenThread : WorkspaceDefinition.stepNoop()
+    ),
+  CompletedClose: () => WorkspaceDefinition.stepNoop()
+})
+
 export const MenuBinding = WorkspaceDefinition.bindChild(DialogBlock, {
   field: "menu",
   init: { contextToArgs: () => [{ id: "workspace-menu" }] },
   outMessage: { fold: foldMenuOutMessage }
 })
+
+export const AsideBinding = WorkspaceDefinition.bindChild(DialogBlock, {
+  field: "aside",
+  init: { contextToArgs: () => [{ id: "workspace-aside" }] },
+  outMessage: { fold: foldAsideOutMessage }
+})
+
+/** Open the side pane's dialog, where the window's width puts the side pane in one. */
+export const showAside = WorkspaceDefinition.step((model: Model) =>
+  isAsideFloating(model.viewport) ? AsideBinding.requestOpen() : WorkspaceDefinition.stepNoop()
+)
+
+/** Close the side pane's dialog; closing one that is closed does nothing. */
+export const hideAside = AsideBinding.requestClose()
+
+/** Close the thread open in the group open, if there is one. */
+const closeOpenThread = WorkspaceDefinition.step((model: Model) =>
+  Open.matchOrElse(model.open, { Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId) }, () =>
+    WorkspaceDefinition.stepNoop()
+  )
+)
 
 export const GroupsBinding = WorkspaceDefinition.bindChild(GroupsBlock, {
   field: "groups",
@@ -103,11 +140,11 @@ export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
 
-/** The open group reporting that its thread opened or closed changes nothing yet. */
+/** The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it. */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
-    OpenedThread: () => WorkspaceDefinition.stepNoop(),
-    ClosedThread: () => WorkspaceDefinition.stepNoop()
+    OpenedThread: () => showAside,
+    ClosedThread: () => hideAside
   })
 
 /** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
@@ -127,6 +164,7 @@ export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
   bindings: [
     MenuBinding,
+    AsideBinding,
     GroupsBinding,
     ActionsBinding,
     InboxBinding,

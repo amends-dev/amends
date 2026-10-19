@@ -1,13 +1,30 @@
 import { describe, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
-import { Command, Subscription, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
-import { membership, session } from "../test/fixtures.ts"
+import {
+  Command,
+  Mount,
+  Subscription,
+  click,
+  expect,
+  given,
+  label,
+  role,
+  scene,
+  text,
+  type,
+  within
+} from "foldkit/scene"
+import { modifyFields } from "foldkit/struct"
+import { general, membership, session, thread } from "../test/fixtures.ts"
 import { SignOut } from "./command.ts"
+import { GroupBlock } from "./feature/group/block.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { SendCode } from "./page/signIn/command.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
+import { Open } from "./page/workspace/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { Workspaces } from "./page/workspaces/definition.ts"
 import { subscriptions } from "./subscription.ts"
@@ -38,6 +55,36 @@ const inWorkspace: Model = {
     })
   }),
   viewport: "Split"
+}
+
+/** Signed in as alice, with the thread of general open in her opened workspace. */
+const withThread: Model = {
+  ...inWorkspace,
+  page: Page.matchOrElse(
+    inWorkspace.page,
+    {
+      SignedIn: (signedIn) =>
+        Page.SignedIn({
+          ...signedIn,
+          workspace: Option.map(signedIn.workspace, (opened) => ({
+            ...opened,
+            model: modifyFields(opened.model, {
+              open: () =>
+                Open.Group({
+                  groupId: general.id,
+                  model: GroupBlock.init(
+                    membership.workspace.id,
+                    membership.member.id,
+                    general.id,
+                    Option.some(thread.id)
+                  ).model
+                })
+            })
+          }))
+        })
+    },
+    (page) => page
+  )
 }
 
 describe("the app", () => {
@@ -105,6 +152,44 @@ describe("the app", () => {
       Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
       expect(role("button", { name: "Menu" })).toBeAbsent(),
       expect(role("navigation", { name: "Studio" })).toExist()
+    )
+  })
+
+  it("moves the thread open between its place beside the main pane and the side pane's dialog as the width changes", () => {
+    scene(
+      { update, view, subscriptions },
+      given(withThread),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(within(role("dialog", { name: "Thread" }), role("complementary", { name: "Thread" }))).toExist(),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Split" })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(role("complementary", { name: "Thread" })).toExist()
+    )
+  })
+
+  it("keeps the side pane's dialog open as the width narrows from Desktop, and opens none while no thread is open", () => {
+    scene(
+      { update, view, subscriptions },
+      given(withThread),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Phone" })),
+      Command.expectNone(),
+      expect(within(role("dialog", { name: "Thread" }), role("complementary", { name: "Thread" }))).toExist()
+    )
+    scene(
+      { update, view, subscriptions },
+      given(inWorkspace),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
+      Command.expectNone(),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent()
     )
   })
 

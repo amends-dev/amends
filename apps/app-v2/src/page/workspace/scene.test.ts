@@ -132,6 +132,19 @@ const withConversation = modifyFields(withThread, {
     )
 })
 
+/** The same, with no thread open, for one to be picked in the main pane. */
+const withoutThread = modifyFields(withConversation, {
+  open: (open) =>
+    Open.matchOrElse(
+      open,
+      {
+        Group: ({ groupId, model: group }) =>
+          Open.Group({ groupId, model: modifyFields(group, { thread: () => Option.none() }) })
+      },
+      () => open
+    )
+})
+
 /** A reply the server refused, with the text it carried. */
 const withRefusal = modifyFields(opened, {
   actions: (actions) =>
@@ -710,30 +723,101 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens a thread picked in the main pane in the side pane, marking it in the list", () => {
+  it("opens a thread picked in the main pane in the side pane beside it, marking it in the list, with no dialog", () => {
     scene(
       { update, view: sceneView },
-      given(
-        modifyFields(withConversation, {
-          open: (open) =>
-            Open.matchOrElse(
-              open,
-              {
-                Group: ({ groupId, model: group }) =>
-                  Open.Group({ groupId, model: modifyFields(group, { thread: () => Option.none() }) })
-              },
-              () => open
-            )
-        })
-      ),
+      given(withoutThread),
       expect(role("complementary")).toBeAbsent(),
       expect(within(role("list", { name: "Threads" }), selector('[aria-current="true"]'))).toBeAbsent(),
       click(role("button", { name: "Plans for the week" })),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      Command.expectNone(),
       expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
       expect(
         within(role("list", { name: "Threads" }), within(selector('[aria-current="true"]'), text("Plans for the week")))
       ).toExist()
+    )
+  })
+
+  it("opens a thread picked in the main pane in the side pane's dialog below Split, closed with the pane's Close", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withoutThread, { viewport: () => "Desktop" })),
+      expect(role("complementary")).toBeAbsent(),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      click(role("button", { name: "Plans for the week" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      inside(
+        role("dialog", { name: "Thread" }),
+        expect(role("heading", { name: "Thread", level: 2 })).toExist(),
+        expect(role("complementary", { name: "Thread" })).toExist(),
+        expect(role("heading", { name: "A thread", level: 2 })).toExist()
+      ),
+      expect(
+        within(role("list", { name: "Threads" }), within(selector('[aria-current="true"]'), text("Plans for the week")))
+      ).toExist(),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Close" }))),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(role("list", { name: "Threads" }), selector('[aria-current="true"]'))).toBeAbsent(),
+      expect(role("main", { name: "General" })).toExist()
+    )
+  })
+
+  it("fills the window with the side pane's dialog on a phone, which its Back closes", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withoutThread, { viewport: () => "Phone" })),
+      click(role("button", { name: "Plans for the week" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(within(role("dialog", { name: "Thread" }), role("complementary", { name: "Thread" }))).toExist(),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Back" }))),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(role("main", { name: "General" })).toExist()
+    )
+  })
+
+  it("closes the thread when the side pane's dialog closes from its scrim", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withoutThread, { viewport: () => "Desktop" })),
+      click(role("button", { name: "Plans for the week" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      // The scrim has no role to find it by; it is the first element in the dialog.
+      click(selector("#workspace-aside div")),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Thread" })).toBeAbsent(),
+      expect(within(role("list", { name: "Threads" }), selector('[aria-current="true"]'))).toBeAbsent(),
+      expect(text("A thread")).toBeAbsent()
+    )
+  })
+
+  it("shows the toasts in the side pane's dialog while it is open, where they are read and dismissed", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withoutThread, { viewport: () => "Desktop", actions: () => withRefusal.actions })),
+      expect(within(role("alert"), text("Couldn't post the reply: You may not reply here."))).toExist(),
+      expect(within(role("dialog", { name: "Thread" }), role("alert"))).toBeAbsent(),
+      click(role("button", { name: "Plans for the week" })),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(within(role("dialog", { name: "Thread" }), role("alert"))).toExist(),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Dismiss" }))),
+      Command.expectExact(Dismiss({ workspaceId: workspace.id, memberId: member.id, key: "action-1" })),
+      Command.resolve(Dismiss, ActionsBlock.Message.CompletedDismiss())
     )
   })
 

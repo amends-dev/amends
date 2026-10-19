@@ -21,29 +21,36 @@ import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { Integrations } from "../../feature/connections/definition.ts"
+import { GroupBlock } from "../../feature/group/block.ts"
+import { ThreadsBinding } from "../../feature/group/composition.ts"
+import { init as initGroup } from "../../feature/group/init.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
+import { ThreadsBlock } from "../../feature/threads/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { LoadIntegrations } from "./command.ts"
 import {
   AgentsBinding,
+  AsideBinding,
   ChannelsBinding,
   ConnectionsBinding,
+  GroupBinding,
   GroupsBinding,
   InboxBinding,
   MenuBinding,
   SettingsBinding
 } from "./composition.ts"
-import { Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
+import { isThreadOpen, Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
 const groupId = GroupId.GroupId.make("general")
+const otherGroupId = GroupId.GroupId.make("design")
 
 const opened = init(workspaceId, memberId, "Studio", "Split").model
 
@@ -90,9 +97,32 @@ const fromMenu = (message: typeof DialogBlock.Message.Type) =>
     message
   )
 
-/** The dialog showing, as the drawer opening asks it to, and closing, as every navigation asks it to. */
-const menuShown = Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
-const menuClosed = Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+/** What the side pane's dialog reports, as the workspace receives it. */
+const fromAside = (message: typeof DialogBlock.Message.Type) =>
+  AsideBinding.embedView({ slotId: "aside", model: opened.aside, viewInputs: { toView: () => null } }).toParentMessage(
+    message
+  )
+
+/** The open group, before it is read, with no thread open. */
+const openGroupModel = initGroup(workspaceId, memberId, groupId, Option.none()).model
+
+/** What the open group reports, as the workspace receives it. */
+const fromGroup = (message: typeof GroupBlock.Message.Type) =>
+  GroupBinding.embedView({ key: groupId, slotId: "group", model: openGroupModel }).toParentMessage(message)
+
+/** What the open group's threads report, as the workspace receives it. */
+const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
+  fromGroup(
+    ThreadsBinding.embedView({
+      slotId: "threads",
+      model: openGroupModel.threads,
+      viewInputs: { members: [], groupName: "General", openThreadId: Option.none() }
+    }).toParentMessage(message)
+  )
+
+/** A dialog showing, as opening one asks it to, and closing, as closing one asks it to. */
+const dialogShown = Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+const dialogClosed = Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
 
 /** The notification of activity in a thread of general, read by the inbox. */
 const notification = notificationOf("notification-1", 2, 5)
@@ -103,6 +133,36 @@ const receivedNotification = message(
     })
   )
 )
+
+const atDesktop = init(workspaceId, memberId, "Studio", "Desktop").model
+
+/** The drafts read as a notification's thread opens its group: the group's new thread, and the thread's reply. */
+const draftsRead = [
+  Command.resolve(
+    ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Thread.make({ groupId }) }),
+    ComposerBlock.Message.ReceivedDraft({ text: "" })
+  ),
+  Command.resolve(
+    ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Reply.make({ threadId: thread.id }) }),
+    ComposerBlock.Message.ReceivedDraft({ text: "" })
+  )
+] as const
+
+/** The group picked and a thread picked among its threads, which opens the side pane's dialog where it is one. */
+const threadPicked = [
+  message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+  Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+  message(fromThreads(ThreadsBlock.Message.ClickedThread({ threadId: thread.id }))),
+  dialogShown,
+  Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
+] as const
+
+/** The thread of the notification opened from the inbox. */
+const notificationOpened = [
+  receivedNotification,
+  message(Message.ClickedInbox()),
+  message(fromInbox(InboxBlock.Message.ClickedOpen({ notificationId: notification.id })))
+] as const
 
 describe("a workspace", () => {
   it("opens the group picked, and reports when the person leaves", () => {
@@ -155,12 +215,12 @@ describe("a workspace", () => {
         expect(model.menu.isOpen).toBe(false)
       }),
       message(Message.ClickedMenu()),
-      menuShown,
+      dialogShown,
       model((model) => {
         expect(model.menu.isOpen).toBe(true)
       }),
       message(fromMenu(DialogBlock.Message.RequestedClose())),
-      menuClosed,
+      dialogClosed,
       model((model) => {
         expect(model.menu.isOpen).toBe(false)
       })
@@ -173,9 +233,9 @@ describe("a workspace", () => {
         update,
         given(opened),
         message(Message.ClickedMenu()),
-        menuShown,
+        dialogShown,
         message(Message.InformedOfViewport({ viewport })),
-        menuClosed,
+        dialogClosed,
         model((model) => {
           expect(model.viewport).toBe(viewport)
           expect(model.menu.isOpen).toBe(false)
@@ -190,7 +250,7 @@ describe("a workspace", () => {
         update,
         given(opened),
         message(Message.ClickedMenu()),
-        menuShown,
+        dialogShown,
         message(Message.InformedOfViewport({ viewport })),
         Command.expectNone(),
         model((model) => {
@@ -224,12 +284,12 @@ describe("a workspace", () => {
         update,
         given(opened),
         message(Message.ClickedMenu()),
-        menuShown,
+        dialogShown,
         model((model) => {
           expect(model.menu.isOpen).toBe(true)
         }),
         message(navigation),
-        menuClosed,
+        dialogClosed,
         model((model) => {
           expect(model.menu.isOpen).toBe(false)
         })
@@ -242,9 +302,9 @@ describe("a workspace", () => {
       update,
       given(opened),
       message(Message.ClickedMenu()),
-      menuShown,
+      dialogShown,
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
-      menuClosed,
+      dialogClosed,
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       model((model) => {
         expect(model.menu.isOpen).toBe(false)
@@ -482,17 +542,10 @@ describe("a workspace", () => {
       receivedNotification,
       message(Message.ClickedInbox()),
       message(Message.ClickedMenu()),
-      menuShown,
+      dialogShown,
       message(fromInbox(InboxBlock.Message.ClickedOpen({ notificationId: notification.id }))),
-      menuClosed,
-      Command.resolve(
-        ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Thread.make({ groupId }) }),
-        ComposerBlock.Message.ReceivedDraft({ text: "" })
-      ),
-      Command.resolve(
-        ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Reply.make({ threadId: thread.id }) }),
-        ComposerBlock.Message.ReceivedDraft({ text: "" })
-      ),
+      dialogClosed,
+      ...draftsRead,
       model((model) => {
         expect(
           Open.isAnyOf(["Group"])(model.open) && [
@@ -503,6 +556,166 @@ describe("a workspace", () => {
         expect(openThreadTitle(model.open)).toEqual(Option.some("A thread"))
         expect(model.groups.selected).toEqual(Option.some(groupId))
         expect(model.menu.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("opens the side pane's dialog for the thread of a notification where the pane is one, and not at Split", () => {
+    for (const viewport of ["Phone", "Tablet", "Desktop"] as const) {
+      story(
+        update,
+        given(init(workspaceId, memberId, "Studio", viewport).model),
+        ...notificationOpened,
+        dialogShown,
+        ...draftsRead,
+        model((model) => {
+          expect(model.aside.isOpen).toBe(true)
+          expect(isThreadOpen(model.open)).toBe(true)
+        })
+      )
+    }
+    story(
+      update,
+      given(opened),
+      ...notificationOpened,
+      ...draftsRead,
+      Command.expectNone(),
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("opens the side pane's dialog as a thread is picked in the group, and closes it as the thread closes", () => {
+    story(
+      update,
+      given(atDesktop),
+      ...threadPicked,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(true)
+        expect(isThreadOpen(model.open)).toBe(true)
+      }),
+      message(fromGroup(GroupBlock.Message.ClickedAllThreads())),
+      dialogClosed,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(false)
+      })
+    )
+  })
+
+  it("opens no dialog for a thread picked in the group beside the main pane", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(fromThreads(ThreadsBlock.Message.ClickedThread({ threadId: thread.id }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(true)
+      }),
+      message(fromGroup(GroupBlock.Message.ClickedAllThreads())),
+      Command.expectNone(),
+      model((model) => {
+        expect(isThreadOpen(model.open)).toBe(false)
+      })
+    )
+  })
+
+  it("closes the thread as the side pane's dialog closes by itself, as by Escape or its scrim", () => {
+    story(
+      update,
+      given(atDesktop),
+      ...threadPicked,
+      message(fromAside(DialogBlock.Message.RequestedClose())),
+      dialogClosed,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(false)
+        expect(Open.isAnyOf(["Group"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("moves the thread open between its dialog and the main pane's side as the window's width changes", () => {
+    story(
+      update,
+      given(opened),
+      ...notificationOpened,
+      ...draftsRead,
+      message(Message.InformedOfViewport({ viewport: "Desktop" })),
+      dialogShown,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(true)
+        expect(isThreadOpen(model.open)).toBe(true)
+      }),
+      message(Message.InformedOfViewport({ viewport: "Tablet" })),
+      Command.expectNone(),
+      message(Message.InformedOfViewport({ viewport: "Phone" })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.aside.isOpen).toBe(true)
+      }),
+      message(Message.InformedOfViewport({ viewport: "Split" })),
+      dialogClosed,
+      model((model) => {
+        expect(model.viewport).toBe("Split")
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("opens no dialog for the side pane as the window narrows while no thread is open", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.InformedOfViewport({ viewport: "Desktop" })),
+      Command.expectNone(),
+      message(Message.InformedOfViewport({ viewport: "Split" })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("closes the side pane's dialog with every navigation, which takes the thread with its group", () => {
+    for (const navigation of [
+      Message.ClickedHome(),
+      Message.ClickedInbox(),
+      Message.ClickedConnections(),
+      Message.ClickedAgents(),
+      Message.ClickedSettings(),
+      Message.ClickedChannels()
+    ]) {
+      story(
+        update,
+        given(atDesktop),
+        ...threadPicked,
+        message(navigation),
+        dialogClosed,
+        model((model) => {
+          expect(model.aside.isOpen).toBe(false)
+          expect(isThreadOpen(model.open)).toBe(false)
+        })
+      )
+    }
+    story(
+      update,
+      given(atDesktop),
+      ...threadPicked,
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId: otherGroupId }))),
+      dialogClosed,
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(isThreadOpen(model.open)).toBe(false)
+        expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(otherGroupId)
       })
     )
   })

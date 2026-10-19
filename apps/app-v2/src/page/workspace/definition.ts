@@ -3,8 +3,9 @@
  * actions, their inbox, their connections, their agents, their settings, and their channels, and
  * what the main content shows: nothing yet, the inbox, the connections, the agents, the settings,
  * the channels, or a group, with its threads and the thread open among them. It lays itself out by the
- * window's width, which its parent informs it of, and below 64rem the sidebar is in a navigation drawer,
- * a dialog that every navigation closes. It lists the host's integrations once, as it opens, informs the
+ * window's width, which its parent informs it of: below 64rem the sidebar is in a navigation drawer, a
+ * dialog that every navigation closes, and below 80rem the thread is in a dialog of its own, which
+ * follows the thread opening and closing. It lists the host's integrations once, as it opens, informs the
  * connections, the agents, and the channels of them, and lists them again when one asks. It reports
  * when the person leaves it, and when they ask to sign out.
  */
@@ -61,7 +62,9 @@ export const Model = Schema.Struct({
   /** The window's width, which the layout follows. */
   viewport: Viewport,
   /** The navigation drawer, a dialog, which the shell shows only below 64rem. */
-  menu: DialogBlock.Model
+  menu: DialogBlock.Model,
+  /** The thread's side pane, a dialog, which the shell shows only below 80rem. */
+  aside: DialogBlock.Model
 })
 export type Model = typeof Model.Type
 
@@ -81,6 +84,12 @@ export const openThreadTitle = (open: Open): Option.Option<string> =>
     { Group: ({ model }) => Option.map(model.thread, ({ model: thread }) => titleOf(thread)) },
     () => Option.none()
   )
+
+/** Whether a thread is open in the group open. */
+export const isThreadOpen = (open: Open): boolean => Option.isSome(openThreadTitle(open))
+
+/** Whether the side pane is in a dialog at `viewport`, not beside the main pane, which is from `Split` alone. */
+export const isAsideFloating = (viewport: Viewport): boolean => viewport !== "Split"
 
 /** What the groups, actions, inbox, connections, agents, settings, and channels are made from: the workspace, as the member. */
 export const ChildInitContext = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId })

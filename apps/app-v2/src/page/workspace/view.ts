@@ -10,6 +10,7 @@ import { waitingCount } from "../../feature/inbox/definition.ts"
 import {
   ActionsBinding,
   AgentsBinding,
+  AsideBinding,
   ChannelsBinding,
   ConnectionsBinding,
   GroupBinding,
@@ -131,10 +132,13 @@ const asideView = (model: Model, h: WorkspaceViewBuilder): Option.Option<Html> =
 
 /**
  * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane,
- * and the notices, laid out for the window's width, with the navigation drawer's dialog lent to the shell.
+ * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
+ * pane lent to the shell.
  */
-export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email }, h) =>
-  shell(h, {
+export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, { email }, h) => {
+  const aside = asideView(model, h)
+
+  return shell(h, {
     viewport: model.viewport,
     rail: rail(h, {
       brand: { letter: "a", label: "amends" },
@@ -150,11 +154,21 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     }),
     sidebar: sidebarView(model, email, h),
     main: mainView(model, h),
-    ...Option.match(asideView(model, h), { onNone: () => ({}), onSome: (aside) => ({ aside }) }),
+    ...(Option.isSome(aside)
+      ? {
+          aside: {
+            view: aside.value,
+            isOpen: model.aside.isOpen,
+            dialog: (toView) =>
+              h.block(AsideBinding.embedView({ slotId: "aside", model: model.aside, viewInputs: { toView } }))
+          }
+        }
+      : {}),
     notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
     menu: {
       onOpen: Message.ClickedMenu(),
+      isOpen: model.menu.isOpen,
       dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
     }
   })
-)
+})

@@ -70,9 +70,9 @@ const sampleStack = "flex max-w-sm flex-col gap-4"
 
 const screenFrame = "h-144 outline outline-outline [--amends-screen-height:36rem]"
 
-const shellFrame = "h-176 outline outline-outline [--amends-screen-height:44rem]"
+const shellFrame = "h-176 outline outline-outline [contain:layout] [--amends-screen-height:44rem]"
 
-const toastFrame = "relative h-64 bg-canvas outline outline-outline"
+const toastFrame = "h-64 bg-canvas outline outline-outline [contain:layout]"
 
 const iconSizeRow = "flex items-end gap-4"
 
@@ -1522,7 +1522,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               rail: shellRail(h, model.destination),
               sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
-              aside: threadPane(h, model.reply)
+              aside: { view: threadPane(h, model.reply), isOpen: false, dialog: () => h.empty }
             })
           ]
         )
