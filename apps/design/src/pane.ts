@@ -60,7 +60,9 @@ const emptyIcon = "mb-2 grid size-10 flex-none place-items-center bg-subtle text
 
 const emptyTitle = "m-0 text-item font-medium text-ink"
 
-const columnBody = "flex max-w-170 flex-col gap-10 pt-1"
+const measuredColumnBody = "flex max-w-170 flex-col gap-10 pt-1"
+
+const wideColumnBody = "flex flex-col gap-10 pt-1"
 
 const sectionColumn = "flex flex-col gap-3"
 
@@ -93,6 +95,11 @@ export type PaneTab<Message> = Readonly<{
   count?: number
   isCurrent: boolean
   onClick: Message
+}>
+
+export type PaneColumnOptions = Readonly<{
+  /** Drops the measure, so the column spans the pane, for a list. */
+  isWide?: boolean
 }>
 
 const renderTitleLeading = <Message, Requirements>(
@@ -227,11 +234,16 @@ export const paneEmpty = <Message, Requirements>(
     ]
   )
 
-/** The one column of a page about one item, 680px at most, its sections 40px apart, with nothing beside it. */
+/**
+ * The one column of a pane's body, its sections 40px apart, with nothing beside it. It keeps a measure of 42.5rem
+ * for what is read and filled in, such as a page about one item or a form, and with `isWide` spans the pane, for a
+ * list or a table, which the pane's width serves.
+ */
 export const paneColumn = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  children: ReadonlyArray<Html>
-): Html => h.div([h.Class(columnBody)], children)
+  children: ReadonlyArray<Html>,
+  options: PaneColumnOptions = {}
+): Html => h.div([h.Class(options.isWide === true ? wideColumnBody : measuredColumnBody)], children)
 
 /**
  * A section of a pane's column, a `section` named by `title`: the title as an `h3`, with the `trailing`

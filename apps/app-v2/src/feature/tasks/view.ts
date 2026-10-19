@@ -79,64 +79,68 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
     label: destination.title,
     header: { title: destination.title, icon: destination.icon, subtitle: destination.subtitle },
     body: [
-      paneColumn(h, [
-        notice(h, model.notice),
-        column(h, [
-          fieldGrid(h, [
-            field(
-              h,
-              {
-                id: "tasks-search",
-                label: "Search tasks",
-                type: "search",
-                value: model.filter.query,
-                onInput: (query) => Message.TypedQuery({ query }),
-                placeholder: "Search tasks…",
-                isAutofocus: false,
-                isLabelHidden: true
-              },
-              Option.none()
-            ),
-            choiceSelect(
-              h,
-              {
-                id: "tasks-assignee",
-                label: "Assignee",
-                choices: assigneeChoices,
-                value: model.filter.assignee,
-                onChange: (assignee) => Message.ChoseAssignee({ assignee })
-              },
-              { isLabelHidden: true }
-            ),
-            ...(destination.statusChoices === undefined
-              ? []
-              : [
-                  choiceSelect(
-                    h,
-                    {
-                      id: "tasks-status",
-                      label: "Status",
-                      choices: destination.statusChoices,
-                      value: model.filter.status,
-                      onChange: (status) => Message.ChoseStatus({ status })
-                    },
-                    { isLabelHidden: true }
-                  )
-                ])
-          ]),
-          summary(h, { copy: destination.summary, count: pluralize(shown.length, "task", "tasks") }),
-          ...(shown.length === 0
-            ? [paneEmpty(h, { icon: destination.icon, ...none })]
-            : taskTable(
+      paneColumn(
+        h,
+        [
+          notice(h, model.notice),
+          column(h, [
+            fieldGrid(h, [
+              field(
                 h,
-                shown.map((item) => ({
-                  ...item,
-                  onClick: Message.ClickedTask({ groupId: item.thread.groupId, threadId: item.thread.id })
-                })),
-                { members: model.members, contacts: model.contacts, now, hasGroupColumn: true }
-              ))
-        ])
-      ])
+                {
+                  id: "tasks-search",
+                  label: "Search tasks",
+                  type: "search",
+                  value: model.filter.query,
+                  onInput: (query) => Message.TypedQuery({ query }),
+                  placeholder: "Search tasks…",
+                  isAutofocus: false,
+                  isLabelHidden: true
+                },
+                Option.none()
+              ),
+              choiceSelect(
+                h,
+                {
+                  id: "tasks-assignee",
+                  label: "Assignee",
+                  choices: assigneeChoices,
+                  value: model.filter.assignee,
+                  onChange: (assignee) => Message.ChoseAssignee({ assignee })
+                },
+                { isLabelHidden: true }
+              ),
+              ...(destination.statusChoices === undefined
+                ? []
+                : [
+                    choiceSelect(
+                      h,
+                      {
+                        id: "tasks-status",
+                        label: "Status",
+                        choices: destination.statusChoices,
+                        value: model.filter.status,
+                        onChange: (status) => Message.ChoseStatus({ status })
+                      },
+                      { isLabelHidden: true }
+                    )
+                  ])
+            ]),
+            summary(h, { copy: destination.summary, count: pluralize(shown.length, "task", "tasks") }),
+            ...(shown.length === 0
+              ? [paneEmpty(h, { icon: destination.icon, ...none })]
+              : taskTable(
+                  h,
+                  shown.map((item) => ({
+                    ...item,
+                    onClick: Message.ClickedTask({ groupId: item.thread.groupId, threadId: item.thread.id })
+                  })),
+                  { members: model.members, contacts: model.contacts, now, hasGroupColumn: true }
+                ))
+          ])
+        ],
+        { isWide: true }
+      )
     ]
   })
 }

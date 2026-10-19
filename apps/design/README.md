@@ -42,7 +42,8 @@ the current row, with a form in place of the text, and set apart by dividers, ce
 start, and notifications under the days Today and Yesterday, unread with a dot and a quiet action and
 read; a pane's empty state with a title
 and a line of copy under a header with an action, and with a title alone, each in a frame of its
-own; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
+own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
+groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
@@ -433,8 +434,13 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
   `icon` at `md` in `ink-secondary`, the `title` as an `h2` at item size in medium weight, under the
   pane's `h1`, and the `copy` under it at hint size in `ink-muted`. The icon is hidden from assistive
   technology.
-- `paneColumn(h, children)` is the one column of a page about one item: 680px at most, its sections
-  40px apart, with nothing beside it.
+- `paneColumn(h, children, options?)` is the one column of a pane's body, its sections 40px apart, with
+  nothing beside it. By default it keeps a measure of 42.5rem (`max-w-170`), the right width for what
+  is read and filled in: a page about one item, such as the settings, and a connection's form.
+  `options.isWide` drops the measure, so the column spans the pane, which is right for a list or a
+  table: the group's threads, the groups to browse, the inbox's rows, and the tasks' table, whose
+  three cells would be squeezed inside the measure until their titles truncate. The side panes keep
+  the measure.
 - `paneSection(h, { title, trailing?, children })` is a section of that column, a `section` named by
   its title: the title as an `h3` at item size in medium weight, with the `trailing` pieces after it on
   the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart.

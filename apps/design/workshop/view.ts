@@ -84,6 +84,8 @@ const mentioningColumn = "flex max-w-md flex-col pt-24"
 
 const emptyPaneFrame = "flex h-96 flex-col outline outline-outline"
 
+const columnPaneFrame = "flex h-96 max-w-5xl flex-col outline outline-outline"
+
 const sidePaneColumn = "flex w-98 flex-col"
 
 const iconGrid = "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4"
@@ -1090,6 +1092,74 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
   ])
 }
 
+const paneColumnGroup = (h: ApplicationViewBuilder, workspaceName: string): Html =>
+  group(h, "Pane column", [
+    sample(
+      h,
+      "Keeping its measure of 42.5rem, for what is read and filled in",
+      [
+        h.div(
+          [h.Class(columnPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Settings",
+              header: { title: "Settings", icon: "mark-settings" },
+              body: [
+                paneColumn(h, [
+                  paneForm(h, { title: "Rename the workspace", onSubmit: Message.ClickedButton() }, [
+                    field(
+                      h,
+                      {
+                        id: "measured-column-name",
+                        label: "Name",
+                        type: "text",
+                        value: workspaceName,
+                        onInput: (value) => Message.TypedWorkspaceName({ value }),
+                        isAutofocus: false
+                      },
+                      Option.none()
+                    ),
+                    buttonRow(h, [submit(h, "Save")])
+                  ])
+                ])
+              ]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Wide, spanning the pane, for a list",
+      [
+        h.div(
+          [h.Class(columnPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Groups",
+              header: { title: "Groups", icon: "users" },
+              body: [
+                paneColumn(
+                  h,
+                  [
+                    summary(h, { copy: "Groups in this workspace.", count: `${groupRows.length} groups` }),
+                    columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
+                    groupList(h)
+                  ],
+                  { isWide: true }
+                )
+              ]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    )
+  ])
+
 const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: string): Html => {
   const press = Message.ClickedButton()
 
@@ -1829,7 +1899,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           centeredGroup(h, model.signInEmail, model.code)
         ]
       ),
-      h.div([h.Class(wideColumn)], [shellGroup(h, model)])
+      h.div([h.Class(wideColumn)], [paneColumnGroup(h, model.workspaceName), shellGroup(h, model)])
     ]
   )
 }))

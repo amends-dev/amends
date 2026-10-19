@@ -277,35 +277,39 @@ export const browseView = GroupsComposition.makeView((model, h) => {
       })
     },
     body: [
-      paneColumn(h, [
-        notice(h, model.notice),
-        column(h, [
-          field(
-            h,
-            {
-              id: "browse-groups",
-              label: "Search groups",
-              type: "search",
-              value: query,
-              onInput: (query) => Message.TypedBrowseQuery({ query }),
-              placeholder: browseTabs[tab].placeholder,
-              isAutofocus: false,
-              isLabelHidden: true
-            },
-            Option.none()
-          ),
-          summary(h, { copy: browseTabs[tab].copy, count: pluralize(shown.length, "group", "groups") }),
-          ...(shown.length === 0
-            ? [paneEmpty(h, { icon: "users", ...none })]
-            : [
-                columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
-                h.ul(
-                  [h.AriaLabel("Groups")],
-                  shown.map((item) => browseRow(item, model, h))
-                )
-              ])
-        ])
-      ])
+      paneColumn(
+        h,
+        [
+          notice(h, model.notice),
+          column(h, [
+            field(
+              h,
+              {
+                id: "browse-groups",
+                label: "Search groups",
+                type: "search",
+                value: query,
+                onInput: (query) => Message.TypedBrowseQuery({ query }),
+                placeholder: browseTabs[tab].placeholder,
+                isAutofocus: false,
+                isLabelHidden: true
+              },
+              Option.none()
+            ),
+            summary(h, { copy: browseTabs[tab].copy, count: pluralize(shown.length, "group", "groups") }),
+            ...(shown.length === 0
+              ? [paneEmpty(h, { icon: "users", ...none })]
+              : [
+                  columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
+                  h.ul(
+                    [h.AriaLabel("Groups")],
+                    shown.map((item) => browseRow(item, model, h))
+                  )
+                ])
+          ])
+        ],
+        { isWide: true }
+      )
     ]
   })
 })

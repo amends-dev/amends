@@ -303,6 +303,46 @@ describe("paneColumn", () => {
       expect(within(role("main"), text("Tools"))).toExist()
     )
   })
+
+  const columnIn = (isWide: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "main",
+      header: { title: "Threads" },
+      body: [paneColumn(h, [h.p([], ["Composer paste crash"]), h.p([], ["Launch checklist"])], { isWide })]
+    })
+
+  it("keeps a measure of 42.5rem, for what is read and filled in", () => {
+    scene(
+      { update, view: paneView(columnIn(false)) },
+      given(initial),
+      expect(selector(".max-w-170")).toExist(),
+      expect(within(selector(".max-w-170"), text("Composer paste crash"))).toExist(),
+      expect(within(selector(".max-w-170"), text("Launch checklist"))).toExist()
+    )
+  })
+
+  it("keeps the measure when it is given no options", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, { variant: "main", header: { title: "Settings" }, body: [paneColumn(h, [h.p([], ["Name"])])] })
+        )
+      },
+      given(initial),
+      expect(within(selector(".max-w-170"), text("Name"))).toExist()
+    )
+  })
+
+  it("spans the pane when it is wide, for a list", () => {
+    scene(
+      { update, view: paneView(columnIn(true)) },
+      given(initial),
+      expect(selector(".max-w-170")).toBeAbsent(),
+      expect(within(role("main"), text("Composer paste crash"))).toExist(),
+      expect(within(role("main"), text("Launch checklist"))).toExist()
+    )
+  })
 })
 
 describe("paneSection", () => {

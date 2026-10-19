@@ -1,6 +1,6 @@
 import { button, notice } from "@amends-dev/design/control"
 import { divider, messageList, notification } from "@amends-dev/design/message"
-import { pane, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -84,16 +84,22 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
       actions: waitingCount(model) === 0 ? [] : [button(h, "Mark all seen", Message.ClickedMarkAllSeen())]
     },
     body: [
-      notice(h, model.notice),
-      items.length === 0
-        ? paneEmpty(h, nothingToList[model.tab])
-        : messageList(h, {
-            label: "Notifications",
-            children: byDay(items, now).flatMap((day) => [
-              divider(h, day.label),
-              ...day.items.map((item) => notificationRow(item, model, now, h))
-            ])
-          })
+      paneColumn(
+        h,
+        [
+          notice(h, model.notice),
+          items.length === 0
+            ? paneEmpty(h, nothingToList[model.tab])
+            : messageList(h, {
+                label: "Notifications",
+                children: byDay(items, now).flatMap((day) => [
+                  divider(h, day.label),
+                  ...day.items.map((item) => notificationRow(item, model, now, h))
+                ])
+              })
+        ],
+        { isWide: true }
+      )
     ]
   })
 })

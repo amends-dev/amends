@@ -56,7 +56,10 @@ The open workspace is on the design's shell: `page/workspace` renders `shell`, `
 and the pane of each destination, `feature/groups` renders the sidebar's sections, the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
 a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
-its content in its own `pane`. Inside the group's panes, the threads, the thread's messages, and the
+its content in its own `pane`. The panes that read or are filled in, the settings, the connections, the agents,
+the channels, and the side panes, keep the `paneColumn`'s measure; the panes that list, the group's
+threads and tasks, the groups to browse, the inbox, and the tasks' Triage and Tasks, pass it `isWide`,
+so that a list spans the pane. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
 initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`.
 

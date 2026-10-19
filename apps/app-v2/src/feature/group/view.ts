@@ -304,12 +304,16 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
         : {})
     },
     body: [
-      paneColumn(h, [
-        notice(h, model.notice),
-        isReadable
-          ? h.block(ThreadsBinding.embedView({ slotId: "threads", model: model.threads, viewInputs: threadsInputs }))
-          : hint(h, "Join this team to read its threads.")
-      ]),
+      paneColumn(
+        h,
+        [
+          notice(h, model.notice),
+          isReadable
+            ? h.block(ThreadsBinding.embedView({ slotId: "threads", model: model.threads, viewInputs: threadsInputs }))
+            : hint(h, "Join this team to read its threads.")
+        ],
+        { isWide: true }
+      ),
       h.block(
         DialogBinding.embedView({
           slotId: "settings",
