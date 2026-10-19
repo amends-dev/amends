@@ -96,6 +96,7 @@ describe("the inbox", () => {
     scene(
       { update, view: sceneView, subscriptions: InboxBlock.subscriptions },
       given(opened),
+      expect(role("tab", { name: "Unread" })).toHaveText("Unread1"),
       expect(role("tab", { name: "Unread" })).toHaveAttr("aria-description", "1"),
       expect(within(notifications, text("Unread"))).toExist(),
       click(role("button", { name: "Mark all seen" })),
@@ -109,7 +110,8 @@ describe("the inbox", () => {
       expect(within(notifications, text("Unread"))).toBeAbsent(),
       expect(role("button", { name: "Mark seen" })).toBeAbsent(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
-      expect(role("tab", { name: "Unread" })).toHaveAttr("aria-description", "0"),
+      expect(role("tab", { name: "Unread" })).toHaveText("Unread"),
+      expect(role("tab", { name: "Unread" })).not.toHaveAttr("aria-description"),
       click(role("tab", { name: "Unread" })),
       expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "false"),

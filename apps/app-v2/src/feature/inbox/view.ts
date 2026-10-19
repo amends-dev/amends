@@ -29,20 +29,23 @@ const nothingToList = {
   Unread: { icon: "mark-done", title: "You're all caught up", copy: "Nothing new." }
 } as const satisfies Record<Tab, Parameters<typeof paneEmpty>[1]>
 
-/** The tabs under the title: every notification, and those waiting, counted. */
-const tabs = (model: Model, h: InboxViewBuilder): Html =>
-  paneTabs(h, {
+/** The tabs under the title: every notification, and those waiting, counted while any wait. */
+const tabs = (model: Model, h: InboxViewBuilder): Html => {
+  const waiting = waitingCount(model)
+
+  return paneTabs(h, {
     label: "Inbox",
     tabs: [
       { label: "All", isCurrent: model.tab === "All", onClick: Message.ChoseTab({ tab: "All" }) },
       {
         label: "Unread",
-        count: waitingCount(model),
+        ...(waiting > 0 ? { count: waiting } : {}),
         isCurrent: model.tab === "Unread",
         onClick: Message.ChoseTab({ tab: "Unread" })
       }
     ]
   })
+}
 
 /**
  * A notification as the design's row: the author of what its activity is about and what they did, where it

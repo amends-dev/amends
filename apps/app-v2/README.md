@@ -72,7 +72,7 @@ The task and the turns a thread embeds are the
 design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
 a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
 each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
-and its `log`. The inbox has `paneTabs` of All and Unread, counted, under its title, and lists its
+and its `log`. The inbox has `paneTabs` of All and Unread, which counts those waiting while any wait, under its title, and lists its
 notifications as `notification`s in a `messageList`, under a `divider` for each day, each its
 author's initials and name and what they did, its place, its text, which opens the thread, how long
 ago it came, a dot while it waits, and a quiet Mark seen, with Mark all seen among the header's
@@ -203,7 +203,7 @@ the pages that compose them; the root composes the pages.
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group.
 - `feature/inbox`: the person's notifications, newest first, on two tabs: All, every notification
-  the store gives, waiting or seen, and Unread, those still waiting, counted, All at first. Each
+  the store gives, waiting or seen, and Unread, those still waiting, counted while any wait, All at first. Each
   tab's notifications sit under a divider for each day they came on by the person's own clock, named
   as it is from the time now (`dayLabel`), and each is a row of its own: who wrote the message its
   activity is about, by their name and initials, and what they did, which is why the person is told
