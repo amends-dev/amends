@@ -414,6 +414,55 @@ describe("row with a status", () => {
   })
 })
 
+describe("row with an icon for a mark", () => {
+  const rows = (h: HtmlBuilder<Message>) => [
+    row(h, {
+      mark: { icon: "mark-connections" },
+      markSize: "md",
+      status: { kind: "attention", label: "Needs setup", detail: "The key is missing." },
+      title: "Search tools",
+      meta: "MCP server · Tools",
+      cells: [h.span([], ["API key"])],
+      cellsText: "API key",
+      onClick: Message.ClickedMercier()
+    }),
+    row(h, {
+      mark: { icon: "mark-connections" },
+      markSize: "md",
+      title: "Local models",
+      meta: "Anthropic · Models",
+      onClick: Message.ClickedFieldwork()
+    })
+  ]
+
+  it("draws the drawing in the square where letters would be, with the patch on its corner", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(within(role("button", { name: "Search tools, Needs setup" }), selector("span.relative svg"))).toExist(),
+      expect(within(role("button", { name: "Search tools, Needs setup" }), selector("span.relative"))).toHaveAttr(
+        "title",
+        "Needs setup: The key is missing."
+      ),
+      expect(within(role("button", { name: "Local models" }), selector("span.relative svg"))).toExist(),
+      expect(within(role("button", { name: "Local models" }), selector("span.relative"))).not.toHaveAttr("title")
+    )
+  })
+
+  it("is named by its title and described by its meta and its cells' words, as any row is", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "Search tools, Needs setup" })).toHaveAttr(
+        "aria-description",
+        "MCP server · Tools · API key"
+      ),
+      click(role("button", { name: "Local models" })),
+      expect(role("status")).toHaveText("Opened Fieldwork")
+    )
+  })
+})
+
 describe("cells of two lines", () => {
   const rows = (h: HtmlBuilder<Message>) => [
     row(h, {

@@ -13,6 +13,7 @@ import {
   fieldGrid,
   hint,
   iconButton,
+  link,
   notice,
   noticeBox,
   sending,
@@ -255,6 +256,9 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
     sample(h, "Link", [
       h.p([], ["Wrong address? ", button(h, "Change email", press, { variant: "link" })]),
       button(h, "Disabled link", press, { variant: "link", isDisabled: true })
+    ]),
+    sample(h, "Link to another page, which opens in a new tab", [
+      h.p([], ["MCP server · ", link(h, { label: "Documentation", href: "https://modelcontextprotocol.io" })])
     ]),
     sample(h, "Icon buttons, regular and compact", [
       iconButton(h, { icon: "mark-settings", label: "Settings", onClick: press }),
@@ -538,6 +542,27 @@ const toggleGroup = (h: ApplicationViewBuilder, isNotificationsOn: boolean, isDi
         })
       ],
       sampleStack
+    ),
+    sample(
+      h,
+      "Disabled, on and off",
+      [
+        toggle(h, {
+          id: "disabled-notifications",
+          label: "Notifications",
+          isOn: true,
+          isDisabled: true,
+          onToggle: (isOn) => Message.ToggledNotifications({ isOn })
+        }),
+        toggle(h, {
+          id: "disabled-digest",
+          label: "Weekly digest",
+          isOn: false,
+          isDisabled: true,
+          onToggle: (isOn) => Message.ToggledDigest({ isOn })
+        })
+      ],
+      sampleStack
     )
   ])
 
@@ -618,13 +643,14 @@ const noticeGroup = (h: ApplicationViewBuilder): Html =>
     ),
     sample(
       h,
-      "Boxed note: caution with a line for each reason, and danger",
+      "Boxed note: caution with a line for each reason, danger, and success",
       [
         noticeBox(h, {
           title: "This agent can't run as it is set up",
           lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
         }),
-        noticeBox(h, { title: "Its integration isn't installed on this host", lines: [], tone: "danger" })
+        noticeBox(h, { title: "Its integration isn't installed on this host", lines: [], tone: "danger" }),
+        noticeBox(h, { title: "Working", lines: ["The check found nothing wrong."], tone: "success" })
       ],
       sampleStack
     ),
@@ -817,6 +843,51 @@ const agentSamples: ReadonlyArray<AgentSample> = [
   }
 ]
 
+type ConnectionSample = Readonly<{
+  name: string
+  status?: MarkStatus
+  integration: string
+  authentication: string
+}>
+
+const connectionSamples: ReadonlyArray<ConnectionSample> = [
+  { name: "Anthropic · Team", integration: "Anthropic · Models", authentication: "API key" },
+  { name: "Search tools", status: needsSetup, integration: "MCP server · Tools", authentication: "API key" },
+  {
+    name: "Vertex · Research",
+    status: unavailable,
+    integration: "Integration not installed",
+    authentication: "API key"
+  },
+  { name: "This machine", integration: "This machine · Sandboxes", authentication: "No authentication" }
+]
+
+const connectionRow = (h: ApplicationViewBuilder, connection: ConnectionSample): Html =>
+  h.keyed("li")(
+    connection.name,
+    [],
+    [
+      row(h, {
+        mark: { icon: "mark-connections" },
+        markSize: "md",
+        ...(connection.status === undefined ? {} : { status: connection.status }),
+        title: connection.name,
+        meta: connection.integration,
+        cells: [h.span([], [connection.authentication])],
+        cellsText: connection.authentication,
+        onClick: Message.ClickedButton()
+      })
+    ]
+  )
+
+const connectionTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  columns(h, { label: "Connection", cells: ["Authentication"] }),
+  h.ul(
+    [h.AriaLabel("Connections")],
+    connectionSamples.map((connection) => connectionRow(h, connection))
+  )
+]
+
 const agentRow = (h: ApplicationViewBuilder, agent: AgentSample): Html =>
   h.keyed("li")(
     agent.name,
@@ -963,6 +1034,12 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
       h,
       "Table of agents: 32px lilac marks with a status patch (none while ready and idle), the status read after the name, cells of two lines, and the activity blank while idle",
       agentTable(h),
+      "flex max-w-3xl flex-col"
+    ),
+    sample(
+      h,
+      "Table of connections: a drawing on a 32px mark with a status patch (none while ready), the integration and what it gives under the name, and the authentication as a cell",
+      connectionTable(h),
       "flex max-w-3xl flex-col"
     )
   ])
@@ -1141,6 +1218,16 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
       h,
       "A status mark alone, 9px, for an item with no mark of its own, and the logo's mark of what is at work",
       [...markStatuses.map((status) => statusMark(h, status)), activityMark(h)],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "A drawing in place of letters, for a thing with no name to abbreviate, by size, and with a status",
+      [
+        ...markSizes.map((size) => mark(h, { icon: "mark-connections", size })),
+        mark(h, { icon: "mark-connections", size: "md", status: needsSetup }),
+        mark(h, { icon: "mark-connections", size: "md", status: unavailable })
+      ],
       iconSizeRow
     ),
     sample(

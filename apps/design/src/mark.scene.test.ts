@@ -2,7 +2,7 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "./mark.ts"
 
@@ -52,6 +52,76 @@ describe("mark", () => {
       expect(text("Y")).toHaveClass("text-avatar-lilac-fg"),
       expect(text("S")).not.toHaveAttr("title"),
       expect(within(selector("div"), selector("span span"))).toBeAbsent()
+    )
+  })
+})
+
+describe("mark with an icon", () => {
+  const icons = (_: null, h: HtmlBuilder<never>) =>
+    h.div(
+      [],
+      [
+        h.p([], ["Anthropic"]),
+        mark(h, { icon: "mark-connections", size: "xs" }),
+        mark(h, { icon: "mark-connections" }),
+        mark(h, { icon: "mark-connections", size: "md" }),
+        mark(h, { icon: "mark-connections", size: "lg", tone: "lilac" })
+      ]
+    )
+
+  it("draws the icon in the square in place of letters, hidden from assistive technology", () => {
+    scene(
+      { ...still, view: icons },
+      given(null),
+      expect(role("img")).toBeAbsent(),
+      expectAll(all.selector("span.relative")).toHaveCount(4),
+      expectAll(all.selector("span.relative svg")).toHaveCount(4),
+      expect(nth(all.selector("span.relative"), 0)).toHaveAttr("aria-hidden", "true"),
+      expect(nth(all.selector("span.relative"), 3)).toHaveAttr("aria-hidden", "true"),
+      expect(nth(all.selector("span.relative svg"), 0)).toHaveAttr("aria-hidden", "true"),
+      expect(nth(all.selector("span.relative svg"), 3)).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("fits the icon to the square: 12px in 20, 16px in 24 and 32, and 20px in 40", () => {
+    scene(
+      { ...still, view: icons },
+      given(null),
+      expect(nth(all.selector("span.relative svg"), 0)).toHaveAttr("width", "0.75rem"),
+      expect(nth(all.selector("span.relative svg"), 1)).toHaveAttr("width", "1rem"),
+      expect(nth(all.selector("span.relative svg"), 2)).toHaveAttr("width", "1rem"),
+      expect(nth(all.selector("span.relative svg"), 3)).toHaveAttr("width", "1.25rem"),
+      expect(nth(all.selector("span.relative"), 0)).toHaveClass("size-5"),
+      expect(nth(all.selector("span.relative"), 3)).toHaveClass("bg-avatar-lilac-bg")
+    )
+  })
+
+  it("carries a status as a patch like a mark of letters", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div(
+            [],
+            [
+              mark(h, {
+                icon: "mark-connections",
+                size: "md",
+                status: {
+                  kind: "blocked",
+                  label: "Unavailable",
+                  detail: "Its integration isn't installed on this host."
+                }
+              })
+            ]
+          )
+      },
+      given(null),
+      expect(selector("span.relative")).toHaveAttr(
+        "title",
+        "Unavailable: Its integration isn't installed on this host."
+      ),
+      expect(within(selector("span.relative"), selector("span.bg-danger-mark"))).toExist()
     )
   })
 })

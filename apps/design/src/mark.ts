@@ -1,12 +1,12 @@
 /**
- * The square that stands for a person, a workspace, or an agent: one or two letters on a ground of its tone,
- * the patch over its corner that says how it stands, the logo's mark that says it is at work, and the button
- * that gathers a few marks to open the people they stand for.
+ * The square that stands for a person, a workspace, an agent, or a connection: one or two letters, or a drawing,
+ * on a ground of its tone, the patch over its corner that says how it stands, the logo's mark that says it is at
+ * work, and the button that gathers a few marks to open the people they stand for.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { icon } from "./icon.ts"
+import { type IconName, type IconSize, icon } from "./icon.ts"
 
 const markBase = "relative grid flex-none place-items-center font-medium uppercase"
 
@@ -21,6 +21,8 @@ const markSizes = {
   md: "size-8 text-hint",
   lg: "size-10 text-item"
 }
+
+const iconSizes = { xs: "xs", sm: "sm", md: "sm", lg: "md" } as const satisfies Record<keyof typeof markSizes, IconSize>
 
 const patchCut = "absolute -end-1 -bottom-1 grid place-items-center bg-status-knockout"
 
@@ -60,8 +62,12 @@ export type MarkTone = keyof typeof markTones
  */
 export type MarkStatus = Readonly<{ kind: keyof typeof statusShapes; label: string; detail?: string }>
 
-/** What a row says of its mark, the letters on a ground of its tone, leaving the size to the row. */
-export type MarkContent = Readonly<{ text: string; tone?: MarkTone }>
+/**
+ * What a row says of its mark, on a ground of its tone, leaving the size to the row: the `text` letters, for a
+ * person, a workspace, or an agent, or an `icon`, for a thing that has no name to abbreviate, such as a connection.
+ */
+export type MarkContent = Readonly<{ tone?: MarkTone }> &
+  (Readonly<{ text: string; icon?: never }> | Readonly<{ icon: IconName; text?: never }>)
 
 /** What the mark shows on hover: its word, and why when it says. */
 const hoverText = (status: MarkStatus): string =>
@@ -75,13 +81,14 @@ const renderStatusShape = <Message, Requirements>(
   h.span([h.Class(`${statusShapes[kind]} ${sizeClass}`)], kind === "blocked" ? [h.span([h.Class(statusBar)])] : [])
 
 /**
- * The `text` letters, upper-cased, in a square on the ground of its `tone`, `neutral` unless given: `xs` 20px,
- * `sm` (the default) 24px, `md` 32px, or `lg` 40px. A mark with a `status` has its patch over the bottom end
- * corner, overhanging it by 2px, in a notch 2px wider all round that is cut from the surface behind it, in the
- * color of `status-knockout`, which a row that is hovered or current sets to its own. The patch is 8px on `sm`,
- * 9px on `md`, 10px on `lg`, and 7px on `xs`, the least the design draws. The status is the word on hover, in
- * the `title`. A mark is hidden from assistive technology, since the name it abbreviates is always beside it, and
- * the row that holds it adds the status to its own name, "Atlas, Needs setup".
+ * The `text` letters, upper-cased, or the `icon`, in a square on the ground of its `tone`, `neutral` unless given:
+ * `xs` 20px, `sm` (the default) 24px, `md` 32px, or `lg` 40px. An icon is drawn at the size that fits its square
+ * (`xs`, `sm`, `sm`, and `md`) and takes the color of the ground's text. A mark with a `status` has its patch over
+ * the bottom end corner, overhanging it by 2px, in a notch 2px wider all round that is cut from the surface behind
+ * it, in the color of `status-knockout`, which a row that is hovered or current sets to its own. The patch is 8px
+ * on `sm`, 9px on `md`, 10px on `lg`, and 7px on `xs`, the least the design draws. The status is the word on hover,
+ * in the `title`. A mark is hidden from assistive technology, since the name it abbreviates is always beside it,
+ * and the row that holds it adds the status to its own name, "Atlas, Needs setup".
  */
 export const mark = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -97,7 +104,7 @@ export const mark = <Message, Requirements>(
       h.Class(`${markBase} ${markSizes[size]} ${markTones[config.tone ?? "neutral"]}`)
     ],
     [
-      config.text,
+      config.icon === undefined ? config.text : icon(h, config.icon, { size: iconSizes[size] }),
       status === undefined
         ? h.empty
         : h.span([h.Class(`${patchCut} ${patchCutSizes[size]}`)], [renderStatusShape(h, status.kind, patchSizes[size])])

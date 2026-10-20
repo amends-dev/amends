@@ -1,9 +1,9 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row
- * they lie in, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a
- * list, a line of hint, why an entry was refused, a boxed note for a page as a whole, that an action is
- * on its way, and the column that holds a few of these together. Each renders with the caller's builder
- * and messages, and carries the look.
+ * they lie in, a link to another page, labelled fields and boxes and the grid they lie in, a labelled
+ * switch, a choice from a list, a line of hint, why an entry was refused, a boxed note for a page as a
+ * whole, that an action is on its way, and the column that holds a few of these together. Each renders
+ * with the caller's builder and messages, and carries the look.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -28,6 +28,8 @@ const buttonLooks = {
     "border border-transparent bg-transparent font-normal text-ink-secondary not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-disabled:text-ink-disabled",
   link: "bg-transparent text-ink underline underline-offset-2 not-aria-disabled:hover:text-ink-secondary aria-disabled:text-ink-disabled"
 }
+
+const linkLook = "text-ink underline underline-offset-2 focus-ring hover:text-ink-secondary"
 
 const buttonRegularSizes = {
   primary: "min-h-9 px-4 text-control max-desktop:min-h-11",
@@ -78,13 +80,16 @@ const selectChevron = "chevron-down"
 const switchRow = "flex items-center gap-3 max-desktop:min-h-11"
 
 const switchTrack =
-  "group relative inline-flex h-5 w-9 flex-none cursor-pointer items-center border border-outline bg-subtle focus-ring data-checked:border-action data-checked:bg-action max-desktop:after:absolute max-desktop:after:-inset-x-1.25 max-desktop:after:-inset-y-3.25"
+  "group relative inline-flex h-5 w-9 flex-none cursor-pointer items-center border border-outline bg-subtle focus-ring data-checked:border-action data-checked:bg-action data-disabled:cursor-default data-disabled:opacity-50 max-desktop:after:absolute max-desktop:after:-inset-x-1.25 max-desktop:after:-inset-y-3.25"
 
 const switchThumb =
   "block size-3.5 translate-x-0.5 bg-action transition-transform group-data-checked:translate-x-4.5 group-data-checked:bg-subtle motion-reduce:transition-none"
 
 const switchLabel =
   "cursor-pointer text-item text-ink select-none max-desktop:flex max-desktop:min-h-11 max-desktop:items-center"
+
+const switchLabelDisabled =
+  "cursor-default text-item text-ink-disabled select-none max-desktop:flex max-desktop:min-h-11 max-desktop:items-center"
 
 const noticeBase = "text-hint"
 
@@ -96,12 +101,13 @@ const noticeTones = {
 
 const noticeBoxLooks = {
   caution: "border-caution-border bg-caution-surface",
-  danger: "border-danger-border bg-danger-surface"
+  danger: "border-danger-border bg-danger-surface",
+  success: "border-success-border bg-success-surface"
 }
 
-const noticeBoxTitles = { caution: "text-caution-text", danger: "text-danger-text" }
+const noticeBoxTitles = { caution: "text-caution-text", danger: "text-danger-text", success: "text-success-text" }
 
-const noticeBoxMarks = { caution: "attention", danger: "blocked" } as const
+const noticeBoxMarks = { caution: "attention", danger: "blocked", success: "available" } as const
 
 const noticeBoxBase = "flex items-start gap-3 border px-4 py-3"
 
@@ -252,6 +258,16 @@ export const submit = <Message, Requirements>(
 ) => renderButton(h, label, { type: "submit" }, options, "primary")
 
 /**
+ * A link to `href` in the look of a `link` button, underlined text in `ink` at the size of the line around it, for
+ * a page elsewhere, such as an integration's documentation. It opens in a new tab and sends the page it was
+ * opened from nothing.
+ */
+export const link = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; href: string }>
+): Html => h.a([h.Href(config.href), h.Target("_blank"), h.Rel("noreferrer"), h.Class(linkLook)], [config.label])
+
+/**
  * A button of one icon in the look of `iconButton`, named by `label`, over `attributes` that already give it its
  * behavior, such as the group a headless dialog publishes for the control that closes it.
  */
@@ -338,9 +354,10 @@ export const notice = <Message, Requirements>(
   })
 
 /**
- * A note boxed in its tone, `caution` (the default) or `danger`, for a page or a form as a whole and not for one
- * field: the tone's shape, the `title` that says what is wrong in medium weight, and under it a quiet line for each
- * of `lines`, why. It is a `note` named by its title, not an alert, since it is there when the page opens.
+ * A note boxed in its tone, `caution` (the default), `danger`, or `success`, for a page or a form as a whole and not
+ * for one field: the tone's shape, the `title` that says what is wrong, or what was found, in medium weight, and
+ * under it a quiet line for each of `lines`, why. It is a `note` named by its title, not an alert, since it is there
+ * when the page opens.
  */
 export const noticeBox = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -489,22 +506,35 @@ export const textarea = <Message, Requirements>(
   )
 }
 
-/** A labelled switch, on or off, with its label after it. */
+/**
+ * A labelled switch, on or off, with its label after it. A switch that `isDisabled` shows how it is set and takes
+ * no click or key, for a page the person may read and not change.
+ */
 export const toggle = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ id: string; label: string; isOn: boolean; onToggle: (isOn: boolean) => Message }>
+  config: Readonly<{
+    id: string
+    label: string
+    isOn: boolean
+    onToggle: (isOn: boolean) => Message
+    isDisabled?: boolean
+  }>
 ) =>
   Switch.view(
     {
       id: config.id,
       isChecked: config.isOn,
       onToggle: config.onToggle,
+      isDisabled: config.isDisabled ?? false,
       toView: (attributes) =>
         h.div(
           [h.Class(switchRow)],
           [
             h.button([...attributes.button, h.Class(switchTrack)], [h.span([h.Class(switchThumb)])]),
-            h.span([...attributes.label, h.Class(switchLabel)], [config.label])
+            h.span(
+              [...attributes.label, h.Class(config.isDisabled === true ? switchLabelDisabled : switchLabel)],
+              [config.label]
+            )
           ]
         )
     },

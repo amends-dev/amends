@@ -33,6 +33,7 @@ import {
   hint,
   iconButton,
   iconSubmit,
+  link,
   notice,
   noticeBox,
   sending,
@@ -549,6 +550,37 @@ describe("toggle", () => {
       expect(role("switch", { name: "Notifications" })).toHaveAttr("aria-checked", "true")
     )
   })
+
+  it("shows how it is set and cannot be clicked while it is disabled", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          toggle(h, {
+            id: "notifications",
+            label: "Notifications",
+            isOn: model.isNotificationsOn,
+            isDisabled: true,
+            onToggle: (isOn) => Message.ToggledNotifications({ isOn })
+          })
+        ])
+      },
+      given(modifyFields(initial, { isNotificationsOn: () => true })),
+      expect(role("switch", { name: "Notifications" })).toHaveAttr("aria-checked", "true"),
+      expect(role("switch", { name: "Notifications" })).toHaveAttr("aria-disabled", "true"),
+      expect(role("switch", { name: "Notifications" })).toBeDisabled(),
+      expect(text("Notifications")).toHaveClass("text-ink-disabled")
+    )
+  })
+
+  it("is not disabled unless it is told", () => {
+    scene(
+      { update, view: viewOf(notifications) },
+      given(initial),
+      expect(role("switch", { name: "Notifications" })).not.toHaveAttr("aria-disabled"),
+      expect(text("Notifications")).toHaveClass("text-ink")
+    )
+  })
 })
 
 describe("choiceSelect", () => {
@@ -780,6 +812,42 @@ describe("noticeBox", () => {
       expect(role("note", { name: "Unavailable" })).toHaveClass("bg-danger-surface"),
       expect(within(role("note", { name: "Unavailable" }), selector("span.bg-danger-mark"))).toExist(),
       expect(within(role("note", { name: "Unavailable" }), selector("ul"))).toBeAbsent()
+    )
+  })
+
+  it("is green with a filled square when it says what was found to be well", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          noticeBox(h, { title: "Working", lines: ["The check found nothing wrong."], tone: "success" })
+        ])
+      },
+      given(initial),
+      expect(role("note", { name: "Working" })).toHaveClass("bg-success-surface"),
+      expect(role("note", { name: "Working" })).toHaveClass("border-success-border"),
+      expect(within(role("note", { name: "Working" }), selector("span.bg-success-mark"))).toExist(),
+      expect(within(role("note", { name: "Working" }), text("Working"))).toHaveClass("text-success-text"),
+      expect(role("listitem", { name: "The check found nothing wrong." })).toExist(),
+      expect(role("alert")).toBeAbsent()
+    )
+  })
+})
+
+describe("link", () => {
+  it("is a link found by its name, to a page elsewhere that opens in a new tab and tells it nothing", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          h.p([], ["Anthropic · ", link(h, { label: "Documentation", href: "https://docs.anthropic.com" })])
+        ])
+      },
+      given(initial),
+      expect(role("link", { name: "Documentation" })).toHaveAttr("href", "https://docs.anthropic.com"),
+      expect(role("link", { name: "Documentation" })).toHaveAttr("target", "_blank"),
+      expect(role("link", { name: "Documentation" })).toHaveAttr("rel", "noreferrer"),
+      expect(role("link", { name: "Documentation" })).toHaveClass("underline")
     )
   })
 })

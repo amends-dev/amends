@@ -19,15 +19,15 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and a link to another page, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
 placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
 disabled; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
-field with its label hidden, in a section that names it; the toggle on and off; a select, and with
+field with its label hidden, in a section that names it; the toggle on and off, and disabled; a select, and with
 descriptions and a choice that can't be chosen and a hint, refused, and disabled; the notice
-tones, a boxed note in each tone, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
+tones, a boxed note in each of its three tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
-directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, and a section of two rows with a button
+directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, a table of connections with a drawing on each mark and the authentication as a cell, and a section of two rows with a button
 named for their workspaces, with a footnote after them, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
@@ -35,7 +35,7 @@ sign-in's two steps and as the workspace picker five times, each with its pieces
 pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; and with the host not reached, whose message is the screen's `h1`; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
-one with tabs and a description; the marks by size, each status at every size, the lilac tone, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
+one with tabs and a description; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -198,6 +198,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   such as the composer's send button.
 - `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
   already give it its behavior, as `buttonWith` is for `button`.
+- `link(h, { label, href })` is a link to a page elsewhere, such as an integration's documentation: underlined text in
+  `ink` at the size of the line around it, the look of a `link` button, that opens in a new tab and sends the page it was
+  opened from nothing (`rel="noreferrer"`). A button that does something in the app is a `button`; this goes to another
+  address.
 - `buttonRow(h, children, options?)` is a row of controls with an 8px gap, wrapping onto a new line when
   they do not fit, such as a thread's Follow and Rename or a form's Save and Cancel. With `isCentered`
   the controls are in the middle of the row's width, for the quiet button that ends a list, such as
@@ -206,8 +210,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   12px apart, such as a notice over the button that answers it, or over a Try again row.
 - `fieldGrid(h, children)` is fields side by side in columns at least 9rem wide, 12px apart, wrapping
   onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
-- `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
-  named by its label. On touch the switch and its label are each a 44px target.
+- `toggle(h, { id, label, isOn, onToggle, isDisabled? })` is a switch with its label after it. The switch is
+  named by its label. On touch the switch and its label are each a 44px target. A switch that `isDisabled` shows how
+  it is set, in half strength with its label quiet, and takes no click or key, for a page the person may read and may
+  not change; it is `aria-disabled` and stays in the tab order.
 - `choiceSelect(h, { id, label, choices, value, onChange, hint?, error?, isDisabled?, attributes? }, options?)`
   is a select over `choices`, each a value and how the person reads it, in the input's look, with the
   `hint` under it, `error` as the alert that describes it first, and the `attributes` on the select, as a
@@ -218,10 +224,12 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   select in a row that says what it is for, such as a member's role beside their name.
 - `notice(h, message, options?)` renders an `Option<string>` as an alert in a tone, `"danger"` by
   default, `"caution"`, or `"success"`, and nothing when there is none.
-- `noticeBox(h, { title, lines, tone? })` is a note boxed in its tone, `"caution"` (the default) or
-  `"danger"`, for a page or a form as a whole and not for a field: the tone's status shape, the `title` in
-  medium weight, and a quiet line under it for each of `lines`, why. It is a `note` named by its title and
-  not an alert, since it is there when the page opens, such as the reasons an agent can't run.
+- `noticeBox(h, { title, lines, tone? })` is a note boxed in its tone, `"caution"` (the default), `"danger"`, or
+  `"success"`, for a page or a form as a whole and not for a field: the tone's status shape (a triangle, a square
+  with a bar, or a filled square), the `title` in medium weight, and a quiet line under it for each of `lines`, why. It
+  is a `note` named by its title and not an alert, since it is there when the page opens, such as the reasons an
+  agent can't run; a caller puts one it adds after the page opened, such as what a check found, in a `status` region
+  of its own.
 - `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
 
 ### `@amends-dev/design/icon`
@@ -236,9 +244,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 
 ### `@amends-dev/design/mark`
 
-- `mark(h, { text, size?, tone?, status? })` is the square that stands for a person, a workspace, or an agent: the
-  `text` letters in capitals on the ground of its `tone`, `"neutral"` (the default, `avatar-neutral`) or
-  `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, as a reply line shows those who
+- `mark(h, { text | icon, size?, tone?, status? })` is the square that stands for a person, a workspace, an agent, or
+  a connection: the `text` letters in capitals, or, for a thing that has no name to abbreviate, an `icon` drawn at the
+  size that fits the square (`xs`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
+  (the default, `avatar-neutral`) or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, as a reply line shows those who
   replied), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
   `"md"` (32px, `hint` text, as a message shows its author and an agent's row in a list), or `"lg"` (40px, `item` text, as a
   directory row shows it). A mark is `aria-hidden`: the name it abbreviates is always beside it. `sidebarHeader`,
@@ -324,9 +333,9 @@ What a directory screen lists.
 - `footnote(h, text)` is a quiet line after a list, 24px under it, at control size in `ink-secondary`, that
   says what else the person can do, such as "Accept an invitation above, or create your own workspace."
 - `row(h, { id?, mark, markSize?, status?, title, meta?, cells?, cellsText?, action?, onClick })` is one button the width of
-  its container, at least 76px tall: a square mark holding the `mark` letters, `{ text, tone? }`, 40px
-  (`markSize` `"lg"`, the default) or 32px (`"md"`, as a list of agents draws it), on `avatar-neutral` unless
-  given the `lilac` tone, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
+  its container, at least 76px tall: a square mark holding the `mark` letters, `{ text, tone? }`, or its drawing,
+  `{ icon, tone? }`, as a connection's is, 40px (`markSize` `"lg"`, the default) or 32px (`"md"`, as a list of agents
+  draws it), on `avatar-neutral` unless given the `lilac` tone, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
   `action` at the right in `ink-secondary`. The row is `hover` on hover. A `status` is the patch on the mark, cut
   out of the row's own fill, which a hovered row gives `status-knockout`. The button is named by the title and, with a
   status, its label after it, "Atlas, Needs setup", and described by the meta through `aria-description`, and the mark
@@ -736,7 +745,7 @@ The groups Block's form for a new team does all four.
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
-`aria-invalid`, and description, a switch by its label, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, also when its label is
+`aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
 landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, and a footnote by its text; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
@@ -764,7 +773,7 @@ label, its marks, and the count of the rest, the line and the marks hidden from 
 and a divider by its label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button, and its list of members by the listbox named for it, its options with the active one selected, the
 textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
-row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text; a row's status in its name and on its mark, and its two-line cells; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; and the shell's landmarks by role and name: `navigation` for
+row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere
