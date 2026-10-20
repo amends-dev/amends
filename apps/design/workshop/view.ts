@@ -56,6 +56,7 @@ import { type IconName, icon } from "../src/icon.ts"
 import { type LogoMotion, logo, logoMotions } from "../src/logo.ts"
 import {
   activityMark,
+  type MarkContent,
   type MarkSize,
   type MarkStatus,
   mark,
@@ -109,6 +110,7 @@ import {
   sidebarSections
 } from "../src/sidebar.ts"
 import { type StateArtKind, stateArt, stateArtKinds } from "../src/stateArt.ts"
+import { taskHeadings, taskList, taskListEmpty, type TaskListRow } from "../src/taskList.ts"
 import { toast, toastStack } from "../src/toast.ts"
 import { tooltip } from "../src/tooltip.ts"
 import {
@@ -182,7 +184,13 @@ const mentioningColumn = "flex max-w-md flex-col pt-24"
 
 const toolbarPaneFrame = "flex h-120 flex-col outline outline-outline"
 
-const toolbarWindowFrame = "h-160 w-90 flex-none outline outline-outline"
+const phoneWindowFrame = "h-160 w-90 max-w-full flex-none outline outline-outline"
+
+const touchWindowFrame = "h-160 w-208 max-w-full flex-none outline outline-outline"
+
+const desktopWindowFrame = "h-160 w-264 max-w-full flex-none outline outline-outline"
+
+const taskListColumn = "flex max-w-5xl flex-col"
 
 const emptyPaneFrame = "flex h-96 flex-col outline outline-outline"
 
@@ -2646,37 +2654,59 @@ const menuGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     )
   ])
 
-const taskSamples: ReadonlyArray<Readonly<{ title: string; meta: string; status: string; age: string }>> = [
-  { title: "Composer crashes on paste", meta: "Started by AJ · 4 replies", status: "To do", age: "2m ago" },
-  { title: "Plan the launch week", meta: "Started by Sara · 2 replies", status: "In progress", age: "14m ago" },
-  { title: "Review the logo", meta: "Started by Alex · 7 replies", status: "Triage", age: "1h ago" },
-  { title: "Ship the release", meta: "Started by Oliver · 3 replies", status: "To do", age: "3h ago" },
-  { title: "Fix the sidebar count", meta: "Started by Yumi · 1 reply", status: "In progress", age: "Yesterday" },
-  { title: "Write the changelog", meta: "Started by Graeme · 5 replies", status: "To do", age: "Sep 20" }
+type TaskSample = Readonly<{
+  title: string
+  status: TaskStatus
+  assignee?: Readonly<{ name: string; mark: MarkContent }>
+  place: string
+  age: string
+  isCurrent?: boolean
+  isSending?: boolean
+}>
+
+const alexMorgan = { name: "Alex Morgan", mark: { text: "AM" } } as const
+
+const yumi = { name: "Yumi", mark: { text: "Y", tone: "lilac" } } as const
+
+const taskSamples: ReadonlyArray<TaskSample> = [
+  { title: "Composer crashes on paste", status: "todo", assignee: alexMorgan, place: "#general", age: "2m ago" },
+  {
+    title: "Plan the launch week",
+    status: "doing",
+    assignee: { name: "Sara", mark: { text: "S" } },
+    place: "#design",
+    age: "14m ago",
+    isCurrent: true
+  },
+  { title: "Review the logo", status: "triage", place: "#design", age: "1h ago" },
+  {
+    title: "Ship the release, and tell every group the week before the long weekend that it is out",
+    status: "held",
+    assignee: yumi,
+    place: "#general",
+    age: "3h ago"
+  },
+  { title: "Fix the sidebar count", status: "done", assignee: alexMorgan, place: "Bob", age: "Yesterday" },
+  { title: "Write the changelog", status: "dismissed", place: "#general", age: "Sep 20" },
+  { title: "Draft the invoice", status: "todo", place: "#finance", age: "Just now", isSending: true }
 ]
 
-const taskRows = (h: ApplicationViewBuilder): Html =>
-  h.ul(
-    [h.AriaLabel("Tasks")],
-    taskSamples.map(({ title, meta, status, age }) =>
-      h.keyed("li")(
-        title,
-        [],
-        [
-          row(h, {
-            mark: { text: title.slice(0, 1) },
-            markSize: "sm",
-            title,
-            meta,
-            cells: [badge(h, { label: status }), h.span([], [age])],
-            cellsText: `${status} · ${age}`,
-            action: "Open →",
-            onClick: Message.ClickedButton()
-          })
-        ]
-      )
-    )
-  )
+/** The rows of the samples, with the place each is in when the list holds the tasks of several groups. */
+const taskListRows = (hasPlaces: boolean): ReadonlyArray<TaskListRow<Message>> =>
+  taskSamples.map((sample) => ({
+    key: sample.title,
+    title: sample.title,
+    status: {
+      shape: taskStatusDrawings[sample.status],
+      label: taskStatusChoices.find(([value]) => value === sample.status)?.[1] ?? sample.status
+    },
+    isFinished: sample.status === "done" || sample.status === "dismissed",
+    ...(hasPlaces ? { place: sample.place } : {}),
+    ...(sample.assignee === undefined ? {} : { assignee: sample.assignee }),
+    activity: sample.isSending === true ? "Sending…" : sample.age,
+    ...(sample.isCurrent === true ? { isCurrent: true } : {}),
+    onClick: Message.ClickedButton()
+  }))
 
 /**
  * A list's pane with its toolbar: the search and the status filter at the start, the sort and the action that adds at
@@ -2703,16 +2733,17 @@ const taskListPane = (h: ApplicationViewBuilder, model: Model): Html =>
         end: [taskSortMenu(h, model, "pane"), button(h, "New task", Message.ClickedButton(), { icon: "mark-new" })]
       }),
       summary(h, { copy: "Open tasks across your groups.", count: `${taskSamples.length} tasks` }),
-      columns(h, { label: "Task", cells: ["Status", "Activity"] })
+      taskHeadings(h)
     ],
-    body: [paneColumn(h, [taskRows(h)], { isWide: true })]
+    body: [paneColumn(h, [taskList(h, taskListRows(true))], { isWide: true })]
   })
 
 /**
- * The `frame` that the workshop is opened with to show the pane's toolbar alone, since it wraps by the width of the
- * window, not of what holds it, so the wrapped toolbar is shown in a frame that is a window of its own, 360px wide.
+ * The `frame` that the workshop is opened with to show a list's pane alone, its toolbar and its task rows. The toolbar
+ * wraps, the labels over the rows and the columns of the rows change, by the width of the window and not of what holds
+ * them, so the pane is shown in frames that are windows of their own: 360px wide, 52rem, and 66rem.
  */
-export const paneToolbarFrame = "pane-toolbar"
+export const listPaneFrame = "list-pane"
 
 const paneToolbarGroup = (h: ApplicationViewBuilder, model: Model): Html =>
   group(h, "Pane toolbar", [
@@ -2727,12 +2758,56 @@ const paneToolbarGroup = (h: ApplicationViewBuilder, model: Model): Html =>
       "Wrapped below 48rem in a frame 360px wide: the search a line of its own, the filter and the actions under it",
       [
         h.iframe([
-          h.Class(toolbarWindowFrame),
+          h.Class(phoneWindowFrame),
           h.Title("Pane toolbar in a window 360px wide"),
-          h.Src(`?frame=${paneToolbarFrame}`)
+          h.Src(`?frame=${listPaneFrame}`)
         ])
       ],
       "flex flex-col"
+    )
+  ])
+
+const taskListGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Task list", [
+    sample(
+      h,
+      "A group's Tasks tab: the labels over the rows, each 56px tall, the status drawn at 1rem, the title in medium weight and quiet once done or dismissed, an assignee as a 24px mark and name or the people icon and Unassigned, and the activity at the end; the second is open beside the list, a long title is cut with an ellipsis, and a task on its way says Sending…",
+      [taskHeadings(h), taskList(h, taskListRows(false))],
+      taskListColumn
+    ),
+    sample(
+      h,
+      "The workspace's lists, which hold the tasks of several groups: the group after each title in quiet text",
+      [taskHeadings(h), taskList(h, taskListRows(true))],
+      taskListColumn
+    ),
+    sample(
+      h,
+      "Filters that leave no task: the labels over a quiet line",
+      [taskHeadings(h), taskListEmpty(h, "No tasks match these filters.")],
+      taskListColumn
+    ),
+    sample(
+      h,
+      "From 64rem in a frame 66rem wide, with the status words and every label; from 48rem to 64rem in a frame 52rem wide, without the status words and their label; below 48rem in a frame 360px wide, with no labels and no assignee names, and a title that wraps",
+      [
+        h.iframe([
+          h.Class(desktopWindowFrame),
+          h.Title("Task list in a window 66rem wide"),
+          h.Src(`?frame=${listPaneFrame}`)
+        ]),
+        h.iframe([
+          h.Class(touchWindowFrame),
+          h.Title("Task list in a window 52rem wide"),
+          h.Src(`?frame=${listPaneFrame}`)
+        ]),
+        h.iframe([
+          h.Class(phoneWindowFrame),
+          h.Title("Task list in a window 360px wide"),
+          h.Src(`?frame=${listPaneFrame}`)
+        ])
+      ],
+      "flex flex-col gap-6"
     )
   ])
 
@@ -3598,6 +3673,38 @@ const detailsGroup = (
     ),
     sample(
       h,
+      "Each place a button that opens the turn's thread: 6px wider than its words each side, filled on hover, with the focus ring inside it",
+      [
+        activityList(h, {
+          label: "Turns under way",
+          lines: [
+            {
+              key: "working",
+              state: "Working",
+              motion: "working",
+              place: "#general",
+              action: { name: "Working in #general: open its log", onClick: Message.ClickedButton() }
+            },
+            {
+              key: "queued",
+              state: "Queued",
+              motion: "thread",
+              place: "#design",
+              action: { name: "Queued in #design: open its log", onClick: Message.ClickedButton() }
+            },
+            {
+              key: "stopping",
+              state: "Stopping",
+              motion: "tug",
+              action: { name: "Stopping: open its log", onClick: Message.ClickedButton() }
+            }
+          ]
+        })
+      ],
+      sidePaneColumn
+    ),
+    sample(
+      h,
       "A person: a mark beside a name over what they are, at 40px, in the agent's tone, and at 24px with a name alone",
       [
         person(h, { mark: { text: "JM" }, name: "Jamie Morgan · You", detail: "Workspace owner" }),
@@ -4118,6 +4225,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
         [
           directoryTableGroup(h),
           paneToolbarGroup(h, model),
+          taskListGroup(h),
           paneColumnGroup(h, model.workspaceName),
           shellGroup(h, model)
         ]
@@ -4126,8 +4234,8 @@ export const view = ApplicationComposition.makeView((model, h) => ({
   )
 }))
 
-export const paneToolbarView = ApplicationComposition.makeView((model, h) => ({
-  title: "amends design workshop: pane toolbar",
+export const listPaneView = ApplicationComposition.makeView((model, h) => ({
+  title: "amends design workshop: list pane",
   body: h.div([h.Class("flex h-dvh flex-col")], [taskListPane(h, model)])
 }))
 

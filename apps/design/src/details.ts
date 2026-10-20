@@ -31,6 +31,8 @@ const activityColumn = "m-0 flex list-none flex-col items-start gap-1 p-0"
 
 const activityLine = "flex items-center gap-2.5 text-item text-ink"
 
+const activityButton = "-mx-1.5 cursor-pointer bg-transparent px-1.5 py-0.5 text-start focus-ring-inset hover:bg-hover"
+
 const activityState = "inline-flex items-center gap-1.25 text-hint whitespace-nowrap text-ink-secondary"
 
 const activityPlace = "font-medium"
@@ -157,34 +159,64 @@ export const badge = <Message, Requirements>(
 
 /**
  * One place an agent is at work: the `key` of its turn, the `state` of the turn in words, how its logo `motion` goes,
- * and the `place`, which a turn has none of until its group is read.
+ * and the `place`, which a turn has none of until its group is read. A line with an `action` is a button named
+ * `action.name` that sends `action.onClick`, such as one that opens the turn's thread.
  */
-export type ActivityLine = Readonly<{ key: string; state: string; motion: LogoMotion; place?: string | undefined }>
+export type ActivityLine<Message> = Readonly<{
+  key: string
+  state: string
+  motion: LogoMotion
+  place?: string | undefined
+  action?: Readonly<{ name: string; onClick: Message }> | undefined
+}>
+
+const renderActivity = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  line: ActivityLine<Message>
+): ReadonlyArray<Html> => [
+  h.span(
+    [h.Class(activityState)],
+    [h.span([h.AriaHidden(true), h.Class("flex")], [activityMark(h, line.motion)]), line.state]
+  ),
+  line.place === undefined ? h.empty : h.span([h.Class(activityPlace)], [line.place])
+]
 
 /**
  * Where an agent is at work, named by `label`, a line for each of the `lines`: the logo moving as its `motion` says
  * and the `state` in quiet text, then the `place` in medium weight, 10px on, unless the line has none. The logo is
- * hidden from assistive technology, since the state says what it does.
+ * hidden from assistive technology, since the state says what it does. A line with an `action` is one button, 6px
+ * wider than its words on each side, filled `hover` while it is hovered, and named by `action.name`, which says what it
+ * does, as `apps/ui` names the link that opens a turn's log: "Working in #general: open its log".
  */
 export const activityList = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; lines: ReadonlyArray<ActivityLine> }>
+  config: Readonly<{ label: string; lines: ReadonlyArray<ActivityLine<Message>> }>
 ): Html =>
   h.ul(
     [h.AriaLabel(config.label), h.Class(activityColumn)],
-    config.lines.map((line) =>
-      h.keyed("li")(
-        line.key,
-        [h.Class(activityLine)],
-        [
-          h.span(
-            [h.Class(activityState)],
-            [h.span([h.AriaHidden(true), h.Class("flex")], [activityMark(h, line.motion)]), line.state]
-          ),
-          line.place === undefined ? h.empty : h.span([h.Class(activityPlace)], [line.place])
-        ]
-      )
-    )
+    config.lines.map((line) => {
+      const { action } = line
+
+      return action === undefined
+        ? h.keyed("li")(line.key, [h.Class(activityLine)], renderActivity(h, line))
+        : h.keyed("li")(
+            line.key,
+            [],
+            [
+              Button.view(
+                {
+                  onClick: action.onClick,
+                  toView: (attributes) =>
+                    h.button(
+                      [...attributes.button, h.AriaLabel(action.name), h.Class(`${activityLine} ${activityButton}`)],
+                      renderActivity(h, line)
+                    )
+                },
+                h
+              )
+            ]
+          )
+    })
   )
 
 /**

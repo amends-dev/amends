@@ -25,6 +25,7 @@
     "./shell": "./src/shell.ts",
     "./sidebar": "./src/sidebar.ts",
     "./stateArt": "./src/stateArt.ts",
+    "./taskList": "./src/taskList.ts",
     "./toast": "./src/toast.ts",
     "./tooltip": "./src/tooltip.ts",
     "./viewport": "./src/viewport.ts"

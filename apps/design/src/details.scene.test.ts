@@ -2,7 +2,7 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button, buttonRow, hint, sending } from "./control.ts"
 import {
@@ -200,6 +200,88 @@ describe("activityList", () => {
       expect(selector("svg.logo-tug")).toHaveAttr("aria-hidden", "true"),
       expect(role("img")).toBeAbsent()
     )
+  })
+
+  it("has no button for a line with no action", () => {
+    scene({ update, view: viewOf(lines) }, given(initial), expectAll(all.role("button")).toHaveCount(0))
+  })
+
+  describe("with actions", () => {
+    const opening = (h: HtmlBuilder<Message>) =>
+      activityList(h, {
+        label: "Turns under way",
+        lines: [
+          {
+            key: "turn-1",
+            state: "Working",
+            motion: "working",
+            place: "#general",
+            action: { name: "Working in #general: open its log", onClick: Message.ClickedOpen() }
+          },
+          { key: "turn-2", state: "Queued", motion: "thread", place: "#design" },
+          {
+            key: "turn-3",
+            state: "Stopping",
+            motion: "tug",
+            action: { name: "Stopping: open its log", onClick: Message.ClickedStop() }
+          }
+        ]
+      })
+
+    it("makes a line with an action one button, named by it, that sends its message when it is clicked", () => {
+      scene(
+        { update, view: viewOf(opening) },
+        given(initial),
+        expectAll(all.role("button")).toHaveCount(2),
+        expect(role("button", { name: "Working in #general: open its log" })).toExist(),
+        expect(role("button", { name: "Stopping: open its log" })).toExist(),
+        click(role("button", { name: "Working in #general: open its log" })),
+        expect(role("status")).toHaveText("Stopped 0, opened 1"),
+        click(role("button", { name: "Stopping: open its log" })),
+        expect(role("status")).toHaveText("Stopped 1, opened 1")
+      )
+    })
+
+    it("keeps the logo, the state, and the place inside the button, the logo hidden from assistive technology", () => {
+      scene(
+        { update, view: viewOf(opening) },
+        given(initial),
+        expect(within(role("button", { name: "Working in #general: open its log" }), text("Working"))).toExist(),
+        expect(within(role("button", { name: "Working in #general: open its log" }), text("#general"))).toHaveClass(
+          "font-medium"
+        ),
+        expect(
+          within(role("button", { name: "Working in #general: open its log" }), selector("svg.logo-working"))
+        ).toHaveAttr("aria-hidden", "true"),
+        expect(within(role("button", { name: "Stopping: open its log" }), selector("svg.logo-tug"))).toExist()
+      )
+    })
+
+    it("sets the button 6px wider than its words each side, filled on hover, with a focus ring inside it", () => {
+      scene(
+        { update, view: viewOf(opening) },
+        given(initial),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("-mx-1.5"),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("px-1.5"),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("py-0.5"),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("hover:bg-hover"),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("focus-ring-inset"),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("cursor-pointer"),
+        expect(role("button", { name: "Working in #general: open its log" })).toHaveClass("text-item")
+      )
+    })
+
+    it("lists a line with no action beside them as text, in the same column", () => {
+      scene(
+        { update, view: viewOf(opening) },
+        given(initial),
+        expectAll(all.role("listitem")).toHaveCount(3),
+        expect(within(nth(all.role("listitem"), 1), text("Queued"))).toExist(),
+        expect(within(nth(all.role("listitem"), 1), selector("button"))).toBeAbsent(),
+        expect(nth(all.role("listitem"), 1)).toHaveClass("items-center"),
+        expect(nth(all.role("listitem"), 0)).not.toHaveClass("items-center")
+      )
+    })
   })
 })
 

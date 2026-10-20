@@ -36,8 +36,8 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
-list, properties that are read under their captions, where an agent is at work as a line for each place, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
+Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
@@ -63,7 +63,7 @@ before a page composes it. It follows the browser's light or dark preference. A 
 hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. The
 folded table's frame is an `iframe` of the workshop itself, opened with `?frame=directory-table` to
 show the table alone, since a table folds by the width of the window, which a `div` 360px wide does
-not change. The toolbar's wrapped frame is an `iframe` the same way, opened with `?frame=pane-toolbar`, since a toolbar wraps by the width of the window. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
+not change. The list pane's frames are `iframe`s the same way, opened with `?frame=list-pane`, since a toolbar wraps and the task list changes its columns by the width of the window: one 360px wide, one 52rem, and one 66rem. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
 
 ## Using it in an app
 
@@ -489,6 +489,39 @@ What a directory screen lists.
   buttons of several rows are told apart. Below 48rem the action moves under the status. A row with no `action` leaves
   its column bare. A page lists these as `li` items of a `ul`.
 
+### `@amends-dev/design/taskList`
+
+Tasks as `apps/ui`'s group Tasks tab lists them, which `app-v2` draws for a group's Tasks tab and the workspace's Triage and
+Tasks. A task here has no key, so the column `apps/ui` has for it is left out.
+
+- `taskHeadings(h)` is the labels of the list's columns, Task, Status, Assignee, and Activity, at `meta` size in capitals
+  in medium weight and `ink-secondary`, 40px tall with a 3px top padding, over a dashed `stitch` rule along their foot, in
+  the columns of the rows, hidden from assistive technology since each row describes itself. Task is over the
+  drawing and the title. It belongs in a pane's `toolbar`, under the search, where it stays while the rows scroll. From
+  48rem to 64rem the Status label goes with the status words, and below 48rem the labels are not shown.
+- `taskList(h, rows)` is the list named Tasks, an `li` for each of the `rows`, each
+  `{ key, title, status: { shape, label }, isFinished?, place?, assignee?: { name, mark }, activity, isCurrent?, onClick }`,
+  in `grid` columns of `1rem`, the title, `7rem` for the status word, `9.25rem` for the assignee, and `5.5rem` for the
+  activity, 12px apart, as `apps/ui` sets them. A row is one button the width of the list, 56px tall, `ink-secondary`
+  by default and `hover` on hover, with the focus ring inside it; it sends `onClick`. It holds, in order, the status
+  drawn by `taskStatus` at 1rem (the `shape`); the `title` at item size in medium weight, in `ink`, or in `ink-secondary`
+  once the task `isFinished`, cut short with an ellipsis, and, when the list holds the tasks of several groups, the
+  `place`, "#general", after it in quiet hint text, which keeps its room while the title gives way; the `label` of
+  the status at hint size; the assignee, as a 24px `mark` and the name at control size in `ink`, or the people
+  icon (`propertyIcon`, 15px) in a 24px box and "Unassigned" in `ink-secondary`; and the `activity` at control
+  size, at the end of its column. A row that `isCurrent` is the one whose task is open beside the list: it is filled
+  `selected`, with the 2px bar at its start, and is `aria-current="true"`. The button is named by the title, and
+  described by all the rest it says, "#general · To do · Alex Morgan · 2m ago", or "Unassigned", whatever the width
+  leaves out; the drawing and the mark are hidden from assistive technology.
+  - From 48rem to 64rem (`max-desktop:`) the status words are not shown, since the drawing says it, and the columns
+    are the drawing, the title, `9.25rem`, and `4.5rem`.
+  - Below 48rem (`max-tablet:`) the assignee's name is not shown and the mark stands for it, the columns are the
+    drawing, the title, `1.5rem`, and `3.5rem`, a row is 60px tall, and the title wraps in place of an ellipsis,
+    with the place under it.
+- `taskListEmpty(h, text)` is a quiet line in the place of the list, in `ink-secondary` at control size, 32px above and
+  below and 12px in from the rows' edge, as `apps/ui` says "No tasks match these filters." where the filters hide every
+  task. The labels stay over it.
+
 ### `@amends-dev/design/shell`
 
 The frame of the first four layout patterns, which the modules below fill.
@@ -725,10 +758,13 @@ What a pane says about one thing.
 - `propertyIcon(h, name)` is an icon before a property's words at 15px, as `apps/ui` draws the people icon for an
   assignee that is no one, hidden from assistive technology. A `propertyMenu` draws its `buttonIcon` with it.
 - `activityList(h, { label, lines })` is where an agent is at work, a `ul` named by `label`, a line for each of the
-  `lines`, `{ key, state, motion, place? }`, as `apps/ui`'s agent page lists the turns in progress: the logo at
+  `lines`, `{ key, state, motion, place?, action? }`, as `apps/ui`'s agent page lists the turns in progress: the logo at
   0.875rem moving as its `motion` says, hidden from assistive technology, and the `state` after it, "Working", at
   `hint` size in `ink-secondary`, then the `place`, "#general", in medium weight at item size, 10px on, unless the line
-  has none, as a turn has until its group is read.
+  has none, as a turn has until its group is read. A line with an `action`, `{ name, onClick }`, is one button, as
+  `apps/ui` makes each line a link that opens the turn's log: 6px wider than its words on each side (`-mx-1.5 px-1.5`),
+  2px taller (`py-0.5`), filled `hover` while it is hovered, with the focus ring inside it, and named by `name`, such as
+  "Working in #general: open its log", which replaces the words inside it. A line with no action is text.
 - `person(h, { mark, markSize?, name, detail? })` is one person or agent alone, not in a list: their `mark`, 40px
   unless `markSize` says otherwise, beside the `name` at item size in medium weight over the `detail` at hint
   size in `ink-secondary`, such as "Workspace owner" or "Person · Active". The mark is hidden from assistive
@@ -1004,7 +1040,7 @@ renderer family as a person does, through what the app's own tests query: a butt
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
 `aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
-landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, a compact row's 24px mark, its height, also with a 32px mark, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, a history row by its title, detail, and status as text, its quiet button named for what it acts on, disabled or absent, and its action moved under the status below 48rem, and a footnote by its text; an
+landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, a compact row's 24px mark, its height, also with a 32px mark, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, a history row by its title, detail, and status as text, its quiet button named for what it acts on, disabled or absent, and its action moved under the status below 48rem, and a footnote by its text; the task list's labels, hidden from assistive technology, in the columns of the rows, with the Status label gone below 64rem and all of them below 48rem, a task by `role("button", { name })` of its title, described by all it says, in a `listitem` of the list named Tasks, its status drawn at 1rem and said in a word, its title quiet once finished, its assignee's mark in its tone or the people icon and Unassigned, its place after the title and under it below 48rem, its activity, its height, `aria-current` on the row open beside the list, and the quiet line that says no task matches; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; the logo the same, with a
 class for each motion and none without one; each state art drawn, hidden from assistive technology, and moving in
 the part its kind moves; the code input's six cells, the digits it keeps, its completion at the sixth, its
@@ -1042,7 +1078,7 @@ chip that holds it and a button by the words joined, a notification by its
 text button named by its author and activity and described by its text, its place and age,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
-and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, and the
+and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button, and its list of members by the listbox named for it, its options with the active one selected, the
 textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
 row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; and the shell's landmarks by role and name: `navigation` for
