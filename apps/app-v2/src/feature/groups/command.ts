@@ -6,29 +6,49 @@ import { MemberId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import { focusMembersInput } from "../../memberPicker.ts"
 import * as Stores from "../../store/Stores.ts"
-import { GroupsDefinition, Message } from "./definition.ts"
+import { GroupsDefinition, Message, teamMembersId } from "./definition.ts"
 
 const written = [Message.WroteAction, Message.FailedWriteAction]
 
 /** Why `error` kept the action from being written, as the person reads it. */
 const failed = (error: string) => Message.FailedWriteAction({ error })
 
-/** Create the team `name`, with the person as its first member, public when `isPublic`. */
+/** Why a team could not be made of the name the person gave, which holds no name or one the host would refuse. */
+const invalidTeamName = "Use 1 to 80 characters, with no invisible ones."
+
+/** Create the team `name`, `visibility` public or private, with `memberIds` as its first members. */
 export const CreateTeam = GroupsDefinition.command("CreateTeam", {
-  args: { ...Stores.AsMember, name: Schema.String, isPublic: Schema.Boolean },
-  messages: written,
+  args: {
+    ...Stores.AsMember,
+    name: Schema.String,
+    visibility: Group.Visibility,
+    memberIds: Schema.Array(MemberId.MemberId)
+  },
+  messages: [Message.SucceededCreateTeam, Message.FailedCreateTeam],
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ name, isPublic, ...member }) =>
+    const write = Stores.writer(yield* Stores.Stores, Message.SucceededCreateTeam(), (error) =>
+      Message.FailedCreateTeam({ error })
+    )
+    return ({ name, visibility, memberIds, ...member }) =>
       Stores.decoded(
         Group.CreateTeamInput,
-        { name, memberIds: [member.memberId], visibility: isPublic ? "Public" : "Private" },
-        failed("A team needs a name.")
+        { name, memberIds, visibility },
+        Message.FailedCreateTeam({ error: invalidTeamName })
       ).pipe(
         Effect.flatMap((input) => write(member, (store) => store.write("TeamCreated", input))),
         Effect.catch(Effect.succeed)
       )
+  }
+})
+
+/** Move focus to the input of the members picker of the team form, which the chip the person removed held. */
+export const FocusTeamMembers = GroupsDefinition.command("FocusTeamMembers", {
+  args: {},
+  messages: [Message.CompletedFocusTeamMembers],
+  handler: function* () {
+    return () => focusMembersInput(teamMembersId).pipe(Effect.as(Message.CompletedFocusTeamMembers()))
   }
 })
 
@@ -63,4 +83,9 @@ export const JoinGroup = GroupsDefinition.command("JoinGroup", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(CreateTeam.layer, StartConversation.layer, JoinGroup.layer)
+export const EffectsLayer = Layer.mergeAll(
+  CreateTeam.layer,
+  FocusTeamMembers.layer,
+  StartConversation.layer,
+  JoinGroup.layer
+)

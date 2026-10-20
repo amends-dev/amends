@@ -12,13 +12,16 @@ import { Grant } from "@amends-dev/core/authorization"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
+import * as RadioGroup from "@foldkit/ui/radioGroup"
 import * as Array from "effect/Array"
-import type * as Option from "effect/Option"
+import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
+import { modifyFields } from "foldkit/struct"
+import { MembersComboboxBlock } from "../../memberPicker.ts"
 import { foldAccents, groupName, isJoinable } from "../../seen.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
@@ -30,12 +33,45 @@ export type TeamItem = GroupItem & Readonly<{ group: Group.Team }>
 
 const isTeamItem = (item: GroupItem): item is TeamItem => item.group.kind === "Team"
 
-/** What the person is starting: a team, by name, or a conversation with another member. */
+/**
+ * A team being created, once its form is sent: the name it was sent under, and which groups the person could see
+ * then, so that the one the store makes is told from the others, and whether the store has kept the action. The
+ * dialog stays on it until the new team is listed.
+ */
+export const CreatingTeam = Schema.Struct({
+  name: Schema.String,
+  knownGroupIds: Schema.Array(GroupId.GroupId),
+  isWritten: Schema.Boolean
+})
+export type CreatingTeam = typeof CreatingTeam.Type
+
+/**
+ * What the person is starting: a team, by name, visibility, and the members to add besides themself, with, once it is
+ * sent, that attempt and why the last one failed, or a conversation with another member.
+ */
 export const Starting = defineTaggedUnion({
-  Team: { name: Schema.String, isPublic: Schema.Boolean },
+  Team: {
+    name: Schema.String,
+    visibility: Group.Visibility,
+    memberIds: Schema.Array(MemberId.MemberId),
+    creating: Schema.Option(CreatingTeam),
+    failure: Schema.Option(Schema.String)
+  },
   Conversation: { memberId: Schema.Option(MemberId.MemberId), text: Schema.String }
 })
 export type Starting = typeof Starting.Type
+
+/** The team form: what `Starting.Team` holds. */
+export type TeamForm = typeof Starting.Team.Type
+
+/** The radio group that chooses whether a new team is public or private. */
+export const VisibilityRadioGroupBlock = RadioGroup.create<Group.Visibility>()
+
+/** The `id` of the radio group of the team form, which names its elements. */
+export const teamVisibilityId = "groups-visibility"
+
+/** The `id` of the members picker of the team form, which names its elements, such as the input that takes focus. */
+export const teamMembersId = "groups-members"
 
 /** Which groups the browse page lists: those the person belongs to, or the public teams they may join. */
 export const BrowseTab = Schema.Literals(["Yours", "Discover"])
@@ -44,7 +80,8 @@ export type BrowseTab = typeof BrowseTab.Type
 /**
  * Whether the groups are read, the groups, the workspace's members, the person's own admissions, what they may do,
  * the group picked, the browse page's tab and search, the teams being joined, what they are starting and the dialog it
- * is in, how many times the person asked to read the groups again, and why the last read or write failed.
+ * is in, with the radio group and the combobox of its form, how many times the person asked to read the groups again,
+ * and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -59,6 +96,8 @@ export const Model = Schema.Struct({
   joining: Schema.Array(GroupId.GroupId),
   starting: Schema.Option(Starting),
   dialog: DialogBlock.Model,
+  visibilityGroup: VisibilityRadioGroupBlock.Model,
+  membersCombobox: MembersComboboxBlock.Model,
   reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
@@ -84,8 +123,11 @@ export const Message = defineMessageUnion({
   FailedJoinGroup: { groupId: GroupId.GroupId, error: Schema.String },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
-  ToggledTeamPublic: { isPublic: Schema.Boolean },
+  ClickedRemoveTeamMember: { memberId: Schema.String },
   SubmittedTeam: {},
+  SucceededCreateTeam: {},
+  FailedCreateTeam: { error: Schema.String },
+  CompletedFocusTeamMembers: {},
   ClickedNewConversation: {},
   ChoseConversationMember: { memberId: Schema.Option(MemberId.MemberId) },
   TypedConversationText: { text: Schema.String },
@@ -97,13 +139,15 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 /**
- * What the Block asks of its parent: to open the group the person picked, to show the browse page, and to confirm
- * that the person joined a group, with where it is as a line says it, "#launches".
+ * What the Block asks of its parent: to open the group the person picked, to show the browse page, to confirm that the
+ * person joined a group, with where it is as a line says it, "#launches", and to open the team the person created and
+ * confirm it.
  */
 export const OutMessage = defineMessageUnion({
   SelectedGroup: { groupId: GroupId.GroupId },
   RequestedBrowse: {},
-  JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String }
+  JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
+  CreatedGroup: { groupId: GroupId.GroupId }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -172,3 +216,41 @@ export const conversationWith = (model: Model, memberId: MemberId.MemberId): Opt
 /** The workspace's other active members, whom the person may start a conversation with. */
 export const others = (model: Model): ReadonlyArray<Member.Member> =>
   model.members.filter((member) => member.id !== model.memberId && member.status === "active")
+
+/** What `starting` becomes when the team being started is changed as `change` makes it, if one is. */
+export const onTeam = (change: (team: TeamForm) => TeamForm) =>
+  Option.map(Starting.matchOrElse({ Team: change }, (same) => same))
+
+/** The team form changed as `change` makes it, while the person is starting a team. */
+export const withTeam = (model: Model, change: (team: TeamForm) => TeamForm): Model =>
+  modifyFields(model, { starting: onTeam(change) })
+
+/** The team being started, while one is. */
+export const teamIn = (model: Model): Option.Option<TeamForm> =>
+  Option.flatMap(
+    model.starting,
+    Starting.matchOrElse({ Team: (team) => Option.some(team) }, () => Option.none())
+  )
+
+/** Whether the team form can be sent: it has a name, and no attempt to create the team is on its way. */
+export const isTeamReady = ({ name, creating }: TeamForm): boolean => name.trim() !== "" && Option.isNone(creating)
+
+/**
+ * The team the person created, once the store has kept the action that creates it and has listed it: one they made
+ * under the name they sent that they could not see when they sent the form.
+ */
+export const findCreatedTeam = (model: Model): Option.Option<TeamItem> =>
+  Option.flatMap(teamIn(model), ({ creating }) =>
+    Option.flatMap(
+      Option.filter(creating, ({ isWritten }) => isWritten),
+      (sent) =>
+        Option.fromUndefinedOr(
+          model.groups
+            .filter(isTeamItem)
+            .find(
+              ({ group }) =>
+                group.createdBy === model.memberId && group.name === sent.name && !sent.knownGroupIds.includes(group.id)
+            )
+        )
+    )
+  )

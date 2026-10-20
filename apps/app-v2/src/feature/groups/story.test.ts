@@ -3,12 +3,13 @@ import { ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
+import { inputId } from "@foldkit/ui/combobox"
 import { Array, Effect, Layer, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, aliceInGeneral, bob, conversationWithBob, design, general } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import { CreateTeam, JoinGroup, StartConversation } from "./command.ts"
+import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import {
   byGeneralThenName,
@@ -17,6 +18,8 @@ import {
   Message,
   OutMessage,
   Starting,
+  teamIn,
+  teamMembersId,
   yourTeams
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -28,6 +31,15 @@ const bobId = MemberId.MemberId.make("member-2")
 const groupId = GroupId.GroupId.make("general")
 
 const listed = init(workspaceId, memberId).model
+
+/** The form of a team just asked for: unnamed, private, with no one added besides the person. */
+const blankTeam = Starting.Team({
+  name: "",
+  visibility: "Private",
+  memberIds: [],
+  creating: Option.none(),
+  failure: Option.none()
+})
 
 /** A public team the person does not belong to. */
 const launches = { ...general, id: GroupId.GroupId.make("launches"), name: "launches" }
@@ -79,7 +91,7 @@ describe("the groups", () => {
       message(Message.ClickedNewTeam()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       model((model) => {
-        expect(model.starting).toEqual(Option.some(Starting.Team({ name: "", isPublic: false })))
+        expect(model.starting).toEqual(Option.some(blankTeam))
         expect(model.dialog.isOpen).toBe(true)
       }),
       message(Message.ClickedNewConversation()),
@@ -91,25 +103,344 @@ describe("the groups", () => {
     )
   })
 
-  it("start a team with the name given, public when the person says so, and close the dialog", () => {
+  it("write a team once, with the person and who they added as its members, and keep the form until it is listed", () => {
+    story(
+      update,
+      given(browsing),
+      message(Message.ClickedNewTeam()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.TypedTeamName({ name: "  Design review " })),
+      message(Message.SubmittedTeam()),
+      Command.expectExact(
+        CreateTeam({ workspaceId, memberId, name: "Design review", visibility: "Private", memberIds: [memberId] })
+      ),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(teamIn(model)).toEqual(
+          Option.some(
+            Starting.Team({
+              name: "  Design review ",
+              visibility: "Private",
+              memberIds: [],
+              creating: Option.some({
+                name: "Design review",
+                knownGroupIds: browsing.groups.map(({ group }) => group.id),
+                isWritten: false
+              }),
+              failure: Option.none()
+            })
+          )
+        )
+      }),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      message(Message.SubmittedTeam()),
+      Command.expectNone()
+    )
+  })
+
+  it("send the visibility and the members the person chose, with themself first", () => {
+    const filledIn = modifyFields(browsing, {
+      starting: () =>
+        Option.some(
+          Starting.Team({
+            name: "Announcements",
+            visibility: "Public",
+            memberIds: [bobId],
+            creating: Option.none(),
+            failure: Option.none()
+          })
+        )
+    })
+
+    story(
+      update,
+      given(filledIn),
+      message(Message.SubmittedTeam()),
+      Command.expectExact(
+        CreateTeam({
+          workspaceId,
+          memberId,
+          name: "Announcements",
+          visibility: "Public",
+          memberIds: [memberId, bobId]
+        })
+      ),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam())
+    )
+  })
+
+  it("send nothing for a team with no name, or only spaces for one", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedNewTeam()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.SubmittedTeam()),
+      Command.expectNone(),
+      message(Message.TypedTeamName({ name: "   " })),
+      message(Message.SubmittedTeam()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(Option.exists(teamIn(model), ({ creating }) => Option.isNone(creating))).toBe(true)
+      })
+    )
+  })
+
+  it("send nothing when no team is being started", () => {
+    story(update, given(listed), message(Message.SubmittedTeam()), Command.expectNone())
+  })
+
+  it("close the dialog, mark the new team in the sidebar, and report it once it is listed", () => {
+    const created = { ...design, id: GroupId.GroupId.make("design-review"), name: "Design review" }
+
+    story(
+      update,
+      given(browsing),
+      message(Message.ClickedNewTeam()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.TypedTeamName({ name: "Design review" })),
+      message(Message.SubmittedTeam()),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam()),
+      message(
+        Message.ReceivedGroups({
+          groups: [...browsing.groups, { group: created, pending: true, members: 1 }],
+          members: browsing.members,
+          memberships: browsing.memberships,
+          grants: browsing.grants
+        })
+      ),
+      expectOutMessage(OutMessage.CreatedGroup({ groupId: created.id })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.selected).toEqual(Option.some(created.id))
+        expect(model.starting).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("report the new team once it is both listed and kept, in whichever order the store tells the Block", () => {
+    const created = { ...design, id: GroupId.GroupId.make("design-review"), name: "Design review" }
+    const sent = modifyFields(browsing, {
+      starting: () =>
+        Option.some(
+          Starting.Team({
+            name: "Design review",
+            visibility: "Private",
+            memberIds: [],
+            creating: Option.some({
+              name: "Design review",
+              knownGroupIds: browsing.groups.map(({ group }) => group.id),
+              isWritten: false
+            }),
+            failure: Option.none()
+          })
+        )
+    })
+
+    story(
+      update,
+      given(sent),
+      message(
+        Message.ReceivedGroups({
+          groups: [...browsing.groups, { group: created, pending: true, members: 1 }],
+          members: browsing.members,
+          memberships: browsing.memberships,
+          grants: browsing.grants
+        })
+      ),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(teamIn(model)).not.toEqual(Option.none())
+        expect(model.selected).toEqual(Option.none())
+      }),
+      message(Message.SucceededCreateTeam()),
+      expectOutMessage(OutMessage.CreatedGroup({ groupId: created.id })),
+      model((model) => {
+        expect(model.selected).toEqual(Option.some(created.id))
+      })
+    )
+  })
+
+  it("tell the team the person made from one of the same name that was listed before, or that someone else made", () => {
+    const sameName = { ...design, id: GroupId.GroupId.make("design-too"), name: "Design review", createdBy: bobId }
+    const alreadyThere = { ...design, id: GroupId.GroupId.make("design-old"), name: "Design review" }
+    const withOld = modifyFields(browsing, {
+      groups: (groups) => [...groups, { group: alreadyThere, pending: false, members: 1 }]
+    })
+
+    story(
+      update,
+      given(withOld),
+      message(Message.ClickedNewTeam()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.TypedTeamName({ name: "Design review" })),
+      message(Message.SubmittedTeam()),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam()),
+      message(
+        Message.ReceivedGroups({
+          groups: [...withOld.groups, { group: sameName, pending: false, members: 1 }],
+          members: withOld.members,
+          memberships: withOld.memberships,
+          grants: withOld.grants
+        })
+      ),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.selected).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("keep the form with why the team could not be written, and write it again when the person sends it again", () => {
     story(
       update,
       given(listed),
       message(Message.ClickedNewTeam()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       message(Message.TypedTeamName({ name: "Design" })),
-      message(Message.ToggledTeamPublic({ isPublic: true })),
       message(Message.SubmittedTeam()),
-      Command.expectHas(CreateTeam({ workspaceId, memberId, name: "Design", isPublic: true }), Dialog.test.CloseDialog),
-      Command.resolve(CreateTeam, Message.WroteAction()),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(CreateTeam, Message.FailedCreateTeam({ error: "This browser could not keep the action." })),
+      expectNoOutMessage(),
       model((model) => {
-        expect(model.starting).toEqual(Option.none())
-        expect(model.dialog.isOpen).toBe(false)
-        expect(model.notice).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(true)
+        expect(teamIn(model)).toEqual(
+          Option.some(
+            Starting.Team({
+              name: "Design",
+              visibility: "Private",
+              memberIds: [],
+              creating: Option.none(),
+              failure: Option.some("This browser could not keep the action.")
+            })
+          )
+        )
+      }),
+      message(Message.SubmittedTeam()),
+      Command.expectExact(
+        CreateTeam({ workspaceId, memberId, name: "Design", visibility: "Private", memberIds: [memberId] })
+      ),
+      model((model) => {
+        expect(Option.exists(teamIn(model), ({ failure }) => Option.isNone(failure))).toBe(true)
+      }),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam())
+    )
+  })
+
+  it("take off the member whose chip the person removed, and ask for the input to take focus again", () => {
+    const withMembers = modifyFields(listed, {
+      starting: () =>
+        Option.some(
+          Starting.Team({
+            name: "",
+            visibility: "Private",
+            memberIds: [bobId, MemberId.MemberId.make("member-3")],
+            creating: Option.none(),
+            failure: Option.none()
+          })
+        )
+    })
+
+    story(
+      update,
+      given(withMembers),
+      message(Message.ClickedRemoveTeamMember({ memberId: bobId })),
+      Command.expectExact(FocusTeamMembers({})),
+      Command.resolve(FocusTeamMembers, Message.CompletedFocusTeamMembers()),
+      model((model) => {
+        expect(Option.map(teamIn(model), ({ memberIds }) => memberIds)).toEqual(
+          Option.some([MemberId.MemberId.make("member-3")])
+        )
       })
     )
   })
+
+  it("open a fresh team form each time, private and with no one added", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedNewTeam()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.TypedTeamName({ name: "Design" })),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      message(Message.ClickedNewTeam()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      model((model) => {
+        expect(model.starting).toEqual(Option.some(blankTeam))
+      })
+    )
+  })
+
+  it.effect("write the team to the person's store with its members and visibility, and tell it written", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+
+      const result = yield* CreateTeam({
+        workspaceId,
+        memberId,
+        name: "Design review",
+        visibility: "Public",
+        memberIds: [memberId, bobId]
+      }).effect.pipe(Effect.provide(Layer.provide(CreateTeam.layer, layer)))
+
+      expect(written).toEqual([
+        {
+          action: "TeamCreated",
+          payload: { name: "Design review", memberIds: [memberId, bobId], visibility: "Public" }
+        }
+      ])
+      expect(result).toEqual(Message.SucceededCreateTeam())
+    })
+  )
+
+  it.effect("write nothing, and say why, for a name the host would refuse", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+
+      const results = yield* Effect.forEach(["", "  Design", "Design​", "x".repeat(81)], (name) =>
+        CreateTeam({ workspaceId, memberId, name, visibility: "Private", memberIds: [memberId] }).effect.pipe(
+          Effect.provide(Layer.provide(CreateTeam.layer, layer))
+        )
+      )
+
+      expect(written).toEqual([])
+      expect(results).toEqual(
+        results.map(() => Message.FailedCreateTeam({ error: "Use 1 to 80 characters, with no invisible ones." }))
+      )
+      expect(results).toHaveLength(4)
+    })
+  )
+
+  it.effect("move focus to the input of the members picker, and complete all the same when it is not there", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const input = yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            const element = document.createElement("input")
+            element.id = inputId(teamMembersId)
+            document.body.append(element)
+            return element
+          }),
+          (element) => Effect.sync(() => element.remove())
+        )
+
+        const focused = yield* FocusTeamMembers({}).effect.pipe(Effect.provide(FocusTeamMembers.layer))
+        expect(document.activeElement).toBe(input)
+        expect(focused).toEqual(Message.CompletedFocusTeamMembers())
+
+        input.remove()
+        const missing = yield* FocusTeamMembers({}).effect.pipe(Effect.provide(FocusTeamMembers.layer))
+        expect(missing).toEqual(Message.CompletedFocusTeamMembers())
+      })
+    )
+  )
 
   it("start a conversation once a member is chosen, with the first message written", () => {
     story(

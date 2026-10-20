@@ -97,13 +97,15 @@ export const goTo = (show: typeof showHome) => Update.combine([MenuBinding.reque
 const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, showHome])
 
 /**
- * Home reports that the person moved within it, which shows it and closes the navigation drawer, and that they joined
- * a group, which is confirmed to them, with the offer to open it.
+ * Home reports that the person moved within it, which shows it and closes the navigation drawer, that they joined a
+ * group, which is confirmed to them, with the offer to open it, and that they created one, which is confirmed to them
+ * and shown, as it is already open.
  */
 const foldHomeOutMessage = HomeBlock.OutMessage.match({
   Navigated: () => goToHome(),
   JoinedGroup: ({ groupId, place }) =>
-    ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) })
+    ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
+  CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()])
 })
 
 /** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */

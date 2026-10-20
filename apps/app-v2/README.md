@@ -458,10 +458,32 @@ below it counted at each level above.
   holds them); the public teams they may join are not in the sidebar, only on the browse page's Discover tab; and
   where they start a team, or a conversation with another member, in a modal
   over the page: a dialog the Block binds from `@foldkit/ui/dialog` and renders with the design's
-  `modal`, a team by its name and whether anyone in the workspace can join, with the name field taking
-  the focus as the dialog opens, and a conversation by the member and the first message, with the
-  member choice taking it, or the first message when the member is already chosen. Cancel, Close, Escape, a click on the scrim, and submitting each close the
-  dialog, which drops what was being started. A group still on its way shows "Sending…" at the end
+  `modal`, a team as Create group and a conversation by the member and the first message, with the
+  member choice taking the focus, or the first message when the member is already chosen. Cancel, Close, Escape, a
+  click on the scrim, and a conversation's submit each close the dialog, which drops what was being started; a team's
+  submit waits, as the next paragraph says.
+  Create group is titled "Create group", with "Set a name, visibility, and members." under the title, and has the
+  `Group name` field, with the placeholder "e.g. release-planning" and at most 80 characters, which takes the focus
+  as the dialog opens; the visibility, Public or Private, Private to begin with, as the design's `choiceGroup` over a
+  radio group from `@foldkit/ui/radioGroup` that the Block binds as a child, with what the one chosen means under it,
+  "Anyone in the workspace can find this group and join it." or "Only people added to this group can find it."; and
+  the members, the design's `memberPicker` over a multi-select combobox from `@foldkit/ui/combobox`
+  (`MembersComboboxBlock` in `src/memberPicker.ts`, which every picker in the app binds). The picker offers the
+  workspace's other active members, people and agents, with the person themself locked in it as "You", and a hint under
+  it, "You're included automatically. Add others now or later.", which counts them once others are added, "3 members,
+  including you.". Picking a member adds them as a chip and keeps the list open for the next; a chip's Remove button, named for the
+  member, and Backspace in the empty input take one off, and the input takes the focus again (`FocusTeamMembers`).
+  The Create group button is disabled until the name holds more than spaces, and while the group is being created.
+  Sending the form writes `TeamCreated` once (`CreateTeam`) with the name trimmed, the visibility, and the person's own
+  member ID first among the `memberIds`, since the host admits a team's creator only when listed; a name it would refuse
+  is answered with "Use 1 to 80 characters, with no invisible ones." without a write. A write returns no ID, so the
+  Block learns the new group's from the store: the store lists the group as soon as the write begins, still on its way,
+  and the Block finds it as the one the person made (`createdBy`) under the name sent that it could not see when the form
+  was sent, as `feature/agents` finds the agent it added (`creating`: the name, the `knownGroupIds`, and whether the
+  store has kept the action). Once the group is both listed and kept, in whichever order the store says so, the dialog
+  closes, the group is marked in the sidebar, and the Block reports `CreatedGroup` with its ID. Until then the form
+  stays with its button disabled, and a write the store could not keep says why in the dialog (`failure`) and leaves the
+  form to send again. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group. The groups are read by one subscription, `ReadGroups`, which zips the
@@ -496,7 +518,7 @@ below it counted at each level above.
   the subscription), as the other destinations do. The search keeps the teams whose name contains what was typed, in
   any case, ignoring spaces at either end; the tabs keep one search between them. A tab with no teams to list says so
   in a quiet line and not an empty state: "No groups match this search." when the search found none, and otherwise
-  "You've joined every public group." on Discover and "You haven't joined any groups yet." on Your groups. The dialog for a new team or a conversation
+  "You've joined every public group." on Discover and "You haven't joined any groups yet." on Your groups. The dialog for a new group or a conversation
   is `dialogView`, a view of its own that renders only that dialog, with nothing in it while it is
   closed, and neither the sidebar's view nor the browse page holds it: below 64rem the sidebar is on
   the page only while the navigation drawer is open, and a dialog the framework shows has to be in the
@@ -836,7 +858,7 @@ below it counted at each level above.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it, shown as the design's `toast`s in its `toastStack` over the shell's bottom end
   corner, with Dismiss; and what the page confirms to the person that they did, which a Block reports and the page
-  hands it with `confirm`, such as "Name saved" or, for a group joined from the browse page, "Joined #launches", shown as the design's `confirmation`s in its `confirmationStack`,
+  hands it with `confirm`, such as "Name saved" or, for a group joined from the browse page, "Joined #launches", or for one created, "Group created", shown as the design's `confirmation`s in its `confirmationStack`,
   centered at the bottom of the window, 24px above its edge and any home indicator, each with a check before its
   words, no Dismiss, and at most one thing it offers to do next. A confirmation goes by itself after five seconds
   (`ExpireConfirmation`, which waits with `Effect.sleep`, so a test moves the clock), each under an ID of its own
@@ -1091,7 +1113,9 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   its dialog and the card without closing the thread. The Block reports `Navigated` when the person moved within it,
   from the sidebar's Inbox, Triage, Tasks, and Browse groups, a group picked, or a task's thread opened, so the page
   closes the navigation drawer and the side pane's dialog and shows Home. It reports `JoinedGroup` too, from the groups
-  Block's, for the page to confirm to the person with the offer to open the group; joining moves nowhere. The page
+  Block's, for the page to confirm to the person with the offer to open the group; joining moves nowhere. A group the
+  person created, which the groups Block reports as `CreatedGroup`, Home opens without a thread, as picking it does, and
+  reports as it is, for the page to confirm. The page
   asks it for the rest: to reset
   (`requestReset`), which closes the thread, leaves no group marked, shows the inbox, and closes the dialog, as leaving
   Home does; to open a group without a thread (`requestOpenGroup`) or a thread in its group (`requestOpenThread`);
@@ -1173,6 +1197,11 @@ the mark `seen.ts` gives them (`memberMark`: their initials, lilac for an agent)
 `memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
 conversation form's, the group's admit form's, and the task's assignee, each saying what its empty
 choice is.
+`memberPicker.ts`, the choice of several workspace members over the design's `memberPicker`, is the Create group form's:
+it holds the combobox Block every picker binds (`MembersComboboxBlock`), the members as the picker offers them, with
+their name, mark, and whether they are a person or an agent (`pickerPeople`), the person themself locked as "You"
+(`youInPicker`), the line under the field that counts who is in (`includedHint`), and the focus a picker takes back
+after a chip is removed (`focusMembersInput`).
 
 ## The store
 
@@ -1306,7 +1335,13 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   or joined, a member admitted and an admission removed,
   and the thread picked opened and closed, each reported, open already as the group opens without a
   report, or closed as its parent asks, without one; the groups starting a
-  team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
+  team in a dialog it opens on a blank form, private and with no one added, a team written once with the name
+  trimmed, the visibility, and the person first among its members, held in its dialog until it is listed and kept,
+  whichever comes first, then reported once with its ID and marked in the sidebar, not sent with no name or only
+  spaces or while it is being created, not mistaken for one of the same name that was listed before or that someone
+  else made, a failed write kept with its reason and sent again, a member's chip taken off with the input asked to
+  take the focus, the command writing `TeamCreated` with its members and visibility and refusing a name the host would
+  refuse, and a conversation in a dialog it opens on a blank form and closes when the form is submitted
   or the dialog closes, dropping what was being started, and reporting the group picked once, asking
   to browse each time, Browse groups on Discover and the title on Your groups, keeping the browse page's search,
   the groups read once they are received, and their order, general first and then by name in any case and
@@ -1491,9 +1526,17 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   sidebar's sections, the teams to join not among them, in order, "No groups yet" only once the groups are read,
   no line for conversations, New message always and its dialog with no one to choose when nobody else is in the
   workspace, a conversation by its other member, one still on
-  its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name
-  field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
-  once written, only from someone who may create one, a conversation started with the member chosen in
+  its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new group taken in a dialog named for it, titled Create group with what to set under the title,
+  the name field with its placeholder and limit holding the focus, the visibility chosen between Public and Private,
+  Private first, with what each means under it and no switch, the members picker with the person locked as You, who
+  need not be added, the others offered by name, added as chips that are counted in the hint and taken off by their
+  Remove buttons, the button disabled until the name holds more than spaces and while the group is being created,
+  the group written once with the person and who they added as its members and the visibility, the dialog kept
+  until the group is both kept and listed, in either order, and then closed with the group reported and marked in the
+  sidebar, a write that failed saying why and sent again, and the dialog closed by Cancel or by its Close button, only
+  from someone who may create one, and Home opening the group created with the page confirming "Group created" with
+  nothing left to offer, from the sidebar's heading and from the browse page, at a width that has the sidebar and at
+  one that does not, a conversation started with the member chosen in
   a dialog of its own, both in a view apart from the sidebar's, with the sidebar's buttons that open
   them and the same team taken from the workspace's sidebar, the dialog for a conversation taking the
   focus on its member choice, or on the first message when the member is chosen, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted

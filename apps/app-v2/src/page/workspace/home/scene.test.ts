@@ -1,3 +1,4 @@
+import { GroupId } from "@amends-dev/core/group"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -8,6 +9,7 @@ import {
   Subscription,
   click,
   expect,
+  expectOutMessage,
   given,
   inside,
   label,
@@ -21,6 +23,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
+  admission,
   aliceInGeneral,
   aliceOwns,
   bob,
@@ -36,6 +39,7 @@ import {
   task,
   thread
 } from "../../../../test/fixtures.ts"
+import { pickerEnded, pickerReady } from "../../../../test/memberPickerSteps.ts"
 import { ComposerBlock } from "../../../feature/composer/block.ts"
 import { ReadDraft } from "../../../feature/composer/command.ts"
 import { GroupBlock } from "../../../feature/group/block.ts"
@@ -45,7 +49,7 @@ import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../../feature/inbox/command.ts"
 import { timeOf } from "../../../seen.ts"
 import { HomeBlock } from "./block.ts"
-import { Open } from "./definition.ts"
+import { Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { dialogView, sidebarView, threadView, view } from "./view.ts"
@@ -78,6 +82,35 @@ const sceneView: typeof mainView = (model, h) =>
       dialogView(model, h)
     ]
   )
+
+/** The team Research, which the person created and the store lists while it is still on its way. */
+const research = { ...design, id: GroupId.GroupId.make("research-1"), name: "Research" }
+
+/**
+ * What follows opening the dialog that creates a group: its name typed and its form sent, the store keeping the action
+ * and then listing the team, Home opening it, and the dialog closing.
+ */
+const createResearch = () =>
+  [
+    pickerReady,
+    type(label("Group name"), "Research"),
+    click(within(role("dialog", { name: "Create group" }), role("button", { name: "Create group" }))),
+    Command.resolve(CreateTeam, GroupsBlock.Message.SucceededCreateTeam()),
+    Subscription.emit(
+      homeSubscriptions["groups/groups"],
+      GroupsBlock.Message.ReceivedGroups({
+        groups: [{ group: research, pending: true, members: 1 }],
+        members: [member],
+        memberships: [admission("membership-research", research.id, member.id)],
+        grants: grantsOf([aliceOwns])
+      })
+    ),
+    expectOutMessage(OutMessage.CreatedGroup({ groupId: research.id })),
+    pickerEnded(),
+    Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+    Mount.expectEnded(Dialog.test.AcquireResources),
+    Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
+  ] as const
 
 const threadId = ThreadId.ThreadId.make("thread-1")
 
@@ -380,23 +413,21 @@ describe("home", () => {
     )
   })
 
-  it("takes a new team from the sidebar's heading in a dialog over the page, closed once the team is written", () => {
+  it("takes a new group from the sidebar's heading in a dialog over the page, and opens it once it is listed", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: sceneView, subscriptions: homeSubscriptions },
       given(
         modifyFields(opened, { groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) }) })
       ),
       click(within(role("navigation", { name: "Studio" }), role("button", { name: "Create group" }))),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "New team" })).toExist(),
-      type(label("Team name"), "Research"),
-      click(role("button", { name: "Create team" })),
-      Command.resolve(CreateTeam, GroupsBlock.Message.WroteAction()),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
-      Mount.expectEnded(Dialog.test.AcquireResources),
-      expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      expect(role("alert")).toBeAbsent()
+      expect(role("dialog", { name: "Create group" })).toExist(),
+      ...createResearch(),
+      expect(role("dialog", { name: "Create group" })).toBeAbsent(),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(sidebarButton("Research")).toHaveAttr("aria-current", "page")
     )
   })
 
@@ -623,9 +654,9 @@ describe("home", () => {
     )
   })
 
-  it("takes a new team from Create group on the browse page, in the dialog the shell keeps", () => {
+  it("takes a new group from Create group on the browse page, in the dialog the shell keeps, and opens it", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: sceneView, subscriptions: homeSubscriptions },
       given(
         modifyFields(withBrowsableGroup, {
           groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) })
@@ -635,14 +666,12 @@ describe("home", () => {
       click(within(role("main", { name: "Groups" }), role("button", { name: "Create group" }))),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "New team" })).toExist(),
-      type(label("Team name"), "Research"),
-      click(role("button", { name: "Create team" })),
-      Command.resolve(CreateTeam, GroupsBlock.Message.WroteAction()),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
-      Mount.expectEnded(Dialog.test.AcquireResources),
-      expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      expect(role("main", { name: "Groups" })).toExist()
+      expect(role("dialog", { name: "Create group" })).toExist(),
+      ...createResearch(),
+      expect(role("dialog", { name: "Create group" })).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(sidebarButton("Research")).toHaveAttr("aria-current", "page")
     )
   })
 })

@@ -169,6 +169,12 @@ export const expiryLabel = (at: DateTime.DateTime, now: DateTime.DateTime): stri
   return days === 1 ? "Expires tomorrow" : `Expires in ${pluralize(days, "day", "days")}`
 }
 
+/** What a team's visibility means, as the person reads it under the choice of one. */
+export const visibilityHint: Readonly<Record<Group.Visibility, string>> = {
+  Public: "Anyone in the workspace can find this group and join it.",
+  Private: "Only people added to this group can find it."
+}
+
 /** Whether the member is an agent. */
 export const isAgent = (member: Member.Member): boolean => Identity.MemberReference.isAnyOf(["Agent"])(member.identity)
 

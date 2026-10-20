@@ -72,22 +72,24 @@ export const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.T
 
 /**
  * Picking a group opens it without a thread, and asking to browse shows the groups. Joining a group changes nothing in
- * Home.
+ * Home. A group the person created opens, as picking it does.
  */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
   RequestedBrowse: () => switchTo(showGroups),
-  JoinedGroup: () => HomeDefinition.stepNoop()
+  JoinedGroup: () => HomeDefinition.stepNoop(),
+  CreatedGroup: ({ groupId }) => openGroupAlone(groupId)
 })
 
 /**
- * Picking a group and asking to browse are the person moving within Home, which Home reports, and joining a group is
- * reported as it is, for the page to confirm.
+ * Picking a group and asking to browse are the person moving within Home, which Home reports, and joining a group and
+ * creating one are reported as they are, for the page to confirm.
  */
 const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: () => OutMessage.Navigated(),
   RequestedBrowse: () => OutMessage.Navigated(),
-  JoinedGroup: ({ groupId, place }) => OutMessage.JoinedGroup({ groupId, place })
+  JoinedGroup: ({ groupId, place }) => OutMessage.JoinedGroup({ groupId, place }),
+  CreatedGroup: ({ groupId }) => OutMessage.CreatedGroup({ groupId })
 })
 
 /**

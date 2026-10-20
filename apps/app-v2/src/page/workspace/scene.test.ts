@@ -32,6 +32,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
+  admission,
   aliceInGeneral,
   aliceOwns,
   bob,
@@ -62,6 +63,7 @@ import {
   thread,
   turnOf
 } from "../../../test/fixtures.ts"
+import { pickerEnded, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { acknowledgeMenuClosed, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { Dismiss, ExpireConfirmation } from "../../feature/actions/command.ts"
@@ -197,6 +199,37 @@ const withBrowsableGroup = atHome(opened, (home) =>
 
 /** A public team Alice does not belong to. */
 const launches = { ...general, id: GroupId.GroupId.make("launches"), name: "launches" }
+
+/** The team Research, which the person created and the store lists while it is still on its way. */
+const research = { ...general, id: GroupId.GroupId.make("research-1"), name: "Research", createdBy: member.id }
+
+/**
+ * What follows opening the dialog that creates a group: its name typed and its form sent, the store keeping the action
+ * and then listing the team, and the dialog closing as Home opens it.
+ */
+const createResearch = () =>
+  [
+    pickerReady,
+    type(label("Group name"), "Research"),
+    click(within(role("dialog", { name: "Create group" }), role("button", { name: "Create group" }))),
+    Command.resolve(CreateTeam, GroupsBlock.Message.SucceededCreateTeam()),
+    Subscription.emit(
+      workspaceSubscriptions["home/groups/groups"],
+      GroupsBlock.Message.ReceivedGroups({
+        groups: [
+          { group: general, pending: false, members: 3 },
+          { group: research, pending: true, members: 1 }
+        ],
+        members: [member],
+        memberships: [aliceInGeneral, admission("membership-research", research.id, member.id)],
+        grants: grantsOf([aliceOwns])
+      })
+    ),
+    pickerEnded(),
+    Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+    Mount.expectEnded(Dialog.test.AcquireResources),
+    Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
+  ] as const
 
 /** The groups read as above, with the public team `launches` to join beside the general group. */
 const withJoinableGroup = atHome(withBrowsableGroup, (home) =>
@@ -1866,13 +1899,46 @@ describe("a workspace", () => {
     )
   })
 
-  it("takes a new team from Create group on the browse page below 64rem, with the sidebar in the shut drawer", () => {
+  it("opens a group created from the browse page in Home and confirms it, with nothing left to offer", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(
+        atHome(withBrowsableGroup, (home) =>
+          modifyFields(home, { groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) }) })
+        )
+      ),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Browse groups" }))),
+      click(within(role("main", { name: "Groups" }), role("button", { name: "Create group" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Create group" })).toExist(),
+      expect(text("Group created")).toBeAbsent(),
+      ...createResearch(),
+      expect(role("dialog", { name: "Create group" })).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(sidebarButton("Research")).toHaveAttr("aria-current", "page"),
+      expect(within(role("list", { name: "Notifications" }), role("status"))).toHaveText("Group created"),
+      expect(within(role("list", { name: "Notifications" }), role("button"))).toBeAbsent(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(text("Group created")).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist()
+    )
+  })
+
+  it("opens a group created below 64rem in Home and confirms it, with the sidebar in the shut drawer", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(
         atHome(onPhone, (home) =>
           modifyFields(home, {
-            groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) }),
+            groups: (groups) =>
+              modifyFields(groups, {
+                isLoaded: () => true,
+                groups: () => [{ group: general, pending: false, members: 3 }],
+                memberships: () => [aliceInGeneral],
+                grants: () => grantsOf([aliceOwns])
+              }),
             open: () => HomeOpen.Groups()
           })
         )
@@ -1881,14 +1947,13 @@ describe("a workspace", () => {
       click(within(role("main", { name: "Groups" }), role("button", { name: "Create group" }))),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "New team" })).toExist(),
-      type(label("Team name"), "Research"),
-      click(role("button", { name: "Create team" })),
-      Command.resolve(CreateTeam, GroupsBlock.Message.WroteAction()),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
-      Mount.expectEnded(Dialog.test.AcquireResources),
-      expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      expect(role("main", { name: "Groups" })).toExist()
+      expect(role("dialog", { name: "Create group" })).toExist(),
+      ...createResearch(),
+      expect(role("dialog", { name: "Create group" })).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(within(role("list", { name: "Notifications" }), role("status"))).toHaveText("Group created"),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
     )
   })
 

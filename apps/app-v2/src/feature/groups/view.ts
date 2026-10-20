@@ -1,7 +1,17 @@
 import { GroupPermissions } from "@amends-dev/core/group"
-import { button, field, iconButton, notice, searchField, submit, textarea, toggle } from "@amends-dev/design/control"
+import {
+  button,
+  choiceGroup,
+  field,
+  iconButton,
+  notice,
+  searchField,
+  submit,
+  textarea
+} from "@amends-dev/design/control"
 import { badge } from "@amends-dev/design/details"
 import { columns, emptyLine, row, statusLine, summary } from "@amends-dev/design/directory"
+import { memberPicker } from "@amends-dev/design/members"
 import { modal } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneTabs, paneToolbar } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
@@ -9,19 +19,29 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
+import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
-import { groupName, pluralize } from "../../seen.ts"
-import { DialogBinding, GroupsComposition, type GroupsViewBuilder } from "./composition.ts"
+import { groupName, pluralize, visibilityHint } from "../../seen.ts"
+import {
+  DialogBinding,
+  GroupsComposition,
+  type GroupsViewBuilder,
+  MembersBinding,
+  VisibilityBinding
+} from "./composition.ts"
 import {
   type BrowseTab,
   discoverable,
   type GroupItem,
+  isTeamReady,
   matching,
   Message,
   type Model,
   others,
   Starting,
+  teamMembersId,
   type TeamItem,
+  teamVisibilityId,
   yours,
   yourTeams
 } from "./definition.ts"
@@ -64,32 +84,57 @@ const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): 
   Option.match(model.starting, {
     onNone: () => modal(h, render, { title: "", body: [] }),
     onSome: Starting.match({
-      Team: ({ name, isPublic }) =>
+      Team: (team) =>
         modal(h, render, {
-          title: "New team",
+          title: "Create group",
+          description: "Set a name, visibility, and members.",
           body: [
             field(
               h,
               {
                 id: "team-name",
-                label: "Team name",
+                label: "Group name",
                 type: "text",
-                value: name,
+                value: team.name,
+                placeholder: "e.g. release-planning",
+                maxLength: 80,
                 onInput: (name) => Message.TypedTeamName({ name }),
                 isAutofocus: false,
                 attributes: render.initialFocus
               },
               Option.none()
             ),
-            toggle(h, {
-              id: "team-public",
-              label: "Anyone in the workspace can join",
-              isOn: isPublic,
-              onToggle: (isPublic) => Message.ToggledTeamPublic({ isPublic })
-            })
+            choiceGroup(h, {
+              id: teamVisibilityId,
+              label: "Visibility",
+              choices: [
+                ["Public", "Public"],
+                ["Private", "Private"]
+              ],
+              value: team.visibility,
+              hint: visibilityHint[team.visibility],
+              embed: (viewInputs) =>
+                h.block(
+                  VisibilityBinding.embedView({ slotId: "team-visibility", model: model.visibilityGroup, viewInputs })
+                )
+            }),
+            memberPicker(h, {
+              id: teamMembersId,
+              label: "Members",
+              locked: [youInPicker(model.members, model.memberId)],
+              chosen: pickerPeopleChosen(model.members, team.memberIds),
+              candidates: pickerPeople(others(model)),
+              query: model.membersCombobox.inputValue,
+              isOpen: model.membersCombobox.isOpen,
+              hint: includedHint(team.memberIds.length),
+              onRemove: (memberId) => Message.ClickedRemoveTeamMember({ memberId }),
+              embed: (viewInputs) =>
+                h.block(MembersBinding.embedView({ slotId: "team-members", model: model.membersCombobox, viewInputs }))
+            }),
+            notice(h, team.failure)
           ],
           cancelLabel: "Cancel",
-          footer: [submit(h, "Create team")],
+          footer: [submit(h, "Create group", { isDisabled: !isTeamReady(team) })],
           onSubmit: Message.SubmittedTeam()
         }),
       Conversation: ({ memberId, text }) =>

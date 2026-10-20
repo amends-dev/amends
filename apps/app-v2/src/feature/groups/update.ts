@@ -1,32 +1,32 @@
 import type { GroupId } from "@amends-dev/core/group"
 import type { MemberId } from "@amends-dev/core/workspace"
+import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { placeName } from "../../seen.ts"
-import { CreateTeam, JoinGroup, StartConversation } from "./command.ts"
-import { DialogBinding, GroupsComposition } from "./composition.ts"
+import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
+import { DialogBinding, GroupsComposition, MembersBinding } from "./composition.ts"
 import {
   type BrowseTab,
   conversationWith,
+  findCreatedTeam,
   findGroup,
   GroupsDefinition,
+  isTeamReady,
   Message,
   type Model,
   OutMessage,
-  Starting
+  onTeam,
+  Starting,
+  teamIn,
+  type TeamForm,
+  withTeam
 } from "./definition.ts"
 
 /** The model with what the person is starting as `change` makes it, while they start something. */
 const atStarting = (model: Model, change: (starting: Starting) => Starting) =>
   modifyFields(model, { starting: Option.map(change) })
-
-/** The team being started, while one is. */
-const teamIn = (model: Model) =>
-  Option.flatMap(
-    model.starting,
-    Starting.matchOrElse({ Team: (team) => Option.some(team) }, () => Option.none())
-  )
 
 /** The conversation being started, with its member chosen, while one is. */
 const conversationIn = (model: Model) =>
@@ -38,9 +38,18 @@ const conversationIn = (model: Model) =>
     )
   )
 
-/** Ask for a new team: unnamed, and private. */
+/** Ask for a new team: unnamed, private, and with no one added besides the person. */
 const openTeamForm = GroupsDefinition.stepFields(() => ({
-  starting: () => Option.some(Starting.Team({ name: "", isPublic: false }))
+  starting: () =>
+    Option.some(
+      Starting.Team({
+        name: "",
+        visibility: "Private",
+        memberIds: [],
+        creating: Option.none(),
+        failure: Option.none()
+      })
+    )
 }))
 
 /** Ask for a new conversation with `memberId` chosen, or with none chosen, and no first message. */
@@ -93,12 +102,30 @@ const reportJoined = (model: Model, groupId: GroupId.GroupId) => {
   })
 }
 
-/** Write the team `name`, public when `isPublic`, to the person's store. */
-const writeTeam = (name: string, isPublic: boolean) =>
-  GroupsDefinition.step((model: Model) => ({
-    model,
-    commands: [CreateTeam({ workspaceId: model.workspaceId, memberId: model.memberId, name, isPublic })]
-  }))
+/**
+ * Write the team of `team` to the person's store, as the person's own first member with the people they added: until
+ * the team is listed, the form shows the attempt and cannot be sent again.
+ */
+const createTeam = (model: Model, team: TeamForm) => {
+  const name = team.name.trim()
+
+  return {
+    model: withTeam(model, (form) => ({
+      ...form,
+      failure: Option.none(),
+      creating: Option.some({ name, knownGroupIds: model.groups.map(({ group }) => group.id), isWritten: false })
+    })),
+    commands: [
+      CreateTeam({
+        workspaceId: model.workspaceId,
+        memberId: model.memberId,
+        name,
+        visibility: team.visibility,
+        memberIds: [model.memberId, ...team.memberIds]
+      })
+    ]
+  }
+}
 
 /** Write the conversation with `withMemberId`, `text` its first message, to the person's store. */
 const writeConversation = (withMemberId: MemberId.MemberId, text: string) =>
@@ -107,17 +134,35 @@ const writeConversation = (withMemberId: MemberId.MemberId, text: string) =>
     commands: [StartConversation({ workspaceId: model.workspaceId, memberId: model.memberId, withMemberId, text })]
   }))
 
-export const update = GroupsComposition.makeUpdate((model, message) =>
-  Message.match(message, {
-    ReceivedGroups: ({ groups, members, memberships, grants }) => ({
-      model: modifyFields(model, {
-        isLoaded: () => true,
-        groups: () => groups,
-        members: () => members,
-        memberships: () => memberships,
-        grants: () => grants
-      })
-    }),
+export const update = GroupsComposition.makeUpdate((model, message) => {
+  /**
+   * Finish creating a team once the store has kept the action and has listed the team it made: mark it in the sidebar,
+   * close the dialog, and report it, for the page to open and confirm.
+   */
+  const finishCreating = (current: typeof model) =>
+    Option.match(findCreatedTeam(current), {
+      onNone: () => ({ model: current }),
+      onSome: ({ group }) =>
+        pipe(
+          Update.combine(current, [
+            GroupsDefinition.stepFields(() => ({ selected: () => Option.some(group.id) })),
+            DialogBinding.requestClose()
+          ]),
+          Update.withOutMessage(OutMessage.CreatedGroup({ groupId: group.id }))
+        )
+    })
+
+  return Message.match(message, {
+    ReceivedGroups: ({ groups, members, memberships, grants }) =>
+      finishCreating(
+        modifyFields(model, {
+          isLoaded: () => true,
+          groups: () => groups,
+          members: () => members,
+          memberships: () => memberships,
+          grants: () => grants
+        })
+      ),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
@@ -137,24 +182,34 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
     FailedJoinGroup: ({ groupId, error }) => ({
       model: modifyFields(joined(model, groupId), { notice: () => Option.some(error) })
     }),
-    ClickedNewTeam: () => Update.combine(model, [openTeamForm, DialogBinding.requestOpen()]),
-    TypedTeamName: ({ name }) => ({
-      model: atStarting(
-        model,
-        Starting.matchOrElse({ Team: (team) => Starting.Team({ ...team, name }) }, (same) => same)
-      )
-    }),
-    ToggledTeamPublic: ({ isPublic }) => ({
-      model: atStarting(
-        model,
-        Starting.matchOrElse({ Team: (team) => Starting.Team({ ...team, isPublic }) }, (same) => same)
-      )
+    ClickedNewTeam: () =>
+      Update.combine(model, [openTeamForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
+    TypedTeamName: ({ name }) => ({ model: withTeam(model, (team) => ({ ...team, name })) }),
+    ClickedRemoveTeamMember: ({ memberId }) => ({
+      model: withTeam(model, (team) => ({
+        ...team,
+        memberIds: team.memberIds.filter((id) => id !== memberId)
+      })),
+      commands: [FocusTeamMembers({})]
     }),
     SubmittedTeam: () =>
       Option.match(teamIn(model), {
         onNone: () => ({ model }),
-        onSome: ({ name, isPublic }) => Update.combine(model, [writeTeam(name, isPublic), DialogBinding.requestClose()])
+        onSome: (team) => (isTeamReady(team) ? createTeam(model, team) : { model })
       }),
+    SucceededCreateTeam: () =>
+      finishCreating(
+        modifyFields(model, {
+          starting: onTeam((team) => ({
+            ...team,
+            creating: Option.map(team.creating, (creating) => ({ ...creating, isWritten: true }))
+          }))
+        })
+      ),
+    FailedCreateTeam: ({ error }) => ({
+      model: withTeam(model, (team) => ({ ...team, creating: Option.none(), failure: Option.some(error) }))
+    }),
+    CompletedFocusTeamMembers: () => ({ model }),
     ClickedNewConversation: () =>
       Update.combine(model, [openConversationForm(Option.none()), DialogBinding.requestOpen()]),
     RequestedConversationWith: ({ memberId }) =>
@@ -189,4 +244,4 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
   })
-)
+})

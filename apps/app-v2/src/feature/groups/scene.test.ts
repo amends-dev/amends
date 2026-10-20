@@ -1,7 +1,7 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
 import { describe, it } from "@effect/vitest"
-import { Dialog, DialogBlock } from "@foldkit/ui"
+import { Dialog, DialogBlock, RadioGroup } from "@foldkit/ui"
 import { Option, Schema } from "effect"
 import {
   Command,
@@ -13,6 +13,7 @@ import {
   expectAll,
   expectNoOutMessage,
   expectOutMessage,
+  focus,
   given,
   label,
   nth,
@@ -26,10 +27,11 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership } from "../../../test/fixtures.ts"
+import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership, scout } from "../../../test/fixtures.ts"
+import { pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { GroupsBlock } from "./block.ts"
-import { CreateTeam, JoinGroup, StartConversation } from "./command.ts"
-import { Message, OutMessage, Starting } from "./definition.ts"
+import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
+import { Message, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -55,6 +57,16 @@ const dialogClosed = () =>
     Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
     Mount.expectEnded(Dialog.test.AcquireResources)
   ] as const
+
+/** The visibility choice moved: the radio chosen takes focus. */
+const visibilityFocused = Command.resolve(
+  RadioGroup.test.FocusOption,
+  VisibilityRadioGroupBlock.Message.CompletedFocusOption()
+)
+
+/** The dialog that creates a group, and its button that sends the form, which the sidebar's own button does not share. */
+const createDialog = role("dialog", { name: "Create group" })
+const createButton = within(createDialog, role("button", { name: "Create group" }))
 
 /** A public team the person does not belong to. */
 const announcements = Schema.decodeSync(Group.Group)({
@@ -113,6 +125,9 @@ const listed = modifyFields(init(workspace.id, member.id).model, {
   grants: () => [Grant.make(GroupPermissions.Create, Scope.Scope.cases.Workspace.make({ workspaceId: workspace.id }))]
 })
 
+/** The groups read, with the members the person may add: themself, Bob, and an agent. */
+const withPeople = modifyFields(listed, { members: () => [member, bob, scout] })
+
 /** The same, with the conversation with Bob read too. */
 const withConversation = modifyFields(listed, {
   groups: (groups) => [...groups, { group: withBob, pending: false, members: 2 }]
@@ -129,7 +144,7 @@ describe("the groups", () => {
       expect(role("heading", { name: "Other teams" })).toBeAbsent(),
       expect(text("Other teams")).toBeAbsent(),
       expect(role("button", { name: "Announcements" })).toBeAbsent(),
-      expect(role("dialog", { name: "New team" })).toBeAbsent()
+      expect(createDialog).toBeAbsent()
     )
   })
 
@@ -163,7 +178,7 @@ describe("the groups", () => {
       { update, view: dialogView },
       given(listed),
       expectAll(all.selector("dialog")).toHaveCount(1),
-      expect(role("dialog", { name: "New team" })).toBeAbsent()
+      expect(createDialog).toBeAbsent()
     )
   })
 
@@ -186,60 +201,206 @@ describe("the groups", () => {
     )
   })
 
-  it("take a new team in a dialog named for it, the name field holding the focus, and close it when written", () => {
+  it("take a new group in a dialog named for it, with what to set, a name field holding the focus, and no group to create yet", () => {
     scene(
       { update, view: withDialog },
-      given(listed),
+      given(withPeople),
       click(role("button", { name: "Create group" })),
       ...dialogOpened(),
-      expect(role("dialog", { name: "New team" })).toExist(),
-      expect(within(role("dialog", { name: "New team" }), label("Team name"))).toExist(),
-      expect(label("Team name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
-      type(label("Team name"), "Research"),
-      click(role("button", { name: "Create team" })),
-      Command.expectHas(
-        CreateTeam({ workspaceId: workspace.id, memberId: member.id, name: "Research", isPublic: false }),
-        Dialog.test.CloseDialog
+      pickerReady,
+      expect(createDialog).toExist(),
+      expect(role("heading", { name: "Create group", level: 2 })).toExist(),
+      expect(text("Set a name, visibility, and members.")).toExist(),
+      expect(within(createDialog, role("button", { name: "Close" }))).toExist(),
+      expect(within(createDialog, role("button", { name: "Cancel" }))).toExist(),
+      expect(label("Group name")).toHaveAttr("placeholder", "e.g. release-planning"),
+      expect(label("Group name")).toHaveAttr("maxLength", "80"),
+      expect(label("Group name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      expect(createButton).toHaveAttr("type", "submit"),
+      expect(createButton).toHaveAttr("aria-disabled", "true")
+    )
+  })
+
+  it("choose whether the group is public or private, Private to begin with, with what each means under the choice", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      expect(role("radiogroup", { name: "Visibility" })).toExist(),
+      expect(role("switch")).toBeAbsent(),
+      expect(role("radio", { name: "Private" })).toHaveAttr("aria-checked", "true"),
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-checked", "false"),
+      expect(text("Only people added to this group can find it.")).toExist(),
+      click(role("radio", { name: "Public" })),
+      visibilityFocused,
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-checked", "true"),
+      expect(text("Anyone in the workspace can find this group and join it.")).toExist(),
+      expect(text("Only people added to this group can find it.")).toBeAbsent()
+    )
+  })
+
+  it("hold the person in the members picker as You, who need not be added, and offer everyone else", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      expect(role("combobox", { name: "Members" })).toExist(),
+      expect(within(createDialog, text("You"))).toExist(),
+      expect(text("You're included automatically. Add others now or later.")).toExist(),
+      expect(role("combobox", { name: "Members" })).toHaveAttr("placeholder", "Search workspace members…"),
+      focus(role("combobox", { name: "Members" })),
+      ...pickerOpened,
+      expect(text("Workspace members")).toExist(),
+      expect(text("2 available")).toExist(),
+      expect(role("option", { name: /Bob/ })).toExist(),
+      expect(role("option", { name: /Scout/ })).toExist(),
+      expect(role("option", { name: /Alice/ })).toBeAbsent()
+    )
+  })
+
+  it("add the members the person picks as chips, count them in the hint, and take one off again", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      focus(role("combobox", { name: "Members" })),
+      ...pickerOpened,
+      click(role("option", { name: /Bob/ })),
+      ...pickerPicked,
+      expect(role("button", { name: "Remove Bob" })).toExist(),
+      expect(text("2 members, including you.")).toExist(),
+      expect(role("combobox", { name: "Members" })).toHaveAttr("placeholder", "Add more…"),
+      expect(role("option", { name: /Bob/ })).toBeAbsent(),
+      click(role("option", { name: /Scout/ })),
+      ...pickerPicked,
+      expect(text("3 members, including you.")).toExist(),
+      click(role("button", { name: "Remove Bob" })),
+      Command.resolve(FocusTeamMembers, Message.CompletedFocusTeamMembers()),
+      expect(role("button", { name: "Remove Bob" })).toBeAbsent(),
+      expect(text("2 members, including you.")).toExist(),
+      expect(role("option", { name: /Bob/ })).toExist()
+    )
+  })
+
+  it("keep Create group disabled until the name holds more than spaces", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      expect(createButton).toHaveAttr("aria-disabled", "true"),
+      type(label("Group name"), "   "),
+      expect(createButton).toHaveAttr("aria-disabled", "true"),
+      type(label("Group name"), "release-planning"),
+      expect(createButton).not.toHaveAttr("aria-disabled"),
+      type(label("Group name"), ""),
+      expect(createButton).toHaveAttr("aria-disabled", "true")
+    )
+  })
+
+  it("write the group once, with the person and who they added as its members and the visibility, and wait for it to be listed", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      type(label("Group name"), "  release-planning "),
+      click(role("radio", { name: "Public" })),
+      visibilityFocused,
+      focus(role("combobox", { name: "Members" })),
+      ...pickerOpened,
+      click(role("option", { name: /Bob/ })),
+      ...pickerPicked,
+      click(createButton),
+      Command.expectExact(
+        CreateTeam({
+          workspaceId: workspace.id,
+          memberId: member.id,
+          name: "release-planning",
+          visibility: "Public",
+          memberIds: [member.id, bob.id]
+        })
       ),
-      Command.resolve(CreateTeam, Message.WroteAction()),
+      expect(createDialog).toExist(),
+      expect(createButton).toHaveAttr("aria-disabled", "true"),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam()),
+      expect(createDialog).toExist(),
+      expectNoOutMessage()
+    )
+  })
+
+  it("close the dialog and report the new group once it is listed, marking it in the sidebar", () => {
+    scene(
+      { update, view: withDialog, subscriptions: GroupsBlock.subscriptions },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      type(label("Group name"), "release-planning"),
+      click(createButton),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam()),
+      Subscription.emit(
+        subscriptions.groups,
+        Message.ReceivedGroups({
+          groups: [
+            ...withPeople.groups,
+            { group: privateTeam("release-planning-1", "release-planning"), pending: true, members: 1 }
+          ],
+          members: withPeople.members,
+          memberships: [...withPeople.memberships, admittedTo("release-planning-1")],
+          grants: withPeople.grants
+        })
+      ),
+      expectOutMessage(OutMessage.CreatedGroup({ groupId: privateTeam("release-planning-1", "release-planning").id })),
+      pickerEnded(),
       ...dialogClosed(),
-      expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      expect(role("button", { name: "Create group" })).toExist()
+      expect(createDialog).toBeAbsent(),
+      expect(role("button", { name: "release-planning" })).toHaveAttr("aria-current", "page")
     )
   })
 
-  it("take a team that anyone in the workspace can join, when the person says so", () => {
+  it("keep the dialog open, with why, when the group could not be created, and let the person try again", () => {
     scene(
       { update, view: withDialog },
-      given(listed),
+      given(withPeople),
       click(role("button", { name: "Create group" })),
       ...dialogOpened(),
-      expect(role("switch", { name: "Anyone in the workspace can join" })).toHaveAttr("aria-checked", "false"),
-      click(role("switch", { name: "Anyone in the workspace can join" })),
-      type(label("Team name"), "Announcements"),
-      click(role("button", { name: "Create team" })),
-      Command.expectHas(
-        CreateTeam({ workspaceId: workspace.id, memberId: member.id, name: "Announcements", isPublic: true })
-      ),
-      Command.resolve(CreateTeam, Message.WroteAction()),
-      ...dialogClosed()
+      pickerReady,
+      type(label("Group name"), "release-planning"),
+      click(createButton),
+      Command.resolve(CreateTeam, Message.FailedCreateTeam({ error: "This browser could not keep the action." })),
+      expect(createDialog).toExist(),
+      expect(role("alert")).toHaveText("This browser could not keep the action."),
+      expect(createButton).not.toHaveAttr("aria-disabled"),
+      click(createButton),
+      Command.expectHas(CreateTeam),
+      expect(role("alert")).toBeAbsent(),
+      Command.resolve(CreateTeam, Message.SucceededCreateTeam())
     )
   })
 
-  it("close the dialog with Cancel, and open a fresh form the next time", () => {
+  it("close the dialog with Cancel, without creating anything", () => {
     scene(
       { update, view: withDialog },
-      given(listed),
+      given(withPeople),
       click(role("button", { name: "Create group" })),
       ...dialogOpened(),
-      type(label("Team name"), "Research"),
-      click(role("button", { name: "Cancel" })),
+      pickerReady,
+      type(label("Group name"), "Research"),
+      click(within(createDialog, role("button", { name: "Cancel" }))),
+      pickerEnded(),
       Command.expectExact(Dialog.test.CloseDialog),
       ...dialogClosed(),
-      expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      click(role("button", { name: "Create group" })),
-      ...dialogOpened(),
-      expect(label("Team name")).toHaveValue("")
+      expect(createDialog).toBeAbsent(),
+      expect(role("button", { name: "Create group" })).toExist()
     )
   })
 
@@ -855,11 +1016,12 @@ describe("the browse page", () => {
       { update, view: browsingWithDialog },
       given(listed),
       expect(role("button", { name: "Create group" })).toExist(),
-      expect(role("dialog", { name: "New team" })).toBeAbsent(),
+      expect(createDialog).toBeAbsent(),
       click(role("button", { name: "Create group" })),
       ...dialogOpened(),
-      expect(role("dialog", { name: "New team" })).toExist(),
-      expect(within(role("dialog", { name: "New team" }), label("Team name"))).toExist()
+      pickerReady,
+      expect(createDialog).toExist(),
+      expect(within(createDialog, label("Group name"))).toExist()
     )
   })
 

@@ -112,7 +112,8 @@ export const design = Schema.decodeSync(Group.Group)({
   createdAt: "2026-10-18T12:00:00Z"
 })
 
-const admission = (id: string, groupId: string, memberId: string) =>
+/** The admission `id` of the member `memberId` to the team `groupId`. */
+export const admission = (id: string, groupId: string, memberId: string) =>
   Schema.decodeSync(GroupMembership.GroupMembership)({
     id,
     workspaceId: "workspace-1",
