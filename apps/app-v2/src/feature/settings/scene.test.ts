@@ -40,6 +40,7 @@ import {
   scout
 } from "../../../test/fixtures.ts"
 import { chooseFromMenu, closeMenu, openMenu } from "../../../test/menu.ts"
+import { panelIs } from "../../../test/panelSize.ts"
 import { SettingsBlock } from "./block.ts"
 import {
   ChangeRole,
@@ -1265,6 +1266,75 @@ describe("a member in the side pane, for membership", () => {
       { update, view: memberView },
       given(withOpen(readBy(bob), scout.id)),
       inside(role("region", { name: "Membership" }), expect(role("button", { name: "Remove member" })).toBeAbsent())
+    )
+  })
+})
+
+describe("the sizes of the settings' dialogs, as @amends-dev/ui gives them", () => {
+  it("is compact for inviting someone, revoking an invitation, handing the workspace over, and removing a member", () => {
+    scene(
+      { update, view: withDialog(membersPage) },
+      given(owner),
+      click(role("button", { name: "Invite people" })),
+      ...dialogOpened(),
+      ...panelIs("settings-dialog", "compact")
+    )
+    scene(
+      { update, view: withDialog(membersPage) },
+      given(owner),
+      click(role("button", { name: "Revoke invitation for carol@example.com" })),
+      ...dialogOpened(),
+      ...panelIs("settings-dialog", "compact")
+    )
+    scene(
+      { update, view: withDialog(view) },
+      given(owner),
+      click(role("button", { name: "Transfer ownership" })),
+      ...dialogOpened(),
+      ...panelIs("settings-dialog", "compact")
+    )
+    scene(
+      { update, view: withDialog(memberView) },
+      given(withOpen(owner, bob.id)),
+      inside(role("region", { name: "Membership" }), click(role("button", { name: "Remove member" }))),
+      ...dialogOpened(),
+      ...panelIs("settings-dialog", "compact")
+    )
+  })
+
+  it("is compact for changing one's own name", () => {
+    scene(
+      { update, view: withDialog(withAccount(view)) },
+      given(owner),
+      ...chooseFromMenu(AccountMenu, "Account: Alice", "Change your name…"),
+      ...dialogOpened(),
+      Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
+      ...panelIs("settings-dialog", "compact")
+    )
+  })
+
+  it("is regular for every invitation", () => {
+    scene(
+      { update, view: withDialog(membersPage) },
+      given(owner),
+      click(role("button", { name: "View history" })),
+      ...dialogOpened(),
+      ...panelIs("settings-dialog", "regular")
+    )
+  })
+
+  it("draws the Cancel of each as a secondary button, bordered as the action beside it is", () => {
+    scene(
+      { update, view: withDialog(memberView) },
+      given(withOpen(owner, bob.id)),
+      inside(role("region", { name: "Membership" }), click(role("button", { name: "Remove member" }))),
+      ...dialogOpened(),
+      inside(
+        role("dialog", { name: "Remove Bob?" }),
+        expect(role("button", { name: "Cancel" })).toHaveClass("border-outline"),
+        expect(role("button", { name: "Cancel" })).toHaveClass("bg-action-secondary"),
+        expect(role("button", { name: "Cancel" })).not.toHaveClass("bg-transparent")
+      )
     )
   })
 })

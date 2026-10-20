@@ -473,7 +473,16 @@ below it counted at each level above.
   group's General section; the Cancel at the start of the footer and the primary action alone at its end for adding
   an agent, removing one, replacing a connection's key, and removing a connection; Back at the start and the primary
   action at the end for the connection's form; and Invite people at the start and Done at the end for the
-  invitations' history.
+  invitations' history. A Cancel is the secondary button, bordered as the action beside it is, as `apps/ui`'s is.
+- Every dialog is the size `apps/ui` gives the same dialog, which the design's `modal` takes as `size`, and fills the
+  window below 48rem. Regular, 40rem by 37.5rem, is the group's settings, in each of its sections, a conversation's
+  members, and the view a phone adds members in, creating a group, the invitations' history, and choosing an
+  integration to add a connection through. Compact, 35rem wide and as tall as its content, is creating and joining a
+  workspace, each in the stage it is in once it is sent too, so that the dialog keeps its size, a new conversation,
+  inviting someone, revoking an invitation, handing the workspace over, removing a member, changing one's own name,
+  removing an agent, replacing a connection's key, and removing a connection. Form, 40rem wide and as tall as its
+  content, is adding an agent and configuring a connection. The tests say each size by the panel's classes
+  (`test/panelSize.ts`).
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to, general first and then by name, and their conversations, ordered the same way by the other members' names,
   to pick one from (`byGeneralThenName`: by name as the person reads it, in any case and whatever the accents, as
@@ -688,7 +697,7 @@ below it counted at each level above.
   end; Revoke invitation?, naming the address; Transfer ownership, choosing the new owner
   among the people who can become it and saying who becomes the only owner; Remove {name}?, saying what they
   lose and that they need a fresh invitation to rejoin; and Your name (`ChangingName`, opened by "Change your name…"),
-  a compact dialog (`width: "compact"`) titled "Your name" with the workspace's name beside the title, "What people in
+  a compact dialog (`size: "compact"`) titled "Your name" with the workspace's name beside the title, "What people in
   this workspace call you. Others keep their own." under it, and one field, "Name", that starts from the name the
   person has, takes the focus with its text selected (the `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name
   that waits for a name that is not blank and not the one they have, as `apps/ui`'s change-name dialog does. Its

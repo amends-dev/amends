@@ -140,6 +140,7 @@ const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): 
       Conversation: ({ memberId, text }) =>
         modal(h, render, {
           title: "New conversation",
+          size: "compact",
           body: [
             memberChoice(h, {
               id: "conversation-member",

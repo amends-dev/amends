@@ -650,6 +650,7 @@ const invitingModal = (render: RenderInfo, inviting: InvitingEntering, model: Mo
 
   return modal(h, render, {
     title: "Invite member",
+    size: "compact",
     context: workspaceName(model),
     body: [
       field(
@@ -730,7 +731,6 @@ const historyModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Se
   return modal(h, render, {
     title: "Invitations",
     context: workspaceName(model),
-    size: "wide",
     body: [
       summary(h, { copy: "Invitations", count: `${history.length} total` }),
       history.length === 0
@@ -749,6 +749,7 @@ const historyModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Se
 const revokingModal = (render: RenderInfo, revoking: RevokingEntering, h: SettingsViewBuilder): Html =>
   modal(h, render, {
     title: "Revoke invitation?",
+    size: "compact",
     context: revoking.recipient,
     description: "This person will no longer be able to join using this invitation.",
     body: [failureView(revoking.failure, h)],
@@ -775,6 +776,7 @@ const transferringModal = (
 
   return modal(h, render, {
     title: "Transfer ownership",
+    size: "compact",
     context: workspaceName(model),
     body: [
       choiceSelect(h, {
@@ -809,6 +811,7 @@ const transferringModal = (
 const removingModal = (render: RenderInfo, removing: RemovingEntering, model: Model, h: SettingsViewBuilder): Html =>
   modal(h, render, {
     title: `Remove ${removing.name}?`,
+    size: "compact",
     description: `They will lose access to ${workspaceName(model)}. To rejoin, they'll need a fresh invitation. Their previous membership will remain in the removed-member history.`,
     body: [failureView(removing.failure, h)],
     cancelLabel: "Cancel",

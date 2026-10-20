@@ -622,7 +622,7 @@ const addingModal = (
   return modal(h, render, {
     title: "Add agent",
     context: workspaceName,
-    size: "wide",
+    size: "form",
     body: [
       field(
         h,
@@ -675,6 +675,7 @@ const addingModal = (
 const removingModal = (render: RenderInfo, removing: Removing, h: AgentsViewBuilder): Html =>
   modal(h, render, {
     title: "Remove agent?",
+    size: "compact",
     context: removing.name,
     description: `${removing.name} will leave the workspace. Its messages stay in their threads.`,
     body: [notice(h, Option.map(removing.failure, failureMessage))],

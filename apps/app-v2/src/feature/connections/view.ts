@@ -734,7 +734,6 @@ const choosingModal = (
   return modal(h, render, {
     title: addLabel(choosing.capability),
     context: workspaceName,
-    size: "wide",
     body:
       integrationsToAdd(model, choosing.capability).length === 0
         ? [
@@ -851,6 +850,7 @@ const configuringModal = (
 
   return modal(h, render, {
     title: "Configure connection",
+    size: "form",
     context: Option.match(integration, {
       onNone: () => configuring.integrationId,
       onSome: ({ name, provides }) => `${name} · ${providesLabel(provides)}`
@@ -914,6 +914,7 @@ const addingModal = (
 const replacingModal = (render: RenderInfo, replacing: Replacing, h: ConnectionsViewBuilder): Html =>
   modal(h, render, {
     title: "Replace API key",
+    size: "compact",
     context: replacing.name,
     description: "The current key stays in place until the new key is saved.",
     body: [
@@ -948,6 +949,7 @@ const replacingModal = (render: RenderInfo, replacing: Replacing, h: Connections
 const removingModal = (render: RenderInfo, removing: Removing, h: ConnectionsViewBuilder): Html =>
   modal(h, render, {
     title: "Remove connection?",
+    size: "compact",
     context: removing.name,
     description: removing.hasKey
       ? `${removing.name} will be removed from the workspace, along with its saved key.`

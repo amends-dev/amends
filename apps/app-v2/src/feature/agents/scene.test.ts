@@ -53,6 +53,7 @@ import {
   scoutAgent,
   turnOf
 } from "../../../test/fixtures.ts"
+import { panelIs } from "../../../test/panelSize.ts"
 import { calendarDate } from "../../seen.ts"
 import { Integrations } from "../connections/definition.ts"
 import { AgentsBlock } from "./block.ts"
@@ -203,6 +204,16 @@ describe("the agents", () => {
       ...dialogClosed(),
       expect(role("dialog", { name: "Add agent" })).toBeAbsent(),
       expect(role("button", { name: "Reviewer" })).toExist()
+    )
+  })
+
+  it("are added in a form-sized dialog, 40rem wide and as tall as its content, as @amends-dev/ui's Add agent is", () => {
+    scene(
+      { update, view: withDialog },
+      given(opened),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      ...panelIs("agents-dialog", "form")
     )
   })
 
@@ -1291,6 +1302,19 @@ describe("an agent's page", () => {
         expect(within(selector(".me-auto"), role("button", { name: "Cancel" }))).toExist(),
         expect(within(selector(".me-auto"), role("button", { name: "Remove agent" }))).toBeAbsent()
       )
+    )
+  })
+
+  it("is compact, as @amends-dev/ui's question is, and has a Cancel that is a secondary button, bordered as Remove agent is", () => {
+    scene(
+      { update, view: pageWithDialog },
+      given(withModels),
+      click(role("button", { name: "Remove agent" })),
+      ...dialogOpened(),
+      ...panelIs("agents-dialog", "compact"),
+      expect(within(removeDialog, role("button", { name: "Cancel" }))).toHaveClass("border-outline"),
+      expect(within(removeDialog, role("button", { name: "Cancel" }))).toHaveClass("bg-action-secondary"),
+      expect(within(removeDialog, role("button", { name: "Cancel" }))).not.toHaveClass("bg-transparent")
     )
   })
 

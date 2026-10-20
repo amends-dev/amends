@@ -29,6 +29,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership, scout } from "../../../test/fixtures.ts"
 import { pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
+import { panelIs } from "../../../test/panelSize.ts"
 import { GroupsBlock } from "./block.ts"
 import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
 import { Message, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
@@ -1036,6 +1037,42 @@ describe("the browse page", () => {
       given(modifyFields(listed, { notice: () => Option.some("This browser could not read the groups.") })),
       expect(role("alert")).toHaveText("This browser could not read the groups."),
       expect(role("button", { name: "Design" })).toExist()
+    )
+  })
+})
+
+describe("the size of the dialogs for starting a group or a conversation, as @amends-dev/ui gives it", () => {
+  it("is regular for creating a group", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      ...panelIs("groups-starting", "regular")
+    )
+  })
+
+  it("is compact for a new conversation", () => {
+    scene(
+      { update, view: withDialog },
+      given(listed),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      ...panelIs("groups-starting", "compact")
+    )
+  })
+
+  it("draws the Cancel as a secondary button, bordered as the action beside it is", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "Create group" })),
+      ...dialogOpened(),
+      pickerReady,
+      expect(within(createDialog, role("button", { name: "Cancel" }))).toHaveClass("border-outline"),
+      expect(within(createDialog, role("button", { name: "Cancel" }))).toHaveClass("bg-action-secondary"),
+      expect(within(createDialog, role("button", { name: "Cancel" }))).not.toHaveClass("bg-transparent")
     )
   })
 })

@@ -41,6 +41,7 @@ import {
   roleOf,
   searchApi
 } from "../../../test/fixtures.ts"
+import { panelIs } from "../../../test/panelSize.ts"
 import { calendarDate } from "../../seen.ts"
 import { ConnectionsBlock } from "./block.ts"
 import {
@@ -1862,6 +1863,59 @@ describe("removing a connection", () => {
       Command.resolve(RemoveConnection, Message.WroteAction({ written: Written.Remove({ connectionId: search.id }) })),
       expectOutMessage(OutMessage.RemovedConnection({ name: "Search tools" })),
       ...dialogClosed()
+    )
+  })
+})
+
+describe("the sizes of the connections' dialogs, as @amends-dev/ui gives them", () => {
+  it("is regular for choosing an integration, and form for configuring the connection it makes", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      ...panelIs("connections-dialog", "regular"),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      expect(configureDialog).toExist(),
+      ...panelIs("connections-dialog", "form")
+    )
+  })
+
+  it("is compact for replacing a key and for confirming a removal", () => {
+    const withSearch: Model = modifyFields(opened, { connections: () => [{ connection: search, pending: false }] })
+    const onPage = withDialog(
+      withViewInputs(connectionView, { connectionId: search.id, workspaceName: workspace.name })()
+    )
+
+    scene(
+      { update, view: onPage },
+      given(withSearch),
+      click(role("button", { name: "Replace key" })),
+      ...dialogOpened(),
+      ...panelIs("connections-dialog", "compact")
+    )
+    scene(
+      { update, view: onPage },
+      given(withSearch),
+      click(role("button", { name: "Remove connection" })),
+      ...dialogOpened(),
+      ...panelIs("connections-dialog", "compact")
+    )
+  })
+
+  it("draws the Cancel as a secondary button, bordered as the action beside it is", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(
+        chooserDialog,
+        expect(role("button", { name: "Cancel" })).toHaveClass("border-outline"),
+        expect(role("button", { name: "Cancel" })).toHaveClass("bg-action-secondary"),
+        expect(role("button", { name: "Cancel" })).not.toHaveClass("bg-transparent")
+      )
     )
   })
 })

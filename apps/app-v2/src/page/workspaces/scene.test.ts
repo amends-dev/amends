@@ -33,6 +33,7 @@ import {
   session,
   unnamedInvitation
 } from "../../../test/fixtures.ts"
+import { panelIs } from "../../../test/panelSize.ts"
 import { calendarDate } from "../../seen.ts"
 import {
   AcceptInvitation,
@@ -857,6 +858,49 @@ describe("joining a workspace", () => {
       expect(joinDialog).toBeAbsent(),
       expect(role("alert")).toHaveText("Couldn't refresh your workspaces."),
       expect(role("button", { name: "Accept invite to Northstar Studio" })).toExist()
+    )
+  })
+})
+
+describe("the sizes of the dialogs for entering a workspace, as @amends-dev/ui gives them", () => {
+  it("is compact for creating a workspace, and stays so once it is created", () => {
+    scene(
+      { update, view: sceneView },
+      given(listed),
+      ...formOpened(),
+      ...panelIs("enter-workspace", "compact"),
+      type(label("Workspace name"), "Acme"),
+      click(inDialog("Create workspace")),
+      Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
+      Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
+      expect(createdDialog).toExist(),
+      ...panelIs("enter-workspace", "compact")
+    )
+  })
+
+  it("is compact for joining a workspace, and stays so once the person has joined", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      ...panelIs("enter-workspace", "compact"),
+      click(inJoinDialog("Join")),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin()),
+      Mount.expectEnded(SelectOnFocus),
+      Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
+      expect(inJoinDialog("Try again")).toExist(),
+      ...panelIs("enter-workspace", "compact")
+    )
+  })
+
+  it("draws the Cancel as a secondary button, bordered as the action beside it is", () => {
+    scene(
+      { update, view: sceneView },
+      given(listed),
+      ...formOpened(),
+      expect(inDialog("Cancel")).toHaveClass("border-outline"),
+      expect(inDialog("Cancel")).toHaveClass("bg-action-secondary"),
+      expect(inDialog("Cancel")).not.toHaveClass("bg-transparent")
     )
   })
 })

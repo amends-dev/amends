@@ -51,6 +51,7 @@ import {
   thread
 } from "../../../test/fixtures.ts"
 import { pickerClosed, pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
+import { panelIs } from "../../../test/panelSize.ts"
 import {
   AdmitMembers,
   FocusAdmitMembers,
@@ -1515,6 +1516,56 @@ describe("a group the person cannot read", () => {
       click(role("button", { name: "Try again" })),
       expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent(),
       expect(role("status")).toHaveText("Loading the conversation…")
+    )
+  })
+})
+
+describe("the size of the group's dialogs, as @amends-dev/ui gives it", () => {
+  it("is regular for a team's settings on each of its sections, as @amends-dev/ui's group settings are", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      ...panelIs("group-settings", "regular"),
+      click(role("tab", { name: "Members" })),
+      pickerReady,
+      ...panelIs("group-settings", "regular")
+    )
+  })
+
+  it("is regular for a conversation's members", () => {
+    scene(
+      { update, view },
+      given(openedConversation),
+      click(role("button", { name: "2 members" })),
+      ...dialogOpened(),
+      ...panelIs("group-settings", "regular")
+    )
+  })
+
+  it("is regular for the view a phone adds members in, which is the same dialog moved on", () => {
+    scene(
+      { update, view: phoneView },
+      given(openedWithPeople),
+      click(role("button", { name: "Group settings" })),
+      ...dialogOpened(),
+      click(role("tab", { name: "Members" })),
+      click(role("button", { name: "Add members" })),
+      ...panelIs("group-settings", "regular")
+    )
+  })
+
+  it("draws the Cancel as a secondary button, bordered as the action beside it is", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...openSettings(),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("button", { name: "Cancel" })).toHaveClass("border-outline"),
+        expect(role("button", { name: "Cancel" })).toHaveClass("bg-action-secondary"),
+        expect(role("button", { name: "Cancel" })).not.toHaveClass("bg-transparent")
+      )
     )
   })
 })
