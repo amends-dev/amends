@@ -13,7 +13,9 @@ import { followEnd, isNearEnd, nearEnd, revealMessage, scrollToEnd } from "./con
 /** The extent of a pane body 400px tall that scrolls `scrollHeight`px, with the view `scrollTop`px down it. */
 const extent = (scrollHeight: number, scrollTop: number) => ({ scrollHeight, scrollTop, clientHeight: 400 })
 
-/** The conversation `list`, with a message that is current when `current`, in a pane body that is anchored to `anchor`. */
+/**
+ * The conversation `list`, with a message that is current when `current`, in a pane body that is anchored to `anchor`.
+ */
 const conversation = (
   options: Readonly<{ anchor: "bottom" | "top"; current?: boolean; scrollHeight: number; scrollTop: number }>
 ) => {

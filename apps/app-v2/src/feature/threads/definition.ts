@@ -123,7 +123,9 @@ const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thr
 export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<Day<ThreadItem>> =>
   groupByDay(Array.sort(items, byCreated), ({ thread }) => thread.createdAt, now)
 
-/** What a thread's opening is to the thread before it when they stack: who wrote it, when the thread began, and replies. */
+/**
+ * What a thread's opening is to the thread before it when they stack: who wrote it, when the thread began, and replies.
+ */
 const stackableOf = (item: ThreadItem): Option.Option<Stackable> =>
   Option.map(item.opening, ({ author }) => ({
     author,

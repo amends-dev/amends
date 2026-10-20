@@ -1010,7 +1010,9 @@ describe("a group's tasks", () => {
   })
 })
 
-/** The thread `id`, opened by `author` with `words` `minutes` after thread-1, which tracks no task and has no replies. */
+/**
+ * The thread `id`, opened by `author` with `words` `minutes` after thread-1, which tracks no task and has no replies.
+ */
 const openedAt = (id: string, minutes: number, words: string, author = aliceAuthor) => ({
   ...alices,
   task: Option.none(),

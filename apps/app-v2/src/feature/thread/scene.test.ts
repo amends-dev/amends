@@ -121,8 +121,8 @@ const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.T
 ]
 
 /**
- * The thread read with `messages`, written by alice and bob, whose names are read, when one of them is highlighted, which
- * the thread reveals once it is drawn.
+ * The thread read with `messages`, written by alice and bob, whose names are read, when one of them is highlighted,
+ * which the thread reveals once it is drawn.
  */
 const readHighlighted = (
   ...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.ThreadMessage; pending: boolean }>>
