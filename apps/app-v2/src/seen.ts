@@ -246,8 +246,8 @@ export const authorName = (
   })
 
 /**
- * `author`'s mark: a member's own, on the agent's tone for an agent, or the letters of the name a channel's contact gave,
- * or of the name a member without a record here is called.
+ * `author`'s mark: a member's own, on the agent's tone for an agent, or the letters of the name a channel's contact
+ * gave, or of the name a member without a record here is called.
  */
 export const authorMark = (
   author: ThreadMessage.Author,

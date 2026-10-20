@@ -2,8 +2,8 @@
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row they lie in, a link
  * to another page, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a list, a
  * six-digit code, a line of hint, what is being waited for, what just happened, why an entry was refused, a boxed note
- * for a page as a whole, that an action is on its way, and the column that holds a few of these together. Each renders with the
- * caller's builder and messages, and carries the look.
+ * for a page as a whole, that an action is on its way, and the column that holds a few of these together. Each renders
+ * with the caller's builder and messages, and carries the look.
  */
 
 import * as Button from "@foldkit/ui/button"
