@@ -12,6 +12,7 @@ import {
   opening,
   reply,
   saying,
+  scout,
   thread
 } from "../test/fixtures.ts"
 import {
@@ -24,8 +25,10 @@ import {
   groupByDay,
   groupMark,
   initials,
+  isAgent,
   isOpen,
   messageRuns,
+  memberMark,
   messageWords,
   placeName,
   pluralize,
@@ -55,6 +58,19 @@ describe("initials", () => {
     expect(initials("")).toBe("")
     expect(initials("   ")).toBe("")
     expect(initials("🦊 Fox")).toBe("🦊F")
+  })
+})
+
+describe("a member's mark", () => {
+  it("is their initials on the neutral tone for a person", () => {
+    expect(isAgent(bob)).toBe(false)
+    expect(memberMark(bob)).toEqual({ text: "B", tone: "neutral" })
+    expect(memberMark(membership.member)).toEqual({ text: "A", tone: "neutral" })
+  })
+
+  it("is their initials on the lilac tone for an agent", () => {
+    expect(isAgent(scout)).toBe(true)
+    expect(memberMark(scout)).toEqual({ text: "S", tone: "lilac" })
   })
 })
 

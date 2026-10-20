@@ -1,5 +1,6 @@
 import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
+import { AssigneeFilter } from "../../taskFilter.ts"
 import { TasksComposition } from "./composition.ts"
 
 /** The tasks before they are read, narrowed to nothing. */
@@ -10,7 +11,7 @@ export const init = TasksComposition.makeInit((workspaceId: WorkspaceId.Workspac
     items: [],
     members: [],
     contacts: [],
-    filter: { status: "All" as const, assignee: "Anyone" as const, query: "" },
+    filter: { status: "All" as const, assignee: AssigneeFilter.Anyone(), query: "" },
     notice: Option.none()
   }
 }))

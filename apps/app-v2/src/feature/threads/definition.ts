@@ -22,7 +22,7 @@ import { type Day, groupByDay, isOpen, threadContains } from "../../seen.ts"
 import {
   AssigneeFilter,
   AssigneeFilterMenu,
-  isAssignedAs,
+  isAssignedTo,
   StatusFilterMenu,
   TaskStatusFilter
 } from "../../taskFilter.ts"
@@ -143,14 +143,16 @@ export const tasksOf = (model: Model, members: ReadonlyArray<Member.Member>): Re
   return Array.sort(tracked, taskOrder[model.taskSort]).filter(
     ({ item, task }) =>
       (status === "All" || task.status === status) &&
-      isAssignedAs(assignee, task.assignee, model.memberId) &&
+      isAssignedTo(assignee, task.assignee) &&
       threadContains(item.thread, item.opening, members, query)
   )
 }
 
 /** Whether the person narrowed the tasks: they searched for letters, or chose an assignee or a status. */
 export const isFiltered = ({ taskFilter }: Model): boolean =>
-  taskFilter.query.trim() !== "" || taskFilter.assignee !== "Anyone" || taskFilter.status !== "All"
+  taskFilter.query.trim() !== "" ||
+  !AssigneeFilter.isAnyOf(["Anyone"])(taskFilter.assignee) ||
+  taskFilter.status !== "All"
 
 /** How many of `items` track a task that is neither done nor dismissed. */
 export const openTaskCount = (items: ReadonlyArray<ThreadItem>): number =>

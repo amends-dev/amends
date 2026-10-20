@@ -15,7 +15,6 @@ import { detailList, entry, entryList, person } from "@amends-dev/design/details
 import { columns, historyRow, row, rowWithButton, section, summary } from "@amends-dev/design/directory"
 import { form } from "@amends-dev/design/form"
 import type { IconName } from "@amends-dev/design/icon"
-import type { MarkContent } from "@amends-dev/design/mark"
 import { choiceMenu, type MenuGroup } from "@amends-dev/design/menu"
 import { modal } from "@amends-dev/design/modal"
 import {
@@ -35,7 +34,7 @@ import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type { Appearance } from "../../appearance.ts"
-import { initials } from "../../seen.ts"
+import { initials, isAgent, memberMark } from "../../seen.ts"
 import { SelectOnFocus } from "./command.ts"
 import {
   AccountBinding,
@@ -54,7 +53,6 @@ import {
   givableRoles,
   invitationHistory,
   invitationStatus,
-  isAgent,
   isChangingRole,
   isNameChanged,
   isRoleChanged,
@@ -111,12 +109,6 @@ const failureView = (failure: Option.Option<Failure>, h: SettingsViewBuilder): H
           ])
         : notice(h, Option.some(settingsMessage(failed)))
   })
-
-/** A member's mark: their initials, on the agent's tone for an agent. */
-const markOf = ({ member }: MemberItem): MarkContent => ({
-  text: initials(member.name),
-  tone: isAgent(member) ? "lilac" : "neutral"
-})
 
 /**
  * A page of the settings, the main content: titled, with the workspace's name under the title on phones, the toolbar
@@ -232,7 +224,10 @@ const detailsSection = (model: Model, id: string, h: SettingsViewBuilder): Html 
         ...Option.match(creator, {
           onNone: () => [],
           onSome: (item) => [
-            { label: "Created by", value: person(h, { mark: markOf(item), markSize: "sm", name: item.member.name }) }
+            {
+              label: "Created by",
+              value: person(h, { mark: memberMark(item.member), markSize: "sm", name: item.member.name })
+            }
           ]
         })
       ])
@@ -253,7 +248,7 @@ const ownershipSection = (model: Model, owner: MemberItem, h: SettingsViewBuilde
     hasStitch: true,
     children: [
       person(h, {
-        mark: markOf(owner),
+        mark: memberMark(owner.member),
         name: displayName(owner.member, model.memberId),
         detail: "Workspace owner"
       }),
@@ -318,7 +313,7 @@ const memberRow = (
     [],
     [
       row(h, {
-        mark: markOf(item),
+        mark: memberMark(item.member),
         markSize: "md",
         isCompact: true,
         title: displayName(member, model.memberId),
@@ -581,7 +576,7 @@ const memberPane = (model: Model, selected: Selected, item: MemberItem, h: Setti
     },
     body: [
       paneColumn(h, [
-        person(h, { mark: markOf(item), name: displayName(member, model.memberId), detail }),
+        person(h, { mark: memberMark(item.member), name: displayName(member, model.memberId), detail }),
         member.status === "active" && mayChangeRole(model, member.id) ? roleForm(model, selected, h) : h.empty,
         mayReadAccess(model, member.id) ? accessSection(model, selected, h) : h.empty,
         paneSection(h, {

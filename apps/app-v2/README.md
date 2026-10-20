@@ -241,9 +241,10 @@ the pages that compose them; the root composes the pages.
   threads Block's `toolbarView`, which the group's pane draws over the rows while the tab is open, as `apps/ui`'s
   `GroupTasks` has it, of a search field, whose label is hidden and whose placeholder says "Search tasks…", beside a
   menu of the status (`StatusFilterMenu`), Any status or one by its name (`statusLabel`), named "Status: Any status",
-  and a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Me, or No one, named "Assignee: Anyone",
-  both the ones `taskFilter.ts` gives the workspace's Triage and Tasks, whose buttons say Status and Assignee while
-  they narrow to nothing, and, at its end, a menu of the order (`TaskSortMenu`), Latest activity, Newest, or Oldest,
+  and a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Unassigned, then each member still in the
+  workspace by name with their mark at 22px, named "Assignee: Anyone", both the ones `taskFilter.ts` gives the
+  workspace's Triage and Tasks, whose buttons say Status and Assignee while they narrow to nothing, Unassigned for the
+  tasks of no one, and the member's name for theirs, and, at its end, a menu of the order (`TaskSortMenu`), Latest activity, Newest, or Oldest,
   named "Sort: Latest activity", the last two by when the thread was created, and New task, which moves the focus to the composer in the
   footer (`ClickedNewTask`, the command `FocusComposer`). Each menu is a Foldkit `Menu` Block the Block binds
   (`StatusBinding`, `AssigneeBinding`, `SortBinding`, with the ids `group-tasks-status`, `group-tasks-assignee`, and
@@ -403,8 +404,8 @@ the pages that compose them; the root composes the pages.
   lists the tasks in triage (`triageTasks`); `tasksView`, the Block's canonical view, is titled Tasks,
   "Every open task you can see.", and lists every task that is neither done nor dismissed (`openTasks`).
   The pane's toolbar has a search field, whose label is hidden and whose placeholder says "Search
-  tasks…", beside a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Me, or No one, whose button
-  says Assignee while it narrows to none and is named "Assignee: Anyone", and, on Tasks
+  tasks…", beside a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Unassigned, or a member by name
+  and mark, whose button says Assignee while it narrows to none and is named "Assignee: Anyone", and, on Tasks
   alone, a menu of the status (`StatusFilterMenu`), Any status or one of the statuses of an open task, named
   "Status: Any status". Each menu is a Foldkit `Menu` Block the Block binds (`AssigneeBinding`, `StatusBinding`), and
   choosing from it sets the filter, so the Block has no message for the choice. The toolbar goes on with a line that says "Tasks in triage across your groups." or "Open tasks across your groups."
@@ -414,8 +415,8 @@ the pages that compose them; the root composes the pages.
   cell, "General · To do · Sep 20" described after "Started by Alice · 3 replies", and "Open →". The
   row reports `OpenedThread` with the thread and its group, which its parent opens in that group,
   where the task's controls are. The search finds the letters in the thread's title or in its
-  opening's words as the group's Tasks tab does (`threadContains`), Me is the member the Block is
-  made for, and No one a task with no assignee. The filters are the Block's, one for both views,
+  opening's words as the group's Tasks tab does (`threadContains`), and the assignee is anyone, no one,
+  or the member the filter names, whoever the Block is made for. The filters are the Block's, one for both views,
   except that Triage leaves out the status (`withAnyStatus`), since it shows no choice of one. With
   no task the pane says "Nothing to triage" or "No open tasks" and that the tasks the person can see
   will be listed there, and with filters that leave none, "No tasks match" and to try different
@@ -925,7 +926,10 @@ feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is t
 `taskTable.ts`, tasks as the design's `directory` rows under the labels of its columns, with the badge
 of each status, is the threads feature's Tasks tab's and the tasks feature's, which adds a column for the group.
 `taskFilter.ts`, what a list of tasks is narrowed to besides the letters typed, the status and the assignee, each
-chosen from a menu, is theirs too.
+chosen from a menu, is theirs too. The assignee is an `AssigneeFilter`: `Anyone`, `Unassigned`, or `Member` with the
+member's ID. The menu reports a choice as a string, `Anyone`, `Unassigned`, or `Member:` and the ID
+(`assigneeChoiceOf`, `assigneeFilterOf`), and `assigneeChoices` lists the members still in the workspace, by name, with
+the mark `seen.ts` gives them (`memberMark`: their initials, lilac for an agent).
 `memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
 conversation form's, the group's admit form's, and the task's assignee, each saying what its empty
 choice is.

@@ -296,9 +296,6 @@ export const findMember = (model: Pick<Model, "members">, memberId: MemberId.Mem
 export const activeMembers = (model: Pick<Model, "members">): ReadonlyArray<MemberItem> =>
   model.members.filter(({ member }) => member.status === "active")
 
-/** Whether the member is an agent. */
-export const isAgent = (member: Member.Member): boolean => Identity.MemberReference.isAnyOf(["Agent"])(member.identity)
-
 const byName = (left: MemberItem, right: MemberItem): number =>
   left.member.name.localeCompare(right.member.name) || (left.member.id < right.member.id ? -1 : 1)
 

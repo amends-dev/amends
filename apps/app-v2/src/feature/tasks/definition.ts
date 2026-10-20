@@ -22,7 +22,7 @@ import { isOpen, threadContains } from "../../seen.ts"
 import {
   AssigneeFilter,
   AssigneeFilterMenu,
-  isAssignedAs,
+  isAssignedTo,
   StatusFilterMenu,
   TaskStatusFilter
 } from "../../taskFilter.ts"
@@ -99,14 +99,14 @@ export const matching = (model: Model, items: ReadonlyArray<TaskItem>): Readonly
   return Array.sort(items, byLastActive).filter(
     ({ task, thread, opening }) =>
       (status === "All" || task.status === status) &&
-      isAssignedAs(assignee, task.assignee, model.memberId) &&
+      isAssignedTo(assignee, task.assignee) &&
       threadContains(thread, opening, model.members, query)
   )
 }
 
 /** Whether the person narrowed the list: they searched for letters, or chose an assignee or a status. */
 export const isFiltered = ({ filter }: Model): boolean =>
-  filter.query.trim() !== "" || filter.assignee !== "Anyone" || filter.status !== "All"
+  filter.query.trim() !== "" || !AssigneeFilter.isAnyOf(["Anyone"])(filter.assignee) || filter.status !== "All"
 
 /** The model with every status chosen, for a list that has no choice of status to show what a status leaves out. */
 export const withAnyStatus = (model: Model): Model =>

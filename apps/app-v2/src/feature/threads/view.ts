@@ -194,6 +194,7 @@ export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((m
         }),
         assigneeFilterMenu(h, {
           value: model.taskFilter.assignee,
+          members: inputs.members,
           embed: (viewInputs) =>
             h.block(
               AssigneeBinding.embedView({ slotId: "group-tasks-assignee", model: model.assigneeMenu, viewInputs })

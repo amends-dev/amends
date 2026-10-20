@@ -82,6 +82,7 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
           }),
           assigneeFilterMenu(h, {
             value: model.filter.assignee,
+            members: model.members,
             embed: (viewInputs) =>
               h.block(AssigneeBinding.embedView({ slotId: "tasks-assignee", model: model.assigneeMenu, viewInputs }))
           }),

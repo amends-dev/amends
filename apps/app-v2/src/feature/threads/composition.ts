@@ -2,7 +2,7 @@ import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Drafts from "../../store/Drafts.ts"
-import { AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { assigneeFilterOf, AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { StartThread } from "./command.ts"
 import { type Model, TaskSortMenu, ThreadsDefinition } from "./definition.ts"
@@ -61,7 +61,7 @@ export const AssigneeBinding = ThreadsDefinition.bindChild(AssigneeFilterMenu, {
     fold: AssigneeFilterMenu.OutMessage.match({
       Selected: ({ value }) =>
         ThreadsDefinition.stepFields(() => ({
-          taskFilter: (filter) => modifyFields(filter, { assignee: () => value })
+          taskFilter: (filter) => modifyFields(filter, { assignee: () => assigneeFilterOf(value) })
         })),
       Closed: () => ThreadsDefinition.stepNoop()
     })

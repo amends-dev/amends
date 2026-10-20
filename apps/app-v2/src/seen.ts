@@ -11,10 +11,12 @@
 
 import type { Contact } from "@amends-dev/core/channel"
 import type { Group } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import type { Task } from "@amends-dev/core/task"
 import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
+import type { MarkContent } from "@amends-dev/design/mark"
 import type { TextRun } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
@@ -127,6 +129,15 @@ export const expiryLabel = (at: DateTime.DateTime, now: DateTime.DateTime): stri
   const days = Math.max(1, Math.ceil((remaining - clockLag) / millisPerDay))
   return remaining <= 0 ? "Expired" : `Expires in ${pluralize(days, "day", "days")}`
 }
+
+/** Whether the member is an agent. */
+export const isAgent = (member: Member.Member): boolean => Identity.MemberReference.isAnyOf(["Agent"])(member.identity)
+
+/** A member's mark: their initials, on the agent's tone for an agent. */
+export const memberMark = (member: Member.Member): MarkContent => ({
+  text: initials(member.name),
+  tone: isAgent(member) ? "lilac" : "neutral"
+})
 
 /** `memberId` by their name among `members`, or their ID until names are read. */
 export const memberName = (members: ReadonlyArray<Member.Member>, memberId: MemberId.MemberId): string =>

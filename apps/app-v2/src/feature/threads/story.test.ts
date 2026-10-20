@@ -6,12 +6,13 @@ import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
-import { bob, now, opening, saying } from "../../../test/fixtures.ts"
+import { bob, membership, now, opening, saying } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import {
-  type AssigneeFilter,
+  AssigneeFilter,
   AssigneeFilterMenu,
+  assigneeChoiceOf,
   assigneeChoices,
   StatusFilterMenu,
   statusChoices,
@@ -37,6 +38,15 @@ import { update } from "./update.ts"
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
 const groupId = GroupId.GroupId.make("general")
+
+/** The members the assignee menu lists in these stories: alice, who opened the group, and bob. */
+const people = [membership.member, bob]
+
+/** The filter for the tasks assigned to `assignedTo`. */
+const assignedTo = (assignedTo: MemberId.MemberId) => AssigneeFilter.Member({ memberId: assignedTo })
+
+/** The filter that keeps every task, assigned to anyone or no one. */
+const anyone = AssigneeFilter.Anyone()
 
 const thread = Schema.decodeSync(Thread.Thread)({
   id: "thread-1",
@@ -78,8 +88,8 @@ const choseAssignee = (assignee: AssigneeFilter) =>
     viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
   }).toParentMessage(
     AssigneeFilterMenu.Message.SelectedItem({
-      index: assigneeChoices.findIndex(([value]) => value === assignee),
-      item: assignee
+      index: assigneeChoices(people).findIndex(([value]) => value === assigneeChoiceOf(assignee)),
+      item: assigneeChoiceOf(assignee)
     })
   )
 
@@ -149,19 +159,19 @@ describe("a group's threads", () => {
 
   it("starts on the Threads tab, with every status, any assignee, and no search on the Tasks tab, latest active first", () => {
     expect(listing.tab).toBe("Threads")
-    expect(listing.taskFilter).toEqual({ status: "All", assignee: "Anyone", query: "" })
+    expect(listing.taskFilter).toEqual({ status: "All", assignee: anyone, query: "" })
     expect(listing.taskSort).toBe("Latest")
   })
 
   it("shows the tab the person chooses, and keeps what the Tasks tab was narrowed to while they are on the other", () => {
-    const narrowed = { status: "doing", assignee: "Me", query: "ship" }
+    const narrowed = { status: "doing", assignee: assignedTo(memberId), query: "ship" }
 
     story(
       update,
       given(listing),
       message(Message.ChoseTab({ tab: "Tasks" })),
       message(choseStatus("doing")),
-      message(choseAssignee("Me")),
+      message(choseAssignee(assignedTo(memberId))),
       message(choseSort("Oldest")),
       message(Message.TypedTaskQuery({ query: "ship" })),
       model((model) => {
@@ -176,11 +186,11 @@ describe("a group's threads", () => {
         expect(model.taskSort).toBe("Oldest")
       }),
       message(choseStatus("All")),
-      message(choseAssignee("Anyone")),
+      message(choseAssignee(anyone)),
       message(choseSort("Latest")),
       message(Message.TypedTaskQuery({ query: "" })),
       model((model) => {
-        expect(model.taskFilter).toEqual({ status: "All", assignee: "Anyone", query: "" })
+        expect(model.taskFilter).toEqual({ status: "All", assignee: anyone, query: "" })
         expect(model.taskSort).toBe("Latest")
       })
     )
@@ -193,19 +203,19 @@ describe("a group's threads", () => {
       message(choseStatus("held")),
       Command.expectNone(),
       model((model) => {
-        expect(model.taskFilter).toEqual({ status: "held", assignee: "Anyone", query: "" })
+        expect(model.taskFilter).toEqual({ status: "held", assignee: anyone, query: "" })
         expect(model.taskSort).toBe("Latest")
       }),
-      message(choseAssignee("NoOne")),
+      message(choseAssignee(AssigneeFilter.Unassigned())),
       Command.expectNone(),
       model((model) => {
-        expect(model.taskFilter).toEqual({ status: "held", assignee: "NoOne", query: "" })
+        expect(model.taskFilter).toEqual({ status: "held", assignee: AssigneeFilter.Unassigned(), query: "" })
         expect(model.taskSort).toBe("Latest")
       }),
       message(choseSort("Newest")),
       Command.expectNone(),
       model((model) => {
-        expect(model.taskFilter).toEqual({ status: "held", assignee: "NoOne", query: "" })
+        expect(model.taskFilter).toEqual({ status: "held", assignee: AssigneeFilter.Unassigned(), query: "" })
         expect(model.taskSort).toBe("Newest")
         expect(model.tab).toBe("Threads")
       }),
@@ -330,7 +340,7 @@ describe("the tasks of a group's threads", () => {
 
   it("are kept to the status the filter chose, and every status for All", () => {
     const filtered = (status: typeof listing.taskFilter.status) =>
-      modifyFields(read(retro, release, café), { taskFilter: () => ({ status, assignee: "Anyone", query: "" }) })
+      modifyFields(read(retro, release, café), { taskFilter: () => ({ status, assignee: anyone, query: "" }) })
 
     expect(titles(filtered("All"))).toEqual(["Ship the release", null, "Retro"])
     expect(titles(filtered("doing"))).toEqual(["Ship the release"])
@@ -338,14 +348,15 @@ describe("the tasks of a group's threads", () => {
     expect(titles(filtered("held"))).toEqual([])
   })
 
-  it("are kept to those assigned as the filter chose: anyone, the member's own, or no one", () => {
+  it("are kept to those assigned as the filter chose: anyone, a member, or no one", () => {
     const mine = item("thread-5", "Mine", "todo", 40, undefined, { assignee: memberId })
     const assigned = (assignee: AssigneeFilter) =>
       modifyFields(read(retro, release, mine), { taskFilter: () => ({ status: "All", assignee, query: "" }) })
 
-    expect(titles(assigned("Anyone"))).toEqual(["Ship the release", "Retro", "Mine"])
-    expect(titles(assigned("Me"))).toEqual(["Mine"])
-    expect(titles(assigned("NoOne"))).toEqual(["Retro"])
+    expect(titles(assigned(anyone))).toEqual(["Ship the release", "Retro", "Mine"])
+    expect(titles(assigned(assignedTo(memberId)))).toEqual(["Mine"])
+    expect(titles(assigned(assignedTo(bob.id)))).toEqual(["Ship the release"])
+    expect(titles(assigned(AssigneeFilter.Unassigned()))).toEqual(["Retro"])
   })
 
   it("are kept to those the status, the assignee, and the search all keep", () => {
@@ -353,13 +364,10 @@ describe("the tasks of a group's threads", () => {
     const narrowed = (taskFilter: typeof listing.taskFilter) =>
       titles(modifyFields(read(retro, release, mine), { taskFilter: () => taskFilter }))
 
-    expect(narrowed({ status: "doing", assignee: "Anyone", query: "ship" })).toEqual([
-      "Ship the release",
-      "Mine to ship"
-    ])
-    expect(narrowed({ status: "doing", assignee: "Me", query: "ship" })).toEqual(["Mine to ship"])
-    expect(narrowed({ status: "todo", assignee: "Me", query: "ship" })).toEqual([])
-    expect(narrowed({ status: "doing", assignee: "Me", query: "retro" })).toEqual([])
+    expect(narrowed({ status: "doing", assignee: anyone, query: "ship" })).toEqual(["Ship the release", "Mine to ship"])
+    expect(narrowed({ status: "doing", assignee: assignedTo(memberId), query: "ship" })).toEqual(["Mine to ship"])
+    expect(narrowed({ status: "todo", assignee: assignedTo(memberId), query: "ship" })).toEqual([])
+    expect(narrowed({ status: "doing", assignee: assignedTo(memberId), query: "retro" })).toEqual([])
   })
 
   it("are ordered as the person chose: by latest activity, or by when their threads were started, newest or oldest first", () => {
@@ -380,7 +388,8 @@ describe("the tasks of a group's threads", () => {
 
     expect(isFiltered(listing)).toBe(false)
     expect(narrowedTo({ status: "done" })).toBe(true)
-    expect(narrowedTo({ assignee: "NoOne" })).toBe(true)
+    expect(narrowedTo({ assignee: AssigneeFilter.Unassigned() })).toBe(true)
+    expect(narrowedTo({ assignee: assignedTo(bob.id) })).toBe(true)
     expect(narrowedTo({ query: "ship" })).toBe(true)
     expect(narrowedTo({ query: "   " })).toBe(false)
   })
@@ -388,7 +397,7 @@ describe("the tasks of a group's threads", () => {
   it("are kept to those whose title or opening has the search, whatever its case and accents, and its spaces", () => {
     const searched = (query: string) =>
       modifyFields(read(retro, release, café), {
-        taskFilter: () => ({ status: "All", assignee: "Anyone", query })
+        taskFilter: () => ({ status: "All", assignee: anyone, query })
       })
 
     expect(titles(searched("RETRO"))).toEqual(["Retro"])
