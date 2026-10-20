@@ -268,6 +268,21 @@ describe("every open task", () => {
     scene(tasking, given(read), expect(selector("[aria-current]")).toBeAbsent())
   })
 
+  it("puts the status menu before the assignee menu in the toolbar, and Triage has the assignee alone", () => {
+    scene(
+      tasking,
+      given(read),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("Status: Any status"),
+      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Assignee: Anyone")
+    )
+    scene(
+      triaging,
+      given(read),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("Assignee: Anyone"),
+      expect(role("button", { name: /^Status/ })).toBeAbsent()
+    )
+  })
+
   it("narrows to the status the person chooses among those of an open task, and back to all of them", () => {
     scene(
       tasking,

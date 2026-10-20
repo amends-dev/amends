@@ -503,10 +503,10 @@ below it counted at each level above.
   lists the tasks in triage (`triageTasks`); `tasksView`, the Block's canonical view, is titled Tasks,
   "Every open task you can see.", and lists every task that is neither done nor dismissed (`openTasks`).
   The pane's toolbar has a search field, whose label is hidden and whose placeholder says "Search
-  tasks…", beside a menu of whom a task is assigned to (`AssigneeMenu`), Anyone, Unassigned, or a member by name
-  and mark, whose button says Assignee while it narrows to none and is named "Assignee: Anyone", and, on Tasks
-  alone, a menu of the status (`StatusFilterMenu`), Any status or one of the statuses of an open task, named
-  "Status: Any status". Each menu is a Foldkit `Menu` Block the Block binds (`AssigneeBinding`, `StatusBinding`), and
+  tasks…", beside, on Tasks alone, a menu of the status (`StatusFilterMenu`), Any status or one of the statuses of an
+  open task, named "Status: Any status", and then a menu of whom a task is assigned to (`AssigneeMenu`), Anyone,
+  Unassigned, or a member by name and mark, whose button says Assignee while it narrows to none and is named
+  "Assignee: Anyone"; Triage, which shows no choice of status, has the assignee alone. Each menu is a Foldkit `Menu` Block the Block binds (`AssigneeBinding`, `StatusBinding`), and
   choosing from it sets the filter, so the Block has no message for the choice. The toolbar goes on with a line that says "Tasks in triage across your groups." or "Open tasks across your groups."
   with how many tasks the filters leave at its end, "12 tasks", over the labels of the columns,
   Task, Status, Assignee, and Activity, and a row for each, latest active first (`matching`): the same

@@ -60,7 +60,7 @@ const tasksDestination: Destination = {
 
 /**
  * A destination as a main pane: the tasks it lists, latest active first, with the place of each task's group after its
- * title, under a toolbar of a search and the menus that narrow it, with how many it lists and the labels of the
+ * title, under a toolbar of a search and the menus that narrow it, the status before the assignee, with how many it lists and the labels of the
  * columns, or why it lists none: the filters leave none, which a quiet line says under the labels, or there are none.
  */
 const destinationView = (destination: Destination, model: Model, { now }: ViewInputs, h: TasksViewBuilder): Html => {
@@ -82,12 +82,6 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
             value: model.filter.query,
             onInput: (query) => Message.TypedQuery({ query })
           }),
-          assigneeFilterMenu(h, {
-            value: model.filter.assignee,
-            members: model.members,
-            embed: (viewInputs) =>
-              h.block(AssigneeBinding.embedView({ slotId: "tasks-assignee", model: model.assigneeMenu, viewInputs }))
-          }),
           ...(destination.statusChoices === undefined
             ? []
             : [
@@ -97,7 +91,13 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
                   embed: (viewInputs) =>
                     h.block(StatusBinding.embedView({ slotId: "tasks-status", model: model.statusMenu, viewInputs }))
                 })
-              ])
+              ]),
+          assigneeFilterMenu(h, {
+            value: model.filter.assignee,
+            members: model.members,
+            embed: (viewInputs) =>
+              h.block(AssigneeBinding.embedView({ slotId: "tasks-assignee", model: model.assigneeMenu, viewInputs }))
+          })
         ]
       }),
       summary(h, { copy: destination.summary, count: pluralize(shown.length, "task", "tasks") }),
