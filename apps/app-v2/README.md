@@ -555,7 +555,26 @@ below it counted at each level above.
   parent, which it shows under the group. The groups are read by one subscription, `ReadGroups`, which zips the
   groups, the members, the person's admissions, and what they may do into one `ReceivedGroups`, so that `isLoaded` is
   true once all of them have been read: "No groups yet" is under the Groups title only then, and nothing is before,
-  as `feature/agents` and `feature/connections` wait for theirs. The Groups section's header has two buttons: Browse
+  as `feature/agents` and `feature/connections` wait for theirs.
+  What a group's row says besides its name is read by a second subscription, `ReadSignals`, into one
+  `ReceivedSignals`, which no row waits for (`readSignals` over the store's records, and `receivedSignals`, which
+  makes the message from them): the groups with activity the person has not read, how many of their notifications
+  wait in each group, and the turns under way. A group has activity the person has not read as core's
+  `Group.hasNewActivity` says it for the row of a group (`findNewActivity` in `signals.ts`): the latest activity of
+  its threads that counts as new, a published message (`ThreadActivity.newActivity`), came after the person last read
+  the group (their `GroupRead`), or, if they never have, after they were admitted to it; each such group is kept with
+  that latest activity. Notifications wait in the group their thread is in while they are pending
+  (`countWaiting`), the same notifications the inbox lists as waiting. A group's row shows what waits as its count,
+  read aloud as "2 for you" by the design's `countName`, and, when nothing does, a dot read aloud as "new activity"
+  while it has activity not read, the label in the primary weight either way, as `apps/ui`'s group rows do (the same
+  for a conversation's row). The logo moves at the end of the row while an agent is at work in the group, as the
+  most pressing of the turns under way there says (`stateInGroup`: working, then stopping, then queued), and the row
+  is named by it, "General, Working", as an agent's row is by its state. Nothing in the app wrote that a group was
+  read, so the dot would never have gone: the Block asks for the group open to be marked read, once, as of its
+  latest activity (`MarkGroupRead` writes `GroupMarkedRead`), as the group is picked, as its parent opens it, and
+  each time the store reports new activity in it, and remembers what it asked for (`readRequested`) so that a
+  store that lists the group as unread until the server has the write does not make it ask again. A group that is
+  not the one open is never marked. The Groups section's header has two buttons: Browse
   groups, shown to everyone, which reports `RequestedBrowse` with the browse page on its Discover tab, and Create
   group, where the person may start a team, in place of the "+" that was called New team. The title, Groups, is a
   button too: it reports `RequestedBrowse` with the page on Your groups, as `apps/ui`'s `#groups` link does, and is
@@ -563,8 +582,8 @@ below it counted at each level above.
   the conversations and has no line of its own for none, and its New message button is shown always, as `apps/ui`'s
   is, whoever else is in the workspace: with nobody else its dialog, "New conversation", has a member choice with
   only "Choose a member" to pick and a first message to write, and Start sends nothing until a member is chosen. A
-  row's count would be read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
-  `countName`); the sidebar's group rows show no count, so there is none to name. `browseView` is the page it asks for, a main pane titled Groups with two tabs, each counted once the groups are
+  row's count is read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
+  `countName`). `browseView` is the page it asks for, a main pane titled Groups with two tabs, each counted once the groups are
   read: Your groups, the teams the person belongs to, and Discover, the public teams they do not, Your groups at
   first, and Create group, the same as the sidebar's, where they may start a team. A conversation is on neither; the
   sidebar lists it. The toolbar over the rows holds a search field, whose label is hidden and whose placeholder
@@ -1272,7 +1291,8 @@ with no turn, which is idle. `placesLine`, `activityLabel`, and `turnLabel` say 
 reads the turns under way and the groups through its `ReadActivity` subscription, apart from the agents.
 `agentsAtWork` lists, from one thread's turns, the agents with a turn under way there, each by its membership and the
 state of its turn, the oldest turn first, which the store gives a group's thread list as `working`, and `workingLabel`
-says one in a line with its agent's name, "Yumi working".
+says one in a line with its agent's name, "Yumi working". `stateInGroup` takes the most pressing state among the turns under way in one group,
+whichever agents they are of, which the sidebar's group rows move the logo as.
 `taskList.ts`, tasks as the design's `taskList`, with the status of each drawn and the assignee named, is the threads
 feature's Tasks tab's and the tasks feature's, which adds the place of the group after each title, and holds the words
 the two say where the filters leave none (`noTasksMatch`).
@@ -1634,7 +1654,15 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   sidebar's sections, the teams to join not among them, in order, "No groups yet" only once the groups are read,
   no line for conversations, New message always and its dialog with no one to choose when nobody else is in the
   workspace, a conversation by its other member, one still on
-  its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new group taken in a dialog named for it, titled Create group with what to set under the title,
+  its way marked "Sending…" at the end of its row, with the thread open under the group picked, what waits for the
+  person in a group as its count read aloud as "2 for you", a dot read aloud as "new activity" for a group with activity
+  not read, with its name in the primary weight, and none beside a count, for a conversation as for a team, the dot
+  shown as the store reports activity and taken away once the group is read, the logo at the end of a group's row
+  moving as the most pressing state of the turns there says, working, queued, or stopping, and the row named by it,
+  kept with the count and the dot, the group open asked to be marked read once for the activity it has, again only for
+  later activity, as it is picked, and as its parent opens it, and never a group that is not open, the write of
+  `GroupMarkedRead`, `findNewActivity` and `countWaiting` over the records they read, `receivedSignals` over what the
+  store holds, and a new group taken in a dialog named for it, titled Create group with what to set under the title,
   the name field with its placeholder and limit holding the focus, the visibility chosen between Public and Private,
   Private first, with what each means under it and no switch, the members picker with the person locked as You, who
   need not be added, the others offered by name, added as chips that are counted in the hint and taken off by their
@@ -1885,7 +1913,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
   the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity
   from them, idle or by the most pressing state and each place once, and the words for them, and the agents at work
-  in one thread from its turns, by state and oldest first, and their line. `Drafts`'
+  in one thread from its turns, by state and oldest first, and their line, and the most pressing state of a group's turns, whichever agents they are of. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

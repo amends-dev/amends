@@ -2,7 +2,7 @@ import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock, RadioGroup } from "@foldkit/ui"
-import { Option, Schema } from "effect"
+import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   Mount,
@@ -27,18 +27,31 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership, scout } from "../../../test/fixtures.ts"
+import {
+  aliceInDesign,
+  aliceInGeneral,
+  art,
+  bob,
+  design,
+  general,
+  membership,
+  scout,
+  turnOf
+} from "../../../test/fixtures.ts"
 import { pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { panelIs } from "../../../test/panelSize.ts"
 import { GroupsBlock } from "./block.ts"
 import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
-import { Message, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
+import { Message, type NewActivity, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { browseView, dialogView, view } from "./view.ts"
 
 const { workspace, member } = membership
+
+/** When the latest activity of a group the person has not read was. */
+const later = DateTime.makeUnsafe("2026-10-18T12:05:00Z")
 
 const sceneView = withViewInputs(view, { openThread: Option.none(), isBrowsing: false })
 
@@ -201,6 +214,114 @@ describe("the groups", () => {
       expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "Sending…"),
       expect(within(role("button", { name: "General" }), text("Sending…"))).toBeAbsent(),
       expect(role("button", { name: "General" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("count what waits for the person in a group at the end of its row, read aloud as 2 for you", () => {
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(listed, { waiting: () => [{ groupId: design.id, count: 2 }] })),
+      expect(within(role("button", { name: "Design" }), text("2"))).toExist(),
+      expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "2 for you"),
+      expect(within(role("button", { name: "General" }), selector("span[aria-hidden]"))).toBeAbsent(),
+      expect(role("button", { name: "General" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("draw a dot, read aloud as new activity, for a group with activity the person has not read, with its name in ink", () => {
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(listed, { newActivity: () => [{ groupId: general.id, latestAt: later }] })),
+      expect(within(role("button", { name: "General" }), selector("span.bg-indicator"))).toExist(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-description", "new activity"),
+      expect(within(role("button", { name: "General" }), text("General"))).toHaveClass("font-medium"),
+      expect(within(role("button", { name: "Design" }), selector("span.bg-indicator"))).toBeAbsent(),
+      expect(role("button", { name: "Design" })).not.toHaveAttr("aria-description"),
+      expect(within(role("button", { name: "Design" }), text("Design"))).not.toHaveClass("font-medium")
+    )
+  })
+
+  it("draw the count and not the dot for a group with both, and the dot for a conversation as for a team", () => {
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(withConversation, {
+          newActivity: () => [
+            { groupId: design.id, latestAt: later },
+            { groupId: withBob.id, latestAt: later }
+          ],
+          waiting: () => [{ groupId: design.id, count: 3 }]
+        })
+      ),
+      expect(within(role("button", { name: "Design" }), text("3"))).toExist(),
+      expect(within(role("button", { name: "Design" }), selector("span.bg-indicator"))).toBeAbsent(),
+      expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "3 for you"),
+      expect(within(role("button", { name: "Design" }), text("Design"))).toHaveClass("font-medium"),
+      expect(within(role("button", { name: "Bob" }), selector("span.bg-indicator"))).toExist(),
+      expect(role("button", { name: "Bob" })).toHaveAttr("aria-description", "new activity")
+    )
+  })
+
+  it("show the dot as the store reports activity not read, and take it away once the group is read", () => {
+    const signals = (newActivity: ReadonlyArray<NewActivity>) =>
+      Subscription.emit(subscriptions.signals, Message.ReceivedSignals({ newActivity, waiting: [], turns: [] }))
+
+    scene(
+      { update, view: sceneView(), subscriptions: GroupsBlock.subscriptions },
+      given(listed),
+      expect(within(role("button", { name: "General" }), selector("span.bg-indicator"))).toBeAbsent(),
+      signals([{ groupId: general.id, latestAt: later }]),
+      expect(within(role("button", { name: "General" }), selector("span.bg-indicator"))).toExist(),
+      signals([]),
+      expect(within(role("button", { name: "General" }), selector("span.bg-indicator"))).toBeAbsent(),
+      expect(role("button", { name: "General" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("move the logo at the end of a group's row while an agent is at work in it, as the most pressing state does", () => {
+    const turn = (id: string, groupId: Group.Group["id"], status: Parameters<typeof turnOf>[1]) => ({
+      ...turnOf(id, status),
+      groupId
+    })
+
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(listed, {
+          turns: () => [
+            turn("turn-1", general.id, "running"),
+            turn("turn-2", general.id, "queued"),
+            turn("turn-3", design.id, "queued")
+          ]
+        })
+      ),
+      expect(within(role("button", { name: "General, Working" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("button", { name: "Design, Queued" }), selector("svg.logo-thread"))).toExist()
+    )
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(listed, { turns: () => [turn("turn-1", design.id, "cancelling")] })),
+      expect(within(role("button", { name: "Design, Stopping" }), selector("svg.logo-tug"))).toExist(),
+      expect(within(role("button", { name: "General" }), selector("svg.logo-working"))).toBeAbsent(),
+      expect(within(role("button", { name: "General" }), selector("svg.logo-thread"))).toBeAbsent(),
+      expect(within(role("button", { name: "General" }), selector("svg.logo-tug"))).toBeAbsent()
+    )
+  })
+
+  it("keep the logo with a count and a dot, and name the row by what the agent is doing", () => {
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(listed, {
+          turns: () => [{ ...turnOf("turn-1", "running"), groupId: design.id }],
+          waiting: () => [{ groupId: design.id, count: 2 }],
+          newActivity: () => [{ groupId: general.id, latestAt: later }]
+        })
+      ),
+      expect(role("button", { name: "Design, Working" })).toHaveAttr("aria-description", "2 for you"),
+      expect(within(role("button", { name: "Design, Working" }), text("2"))).toExist(),
+      expect(within(role("button", { name: "Design, Working" }), selector("svg.logo-working"))).toExist(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-description", "new activity")
     )
   })
 

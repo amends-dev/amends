@@ -11,6 +11,7 @@ import {
   agentsAtWork,
   motionOfState,
   placesLine,
+  stateInGroup,
   stateWord,
   turnLabel,
   turnsUnderWay,
@@ -201,6 +202,41 @@ describe("an agent's activity", () => {
     expect(activityOf(turnsUnderWay(scoutId, [scoutsTurn("turn-1", "running")], [], members, member.id))).toEqual(
       Option.some({ state: "working", places: [] })
     )
+  })
+})
+
+describe("the state of a group's turns", () => {
+  it("is the most pressing state among the turns under way in the group: working, then stopping, then queued", () => {
+    const inGeneral = (...states: Array<Parameters<typeof turnOf>[1]>) =>
+      stateInGroup(
+        states.map((status, index) => scoutsTurn(`turn-${index}`, status, general.id)),
+        general.id
+      )
+
+    expect(inGeneral("queued")).toEqual(Option.some("queued"))
+    expect(inGeneral("queued", "cancelling")).toEqual(Option.some("stopping"))
+    expect(inGeneral("cancelling", "queued", "running")).toEqual(Option.some("working"))
+  })
+
+  it("counts the turns of any agent, and none of another group's", () => {
+    const otherAgents = { ...scoutsTurn("turn-1", "running", design.id), agentId: otherAgentId }
+
+    expect(stateInGroup([otherAgents], design.id)).toEqual(Option.some("working"))
+    expect(stateInGroup([otherAgents], general.id)).toEqual(Option.none())
+  })
+
+  it("is none while no turn there is under way, which finished turns are not", () => {
+    expect(stateInGroup([], general.id)).toEqual(Option.none())
+    expect(
+      stateInGroup(
+        [
+          scoutsTurn("turn-1", "completed", general.id),
+          scoutsTurn("turn-2", "failed", general.id),
+          scoutsTurn("turn-3", "cancelled", general.id)
+        ],
+        general.id
+      )
+    ).toEqual(Option.none())
   })
 })
 

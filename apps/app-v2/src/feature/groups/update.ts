@@ -5,7 +5,7 @@ import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { placeName } from "../../seen.ts"
-import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
+import { CreateTeam, FocusTeamMembers, JoinGroup, MarkGroupRead, StartConversation } from "./command.ts"
 import { DialogBinding, GroupsComposition, MembersBinding } from "./composition.ts"
 import {
   type BrowseTab,
@@ -21,6 +21,7 @@ import {
   Starting,
   teamIn,
   type TeamForm,
+  unreadInOpenGroup,
   withTeam
 } from "./definition.ts"
 
@@ -59,16 +60,34 @@ const openConversationForm = (memberId: Option.Option<MemberId.MemberId>) =>
   }))
 
 /**
- * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row
- * does.
+ * Ask to mark the group open as read, as of its latest activity, while it has activity the person has not read, unless
+ * they asked already for the activity it has now. Asking is recorded, so that a store that still lists the group as
+ * unread until the server has the action does not ask again.
+ */
+const readOpenGroup = GroupsDefinition.step((model: Model) =>
+  Option.match(unreadInOpenGroup(model), {
+    onNone: () => ({ model }),
+    onSome: (unread) => ({
+      model: modifyFields(model, { readRequested: () => Option.some(unread) }),
+      commands: [MarkGroupRead({ workspaceId: model.workspaceId, memberId: model.memberId, groupId: unread.groupId })]
+    })
+  })
+)
+
+/**
+ * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row does, and
+ * read.
  */
 const pickGroup = (model: Model, groupId: GroupId.GroupId) =>
   Option.contains(model.selected, groupId)
     ? { model }
-    : {
-        model: modifyFields(model, { selected: () => Option.some(groupId) }),
-        outMessage: OutMessage.SelectedGroup({ groupId })
-      }
+    : Update.withOutMessage(
+        Update.combine(model, [
+          GroupsDefinition.stepFields(() => ({ selected: () => Option.some(groupId) })),
+          readOpenGroup
+        ]),
+        OutMessage.SelectedGroup({ groupId })
+      )
 
 /** Ask to browse the groups, on the tab `tab`. */
 const browseOn = (model: Model, tab: BrowseTab) => ({
@@ -163,12 +182,22 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
           grants: () => grants
         })
       ),
+    ReceivedSignals: ({ newActivity, waiting, turns }) =>
+      Update.combine(model, [
+        GroupsDefinition.stepFields(() => ({
+          newActivity: () => newActivity,
+          waiting: () => waiting,
+          turns: () => turns
+        })),
+        readOpenGroup
+      ]),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
     }),
     ClickedGroup: ({ groupId }) => pickGroup(model, groupId),
-    InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
+    InformedOfOpenGroup: ({ groupId }) =>
+      Update.combine(model, [GroupsDefinition.stepFields(() => ({ selected: () => groupId })), readOpenGroup]),
     ClickedGroupsTitle: () => browseOn(model, "Yours"),
     ClickedBrowse: () => browseOn(model, "Discover"),
     ChoseBrowseTab: ({ tab }) => ({

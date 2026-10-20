@@ -4,22 +4,32 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { inputId } from "@foldkit/ui/combobox"
-import { Array, Effect, Layer, Option } from "effect"
+import { Array, DateTime, Effect, Layer, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, aliceInGeneral, bob, conversationWithBob, design, general } from "../../../test/fixtures.ts"
+import {
+  aliceInDesign,
+  aliceInGeneral,
+  bob,
+  conversationWithBob,
+  design,
+  general,
+  turnOf
+} from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
+import { CreateTeam, FocusTeamMembers, JoinGroup, MarkGroupRead, StartConversation } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import {
   byGeneralThenName,
   conversationWith,
   discoverable,
+  hasNewActivityIn,
   Message,
   OutMessage,
   Starting,
   teamIn,
   teamMembersId,
+  waitingIn,
   yourTeams
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -792,6 +802,144 @@ describe("the groups", () => {
       ),
       Command.resolve(StartConversation, Message.WroteAction()),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  describe("reading what a group's row says", () => {
+    const firstAt = DateTime.makeUnsafe("2026-10-18T12:10:00Z")
+    const laterAt = DateTime.makeUnsafe("2026-10-18T12:20:00Z")
+    const unread = { groupId: general.id, latestAt: firstAt }
+    const markGeneralRead = MarkGroupRead({ workspaceId, memberId, groupId: general.id })
+    const inGeneral = modifyFields(browsing, { selected: () => Option.some(general.id) })
+
+    it("keep what is unread, what waits, and the turns under way, as the store reports them", () => {
+      const turn = turnOf("turn-1", "running")
+
+      story(
+        update,
+        given(browsing),
+        message(
+          Message.ReceivedSignals({
+            newActivity: [unread],
+            waiting: [{ groupId: design.id, count: 2 }],
+            turns: [turn]
+          })
+        ),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.newActivity).toEqual([unread])
+          expect(model.waiting).toEqual([{ groupId: design.id, count: 2 }])
+          expect(model.turns).toEqual([turn])
+          expect(hasNewActivityIn(model, general.id)).toBe(true)
+          expect(hasNewActivityIn(model, design.id)).toBe(false)
+          expect(waitingIn(model, design.id)).toBe(2)
+          expect(waitingIn(model, general.id)).toBe(0)
+        }),
+        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [] })),
+        model((model) => {
+          expect(hasNewActivityIn(model, general.id)).toBe(false)
+          expect(waitingIn(model, design.id)).toBe(0)
+        })
+      )
+    })
+
+    it("ask to mark the group open as read once it has activity the person has not read, and ask again only for later activity", () => {
+      story(
+        update,
+        given(inGeneral),
+        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [] })),
+        Command.expectNone(),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        Command.expectExact(markGeneralRead),
+        Command.resolve(MarkGroupRead, Message.WroteAction()),
+        model((model) => {
+          expect(model.readRequested).toEqual(Option.some(unread))
+        }),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        Command.expectNone(),
+        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [] })),
+        Command.expectNone(),
+        message(Message.ReceivedSignals({ newActivity: [{ ...unread, latestAt: laterAt }], waiting: [], turns: [] })),
+        Command.expectExact(markGeneralRead),
+        Command.resolve(MarkGroupRead, Message.WroteAction()),
+        model((model) => {
+          expect(model.readRequested).toEqual(Option.some({ ...unread, latestAt: laterAt }))
+        })
+      )
+    })
+
+    it("ask to mark nothing read for a group that is not the one open", () => {
+      story(
+        update,
+        given(browsing),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.readRequested).toEqual(Option.none())
+        }),
+        message(Message.ReceivedSignals({ newActivity: [{ ...unread, groupId: design.id }], waiting: [], turns: [] })),
+        Command.expectNone()
+      )
+      story(
+        update,
+        given(modifyFields(browsing, { selected: () => Option.some(design.id) })),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        Command.expectNone()
+      )
+    })
+
+    it("mark a group read as the person picks it, once, and report it picked", () => {
+      story(
+        update,
+        given(modifyFields(browsing, { newActivity: () => [unread] })),
+        message(Message.ClickedGroup({ groupId: general.id })),
+        expectOutMessage(OutMessage.SelectedGroup({ groupId: general.id })),
+        Command.expectExact(markGeneralRead),
+        Command.resolve(MarkGroupRead, Message.WroteAction()),
+        model((model) => {
+          expect(model.selected).toEqual(Option.some(general.id))
+          expect(model.readRequested).toEqual(Option.some(unread))
+        }),
+        message(Message.ClickedGroup({ groupId: general.id })),
+        Command.expectNone(),
+        expectNoOutMessage()
+      )
+    })
+
+    it("mark no group read as the person picks one that has nothing unread", () => {
+      story(
+        update,
+        given(modifyFields(browsing, { newActivity: () => [unread] })),
+        message(Message.ClickedGroup({ groupId: design.id })),
+        Command.expectNone(),
+        expectOutMessage(OutMessage.SelectedGroup({ groupId: design.id }))
+      )
+    })
+
+    it("mark a group read as its parent opens it, and not as the parent leaves it", () => {
+      story(
+        update,
+        given(modifyFields(browsing, { newActivity: () => [unread] })),
+        message(Message.InformedOfOpenGroup({ groupId: Option.some(general.id) })),
+        Command.expectExact(markGeneralRead),
+        Command.resolve(MarkGroupRead, Message.WroteAction()),
+        message(Message.InformedOfOpenGroup({ groupId: Option.none() })),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.selected).toEqual(Option.none())
+        })
+      )
+    })
+
+    it.effect("write the group read to the person's store, and tell it written", () =>
+      Effect.gen(function* () {
+        const { written, layer } = recordingStores()
+
+        const result = yield* markGeneralRead.effect.pipe(Effect.provide(Layer.provide(MarkGroupRead.layer, layer)))
+
+        expect(written).toEqual([{ action: "GroupMarkedRead", payload: { groupId: general.id } }])
+        expect(result).toEqual(Message.WroteAction())
+      })
     )
   })
 

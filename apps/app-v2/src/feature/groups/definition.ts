@@ -5,15 +5,18 @@
  * or a conversation with another member. It reports the group the person picks and when they ask to browse, and its
  * parent tells it which group is open and when to talk with a member: the conversation of the two when there is one,
  * and otherwise a new one to write the first message of. The browse page's Discover tab joins a public team in place
- * and reports it, with where it is, to be confirmed.
+ * and reports it, with where it is, to be confirmed. A group's row says what waits for the person in it, whether it has
+ * activity they have not read, and whether an agent is at work in it, and the Block marks the group open as read.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
 import { Group, GroupId, GroupMembership } from "@amends-dev/core/group"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as RadioGroup from "@foldkit/ui/radioGroup"
 import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
@@ -27,6 +30,14 @@ import { foldAccents, groupName, isJoinable } from "../../seen.ts"
 /** A group the person can see, whether it is still being created, and how many members it has. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
 export type GroupItem = typeof GroupItem.Type
+
+/** A group with activity the person has not read, and when its latest activity was. */
+export const NewActivity = Schema.Struct({ groupId: GroupId.GroupId, latestAt: Schema.DateTimeUtc })
+export type NewActivity = typeof NewActivity.Type
+
+/** How many of the person's notifications from a group's threads wait for them. */
+export const Waiting = Schema.Struct({ groupId: GroupId.GroupId, count: Schema.Int })
+export type Waiting = typeof Waiting.Type
 
 /** A group the person can see that is a team, which has a name and is public or private. */
 export type TeamItem = GroupItem & Readonly<{ group: Group.Team }>
@@ -80,8 +91,9 @@ export type BrowseTab = typeof BrowseTab.Type
 /**
  * Whether the groups are read, the groups, the workspace's members, the person's own admissions, what they may do,
  * the group picked, the browse page's tab and search, the teams being joined, what they are starting and the dialog it
- * is in, with the radio group and the combobox of its form, how many times the person asked to read the groups again,
- * and why the last read or write failed.
+ * is in, with the radio group and the combobox of its form, the groups with activity the person has not read and when
+ * they last asked to mark the group open as read, how many notifications wait for them in each group, the turns under
+ * way, how many times the person asked to read the groups again, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -98,6 +110,10 @@ export const Model = Schema.Struct({
   dialog: DialogBlock.Model,
   visibilityGroup: VisibilityRadioGroupBlock.Model,
   membersCombobox: MembersComboboxBlock.Model,
+  newActivity: Schema.Array(NewActivity),
+  readRequested: Schema.Option(NewActivity),
+  waiting: Schema.Array(Waiting),
+  turns: Schema.Array(ReplicaRecord.Turn),
   reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
@@ -109,6 +125,11 @@ export const Message = defineMessageUnion({
     members: Schema.Array(Member.Member),
     memberships: Schema.Array(GroupMembership.GroupMembership),
     grants: Schema.Array(Grant.Grant)
+  },
+  ReceivedSignals: {
+    newActivity: Schema.Array(NewActivity),
+    waiting: Schema.Array(Waiting),
+    turns: Schema.Array(ReplicaRecord.Turn)
   },
   FailedRead: { error: Schema.String },
   ClickedTryAgain: {},
@@ -182,6 +203,33 @@ export const yourTeams = (model: Model): ReadonlyArray<TeamItem> => yours(model)
 /** The group `groupId`, while the person can see it. */
 export const findGroup = (model: Model, groupId: GroupId.GroupId): Option.Option<GroupItem> =>
   Array.findFirst(model.groups, ({ group }) => group.id === groupId)
+
+/** Whether the group `groupId` has activity the person has not read. */
+export const hasNewActivityIn = (model: Pick<Model, "newActivity">, groupId: GroupId.GroupId): boolean =>
+  model.newActivity.some((unread) => unread.groupId === groupId)
+
+/** How many of the person's notifications from the threads of the group `groupId` wait for them. */
+export const waitingIn = (model: Pick<Model, "waiting">, groupId: GroupId.GroupId): number =>
+  model.waiting.find((waiting) => waiting.groupId === groupId)?.count ?? 0
+
+/**
+ * The activity of the group open that the person has not read and has not asked to mark as read: none while the group
+ * has none, or once they asked to mark the group read as of the latest activity it has now.
+ */
+export const unreadInOpenGroup = (
+  model: Pick<Model, "selected" | "newActivity" | "readRequested">
+): Option.Option<NewActivity> =>
+  Option.flatMap(model.selected, (groupId) =>
+    Option.filter(
+      Array.findFirst(model.newActivity, (unread) => unread.groupId === groupId),
+      (unread) =>
+        !Option.exists(
+          model.readRequested,
+          (requested) =>
+            requested.groupId === unread.groupId && DateTime.Equivalence(requested.latestAt, unread.latestAt)
+        )
+    )
+  )
 
 /** The public teams the person may join and does not belong to, in order. */
 export const discoverable = (model: Model): ReadonlyArray<TeamItem> =>

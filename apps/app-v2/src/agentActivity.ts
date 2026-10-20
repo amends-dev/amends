@@ -1,8 +1,8 @@
 /**
  * What an agent is doing, read from its turns: each turn it has under way, in what state and in which group, and, of
  * those, the agent's own activity: its most pressing state and each place it is at work. An agent with no turn under
- * way is idle. The agents list, the sidebar, and an agent's page show it, and a group's threads show which agents are
- * at work in each.
+ * way is idle. The agents list, the sidebar, and an agent's page show it, a group's threads show which agents are at
+ * work in each, and the sidebar's group rows move the logo while any agent is at work in the group.
  */
 
 import type { Group, GroupId } from "@amends-dev/core/group"
@@ -135,6 +135,21 @@ export const activityOf = (turns: ReadonlyArray<TurnUnderWay>): Option.Option<Ag
     state,
     places: [...new Set(turns.flatMap(({ place }) => Option.toArray(place)))]
   }))
+
+/**
+ * The most pressing state among the `turns` under way in the group `groupId`, whichever agent they are of: what the
+ * group's row in the sidebar moves the logo as. None while no agent is at work there.
+ */
+export const stateInGroup = (
+  turns: ReadonlyArray<ReplicaRecord.Turn>,
+  groupId: GroupId.GroupId
+): Option.Option<ActivityState> => {
+  const statesHere = turns.flatMap((turn) =>
+    turn.groupId === groupId ? Option.toArray(activityStateOf(turn.status)) : []
+  )
+
+  return Option.fromUndefinedOr(mostPressingFirst.find((state) => statesHere.includes(state)))
+}
 
 /** Where an agent is at work, as a line: "#general", or "#general + 1 more". */
 export const placesLine = (places: ReadonlyArray<string>): string =>

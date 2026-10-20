@@ -18,6 +18,7 @@ import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@ame
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
+import { type ActivityState, motionOfState, stateInGroup, stateWord } from "../../agentActivity.ts"
 import { memberChoice } from "../../memberChoice.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
@@ -33,6 +34,7 @@ import {
   type BrowseTab,
   discoverable,
   type GroupItem,
+  hasNewActivityIn,
   isTeamReady,
   matching,
   Message,
@@ -42,6 +44,7 @@ import {
   teamMembersId,
   type TeamItem,
   teamVisibilityId,
+  waitingIn,
   yours,
   yourTeams
 } from "./definition.ts"
@@ -52,9 +55,17 @@ import {
  */
 export type ViewInputs = Readonly<{ openThread: Option.Option<string>; isBrowsing: boolean }>
 
+/** What counts the notifications that wait for the person in a group, as `apps/ui` says it. */
+const waitingCountName = "for you"
+
+/** What a row of the sidebar says of an agent being at work in the group, and how the logo moves as its state does. */
+const groupActivity = (state: ActivityState) => ({ activity: stateWord[state], activityMotion: motionOfState[state] })
+
 /**
- * A group as a row of the sidebar, a team by its mark and a conversation by the first letter of the other
- * member's name, the group picked marked, and under it the thread open in it, when there is one.
+ * A group as a row of the sidebar, a team by its mark and a conversation by the first letter of the other member's
+ * name, the group picked marked, and under it the thread open in it, when there is one. What waits for the person in
+ * it is a count, read as "2 for you", or, with none, a dot while it has activity they have not read; the logo moves
+ * while an agent is at work in it.
  */
 const groupRow = (
   { group, pending }: GroupItem,
@@ -64,9 +75,14 @@ const groupRow = (
 ): Html => {
   const name = groupName(group, model.members, model.memberId)
   const isCurrent = Option.contains(model.selected, group.id)
+  const waiting = waitingIn(model, group.id)
+
   return sidebarItem(h, {
     ...(group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: { text: name.slice(0, 1) } }),
     label: name,
+    ...(waiting > 0 ? { count: waiting, countName: waitingCountName } : {}),
+    isUnread: hasNewActivityIn(model, group.id),
+    ...Option.match(stateInGroup(model.turns, group.id), { onNone: () => ({}), onSome: groupActivity }),
     isPending: pending,
     isCurrent,
     onClick: Message.ClickedGroup({ groupId: group.id }),

@@ -1,4 +1,7 @@
-/** Starting a team or a conversation, or joining a public team, each an action written to the person's store. */
+/**
+ * Starting a team or a conversation, joining a public team, or reading a group, each an action written to the person's
+ * store.
+ */
 
 import { Group, GroupId } from "@amends-dev/core/group"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
@@ -83,9 +86,20 @@ export const JoinGroup = GroupsDefinition.command("JoinGroup", {
   }
 })
 
+/** Record that the person read the group `groupId` now. */
+export const MarkGroupRead = GroupsDefinition.command("MarkGroupRead", {
+  args: { ...Stores.AsMember, groupId: GroupId.GroupId },
+  messages: written,
+  handler: function* () {
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
+    return ({ groupId, ...member }) => write(member, (store) => store.write("GroupMarkedRead", { groupId }))
+  }
+})
+
 export const EffectsLayer = Layer.mergeAll(
   CreateTeam.layer,
   FocusTeamMembers.layer,
   StartConversation.layer,
-  JoinGroup.layer
+  JoinGroup.layer,
+  MarkGroupRead.layer
 )
