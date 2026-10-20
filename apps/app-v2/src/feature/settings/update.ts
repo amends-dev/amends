@@ -44,7 +44,10 @@ import {
 
 const failureOf = (action: SettingsAction, reason: Reason): Failure => ({ action, reason })
 
-/** What the person typed in the field of a name, with no failure left from the name before it, while it is not on its way. */
+/**
+ * What the person typed in the field of a name, with no failure left from the name before it, while it is not on its
+ * way.
+ */
 const typedName = (edit: Option.Option<NameEdit>, name: string): Option.Option<NameEdit> =>
   Option.some(
     Option.match(edit, {
@@ -361,7 +364,10 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
         )
     })
 
-  /** Send the handing over the person confirmed, from the owner's assignment they saw, to a member who can still become the owner. */
+  /**
+   * Send the handing over the person confirmed, from the owner's assignment they saw, to a member who can still become
+   * the owner.
+   */
   const submitTransfer = (model: Model) =>
     Option.match(model.entering, {
       onNone: () => ({ model }),

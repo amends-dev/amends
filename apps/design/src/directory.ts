@@ -114,7 +114,10 @@ export const summary = <Message, Requirements>(
   config: Readonly<{ copy: string; count: string }>
 ): Html => h.p([h.Class(summaryLine)], [h.span([], [config.copy]), h.span([h.Class(summaryCount)], [config.count])])
 
-/** A line of quiet text after a list, 24px under it, that says what else the person can do, such as accept an invitation. */
+/**
+ * A line of quiet text after a list, 24px under it, that says what else the person can do, such as accept an
+ * invitation.
+ */
 export const footnote = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Class(footnoteLine)], [text])
 
@@ -177,7 +180,9 @@ export const activityCell = <Message, Requirements>(
     ]
   )
 
-/** How big a row's mark is, which sets how tall the row is: a 24px mark makes a compact row, 32px and 40px a roomy one. */
+/**
+ * How big a row's mark is, which sets how tall the row is: a 24px mark makes a compact row, 32px and 40px a roomy one.
+ */
 export type RowMarkSize = keyof typeof rowHeights
 
 /**

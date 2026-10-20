@@ -70,8 +70,8 @@ const readBy = (
 const owner = readBy(alice)
 
 /** The Members page at a width where the invitations are a list, and at one where they are a card. */
-const membersPage = withViewInputs(membersView, { now, viewport: "Desktop" })()
-const phoneMembersPage = withViewInputs(membersView, { now, viewport: "Phone" })()
+const membersPage = withViewInputs(membersView, { now, viewport: "Desktop", openMemberId: Option.none() })()
+const phoneMembersPage = withViewInputs(membersView, { now, viewport: "Phone", openMemberId: Option.none() })()
 
 const dialog = withViewInputs(dialogView, { now })()
 
@@ -327,13 +327,23 @@ describe("the Members page of the settings", () => {
     )
   })
 
-  it("opens a member, whom the workspace shows in the side pane, and marks their row", () => {
+  it("opens a member, whom the workspace shows in the side pane", () => {
     scene(
       { update, view: membersPage },
       given(owner),
       expect(role("button", { name: "Bob" })).not.toHaveAttr("aria-current"),
       click(role("button", { name: "Bob" })),
-      expectOutMessage(OutMessage.OpenedMember({ memberId: bob.id })),
+      expectOutMessage(OutMessage.OpenedMember({ memberId: bob.id }))
+    )
+  })
+
+  it("marks the row of the member the workspace has open, and no other", () => {
+    scene(
+      {
+        update,
+        view: withViewInputs(membersView, { now, viewport: "Desktop", openMemberId: Option.some(bob.id) })()
+      },
+      given(owner),
       expect(role("button", { name: "Bob" })).toHaveAttr("aria-current", "true"),
       expect(role("button", { name: "Alice · You" })).not.toHaveAttr("aria-current")
     )

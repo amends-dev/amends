@@ -1296,12 +1296,14 @@ describe("a workspace", () => {
       expect(role("complementary")).toBeAbsent(),
       click(sidebarButton("Members")),
       expect(role("complementary")).toBeAbsent(),
+      expect(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))).not.toHaveAttr("aria-current"),
       click(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))),
       click(railButton("Home")),
       expect(role("complementary")).toBeAbsent(),
       click(railButton("Settings")),
       click(sidebarButton("Members")),
-      expect(role("complementary")).toBeAbsent()
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))).not.toHaveAttr("aria-current")
     )
   })
 

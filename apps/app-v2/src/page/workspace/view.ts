@@ -44,7 +44,7 @@ import {
   WorkspaceComposition,
   type WorkspaceViewBuilder
 } from "./composition.ts"
-import { Message, type Model, nameOf, Open, openThreadTitle, type SettingsPage } from "./definition.ts"
+import { Message, type Model, nameOf, Open, openMemberId, openThreadTitle, type SettingsPage } from "./definition.ts"
 
 /**
  * Who is signed in, which the sidebar's footer shows beside the way to sign out, the time now, which the
@@ -281,7 +281,7 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
               slotId: "settings-members",
               model: model.settings,
               view: settingsMembersView,
-              viewInputs: { now, viewport: model.viewport }
+              viewInputs: { now, viewport: model.viewport, openMemberId: openMemberId(model) }
             })
           ),
     Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
@@ -347,13 +347,13 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
   )
 
 /**
- * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane,
- * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
- * pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, of the connections,
- * for adding one, replacing its key, or confirming its removal, of the agents, for
- * adding one or confirming its removal, of the settings, for inviting someone, reading the invitations, revoking one,
- * handing the workspace over, or removing a member, and of the search, which the shell keeps in the frame whether or not the
- * sidebar or the page that opens them is on the page.
+ * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane, and
+ * the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side pane lent to
+ * the shell, and the dialogs of the groups, for starting a team or a conversation, of the connections, for adding one,
+ * replacing its key, or confirming its removal, of the agents, for adding one or confirming its removal, of the
+ * settings, for inviting someone, reading the invitations, revoking one, handing the workspace over, or removing a
+ * member, and of the search, which the shell keeps in the frame whether or not the sidebar or the page that opens them
+ * is on the page.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   const { now } = inputs

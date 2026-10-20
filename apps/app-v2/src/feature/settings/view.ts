@@ -1,3 +1,4 @@
+import type { MemberId } from "@amends-dev/core/workspace"
 import {
   button,
   buttonRow,
@@ -318,8 +319,16 @@ export const view = SettingsComposition.makeView((model, h) =>
   })
 )
 
-/** A member as a row of the roster: their mark, their name, with Agent under it for an agent, their role, and their status. */
-const memberRow = (item: MemberItem, model: Model, h: SettingsViewBuilder): Html => {
+/**
+ * A member as a row of the roster: their mark, their name, with Agent under it for an agent, their role, and their
+ * status.
+ */
+const memberRow = (
+  item: MemberItem,
+  model: Model,
+  openMemberId: Option.Option<MemberId.MemberId>,
+  h: SettingsViewBuilder
+): Html => {
   const { member, pending } = item
   const role = roleLabel(model, member.id)
   const status = statusLabels[member.status]
@@ -336,7 +345,7 @@ const memberRow = (item: MemberItem, model: Model, h: SettingsViewBuilder): Html
         ...(kind === "" ? {} : { meta: kind }),
         cells: [h.span([], [role]), h.span([], [status])],
         cellsText: [role, status].filter((part) => part !== "").join(" · "),
-        isCurrent: Option.exists(model.selected, ({ memberId }) => memberId === member.id),
+        isCurrent: Option.contains(openMemberId, member.id),
         onClick: Message.ClickedMember({ memberId: member.id })
       })
     ]
@@ -344,10 +353,10 @@ const memberRow = (item: MemberItem, model: Model, h: SettingsViewBuilder): Html
 }
 
 /** The search and the filter over the roster, then the roster, or what it says when it has no one to show. */
-const roster = (model: Model, h: SettingsViewBuilder): ReadonlyArray<Html> => {
+const roster = (model: Model, openMemberId: Option.Option<MemberId.MemberId>, h: SettingsViewBuilder): Html => {
   const shown = shownMembers(model)
 
-  return [
+  return column(h, [
     fieldGrid(h, [
       field(
         h,
@@ -381,10 +390,10 @@ const roster = (model: Model, h: SettingsViewBuilder): ReadonlyArray<Html> => {
           columns(h, { label: "Member", cells: ["Workspace role", "Status"] }),
           h.ul(
             [h.AriaLabel(model.filter.status === "removed" ? "Removed members" : "Members")],
-            shown.map((item) => memberRow(item, model, h))
+            shown.map((item) => memberRow(item, model, openMemberId, h))
           )
         ])
-  ]
+  ])
 }
 
 /** An invitation still to be accepted as a row: its address over what it gives and when it ends, with Revoke. */
@@ -450,31 +459,40 @@ const invitationsCard = (waiting: ReadonlyArray<InvitationItem>, h: SettingsView
     ]
   )
 
-/** What the Members page is given besides the model: the time now, which invitations end by, and the window's width. */
-export type MembersInputs = Readonly<{ now: DateTime.Utc; viewport: Viewport }>
+/**
+ * What the Members page is given besides the model: the time now, which invitations end by, the window's width, and
+ * the member the page has open beside the roster, whose row is current.
+ */
+export type MembersInputs = Readonly<{
+  now: DateTime.Utc
+  viewport: Viewport
+  openMemberId: Option.Option<MemberId.MemberId>
+}>
 
 /**
  * The Members page of the settings, the main content: a search and a filter over the roster, which opens a member
  * in the side pane, and, where the person manages invitations, Invite people in its header and the invitations still
  * to be accepted after the roster, or on a phone as a card.
  */
-export const membersView = SettingsComposition.makeView.withInputs<MembersInputs>((model, { now, viewport }, h) => {
-  const mayManageInvitations = mayInvite(model)
-  const waiting = pendingInvitations(model, now)
+export const membersView = SettingsComposition.makeView.withInputs<MembersInputs>(
+  (model, { now, viewport, openMemberId }, h) => {
+    const mayManageInvitations = mayInvite(model)
+    const waiting = pendingInvitations(model, now)
 
-  return settingsPage(h, model, {
-    title: "Members",
-    icon: "users",
-    isWide: true,
-    ...(mayManageInvitations ? { actions: [button(h, "Invite people", Message.ClickedInvite())] } : {}),
-    body: [
-      ...roster(model, h),
-      ...(mayManageInvitations
-        ? [viewport === "Phone" ? invitationsCard(waiting, h) : waitingInvitations(waiting, model, now, h)]
-        : [])
-    ]
-  })
-})
+    return settingsPage(h, model, {
+      title: "Members",
+      icon: "users",
+      isWide: true,
+      ...(mayManageInvitations ? { actions: [button(h, "Invite people", Message.ClickedInvite())] } : {}),
+      body: [
+        roster(model, openMemberId, h),
+        ...(mayManageInvitations
+          ? [viewport === "Phone" ? invitationsCard(waiting, h) : waitingInvitations(waiting, model, now, h)]
+          : [])
+      ]
+    })
+  }
+)
 
 /** The roles the person may give, each with its name, to choose from. */
 const roleChoices = (model: Model) => givableRoles(model).map(({ id, name }) => [id, name] as const)
@@ -523,7 +541,9 @@ const accessSection = (model: Model, selected: Selected, h: SettingsViewBuilder)
   })
 }
 
-/** The side pane of the member open: who they are, their role, their access, and what has become of their membership. */
+/**
+ * The side pane of the member open: who they are, their role, their access, and what has become of their membership.
+ */
 const memberPane = (model: Model, selected: Selected, item: MemberItem, h: SettingsViewBuilder): Html => {
   const { member } = item
   const detail = [
@@ -658,7 +678,10 @@ const invitingModal = (render: RenderInfo, inviting: InvitingEntering, model: Mo
   })
 }
 
-/** An invitation in the history: its address, what it gives and when it ends or was made, where it stands, and Revoke while it waits. */
+/**
+ * An invitation in the history: its address, what it gives and when it ends or was made, where it stands, and Revoke
+ * while it waits.
+ */
 const historyEntry = (item: InvitationItem, model: Model, now: DateTime.Utc, h: SettingsViewBuilder): Html => {
   const { details } = item.invitation
   const status = invitationStatus(item, now)
@@ -792,7 +815,10 @@ const dialogModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Set
       })
   })
 
-/** Whether the dialog opens with a line that describes it: it does to confirm revoking an invitation or removing a member. */
+/**
+ * Whether the dialog opens with a line that describes it: it does to confirm revoking an invitation or removing a
+ * member.
+ */
 const hasDescription = (model: Model): boolean =>
   Option.exists(model.entering, Entering.isAnyOf(["Revoking", "Removing"]))
 

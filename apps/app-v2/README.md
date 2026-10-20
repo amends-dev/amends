@@ -380,11 +380,11 @@ the pages that compose them; the root composes the pages.
   workspace has one owner, and, for the owner, that transferring ownership makes them an administrator and a
   Transfer ownership button, which waits, with "Invite another person before transferring ownership.", while there
   is no one who can become the owner; and, at the end, the person's own name in a form with Save name, since the app
-  has no account menu to change it from. The Members page (`membersView`, which takes the time now and the
-  window's width as view inputs) is a search, "Search members…", and a filter of Active or Removed members
+  has no account menu to change it from. The Members page (`membersView`, which takes the time now, the
+  window's width, and the member the page has open as view inputs) is a search, "Search members…", and a filter of Active or Removed members
   (`choiceSelect`, since the design has no menu), over the roster: `columns` for Member, Workspace role, and
   Status, and a `row` for each member with a 24px mark (`markSize: "sm"`), their name, "Agent" under an agent's,
-  their role, and their status, the row of the member open drawn current. A phone shows the role and status under
+  their role, and their status, the row of the member the page has open drawn current. A phone shows the role and status under
   the name. Where the person manages invitations, Invite people is in the page's header, and after the roster are
   the Pending invitations, with how many, each a `rowWithButton` of the address over what it gives and when it ends
   ("Member · Expires in 6 days") with a quiet Revoke named for the address, held while the invitation is itself on

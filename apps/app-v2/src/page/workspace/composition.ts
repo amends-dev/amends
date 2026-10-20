@@ -365,7 +365,10 @@ const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof Group
     ClosedThread: () => hideAside
   })
 
-/** The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
+/**
+ * The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong
+ * one.
+ */
 export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
   readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
   key: (open) => open.groupId,

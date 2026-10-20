@@ -61,7 +61,10 @@ export const invitationStatusTones: Readonly<Record<InvitationStatus, BadgeTone>
   revoked: "neutral"
 }
 
-/** "Member · Expires in 5 days", "Member · Expired Tuesday", or, for one that was accepted or revoked, when it was created. */
+/**
+ * "Member · Expires in 5 days", "Member · Expired Tuesday", or, for one that was accepted or revoked, when it was
+ * created.
+ */
 export const invitationDetail = (item: InvitationItem, model: Pick<Model, "roles">, now: DateTime.Utc): string => {
   const { details } = item.invitation
   const role = roleName(model, details.roleId)
@@ -85,7 +88,9 @@ export const accessName = (model: Pick<Model, "roles">, assignment: Assignment.A
     Direct: ({ grant }) => grant.permission
   })
 
-/** What one of a member's assignments reaches, and whether it still does: "Workspace · Active", "One item · Revoked". */
+/**
+ * What one of a member's assignments reaches, and whether it still does: "Workspace · Active", "One item · Revoked".
+ */
 export const accessDetail = (assignment: Assignment.Assignment): string => {
   const scope = Scope.Scope.match(
     Assignment.Source.match(assignment.source, { Role: ({ scope }) => scope, Direct: ({ grant }) => grant.scope }),
@@ -147,7 +152,10 @@ export const settingsMessage = ({ action, reason }: Failure): string => {
 export const needsRefresh = (reason: Reason): boolean =>
   reason === "Denied" || reason === "Gone" || reason === "Outdated"
 
-/** What confirms an action that was kept, for a toast: `ownerChanged`, `roleSaved`, and `memberRemoved` say whom by name. */
+/**
+ * What confirms an action that was kept, for a toast: `ownerChanged`, `roleSaved`, and `memberRemoved` say whom by
+ * name.
+ */
 export const settingsToast = {
   workspaceRenamed: "Workspace renamed",
   ownNameSaved: "Name saved",

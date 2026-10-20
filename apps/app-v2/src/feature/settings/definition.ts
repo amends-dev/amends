@@ -341,7 +341,10 @@ export const isOwner = (model: Pick<Model, "workspace" | "memberId">): boolean =
 export const ownerOf = (model: Pick<Model, "workspace" | "members">): Option.Option<MemberItem> =>
   Option.flatMap(model.workspace, ({ workspace }) => findMember(model, workspace.ownerMemberId))
 
-/** The member who made the workspace, found by the person's identity the workspace remembers, while the replica has them. */
+/**
+ * The member who made the workspace, found by the person's identity the workspace remembers, while the replica has
+ * them.
+ */
 export const creatorOf = (model: Pick<Model, "workspace" | "members">): Option.Option<MemberItem> =>
   Option.flatMapNullishOr(model.workspace, ({ workspace }) =>
     model.members.find(

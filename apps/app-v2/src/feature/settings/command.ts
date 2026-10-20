@@ -176,7 +176,9 @@ export const CopyWorkspaceId = SettingsDefinition.command("CopyWorkspaceId", {
   }
 })
 
-/** Wait a moment, then report that the person's `attempt` at copying the workspace's ID has shown as done long enough. */
+/**
+ * Wait a moment, then report that the person's `attempt` at copying the workspace's ID has shown as done long enough.
+ */
 export const ExpireCopied = SettingsDefinition.command("ExpireCopied", {
   args: { attempt: Schema.Int },
   messages: [Message.ExpiredCopied],
