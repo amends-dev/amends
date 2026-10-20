@@ -386,6 +386,24 @@ describe("the inbox", () => {
     )
   })
 
+  it("shows markdown in what a notification says as one run of words, without its layout or syntax", () => {
+    const formatted = saying(mention, "# Plan\n\n**Ship** the [retry fix](https://example.com):\n\n- `one`\n- two")
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [{ ...bobsReply, message: Option.some(formatted) }] })),
+      expect(role("button", { name: "Bob mentioned you" })).toHaveAttr(
+        "aria-description",
+        "Plan Ship the retry fix: one two"
+      ),
+      expect(within(notifications, text("Plan Ship the retry fix: one two"))).toExist(),
+      expect(selector("button strong")).toBeAbsent(),
+      expect(selector("button a")).toBeAbsent(),
+      expect(selector("button li")).toBeAbsent(),
+      expect(selector("button p")).toBeAbsent()
+    )
+  })
+
   it("says that a message was deleted where it would say what it said", () => {
     scene(
       { update, view: sceneView },

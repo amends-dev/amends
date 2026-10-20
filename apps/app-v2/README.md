@@ -109,15 +109,20 @@ draws a task's status (`statusShape`) with the design's `taskStatus`.
 
 A message's text is markdown as the person wrote it, and a mention in it is a link to the member,
 `[@Ada](member:<id>)`, labelled with the name they had when mentioned. Wherever a message's text is
-shown, in a thread, in a group's list of threads, and in the inbox, `seen.ts` reads it as runs
-(`textRuns`, `messageRuns`, `threadRuns`; core's `ThreadMessage.parts` finds the mentions) and the
-design shows each mention as a chip of "@" and the member's current name among the members the view
-has, or the name the mention recorded while they are not among them, inline with the words. The
-text shows nothing else of its markdown yet: emphasis, links, lists, and code appear as written, with
-their marks, and the form that edits a message shows its text as written, mentions too. A title taken
-from a thread's opening is its words as a reader hears them, a mention as "@" and the member's
-current name (`titleOf`, by `messageWords`), in the pane's header and under the group in the
-sidebar. Every write of a message's text, a thread's opening, a reply, an edit, and a conversation's
+shown, in a thread, as a task's description, in a group's list of threads, and in the inbox, `seen.ts` hands the
+design the markdown with the members its mentions may name (`messageText` and `threadText`, which are a `MessageText`
+of the design's `message` module) and the design shows it as `apps/ui`'s `RichText` does: paragraphs, emphasis, code,
+quotes, lists, tables, and links, a mention as a chip of "@" and the member's current name among the members the view
+has, or the name the mention recorded while they are not among them (see the design's `richText`, where `marked` lexes
+the markdown; this app imports no markdown library). A thread's messages and a task's description show it as blocks.
+A row that is a button, a thread in the group's list, and the text of a notification, show it as the preview, one run
+of its words and mentions, since a button holds no block or link. A thread's title is not markdown and shows as it
+was written. The form that edits a message shows its text as written, mentions too. What a title or a search reads of a
+message is its words without that syntax, a mention as "@" and the member's current name (`messageWords` and
+`threadWords`, by the design's `messageTextWords`, which `richTextWords` gives the markdown's words): a title taken
+from a thread's opening (`titleOf`), in the pane's header and under the group in the sidebar, and what a search for a
+thread's words matches (`threadContains`, and the store's `findMatches`), so that `**` and a link's address are
+never found. Every write of a message's text, a thread's opening, a reply, an edit, and a conversation's
 first message, says whom the message addresses by the mentions in its text (core's
 `ThreadMessage.mentionedIn`, each member once).
 
@@ -223,8 +228,8 @@ below it counted at each level above.
   (making it one, where they may) and the turns, then its messages as a list, the opening first, how
   many replies follow it, and the replies, each by its author's initials, name, and when it was
   published (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with
-  "Sending…" or "edited" after it, its text with each mention a chip (`messageRuns`, by the thread's
-  members), and Edit and Delete on the person's own, which the form to edit it replaces while they
+  "Sending…" or "edited" after it, its text as markdown with each mention a chip (`messageText`, by the
+  thread's members), and Edit and Delete on the person's own, which the form to edit it replaces while they
   do; and who else types, in a live region under them. For a thread that tracks a task it is a
   section named Task, laid out as `apps/ui`'s task pane is: Rename, which `apps/ui` has no place for
   and so stays at the top of the body, the task's properties, a "Description" caption over the
@@ -290,8 +295,8 @@ below it counted at each level above.
   each the opening's author, by initials and name ("Someone" until the members are read, and "A thread"
   when the opening is not read yet), when the thread was created (`whenLabel`: its time of day today,
   "Yesterday" or the day's name before), which it says before the opening is read too, and the thread's
-  title or its opening, each mention in it a chip (`threadRuns`, by the group's members), as the text
-  that opens it, with "Sending…" while it is being started, under it,
+  title as written or its opening's markdown as a preview, one run of its words with each mention a chip
+  (`threadText`, by the group's members), as the text that opens it, with "Sending…" while it is being started, under it,
   while the thread has replies, a reply line: the initials of those who replied, in the order of their
   first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then how much is new and where its
   task stands; the thread open is the current row. Until the store has answered (`isLoaded`) the tab says "Loading the
@@ -330,7 +335,7 @@ below it counted at each level above.
   "Open →", which the row no longer shows. The row is named by the title and described by all else it says, "Doing ·
   Alice · 10m ago", the status word and the assignee's name included, which the row drops below 64rem and 48rem. The
   search finds the letters in the thread's title or in its
-  opening's words, whatever their case and accents (`threadContains`); a mention in it is the member's current name. With
+  opening's words without its markdown's syntax, whatever their case and accents (`threadContains`); a mention in it is the member's current name. With
   no task the tab says "No tasks yet" and to start one from the composer, which `apps/ui` has no words for, and with a
   search or a status that leaves none, "No tasks match these filters." in a quiet line under the labels of the columns, as
   `apps/ui` says it (`noTasksMatch`, the design's `taskListEmpty`). `composerView` is the composer to start one, for the
@@ -478,8 +483,8 @@ below it counted at each level above.
   (`notificationReason`): the message mentions them ("mentioned you"), it opens the thread ("started
   a thread"), or it replies ("replied"); where it comes from, a team as `#` and its name, a
   conversation as the others in it and "Direct message", and "Unavailable thread" while the store
-  lacks the thread, with no place while it lacks the thread's group; what the message says, each
-  mention in it a chip (`notificationText`, by the inbox's members); and how long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
+  lacks the thread, with no place while it lacks the thread's group; what the message says, as the preview of its
+  markdown, one run of words with each mention a chip (`notificationText`, by the inbox's members); and how long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
   first line says "Activity in a thread" beside the design's `message` icon in place of letters, and the text says
   what it can. The time
   now is its view input, as the page gives it, so the days and ages follow the clock. A notification's
@@ -1197,7 +1202,7 @@ choice is.
   groups, the members, the threads, and their messages once, as the person's unfinished actions leave
   them, and `findMatches` decides what has the query in it. It reads every message, since the replica
   keeps no index of a thread's opening. It gives `SearchResults`: the groups whose names, as the
-  person reads them (a conversation by the other members), contain it; the threads whose title, or whose opening message's words, a mention as the member's current name, contain it,
+  person reads them (a conversation by the other members), contain it; the threads whose title, or whose opening message's words, without its markdown's syntax and a mention as the member's current name, contain it,
   each with the name of its group and the words the person reads it by, its title or its opening's;
   and the active members, other than the person, whose names contain it. Each kind is at most eight
   (`maxSearchResults`), in the order of the records, and the query is matched whatever its case or
@@ -1391,9 +1396,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   in the document.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
-  edited one, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
+  edited one, a message's markdown as blocks, a task's description as markdown, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
-  author of their opening, their time, a mention in the opening as a chip, who replied and how many
+  author of their opening, their time, a mention in the opening as a chip, its markdown as the words that open the thread and a title as written, who replied and how many
   times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
   from the composer, whose box is named for the group; a group's tabs, Tasks counted while any task is
   open and chosen to show the tasks as rows by their assignee, title, who started them, replies, status,
@@ -1442,8 +1447,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   its Join button, which is disabled while the join is written, reports it, and then leaves Discover for Your groups,
   a join that could not be kept saying why over the list and offered again, and Create group only for someone who
   may create one, opening the dialog with no sidebar on the page; the inbox's notifications under the day they came, by their
-  author and what they did, the place they come from, how long ago, and what they say, with a mention
-  in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
+  author and what they did, the place they come from, how long ago, and what they say, as the preview of its markdown
+  with a mention in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
   activity alone while the thread is, the unread ones with a dot and no button to mark one seen, the
   seen ones on All without the dot and not on Unread, the tabs, Unread first and the inbox opening on it, counted
@@ -1654,14 +1659,13 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   is `Store.findMatches`: nothing for an empty
   query or one of spaces, a group by the name the person reads and a conversation by the other member,
   a thread by its title or its opening's words and shown by its title, a mention in an opening as
-  the member's current name, no thread by a deleted opening or without its group, the active members
+  the member's current name and the syntax of its markdown not found, no thread by a deleted opening or without its group, the active members
   but the person by name, whatever the case or accents, and at most eight of each in the order given,
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
-  and once it has, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the runs of a text and of a message and of a thread's row,
-  a mention as "@" and the member's current name or the name it recorded, and the rest of the
-  markdown as written, and `settingsForm.ts`: the fields an
+  and once it has, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
+  a mention as "@" and the member's current name or the name it recorded, a title as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
   the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity

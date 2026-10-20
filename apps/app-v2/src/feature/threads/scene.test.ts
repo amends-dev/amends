@@ -219,6 +219,25 @@ describe("a group's threads", () => {
     )
   })
 
+  it("shows markdown in an opening as the words that open the thread, without its syntax, and a title as written", () => {
+    const formatted = saying(opening, "**Ship** the [retry fix](https://example.com) `now`")
+
+    scene(
+      { update, view: sceneView },
+      given(listing({ ...alices, opening: Option.some(formatted) })),
+      expect(role("button", { name: "Ship the retry fix now" })).toExist(),
+      expect(selector("button strong")).toBeAbsent(),
+      expect(selector("button a")).toBeAbsent(),
+      expect(selector("button code")).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView },
+      given(listing({ ...alices, thread: { ...thread, title: "**Retro**" }, opening: Option.some(formatted) })),
+      expect(role("button", { name: "**Retro**" })).toExist(),
+      expect(selector("button strong")).toBeAbsent()
+    )
+  })
+
   it("sets the threads apart by the day they were created on, and says when each was by its time of day or its day", () => {
     scene(
       { update, view: sceneView },

@@ -1,11 +1,12 @@
 /**
  * What the person sees of the workspace's records: what a member and a group are called, what letters mark them, and
- * where a group is as a line says it, who wrote a message and what it says, with a mention in it as its member's
- * current name, when a time was, by its time of day, its day, either as a message shows it, and how long ago it was,
- * the date something was made, which day each of a list's items falls on, how a thread is titled, where it is, and how
- * many replies it has, whether anyone may join a group, how two texts are compared when the person searches and whether
- * a thread's title or opening has what they search for, how a task's status and priority and a turn's status read and
- * how a status is drawn, which statuses leave a task open, and when an invitation closes.
+ * where a group is as a line says it, who wrote a message and what it says, as the markdown a view shows and as the
+ * words it comes to without its syntax, with a mention in it as its member's current name, when a time was, by its time
+ * of day, its day, either as a message shows it, and how long ago it was, the date something was made, which day each
+ * of a list's items falls on, how a thread is titled, where it is, and how many replies it has, whether anyone may
+ * join a group, how two texts are compared when the person searches and whether a thread's title or opening has what
+ * they search for, how a task's status and priority and a turn's status read and how a status is drawn, which statuses
+ * leave a task open, and when an invitation closes.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -16,7 +17,7 @@ import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { MarkContent, TaskStatusShape } from "@amends-dev/design/mark"
-import type { TextRun } from "@amends-dev/design/message"
+import { type MessageText, messageTextWords } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -268,35 +269,21 @@ export const authorMark = (
 const deletedText = "This message was deleted."
 
 /**
- * `text` as the runs a view shows: its words as written, and each mention as "@" and the name the member has
- * now among `members`, or the name the mention recorded while they are not among them.
+ * What `message` says as the text a view shows: its markdown, with the members its mentions name, who are called what
+ * they are now among `members`, or that it was deleted.
  */
-export const textRuns = (text: string, members: ReadonlyArray<Member.Member>): ReadonlyArray<TextRun> =>
-  ThreadMessage.parts(text).map((part) =>
-    ThreadMessage.Part.match(part, {
-      Text: ({ text }) => ({ text }),
-      Mention: ({ memberId, label }) => ({
-        text: `@${members.find((member) => member.id === memberId)?.name ?? label}`,
-        isMention: true
-      })
-    })
-  )
-
-/** What `message` says as the runs a view shows, or that it was deleted. */
-export const messageRuns = (
-  message: ThreadMessage.ThreadMessage,
-  members: ReadonlyArray<Member.Member>
-): ReadonlyArray<TextRun> =>
+export const messageText = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>): MessageText =>
   ThreadMessage.Content.match(message.content, {
-    Text: ({ text }) => textRuns(text, members),
-    Deleted: (): ReadonlyArray<TextRun> => [{ text: deletedText }]
+    Text: ({ text }): MessageText => ({ text, mentions: members }),
+    Deleted: (): MessageText => deletedText
   })
 
-/** What `message` says as the words a reader hears, its runs joined: a mention as "@" and the member's current name. */
+/**
+ * What `message` says as the words a reader hears, without its markdown's syntax: a mention as "@" and the member's
+ * current name.
+ */
 export const messageWords = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>): string =>
-  messageRuns(message, members)
-    .map((run) => run.text)
-    .join("")
+  messageTextWords(messageText(message, members))
 
 /** `count` of something, as the person reads it: "1 member", "4 members", by its `singular` and its `plural`. */
 export const pluralize = (count: number, singular: string, plural: string): string =>
@@ -305,28 +292,28 @@ export const pluralize = (count: number, singular: string, plural: string): stri
 /** How many replies a thread has, as the person reads it: "1 reply", "4 replies". */
 export const repliesLabel = (replies: number): string => pluralize(replies, "reply", "replies")
 
-/** A thread as the person reads it in a list: its title, or its opening message as runs, or "A thread". */
-export const threadRuns = (
+/**
+ * A thread as the person reads it in a list: its title, as written, or its opening message as the text a view shows, or
+ * "A thread".
+ */
+export const threadText = (
   thread: Thread.Thread,
   opening: Option.Option<ThreadMessage.ThreadMessage>,
   members: ReadonlyArray<Member.Member>
-): ReadonlyArray<TextRun> =>
+): MessageText =>
   thread.title === null
     ? Option.match(opening, {
-        onNone: (): ReadonlyArray<TextRun> => [{ text: "A thread" }],
-        onSome: (message) => messageRuns(message, members)
+        onNone: (): MessageText => "A thread",
+        onSome: (message) => messageText(message, members)
       })
-    : [{ text: thread.title }]
+    : thread.title
 
-/** A thread as the person reads it in a list, its runs joined: its title, or its opening's words, or "A thread". */
+/** A thread as the person reads it in a list, as words: its title, or its opening's words, or "A thread". */
 export const threadWords = (
   thread: Thread.Thread,
   opening: Option.Option<ThreadMessage.ThreadMessage>,
   members: ReadonlyArray<Member.Member>
-): string =>
-  threadRuns(thread, opening, members)
-    .map((run) => run.text)
-    .join("")
+): string => messageTextWords(threadText(thread, opening, members))
 
 /** Whether anyone in the workspace may join `group`: a public team. */
 export const isJoinable = (group: Group.Group): boolean => group.kind === "Team" && group.visibility === "Public"

@@ -9,6 +9,7 @@ import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { icon } from "./icon.ts"
 import { type MarkContent, mark } from "./mark.ts"
+import { type Markdown, richText, richTextWords } from "./richText.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
 
@@ -28,8 +29,6 @@ const placeLine = "m-0 text-meta text-ink-muted"
 const actionsRow = "-my-1.5 ms-auto flex flex-none items-center gap-1 self-center"
 
 type Ink = "text-ink" | "text-ink-secondary"
-
-const mentionChip = "bg-mention px-1 font-medium"
 
 const textLook = (ink: Ink) => `m-0 text-body wrap-break-word ${ink}`
 
@@ -66,7 +65,7 @@ const shownMarks = 3
 const descriptionLook =
   "relative -mx-3 flex flex-col px-3 aria-[current=true]:bg-selected aria-[current=true]:indicator-bar"
 
-const descriptionText = "m-0 mt-2.75 text-item wrap-break-word whitespace-pre-wrap text-ink"
+const descriptionText = "m-0 mt-2.75 text-item wrap-break-word text-ink"
 
 const descriptionActions = "mt-2 -ms-2.5 flex flex-wrap items-center gap-1"
 
@@ -108,30 +107,34 @@ const renderTime = <Message, Requirements>(
         ]
       )
 
-/** One run of a message's text: words as written, or, with `isMention`, a mention, which shows as a chip. */
-export type TextRun = Readonly<{ text: string; isMention?: boolean }>
+/** What a row says: words as written, or the markdown of a message's text, which `richText` shows. */
+export type MessageText = string | Markdown
 
-/** The words of a text as one line, a mention in them as the words it is: what a reader hears. */
-const wordsOf = (text: string | ReadonlyArray<TextRun>): string =>
-  typeof text === "string" ? text : text.map((run) => run.text).join("")
+/** The words of `text` as a reader hears them, a mention as "@" and the member's name, which describe a button. */
+export const messageTextWords = (text: MessageText): string => (typeof text === "string" ? text : richTextWords(text))
 
-const renderRuns = <Message, Requirements>(
+/**
+ * The elements that show `text`: words as written, or its markdown, as the blocks of `richText`, or, when `isInline`,
+ * as its preview, which a button may hold.
+ */
+const renderWords = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  text: string | ReadonlyArray<TextRun>
-): ReadonlyArray<Html | string> =>
-  typeof text === "string"
-    ? [text]
-    : text.map((run) => (run.isMention === true ? h.span([h.Class(mentionChip)], [run.text]) : run.text))
+  text: MessageText,
+  isInline: boolean
+): Html | string => (typeof text === "string" ? text : richText(h, { ...text, isInline }))
 
-/** The text, a button when `onOpen` is given, which is named `name` and described by the text when it has one. */
+/**
+ * The text, a button when `onOpen` is given, which is named `name` and described by the text when it has one. A button
+ * holds the preview of markdown, since it may hold no block, link, or other button.
+ */
 const renderText = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ text: string | ReadonlyArray<TextRun>; ink: Ink; onOpen?: Message; name?: string }>
+  config: Readonly<{ text: MessageText; ink: Ink; isInline: boolean; onOpen?: Message; name?: string }>
 ): Html => {
   const { onOpen, name } = config
 
   return onOpen === undefined
-    ? h.p([h.Class(textLook(config.ink))], renderRuns(h, config.text))
+    ? h.div([h.Class(textLook(config.ink))], [renderWords(h, config.text, config.isInline)])
     : Button.view(
         {
           onClick: onOpen,
@@ -139,10 +142,10 @@ const renderText = <Message, Requirements>(
             h.button(
               [
                 ...attributes.button,
-                ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(wordsOf(config.text))]),
+                ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(messageTextWords(config.text))]),
                 h.Class(textButton(config.ink))
               ],
-              renderRuns(h, config.text)
+              [renderWords(h, config.text, true)]
             )
         },
         h
@@ -151,13 +154,13 @@ const renderText = <Message, Requirements>(
 
 /**
  * One message, a row of a `messageList` keyed by `key`: the author's `mark` letters, then the `author`
- * with the `time` after it and a `note` after that, such as "edited" or "Sending…", and the `text`, a
- * string or `TextRun`s, in which a mention is a chip. Under the text, `meta` is a row of quiet facts, such as how
+ * with the `time` after it and a `note` after that, such as "Sending…", and the `text`, words as written or markdown
+ * as `richText` shows it, with its mentions as chips. Under the text, `meta` is a row of quiet facts, such as how
  * much is new, and at the end of the author line, `actions` are quiet buttons, such as Edit and Delete.
  * `onOpen` makes the text a button named by it that sends `onOpen`, for a message that is the start of a
- * thread; `body` takes the text's place, for the form that changes it. The current row is filled with the
- * 2px bar and `aria-current="true"`, and a row reaches 12px into the pane's gutter so its fill reaches past
- * the text.
+ * thread, and a button holds markdown as its preview, one run of words and mentions; `body` takes the text's place,
+ * for the form that changes it. The current row is filled with the 2px bar and `aria-current="true"`, and a row
+ * reaches 12px into the pane's gutter so its fill reaches past the text.
  */
 export const message = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -167,7 +170,7 @@ export const message = <Message, Requirements>(
     author: string
     time?: string | undefined
     note?: string | undefined
-    text: string | ReadonlyArray<TextRun>
+    text: MessageText
     onOpen?: Message
     body?: Html | undefined
     actions?: ReadonlyArray<Html>
@@ -194,7 +197,7 @@ export const message = <Message, Requirements>(
               actions.length === 0 ? h.empty : h.div([h.Class(actionsRow)], actions)
             ]
           ),
-          config.body ?? renderText(h, { ...config, ink: "text-ink" }),
+          config.body ?? renderText(h, { ...config, ink: "text-ink", isInline: false }),
           meta.length === 0 ? h.empty : h.div([h.Class(metaRow)], meta)
         ]
       )
@@ -250,7 +253,8 @@ const renderAge = <Message, Requirements>(
  * author's letters on the ground of their tone, or an icon for a notification that has no author to show, then a
  * first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
  * as "Sara" and "mentioned you", under it the `place` it comes from, at `meta` size in `ink-muted`, and the
- * `text`, a string or `TextRun`s, in which a mention is a chip. At the end of the first line is the `age`, already
+ * `text`, words as written or markdown as the preview `richText` gives, one run of words and mentions in which a
+ * mention is a chip. At the end of the first line is the `age`, already
  * formatted, such as "2m ago". While `isUnread`, a 6px dot of `ink` comes before the age, hidden from assistive
  * technology, which an `sr-only` "Unread" before the age replaces; a row that is not unread has its text in
  * `ink-secondary`, quieter than the first line. `onOpen` makes the text a button that sends it, named by the author
@@ -266,7 +270,7 @@ export const notification = <Message, Requirements>(
     author: string
     activity: string
     place?: string | undefined
-    text: string | ReadonlyArray<TextRun>
+    text: MessageText
     age: string
     isUnread?: boolean
     onOpen?: Message
@@ -294,6 +298,7 @@ export const notification = <Message, Requirements>(
           renderText(h, {
             ...config,
             ink: isUnread ? "text-ink" : "text-ink-secondary",
+            isInline: true,
             name: `${config.author} ${config.activity}`
           })
         ]
@@ -336,16 +341,16 @@ export const event = <Message, Requirements>(
   )
 
 /**
- * The text that describes the thing a pane is about, such as a task, in the size of an item and in `ink`, its
- * line breaks kept, a mention in it a chip, 11px under the caption above it. `body` takes the text's place, for
- * the form that changes it, and `actions` are quiet buttons under it, such as Edit and Delete, level with its words.
- * While `isCurrent` it is filled with the 2px bar and `aria-current="true"`, reaching 12px into the pane's gutter, as
- * a message's row does.
+ * The text that describes the thing a pane is about, such as a task, in the size of an item and in `ink`, words as
+ * written or markdown as `richText` shows it, with its mentions as chips, 11px under the caption above it. `body` takes
+ * the text's place, for the form that changes it, and `actions` are quiet buttons under it, such as Edit and Delete,
+ * level with its words. While `isCurrent` it is filled with the 2px bar and `aria-current="true"`, reaching 12px into
+ * the pane's gutter, as a message's row does.
  */
 export const description = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
-    text: string | ReadonlyArray<TextRun>
+    text: MessageText
     body?: Html | undefined
     actions?: ReadonlyArray<Html>
     isCurrent?: boolean
@@ -356,7 +361,7 @@ export const description = <Message, Requirements>(
   return h.div(
     [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(descriptionLook)],
     [
-      config.body ?? h.p([h.Class(descriptionText)], renderRuns(h, config.text)),
+      config.body ?? h.div([h.Class(descriptionText)], [renderWords(h, config.text, false)]),
       actions.length === 0 ? h.empty : h.div([h.Class(descriptionActions)], actions)
     ]
   )

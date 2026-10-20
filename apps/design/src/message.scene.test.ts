@@ -7,7 +7,16 @@ import { all, click, expect, expectAll, given, role, scene, selector, text, with
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
 import type { MarkContent } from "./mark.ts"
-import { description, divider, event, message, messageList, notification, replyLine, type TextRun } from "./message.ts"
+import {
+  description,
+  divider,
+  event,
+  message,
+  messageList,
+  type MessageText,
+  notification,
+  replyLine
+} from "./message.ts"
 
 const Message = defineMessageUnion({
   OpenedThread: { key: Schema.String },
@@ -38,11 +47,18 @@ const viewOf = (render: (model: Model, h: HtmlBuilder<Message>) => Html) => (mod
 
 const mention = "@Jamie can you check the composer fix before we ship?"
 
-/** The words of `mention` as runs: a mention of Jamie, then the words that follow it. */
-const mentionRuns: ReadonlyArray<TextRun> = [
-  { text: "@Jamie", isMention: true },
-  { text: " can you check the composer fix before we ship?" }
-]
+/** `mention` as the markdown of a message's text, with the mention of Jamie that core writes. */
+const mentionText: MessageText = {
+  text: "[@Jamie](member:jamie) can you check the composer fix before we ship?",
+  mentions: [{ id: "jamie", name: "Jamie" }]
+}
+
+const formatted: MessageText = {
+  text: "# Release notes\n\n**Shipped** it, see [the docs](https://example.com):\n\n- one\n- `two`\n\n> Ready.",
+  mentions: []
+}
+
+const formattedWords = "Release notes Shipped it, see the docs: one two Ready."
 
 const threads = (model: Model, h: HtmlBuilder<Message>) =>
   messageList(h, {
@@ -139,7 +155,7 @@ describe("message", () => {
         view: viewOf((_, h) =>
           messageList(h, {
             label: "Messages",
-            children: [message(h, { key: "message-1", mark: "S", author: "Sara", text: mentionRuns })]
+            children: [message(h, { key: "message-1", mark: "S", author: "Sara", text: mentionText })]
           })
         )
       },
@@ -150,20 +166,44 @@ describe("message", () => {
     )
   })
 
-  it("shows runs of words alone as the text of a string, with no chip", () => {
+  it("shows a string as the words it is, whatever markdown it holds, with no chip", () => {
     scene(
       {
         update,
         view: viewOf((_, h) =>
           messageList(h, {
             label: "Messages",
-            children: [message(h, { key: "message-1", mark: "A", author: "Alex", text: [{ text: "Looks good." }] })]
+            children: [message(h, { key: "message-1", mark: "A", author: "Alex", text: "**Looks** good." })]
           })
         )
       },
       given(initial),
-      expect(text("Looks good.")).toExist(),
-      expect(text("Looks good.")).not.toHaveClass("bg-mention")
+      expect(text("**Looks** good.")).toExist(),
+      expect(selector("strong")).toBeAbsent(),
+      expect(text("**Looks** good.")).not.toHaveClass("bg-mention")
+    )
+  })
+
+  it("shows markdown as the blocks richText makes of it, in the size of a message's text", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Messages",
+            children: [message(h, { key: "message-1", mark: "S", author: "Sara", text: formatted })]
+          })
+        )
+      },
+      given(initial),
+      expect(selector("strong")).toHaveText("Shipped"),
+      expect(selector("a")).toHaveAttr("href", "https://example.com"),
+      expect(selector("blockquote")).toHaveText("Ready."),
+      expectAll(all.selector("ul li")).toHaveCount(2),
+      expect(selector("code")).toHaveText("two"),
+      expect(text("Release notes")).toHaveClass("font-semibold"),
+      expect(role("button")).toBeAbsent(),
+      expect(selector("li div.text-body")).toHaveClass("text-ink")
     )
   })
 
@@ -179,7 +219,7 @@ describe("message", () => {
                 key: "thread-1",
                 mark: "S",
                 author: "Sara",
-                text: mentionRuns,
+                text: mentionText,
                 onOpen: Message.OpenedThread({ key: "thread-1" })
               })
             ]
@@ -189,6 +229,36 @@ describe("message", () => {
       given(initial),
       expect(within(role("button", { name: mention }), text("@Jamie"))).toHaveClass("bg-mention"),
       click(role("button", { name: mention })),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+
+  it("makes markdown in a button its preview, words and mentions that hold no block, link, or other button", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Threads",
+            children: [
+              message(h, {
+                key: "thread-1",
+                mark: "S",
+                author: "Sara",
+                text: formatted,
+                onOpen: Message.OpenedThread({ key: "thread-1" })
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: formattedWords })).toExist(),
+      expect(selector("button p")).toBeAbsent(),
+      expect(selector("button strong")).toBeAbsent(),
+      expect(selector("button a")).toBeAbsent(),
+      expect(selector("button li")).toBeAbsent(),
+      click(role("button", { name: formattedWords })),
       expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
     )
   })
@@ -283,7 +353,7 @@ describe("message", () => {
 describe("notification", () => {
   type Options = Readonly<{
     place?: string
-    text?: string | ReadonlyArray<TextRun>
+    text?: MessageText
     isUnread?: boolean
     isOpenable?: boolean
     isCurrent?: boolean
@@ -415,7 +485,7 @@ describe("notification", () => {
 
   it("shows a mention in its text as a chip, and describes the button that opens it by the words joined", () => {
     scene(
-      { update, view: viewOf(notifications({ text: mentionRuns })) },
+      { update, view: viewOf(notifications({ text: mentionText })) },
       given(initial),
       expect(within(role("button", { name: "Sara mentioned you" }), text("@Jamie"))).toHaveClass("bg-mention"),
       expect(role("button", { name: "Sara mentioned you" })).toHaveAttr("aria-description", mention),
@@ -425,9 +495,26 @@ describe("notification", () => {
     )
   })
 
+  it("shows markdown as its preview, even when it is not a button", () => {
+    scene(
+      { update, view: viewOf(notifications({ text: formatted, isOpenable: false })) },
+      given(initial),
+      expect(role("button")).toBeAbsent(),
+      expect(selector("li p")).toBeAbsent(),
+      expect(selector("strong")).toBeAbsent(),
+      expect(selector("a")).toBeAbsent(),
+      expect(text(formattedWords)).toExist()
+    )
+    scene(
+      { update, view: viewOf(notifications({ text: formatted })) },
+      given(initial),
+      expect(role("button", { name: "Sara mentioned you" })).toHaveAttr("aria-description", formattedWords)
+    )
+  })
+
   it("shows a mention as a chip in the text of one that is not a button", () => {
     scene(
-      { update, view: viewOf(notifications({ text: mentionRuns, isOpenable: false })) },
+      { update, view: viewOf(notifications({ text: mentionText, isOpenable: false })) },
       given(initial),
       expect(within(role("listitem"), text("@Jamie"))).toHaveClass("bg-mention"),
       expect(text(mention)).toExist()
@@ -631,25 +718,34 @@ describe("description", () => {
       [],
       [
         description(h, {
-          text: [
-            { text: "Ask " },
-            { text: "@Jamie", isMention: true },
-            { text: " about the 5 MB limit.\nThen test it." }
-          ],
+          text: {
+            text: "Ask [@Jamie](member:jamie) about the 5 MB limit.\nThen test it.",
+            mentions: [{ id: "jamie", name: "Jamie" }]
+          },
           isCurrent: model.current === "thread-2",
           actions: [button(h, "Edit", Message.ClickedEdit({ key: "opening" }), { variant: "quiet" })]
         })
       ]
     )
 
-  it("shows its text in the size of an item and in ink, its line breaks kept, a mention in it a chip", () => {
+  it("shows its markdown in the size of an item and in ink, its line breaks kept, a mention in it a chip", () => {
     scene(
       { update, view: viewOf(described) },
       given(initial),
-      expect(selector("p.whitespace-pre-wrap")).toHaveClass("text-item"),
-      expect(selector("p.whitespace-pre-wrap")).toHaveClass("text-ink"),
-      expect(selector("p.whitespace-pre-wrap")).toHaveClass("mt-2.75"),
+      expect(selector("[aria-current] div")).toHaveClass("text-item"),
+      expect(selector("[aria-current] div")).toHaveClass("text-ink"),
+      expect(selector("[aria-current] div")).toHaveClass("mt-2.75"),
+      expect(selector("p br")).toExist(),
       expect(text("@Jamie")).toHaveClass("bg-mention")
+    )
+  })
+
+  it("shows a string as the words it is", () => {
+    scene(
+      { update, view: viewOf((_, h) => description(h, { text: "Ask *about* the limit." })) },
+      given(initial),
+      expect(text("Ask *about* the limit.")).toExist(),
+      expect(selector("em")).toBeAbsent()
     )
   })
 

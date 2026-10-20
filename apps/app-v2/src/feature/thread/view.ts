@@ -20,7 +20,7 @@ import { pane, paneBack, paneClose, paneColumn, paneStack } from "@amends-dev/de
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { authorName, initials, messageRuns, repliesLabel, sideSubtitle, statusShape, whenLabel } from "../../seen.ts"
+import { authorName, initials, messageText, repliesLabel, sideSubtitle, statusShape, whenLabel } from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, titleOf, typingIn } from "./definition.ts"
 
@@ -152,7 +152,7 @@ const messageView = (
     author,
     time: whenLabel(item.message.publishedAt, now),
     note: noteOf(item.pending, edited),
-    text: messageRuns(item.message, model.members),
+    text: messageText(item.message, model.members),
     isCurrent: Option.contains(highlightedMessageId, item.message.id),
     body,
     actions
@@ -202,7 +202,7 @@ const descriptionView = (
     caption: "Description",
     children: [
       description(h, {
-        text: messageRuns(opening.message, model.members),
+        text: messageText(opening.message, model.members),
         body,
         actions,
         isCurrent: Option.contains(highlightedMessageId, opening.message.id)

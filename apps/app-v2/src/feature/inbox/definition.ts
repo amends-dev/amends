@@ -14,14 +14,14 @@ import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import type { MarkContent } from "@amends-dev/design/mark"
-import type { TextRun } from "@amends-dev/design/message"
+import type { MessageText } from "@amends-dev/design/message"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorMark, authorName, type Day, groupByDay, messageRuns, placeName } from "../../seen.ts"
+import { authorMark, authorName, type Day, groupByDay, messageText, placeName } from "../../seen.ts"
 import { ThreadBlock } from "../thread/block.ts"
 
 /**
@@ -274,17 +274,12 @@ export const notificationPlace = (item: InboxItem, model: Model): Option.Option<
       })
 
 /**
- * What the message a notification's activity is about says, with a mention as the name its member has now, or
- * why there is nothing to read.
+ * What the message a notification's activity is about says, as markdown whose mentions name their members as they are
+ * called now, or why there is nothing to read.
  */
-export const notificationText = (item: InboxItem, model: Model): ReadonlyArray<TextRun> =>
+export const notificationText = (item: InboxItem, model: Model): MessageText =>
   Option.match(item.message, {
-    onNone: () => [
-      {
-        text: Option.isSome(item.thread)
-          ? "Open the thread to see what happened."
-          : "You can no longer see this thread."
-      }
-    ],
-    onSome: (message) => messageRuns(message, model.members)
+    onNone: () =>
+      Option.isSome(item.thread) ? "Open the thread to see what happened." : "You can no longer see this thread.",
+    onSome: (message) => messageText(message, model.members)
   })

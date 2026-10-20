@@ -28,8 +28,8 @@ import {
   initials,
   isAgent,
   isOpen,
-  messageRuns,
   memberMark,
+  messageText,
   messageWords,
   placeName,
   pluralize,
@@ -37,9 +37,8 @@ import {
   repliesLabel,
   sideSubtitle,
   statusShape,
-  textRuns,
   threadContains,
-  threadRuns,
+  threadText,
   threadWords,
   timeOf,
   whenLabel
@@ -248,51 +247,19 @@ describe("whenLabel", () => {
 /** Alice and bob, who a text can mention. */
 const members = [membership.member, bob]
 
-describe("textRuns", () => {
-  const mentionOf = (member: typeof bob, label = member.name) => ThreadMessage.mentionText(member.id, label)
+describe("messageText", () => {
+  it("is the markdown of what a message says, with the members its mentions may name", () => {
+    const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you *check* this?`)
 
-  it("is the words as written in one run, and no runs for none", () => {
-    expect(textRuns("Let's grab some coffee", members)).toEqual([{ text: "Let's grab some coffee" }])
-    expect(textRuns("", members)).toEqual([])
+    expect(messageText(asked, members)).toEqual({
+      text: `${ThreadMessage.mentionText(bob.id, "Robert")} can you *check* this?`,
+      mentions: members
+    })
+    expect(messageText(reply, members)).toEqual({ text: "Sounds good", mentions: members })
   })
 
-  it("shows a mention as @ and the name the member has now, a chip among the words", () => {
-    expect(textRuns(`Thanks ${mentionOf(bob, "Robert")}, see you there`, members)).toEqual([
-      { text: "Thanks " },
-      { text: "@Bob", isMention: true },
-      { text: ", see you there" }
-    ])
-    expect(textRuns(`${mentionOf(membership.member)} and ${mentionOf(bob)}`, members)).toEqual([
-      { text: "@Alice", isMention: true },
-      { text: " and " },
-      { text: "@Bob", isMention: true }
-    ])
-  })
-
-  it("shows a mention of someone who is not among the members by the name it recorded", () => {
-    expect(textRuns(`${mentionOf(bob, "Robert")} let's grab coffee`, [membership.member])).toEqual([
-      { text: "@Robert", isMention: true },
-      { text: " let's grab coffee" }
-    ])
-  })
-
-  it("leaves the rest of the markdown as written", () => {
-    expect(textRuns("*Ship* it, [the notes](https://example.com)", members)).toEqual([
-      { text: "*Ship* it, [the notes](https://example.com)" }
-    ])
-  })
-})
-
-describe("messageRuns", () => {
-  it("is the runs of what a message says, a mention as the name its member has now", () => {
-    const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check this?`)
-
-    expect(messageRuns(asked, members)).toEqual([{ text: "@Bob", isMention: true }, { text: " can you check this?" }])
-    expect(messageRuns(reply, members)).toEqual([{ text: "Sounds good" }])
-  })
-
-  it("is one run saying a deleted message was deleted", () => {
-    expect(messageRuns(deleted(reply), members)).toEqual([{ text: "This message was deleted." }])
+  it("says a deleted message was deleted", () => {
+    expect(messageText(deleted(reply), members)).toBe("This message was deleted.")
   })
 })
 
@@ -310,24 +277,31 @@ describe("messageWords", () => {
     expect(messageWords(asked, [membership.member])).toBe("Hey @Robert, look")
   })
 
+  it("leaves out the syntax of the markdown, and keeps its words", () => {
+    const formatted = saying(
+      opening,
+      "# Plan\n\n**Ship** it, [the notes](https://example.com) and `retry`:\n\n- one\n- two\n\n> soon\n\n```\nrun\n```"
+    )
+
+    expect(messageWords(formatted, members)).toBe("Plan Ship it, the notes and retry: one two soon run")
+  })
+
   it("says a deleted message was deleted", () => {
     expect(messageWords(deleted(reply), members)).toBe("This message was deleted.")
   })
 })
 
-describe("threadRuns", () => {
+describe("threadText", () => {
   const asked = saying(opening, `${ThreadMessage.mentionText(bob.id, "Robert")} can you check this?`)
 
-  it("is the title as one run when the thread has one", () => {
-    expect(threadRuns({ ...thread, title: "Retro" }, Option.some(asked), members)).toEqual([{ text: "Retro" }])
+  it("is the title as written when the thread has one, whatever markdown it holds", () => {
+    expect(threadText({ ...thread, title: "Retro" }, Option.some(asked), members)).toBe("Retro")
+    expect(threadText({ ...thread, title: "*Retro*" }, Option.some(asked), members)).toBe("*Retro*")
   })
 
-  it("is the runs of the opening without a title, and A thread while the opening is not read", () => {
-    expect(threadRuns(thread, Option.some(asked), members)).toEqual([
-      { text: "@Bob", isMention: true },
-      { text: " can you check this?" }
-    ])
-    expect(threadRuns(thread, Option.none(), members)).toEqual([{ text: "A thread" }])
+  it("is the opening's text without a title, and A thread while the opening is not read", () => {
+    expect(threadText(thread, Option.some(asked), members)).toEqual(messageText(asked, members))
+    expect(threadText(thread, Option.none(), members)).toBe("A thread")
   })
 })
 
@@ -337,6 +311,13 @@ describe("threadWords", () => {
   it("is the title when the thread has one, and the words of the opening without, with a mention as its member's name", () => {
     expect(threadWords({ ...thread, title: "Retro" }, Option.some(asked), members)).toBe("Retro")
     expect(threadWords(thread, Option.some(asked), members)).toBe("@Bob can you check this?")
+  })
+
+  it("keeps a title as written and leaves the syntax out of an opening", () => {
+    const formatted = saying(opening, "**Ship** the *retry* fix")
+
+    expect(threadWords({ ...thread, title: "*Retro*" }, Option.some(formatted), members)).toBe("*Retro*")
+    expect(threadWords(thread, Option.some(formatted), members)).toBe("Ship the retry fix")
   })
 
   it("is A thread while the opening is not read", () => {
@@ -361,6 +342,16 @@ describe("threadContains", () => {
     expect(contains("check", "Retro")).toBe(true)
     expect(contains("@bob")).toBe(true)
     expect(contains("robert")).toBe(false)
+  })
+
+  it("reads the opening's words without the syntax of its markdown", () => {
+    const formatted = saying(opening, "**Ship** the [retry fix](https://example.com) `now`")
+    const containsFormatted = (query: string) => threadContains(thread, Option.some(formatted), members, query)
+
+    expect(containsFormatted("ship the retry fix now")).toBe(true)
+    expect(containsFormatted("**")).toBe(false)
+    expect(containsFormatted("example.com")).toBe(false)
+    expect(containsFormatted("`now`")).toBe(false)
   })
 
   it("leaves out the spaces around the letters, and keeps every thread for none", () => {

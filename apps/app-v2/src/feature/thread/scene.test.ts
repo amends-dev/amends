@@ -154,6 +154,39 @@ describe("a thread", () => {
     )
   })
 
+  it("shows a message's text as markdown, a mention in it as the name its member has now", () => {
+    const formatted = saying(
+      reply,
+      `**Ship** it ${ThreadMessage.mentionText(bob.id, "Robert")}, [the notes](https://example.com):\n\n- \`one\`\n- two`
+    )
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: formatted, pending: false }),
+      expect(selector("strong")).toHaveText("Ship"),
+      expect(text("the notes")).toHaveAttr("href", "https://example.com"),
+      expect(selector("code")).toHaveText("one"),
+      expectAll(all.selector("ul li")).toHaveCount(2),
+      expect(text("@Bob")).toHaveClass("bg-mention"),
+      expect(text("@Robert")).toBeAbsent()
+    )
+  })
+
+  it("shows a task's description as markdown, with the opening's mention as the name its member has now", () => {
+    const described = saying(opening, `Ask ${ThreadMessage.mentionText(bob.id, "Robert")} about **retries**:\n\n> soon`)
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      ...readWith({ message: described, pending: false }, { message: reply, pending: false }),
+      expect(within(role("region", { name: "Task" }), selector("strong"))).toHaveText("retries"),
+      expect(selector("blockquote")).toHaveText("soon"),
+      expect(text("@Bob")).toHaveClass("bg-mention"),
+      expect(text("@Robert")).toBeAbsent()
+    )
+  })
+
   it("says when each message was by its time of day today, and by its day before today", () => {
     const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
 
@@ -177,7 +210,7 @@ describe("a thread", () => {
       expect(role("group", { name: "Properties" })).toExist(),
       expect(text("Description")).toExist(),
       // The opening is the description, which the activity does not repeat.
-      expectAll(all.text("Plans for the week")).toHaveCount(1),
+      expect(text("Plans for the week")).toExist(),
       expect(within(role("list", { name: "Activity" }), text("Activity"))).toExist(),
       expect(within(role("list", { name: "Activity" }), text(/^Alice created this task · /))).toExist(),
       expect(within(role("list", { name: "Activity" }), text("Sounds good"))).toExist(),

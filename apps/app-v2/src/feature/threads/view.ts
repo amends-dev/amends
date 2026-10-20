@@ -10,7 +10,7 @@ import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { authorName, initials, pluralize, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
+import { authorName, initials, pluralize, repliesLabel, statusLabel, threadText, whenLabel } from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
 import {
@@ -109,7 +109,7 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
     author: author.name,
     time: whenLabel(item.thread.createdAt, now),
     note: item.pending ? "Sending…" : undefined,
-    text: threadRuns(item.thread, item.opening, members),
+    text: threadText(item.thread, item.opening, members),
     onOpen: Message.ClickedThread({ threadId: item.thread.id }),
     isCurrent: Option.exists(openThreadId, (threadId) => threadId === item.thread.id),
     meta: [

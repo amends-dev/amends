@@ -1229,6 +1229,17 @@ describe("Store.findMatches", () => {
     expect(Store.findMatches("bobby", { ...searched, messages: [mentioning] }).threads).toEqual([])
   })
 
+  it("reads an opening's words without the syntax of its markdown", () => {
+    const formatted = saying(opening, "**Ship** the [retry fix](https://example.com) `now`")
+    const among = { ...searched, messages: [formatted] }
+
+    expect(Store.findMatches("ship the retry fix now", among).threads).toMatchObject([
+      { words: "Ship the retry fix now" }
+    ])
+    expect(Store.findMatches("**", among).threads).toEqual([])
+    expect(Store.findMatches("example.com", among).threads).toEqual([])
+  })
+
   it("does not find a thread by a deleted opening, nor one whose group the replica lacks", () => {
     expect(Store.findMatches("deleted", { ...searched, messages: [deleted(opening)] }).threads).toEqual([])
     expect(Store.findMatches("week", { ...searched, groups: [design] }).threads).toEqual([])

@@ -3,6 +3,8 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
+import { modifyFields } from "foldkit/struct"
+import { saying } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -18,7 +20,7 @@ import {
   UnfollowThread
 } from "./command.ts"
 import { ReplyBinding } from "./composition.ts"
-import { Message, type Model } from "./definition.ts"
+import { Message, type Model, titleOf } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -65,6 +67,20 @@ const received = (latest: number, readThrough: number, active = true) =>
       readThrough
     })
   )
+
+describe("a thread's title", () => {
+  const formatted = { message: saying(opening, "**Plans** for the [week](https://example.com)"), pending: false }
+  const read = modifyFields(opened, { messages: () => [formatted] })
+
+  it("is its opening's words without the syntax of its markdown, or A thread while it is not read", () => {
+    expect(titleOf(read)).toBe("Plans for the week")
+    expect(titleOf(opened)).toBe("A thread")
+  })
+
+  it("is the title the thread was given, as written", () => {
+    expect(titleOf(modifyFields(read, { title: () => Option.some("*Plans*") }))).toBe("*Plans*")
+  })
+})
 
 describe("a thread", () => {
   it("is read through its latest activity, once, and its title and messages change from what was seen", () => {

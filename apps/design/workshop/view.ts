@@ -84,9 +84,9 @@ import {
   event,
   message,
   messageList,
+  type MessageText,
   notification,
-  replyLine,
-  type TextRun
+  replyLine
 } from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
 import {
@@ -1827,11 +1827,28 @@ const openableThreads: ReadonlyArray<
   }
 ]
 
-/** A text that opens with a mention, `name` as it shows, and goes on with `words`. */
-const mentionRuns = (name: string, words: string): ReadonlyArray<TextRun> => [
-  { text: name, isMention: true },
-  { text: words }
+/** The members a text of the workshop may mention. */
+const mentionable = [
+  { id: "caleb", name: "Caleb" },
+  { id: "jamie", name: "Jamie" },
+  { id: "sara", name: "Sara" },
+  { id: "yumi", name: "Yumi" }
 ]
+
+/** `markdown` as a message's text, with the workshop's members as the ones its mentions name. */
+const written = (markdown: string): MessageText => ({ text: markdown, mentions: mentionable })
+
+/** A message that is formatted: a heading, emphasis, a list, code, a quote, a link, and a mention. */
+const markdownMessage = [
+  "## Release notes",
+  "",
+  "**Shipped** the retry fix for [@Jamie](member:jamie), see [the change](https://example.com/change):",
+  "",
+  "- the request is *kept* on retry",
+  "- `retries` is capped at 3",
+  "",
+  "> Ready for another look."
+].join("\n")
 
 const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: string): Html => {
   const press = Message.ClickedButton()
@@ -1903,14 +1920,14 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               mark: "G",
               author: "Graeme",
               time: "10:08 AM",
-              text: mentionRuns("@Caleb", " Let's grab some coffee")
+              text: written("[@Caleb](member:caleb) Let's grab some coffee")
             }),
             message(h, {
               key: "openable-mention",
               mark: "S",
               author: "Sara",
               time: "10:12 AM",
-              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
+              text: written("[@Jamie](member:jamie) can you check the composer fix before we ship?"),
               onOpen: press
             }),
             message(h, {
@@ -1918,15 +1935,47 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               mark: "AJ",
               author: "AJ",
               time: "10:15 AM",
-              text: [
-                { text: "Thanks " },
-                { text: "@Sara", isMention: true },
-                { text: " and " },
-                { text: "@Yumi", isMention: true },
-                { text: ", both fixes are in." }
-              ],
+              text: written("Thanks [@Sara](member:sara) and [@Yumi](member:yumi), both fixes are in."),
               onOpen: press,
               isCurrent: true
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "Markdown in the text: as blocks in a plain row, and as a preview in a row that opens a thread and in a notification",
+      [
+        messageList(h, {
+          label: "Markdown",
+          children: [
+            message(h, {
+              key: "markdown-blocks",
+              mark: "AJ",
+              author: "AJ",
+              time: "10:20 AM",
+              text: written(markdownMessage)
+            }),
+            message(h, {
+              key: "markdown-preview",
+              mark: "S",
+              author: "Sara",
+              time: "10:22 AM",
+              text: written(markdownMessage),
+              onOpen: press
+            }),
+            notification(h, {
+              key: "markdown-notification",
+              mark: { text: "S" },
+              author: "Sara",
+              activity: "replied",
+              place: "#general",
+              text: written(markdownMessage),
+              age: "3m ago",
+              isUnread: true,
+              onOpen: press
             })
           ]
         })
@@ -1986,7 +2035,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Sara",
               activity: "mentioned you",
               place: "#general",
-              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
+              text: written("[@Jamie](member:jamie) can you check the composer fix before we ship?"),
               age: "2m ago",
               isUnread: true,
               onOpen: press
@@ -2019,7 +2068,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
-              text: mentionRuns("@Jamie", " let's grab coffee after the rollout."),
+              text: written("[@Jamie](member:jamie) let's grab coffee after the rollout."),
               age: "Yesterday",
               onOpen: press
             }),
@@ -2051,7 +2100,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Sara",
               activity: "mentioned you",
               place: "#general",
-              text: mentionRuns("@Jamie", " can you check the composer fix before we ship?"),
+              text: written("[@Jamie](member:jamie) can you check the composer fix before we ship?"),
               age: "2m ago",
               isUnread: true,
               onOpen: press
@@ -2096,7 +2145,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
-              text: mentionRuns("@Jamie", " let's grab coffee after the rollout."),
+              text: written("[@Jamie](member:jamie) let's grab coffee after the rollout."),
               age: "Yesterday",
               onOpen: press
             })
