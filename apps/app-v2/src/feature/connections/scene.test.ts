@@ -19,6 +19,7 @@ import {
   given,
   inside,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -373,7 +374,10 @@ describe("the connections list", () => {
       expect(text("This browser could not read the workspace's copy.")).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("alert")).toBeAbsent(),
-      expect(role("status")).toBeAbsent()
+      expect(role("status")).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(art("came-apart")).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading connections…")
     )
   })
 
@@ -1050,7 +1054,10 @@ describe("a connection's page", () => {
       expect(role("heading", { name: "Couldn't load connections", level: 2 })).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("status")).toBeAbsent(),
-      expect(role("heading", { name: "This connection isn't here" })).toBeAbsent()
+      expect(role("heading", { name: "This connection isn't here" })).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(art("came-apart")).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading connection…")
     )
   })
 
@@ -1302,6 +1309,26 @@ describe("adding a connection", () => {
         click(role("button", { name: "Clear search" })),
         expect(role("button", { name: "Anthropic" })).toExist(),
         expect(role("button", { name: "MCP server" })).toExist()
+      )
+    )
+  })
+
+  it("puts Back at the start of the footer of the form and Create connection at its end", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        expectAll(all.role("button")).toHaveCount(3),
+        expect(nth(all.role("button"), 0)).toHaveAccessibleName("Close"),
+        expect(nth(all.role("button"), 1)).toHaveAccessibleName("Back"),
+        expect(nth(all.role("button"), 2)).toHaveAccessibleName("Create connection"),
+        expect(within(selector(".me-auto"), role("button", { name: "Back" }))).toExist(),
+        expect(within(selector(".me-auto"), role("button", { name: "Create connection" }))).toBeAbsent()
       )
     )
   })
@@ -1661,6 +1688,7 @@ describe("replacing a connection's key", () => {
         expect(role("button", { name: "Replace key" })).toBeDisabled(),
         type(label("New API key"), "sk-new"),
         expect(role("button", { name: "Replace key" })).toBeEnabled(),
+        expect(within(selector(".me-auto"), role("button", { name: "Cancel" }))).toExist(),
         click(role("button", { name: "Cancel" }))
       ),
       Command.expectExact(Dialog.test.CloseDialog),
@@ -1772,6 +1800,7 @@ describe("removing a connection", () => {
         removeDialog,
         expect(text("Search tools")).toExist(),
         expect(text("Search tools will be removed from the workspace, along with its saved key.")).toExist(),
+        expect(within(selector(".me-auto"), role("button", { name: "Cancel" }))).toExist(),
         click(role("button", { name: "Cancel" }))
       ),
       Command.expectExact(Dialog.test.CloseDialog),

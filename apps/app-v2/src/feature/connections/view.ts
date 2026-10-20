@@ -316,7 +316,8 @@ const unreadConnections = (model: Model, h: ConnectionsViewBuilder): Html =>
   paneEmpty(h, {
     art: "came-apart",
     title: "Couldn't load connections",
-    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) })
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
+    action: button(h, "Try again", Message.ClickedTryAgain())
   })
 
 /**
@@ -885,8 +886,8 @@ const configuringModal = (
       }),
       failureView(configuring.failure, h)
     ],
+    leading: [button(h, "Back", Message.ClickedBack(), { variant: "quiet", isDisabled: isSending })],
     footer: [
-      button(h, "Back", Message.ClickedBack(), { variant: "quiet", isDisabled: isSending }),
       submit(h, isSending ? "Creating…" : "Create connection", {
         isDisabled:
           isSending || Option.isNone(Option.flatMap(integration, (installed) => settingsToAdd(installed, configuring)))
@@ -934,6 +935,7 @@ const replacingModal = (render: RenderInfo, replacing: Replacing, h: Connections
       failureView(replacing.failure, h)
     ],
     cancelLabel: "Cancel",
+    isCancelLeading: true,
     footer: [
       submit(h, replacing.isSending ? "Replacing…" : "Replace key", {
         isDisabled: replacing.isSending || replacing.apiKey.trim() === ""
@@ -952,6 +954,7 @@ const removingModal = (render: RenderInfo, removing: Removing, h: ConnectionsVie
       : `${removing.name} will be removed from the workspace.`,
     body: [failureView(removing.failure, h)],
     cancelLabel: "Cancel",
+    isCancelLeading: true,
     footer: [submit(h, removing.isSending ? "Removing…" : "Remove connection", { isDisabled: removing.isSending })],
     onSubmit: Message.ConfirmedRemoval()
   })

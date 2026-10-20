@@ -434,24 +434,20 @@ describe("expiryLabel", () => {
     expect(expiryLabel(DateTime.subtract(now, { days: 3 }), now)).toBe("Expired")
   })
 
-  it("is Expires soon under an hour, up to the last second before it", () => {
-    expect(after({ seconds: 1 })).toBe("Expires soon")
-    expect(after({ minutes: 12 })).toBe("Expires soon")
-    expect(after({ minutes: 59, seconds: 59 })).toBe("Expires soon")
-  })
-
-  it("is the whole hours left from an hour, the singular for one", () => {
-    expect(after({ hours: 1 })).toBe("Expires in 1 hour")
-    expect(after({ hours: 3, minutes: 45 })).toBe("Expires in 3 hours")
-    expect(after({ hours: 23, minutes: 59 })).toBe("Expires in 23 hours")
-  })
-
-  it("is the whole days left from a day, the singular for one", () => {
+  it("is a day, the singular, for as little as is left of the last one", () => {
+    expect(after({ seconds: 1 })).toBe("Expires in 1 day")
+    expect(after({ hours: 3, minutes: 45 })).toBe("Expires in 1 day")
+    expect(after({ hours: 23, minutes: 59 })).toBe("Expires in 1 day")
     expect(after({ days: 1 })).toBe("Expires in 1 day")
-    expect(after({ days: 1, hours: 23 })).toBe("Expires in 1 day")
+  })
+
+  it("is the days left rounded up, so that an invitation just made for a week says seven", () => {
+    expect(after({ days: 1, minutes: 1 })).toBe("Expires in 2 days")
     expect(after({ days: 3 })).toBe("Expires in 3 days")
-    expect(after({ days: 6, hours: 23, minutes: 59 })).toBe("Expires in 6 days")
+    expect(after({ days: 6, hours: 23, minutes: 59 })).toBe("Expires in 7 days")
+    expect(after({ days: 6, hours: 12 })).toBe("Expires in 7 days")
     expect(after({ days: 7 })).toBe("Expires in 7 days")
+    expect(after({ days: 7, minutes: 1 })).toBe("Expires in 8 days")
     expect(after({ days: 45 })).toBe("Expires in 45 days")
   })
 })

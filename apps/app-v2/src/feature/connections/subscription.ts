@@ -4,6 +4,7 @@
  */
 
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
@@ -12,10 +13,10 @@ import { ConnectionsDefinition, Message } from "./definition.ts"
 export const subscriptions = ConnectionsDefinition.subscriptions((entry) => ({
   connections: entry(
     "ReadConnections",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
     {
       messages: [Message.ReceivedConnections, Message.ReceivedMembers, Message.ReceivedGrants, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
+      modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId }) =>

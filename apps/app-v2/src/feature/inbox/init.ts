@@ -16,6 +16,7 @@ export const init = InboxComposition.makeInit((workspaceId: WorkspaceId.Workspac
     groups: [],
     members: [],
     contacts: [],
+    reads: 0,
     notice: Option.none()
   })
 }))

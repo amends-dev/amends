@@ -1395,6 +1395,26 @@ describe("an agent's page", () => {
   })
 })
 
+describe("trying again", () => {
+  it("reads the agents again, and no longer says why the read failed", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      model((model) => {
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.reads).toBe(0)
+      }),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.notice).toEqual(Option.none())
+        expect(model.isLoaded).toBe(false)
+        expect(model.reads).toBe(1)
+      })
+    )
+  })
+})
+
 describe("the setup of an agent", () => {
   const setup: Draft = {
     instructions: "",

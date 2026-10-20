@@ -179,7 +179,7 @@ export type Removing = typeof Removing.Type
  * The workspace's connections, whether they are read yet, the members who made them, the integrations the host
  * installs, what the person may do, the list page's tab and search, the dialog and what it is for, adding a
  * connection, replacing a key, or confirming a removal, what they changed on the connections' pages, the last check
- * of each, and why the last read failed.
+ * of each, how many times the person asked to read them again, and why the last read failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -196,6 +196,7 @@ export const Model = Schema.Struct({
   removing: Schema.Option(Removing),
   edits: Schema.Array(Edit),
   checks: Schema.Array(CheckItem),
+  reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -207,6 +208,7 @@ export const Message = defineMessageUnion({
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String },
   FailedRead: { error: Schema.String },
+  ClickedTryAgain: {},
   ClickedReloadIntegrations: {},
   ClickedRefresh: {},
   ClickedBrowse: { tab: ConnectionsTab },

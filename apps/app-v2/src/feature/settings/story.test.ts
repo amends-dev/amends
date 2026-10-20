@@ -1,5 +1,5 @@
 import { type Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
-import { Invitation, type MemberId } from "@amends-dev/core/workspace"
+import { Invitation, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
@@ -511,6 +511,31 @@ describe("the settings", () => {
     )
   })
 
+  it("lists the roster by name, whatever the case and accents, whichever order the replica gives it", () => {
+    const named = (id: string, name: string) => ({
+      member: { ...bob, id: MemberId.MemberId.make(`member-${id}`), name },
+      pending: false
+    })
+    const members = [named("9", "Zoë"), named("8", "émile"), named("7", "bruno"), named("6", "Ada")]
+    const names = (items: typeof members) =>
+      shownMembers({ members: items, filter: { query: "", status: "active" } }).map(({ member }) => member.name)
+
+    expect(names(members)).toEqual(["Ada", "bruno", "émile", "Zoë"])
+    expect(names(members.toReversed())).toEqual(["Ada", "bruno", "émile", "Zoë"])
+  })
+
+  it("lists members of one name by their IDs, so that the roster never reorders itself", () => {
+    const twin = (id: string) => ({
+      member: { ...bob, id: MemberId.MemberId.make(`member-${id}`), name: "Sam" },
+      pending: false
+    })
+    const ids = (items: ReadonlyArray<ReturnType<typeof twin>>) =>
+      shownMembers({ members: items, filter: { query: "", status: "active" } }).map(({ member }) => member.id)
+
+    expect(ids([twin("5"), twin("3"), twin("4")])).toEqual(["member-3", "member-4", "member-5"])
+    expect(ids([twin("4"), twin("5"), twin("3")])).toEqual(["member-3", "member-4", "member-5"])
+  })
+
   it("narrows the roster by the letters of a name, and by whether the member is still in the workspace", () => {
     const left = { ...bob, status: "removed" as const }
     const names = (model: Parameters<typeof shownMembers>[0]) => shownMembers(model).map(({ member }) => member.name)
@@ -905,7 +930,7 @@ describe("revoking an invitation from the settings", () => {
     ])
     expect(pendingInvitations(read, later)).toEqual([])
     expect(invitationHistory(read)).toHaveLength(3)
-    expect(invitationDetail({ invitation, pending: false }, read, now)).toBe("Member · Expires in 6 days")
+    expect(invitationDetail({ invitation, pending: false }, read, now)).toBe("Member · Expires in 7 days")
   })
 })
 

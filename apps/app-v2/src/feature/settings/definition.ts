@@ -299,15 +299,18 @@ export const activeMembers = (model: Pick<Model, "members">): ReadonlyArray<Memb
 /** Whether the member is an agent. */
 export const isAgent = (member: Member.Member): boolean => Identity.MemberReference.isAnyOf(["Agent"])(member.identity)
 
+const byName = (left: MemberItem, right: MemberItem): number =>
+  left.member.name.localeCompare(right.member.name) || (left.member.id < right.member.id ? -1 : 1)
+
 /**
  * The members the roster lists: those who are in the workspace, or who left, as the filter says, whose name contains
- * its letters, in any case and whatever the accents, in the order the replica lists them.
+ * its letters, in any case and whatever the accents, by name, then by ID among those of one name.
  */
 export const shownMembers = (model: Pick<Model, "members" | "filter">): ReadonlyArray<MemberItem> => {
   const wanted = foldAccents(model.filter.query.trim())
-  return model.members.filter(
-    ({ member }) => member.status === model.filter.status && foldAccents(member.name).includes(wanted)
-  )
+  return model.members
+    .filter(({ member }) => member.status === model.filter.status && foldAccents(member.name).includes(wanted))
+    .toSorted(byName)
 }
 
 /** Where an invitation stands: still to be accepted, accepted, past its expiry unanswered, or revoked. */

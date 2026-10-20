@@ -269,7 +269,7 @@ const settingsModal = (render: RenderInfo, model: Model, h: GroupViewBuilder): H
         context: isTeam ? `# ${nameOf(model)}` : nameOf(model),
         width: "wide",
         ...(isTeam ? { tabs: settingsTabs(model, h) } : {}),
-        cancelLabel: "Cancel",
+        cancelLabel: isTeam && model.settingsTab === "General" ? "Cancel" : "Done",
         ...panel
       })
     }

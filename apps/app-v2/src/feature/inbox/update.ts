@@ -37,6 +37,9 @@ export const update = InboxComposition.makeUpdate((model, message) => {
       model: modifyFields(model, { members: () => members, contacts: () => contacts })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
     ClickedShowOlder: () => ({ model: modifyFields(model, { shown: (shown) => shown + pageSize }) }),
     ClickedOpen: ({ notificationId }) =>

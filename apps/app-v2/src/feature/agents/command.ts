@@ -10,6 +10,7 @@ import { Role } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
 import { Identity } from "@amends-dev/core/identity"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
@@ -110,7 +111,9 @@ export const LoadModels = AgentsDefinition.command("LoadModels", {
         const models = yield* client.connections.models({ params: { connectionId } })
         return Message.ReceivedModels({ connectionId, models })
       }).pipe(
-        Effect.catch((error) => Effect.succeed(Message.FailedLoadModels({ connectionId, error: refusalOf(error) })))
+        Effect.catchCause((cause) =>
+          Effect.succeed(Message.FailedLoadModels({ connectionId, error: refusalOf(Cause.squash(cause)) }))
+        )
       )
   }
 })

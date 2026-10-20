@@ -20,6 +20,7 @@ import {
   given,
   inside,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -371,6 +372,24 @@ describe("the agents", () => {
     )
   })
 
+  it("put Cancel at the start of the footer and Create agent at its end", () => {
+    scene(
+      { update, view: withDialog },
+      given(opened),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      inside(
+        addDialog,
+        expectAll(all.role("button")).toHaveCount(3),
+        expect(nth(all.role("button"), 0)).toHaveAccessibleName("Close"),
+        expect(nth(all.role("button"), 1)).toHaveAccessibleName("Cancel"),
+        expect(nth(all.role("button"), 2)).toHaveAccessibleName("Create agent"),
+        expect(within(selector(".me-auto"), role("button", { name: "Cancel" }))).toExist(),
+        expect(within(selector(".me-auto"), role("button", { name: "Create agent" }))).toBeAbsent()
+      )
+    )
+  })
+
   it("close the dialog with Cancel and with Close, and open a fresh form the next time", () => {
     scene(
       { update, view: withDialog },
@@ -609,7 +628,10 @@ describe("the agents", () => {
       expect(art("came-apart")).toExist(),
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
-      expect(role("heading", { name: "No agents yet" })).toBeAbsent()
+      expect(role("heading", { name: "No agents yet" })).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(art("came-apart")).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading agents…")
     )
   })
 
@@ -1148,7 +1170,10 @@ describe("an agent's page", () => {
       expect(role("heading", { name: "Couldn't load agents", level: 2 })).toExist(),
       expect(art("came-apart")).toExist(),
       expect(role("status")).toBeAbsent(),
-      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent()
+      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(art("came-apart")).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading agent…")
     )
   })
 
@@ -1236,6 +1261,23 @@ describe("an agent's page", () => {
         expect(role("button", { name: "Remove agent" })).not.toBeDisabled()
       ),
       expect(removeDialog).toExist()
+    )
+  })
+
+  it("puts Cancel at the start of the question's footer and Remove agent at its end", () => {
+    scene(
+      { update, view: pageWithDialog },
+      given(withModels),
+      click(role("button", { name: "Remove agent" })),
+      ...dialogOpened(),
+      inside(
+        removeDialog,
+        expectAll(all.role("button")).toHaveCount(3),
+        expect(nth(all.role("button"), 1)).toHaveAccessibleName("Cancel"),
+        expect(nth(all.role("button"), 2)).toHaveAccessibleName("Remove agent"),
+        expect(within(selector(".me-auto"), role("button", { name: "Cancel" }))).toExist(),
+        expect(within(selector(".me-auto"), role("button", { name: "Remove agent" }))).toBeAbsent()
+      )
     )
   })
 

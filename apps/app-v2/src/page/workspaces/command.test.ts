@@ -4,10 +4,23 @@ import { WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Schema } from "effect"
 import { TestClock } from "effect/testing"
-import { atlasInvitation, northstar } from "../../../test/fixtures.ts"
+import * as Story from "foldkit/story"
+import { modifyFields } from "foldkit/struct"
+import { atlasInvitation, northstar, northstarInvitation, session } from "../../../test/fixtures.ts"
 import { type Answer, hostAnswering } from "../../../test/host.ts"
 import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
-import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, workspaceRowId } from "./definition.ts"
+import {
+  Entering,
+  FormErrors,
+  JoinErrors,
+  Message,
+  noFormErrors,
+  noJoinErrors,
+  Workspaces,
+  workspaceRowId
+} from "./definition.ts"
+import { init } from "./init.ts"
+import { update } from "./update.ts"
 
 const created = { id: "workspace-3", name: "Acme", createdBy: "alice", ownerMemberId: "member-20" }
 
@@ -16,6 +29,21 @@ const unauthorized: Answer = {
   status: 401,
   body: { _tag: "Authentication.Unauthorized", message: "The bearer token is not recognized" }
 }
+
+/** The page before it has read anything, and with the dialog open over what the person is doing in it. */
+const started = init(session.account.email).model
+
+const inDialog = (entering: Entering) =>
+  modifyFields(started, {
+    entering: () => Option.some(entering),
+    dialog: (dialog) => modifyFields(dialog, { isOpen: () => true })
+  })
+
+/** The answers that are no answer the contract lists: the client reports a defect, or the host is not there. */
+const unlisted = [
+  ["answers a status the contract does not list", { status: 500, body: { message: "Boom" } }],
+  ["makes the client's call die", "dies"]
+] as const satisfies ReadonlyArray<readonly [string, Answer]>
 
 const load = (answer: Answer) => {
   const { sent, layer } = hostAnswering(answer)
@@ -81,7 +109,8 @@ describe("LoadWorkspaces", () => {
         body: { _tag: "CoreError.Unavailable", reason: { _tag: "CredentialsUnavailable", description: "No keys" } }
       }
     ],
-    ["the host cannot be reached", "unreachable"]
+    ["the host cannot be reached", "unreachable"],
+    ...unlisted
   ] as const satisfies ReadonlyArray<readonly [string, Answer]>) {
     it.effect(`says the listing failed when ${description}, which is no reason to sign in again`, () =>
       Effect.gen(function* () {
@@ -91,6 +120,24 @@ describe("LoadWorkspaces", () => {
       })
     )
   }
+
+  it.effect("ends the page's wait for the host with the failure when the client's call dies", () =>
+    Effect.gen(function* () {
+      const { message: outcome } = yield* load("dies")
+
+      Story.story(
+        update,
+        Story.given(started),
+        Story.model((checking) => {
+          expect(checking.workspaces).toEqual(Workspaces.Loading())
+        }),
+        Story.message(outcome),
+        Story.model((after) => {
+          expect(after.workspaces).toEqual(Workspaces.Unreachable())
+        })
+      )
+    })
+  )
 })
 
 describe("CreateWorkspace", () => {
@@ -192,7 +239,8 @@ describe("CreateWorkspace", () => {
       }
     ],
     ["the outcome is not known", { status: 500, body: { _tag: "CoreError.Uncertain", commitId: "commit-1" } }],
-    ["the host cannot be reached", "unreachable"]
+    ["the host cannot be reached", "unreachable"],
+    ...unlisted
   ] as const satisfies ReadonlyArray<readonly [string, Answer]>) {
     it.effect(`asks the person to try again when ${description}, with the key that makes trying again safe`, () =>
       Effect.gen(function* () {
@@ -210,6 +258,27 @@ describe("CreateWorkspace", () => {
       })
     )
   }
+
+  it.effect("ends the form's sending with the general failure when the client's call dies", () =>
+    Effect.gen(function* () {
+      const { message: outcome } = yield* create("dies", names, Option.some(key))
+      const error = refusedForm(
+        "We couldn't confirm creation. Try again with this name to safely check the same request."
+      )
+
+      expect(outcome).toEqual(Message.FailedCreate({ key: Option.some(key), error }))
+      Story.story(
+        update,
+        Story.given(inDialog(Entering.SendingCreate({ ...names, key: Option.some(key) }))),
+        Story.message(outcome),
+        Story.model((after) => {
+          expect(after.entering).toEqual(
+            Option.some(Entering.FillingCreate({ ...names, key: Option.some(key), errors: error }))
+          )
+        })
+      )
+    })
+  )
 })
 
 const accept = (answer: Answer, name: string) => {
@@ -311,6 +380,16 @@ describe("AcceptInvitation", () => {
       "cannot be accepted because the host cannot be reached",
       "unreachable",
       refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+    ],
+    [
+      "cannot be accepted because the host answers a status the contract does not list",
+      { status: 500, body: { message: "Boom" } },
+      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+    ],
+    [
+      "cannot be accepted because the client's call dies",
+      "dies",
+      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
     ]
   ] as const satisfies ReadonlyArray<readonly [string, Answer, JoinErrors]>) {
     it.effect(`says so when the invitation ${description}`, () =>
@@ -322,6 +401,25 @@ describe("AcceptInvitation", () => {
       })
     )
   }
+
+  it.effect("ends the form's sending with the general failure when the client's call dies", () =>
+    Effect.gen(function* () {
+      const { message: outcome } = yield* accept("dies", "Alex")
+      const errors = refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
+
+      expect(outcome).toEqual(Message.FailedJoin({ error: errors }))
+      Story.story(
+        update,
+        Story.given(inDialog(Entering.SendingJoin({ invitation: northstarInvitation, name: "Alex" }))),
+        Story.message(outcome),
+        Story.model((after) => {
+          expect(after.entering).toEqual(
+            Option.some(Entering.FillingJoin({ invitation: northstarInvitation, name: "Alex", errors }))
+          )
+        })
+      )
+    })
+  )
 })
 
 describe("FocusWorkspaceRow", () => {

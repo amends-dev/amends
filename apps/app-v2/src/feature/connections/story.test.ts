@@ -174,6 +174,24 @@ describe("the connections", () => {
     )
   })
 
+  it("read the connections again when the person tries again, and no longer say why the read failed", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      model((model) => {
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.reads).toBe(0)
+      }),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.notice).toEqual(Option.none())
+        expect(model.isLoaded).toBe(false)
+        expect(model.reads).toBe(1)
+      })
+    )
+  })
+
   it("name the members, and keep why a read failed until a write is kept", () => {
     story(
       update,

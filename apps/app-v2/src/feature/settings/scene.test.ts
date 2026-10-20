@@ -7,19 +7,24 @@ import {
   Command,
   Mount,
   Subscription,
+  all,
   change,
   click,
   expect,
+  expectAll,
   expectNoOutMessage,
   expectOutMessage,
   given,
   inside,
   label,
+  nth,
   role,
   scene,
+  selector,
   text,
   type,
-  withViewInputs
+  withViewInputs,
+  within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
@@ -128,7 +133,7 @@ describe("the Workspace page of the settings", () => {
         role("region", { name: "Details" }),
         expect(text("Workspace ID")).toExist(),
         expect(text("workspace-1")).toExist(),
-        expect(role("button", { name: "Copy ID" })).toExist(),
+        expect(role("button", { name: "Copy workspace ID" })).toHaveText("Copy ID"),
         expect(text("Created by")).toExist(),
         expect(text("Alice")).toExist()
       ),
@@ -246,13 +251,12 @@ describe("the Workspace page of the settings", () => {
     scene(
       { update, view },
       given(owner),
-      click(role("button", { name: "Copy ID" })),
+      click(role("button", { name: "Copy workspace ID" })),
       Command.expectExact(CopyWorkspaceId({ workspaceId: workspace.id, attempt: 1 })),
       Command.resolve(CopyWorkspaceId, Message.CopiedWorkspaceId({ attempt: 1 })),
-      expect(role("button", { name: "Copied" })).toExist(),
-      expect(role("button", { name: "Copy ID" })).toBeAbsent(),
+      expect(role("button", { name: "Copy workspace ID" })).toHaveText("Copied"),
       Command.resolve(ExpireCopied, Message.ExpiredCopied({ attempt: 1 })),
-      expect(role("button", { name: "Copy ID" })).toExist()
+      expect(role("button", { name: "Copy workspace ID" })).toHaveText("Copy ID")
     )
   })
 
@@ -323,7 +327,7 @@ describe("the Workspace page of the settings", () => {
         })
       ),
       expect(role("textbox", { name: "Workspace name" })).toHaveValue("Studio"),
-      expect(role("button", { name: "Copy ID" })).toExist()
+      expect(role("button", { name: "Copy workspace ID" })).toExist()
     )
   })
 })
@@ -344,6 +348,33 @@ describe("the Members page of the settings", () => {
         expect(role("button", { name: "Bob" })).toHaveAttr("aria-description", "Member · Active"),
         expect(role("button", { name: "Scout" })).toHaveAttr("aria-description", "Agent · Active"),
         expect(text("Agent")).toExist()
+      )
+    )
+  })
+
+  it("draws each member's mark at 32px in a row 56px tall, the height of a table of people", () => {
+    scene(
+      { update, view: membersPage },
+      given(owner),
+      inside(
+        role("list", { name: "Members" }),
+        expect(role("button", { name: "Bob" })).toHaveClass("min-h-14"),
+        expect(role("button", { name: "Bob" })).not.toHaveClass("min-h-19"),
+        expect(text("B")).toHaveClass("size-8"),
+        expect(text("S")).toHaveClass("size-8")
+      )
+    )
+  })
+
+  it("lists the members by name, whichever order the replica gives them", () => {
+    scene(
+      { update, view: membersPage },
+      given(modifyFields(owner, { members: (members) => members.toReversed() })),
+      inside(
+        role("list", { name: "Members" }),
+        expect(nth(all.role("button"), 0)).toHaveAccessibleName("Alice · You"),
+        expect(nth(all.role("button"), 1)).toHaveAccessibleName("Bob"),
+        expect(nth(all.role("button"), 2)).toHaveAccessibleName("Scout")
       )
     )
   })
@@ -750,7 +781,7 @@ describe("the Members page of the settings, for invitations", () => {
         inside(
           role("list", { name: "Pending invitations" }),
           expect(text("carol@example.com")).toExist(),
-          expect(text("Member · Expires in 6 days")).toExist(),
+          expect(text("Member · Expires in 7 days")).toExist(),
           expect(role("button", { name: "Revoke invitation for carol@example.com" })).toHaveText("Revoke")
         )
       )
@@ -1013,6 +1044,58 @@ describe("the dialog for every invitation", () => {
           expect(role("button", { name: "Revoke invitation for erin@example.com" })).toBeAbsent()
         ),
         expect(role("button", { name: "Invite people" })).toExist()
+      )
+    )
+  })
+
+  it("reads each invitation as its address over what it gives, with where it stands beside them", () => {
+    scene(
+      { update, view: withDialog(membersPage) },
+      given(withHistory),
+      click(role("button", { name: "View history" })),
+      ...dialogOpened(),
+      inside(
+        historyDialog,
+        inside(
+          role("list", { name: "Invitation history" }),
+          expect(text("Member · Expires in 7 days")).toExist(),
+          expect(text("Member · Created October 10")).toExist(),
+          expect(text("Member · Created October 5")).toExist(),
+          expect(role("button", { name: "Revoke invitation for carol@example.com" })).toHaveText("Revoke")
+        )
+      )
+    )
+  })
+
+  it("holds Revoke for an invitation that is itself on its way", () => {
+    scene(
+      { update, view: withDialog(membersPage) },
+      given(
+        modifyFields(withHistory, {
+          invitations: (items) => items.map((item) => ({ ...item, pending: true }))
+        })
+      ),
+      click(role("button", { name: "View history" })),
+      ...dialogOpened(),
+      inside(historyDialog, expect(role("button", { name: "Revoke invitation for carol@example.com" })).toBeDisabled())
+    )
+  })
+
+  it("puts Invite people at the start of the footer and Done at its end, as apps/ui's history does", () => {
+    scene(
+      { update, view: withDialog(membersPage) },
+      given(withHistory),
+      click(role("button", { name: "View history" })),
+      ...dialogOpened(),
+      inside(
+        historyDialog,
+        expectAll(all.role("button")).toHaveCount(4),
+        expect(nth(all.role("button"), 0)).toHaveAccessibleName("Close"),
+        expect(nth(all.role("button"), 1)).toHaveAccessibleName("Revoke invitation for carol@example.com"),
+        expect(nth(all.role("button"), 2)).toHaveAccessibleName("Invite people"),
+        expect(nth(all.role("button"), 3)).toHaveAccessibleName("Done"),
+        expect(within(selector(".me-auto"), role("button", { name: "Invite people" }))).toExist(),
+        expect(within(selector(".me-auto"), role("button", { name: "Done" }))).toBeAbsent()
       )
     )
   })

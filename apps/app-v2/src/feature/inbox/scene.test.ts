@@ -531,7 +531,23 @@ describe("the inbox", () => {
       expect(text("This browser could not read the workspace's copy.")).toExist(),
       expect(role("alert")).toBeAbsent(),
       expect(role("status")).toBeAbsent(),
-      expect(selector("svg g.art-swinging")).toExist()
+      expect(selector("svg g.art-swinging")).toExist(),
+      expect(role("button", { name: "Try again" })).toExist()
+    )
+  })
+
+  it("reads the notifications again when the person tries again, with the loading line in the meantime", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(init(workspace.id, member.id).model, {
+          notice: () => Option.some("This browser could not read the workspace's copy.")
+        })
+      ),
+      click(role("button", { name: "Try again" })),
+      expect(role("heading", { name: "Can't load your inbox" })).toBeAbsent(),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading your inbox…")
     )
   })
 

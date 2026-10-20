@@ -24,6 +24,7 @@ export const init = AgentsComposition.makeInit((workspaceId: WorkspaceId.Workspa
     removing: Option.none(),
     edits: [],
     offered: [],
+    reads: 0,
     notice: Option.none()
   }
 }))

@@ -1712,7 +1712,7 @@ describe("a workspace", () => {
         expect(text("Everyone in the workspace belongs to general.")).toExist(),
         click(role("tab", { name: "Members" })),
         expect(within(role("list", { name: "Members" }), text("Alice"))).toExist(),
-        click(role("button", { name: "Cancel" }))
+        click(role("button", { name: "Done" }))
       ),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),

@@ -652,7 +652,8 @@ describe("a group's settings", () => {
         expect(text("A conversation between its members.")).toExist(),
         expect(role("button", { name: "Leave" })).toBeAbsent(),
         expect(role("button", { name: "Save changes" })).toBeAbsent(),
-        expect(role("button", { name: "Cancel" })).toExist()
+        expect(role("button", { name: "Done" })).toExist(),
+        expect(role("button", { name: "Cancel" })).toBeAbsent()
       )
     )
   })
@@ -674,11 +675,14 @@ describe("a group's settings", () => {
       ),
       expect(text("Choose a member")).toBeAbsent(),
       expect(text("Visibility")).toBeAbsent(),
-      expect(role("button", { name: "Cancel" })).toExist(),
+      expect(role("button", { name: "Done" })).toExist(),
+      expect(role("button", { name: "Cancel" })).toBeAbsent(),
       expect(role("button", { name: "Save changes" })).toBeAbsent(),
       click(role("tab", { name: "General" })),
       expect(role("list", { name: "Members" })).toBeAbsent(),
-      expect(text("Visibility")).toExist()
+      expect(text("Visibility")).toExist(),
+      expect(role("button", { name: "Cancel" })).toExist(),
+      expect(role("button", { name: "Done" })).toBeAbsent()
     )
   })
 
@@ -687,7 +691,7 @@ describe("a group's settings", () => {
       { update, view },
       given(opened),
       ...openMembers(),
-      click(role("button", { name: "Cancel" })),
+      click(role("button", { name: "Done" })),
       ...dialogClosed(),
       ...openSettings(),
       expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "true"),

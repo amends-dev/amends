@@ -111,15 +111,13 @@ export const calendarDate = (at: DateTime.DateTime): string =>
   DateTime.formatLocal(at, { month: "short", day: "numeric", year: "numeric" })
 
 /**
- * How long after `now` it will be `at`, as an invitation says when it closes: "Expires in 7 days" and "Expires in
- * 3 hours", by the whole days and hours left, then "Expires soon" under an hour, and "Expired" once `at` has come.
+ * How long after `now` it will be `at`, as an invitation says when it closes: "Expires in 7 days", by the days left
+ * rounded up, and so at least one, as `apps/ui` says it, so that an invitation made for a week reads seven until
+ * a day of it has passed, and "Expired" once `at` has come.
  */
 export const expiryLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
   const remaining = DateTime.toEpochMillis(at) - DateTime.toEpochMillis(now)
-  if (remaining <= 0) return "Expired"
-  if (remaining < millisPerHour) return "Expires soon"
-  if (remaining < millisPerDay) return `Expires in ${pluralize(Math.floor(remaining / millisPerHour), "hour", "hours")}`
-  return `Expires in ${pluralize(Math.floor(remaining / millisPerDay), "day", "days")}`
+  return remaining <= 0 ? "Expired" : `Expires in ${pluralize(Math.ceil(remaining / millisPerDay), "day", "days")}`
 }
 
 /** `memberId` by their name among `members`, or their ID until names are read. */

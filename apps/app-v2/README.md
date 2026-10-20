@@ -59,7 +59,10 @@ the person's account, the design's `railAccount`, a menu of their Appearance, th
 workspace's settings, a dialog that changes their name, and Sign out, which `page/workspace` binds. The Appearance,
 System, Light, or Dark, is the root's: `src/appearance.ts` shows it as `data-theme` on the page's root element, which the
 design's theme follows (System removes the attribute and leaves the browser's preference), and keeps it in the browser's
-key-value store, so that the next visit starts in it. A list's search and the choices that narrow it are the design's
+key-value store under the key `amends/appearance`, so that the next visit starts in it: a script in `index.html`, before
+the stylesheet, reads that key and sets `data-theme` for a kept Light or Dark before the page first paints, which the
+app's own script comes too late for, and does nothing when nothing was kept, what was kept is not one, or the browser
+refuses its storage. A list's search and the choices that narrow it are the design's
 `paneToolbar` over its rows, a `searchField` and menus (`choiceMenu`, over Foldkit's `Menu` Block, which the list's
 Block binds to hold the menu's state and to fold its choice), where they were a row of selects. What a pane says
 when it has nothing to list, or could not read what it lists, is the design's `paneEmpty` with the `stateArt` that
@@ -72,7 +75,9 @@ or filter that finds none, `came-apart` for what could not be read, and `lost-th
 shows the design's `loadingRows` under a line, "Loading agents…" or "Loading connections…", and a pane or a page
 shows `loadingLine`, "Loading your inbox…", "Loading settings…", "Loading the conversation…", "Loading agent…", and
 "Loading connection…"; a destination's first read that failed says why in the place of the list, "Couldn't load
-agents", "Couldn't load connections", "Can't load your inbox", with no button to try again.
+agents", "Couldn't load connections", "Can't load your inbox", with a Try again, as the settings have, that forgets why
+and reads again (`ClickedTryAgain`, which raises the Block's `reads`, the dependency that restarts its subscription, and
+shows the loading rows or line until the read answers).
 A turn's `badge` carries the
 logo moving while the turn waits (`thread`), runs (`working`), or stops (`tug`). The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations and the modals they open, `feature/groups` the pane where the
@@ -123,7 +128,8 @@ current, with Mark all seen among the header's actions, a quiet Show older after
 centered `buttonRow`, while there are older notifications, and `paneEmpty` when a tab has nothing. The settings' Workspace page is a `paneColumn` of a `form` of the workspace's name, and `paneSection`s
 whose `detailList` has the ID with a quiet Copy ID and who made the workspace as a `person`, and whose
 Ownership has the owner as a `person`; its Members page, which passes `isWide`, is a toolbar of a search
-and a menu of Active or Removed members over the `directory`'s `columns` and 24px `row`s, and a member opens in the side pane as
+and a menu of Active or Removed members over the `directory`'s `columns` and `row`s with a 32px mark in a 56px
+row, and a member opens in the side pane as
 a `person`, a `paneForm` of their role, and `paneSection`s of their access and membership, under `paneBack`. The
 invitations waiting after the roster are a `section` over `rowWithButton`s, or on a phone a `section` over one
 `row`; the settings' dialogs are `modal`s, the invitations in them an `entryList` of `entry`s with a `badge` each. The
@@ -267,7 +273,10 @@ the pages that compose them; the root composes the pages.
   they apply; and a gear that opens the settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
   tab's content, threads or tasks, with the composer to start one in the footer, which a team the person has not joined does
   not have. The Tasks tab's status stays a select, and it has no menu of the assignee or sort, as `apps/ui`'s has: a Menu Block
-  bound in the threads Block adds a binding to the workspace page's tree, whose `makeUpdate` is at TypeScript's limit
+  bound in the threads Block takes the workspace page's `makeUpdate` past what TypeScript instantiates (TS2589 at
+  `page/workspace/update.ts`, `Type instantiation is excessively deep and possibly infinite`), however few: a single
+  binding of the `Menu` Block `feature/tasks` already binds, with folds that return `stepFields` and `stepNoop` and a
+  view that does not use it, does it, and so do two, and three with a menu of the group's members as `apps/ui` has it
   (see `page/workspace`). The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
   beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
@@ -277,8 +286,9 @@ the pages that compose them; the root composes the pages.
   membership, with Leave for a team they belong to, except general, and Join for a public team they do not. Its
   Members tab, for a team only, lists the members, each marked Online while they have the workspace
   open, with Remove and the form to admit another where the person manages them, and counts them in
-  the tab. The dialog opens on General, and closing it, by Cancel, Close, Escape, a click on the
-  scrim, Save changes, or Leave, drops the draft of the name and the member chosen to admit.
+  the tab. The dialog opens on General, and closing it, by Cancel on General or Done on Members and in a conversation,
+  as `apps/ui` words them, Close, Escape, a click on the scrim, Save changes, or Leave, drops the draft of the name and
+  the member chosen to admit.
   `threadView` is the thread open in it as a side pane, titled by the
   thread with "Thread in #Design" or "Thread in Bob" under it (`threadSubtitle`), with a button that closes it, Close, and, below 48rem where the pane is full screen over
   the main pane, Back before the title, both sending `ClickedAllThreads`, the thread's messages, and
@@ -287,6 +297,12 @@ the pages that compose them; the root composes the pages.
   and the thread Block. The main pane embeds the threads Block three times, for the tabs in its header, for
   its content, and for its composer, and the side pane the thread Block twice, once for its content and once for its
   composer, each in a slot of its own.
+- Every dialog's footer follows `apps/ui`'s `Modal.Actions`, through the design's `modal`: a Cancel or Close and the
+  primary action together at the end, for a team, a conversation, the settings' dialogs, the workspaces', and the
+  group's General section; the Cancel at the start of the footer and the primary action alone at its end for adding
+  an agent, removing one, replacing a connection's key, and removing a connection; Back at the start and the primary
+  action at the end for the connection's form; and Invite people at the start and Done at the end for the
+  invitations' history.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to by name, their conversations by the other members in them, then the public teams they may join,
   to pick one from; and where they start a team, or a conversation with another member, in a modal
@@ -405,8 +421,8 @@ the pages that compose them; the root composes the pages.
 - `feature/settings`: the workspace's settings as `apps/ui` has them, two pages, a member in the side pane, and
   six dialogs, read together from the store. The Workspace page (`view`) is the workspace's name in a form with
   Save changes, which waits for a name that is new and which only the owner may use, the field being disabled with
-  "Only the workspace owner can rename it." for another; Details, with the workspace's ID, which Copy ID puts on
-  the browser's clipboard (the `Clipboard` service, which the browser's services provide, so the command
+  "Only the workspace owner can rename it." for another; Details, with the workspace's ID, which the quiet button
+  Copy ID, named "Copy workspace ID" as `apps/ui` names it, puts on the browser's clipboard (the `Clipboard` service, which the browser's services provide, so the command
   `CopyWorkspaceId` needs no `navigator`) and the button then says Copied for two seconds, the command
   `ExpireCopied` ending the copy it was started for and no later one, and Created by, the member whose account made
   the workspace; Ownership, with the owner as "{name} · You" when it is the person, "Workspace owner", and that a
@@ -416,11 +432,15 @@ the pages that compose them; the root composes the pages.
   opens a dialog for it, below. The Members page (`membersView`, which takes the time now, the
   window's width, and the member the page has open as view inputs) is a toolbar of a search, "Search members…", and a menu of
   Active or Removed members (`choiceMenu`, bound as `MemberStatusBinding`, its button named "Active members" or "Removed members"), over the roster: `columns` for Member, Workspace role, and
-  Status, and a `row` for each member with a 24px mark (`markSize: "sm"`), their name, "Agent" under an agent's,
-  their role, and their status, the row of the member the page has open drawn current. A phone shows the role and status under
+  Status, and a `row` for each member, by name, with a 32px mark in a row 56px tall (`markSize: "md"` and `isCompact`),
+  their name, "Agent" under an agent's, their role, and their status, the row of the member the page has open drawn
+  current. `apps/ui` does not sort its roster, which its fixture lists in no order a name or a role explains, so the
+  roster is by name, in any case and whatever the accents, then by ID among those of one name (`shownMembers`). A phone shows the role and status under
   the name. Where the person manages invitations, Invite people is in the page's header, and after the roster are
   the Pending invitations, with how many, each a `rowWithButton` of the address over what it gives and when it ends
-  ("Member · Expires in 6 days") with a quiet Revoke named for the address, held while the invitation is itself on
+  ("Member · Expires in 7 days", the days left rounded up as `apps/ui` rounds them and at least one, so that an
+  invitation just made for a week says seven: `expiryLabel`) with a quiet Revoke named for the address, held while the
+  invitation is itself on
   its way, or "No invitations are waiting.", and View history; on a phone the invitations are one card, "1 pending
   invitation" over "View and manage invitations", that opens the same history. A row reports `OpenedMember` and
   the member opens in the side pane (`memberView`, "Member details", with Back to Members on phones): who they are,
@@ -436,9 +456,11 @@ the pages that compose them; the root composes the pages.
   The six dialogs are one `DialogBlock` the Block binds (`DialogBinding`, id `settings-dialog`) and `dialogView`,
   which the workspace page lends the shell, renders for what the person is doing in it (`Entering`): Invite member,
   the address ("Sign-in email") and the role an invitation gives, with "No email is sent." and a Create invitation
-  that sends it, ending seven days from when it is made; Invitations, every invitation newest first with where it
-  stands (Pending, Accepted, Expired, or Revoked, which the state and the clock tell) and Revoke for each that
-  waits, and Invite people; Revoke invitation?, naming the address; Transfer ownership, choosing the new owner
+  that sends it, ending seven days from when it is made; Invitations, every invitation newest first, each the
+  design's `historyRow` as `apps/ui` draws its history: the address over what it gives and when it ends or was made,
+  where it stands in words (Pending, Accepted, Expired, or Revoked, which the state and the clock tell) beside them,
+  and a quiet Revoke at the end of each that waits, with Invite people at the start of the footer and Done at its
+  end; Revoke invitation?, naming the address; Transfer ownership, choosing the new owner
   among the people who can become it and saying who becomes the only owner; Remove {name}?, saying what they
   lose and that they need a fresh invitation to rejoin; and Change your name (`ChangingName`), a compact dialog of one
   field, "Your name", that starts from the name the person has, takes the focus with its text selected (the
@@ -624,6 +646,10 @@ the pages that compose them; the root composes the pages.
   shown in the same stack as a status toast with a Dismiss that goes by itself after five seconds
   (`ExpireConfirmation`), each under an ID of its own (`nextConfirmationId`) so that the time of one the person
   dismissed cannot take another's.
+- `page/signIn`, `page/workspaces`, `page/workspace`'s listing of the integrations, and `feature/agents`' listing of a
+  connection's models are commands that call the host and end in a message whatever happens to the call: the client
+  reports a status its contract does not list as a defect, which a failure handler misses, so each handles the whole
+  cause and words it as it words a host that cannot be reached, and a form never stays on "Sending…" or "Checking…".
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
   which the person can change the email or ask for a new code to the same address; it keeps the
   session a right code gives, and reports it. It starts with an address, which the root gives when it
@@ -846,8 +872,8 @@ the pages that compose them; the root composes the pages.
   when none was kept or what was kept is not one), which the root keeps in its model and the open workspace's account menu
   checks. `init` shows it on the page (`ShowAppearance`), and choosing another in the menu shows and keeps it again
   (`ShowAppearance`, `KeepAppearance`; a browser that refuses to keep it loses it only for the next visit). The runtime
-  paints once before it runs a command, so a page kept in Light or Dark may show the browser's preference for a moment
-  first. The
+  paints once before it runs a command, so `index.html` shows a kept Light or Dark itself, before the page first paints,
+  and `init` shows it again. The
   subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries,
   drops a width that did not change, and sends `ChangedViewport`, whose update sets the width and
   informs the open workspace of it, and a workspace opened later starts from the width the root has
@@ -986,7 +1012,10 @@ with the error rather than leaving the replica silently behind.
 ## Tests
 
 `bun run test --project @amends-dev/app-v2` runs them in happy-dom, with `fake-indexeddb` as the
-browser's storage. Each Block's tests sit beside it:
+browser's storage. Each Block's tests sit beside it. The commands that call the host are run over a client that answers
+what a test names, which can be that its call dies, and the message they end in is given to the form's update, to show
+it leaves its sending state with the general failure. `appearance.test.ts` runs the script of `index.html` against the
+key `keepAppearance` keeps, to show the two agree:
 
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
@@ -1379,8 +1408,8 @@ browser's storage. Each Block's tests sit beside it:
   but the person by name, whatever the case or accents, and at most eight of each in the order given,
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
-  times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days,
-  in hours, soon, and once it has, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the runs of a text and of a message and of a thread's row,
+  times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
+  and once it has, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the runs of a text and of a message and of a thread's row,
   a mention as "@" and the member's current name or the name it recorded, and the rest of the
   markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a

@@ -13,8 +13,8 @@ export const LoadIntegrations = WorkspaceDefinition.command("LoadIntegrations", 
         const client = yield* Api.asMember(workspaceId)
         return Message.ReceivedIntegrations({ integrations: yield* client.connections.integrations() })
       }).pipe(
-        Effect.orElseSucceed(() =>
-          Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." })
+        Effect.catchCause(() =>
+          Effect.succeed(Message.FailedLoadIntegrations({ error: "The host could not be reached. Try again." }))
         )
       )
   }

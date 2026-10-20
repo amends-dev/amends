@@ -221,6 +221,29 @@ describe("the inbox", () => {
     )
   })
 
+  it("reads the notifications again when the person tries again, and no longer says why the read failed", () => {
+    story(
+      update,
+      given(init(workspace.id, member.id).model),
+      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      model((model) => {
+        expect(model.notice).toEqual(Option.some("This browser could not read the workspace's copy."))
+        expect(model.reads).toBe(0)
+      }),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.notice).toEqual(Option.none())
+        expect(model.isLoaded).toBe(false)
+        expect(model.reads).toBe(1)
+      }),
+      message(Message.FailedRead({ error: "This browser could not read the workspace's copy." })),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.reads).toBe(2)
+      })
+    )
+  })
+
   it("starts on All", () => {
     expect(listed.tab).toBe("All")
   })

@@ -510,6 +510,9 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       model: modifyFields(model, { integrations: () => Integrations.Failed({ error }) })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
     ClickedReloadIntegrations: () =>
       Integrations.isAnyOf(["Failed"])(model.integrations)
         ? {

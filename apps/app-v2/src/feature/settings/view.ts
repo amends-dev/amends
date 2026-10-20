@@ -11,8 +11,8 @@ import {
   searchField,
   submit
 } from "@amends-dev/design/control"
-import { badge, detailList, entry, entryList, person } from "@amends-dev/design/details"
-import { columns, row, rowWithButton, section, summary } from "@amends-dev/design/directory"
+import { detailList, entry, entryList, person } from "@amends-dev/design/details"
+import { columns, historyRow, row, rowWithButton, section, summary } from "@amends-dev/design/directory"
 import { form } from "@amends-dev/design/form"
 import type { IconName } from "@amends-dev/design/icon"
 import type { MarkContent } from "@amends-dev/design/mark"
@@ -88,7 +88,6 @@ import {
   filterChoices,
   invitationDetail,
   invitationStatusLabels,
-  invitationStatusTones,
   needsRefresh,
   settingsMessage,
   statusLabels
@@ -225,7 +224,8 @@ const detailsSection = (model: Model, id: string, h: SettingsViewBuilder): Html 
           value: buttonRow(h, [
             h.span([h.Title(id)], [shortId(id)]),
             button(h, Option.isSome(model.copiedAttempt) ? "Copied" : "Copy ID", Message.ClickedCopyId(), {
-              variant: "quiet"
+              variant: "quiet",
+              name: "Copy workspace ID"
             })
           ])
         },
@@ -319,7 +319,8 @@ const memberRow = (
     [
       row(h, {
         mark: markOf(item),
-        markSize: "sm",
+        markSize: "md",
+        isCompact: true,
         title: displayName(member, model.memberId),
         ...(kind === "" ? {} : { meta: kind }),
         cells: [h.span([], [role]), h.span([], [status])],
@@ -697,33 +698,34 @@ const invitingModal = (render: RenderInfo, inviting: InvitingEntering, model: Mo
 }
 
 /**
- * An invitation in the history: its address, what it gives and when it ends or was made, where it stands, and Revoke
- * while it waits.
+ * An invitation in the history as a row of the history: its address over what it gives and when it ends or was made,
+ * where it stands in words, and Revoke while it waits.
  */
-const historyEntry = (item: InvitationItem, model: Model, now: DateTime.Utc, h: SettingsViewBuilder): Html => {
+const historyItem = (item: InvitationItem, model: Model, now: DateTime.Utc, h: SettingsViewBuilder): Html => {
   const { details } = item.invitation
   const status = invitationStatus(item, now)
 
-  return entry(h, {
-    key: details.id,
-    mark: details.recipientEmail.slice(0, 1).toUpperCase(),
-    title: details.recipientEmail,
-    trailing: [badge(h, { label: invitationStatusLabels[status], tone: invitationStatusTones[status] })],
-    children: [
-      hint(h, invitationDetail(item, model, now)),
-      ...(status === "pending"
-        ? [
-            buttonRow(h, [
-              button(h, "Revoke", Message.ClickedRevoke({ invitationId: details.id }), {
-                variant: "quiet",
+  return h.keyed("li")(
+    details.id,
+    [],
+    [
+      historyRow(h, {
+        title: details.recipientEmail,
+        detail: invitationDetail(item, model, now),
+        status: invitationStatusLabels[status],
+        ...(status === "pending"
+          ? {
+              action: {
+                label: "Revoke",
+                name: `Revoke invitation for ${details.recipientEmail}`,
                 isDisabled: item.pending,
-                name: `Revoke invitation for ${details.recipientEmail}`
-              })
-            ])
-          ]
-        : [])
+                onClick: Message.ClickedRevoke({ invitationId: details.id })
+              }
+            }
+          : {})
+      })
     ]
-  })
+  )
 }
 
 /** The dialog that lists every invitation there has been, newest first, with the way to make another. */
@@ -738,13 +740,13 @@ const historyModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Se
       summary(h, { copy: "Invitations", count: `${history.length} total` }),
       history.length === 0
         ? hint(h, "No invitations yet.")
-        : entryList(h, {
-            label: "Invitation history",
-            children: history.map((item) => historyEntry(item, model, now, h))
-          })
+        : h.ul(
+            [h.AriaLabel("Invitation history")],
+            history.map((item) => historyItem(item, model, now, h))
+          )
     ],
-    cancelLabel: "Done",
-    footer: [button(h, "Invite people", Message.ClickedInvite())]
+    leading: [button(h, "Invite people", Message.ClickedInvite())],
+    cancelLabel: "Done"
   })
 }
 

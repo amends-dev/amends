@@ -51,7 +51,8 @@ const unreadInbox = (model: Model, h: InboxViewBuilder): Html =>
   paneEmpty(h, {
     art: "came-apart",
     title: "Can't load your inbox",
-    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) })
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
+    action: button(h, "Try again", Message.ClickedTryAgain())
   })
 
 /** The tabs under the title: every notification, and those waiting, counted while any wait. */

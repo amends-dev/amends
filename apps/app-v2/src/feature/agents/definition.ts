@@ -143,7 +143,7 @@ export type BrowseTab = typeof BrowseTab.Type
  * integrations that say what those give, the roles and the workspace that say which role a new
  * agent may start with, what the person may do, the list page's tab and search, the dialog and what it is
  * for, adding an agent or confirming one's removal, what they changed on the agents' pages, the models the
- * connections offer, and why the last read or write failed.
+ * connections offer, how many times the person asked to read them again, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -162,6 +162,7 @@ export const Model = Schema.Struct({
   removing: Schema.Option(Removing),
   edits: Schema.Array(Edit),
   offered: Schema.Array(OfferedModels),
+  reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -178,6 +179,7 @@ export const Message = defineMessageUnion({
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String },
   FailedRead: { error: Schema.String },
+  ClickedTryAgain: {},
   ClickedReloadIntegrations: {},
   ClickedBrowse: {},
   ChoseBrowseTab: { tab: BrowseTab },

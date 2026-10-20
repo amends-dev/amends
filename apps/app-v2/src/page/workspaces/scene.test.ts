@@ -275,16 +275,16 @@ describe("the workspaces page", () => {
       given(showing(loaded([], [unnamedInvitation]))),
       expect(within(role("list", { name: "Invitations" }), text("Workspace invitation"))).toExist(),
       expect(within(role("list", { name: "Invitations" }), text("?"))).toHaveAttr("aria-hidden", "true"),
-      expect(text("Pending invitation · Expires in 3 hours")).toExist(),
+      expect(text("Pending invitation · Expires in 1 day")).toExist(),
       expect(role("button", { name: "Accept invite to Workspace invitation" })).toExist()
     )
   })
 
-  it("reads when an invitation expires from the time now, and says so once it has", () => {
+  it("reads when an invitation expires from the time now, in days rounded up, and says so once it has", () => {
     scene(
       { update, view: withViewInputs(view, { now })({ now: DateTime.add(now, { days: 6, hours: 23, minutes: 45 }) }) },
       given(showing(loaded([], [northstarInvitation, atlasInvitation]))),
-      expect(text("Pending invitation · Expires soon")).toExist(),
+      expect(text("Pending invitation · Expires in 1 day")).toExist(),
       expect(text("Pending invitation · Expired")).toExist()
     )
   })

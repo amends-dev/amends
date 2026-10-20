@@ -8,6 +8,7 @@ import { Request } from "@amends-dev/core/request"
 import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as Authentication from "@amends-dev/http/Authentication"
+import * as Cause from "effect/Cause"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -27,12 +28,16 @@ import {
 } from "./definition.ts"
 
 /**
- * What a request ends in when the host answered `failure`: that the host does not know the session, when the
- * failure is that, since nothing the person does here will succeed until they sign in again, and otherwise what
- * `otherwise` makes of it.
+ * What a request ends in when it ended in `cause`: that the host does not know the session, when that is what it
+ * answered, since nothing the person does here will succeed until they sign in again, and otherwise what `otherwise`
+ * makes of the failure. The client reports a status the contract does not list as a defect, which a failure handler
+ * misses, so each request handles the whole cause, and the page never stays waiting for one.
  */
-const rejectedSessionOr = <Otherwise>(failure: unknown, otherwise: () => Otherwise) =>
-  Schema.is(Authentication.Unauthorized)(failure) ? Message.RejectedSession() : otherwise()
+const rejectedSessionOr = <Otherwise>(cause: Cause.Cause<unknown>, otherwise: (failure: unknown) => Otherwise) => {
+  const failure = Cause.squash(cause)
+
+  return Schema.is(Authentication.Unauthorized)(failure) ? Message.RejectedSession() : otherwise(failure)
+}
 
 /** List the workspaces the person belongs to and the invitations waiting for them. */
 export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
@@ -44,7 +49,7 @@ export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
         const listing = yield* client.me.workspaces()
         return Message.SucceededLoadWorkspaces({ memberships: listing.memberships, invitations: listing.invitations })
       }).pipe(
-        Effect.catch((failure) => Effect.succeed(rejectedSessionOr(failure, () => Message.FailedLoadWorkspaces())))
+        Effect.catchCause((cause) => Effect.succeed(rejectedSessionOr(cause, () => Message.FailedLoadWorkspaces())))
       )
   }
 })
@@ -110,9 +115,11 @@ export const CreateWorkspace = WorkspacesDefinition.command("CreateWorkspace", {
           Effect.flatMap((client) =>
             client.workspaces.create({ payload: input, headers: { "idempotency-key": requestKey } })
           ),
-          Effect.mapError((failure) =>
-            rejectedSessionOr(failure, () =>
-              Message.FailedCreate({ key: Option.some(requestKey), error: wordFailure(failure) })
+          Effect.catchCause((cause) =>
+            Effect.fail(
+              rejectedSessionOr(cause, (failure) =>
+                Message.FailedCreate({ key: Option.some(requestKey), error: wordFailure(failure) })
+              )
             )
           )
         )
@@ -158,8 +165,8 @@ export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation",
           Effect.flatMap((client) =>
             client.workspaces.acceptInvitation({ params: { workspaceId, invitationId }, payload: { name: memberName } })
           ),
-          Effect.mapError((failure) =>
-            rejectedSessionOr(failure, () => Message.FailedJoin({ error: wordJoinFailure(failure) }))
+          Effect.catchCause((cause) =>
+            Effect.fail(rejectedSessionOr(cause, (failure) => Message.FailedJoin({ error: wordJoinFailure(failure) })))
           )
         )
         return Message.SucceededJoin()

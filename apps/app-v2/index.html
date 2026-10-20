@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      // Shows the Appearance the person kept before the first paint, which the app's own script comes too late for.
+      // It reads the key `src/appearance.ts` keeps it under, and does what `showAppearance` does for Light and Dark.
+      try {
+        var kept = localStorage.getItem("amends/appearance")
+        if (kept === "Light" || kept === "Dark") {
+          document.documentElement.setAttribute("data-theme", kept.toLowerCase())
+        }
+      } catch (error) {
+        // The browser refuses its storage: the page starts in the browser's preference, as System does.
+      }
+    </script>
     <link href="/src/styles.css" rel="stylesheet" />
     <title>amends</title>
   </head>

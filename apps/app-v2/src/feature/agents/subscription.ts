@@ -6,6 +6,7 @@
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
@@ -38,10 +39,10 @@ export const readAgents = (store: Store.Store["Service"]) =>
 export const subscriptions = AgentsDefinition.subscriptions((entry) => ({
   agents: entry(
     "ReadAgents",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
     {
       messages: [Message.ReceivedAgents, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
+      modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId }) =>

@@ -1,7 +1,8 @@
 /**
  * How the app looks to the person: their choice of Appearance, which the design's theme follows. System leaves it to
  * the browser's preference; Light and Dark override it through `data-theme` on the page's root element. The browser
- * keeps the choice for the next visit.
+ * keeps the choice for the next visit, and `index.html` shows it before the page first paints, reading the key kept
+ * here.
  */
 
 import * as Effect from "effect/Effect"

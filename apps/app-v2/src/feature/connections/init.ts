@@ -23,6 +23,7 @@ export const init = ConnectionsComposition.makeInit(
       removing: Option.none(),
       edits: [],
       checks: [],
+      reads: 0,
       notice: Option.none()
     }
   })

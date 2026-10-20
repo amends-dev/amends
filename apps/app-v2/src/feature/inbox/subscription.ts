@@ -1,9 +1,10 @@
 /**
  * The person's notifications, with the threads and messages they are about, and the groups and
- * people that name them, read from their store as they change.
+ * people that name them, read from their store as they change, and again each time the person asks to try again.
  */
 
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
@@ -12,10 +13,10 @@ import { InboxDefinition, Message } from "./definition.ts"
 export const subscriptions = InboxDefinition.subscriptions((entry) => ({
   inbox: entry(
     "ReadInbox",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
     {
       messages: [Message.ReceivedInbox, Message.ReceivedGroups, Message.ReceivedPeople, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
+      modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId }) =>

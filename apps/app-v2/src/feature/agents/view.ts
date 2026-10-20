@@ -278,7 +278,8 @@ const unreadAgents = (model: Model, h: AgentsViewBuilder): Html =>
   paneEmpty(h, {
     art: "came-apart",
     title: "Couldn't load agents",
-    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) })
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) }),
+    action: button(h, "Try again", Message.ClickedTryAgain())
   })
 
 /**
@@ -589,6 +590,7 @@ const addingModal = (
       notice(h, Option.map(adding.failure, failureMessage))
     ],
     cancelLabel: "Cancel",
+    isCancelLeading: true,
     footer: [submit(h, isSending ? "Creating…" : "Create agent", { isDisabled: !isAddingReady(adding) || isSending })],
     onSubmit: Message.SubmittedAdding()
   })
@@ -605,6 +607,7 @@ const removingModal = (render: RenderInfo, removing: Removing, h: AgentsViewBuil
     description: `${removing.name} will leave the workspace. Its messages stay in their threads.`,
     body: [notice(h, Option.map(removing.failure, failureMessage))],
     cancelLabel: "Cancel",
+    isCancelLeading: true,
     footer: [submit(h, removing.isSending ? "Removing…" : "Remove agent", { isDisabled: removing.isSending })],
     onSubmit: Message.ConfirmedRemoval()
   })

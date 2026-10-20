@@ -6,7 +6,6 @@
 
 import { Assignment, Scope } from "@amends-dev/core/authorization"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
-import type { BadgeTone } from "@amends-dev/design/details"
 import type { StateArtKind } from "@amends-dev/design/stateArt"
 import type * as DateTime from "effect/DateTime"
 import { dayLabel, dayOf, expiryLabel } from "../../seen.ts"
@@ -61,14 +60,6 @@ export const invitationStatusLabels: Readonly<Record<InvitationStatus, string>> 
   accepted: "Accepted",
   expired: "Expired",
   revoked: "Revoked"
-}
-
-/** How an invitation's standing shows as a badge in the history. */
-export const invitationStatusTones: Readonly<Record<InvitationStatus, BadgeTone>> = {
-  pending: "neutral",
-  accepted: "success",
-  expired: "caution",
-  revoked: "neutral"
 }
 
 /**
