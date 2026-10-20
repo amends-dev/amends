@@ -35,7 +35,7 @@ import {
   thread
 } from "../../../test/fixtures.ts"
 import { chooseFromMenu, chooseMenuItem, openMenu } from "../../../test/menu.ts"
-import { AssigneeFilter, AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { AssigneeFilter, AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { OutMessage, type TaskItem } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -135,12 +135,12 @@ describe("the tasks in triage", () => {
       expect(label("Search tasks")).toHaveAttr("placeholder", "Search tasks…"),
       expect(role("button", { name: "Assignee: Anyone" })).toExist(),
       expect(role("button", { name: "Status: Any status" })).toBeAbsent(),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Anyone", "Alice"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Anyone", "Alice"),
       expect(role("button", { name: "Assignee: Alice" })).toExist(),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       expect(text("Try different filters.")).toExist(),
       expect(text("0 tasks")).toExist(),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Alice", "Unassigned"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Alice", "Unassigned"),
       expect(role("button", { name: "Plans for the week" })).toExist(),
       type(label("Search tasks"), "PLANS"),
       expect(role("button", { name: "Plans for the week" })).toExist(),
@@ -267,23 +267,23 @@ describe("every open task", () => {
       given(read),
       expect(role("button", { name: "Assignee: Anyone" })).toExist(),
       expect(within(role("button", { name: "Assignee: Anyone" }), text("Assignee"))).toExist(),
-      ...openMenu(AssigneeFilterMenu, "Assignee: Anyone"),
+      ...openMenu(AssigneeMenu, "Assignee: Anyone"),
       expect(role("menuitem", { name: "Anyone (selected)" })).toExist(),
       expect(role("menuitem", { name: "Unassigned" })).toExist(),
       expect(role("menuitem", { name: "Alice" })).toExist(),
       expect(role("menuitem", { name: "Bob" })).toExist(),
       expect(role("menuitem", { name: "Me" })).toBeAbsent(),
-      ...chooseMenuItem(AssigneeFilterMenu, "Alice"),
+      ...chooseMenuItem(AssigneeMenu, "Alice"),
       expect(within(role("button", { name: "Assignee: Alice" }), text("Alice"))).toExist(),
       expectAll(all.role("listitem")).toHaveCount(1),
       expect(role("button", { name: "Ship the release" })).toExist(),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Alice", "Unassigned"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Alice", "Unassigned"),
       expect(within(role("button", { name: "Assignee: Unassigned" }), text("Unassigned"))).toExist(),
       expectAll(all.role("listitem")).toHaveCount(1),
       expect(role("button", { name: "Plans for the week" })).toExist(),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Unassigned", "Bob"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Unassigned", "Bob"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Bob", "Anyone"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Bob", "Anyone"),
       expectAll(all.role("listitem")).toHaveCount(2)
     )
   })
@@ -294,7 +294,7 @@ describe("every open task", () => {
     scene(
       tasking,
       given(modifyFields(read, { members: () => [bob, scout, carol, member] })),
-      ...openMenu(AssigneeFilterMenu, "Assignee: Anyone"),
+      ...openMenu(AssigneeMenu, "Assignee: Anyone"),
       expectAll(all.role("menuitem")).toHaveCount(5),
       expect(nth(all.role("menuitem"), 0)).toHaveAccessibleName("Anyone (selected)"),
       expect(nth(all.role("menuitem"), 1)).toHaveAccessibleName("Unassigned"),
@@ -347,12 +347,12 @@ describe("every open task", () => {
       tasking,
       given(read),
       ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Triage"),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Anyone", "Alice"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Anyone", "Alice"),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist(),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       expect(text("Try different filters.")).toExist(),
-      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Alice", "Anyone"),
+      ...chooseFromMenu(AssigneeMenu, "Assignee: Alice", "Anyone"),
       type(label("Search tasks"), "zzz"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       type(label("Search tasks"), "  "),

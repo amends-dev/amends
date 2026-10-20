@@ -1611,7 +1611,7 @@ describe("a workspace", () => {
       expect(
         within(role("list", { name: "Threads" }), within(selector('[aria-current="true"]'), text("Plans for the week")))
       ).toExist(),
-      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Close" }))),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Close thread" }))),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),
       expect(role("dialog", { name: "Thread" })).toBeAbsent(),
@@ -1630,7 +1630,7 @@ describe("a workspace", () => {
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(within(role("dialog", { name: "Thread" }), role("complementary", { name: "Thread" }))).toExist(),
-      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Back" }))),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Back to General" }))),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),
       expect(role("dialog", { name: "Thread" })).toBeAbsent(),
@@ -1691,7 +1691,7 @@ describe("a workspace", () => {
         expect(role("heading", { name: "A thread", level: 2 })).toExist()
       ),
       expect(within(inbox, selector('[aria-current="true"]'))).toExist(),
-      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Close" }))),
+      click(within(role("dialog", { name: "Thread" }), role("button", { name: "Close thread" }))),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),
       expect(role("dialog", { name: "Thread" })).toBeAbsent(),

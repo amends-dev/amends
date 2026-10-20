@@ -510,7 +510,7 @@ describe("home", () => {
     scene(
       { update, view: sceneView },
       given(withThread),
-      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close" }))),
+      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close thread" }))),
       expect(role("complementary")).toBeAbsent(),
       expect(role("main", { name: "General" })).toExist(),
       expect(text("Composer paste crash")).toBeAbsent()
@@ -532,7 +532,7 @@ describe("home", () => {
       expect(inbox).toExist(),
       expect(pane).toExist(),
       expect(role("dialog", { name: "Thread" })).toBeAbsent(),
-      expect(within(pane, text("Thread in #General"))).toExist(),
+      expect(within(pane, text("Reply · #General"))).toExist(),
       expect(within(pane, role("heading", { name: "A thread", level: 2 }))).toExist(),
       expect(
         within(inbox, within(selector('[aria-current="true"]'), role("button", { name: "Bob replied" })))
@@ -549,7 +549,7 @@ describe("home", () => {
       given(withNotification),
       click(role("button", { name: "Bob replied" })),
       ...notificationThreadOpened,
-      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close" }))),
+      click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close thread" }))),
       expect(role("complementary")).toBeAbsent(),
       expect(inbox).toExist(),
       expect(within(inbox, selector('[aria-current="true"]'))).toBeAbsent(),

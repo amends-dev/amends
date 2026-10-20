@@ -4,8 +4,8 @@
  * current name, when a time was, by its time of day, its day, either as a message shows it, and how long ago it was,
  * the date something was made, which day each of a list's items falls on, how a thread is titled, where it is, and how
  * many replies it has, whether anyone may join a group, how two texts are compared when the person searches and whether
- * a thread's title or opening has what they search for, how a task's status and priority and a turn's status read,
- * which statuses leave a task open, and when an invitation closes.
+ * a thread's title or opening has what they search for, how a task's status and priority and a turn's status read and
+ * how a status is drawn, which statuses leave a task open, and when an invitation closes.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -15,7 +15,7 @@ import type { Task } from "@amends-dev/core/task"
 import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
-import type { MarkContent } from "@amends-dev/design/mark"
+import type { MarkContent, TaskStatusShape } from "@amends-dev/design/mark"
 import type { TextRun } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
@@ -165,18 +165,38 @@ export const placeName = (
   self: MemberId.MemberId
 ): string => (group.kind === "Team" ? `#${group.name}` : groupName(group, members, self))
 
+/** What a side pane is about: a thread, or the task it tracks. */
+export type SideAbout = "Thread" | "Task"
+
 /**
- * Where a thread is, as the side pane's subtitle says it: "Thread in #general" for a team, "Thread in Bob" for a
- * conversation, or only "Thread" while its group is not read.
+ * Where a thread or a task is, as the side pane's subtitle says it, as `apps/ui` does: "Thread in #general" for a team,
+ * "Thread with Bob" for a conversation, or only "Thread" while its group is not read; "Task in #general" and "Task
+ * with Bob" the same way.
  */
-export const threadSubtitle = (
+export const sideSubtitle = (
+  about: SideAbout,
   group: Option.Option<Group.Group>,
   members: ReadonlyArray<Member.Member>,
   self: MemberId.MemberId
 ): string =>
   Option.match(group, {
-    onNone: () => "Thread",
-    onSome: (known) => `Thread in ${placeName(known, members, self)}`
+    onNone: () => about,
+    onSome: (known) => `${about} ${known.kind === "Team" ? "in" : "with"} ${placeName(known, members, self)}`
+  })
+
+/**
+ * Where a thread is when the person came to it for a reason, as `apps/ui`'s inbox says it in the side pane's
+ * subtitle: "Mention · #general", or only the reason while the thread's group is not read.
+ */
+export const reasonSubtitle = (
+  reason: string,
+  group: Option.Option<Group.Group>,
+  members: ReadonlyArray<Member.Member>,
+  self: MemberId.MemberId
+): string =>
+  Option.match(group, {
+    onNone: () => reason,
+    onSome: (known) => `${reason} · ${placeName(known, members, self)}`
   })
 
 /** `author` by their name here: a member's, or the name a channel's contact gave. */
@@ -283,6 +303,19 @@ export const statusLabel: Readonly<Record<Task.Status, string>> = {
   held: "Held",
   done: "Done",
   dismissed: "Dismissed"
+}
+
+/**
+ * How a task's status is drawn: the four drawings `apps/ui` has for triage, to do (open), doing (in progress), and
+ * done, and a pause for held and a cross for dismissed, which `apps/ui` has no statuses for.
+ */
+export const statusShape: Readonly<Record<Task.Status, TaskStatusShape>> = {
+  triage: "triage",
+  todo: "open",
+  doing: "progress",
+  held: "paused",
+  done: "done",
+  dismissed: "dismissed"
 }
 
 /** Whether a task in `status` is open: it is neither done nor dismissed. */

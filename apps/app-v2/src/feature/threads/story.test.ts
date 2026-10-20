@@ -11,7 +11,7 @@ import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import {
   AssigneeFilter,
-  AssigneeFilterMenu,
+  AssigneeMenu,
   assigneeChoiceOf,
   assigneeChoices,
   StatusFilterMenu,
@@ -87,7 +87,7 @@ const choseAssignee = (assignee: AssigneeFilter) =>
     model: listing.assigneeMenu,
     viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
   }).toParentMessage(
-    AssigneeFilterMenu.Message.SelectedItem({
+    AssigneeMenu.Message.SelectedItem({
       index: assigneeChoices(people).findIndex(([value]) => value === assigneeChoiceOf(assignee)),
       item: assigneeChoiceOf(assignee)
     })

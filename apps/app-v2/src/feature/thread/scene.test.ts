@@ -1,12 +1,14 @@
-import { ThreadId, ThreadMessage, ThreadMessageId } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   Subscription,
+  all,
   click,
   expect,
+  expectAll,
   given,
   label,
   role,
@@ -17,7 +19,8 @@ import {
   withViewInputs,
   within
 } from "foldkit/scene"
-import { deleted, now, saying, scout, turnOf } from "../../../test/fixtures.ts"
+import { modifyFields } from "foldkit/struct"
+import { deleted, now, saying, scout, task, turnOf } from "../../../test/fixtures.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -25,12 +28,20 @@ import { SaveDraft } from "../composer/command.ts"
 import { TurnsBlock } from "../turns/block.ts"
 import { subscriptions as turnsSubscriptions } from "../turns/subscription.ts"
 import { ThreadBlock } from "./block.ts"
-import { DeleteMessage, EditMessage, PostReply, RenameThread, TellTyping } from "./command.ts"
-import { Message } from "./definition.ts"
+import {
+  DeleteMessage,
+  EditMessage,
+  FollowThread,
+  PostReply,
+  RenameThread,
+  TellTyping,
+  UnfollowThread
+} from "./command.ts"
+import { type Following, Message } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { replyView, view } from "./view.ts"
+import { followView, replyView, view } from "./view.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
@@ -77,9 +88,9 @@ const savingDraft = (text: string) =>
 
 const sceneView = withViewInputs(view, { now })()
 
-/** The side pane's body and its footer, as the group's side pane puts them. */
+/** The side pane's bell, body and footer, as the group's side pane puts them. */
 const sidePane = (model: Parameters<typeof sceneView>[0], h: Parameters<typeof sceneView>[1]) =>
-  h.div([], [sceneView(model, h), replyView(model, h)])
+  h.div([], [followView(model, h), sceneView(model, h), replyView(model, h)])
 
 /** The thread read with `messages`, written by alice and bob, whose names are read. */
 const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.ThreadMessage; pending: boolean }>>) => [
@@ -96,7 +107,14 @@ const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.T
   Subscription.emit(subscriptions.thread, Message.ReceivedPeople({ members: [alice, bob], contacts: [] }))
 ]
 
+const participationId = ThreadParticipationId.ThreadParticipationId.make("participation-1")
+
 const opened = init(workspaceId, memberId, threadId).model
+
+/** The thread when it tracks a task, which is in triage and assigned to no one. */
+const trackingTask = modifyFields(opened, {
+  task: (taskModel) => modifyFields(taskModel, { task: () => Option.some({ task, pending: false }) })
+})
 
 describe("a thread", () => {
   it("shows its messages by their authors, who types, and takes a reply", () => {
@@ -114,7 +132,7 @@ describe("a thread", () => {
       // A reply on its way is marked so, and only the person's own messages can be edited.
       expect(text(" · Sending…")).toExist(),
       expect(role("button", { name: "Edit" })).toExist(),
-      expect(role("button", { name: "Follow" })).toExist(),
+      expect(role("button", { name: "Follow thread" })).toExist(),
       Subscription.emit(
         subscriptions.presence,
         Message.ReceivedPresence({ present: [{ memberId: bob.id, typingIn: threadId }] })
@@ -146,6 +164,88 @@ describe("a thread", () => {
       expect(text("Yesterday")).toExist(),
       expect(text(timeOf(yesterday.publishedAt))).toBeAbsent(),
       expect(text(timeOf(reply.publishedAt))).toExist()
+    )
+  })
+
+  it("lays a thread that tracks a task out as the task's properties, its description, and its activity", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(role("region", { name: "Task" })).toExist(),
+      expect(role("region", { name: "Thread" })).toBeAbsent(),
+      expect(role("group", { name: "Properties" })).toExist(),
+      expect(text("Description")).toExist(),
+      // The opening is the description, which the activity does not repeat.
+      expectAll(all.text("Plans for the week")).toHaveCount(1),
+      expect(within(role("list", { name: "Activity" }), text("Activity"))).toExist(),
+      expect(within(role("list", { name: "Activity" }), text(/^Alice created this task · /))).toExist(),
+      expect(within(role("list", { name: "Activity" }), text("Sounds good"))).toExist(),
+      expect(within(role("list", { name: "Activity" }), text("Plans for the week"))).toBeAbsent(),
+      expect(role("list", { name: "Messages" })).toBeAbsent()
+    )
+  })
+
+  it("edits and deletes the description, the person's own opening, where it is read", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      expectAll(all.role("button", { name: "Edit" })).toHaveCount(1),
+      click(role("button", { name: "Edit" })),
+      expect(label("Edit")).toHaveValue("Plans for the week"),
+      type(label("Edit"), "Plans for next week"),
+      click(role("button", { name: "Save" })),
+      Command.expectExact(
+        EditMessage({
+          workspaceId,
+          memberId,
+          messageId: opening.id,
+          text: "Plans for next week",
+          expectedRevision: 1
+        })
+      ),
+      Command.resolve(EditMessage, Message.WroteAction())
+    )
+  })
+
+  it("keeps Rename above the task, and describes nothing until the opening is read", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      expect(role("button", { name: "Rename" })).toExist(),
+      expect(role("list", { name: "Activity" })).toExist(),
+      expect(text("Description")).toBeAbsent()
+    )
+  })
+
+  it("puts the person's part in the thread in a bell: Follow thread, then Following thread, pressed, which unfollows", () => {
+    const readFollowing = (following: Option.Option<Following>) =>
+      Subscription.emit(
+        subscriptions.thread,
+        Message.ReceivedThread({ title: Option.none(), messages: [], following, latest: 0, readThrough: 0 })
+      )
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      readFollowing(Option.none()),
+      expect(role("button", { name: "Follow thread" })).toHaveAttr("aria-pressed", "false"),
+      click(role("button", { name: "Follow thread" })),
+      Command.expectExact(FollowThread({ workspaceId, memberId, threadId })),
+      Command.resolve(FollowThread, Message.WroteAction()),
+      readFollowing(Option.some({ participationId, active: true, pending: false })),
+      expect(role("button", { name: "Follow thread" })).toBeAbsent(),
+      expect(role("button", { name: "Following thread" })).toHaveAttr("aria-pressed", "true"),
+      click(role("button", { name: "Following thread" })),
+      Command.expectExact(UnfollowThread({ workspaceId, memberId, threadId, participationId })),
+      Command.resolve(UnfollowThread, Message.WroteAction()),
+      readFollowing(Option.some({ participationId, active: false, pending: false })),
+      expect(role("button", { name: "Follow thread" })).toHaveAttr("aria-pressed", "false"),
+      readFollowing(Option.some({ participationId, active: true, pending: true })),
+      expect(role("button", { name: "Follow thread" })).toBeAbsent(),
+      expect(role("button", { name: "Following thread" })).toBeAbsent(),
+      expect(text(" · Sending…")).toExist()
     )
   })
 

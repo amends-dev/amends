@@ -6,6 +6,8 @@ import {
   assigneeChoiceOf,
   assigneeChoices,
   assigneeFilterOf,
+  assigneeOfChoice,
+  assigneeProperties,
   isAssignedTo,
   statusChoices
 } from "./taskFilter.ts"
@@ -63,6 +65,58 @@ describe("the choices of whom a task is assigned to", () => {
       "Anyone",
       "Unassigned",
       "Member:member-0",
+      "Member:member-2"
+    ])
+  })
+})
+
+describe("whom the assignee menu assigns a task to", () => {
+  it("is the member a choice names, and no one for Unassigned", () => {
+    expect(assigneeOfChoice("Member:member-2")).toBe(bob.id)
+    expect(assigneeOfChoice("Unassigned")).toBeNull()
+  })
+
+  it("is no one for Anyone, which only narrows a list", () => {
+    expect(assigneeOfChoice("Anyone")).toBeNull()
+  })
+})
+
+describe("the choices of whom one task is assigned to", () => {
+  const everyone = [scout, bob, left, member]
+
+  it("are Unassigned, drawn as the people icon in the button, then each member that can be assigned by name, with their mark", () => {
+    expect(assigneeProperties([bob, member], everyone, null)).toEqual([
+      { value: "Unassigned", label: "Unassigned", buttonIcon: "users" },
+      { value: "Member:member-1", label: "Alice", mark: { text: "A", tone: "neutral" } },
+      { value: "Member:member-2", label: "Bob", mark: { text: "B", tone: "neutral" } }
+    ])
+  })
+
+  it("leave out a member who has left the workspace and one that cannot be assigned", () => {
+    expect(assigneeProperties([left, bob], everyone, null).map(({ value }) => value)).toEqual([
+      "Unassigned",
+      "Member:member-2"
+    ])
+    expect(assigneeProperties([bob], everyone, null).map(({ value }) => value)).not.toContain("Member:member-3")
+  })
+
+  it("keep an assignee who cannot be chosen, such as an agent the person may not use, by their name and mark", () => {
+    expect(assigneeProperties([bob], everyone, scout.id)).toEqual([
+      { value: "Unassigned", label: "Unassigned", buttonIcon: "users" },
+      { value: "Member:member-2", label: "Bob", mark: { text: "B", tone: "neutral" } },
+      { value: "Member:member-3", label: "Scout", mark: { text: "S", tone: "lilac" } }
+    ])
+  })
+
+  it("keep an assignee the members do not know by their ID, with no mark, and list one that can be chosen once", () => {
+    const stranger = MemberId.MemberId.make("member-8")
+
+    expect(assigneeProperties([bob], everyone, stranger).at(-1)).toEqual({
+      value: "Member:member-8",
+      label: "member-8"
+    })
+    expect(assigneeProperties([bob], everyone, bob.id).map(({ value }) => value)).toEqual([
+      "Unassigned",
       "Member:member-2"
     ])
   })

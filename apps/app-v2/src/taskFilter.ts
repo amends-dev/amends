@@ -6,7 +6,7 @@
 
 import { Task } from "@amends-dev/core/task"
 import { type Member, MemberId } from "@amends-dev/core/workspace"
-import { type ChoiceMenuChoice, choiceMenu, type MenuConfig } from "@amends-dev/design/menu"
+import { type ChoiceMenuChoice, choiceMenu, type MenuConfig, type PropertyChoice } from "@amends-dev/design/menu"
 import * as Menu from "@foldkit/ui/menu"
 import * as Schema from "effect/Schema"
 import type { Html, HtmlBuilder } from "foldkit/html"
@@ -36,8 +36,8 @@ export type AssigneeChoice = "Anyone" | "Unassigned" | `Member:${string}`
 /** The menu that chooses the status a list is narrowed to. */
 export const StatusFilterMenu = Menu.create<TaskStatusFilter>()
 
-/** The menu that chooses whom the tasks of a list are assigned to. */
-export const AssigneeFilterMenu = Menu.create<AssigneeChoice>()
+/** The menu that chooses whom tasks are assigned to: to narrow a list of them, or to assign one. */
+export const AssigneeMenu = Menu.create<AssigneeChoice>()
 
 /** The statuses a list of tasks narrows to: any, then each of `statuses` as the person reads it. */
 export const statusChoices = (
@@ -65,8 +65,23 @@ export const assigneeFilterOf = (choice: AssigneeChoice): AssigneeFilter =>
       ? AssigneeFilter.Unassigned()
       : AssigneeFilter.Member({ memberId: MemberId.MemberId.make(choice.slice(memberChoicePrefix.length)) })
 
+/**
+ * Whom the assignee menu's `choice` assigns a task to: the member it names, or no one. Anyone, which only narrows a
+ * list, is not a choice of whom to assign, and assigns no one.
+ */
+export const assigneeOfChoice = (choice: AssigneeChoice): MemberId.MemberId | null =>
+  AssigneeFilter.match(assigneeFilterOf(choice), {
+    Anyone: () => null,
+    Unassigned: () => null,
+    Member: ({ memberId }) => memberId
+  })
+
 const byName = (left: Member.Member, right: Member.Member): number =>
   left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1)
+
+/** The members the assignee menu lists: those still in the workspace, by name. */
+const listedMembers = (members: ReadonlyArray<Member.Member>): ReadonlyArray<Member.Member> =>
+  members.filter((member) => member.status === "active").toSorted(byName)
 
 /**
  * The choices of whom a task is assigned to: Anyone, Unassigned, then each member still in the workspace, by name,
@@ -77,14 +92,40 @@ export const assigneeChoices = (
 ): ReadonlyArray<ChoiceMenuChoice<AssigneeChoice>> => [
   ["Anyone", "Anyone"],
   ["Unassigned", "Unassigned"],
-  ...members
-    .filter((member) => member.status === "active")
-    .toSorted(byName)
-    .map(
-      (member) =>
-        [assigneeChoiceOf(AssigneeFilter.Member({ memberId: member.id })), member.name, memberMark(member)] as const
-    )
+  ...listedMembers(members).map(
+    (member) =>
+      [assigneeChoiceOf(AssigneeFilter.Member({ memberId: member.id })), member.name, memberMark(member)] as const
+  )
 ]
+
+/**
+ * The choices of whom one task is assigned to, as a property of the task: Unassigned, which the button draws as the
+ * people icon, then each of `assignable` still in the workspace, by name, with their mark. The `assignee`, if there is
+ * one, is always among them, by the name `members` give them, though they have left the group or the person may not
+ * use them, so that the button says who the task is assigned to.
+ */
+export const assigneeProperties = (
+  assignable: ReadonlyArray<Member.Member>,
+  members: ReadonlyArray<Member.Member>,
+  assignee: MemberId.MemberId | null
+): ReadonlyArray<PropertyChoice<AssigneeChoice>> => {
+  const choiceOf = (memberId: MemberId.MemberId): PropertyChoice<AssigneeChoice> => {
+    const member = members.find(({ id }) => id === memberId)
+
+    return {
+      value: assigneeChoiceOf(AssigneeFilter.Member({ memberId })),
+      label: memberName(members, memberId),
+      ...(member === undefined ? {} : { mark: memberMark(member) })
+    }
+  }
+  const listed = listedMembers(assignable)
+
+  return [
+    { value: "Unassigned", label: "Unassigned", buttonIcon: "users" },
+    ...listed.map(({ id }) => choiceOf(id)),
+    ...(assignee === null || listed.some(({ id }) => id === assignee) ? [] : [choiceOf(assignee)])
+  ]
+}
 
 /** Whether a task assigned to `assignee` is one `filter` keeps. */
 export const isAssignedTo = (filter: AssigneeFilter, assignee: MemberId.MemberId | null): boolean =>

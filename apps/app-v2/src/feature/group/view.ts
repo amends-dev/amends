@@ -15,16 +15,15 @@ import { badge, entry, entryList } from "@amends-dev/design/details"
 import { form, settingRow } from "@amends-dev/design/form"
 import { markCluster } from "@amends-dev/design/mark"
 import { type ModalConfig, modal } from "@amends-dev/design/modal"
-import { pane, paneBack, paneClose, paneColumn, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneTabs } from "@amends-dev/design/pane"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may } from "../../permissions.ts"
-import { groupName, initials, isJoinable, memberName, pluralize, threadSubtitle } from "../../seen.ts"
-import { titleOf } from "../thread/definition.ts"
-import { replyView } from "../thread/view.ts"
+import { groupName, initials, isJoinable, memberName, pluralize } from "../../seen.ts"
+import { followView, replyView, sidePane } from "../thread/view.ts"
 import { composerView, tabsView, toolbarView } from "../threads/view.ts"
 import { DialogBinding, GroupComposition, type GroupViewBuilder, ThreadBinding, ThreadsBinding } from "./composition.ts"
 import { admitted, belongs, mayRename, Message, type Model, membersOf, teamName } from "./definition.ts"
@@ -354,31 +353,26 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
 })
 
 /**
- * The thread open in the group as the side pane, with the button that closes it, Close beside the title and
- * Back before it on a phone, and nothing while none is open.
+ * The thread open in the group as the side pane (see `sidePane`), a task's when the thread tracks one, with the button
+ * that closes it, Close beside the title and Back before it on a phone, which goes back to the Tasks tab when the
+ * tasks are what the group lists, and to the group otherwise. Nothing while none is open.
  */
 export const threadView = GroupComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   Option.match(model.thread, {
     onNone: () => h.empty,
     onSome: ({ threadId, model: open }) =>
-      pane(h, {
-        variant: "side",
-        label: "Thread",
-        header: {
-          title: titleOf(open),
-          icon: "mark-reply",
-          subtitle: threadSubtitle(
-            Option.map(model.group, ({ group }) => group),
-            model.members,
-            model.memberId
-          ),
-          leading: paneBack(h, Message.ClickedAllThreads()),
-          actions: [paneClose(h, Message.ClickedAllThreads())]
-        },
-        body: [h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open, viewInputs: { now } }))],
-        footer: [
-          h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView }))
-        ]
+      sidePane(h, {
+        thread: open,
+        group: Option.map(model.group, ({ group }) => group),
+        members: model.members,
+        self: model.memberId,
+        backTo: model.threads.tab === "Tasks" ? "Tasks" : nameOf(model),
+        onClose: Message.ClickedAllThreads(),
+        follow: h.block(
+          ThreadBinding.embedView({ key: threadId, slotId: "thread-follow", model: open, view: followView })
+        ),
+        body: h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open, viewInputs: { now } })),
+        reply: h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView }))
       })
   })
 )

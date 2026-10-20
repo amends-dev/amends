@@ -34,6 +34,7 @@ import {
   opening,
   reply,
   saying,
+  task,
   thread
 } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -432,7 +433,7 @@ describe("the inbox", () => {
       expect(role("heading", { name: "You're all caught up", level: 2 })).toBeAbsent(),
       expect(role("complementary", { name: "Thread" })).toExist(),
       // Closing the panel clears the selection, and with nothing waiting the inbox is caught up.
-      click(role("button", { name: "Close" })),
+      click(role("button", { name: "Close thread" })),
       expectOutMessage(OutMessage.ClosedThread()),
       expect(role("complementary", { name: "Thread" })).toBeAbsent(),
       expect(notifications).toBeAbsent(),
@@ -569,18 +570,31 @@ const sidePane = (model: Parameters<typeof sceneThreadView>[0], h: Parameters<ty
 describe("the inbox's side pane", () => {
   const pane = role("complementary", { name: "Thread" })
 
-  it("is the complementary landmark named Thread, titled by the thread, saying which group it is in", () => {
+  it("is the complementary landmark named Thread, titled by the thread, saying why it came and from which group", () => {
     scene(
       { update, view: sceneThreadView },
       given(openedThread),
       expect(pane).toExist(),
       expect(within(pane, role("heading", { name: "Composer paste crash", level: 2 }))).toExist(),
-      expect(within(pane, text("Thread in #General"))).toExist(),
+      expect(within(pane, text("Reply · #General"))).toExist(),
       expect(within(pane, role("region", { name: "Thread" }))).toExist()
     )
   })
 
-  it("says Thread in a conversation by the others in it, and only Thread while the store lacks the group", () => {
+  it("says Mention when the message addresses the person, and New thread when it opens the thread", () => {
+    scene(
+      { update, view: sceneThreadView },
+      given(modifyFields(openedThread, { items: () => [{ ...bobsReply, message: Option.some(mention) }] })),
+      expect(within(pane, text("Mention · #General"))).toExist()
+    )
+    scene(
+      { update, view: sceneThreadView },
+      given(modifyFields(openedThread, { items: () => [{ ...bobsReply, message: Option.some(opening) }] })),
+      expect(within(pane, text("New thread · #General"))).toExist()
+    )
+  })
+
+  it("says the reason with a conversation by the others in it, and only the reason while the store lacks the group", () => {
     scene(
       { update, view: sceneThreadView },
       given(
@@ -589,14 +603,53 @@ describe("the inbox's side pane", () => {
           selected: Option.map((selected) => ({ ...selected, groupId: conversationWithBob.id }))
         })
       ),
-      expect(within(pane, text("Thread in Bob"))).toExist(),
-      expect(within(pane, text("Thread in #General"))).toBeAbsent()
+      expect(within(pane, text("Reply · Bob"))).toExist(),
+      expect(within(pane, text("Reply · #General"))).toBeAbsent()
     )
     scene(
       { update, view: sceneThreadView },
       given(modifyFields(openedThread, { groups: () => [] })),
-      expect(within(pane, text("Thread"))).toExist(),
-      expect(within(pane, text(/Thread in/))).toBeAbsent()
+      expect(within(pane, text("Reply"))).toExist(),
+      expect(within(pane, text(/Reply ·/))).toBeAbsent()
+    )
+  })
+
+  it("says where the thread is when the store lacks the message the notification is about", () => {
+    scene(
+      { update, view: sceneThreadView },
+      given(modifyFields(openedThread, { items: () => [{ ...bobsReply, message: Option.none() }] })),
+      expect(within(pane, text("Thread in #General"))).toExist()
+    )
+  })
+
+  it("is the complementary landmark named Task for a thread that tracks one, back to the inbox", () => {
+    scene(
+      { update, view: sceneThreadView },
+      given(
+        modifyFields(openedThread, {
+          selected: Option.map((selected) => ({
+            ...selected,
+            model: modifyFields(selected.model, {
+              task: (taskModel) =>
+                modifyFields(taskModel, {
+                  task: () => Option.some({ task: { ...task, threadId: thread.id }, pending: false })
+                })
+            })
+          }))
+        })
+      ),
+      expect(pane).toBeAbsent(),
+      expect(within(role("complementary", { name: "Task" }), text("Reply · #General"))).toExist(),
+      expect(within(role("complementary", { name: "Task" }), role("button", { name: "Close task" }))).toExist(),
+      expect(within(role("complementary", { name: "Task" }), role("button", { name: "Back to Inbox" }))).toExist()
+    )
+  })
+
+  it("offers the bell that follows the thread in its header", () => {
+    scene(
+      { update, view: sceneThreadView },
+      given(openedThread),
+      expect(within(pane, role("button", { name: "Follow thread" }))).toExist()
     )
   })
 
@@ -635,8 +688,8 @@ describe("the inbox's side pane", () => {
     )
   })
 
-  it("closes with a button named Close, and goes back with one named Back, each reporting it", () => {
-    for (const name of ["Close", "Back"]) {
+  it("closes with a button named Close thread, and goes back with one named for the inbox, each reporting it", () => {
+    for (const name of ["Close thread", "Back to Inbox"]) {
       scene(
         { update, view: sidePane },
         given(openedThread),

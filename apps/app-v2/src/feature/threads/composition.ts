@@ -2,7 +2,7 @@ import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Drafts from "../../store/Drafts.ts"
-import { assigneeFilterOf, AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { assigneeFilterOf, AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { StartThread } from "./command.ts"
 import { type Model, TaskSortMenu, ThreadsDefinition } from "./definition.ts"
@@ -53,12 +53,12 @@ export const StatusBinding = ThreadsDefinition.bindChild(StatusFilterMenu, {
   }
 })
 
-export const AssigneeBinding = ThreadsDefinition.bindChild(AssigneeFilterMenu, {
+export const AssigneeBinding = ThreadsDefinition.bindChild(AssigneeMenu, {
   field: "assigneeMenu",
   init: { contextToArgs: () => [{ id: "group-tasks-assignee" }] },
   outMessage: {
     /** Choosing whom the tasks are assigned to narrows the Tasks tab to them. */
-    fold: AssigneeFilterMenu.OutMessage.match({
+    fold: AssigneeMenu.OutMessage.match({
       Selected: ({ value }) =>
         ThreadsDefinition.stepFields(() => ({
           taskFilter: (filter) => modifyFields(filter, { assignee: () => assigneeFilterOf(value) })

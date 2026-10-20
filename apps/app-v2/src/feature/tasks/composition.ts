@@ -1,6 +1,6 @@
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
-import { assigneeFilterOf, AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
+import { assigneeFilterOf, AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { TasksDefinition } from "./definition.ts"
 
 export const StatusBinding = TasksDefinition.bindChild(StatusFilterMenu, {
@@ -16,12 +16,12 @@ export const StatusBinding = TasksDefinition.bindChild(StatusFilterMenu, {
   }
 })
 
-export const AssigneeBinding = TasksDefinition.bindChild(AssigneeFilterMenu, {
+export const AssigneeBinding = TasksDefinition.bindChild(AssigneeMenu, {
   field: "assigneeMenu",
   init: { contextToArgs: () => [{ id: "tasks-assignee" }] },
   outMessage: {
     /** Choosing whom the tasks are assigned to narrows the list to them. */
-    fold: AssigneeFilterMenu.OutMessage.match({
+    fold: AssigneeMenu.OutMessage.match({
       Selected: ({ value }) =>
         TasksDefinition.stepFields(() => ({
           filter: (filter) => modifyFields(filter, { assignee: () => assigneeFilterOf(value) })

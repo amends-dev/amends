@@ -1,12 +1,11 @@
 import { button, buttonRow, loadingLine, notice } from "@amends-dev/design/control"
 import { divider, messageList, notification } from "@amends-dev/design/message"
-import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { ageLabel, threadSubtitle } from "../../seen.ts"
-import { titleOf } from "../thread/definition.ts"
-import { replyView } from "../thread/view.ts"
+import { ageLabel, reasonSubtitle } from "../../seen.ts"
+import { followView, replyView, sidePane } from "../thread/view.ts"
 import { InboxComposition, type InboxViewBuilder, ThreadBinding } from "./composition.ts"
 import {
   byDay,
@@ -20,6 +19,7 @@ import {
   notificationHeadline,
   notificationPlace,
   notificationText,
+  selectedReasonWords,
   shownItems,
   type Tab,
   waitingCount
@@ -155,44 +155,54 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
 )
 
 /**
- * The thread of the notification the person opened as the side pane, with the message the notification is about
- * highlighted in it, and the button that closes it, Close beside the title and Back before it on a phone, and
- * nothing while none is open.
+ * The thread of the notification the person opened as the side pane (see `sidePane`), a task's when it tracks one, with
+ * the message the notification is about highlighted in it, the reason the notification came as its subtitle, such as
+ * "Mention · #general", while the store holds the message, and the button that closes it, Close beside the title and
+ * Back, named for the Inbox, before it on a phone, and nothing while none is open.
  */
 export const threadView = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   Option.match(model.selected, {
     onNone: () => h.empty,
-    onSome: (selected) =>
-      pane(h, {
-        variant: "side",
-        label: "Thread",
-        header: {
-          title: titleOf(selected.model),
-          icon: "mark-reply",
-          subtitle: threadSubtitle(findGroup(model, selected.groupId), model.members, model.memberId),
-          leading: paneBack(h, Message.ClickedClose()),
-          actions: [paneClose(h, Message.ClickedClose())]
-        },
-        body: [
-          h.block(
-            ThreadBinding.embedView({
-              key: selected.threadId,
-              slotId: "thread",
-              model: selected.model,
-              viewInputs: { now, highlightedMessageId: selected.messageId }
-            })
+    onSome: (selected) => {
+      const group = findGroup(model, selected.groupId)
+
+      return sidePane(h, {
+        thread: selected.model,
+        group,
+        members: model.members,
+        self: model.memberId,
+        backTo: "Inbox",
+        subtitle: Option.getOrUndefined(
+          Option.map(selectedReasonWords(model), (reason) =>
+            reasonSubtitle(reason, group, model.members, model.memberId)
           )
-        ],
-        footer: [
-          h.block(
-            ThreadBinding.embedView({
-              key: selected.threadId,
-              slotId: "thread-reply",
-              model: selected.model,
-              view: replyView
-            })
-          )
-        ]
+        ),
+        onClose: Message.ClickedClose(),
+        follow: h.block(
+          ThreadBinding.embedView({
+            key: selected.threadId,
+            slotId: "thread-follow",
+            model: selected.model,
+            view: followView
+          })
+        ),
+        body: h.block(
+          ThreadBinding.embedView({
+            key: selected.threadId,
+            slotId: "thread",
+            model: selected.model,
+            viewInputs: { now, highlightedMessageId: selected.messageId }
+          })
+        ),
+        reply: h.block(
+          ThreadBinding.embedView({
+            key: selected.threadId,
+            slotId: "thread-reply",
+            model: selected.model,
+            view: replyView
+          })
+        )
       })
+    }
   })
 )

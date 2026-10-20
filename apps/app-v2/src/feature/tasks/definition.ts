@@ -19,13 +19,7 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
 import { isOpen, threadContains } from "../../seen.ts"
-import {
-  AssigneeFilter,
-  AssigneeFilterMenu,
-  isAssignedTo,
-  StatusFilterMenu,
-  TaskStatusFilter
-} from "../../taskFilter.ts"
+import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 
 /**
  * A task, the thread that tracks it with its opening message, its group's name, how many messages follow the
@@ -54,7 +48,7 @@ export const Model = Schema.Struct({
   contacts: Schema.Array(Contact.Contact),
   filter: Schema.Struct({ status: TaskStatusFilter, assignee: AssigneeFilter, query: Schema.String }),
   statusMenu: StatusFilterMenu.Model,
-  assigneeMenu: AssigneeFilterMenu.Model,
+  assigneeMenu: AssigneeMenu.Model,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type

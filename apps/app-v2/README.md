@@ -104,7 +104,8 @@ composers are the design's `message`, `divider`, and `composer`, in a `messageLi
 initials and when a message was, by its time of day today and by its day before, from `src/seen.ts`,
 which also groups what has a time by the day it was (`groupByDay`, under a `divider` each) and says where a
 group is: its mark in a list (`groupMark`), as a line says it, `#general` or the others in a conversation
-(`placeName`), and as a side pane's subtitle (`threadSubtitle`).
+(`placeName`), and as a side pane's subtitle (`sideSubtitle`, and `reasonSubtitle` for the inbox's), and which
+draws a task's status (`statusShape`) with the design's `taskStatus`.
 
 A message's text is markdown as the person wrote it, and a mention in it is a link to the member,
 `[@Ada](member:<id>)`, labelled with the name they had when mentioned. Wherever a message's text is
@@ -129,11 +130,10 @@ that alone; a mention typed in the middle of the text is left as typed. A link w
 hand, still addresses its member, since a write reads the text. The textarea that edits a message,
 and the one that begins a conversation, are not the composer, and suggest no one.
 
-The task and the turns a thread embeds are the
-design's `paneSection`s: the task's status, priority, and assignee are a `fieldGrid` of selects, or
-a `detailList` for someone who may not change them, and the turns are an `entryList` of `entry`s,
-each its agent's initials and name with a `badge` for how it stands, its buttons in a `buttonRow`,
-and its `log`. The inbox has `paneTabs` of All and Unread, which counts those waiting while any wait, under its title, and lists its
+The task a thread embeds is the design's `properties`: its status, assignee, and priority are
+`propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
+turns it embeds are the design's `paneSection`s, an `entryList` of `entry`s, each its agent's initials
+and name with a `badge` for how it stands, its buttons in a `buttonRow`, and its `log`. The inbox has `paneTabs` of All and Unread, which counts those waiting while any wait, under its title, and lists its
 notifications as `notification`s in a `messageList`, under a `divider` for each day, each its
 author's initials and name and what they did, its place, its text, which opens the thread, how long
 ago it came, and a dot while it waits, the row of the notification whose thread is open drawn
@@ -207,21 +207,49 @@ below it counted at each level above.
   `Presence.typingRepeats`, and sending says they stopped. It has two views. `view`, its canonical
   one, is the body of a side pane, which takes the time now as its view input, and, optionally, the
   id of a message to highlight (`highlightedMessageId`), which it draws as the current row, so the
-  person sees what a notification was about, and the group gives none: Follow or Unfollow and Rename in a row, the form to rename it while
-  the person does, the task and the turns, then its messages as a list, the opening first, how many
-  replies follow it, and the replies, each by its author's initials, name, and when it was published
-  (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with "Sending…" or
-  "edited" after it, its text with each mention a chip (`messageRuns`, by the thread's members),
-  and Edit and Delete on the person's own, which the form to edit it replaces while they do; and who
-  else types, in a live region under them. It shows no title, which
-  the pane's header has. `replyView` is the reply composer, for the pane's footer, which suggests the
-  workspace's members the thread has read.
-- `feature/task`: the task a thread tracks: its status, priority, and assignee, which the person
+  person sees what a notification was about, and the group gives none. For a thread that tracks no
+  task it is a section named Thread: Rename, the form to rename it while the person does, the task
+  (making it one, where they may) and the turns, then its messages as a list, the opening first, how
+  many replies follow it, and the replies, each by its author's initials, name, and when it was
+  published (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with
+  "Sending…" or "edited" after it, its text with each mention a chip (`messageRuns`, by the thread's
+  members), and Edit and Delete on the person's own, which the form to edit it replaces while they
+  do; and who else types, in a live region under them. For a thread that tracks a task it is a
+  section named Task, laid out as `apps/ui`'s task pane is: Rename, which `apps/ui` has no place for
+  and so stays at the top of the body, the task's properties, a "Description" caption over the
+  thread's opening, which is the task's description, with Edit and Delete on the person's own, the
+  turns, and under an "Activity" divider the line "Alice created this task · 12:01" and the replies
+  as messages, and who types. `apps/ui` links a task to the discussion it came from ("View original
+  discussion"); this view does not, since a thread names the thread it was derived from only in
+  `Thread.origin`, no thread the app starts has one, and the link would have to ask the page to open
+  another thread from inside a side pane. It shows no title, which the pane's header has. `followView` is the bell for that header, as
+  `apps/ui` draws it: an outlined bell named "Follow thread", or, while the person follows, a filled
+  one named "Following thread" and pressed, which stops following, and " · Sending…" in its place
+  while a change is on its way. `replyView` is the reply composer, for the pane's footer, which
+  suggests the workspace's members the thread has read. `sidePane` puts the three into the design's
+  side `pane` for the group and the inbox alike: the pane is named Thread, or Task for a thread that
+  tracks one; the header has the thread's title, or its first message's words, before a message icon
+  or the task's status drawing, a subtitle (the group's, or the inbox's own), Back, named for where
+  it goes back to, such as "Back to Design", "Back to Tasks", or "Back to Inbox", before the title on
+  a phone, and the bell and Close thread, or Close task, after it.
+- `feature/task`: the task a thread tracks: its status, assignee, and priority, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
   while the thread tracks none, making it one, when they may create tasks in its group. Its view is
-  a section titled Task, with "Sending…" after the title while a change is on its way: the three
-  selects side by side, with "No one" as the assignee's empty choice, or, for someone who may not
-  change it, the three as labelled rows, the assignee by name. The thread embeds it.
+  a group named Properties, as `apps/ui`'s task pane has its properties: Status, Assignee, and
+  Priority, each a quiet menu under its caption, named "Status: Triage", "Assignee: Unassigned", and
+  "Priority: No priority". The status shows its drawing (`statusShape`, the design's `taskStatus`),
+  and its menu lists the six statuses, each with its drawing; the assignee shows the person's mark
+  and name, or the users icon and "Unassigned", and its menu (`AssigneeMenu`, from `taskFilter.ts`,
+  `assigneeProperties`) lists Unassigned, then each person the task can go to with their mark, and
+  the current assignee by name alone when the person could not choose them, such as an agent they may
+  not use. Priority is a third menu after Assignee, which `apps/ui`'s task pane has none of; Held and
+  Dismissed have drawings `apps/ui` lacks, since its `TaskStatus` has only triage, open, progress,
+  and done. Each menu is a Foldkit `Menu` Block the Block binds (`StatusBinding`,
+  `AssigneeBinding`, `PriorityBinding`, with the ids `task-status`, `task-assignee`, and
+  `task-priority`), and choosing from it changes the task from the value the person saw, unless
+  it changes nothing, so the Block has no message for the choice. For someone who may not change
+  the task the same three are read, each caption over its value. A line says "Sending…" under them
+  while a change is on its way. The thread embeds it.
 - `feature/turns`: a thread's agents' turns, oldest first, each with its agent by name and how it
   stands, who ran it again, and why it failed. The person stops a turn while it is active and runs
   it again once nothing but who may direct its agent keeps it from running again, when they may
@@ -263,7 +291,7 @@ below it counted at each level above.
   threads Block's `toolbarView`, which the group's pane draws over the rows while the tab is open, as `apps/ui`'s
   `GroupTasks` has it, of a search field, whose label is hidden and whose placeholder says "Search tasks…", beside a
   menu of the status (`StatusFilterMenu`), Any status or one by its name (`statusLabel`), named "Status: Any status",
-  and a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Unassigned, then each member still in the
+  and a menu of whom a task is assigned to (`AssigneeMenu`), Anyone, Unassigned, then each member still in the
   workspace by name with their mark at 22px, named "Assignee: Anyone", both the ones `taskFilter.ts` gives the
   workspace's Triage and Tasks, whose buttons say Status and Assignee while they narrow to nothing, Unassigned for the
   tasks of no one, and the member's name for theirs, and, at its end, a menu of the order (`TaskSortMenu`), Latest activity, Newest, or Oldest,
@@ -290,7 +318,7 @@ below it counted at each level above.
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
   open when its parent gives one, and reports nothing for it. It reports `OpenedThread` when the
-  person picks a thread and `ClosedThread` when they close it, by Close or Back, so its parent can
+  person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, or Back, so its parent can
   hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit and remove them. It
@@ -314,9 +342,13 @@ below it counted at each level above.
   the tab. The dialog opens on General, and closing it, by Cancel on General or Done on Members and in a conversation,
   as `apps/ui` words them, Close, Escape, a click on the scrim, Save changes, or Leave, drops the draft of the name and
   the member chosen to admit.
-  `threadView` is the thread open in it as a side pane, titled by the
-  thread with "Thread in #Design" or "Thread in Bob" under it (`threadSubtitle`), with a button that closes it, Close, and, below 48rem where the pane is full screen over
-  the main pane, Back before the title, both sending `ClickedAllThreads`, the thread's messages, and
+  `threadView` is the thread open in it as a side pane (the thread Block's `sidePane`), titled by the
+  thread with "Thread in #Design" or "Thread with Bob" under it (`sideSubtitle`), or, for a thread
+  that tracks a task, by the task's status drawing with "Task in #Design" under it, and the thread's own bell,
+  Follow thread, beside a button that closes it, Close thread, or Close task, and, below 48rem where the pane is full screen over
+  the main pane, Back before the title, named for where it goes back to, the group ("Back to Design") or, while the
+  Tasks tab is shown, "Back to Tasks", both sending `ClickedAllThreads`, the thread's messages or the task's
+  description and activity, and
   the reply composer in the footer, and nothing while none is open. The page embeds the Block twice, `view` in the shell's main pane
   and `threadView` in its side pane, giving both the time now, which they give on to the threads Block
   and the thread Block. The main pane embeds the threads Block three times, for the tabs in its header, for
@@ -402,9 +434,13 @@ below it counted at each level above.
   every one up to the newest that waits and keeps the selection. The Unread count and Mark all seen
   follow what waits alone (`waitingCount`), so the count can be none while the selected row is still
   listed (`shownItems`), and the caught-up state shows only once the thread is closed and nothing
-  waits. `threadView` is the thread open as a side pane, as the group's is: titled by the thread,
-  "Thread in #General" or "Thread in Bob" under it, or only "Thread" while the store lacks the group
-  (`threadSubtitle` in `seen.ts`, which the group's pane uses too), with Close beside the title and, below 48rem, Back before it, both sending
+  waits. `threadView` is the thread open as a side pane, as the group's is (the thread Block's
+  `sidePane`): titled by the thread, or for a thread that tracks a task by its status drawing, with why the
+  notification came under it, "Mention · #General", "New thread · Bob", or "Reply · #General"
+  (`reasonSubtitle` in `seen.ts`, by `selectedReasonWords`), or, while the store lacks the message
+  the notification is about, where the thread is as the group's pane says it, or only the reason while it lacks the group,
+  with the thread's bell, Follow thread, and Close thread, or Close task, beside the title and, below 48rem, Back to Inbox
+  before it, both sending
   `ClickedClose`, the thread's messages, with the one the notification is about drawn current, and
   the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
   when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
@@ -426,7 +462,7 @@ below it counted at each level above.
   lists the tasks in triage (`triageTasks`); `tasksView`, the Block's canonical view, is titled Tasks,
   "Every open task you can see.", and lists every task that is neither done nor dismissed (`openTasks`).
   The pane's toolbar has a search field, whose label is hidden and whose placeholder says "Search
-  tasks…", beside a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Unassigned, or a member by name
+  tasks…", beside a menu of whom a task is assigned to (`AssigneeMenu`), Anyone, Unassigned, or a member by name
   and mark, whose button says Assignee while it narrows to none and is named "Assignee: Anyone", and, on Tasks
   alone, a menu of the status (`StatusFilterMenu`), Any status or one of the statuses of an open task, named
   "Status: Any status". Each menu is a Foldkit `Menu` Block the Block binds (`AssigneeBinding`, `StatusBinding`), and

@@ -19,13 +19,7 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { type Day, groupByDay, isOpen, threadContains } from "../../seen.ts"
-import {
-  AssigneeFilter,
-  AssigneeFilterMenu,
-  isAssignedTo,
-  StatusFilterMenu,
-  TaskStatusFilter
-} from "../../taskFilter.ts"
+import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**
@@ -79,7 +73,7 @@ export const Model = Schema.Struct({
   taskFilter: Schema.Struct({ status: TaskStatusFilter, assignee: AssigneeFilter, query: Schema.String }),
   taskSort: TaskSort,
   statusMenu: StatusFilterMenu.Model,
-  assigneeMenu: AssigneeFilterMenu.Model,
+  assigneeMenu: AssigneeMenu.Model,
   sortMenu: TaskSortMenu.Model,
   composer: ComposerBlock.Model,
   notice: Schema.Option(Schema.String)

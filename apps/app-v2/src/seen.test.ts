@@ -32,11 +32,13 @@ import {
   messageWords,
   placeName,
   pluralize,
+  reasonSubtitle,
   repliesLabel,
+  sideSubtitle,
+  statusShape,
   textRuns,
   threadContains,
   threadRuns,
-  threadSubtitle,
   threadWords,
   timeOf,
   whenLabel
@@ -89,10 +91,22 @@ describe("where a group is", () => {
     expect(placeName(conversationWithBob, members, self)).toBe("Bob")
   })
 
-  it("is said by the side pane's subtitle as the thread in it, or only as a thread while the group is not read", () => {
-    expect(threadSubtitle(Option.some(general), members, self)).toBe("Thread in #General")
-    expect(threadSubtitle(Option.some(conversationWithBob), members, self)).toBe("Thread in Bob")
-    expect(threadSubtitle(Option.none(), members, self)).toBe("Thread")
+  it("is said by the side pane's subtitle as the thread in a team and with the others in a conversation, or only as a thread while the group is not read", () => {
+    expect(sideSubtitle("Thread", Option.some(general), members, self)).toBe("Thread in #General")
+    expect(sideSubtitle("Thread", Option.some(conversationWithBob), members, self)).toBe("Thread with Bob")
+    expect(sideSubtitle("Thread", Option.none(), members, self)).toBe("Thread")
+  })
+
+  it("is said by the side pane's subtitle the same way for a task", () => {
+    expect(sideSubtitle("Task", Option.some(general), members, self)).toBe("Task in #General")
+    expect(sideSubtitle("Task", Option.some(conversationWithBob), members, self)).toBe("Task with Bob")
+    expect(sideSubtitle("Task", Option.none(), members, self)).toBe("Task")
+  })
+
+  it("is said by the subtitle of a thread the person came to for a reason, after the reason", () => {
+    expect(reasonSubtitle("Mention", Option.some(general), members, self)).toBe("Mention · #General")
+    expect(reasonSubtitle("Reply", Option.some(conversationWithBob), members, self)).toBe("Reply · Bob")
+    expect(reasonSubtitle("New thread", Option.none(), members, self)).toBe("New thread")
   })
 })
 
@@ -366,6 +380,14 @@ describe("isOpen", () => {
   it("is true for a task that is not done or dismissed, and false for one that is", () => {
     expect((["triage", "todo", "doing", "held"] as const).map(isOpen)).toEqual([true, true, true, true])
     expect((["done", "dismissed"] as const).map(isOpen)).toEqual([false, false])
+  })
+})
+
+describe("statusShape", () => {
+  it("draws the four statuses apps/ui has as it does, and a pause for held and a cross for dismissed", () => {
+    expect(
+      (["triage", "todo", "doing", "held", "done", "dismissed"] as const).map((status) => statusShape[status])
+    ).toEqual(["triage", "open", "progress", "paused", "done", "dismissed"])
   })
 })
 

@@ -213,6 +213,20 @@ const reasonFor = (
 export const notificationReason = (item: InboxItem, memberId: MemberId.MemberId): Option.Option<Reason> =>
   Option.map(item.message, (message) => reasonFor(message, item.opening, memberId))
 
+/** A reason in the words of the side pane's subtitle, as `apps/ui` says them. */
+const reasonWords: Readonly<Record<Reason, string>> = { Mention: "Mention", Thread: "New thread", Reply: "Reply" }
+
+/**
+ * Why the person came to the thread open beside the inbox, in the words of the side pane's subtitle, while the store
+ * holds the message its notification's activity is about.
+ */
+export const selectedReasonWords = (model: Model): Option.Option<string> =>
+  Option.flatMap(model.selected, ({ notificationId }) =>
+    Option.flatMap(itemOfNotification(model, notificationId), (item) =>
+      Option.map(notificationReason(item, model.memberId), (reason) => reasonWords[reason])
+    )
+  )
+
 /** Who wrote the message a notification's activity is about, with their letters, while the store holds it. */
 const notificationAuthor = (item: InboxItem, model: Model): Option.Option<Readonly<{ name: string; mark: string }>> =>
   Option.map(item.message, (message) => {

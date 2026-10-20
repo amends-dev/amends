@@ -859,17 +859,17 @@ describe("a group's side pane", () => {
     )
   })
 
-  it("closes with a button named Close, back to the group's threads", () => {
+  it("closes with a button named Close thread, back to the group's threads", () => {
     scene(
       { update, view: sidePane },
       given(withThread),
-      click(role("button", { name: "Close" })),
+      click(role("button", { name: "Close thread" })),
       expect(role("complementary")).toBeAbsent()
     )
   })
 
-  it("goes back to the group's threads with a button named Back, as it does with the one named Close", () => {
-    for (const name of ["Back", "Close"]) {
+  it("goes back to the group's threads with a button named for the group, as it does with Close thread", () => {
+    for (const name of ["Back to Design", "Close thread"]) {
       scene(
         { update, view: sidePane },
         given(withThread),
@@ -878,6 +878,46 @@ describe("a group's side pane", () => {
         expect(role("complementary")).toBeAbsent()
       )
     }
+  })
+
+  it("goes back to the Tasks tab, named for it, while the thread was opened from it", () => {
+    scene(
+      { update, view: sidePane },
+      given(modifyFields(withThread, { threads: (threads) => modifyFields(threads, { tab: () => "Tasks" as const }) })),
+      expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Back to Tasks" }))).toExist(),
+      expect(role("button", { name: "Back to Design" })).toBeAbsent()
+    )
+  })
+
+  it("offers the bell that follows the thread in its header, beside Close thread", () => {
+    scene(
+      { update, view: sidePane },
+      given(withThread),
+      expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Follow thread" }))).toExist()
+    )
+  })
+
+  it("is the complementary landmark named Task for a thread that tracks one, with its status, subtitle, and close", () => {
+    scene(
+      { update, view: sidePane },
+      given(
+        modifyFields(withThread, {
+          thread: Option.map((open) => ({
+            ...open,
+            model: modifyFields(open.model, {
+              task: (taskModel) => modifyFields(taskModel, { task: () => Option.some({ task, pending: false }) })
+            })
+          }))
+        })
+      ),
+      expect(role("complementary", { name: "Thread" })).toBeAbsent(),
+      expect(within(role("complementary", { name: "Task" }), text("Task in #Design"))).toExist(),
+      expect(within(role("complementary", { name: "Task" }), role("button", { name: "Close task" }))).toExist(),
+      expect(within(role("complementary", { name: "Task" }), role("button", { name: "Back to Design" }))).toExist(),
+      expect(within(role("complementary", { name: "Task" }), role("button", { name: "Follow thread" }))).toExist(),
+      click(role("button", { name: "Close task" })),
+      expect(role("complementary")).toBeAbsent()
+    )
   })
 
   it("renders nothing while no thread is open", () => {
