@@ -6,9 +6,7 @@ import { Message, OutMessage } from "./definition.ts"
 export const update = TasksComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ReceivedTasks: ({ items }) => ({ model: modifyFields(model, { items: () => items }) }),
-    ReceivedPeople: ({ members, contacts }) => ({
-      model: modifyFields(model, { members: () => members, contacts: () => contacts })
-    }),
+    ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     TypedQuery: ({ query }) => ({
       model: modifyFields(model, { filter: (filter) => modifyFields(filter, { query: () => query }) })

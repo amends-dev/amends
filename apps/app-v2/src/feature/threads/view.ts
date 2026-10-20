@@ -6,12 +6,13 @@ import { summary } from "@amends-dev/design/directory"
 import { choiceMenu } from "@amends-dev/design/menu"
 import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
 import { paneEmpty, paneTabs, paneToolbar, paneToolbarStack } from "@amends-dev/design/pane"
+import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { authorName, initials, pluralize, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
-import { taskColumns, taskRows } from "../../taskTable.ts"
+import { noTasksMatch, taskRows } from "../../taskList.ts"
 import {
   AssigneeBinding,
   ComposerBinding,
@@ -138,40 +139,40 @@ const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): H
   ])
 
 /**
- * The threads that track a task, latest active first, as a table, or why it lists none: nothing is tracked yet, or
- * nothing matches what the person narrowed it to.
+ * The threads that track a task, latest active first, as the task list, the one whose thread is open drawn current,
+ * or why it lists none: nothing matches what the person narrowed it to, which a quiet line says, or nothing is
+ * tracked yet.
  */
 const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Html => {
   const shown = tasksOf(model, inputs.members)
-  const none = isFiltered(model)
-    ? ({ art: "nothing-here", title: "No tasks match", copy: "Try different filters." } as const)
-    : ({ art: "fill", title: "No tasks yet", copy: "Start one from the composer below." } as const)
 
   return column(h, [
     notice(h, model.notice),
-    shown.length === 0
-      ? paneEmpty(h, none)
-      : taskRows(
+    shown.length > 0
+      ? taskRows(
           h,
           shown.map(({ item, task }) => ({
             task,
             thread: item.thread,
             opening: item.opening,
-            replies: item.replies,
             pending: item.pending,
             lastActiveAt: item.lastActiveAt,
-            groupName: inputs.groupName,
+            isCurrent: Option.exists(inputs.openThreadId, (threadId) => threadId === item.thread.id),
             onClick: Message.ClickedThread({ threadId: item.thread.id })
           })),
-          { members: inputs.members, contacts: [], now: inputs.now, hasGroupColumn: false }
+          { members: inputs.members, now: inputs.now }
         )
+      : isFiltered(model)
+        ? taskListEmpty(h, noTasksMatch)
+        : paneEmpty(h, { art: "fill", title: "No tasks yet", copy: "Start one from the composer below." })
   ])
 }
 
 /**
  * The toolbar of the Tasks tab, for the pane that holds the tab: a search and the menus of status and assignee that
  * narrow the tasks, and at its end the menu of the order they are listed in and New task, which moves the focus to the
- * composer; under it, how many tasks the tab lists and the labels of its columns.
+ * composer; under it, how many tasks the tab lists and the labels of its columns, which stay over the line that says
+ * the filters leave none.
  */
 export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   const shown = tasksOf(model, inputs.members)
@@ -213,7 +214,7 @@ export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((m
       ]
     }),
     summary(h, { copy: "Threads that track a task.", count: pluralize(shown.length, "task", "tasks") }),
-    ...(shown.length === 0 ? [] : [taskColumns(h, { hasGroupColumn: false })])
+    ...(shown.length === 0 && !isFiltered(model) ? [] : [taskHeadings(h)])
   ])
 })
 

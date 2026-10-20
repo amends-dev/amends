@@ -352,9 +352,8 @@ const receivedTask = message(
         {
           task,
           thread,
-          groupName: "General",
+          place: "#General",
           opening: Option.some(opening),
-          replies: 0,
           pending: false,
           lastActiveAt: opening.publishedAt
         }

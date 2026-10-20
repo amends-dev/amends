@@ -211,9 +211,8 @@ const admit = (gateway: Gateway.Gateway["Service"], workspace: Workspace.Workspa
 const firstWhere = <A, E>(stream: Stream.Stream<A, E>, holds: (value: A) => boolean) =>
   stream.pipe(Stream.filter(holds), Stream.runHead, Effect.map(Option.getOrThrow), Effect.timeout("5 seconds"))
 
-/** The task listed under the group called `groupName` among `views`. */
-const taskIn = (views: ReadonlyArray<Store.TaskView>, groupName: string) =>
-  views.find((view) => view.groupName === groupName)!
+/** The task listed under the place `place` among `views`. */
+const taskIn = (views: ReadonlyArray<Store.TaskView>, place: string) => views.find((view) => view.place === place)!
 
 /** How many members the group `groupId` has among `views`. */
 const membersIn = (views: ReadonlyArray<Store.GroupView>, groupId: Group.Group["id"]) =>
@@ -426,59 +425,52 @@ describe("Store", () => {
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
-  it.live(
-    "a task lists with its thread, its group's name, and its replies, as it is written and once the host has it",
-    () =>
-      Effect.gen(function* () {
-        const services = yield* host
-        const gateway = Context.get(services, Gateway.Gateway)
-        const workspace = yield* gateway.createWorkspace(alice, {
-          name: "Studio",
-          memberName: Member.Name.make("Alice")
-        })
-        const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
-        const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
-        yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
+  it.live("a task lists with its thread and its group's place, as it is written and once the host has it", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, {
+        name: "Studio",
+        memberName: Member.Name.make("Alice")
+      })
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
 
-        // A task in each of two groups, once the host has the team, and a thread that tracks none.
-        yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
-        const teams = yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
-          held.some(({ record, pending }) => !pending && record.value.kind === "Team" && record.value.name === "Design")
-        )
-        const teamId = teams.find(({ record }) => record.value.kind === "Team" && record.value.name === "Design")!
-          .record.value.id
-        yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plan the offsite", mentions: [] })
-        yield* store.write("ThreadStarted", {
-          groupId: Group.GeneralId,
-          text: "Ship the release",
-          mentions: [],
-          task: {}
-        })
-        yield* store.write("ThreadStarted", { groupId: teamId, text: "Review the logo", mentions: [], task: {} })
+      // A task in each of two groups, once the host has the team, and a thread that tracks none.
+      yield* store.write("TeamCreated", { name: "Design", memberIds: [workspace.ownerMemberId] })
+      const teams = yield* firstWhere(store.list("Group", Store.workspacePlace), (held) =>
+        held.some(({ record, pending }) => !pending && record.value.kind === "Team" && record.value.name === "Design")
+      )
+      const teamId = teams.find(({ record }) => record.value.kind === "Team" && record.value.name === "Design")!.record
+        .value.id
+      yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Plan the offsite", mentions: [] })
+      yield* store.write("ThreadStarted", {
+        groupId: Group.GeneralId,
+        text: "Ship the release",
+        mentions: [],
+        task: {}
+      })
+      yield* store.write("ThreadStarted", { groupId: teamId, text: "Review the logo", mentions: [], task: {} })
 
-        // Each lists at once, in triage, under the name of its group.
-        const written = yield* firstWhere(store.tasks, (views) => views.length === 2)
-        const shipping = taskIn(written, "general")
-        expect([shipping.task.status, taskIn(written, "Design").task.status]).toEqual(["triage", "triage"])
-        yield* store.write("ThreadMessagePosted", { threadId: shipping.thread.id, text: "On it", mentions: [] })
-        yield* firstWhere(store.tasks, (views) => views.some(({ replies }) => replies === 1))
+      // Each lists at once, in triage, at the place of its group.
+      const written = yield* firstWhere(store.tasks, (views) => views.length === 2)
+      const shipping = taskIn(written, "#general")
+      expect([shipping.task.status, taskIn(written, "#Design").task.status]).toEqual(["triage", "triage"])
 
-        // Once the host has them, the same tasks list with the replies each thread has.
-        const made = yield* firstWhere(
-          store.tasks,
-          (views) =>
-            views.length === 2 && views.every(({ pending }) => !pending) && views.some(({ replies }) => replies === 1)
-        )
-        expect(taskIn(made, "general")).toMatchObject({
-          replies: 1,
-          thread: { id: shipping.thread.id, groupId: Group.GeneralId }
-        })
-        expect(taskIn(made, "Design")).toMatchObject({
-          replies: 0,
-          thread: { groupId: teamId },
-          opening: Option.some({ content: { _tag: "Text", text: "Review the logo" } })
-        })
-      }).pipe(Effect.scoped, Effect.provide(browser))
+      // Once the host has them, the same tasks list.
+      const made = yield* firstWhere(
+        store.tasks,
+        (views) => views.length === 2 && views.every(({ pending }) => !pending)
+      )
+      expect(taskIn(made, "#general")).toMatchObject({
+        thread: { id: shipping.thread.id, groupId: Group.GeneralId }
+      })
+      expect(taskIn(made, "#Design")).toMatchObject({
+        thread: { groupId: teamId },
+        opening: Option.some({ content: { _tag: "Text", text: "Review the logo" } })
+      })
+    }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
   it.live("a team and a conversation started here are the ones the host makes, under the same IDs", () =>
@@ -1135,30 +1127,28 @@ describe("Store.viewTasks", () => {
     members: [person, bob]
   }
 
-  it("pairs each task with its thread, its group's name, its opening, its replies, and when it was last active", () => {
+  it("pairs each task with its thread, the place of its group, its opening, and when it was last active", () => {
     expect(Store.viewTasks(records)).toEqual([
       {
         task,
         thread,
-        groupName: "General",
+        place: "#General",
         opening: Option.some(opening),
-        replies: 1,
         lastActiveAt: reply.publishedAt,
         pending: false
       },
       {
         task: logoTask,
         thread: logoThread,
-        groupName: "Design",
+        place: "#Design",
         opening: Option.none(),
-        replies: 0,
         lastActiveAt: logoThread.createdAt,
         pending: false
       }
     ])
   })
 
-  it("names a conversation's group by the other member", () => {
+  it("places a conversation by the other member", () => {
     const talk = { ...thread, groupId: conversationWithBob.id }
 
     expect(
@@ -1167,7 +1157,7 @@ describe("Store.viewTasks", () => {
         tasks: [{ ...task, groupId: talk.groupId }],
         threads: [heldThread(talk)],
         groups: [conversationWithBob]
-      }).map(({ groupName }) => groupName)
+      }).map(({ place }) => place)
     ).toEqual(["Bob"])
   })
 

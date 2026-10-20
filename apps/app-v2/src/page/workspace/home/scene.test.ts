@@ -233,18 +233,16 @@ const withTasks = modifyFields(opened, {
         {
           task,
           thread,
-          groupName: "General",
+          place: "#General",
           opening: Option.some(opening),
-          replies: 0,
           pending: false,
           lastActiveAt: opening.publishedAt
         },
         {
           task: { ...task, threadId: shippingId, groupId: design.id, status: "todo" as const },
           thread: { ...thread, id: shippingId, groupId: design.id, title: "Ship the release" },
-          groupName: "Design",
+          place: "#Design",
           opening: Option.none(),
-          replies: 0,
           pending: false,
           lastActiveAt: reply.publishedAt
         }
@@ -309,14 +307,14 @@ describe("home", () => {
       click(role("button", { name: "Triage" })),
       expect(triaged).toExist(),
       expect(within(triaged, role("button", { name: "Plans for the week" }))).toExist(),
-      expect(within(triaged, text("General"))).toExist(),
+      expect(within(triaged, text("#General"))).toExist(),
       expect(within(triaged, role("button", { name: "Ship the release" }))).toBeAbsent(),
       click(role("button", { name: "Tasks" })),
       expect(open).toExist(),
       expect(triaged).toBeAbsent(),
       expect(within(open, role("button", { name: "Plans for the week" }))).toExist(),
       expect(within(open, role("button", { name: "Ship the release" }))).toExist(),
-      expect(within(open, text("Design"))).toExist()
+      expect(within(open, text("#Design"))).toExist()
     )
   })
 

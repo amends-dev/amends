@@ -55,7 +55,7 @@ import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Api from "../api.ts"
-import { foldAccents, groupName, messageWords } from "../seen.ts"
+import { foldAccents, groupName, messageWords, placeName } from "../seen.ts"
 import * as Drafts from "./Drafts.ts"
 import * as Pending from "./Pending.ts"
 import * as Replica from "./Replica.ts"
@@ -129,18 +129,15 @@ export const deriveLastActiveAt = (
   Option.match(Array.last(messages), { onNone: () => thread.createdAt, onSome: (latest) => latest.publishedAt })
 
 /**
- * A task as the workspace lists it: the task, the thread that tracks it with its opening message, its group's
- * name, how many messages follow the opening, when the thread was last active, and whether it is still being
- * started.
+ * A task as the workspace lists it: the task, the thread that tracks it with its opening message, the place its
+ * group is, when the thread was last active, and whether it is still being started.
  */
 export interface TaskView {
   readonly task: Task.Task
   readonly thread: Thread.Thread
-  /** Its group's name as the person reads it: a team's own, or a conversation's other members. */
-  readonly groupName: string
+  /** Where its group is as a line says it: a team as `#` and its name, or a conversation by the others in it. */
+  readonly place: string
   readonly opening: Option.Option<ThreadMessage.ThreadMessage>
-  /** How many of the thread's messages come after the opening. */
-  readonly replies: number
   /** When the thread's latest message was published, or when it was created while it has none. */
   readonly lastActiveAt: DateTime.Utc
   /** Whether the thread is still being started. */
@@ -171,8 +168,8 @@ const messagesByThread = (
 }
 
 /**
- * The `tasks` in the order given, each with its thread, its group's name as the person reads it among `members`,
- * and the summary of the thread's messages. A task whose thread or group the replica lacks is left out, since it
+ * The `tasks` in the order given, each with its thread, the place its group is as the person reads it among
+ * `members`, and the summary of the thread's messages. A task whose thread or group the replica lacks is left out, since it
  * could not be opened.
  */
 export const viewTasks = ({
@@ -197,9 +194,8 @@ export const viewTasks = ({
       {
         task,
         thread,
-        groupName: groupName(group, members, memberId),
+        place: placeName(group, members, memberId),
         opening: Array.head(threadMessages),
-        replies: summarizeReplies(threadMessages).replies,
         lastActiveAt: deriveLastActiveAt(thread, threadMessages),
         pending: held.pending
       }
@@ -452,7 +448,10 @@ export class Store extends Context.Service<
     readonly people: Stream.Stream<People, QueryError>
     /** The threads of `groupId`, each with its opening message, and again after each change. */
     readonly threads: (groupId: GroupId.GroupId) => Stream.Stream<ReadonlyArray<ThreadView>, QueryError>
-    /** Every task the replica holds, with the thread that tracks it and its group's name, and again after each change. */
+    /**
+     * Every task the replica holds, with the thread that tracks it and the place of its group, and again after each
+     * change.
+     */
     readonly tasks: Stream.Stream<ReadonlyArray<TaskView>, QueryError>
     /** The thread `threadId` as the person sees it open, and again after each change. */
     readonly thread: (threadId: ThreadId.ThreadId) => Stream.Stream<ThreadDetail, QueryError>

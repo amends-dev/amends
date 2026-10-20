@@ -26,8 +26,8 @@ import { update } from "./update.ts"
 const { workspace, member } = membership
 
 /**
- * The task of the thread `id`, in `status`, last active `minutesAgo` before now, in a group called General unless
- * it is given another.
+ * The task of the thread `id`, in `status`, last active `minutesAgo` before now, in the place `#General` unless it
+ * is given another.
  */
 const item = (
   id: string,
@@ -35,7 +35,7 @@ const item = (
   details: {
     title?: string | null
     words?: string
-    groupName?: string
+    place?: string
     assignee?: MemberId.MemberId | null
     minutesAgo?: number
   } = {}
@@ -45,9 +45,8 @@ const item = (
   return {
     task: { ...task, threadId, status, assignee: details.assignee ?? null },
     thread: { ...thread, id: threadId, title: details.title ?? null },
-    groupName: details.groupName ?? "General",
+    place: details.place ?? "#General",
     opening: details.words === undefined ? Option.none() : Option.some(saying(opening, details.words)),
-    replies: 0,
     pending: false,
     lastActiveAt: DateTime.subtract(now, { minutes: details.minutesAgo ?? 0 })
   }
@@ -58,14 +57,14 @@ const release = item("thread-2", "doing", {
   title: "Ship the release",
   words: "Ready to ship?",
   assignee: bob.id,
-  groupName: "Design",
+  place: "#Design",
   minutesAgo: 10
 })
 const café = item("thread-3", "triage", {
   words: `Menu for ${ThreadMessage.mentionText(bob.id, "Robert")}'s café`,
   minutesAgo: 20
 })
-const logo = item("thread-4", "done", { title: "Review the logo", groupName: "Design", minutesAgo: 5 })
+const logo = item("thread-4", "done", { title: "Review the logo", place: "#Design", minutesAgo: 5 })
 const idea = item("thread-5", "dismissed", { title: "Old idea", minutesAgo: 1 })
 const legal = item("thread-6", "held", { title: "Wait for legal", minutesAgo: 40 })
 const items = [retro, release, café, logo, idea, legal]
@@ -183,18 +182,17 @@ describe("the tasks a filter keeps", () => {
 })
 
 describe("the workspace's tasks, as the person uses them", () => {
-  it("keep the tasks and the people they are told of", () => {
+  it("keep the tasks and the members they are told of", () => {
     story(
       update,
       given(listed),
       message(Message.ReceivedTasks({ items })),
-      message(Message.ReceivedPeople({ members: [member, bob], contacts: [] })),
+      message(Message.ReceivedMembers({ members: [member, bob] })),
       Command.expectNone(),
       expectNoOutMessage(),
       model((model) => {
         expect(model.items).toEqual(items)
         expect(model.members).toEqual([member, bob])
-        expect(model.contacts).toEqual([])
         expect(model.notice).toEqual(Option.none())
       })
     )

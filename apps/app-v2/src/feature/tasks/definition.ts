@@ -1,12 +1,11 @@
 /**
  * The tasks the person can see across the workspace, as the sidebar's Triage and Tasks list them: Triage, the
  * tasks in triage, which wait for someone to decide on them, and Tasks, every task that is neither done nor
- * dismissed, each as a table under a toolbar of a search and the menus of assignee and status that narrow it. The
- * task's controls are in its thread, in its group, so the Block writes nothing and reports the thread the person
- * opens.
+ * dismissed, each as a list of tasks under a toolbar of a search and the menus of assignee and status that narrow
+ * it. The task's controls are in its thread, in its group, so the Block writes nothing and reports the thread the
+ * person opens.
  */
 
-import { Contact } from "@amends-dev/core/channel"
 import { GroupId } from "@amends-dev/core/group"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
@@ -22,30 +21,28 @@ import { isOpen, threadContains } from "../../seen.ts"
 import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 
 /**
- * A task, the thread that tracks it with its opening message, its group's name, how many messages follow the
- * opening, when the thread was last active, and whether it is still being started.
+ * A task, the thread that tracks it with its opening message, the place its group is as a line says it, when the
+ * thread was last active, and whether it is still being started.
  */
 export const TaskItem = Schema.Struct({
   task: Task.Task,
   thread: Thread.Thread,
-  groupName: Schema.String,
+  place: Schema.String,
   opening: Schema.Option(ThreadMessage.ThreadMessage),
-  replies: Schema.Int,
   pending: Schema.Boolean,
   lastActiveAt: Schema.DateTimeUtc
 })
 export type TaskItem = typeof TaskItem.Type
 
 /**
- * The tasks as they were read, the members and the contacts that name who started a thread and who is assigned
- * to it, what the list is narrowed to and the menus it is chosen in, and why the last read failed.
+ * The tasks as they were read, the members that name who is assigned to them, what the list is narrowed to and
+ * the menus it is chosen in, and why the last read failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   items: Schema.Array(TaskItem),
   members: Schema.Array(Member.Member),
-  contacts: Schema.Array(Contact.Contact),
   filter: Schema.Struct({ status: TaskStatusFilter, assignee: AssigneeFilter, query: Schema.String }),
   statusMenu: StatusFilterMenu.Model,
   assigneeMenu: AssigneeMenu.Model,
@@ -55,7 +52,7 @@ export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ReceivedTasks: { items: Schema.Array(TaskItem) },
-  ReceivedPeople: { members: Schema.Array(Member.Member), contacts: Schema.Array(Contact.Contact) },
+  ReceivedMembers: { members: Schema.Array(Member.Member) },
   FailedRead: { error: Schema.String },
   TypedQuery: { query: Schema.String },
   ClickedTask: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId }

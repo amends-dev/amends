@@ -10,7 +10,6 @@ export const init = TasksComposition.makeInit((workspaceId: WorkspaceId.Workspac
     memberId,
     items: [],
     members: [],
-    contacts: [],
     filter: { status: "All" as const, assignee: AssigneeFilter.Anyone(), query: "" },
     notice: Option.none()
   }

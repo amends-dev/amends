@@ -10,7 +10,7 @@ export const subscriptions = TasksDefinition.subscriptions((entry) => ({
     "ReadTasks",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
     {
-      messages: [Message.ReceivedTasks, Message.ReceivedPeople, Message.FailedRead],
+      messages: [Message.ReceivedTasks, Message.ReceivedMembers, Message.FailedRead],
       modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
       handler: function* () {
         const stores = yield* Stores.Stores
@@ -19,7 +19,7 @@ export const subscriptions = TasksDefinition.subscriptions((entry) => ({
             .read(workspaceId, memberId, (store) =>
               Stream.merge(
                 Stream.map(store.tasks, (items) => Message.ReceivedTasks({ items })),
-                Stream.map(store.people, (people) => Message.ReceivedPeople(people))
+                Stream.map(store.people, ({ members }) => Message.ReceivedMembers({ members }))
               )
             )
             .pipe(Stream.catchCause(() => Stream.make(Message.FailedRead({ error: Stores.unreadable }))))

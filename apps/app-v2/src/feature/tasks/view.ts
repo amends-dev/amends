@@ -3,11 +3,12 @@ import { notice, searchField } from "@amends-dev/design/control"
 import { summary } from "@amends-dev/design/directory"
 import type { IconName } from "@amends-dev/design/icon"
 import { pane, paneColumn, paneEmpty, paneToolbar } from "@amends-dev/design/pane"
+import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import type { Html } from "foldkit/html"
 import { isOpen, pluralize } from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
-import { taskColumns, taskRows } from "../../taskTable.ts"
+import { noTasksMatch, taskRows } from "../../taskList.ts"
 import { AssigneeBinding, StatusBinding, TasksComposition, type TasksViewBuilder } from "./composition.ts"
 import {
   isFiltered,
@@ -25,7 +26,7 @@ export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
 /**
  * What a destination lists and says: its title and the icon before it, the line under the title, the line over the
- * table, which of the tasks it lists, what it says while it lists none, and the choices of status it offers, when
+ * list, which of the tasks it lists, what it says while it lists none, and the choices of status it offers, when
  * it offers any.
  */
 type Destination = Readonly<{
@@ -58,13 +59,14 @@ const tasksDestination: Destination = {
 }
 
 /**
- * A destination as a main pane: the tasks it lists, latest active first, as a table with a column of groups, under
- * a toolbar of a search and the menus that narrow it, with how many it lists, or why it lists none.
+ * A destination as a main pane: the tasks it lists, latest active first, with the place of each task's group after its
+ * title, under a toolbar of a search and the menus that narrow it, with how many it lists and the labels of the
+ * columns, or why it lists none: the filters leave none, which a quiet line says under the labels, or there are none.
  */
 const destinationView = (destination: Destination, model: Model, { now }: ViewInputs, h: TasksViewBuilder): Html => {
   const narrowed = destination.statusChoices === undefined ? withAnyStatus(model) : model
   const shown = matching(narrowed, destination.listed(model.items))
-  const none = isFiltered(narrowed) ? { title: "No tasks match", copy: "Try different filters." } : destination.nothing
+  const isNarrowed = isFiltered(narrowed)
 
   return pane(h, {
     variant: "main",
@@ -99,23 +101,25 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
         ]
       }),
       summary(h, { copy: destination.summary, count: pluralize(shown.length, "task", "tasks") }),
-      ...(shown.length === 0 ? [] : [taskColumns(h, { hasGroupColumn: true })])
+      ...(shown.length === 0 && !isNarrowed ? [] : [taskHeadings(h)])
     ],
     body: [
       paneColumn(
         h,
         [
           notice(h, model.notice),
-          shown.length === 0
-            ? paneEmpty(h, { art: isFiltered(narrowed) ? "nothing-here" : "rest", ...none })
-            : taskRows(
+          shown.length > 0
+            ? taskRows(
                 h,
                 shown.map((item) => ({
                   ...item,
                   onClick: Message.ClickedTask({ groupId: item.thread.groupId, threadId: item.thread.id })
                 })),
-                { members: model.members, contacts: model.contacts, now, hasGroupColumn: true }
+                { members: model.members, now }
               )
+            : isNarrowed
+              ? taskListEmpty(h, noTasksMatch)
+              : paneEmpty(h, { art: "rest", ...destination.nothing })
         ],
         { isWide: true }
       )

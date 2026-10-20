@@ -132,6 +132,14 @@ const shipping = {
   unread: 0
 }
 
+/** The thread titled Retro, last active 20 minutes ago, whose task is in doing, with no assignee. */
+const retroTask = {
+  ...starting,
+  task: Option.some({ ...task, threadId: retro.id, status: "doing" as const }),
+  pending: false,
+  lastActiveAt: DateTime.subtract(now, { minutes: 20 })
+}
+
 /** `item` with its task in `status`. */
 const inStatus = <Item extends { readonly task: Option.Option<typeof task> }>(
   item: Item,
@@ -153,7 +161,17 @@ const withTabsAndComposer: typeof sceneView = (model, h) =>
 const tasksTab: typeof sceneView = (model, h) =>
   h.div([], [withViewInputs(toolbarView, inputs)()(model, h), sceneView(model, h)])
 
-/** The row of the tasks table at `index`. */
+/** The Tasks tab under its toolbar while the thread `openedId` is open beside it. */
+const tasksTabWithPlansOpen: typeof sceneView = (model, h) => {
+  const open = { ...inputs, openThreadId: Option.some(openedId) }
+
+  return h.div([], [withViewInputs(toolbarView, open)()(model, h), withViewInputs(view, open)()(model, h)])
+}
+
+/** What the Tasks tab says where the filters leave no task. */
+const noMatches = text("No tasks match these filters.")
+
+/** The row of the task list at `index`. */
 const taskRow = (index: number) => nth(all.role("listitem"), index)
 
 describe("a group's threads", () => {
@@ -454,47 +472,90 @@ describe("a group's tasks", () => {
     )
   })
 
-  it("shows each by its assignee's initials or a dash, its thread's title or opening, who started it, and its replies", () => {
+  it("shows each by its status drawn at 1rem, its thread's title or opening, its assignee, and how long ago", () => {
     scene(
       { update, view: tasksTab },
       given(tasking(alices, shipping)),
+      expect(within(role("button", { name: "Ship the release" }), selector("svg"))).toHaveAttr("width", "1rem"),
+      expect(within(role("button", { name: "Ship the release" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Ship the release" }), text("Doing"))).toExist(),
       expect(within(role("button", { name: "Ship the release" }), text("A"))).toHaveAttr("aria-hidden", "true"),
-      expect(within(role("button", { name: "Plans for the week" }), text("–"))).toHaveAttr("aria-hidden", "true"),
-      expect(role("button", { name: "Ship the release" })).toHaveAttr(
-        "aria-description",
-        "Started by Bob · 3 replies · Doing · 10m ago"
-      ),
+      expect(within(role("button", { name: "Ship the release" }), text("A"))).toHaveClass("size-6"),
+      expect(within(role("button", { name: "Ship the release" }), text("Alice"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), text("10m ago"))).toHaveClass("text-end"),
+      expect(role("button", { name: "Ship the release" })).toHaveAttr("aria-description", "Doing · Alice · 10m ago"),
+      expect(within(role("button", { name: "Plans for the week" }), text("Triage"))).toExist(),
+      expect(within(role("button", { name: "Plans for the week" }), text("Unassigned"))).toExist(),
+      expect(
+        within(role("button", { name: "Plans for the week" }), selector("span.text-control.text-ink-secondary"))
+      ).toExist(),
       expect(role("button", { name: "Plans for the week" })).toHaveAttr(
         "aria-description",
-        "Started by Alice · 0 replies · Triage · 30m ago"
-      ),
-      expect(within(role("button", { name: "Ship the release" }), text("Doing"))).toExist(),
-      expect(within(role("button", { name: "Ship the release" }), text("10m ago"))).toExist(),
-      expect(within(role("button", { name: "Ship the release" }), text("Open →"))).toExist()
-    )
-  })
-
-  it("says that a task is on its way while its thread is being started", () => {
-    scene(
-      { update, view: tasksTab },
-      given(tasking({ ...shipping, pending: true })),
-      expect(role("button", { name: "Ship the release" })).toHaveAttr(
-        "aria-description",
-        "Started by Bob · 3 replies · Sending… · Doing · 10m ago"
+        "Triage · Unassigned · 30m ago"
       )
     )
   })
 
-  it("shows where each stands in a badge, and says how many tasks it lists", () => {
+  it("leaves out who started a thread, how many replies it has, a word that opens it, and the place of its group", () => {
     scene(
       { update, view: tasksTab },
-      given(tasking(inStatus(alices, "done"), inStatus(shipping, "held"))),
+      given(tasking(alices, shipping)),
+      expect(text("Open →")).toBeAbsent(),
+      expect(within(role("button", { name: "Ship the release" }), text("General"))).toBeAbsent(),
+      expect(within(role("button", { name: "Ship the release" }), text("#General"))).toBeAbsent(),
+      expect(within(role("button", { name: "Ship the release" }), selector("span.text-hint.flex-none"))).toBeAbsent()
+    )
+  })
+
+  it("labels the columns over the rows: Task, Status, Assignee, and Activity", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(alices, shipping)),
+      expect(text("Task")).toExist(),
+      expect(text("Activity")).toExist(),
+      expect(text("Group")).toBeAbsent()
+    )
+  })
+
+  it("says that a task is on its way, in place of its activity, while its thread is being started", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking({ ...shipping, pending: true })),
+      expect(within(role("button", { name: "Ship the release" }), text("Sending…"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), text("10m ago"))).toBeAbsent(),
+      expect(role("button", { name: "Ship the release" })).toHaveAttr("aria-description", "Doing · Alice · Sending…")
+    )
+  })
+
+  it("says where each stands by its drawing and its word, quiet in its title once it is done or dismissed", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(inStatus(alices, "done"), inStatus(shipping, "held"), inStatus(retroTask, "dismissed"))),
       expect(text("Threads that track a task.")).toExist(),
-      expect(text("2 tasks")).toExist(),
+      expect(text("3 tasks")).toExist(),
       expect(within(role("button", { name: "Plans for the week" }), text("Done"))).toExist(),
-      expect(within(role("button", { name: "Ship the release" }), text("Held"))).toExist()
+      expect(within(role("button", { name: "Plans for the week" }), selector("svg.text-ink"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), selector("svg.text-ink"))).toBeAbsent(),
+      expect(within(role("button", { name: "Plans for the week" }), text("Plans for the week"))).toHaveClass(
+        "text-ink-secondary"
+      ),
+      expect(within(role("button", { name: "Ship the release" }), text("Held"))).toExist(),
+      expect(within(role("button", { name: "Ship the release" }), text("Ship the release"))).toHaveClass("text-ink"),
+      expect(within(role("button", { name: "Ship the release" }), text("Ship the release"))).toHaveClass("font-medium"),
+      expect(within(role("button", { name: "Retro" }), text("Dismissed"))).toExist(),
+      expect(within(role("button", { name: "Retro" }), text("Retro"))).toHaveClass("text-ink-secondary")
     )
     scene({ update, view: tasksTab }, given(tasking(shipping)), expect(text("1 task")).toExist())
+  })
+
+  it("draws the task whose thread is open beside the list as the current row, and no other", () => {
+    scene(
+      { update, view: tasksTabWithPlansOpen },
+      given(tasking(alices, shipping)),
+      expect(role("button", { name: "Plans for the week" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Ship the release" })).not.toHaveAttr("aria-current")
+    )
+    scene({ update, view: tasksTab }, given(tasking(alices, shipping)), expect(selector("[aria-current]")).toBeAbsent())
   })
 
   it("opens the thread of the task the person picks, as a thread of the list opens", () => {
@@ -661,12 +722,12 @@ describe("a group's tasks", () => {
       type(label("Search tasks"), "ship"),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist(),
-      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      expect(noMatches).toExist(),
       type(label("Search tasks"), "plans"),
       expect(role("button", { name: "Plans for the week" })).toExist(),
       ...chooseFromMenu(AssigneeMenu, "Assignee: Anyone", "Alice"),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
-      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      expect(noMatches).toExist(),
       ...chooseFromMenu(AssigneeMenu, "Assignee: Alice", "Unassigned"),
       expect(role("button", { name: "Plans for the week" })).toExist()
     )
@@ -680,29 +741,42 @@ describe("a group's tasks", () => {
       expect(art("fill")).toExist(),
       expect(text("Start one from the composer below.")).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
-      expect(text("0 tasks")).toExist()
+      expect(text("0 tasks")).toExist(),
+      expect(text("Activity")).toBeAbsent()
     )
     scene({ update, view: tasksTab }, given(tasking()), expect(role("heading", { name: "No tasks yet" })).toExist())
   })
 
-  it("says that none match when a search, a status, or an assignee leaves none, and not that there are none yet", () => {
+  it("says in a quiet line that none match when a search, a status, or an assignee leaves none, and not that there are none yet", () => {
     scene(
       { update, view: tasksTab },
       given(tasking(alices, shipping)),
       type(label("Search tasks"), "zzz"),
-      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
-      expect(art("nothing-here")).toExist(),
-      expect(text("Try different filters.")).toExist(),
+      expect(noMatches).toExist(),
+      expect(noMatches).toHaveClass("text-ink-secondary"),
+      expect(art("nothing-here")).toBeAbsent(),
+      expect(role("heading", { name: "No tasks match" })).toBeAbsent(),
       expect(role("heading", { name: "No tasks yet" })).toBeAbsent(),
       type(label("Search tasks"), "  "),
       expectAll(all.role("listitem")).toHaveCount(2),
       ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Done"),
-      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      expect(noMatches).toExist(),
       ...chooseFromMenu(StatusFilterMenu, "Status: Done", "Any status"),
       expectAll(all.role("listitem")).toHaveCount(2),
       ...chooseFromMenu(AssigneeMenu, "Assignee: Anyone", "Alice"),
       ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Triage"),
-      expect(role("heading", { name: "No tasks match", level: 2 })).toExist()
+      expect(noMatches).toExist()
+    )
+  })
+
+  it("keeps the labels of the columns over the line that says none match", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(alices, shipping)),
+      expect(text("Activity")).toExist(),
+      type(label("Search tasks"), "zzz"),
+      expect(noMatches).toExist(),
+      expect(text("Activity")).toExist()
     )
   })
 

@@ -302,9 +302,8 @@ const withTasks = atHome(opened, (home) =>
           {
             task,
             thread,
-            groupName: "General",
+            place: "#General",
             opening: Option.some(opening),
-            replies: 0,
             pending: false,
             lastActiveAt: opening.publishedAt
           },
@@ -321,9 +320,8 @@ const withTasks = atHome(opened, (home) =>
               groupId: design.id,
               title: "Ship the release"
             },
-            groupName: "Design",
+            place: "#Design",
             opening: Option.none(),
-            replies: 0,
             pending: false,
             lastActiveAt: reply.publishedAt
           }

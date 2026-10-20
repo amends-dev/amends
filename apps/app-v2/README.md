@@ -83,7 +83,7 @@ when it has nothing to list, or could not read what it lists, is the design's `p
 no workspaces, no groups), `reach` for nothing connected (no connections, no channels), `fill` for a place waiting
 for its first thing (a group's Tasks tab, a roster), `caret` for nothing said yet (no activity, a new conversation), `rest` for nothing
 left to do (all caught up, nothing to discover, every agent set up, no task to triage or open), `nothing-here` for a search
-or filter that finds none, `came-apart` for what could not be read, and `lost-thread` for what is gone or out of reach
+or filter that finds none, except in the lists of tasks, which say it in a quiet line as `apps/ui` does, `came-apart` for what could not be read, and `lost-thread` for what is gone or out of reach
 (a host that cannot be reached, an agent, connection, or member that is not there). A list read for the first time
 shows the design's `loadingRows` under a line, "Loading agents…" or "Loading connections…", and a pane or a page
 shows `loadingLine`, "Loading your inbox…", "Loading settings…", "Loading the conversation…", "Loading agent…", and
@@ -301,15 +301,21 @@ below it counted at each level above.
   `group-tasks-sort`), and choosing from it changes only the Block's own model (`taskFilter`, `taskSort`), so the Block
   has no message for the choice. A line says "Threads that track a task." with how many
   tasks the search, the status, and the assignee leave at its end, "12 tasks", over the labels of the columns, Task,
-  Status, and Activity, and a row for each task: the initials of its assignee, or a dash for no one, the
-  thread's title or its opening's words (`threadWords`), "Started by Alice · 3 replies" under it, with
-  "Sending…" while the thread is being started, a badge of the status, a success for done and a caution
-  for held, how long ago the thread was last written in (`ageLabel`), and "Open →", the row opening the
-  thread as a row of the list does; the table is `taskTable.ts`'s, which `feature/tasks` draws too. The
+  Status, Assignee, and Activity, as `apps/ui`'s `GroupTasks` has them, and a row for each task, the design's
+  `taskList` (`taskList.ts`, which `feature/tasks` draws too): the status drawn at 1rem (`statusShape`), the
+  thread's title or its opening's words (`threadWords`), in medium weight and quiet once the task is done or
+  dismissed, the word for the status (`statusLabel`), the assignee as a 24px mark and name, or the people icon and
+  "Unassigned", and how long ago the thread was last written in (`ageLabel`), or "Sending…" in its place while the
+  thread is being started; the row opens the thread as a row of the list does, and the one whose thread is open
+  beside the list is drawn current. `apps/ui` has a key for each task, which a task here lacks, so the row has no
+  column for one, and it has no place for who started a thread, how many replies it has, the status as a badge, or
+  "Open →", which the row no longer shows. The row is named by the title and described by all else it says, "Doing ·
+  Alice · 10m ago", the status word and the assignee's name included, which the row drops below 64rem and 48rem. The
   search finds the letters in the thread's title or in its
   opening's words, whatever their case and accents (`threadContains`); a mention in it is the member's current name. With
-  no task the tab says "No tasks yet" and to start one from the composer, and with a search or a
-  status that leaves none, "No tasks match", each with its art. `composerView` is the composer to start one, for the
+  no task the tab says "No tasks yet" and to start one from the composer, which `apps/ui` has no words for, and with a
+  search or a status that leaves none, "No tasks match these filters." in a quiet line under the labels of the columns, as
+  `apps/ui` says it (`noTasksMatch`, the design's `taskListEmpty`). `composerView` is the composer to start one, for the
   pane's footer, whose box shows "Message" and the group's name until the person writes. On the Tasks
   tab it starts a thread that tracks a task, in triage: its box is named New task, shows "New task in"
   and the group's name, with a `#` before a team's, and its button says Create task. The draft is the
@@ -455,8 +461,8 @@ below it counted at each level above.
   centered, follows the list. The tabs keep what is shown, and the notification opened stays listed in
   its place even when newer ones push it past the page.
 - `feature/tasks`: the tasks the person can see across their groups, from the store's `tasks`: each
-  with its thread, its group's name, how many replies the thread has, and when it was last active,
-  and the members and contacts that name who started a thread and who is assigned to it. It is made
+  with its thread, the place its group is as a line says it (`#general`), and when it was last active,
+  and the members that name who is assigned to it. It is made
   from the workspace as the member, writes nothing, and has two views, each a main pane that takes
   the time now from its parent. `triageView` is titled Triage, "Tasks waiting for a decision.", and
   lists the tasks in triage (`triageTasks`); `tasksView`, the Block's canonical view, is titled Tasks,
@@ -468,17 +474,19 @@ below it counted at each level above.
   "Status: Any status". Each menu is a Foldkit `Menu` Block the Block binds (`AssigneeBinding`, `StatusBinding`), and
   choosing from it sets the filter, so the Block has no message for the choice. The toolbar goes on with a line that says "Tasks in triage across your groups." or "Open tasks across your groups."
   with how many tasks the filters leave at its end, "12 tasks", over the labels of the columns,
-  Task, Group, Status, and Activity, and a row for each, latest active first (`matching`): the same
-  row as the group's Tasks tab has (`taskTable.ts`), with the name of the task's group as its first
-  cell, "General · To do · Sep 20" described after "Started by Alice · 3 replies", and "Open →". The
+  Task, Status, Assignee, and Activity, and a row for each, latest active first (`matching`): the same
+  row as the group's Tasks tab has (`taskList.ts`), with the place of the task's group, "#General", in quiet
+  text after its title, since `apps/ui` has no list of several groups' tasks and this keeps its columns as they are,
+  and "#General · To do · Alice · 10m ago" as its description. No row is drawn current, since opening a task opens its
+  group, where the list is not shown. The
   row reports `OpenedThread` with the thread and its group, which its parent opens in that group,
   where the task's controls are. The search finds the letters in the thread's title or in its
   opening's words as the group's Tasks tab does (`threadContains`), and the assignee is anyone, no one,
   or the member the filter names, whoever the Block is made for. The filters are the Block's, one for both views,
   except that Triage leaves out the status (`withAnyStatus`), since it shows no choice of one. With
   no task the pane says "Nothing to triage" or "No open tasks" and that the tasks the person can see
-  will be listed there, and with filters that leave none, "No tasks match" and to try different
-  ones. `triageCount` is how many tasks wait in triage, for the sidebar to show.
+  will be listed there, and with filters that leave none, "No tasks match these filters." in a quiet line under the
+  labels, as the group's Tasks tab says it. `triageCount` is how many tasks wait in triage, for the sidebar to show.
 - `feature/settings`: the workspace's settings as `apps/ui` has them, two pages, a member in the side pane, and
   six dialogs, read together from the store. The Workspace page (`view`) is the workspace's name in a form with
   Save changes, which waits for a name that is new and which only the owner may use, the field being disabled with
@@ -996,8 +1004,9 @@ while the store lacks the group; `activityOf` takes the most pressing state and 
 with no turn, which is idle. `placesLine`, `activityLabel`, and `turnLabel` say them in words, "#general + 1 more" and
 "Working in #general", and `motionOfState` says how the logo moves for each: threaded, lit, or tugged. The Block
 reads the turns under way and the groups through its `ReadActivity` subscription, apart from the agents.
-`taskTable.ts`, tasks as the design's `directory` rows under the labels of its columns, with the badge
-of each status, is the threads feature's Tasks tab's and the tasks feature's, which adds a column for the group.
+`taskList.ts`, tasks as the design's `taskList`, with the status of each drawn and the assignee named, is the threads
+feature's Tasks tab's and the tasks feature's, which adds the place of the group after each title, and holds the words
+the two say where the filters leave none (`noTasksMatch`).
 `taskFilter.ts`, what a list of tasks is narrowed to besides the letters typed, the status and the assignee, each
 chosen from a menu, is theirs too. The assignee is an `AssigneeFilter`: `Anyone`, `Unassigned`, or `Member` with the
 member's ID. The menu reports a choice as a string, `Anyone`, `Unassigned`, or `Member:` and the ID
@@ -1506,7 +1515,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
   with no messages, and the later of two messages, and so is `Store.viewTasks`: each task with its
-  thread, its group's name, and the summary of its messages, a conversation's group named by the other
+  thread, the place of its group, and the summary of its messages, a conversation's group placed by the other
   member, a thread still being started, and no task whose thread or group the replica lacks, and so
   is `Store.findMatches`: nothing for an empty
   query or one of spaces, a group by the name the person reads and a conversation by the other member,
