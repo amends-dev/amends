@@ -1,13 +1,15 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
+import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { MembersComboboxBlock } from "../../memberPicker.ts"
 import {
   GroupsDefinition,
   type Model,
+  onMemberIds,
   others,
-  teamMembersId,
+  startingMembersId,
   teamVisibilityId,
   VisibilityRadioGroupBlock,
   withTeam
@@ -43,9 +45,9 @@ export const VisibilityBinding = GroupsDefinition.bindChild(VisibilityRadioGroup
 })
 
 /**
- * Choosing a member adds them to the team, unless they are not one of the people who may be added or are in it already.
- * The combobox does not empty the text typed once a choice is made, so the list is closed and opened again, which
- * empties it and leaves the list open for the next choice.
+ * Choosing a member adds them to the team or the conversation being started, unless they are not one of the people who
+ * may be added or are in it already. The combobox does not empty the text typed once a choice is made, so the list is
+ * closed and opened again, which empties it and leaves the list open for the next choice.
  */
 const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
   Selected: ({ value }) =>
@@ -57,9 +59,11 @@ const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
           model:
             member === undefined
               ? model
-              : withTeam(model, (team) =>
-                  team.memberIds.includes(member.id) ? team : { ...team, memberIds: [...team.memberIds, member.id] }
-                )
+              : modifyFields(model, {
+                  starting: onMemberIds((memberIds) =>
+                    memberIds.includes(member.id) ? memberIds : [...memberIds, member.id]
+                  )
+                })
         }
       }),
       MembersBinding.requestClose(),
@@ -70,7 +74,7 @@ const foldMembersOutMessage = MembersComboboxBlock.OutMessage.match({
 
 export const MembersBinding = GroupsDefinition.bindChild(MembersComboboxBlock, {
   field: "membersCombobox",
-  init: { contextToArgs: () => [{ id: teamMembersId }] },
+  init: { contextToArgs: () => [{ id: startingMembersId }] },
   outMessage: { fold: foldMembersOutMessage }
 })
 

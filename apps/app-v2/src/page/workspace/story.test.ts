@@ -1641,9 +1641,7 @@ describe("a workspace", () => {
         expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
         expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
         expect(model.home.groups.dialog.isOpen).toBe(true)
-        expect(model.home.groups.starting).toEqual(
-          Option.some({ _tag: "Conversation", memberId: Option.some(bob.id), text: "" })
-        )
+        expect(model.home.groups.starting).toEqual(Option.some({ _tag: "Conversation", memberIds: [bob.id] }))
       })
     )
   })

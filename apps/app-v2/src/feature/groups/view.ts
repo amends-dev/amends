@@ -2,14 +2,14 @@ import { type Group, GroupPermissions } from "@amends-dev/core/group"
 import type { Task } from "@amends-dev/core/task"
 import type { Member } from "@amends-dev/core/workspace"
 import {
+  announcement,
   button,
   choiceGroup,
   field,
   iconButton,
   notice,
   searchField,
-  submit,
-  textarea
+  submit
 } from "@amends-dev/design/control"
 import { badge } from "@amends-dev/design/details"
 import { columns, emptyLine, row, statusLine, summary } from "@amends-dev/design/directory"
@@ -22,7 +22,6 @@ import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { type ActivityState, motionOfState, stateInGroup, stateWord } from "../../agentActivity.ts"
 import { sidebarActivity, statusOfAgent } from "../../agentStanding.ts"
-import { memberChoice } from "../../memberChoice.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
 import { groupName, memberMark, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
@@ -40,6 +39,7 @@ import {
   type BrowseTab,
   discoverable,
   findAgentOfMember,
+  conversationWith,
   type GroupItem,
   hasNewActivityIn,
   isTeamReady,
@@ -48,7 +48,7 @@ import {
   type Model,
   others,
   Starting,
-  teamMembersId,
+  startingMembersId,
   teammates,
   type TeamItem,
   teamVisibilityId,
@@ -165,9 +165,13 @@ const teammateRow = (member: Member.Member, model: Model, h: GroupsViewBuilder):
     onClick: Message.ClickedTeammate({ memberId: member.id })
   })
 
+/** What the New message modal says when the people chosen are exactly those of a conversation the person has. */
+const existingConversationLine = "You already have a conversation with them."
+
 /**
- * The modal for what the person is starting: a team, or a conversation with another member. While nothing is being
- * started the dialog has no content to show, so it is an empty frame.
+ * The modal for what the person is starting: a team, or a conversation with the people they choose, which is New message
+ * as `apps/ui` has it. A conversation they have with exactly those people is opened, not started, and the modal says
+ * so. While nothing is being started the dialog has no content to show, so it is an empty frame.
  */
 const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): Html =>
   Option.match(model.starting, {
@@ -208,7 +212,7 @@ const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): 
                 )
             }),
             memberPicker(h, {
-              id: teamMembersId,
+              id: startingMembersId,
               label: "Members",
               locked: [youInPicker(model.members, model.memberId)],
               chosen: pickerPeopleChosen(model.members, team.memberIds),
@@ -216,9 +220,11 @@ const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): 
               query: model.membersCombobox.inputValue,
               isOpen: model.membersCombobox.isOpen,
               hint: includedHint(team.memberIds.length),
-              onRemove: (memberId) => Message.ClickedRemoveTeamMember({ memberId }),
+              onRemove: (memberId) => Message.ClickedRemoveStartingMember({ memberId }),
               embed: (viewInputs) =>
-                h.block(MembersBinding.embedView({ slotId: "team-members", model: model.membersCombobox, viewInputs }))
+                h.block(
+                  MembersBinding.embedView({ slotId: "starting-members", model: model.membersCombobox, viewInputs })
+                )
             }),
             notice(h, team.failure)
           ],
@@ -226,33 +232,40 @@ const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): 
           footer: [submit(h, "Create group", { isDisabled: !isTeamReady(team) })],
           onSubmit: Message.SubmittedTeam()
         }),
-      Conversation: ({ memberId, text }) =>
-        modal(h, render, {
-          title: "New conversation",
+      Conversation: ({ memberIds }) => {
+        const hasConversation = Option.isSome(conversationWith(model, memberIds))
+
+        return modal(h, render, {
+          title: "New message",
+          description: "Everyone you choose sees every thread in your conversation together.",
           size: "compact",
           body: [
-            memberChoice(h, {
-              id: "conversation-member",
-              label: "With",
-              none: "Choose a member",
-              members: others(model),
-              value: memberId,
-              onChange: (memberId) => Message.ChoseConversationMember({ memberId }),
-              // The dialog opens on the member choice, or, with a member chosen already, on the first message.
-              attributes: Option.isNone(memberId) ? render.initialFocus : []
+            memberPicker(h, {
+              id: startingMembersId,
+              label: "To",
+              placeholder: "Add someone…",
+              chosen: pickerPeopleChosen(model.members, memberIds),
+              candidates: pickerPeople(others(model)),
+              query: model.membersCombobox.inputValue,
+              isOpen: model.membersCombobox.isOpen,
+              attributes: render.initialFocus,
+              onRemove: (memberId) => Message.ClickedRemoveStartingMember({ memberId }),
+              embed: (viewInputs) =>
+                h.block(
+                  MembersBinding.embedView({ slotId: "starting-members", model: model.membersCombobox, viewInputs })
+                )
             }),
-            textarea(h, {
-              id: "conversation-text",
-              label: "First message",
-              value: text,
-              onInput: (text) => Message.TypedConversationText({ text }),
-              attributes: Option.isSome(memberId) ? render.initialFocus : []
-            })
+            announcement(h, hasConversation ? Option.some(existingConversationLine) : Option.none())
           ],
           cancelLabel: "Cancel",
-          footer: [submit(h, "Start")],
+          footer: [
+            submit(h, hasConversation ? "Open conversation" : "Start conversation", {
+              isDisabled: memberIds.length === 0
+            })
+          ],
           onSubmit: Message.SubmittedConversation()
         })
+      }
     })
   })
 
@@ -341,7 +354,7 @@ export const dialogView = GroupsComposition.makeView((model, h) =>
     DialogBinding.embedView({
       slotId: "starting",
       model: model.dialog,
-      viewInputs: { toView: (render) => startingModal(render, model, h) }
+      viewInputs: { hasDescription: Option.isSome(model.starting), toView: (render) => startingModal(render, model, h) }
     })
   )
 )

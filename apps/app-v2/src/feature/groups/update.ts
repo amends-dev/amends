@@ -5,10 +5,11 @@ import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { placeName } from "../../seen.ts"
-import { CreateTeam, FocusTeamMembers, JoinGroup, MarkGroupRead, StartConversation } from "./command.ts"
+import { CreateTeam, FocusStartingMembers, JoinGroup, MarkGroupRead } from "./command.ts"
 import { DialogBinding, GroupsComposition, MembersBinding } from "./composition.ts"
 import {
   type BrowseTab,
+  conversationIn,
   conversationWith,
   findCreatedTeam,
   findGroup,
@@ -17,6 +18,7 @@ import {
   Message,
   type Model,
   OutMessage,
+  onMemberIds,
   onTeam,
   Starting,
   teamIn,
@@ -24,20 +26,6 @@ import {
   unreadInOpenGroup,
   withTeam
 } from "./definition.ts"
-
-/** The model with what the person is starting as `change` makes it, while they start something. */
-const atStarting = (model: Model, change: (starting: Starting) => Starting) =>
-  modifyFields(model, { starting: Option.map(change) })
-
-/** The conversation being started, with its member chosen, while one is. */
-const conversationIn = (model: Model) =>
-  Option.flatMap(
-    model.starting,
-    Starting.matchOrElse(
-      { Conversation: ({ memberId, text }) => Option.map(memberId, (withMemberId) => ({ withMemberId, text })) },
-      () => Option.none()
-    )
-  )
 
 /** Ask for a new team: unnamed, private, and with no one added besides the person. */
 const openTeamForm = GroupsDefinition.stepFields(() => ({
@@ -53,10 +41,10 @@ const openTeamForm = GroupsDefinition.stepFields(() => ({
     )
 }))
 
-/** Ask for a new conversation with `memberId` chosen, or with none chosen, and no first message. */
-const openConversationForm = (memberId: Option.Option<MemberId.MemberId>) =>
+/** Ask for a new conversation with `memberIds` chosen, none when there are none. */
+const openConversationForm = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
   GroupsDefinition.stepFields(() => ({
-    starting: () => Option.some(Starting.Conversation({ memberId, text: "" }))
+    starting: () => Option.some(Starting.Conversation({ memberIds }))
   }))
 
 /**
@@ -74,6 +62,10 @@ const readOpenGroup = GroupsDefinition.step((model: Model) =>
   })
 )
 
+/** Mark the group `groupId` as the one open, and read it. */
+const selectGroup = (groupId: GroupId.GroupId) =>
+  Update.combine([GroupsDefinition.stepFields(() => ({ selected: () => Option.some(groupId) })), readOpenGroup])
+
 /**
  * Picking the group already picked changes nothing; any other is marked and reported, as a click on its row does, and
  * read.
@@ -81,13 +73,7 @@ const readOpenGroup = GroupsDefinition.step((model: Model) =>
 const pickGroup = (model: Model, groupId: GroupId.GroupId) =>
   Option.contains(model.selected, groupId)
     ? { model }
-    : Update.withOutMessage(
-        Update.combine(model, [
-          GroupsDefinition.stepFields(() => ({ selected: () => Option.some(groupId) })),
-          readOpenGroup
-        ]),
-        OutMessage.SelectedGroup({ groupId })
-      )
+    : Update.withOutMessage(Update.combine(model, [selectGroup(groupId)]), OutMessage.SelectedGroup({ groupId }))
 
 /** Ask to browse the groups, on the tab `tab`. */
 const browseOn = (model: Model, tab: BrowseTab) => ({
@@ -146,13 +132,6 @@ const createTeam = (model: Model, team: TeamForm) => {
   }
 }
 
-/** Write the conversation with `withMemberId`, `text` its first message, to the person's store. */
-const writeConversation = (withMemberId: MemberId.MemberId, text: string) =>
-  GroupsDefinition.step((model: Model) => ({
-    model,
-    commands: [StartConversation({ workspaceId: model.workspaceId, memberId: model.memberId, withMemberId, text })]
-  }))
-
 export const update = GroupsComposition.makeUpdate((model, message) => {
   /**
    * Finish creating a team once the store has kept the action and has listed the team it made: mark it in the sidebar,
@@ -172,13 +151,38 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     })
 
   /**
+   * Close the dialog and show the conversation of the person with `memberIds`: the one they have, picked as a click on
+   * its row does, or, when they have none, the people for the parent to start one with.
+   */
+  const confirmConversation = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
+    Option.match(conversationWith(model, memberIds), {
+      onSome: ({ id: groupId }) =>
+        Option.contains(model.selected, groupId)
+          ? Update.combine(model, [DialogBinding.requestClose()])
+          : Update.withOutMessage(
+              Update.combine(model, [selectGroup(groupId), DialogBinding.requestClose()]),
+              OutMessage.SelectedGroup({ groupId })
+            ),
+      onNone: () =>
+        Update.withOutMessage(
+          Update.combine(model, [DialogBinding.requestClose()]),
+          OutMessage.SelectedPeople({ memberIds })
+        )
+    })
+
+  /**
    * Open the conversation of the person and `memberId` when there is one, and otherwise ask for a new one with them
-   * chosen, to write the first message of.
+   * chosen.
    */
   const talkWith = (memberId: MemberId.MemberId) =>
-    Option.match(conversationWith(model, memberId), {
-      onSome: ({ group }) => pickGroup(model, group.id),
-      onNone: () => Update.combine(model, [openConversationForm(Option.some(memberId)), DialogBinding.requestOpen()])
+    Option.match(conversationWith(model, [memberId]), {
+      onSome: ({ id: groupId }) => pickGroup(model, groupId),
+      onNone: () =>
+        Update.combine(model, [
+          openConversationForm([memberId]),
+          MembersBinding.requestClose(),
+          DialogBinding.requestOpen()
+        ])
     })
 
   return Message.match(message, {
@@ -225,12 +229,11 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     ClickedNewTeam: () =>
       Update.combine(model, [openTeamForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
     TypedTeamName: ({ name }) => ({ model: withTeam(model, (team) => ({ ...team, name })) }),
-    ClickedRemoveTeamMember: ({ memberId }) => ({
-      model: withTeam(model, (team) => ({
-        ...team,
-        memberIds: team.memberIds.filter((id) => id !== memberId)
-      })),
-      commands: [FocusTeamMembers({})]
+    ClickedRemoveStartingMember: ({ memberId }) => ({
+      model: modifyFields(model, {
+        starting: onMemberIds((memberIds) => memberIds.filter((id) => id !== memberId))
+      }),
+      commands: [FocusStartingMembers({})]
     }),
     SubmittedTeam: () =>
       Option.match(teamIn(model), {
@@ -249,34 +252,15 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     FailedCreateTeam: ({ error }) => ({
       model: withTeam(model, (team) => ({ ...team, creating: Option.none(), failure: Option.some(error) }))
     }),
-    CompletedFocusTeamMembers: () => ({ model }),
+    CompletedFocusStartingMembers: () => ({ model }),
     ClickedNewConversation: () =>
-      Update.combine(model, [openConversationForm(Option.none()), DialogBinding.requestOpen()]),
+      Update.combine(model, [openConversationForm([]), MembersBinding.requestClose(), DialogBinding.requestOpen()]),
     ClickedTeammate: ({ memberId }) => talkWith(memberId),
     RequestedConversationWith: ({ memberId }) => talkWith(memberId),
-    ChoseConversationMember: ({ memberId: chosen }) => ({
-      model: atStarting(
-        model,
-        Starting.matchOrElse(
-          { Conversation: (conversation) => Starting.Conversation({ ...conversation, memberId: chosen }) },
-          (same) => same
-        )
-      )
-    }),
-    TypedConversationText: ({ text }) => ({
-      model: atStarting(
-        model,
-        Starting.matchOrElse(
-          { Conversation: (conversation) => Starting.Conversation({ ...conversation, text }) },
-          (same) => same
-        )
-      )
-    }),
     SubmittedConversation: () =>
       Option.match(conversationIn(model), {
         onNone: () => ({ model }),
-        onSome: ({ withMemberId, text }) =>
-          Update.combine(model, [writeConversation(withMemberId, text), DialogBinding.requestClose()])
+        onSome: (memberIds) => (memberIds.length === 0 ? { model } : confirmConversation(memberIds))
       }),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })

@@ -3,7 +3,7 @@
  * several, a mark of their own.
  */
 
-import type { Group } from "@amends-dev/core/group"
+import { Group } from "@amends-dev/core/group"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { MarkContent } from "@amends-dev/design/mark"
 import * as Array from "effect/Array"
@@ -13,6 +13,20 @@ import { initials, memberMark, memberName } from "../../seen.ts"
 /** The members of `group` other than the person `self`, by their IDs. */
 export const othersIn = (group: Group.Direct, self: MemberId.MemberId): ReadonlyArray<MemberId.MemberId> =>
   group.memberIds.filter((memberId) => memberId !== self)
+
+/** The conversation among `groups` of the person `self` with exactly the members `others`, when there is one. */
+export const conversationAmong = (
+  groups: ReadonlyArray<Group.Group>,
+  self: MemberId.MemberId,
+  others: ReadonlyArray<MemberId.MemberId>
+): Option.Option<Group.Direct> => {
+  const wanted = Group.directKey([self, ...others])
+
+  return Array.findFirst(
+    groups,
+    (group): group is Group.Direct => group.kind === "Direct" && Group.directKey(group.memberIds) === wanted
+  )
+}
 
 /** The member `group` is with, when it is with one: none for a conversation with several. */
 export const soleOtherIn = (group: Group.Direct, self: MemberId.MemberId): Option.Option<MemberId.MemberId> => {

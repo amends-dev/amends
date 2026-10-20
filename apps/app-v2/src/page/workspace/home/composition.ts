@@ -76,6 +76,7 @@ export const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.T
  */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
+  SelectedPeople: () => HomeDefinition.stepNoop(),
   RequestedBrowse: () => switchTo(showGroups),
   JoinedGroup: () => HomeDefinition.stepNoop(),
   CreatedGroup: ({ groupId }) => openGroupAlone(groupId)
@@ -87,6 +88,7 @@ const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
  */
 const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: () => OutMessage.Navigated(),
+  SelectedPeople: () => OutMessage.Navigated(),
   RequestedBrowse: () => OutMessage.Navigated(),
   JoinedGroup: ({ groupId, place }) => OutMessage.JoinedGroup({ groupId, place }),
   CreatedGroup: ({ groupId }) => OutMessage.CreatedGroup({ groupId })

@@ -1,5 +1,4 @@
 import { GroupId } from "@amends-dev/core/group"
-import { ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -18,18 +17,19 @@ import {
   turnOf
 } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import { CreateTeam, FocusTeamMembers, JoinGroup, MarkGroupRead, StartConversation } from "./command.ts"
+import { CreateTeam, FocusStartingMembers, JoinGroup, MarkGroupRead } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import {
   byGeneralThenName,
+  conversationIn,
   conversationWith,
   discoverable,
   hasNewActivityIn,
   Message,
   OutMessage,
   Starting,
+  startingMembersId,
   teamIn,
-  teamMembersId,
   waitingIn,
   yourTeams
 } from "./definition.ts"
@@ -39,6 +39,7 @@ import { update } from "./update.ts"
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
 const bobId = MemberId.MemberId.make("member-2")
+const carolId = MemberId.MemberId.make("member-9")
 const groupId = GroupId.GroupId.make("general")
 
 const listed = init(workspaceId, memberId).model
@@ -108,7 +109,7 @@ describe("the groups", () => {
       message(Message.ClickedNewConversation()),
       Command.expectNone(),
       model((model) => {
-        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberId: Option.none(), text: "" })))
+        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberIds: [] })))
         expect(model.dialog.isOpen).toBe(true)
       })
     )
@@ -361,13 +362,35 @@ describe("the groups", () => {
     story(
       update,
       given(withMembers),
-      message(Message.ClickedRemoveTeamMember({ memberId: bobId })),
-      Command.expectExact(FocusTeamMembers({})),
-      Command.resolve(FocusTeamMembers, Message.CompletedFocusTeamMembers()),
+      message(Message.ClickedRemoveStartingMember({ memberId: bobId })),
+      Command.expectExact(FocusStartingMembers({})),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
       model((model) => {
         expect(Option.map(teamIn(model), ({ memberIds }) => memberIds)).toEqual(
           Option.some([MemberId.MemberId.make("member-3")])
         )
+      })
+    )
+  })
+
+  it("take off the person whose chip was removed from the conversation being started the same way", () => {
+    const choosing = modifyFields(listed, {
+      starting: () => Option.some(Starting.Conversation({ memberIds: [bobId, carolId] }))
+    })
+
+    story(
+      update,
+      given(choosing),
+      message(Message.ClickedRemoveStartingMember({ memberId: bobId })),
+      Command.expectExact(FocusStartingMembers({})),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
+      model((model) => {
+        expect(conversationIn(model)).toEqual(Option.some([carolId]))
+      }),
+      message(Message.ClickedRemoveStartingMember({ memberId: bobId })),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
+      model((model) => {
+        expect(conversationIn(model)).toEqual(Option.some([carolId]))
       })
     )
   })
@@ -435,73 +458,114 @@ describe("the groups", () => {
         const input = yield* Effect.acquireRelease(
           Effect.sync(() => {
             const element = document.createElement("input")
-            element.id = inputId(teamMembersId)
+            element.id = inputId(startingMembersId)
             document.body.append(element)
             return element
           }),
           (element) => Effect.sync(() => element.remove())
         )
 
-        const focused = yield* FocusTeamMembers({}).effect.pipe(Effect.provide(FocusTeamMembers.layer))
+        const focused = yield* FocusStartingMembers({}).effect.pipe(Effect.provide(FocusStartingMembers.layer))
         expect(document.activeElement).toBe(input)
-        expect(focused).toEqual(Message.CompletedFocusTeamMembers())
+        expect(focused).toEqual(Message.CompletedFocusStartingMembers())
 
         input.remove()
-        const missing = yield* FocusTeamMembers({}).effect.pipe(Effect.provide(FocusTeamMembers.layer))
-        expect(missing).toEqual(Message.CompletedFocusTeamMembers())
+        const missing = yield* FocusStartingMembers({}).effect.pipe(Effect.provide(FocusStartingMembers.layer))
+        expect(missing).toEqual(Message.CompletedFocusStartingMembers())
       })
     )
   )
 
-  it("start a conversation once a member is chosen, with the first message written", () => {
+  it("start nothing from the New message dialog while no one is chosen", () => {
     story(
       update,
       given(listed),
       message(Message.ClickedNewConversation()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
-      message(Message.TypedConversationText({ text: "Got a minute?" })),
       message(Message.SubmittedConversation()),
       Command.expectNone(),
+      expectNoOutMessage(),
       model((model) => {
         expect(model.dialog.isOpen).toBe(true)
-      }),
-      message(Message.ChoseConversationMember({ memberId: Option.some(bobId) })),
-      message(Message.SubmittedConversation()),
-      Command.expectHas(
-        StartConversation({ workspaceId, memberId, withMemberId: bobId, text: "Got a minute?" }),
-        Dialog.test.CloseDialog
-      ),
-      Command.resolve(
-        StartConversation,
-        Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
-      ),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
-      model((model) => {
-        expect(model.starting).toEqual(Option.none())
-        expect(model.dialog.isOpen).toBe(false)
-        expect(model.notice).toEqual(Option.some("This browser could not keep that. Try again."))
+        expect(conversationIn(model)).toEqual(Option.some([]))
       })
     )
   })
 
-  it.effect("write a conversation with the members its first message mentions", () =>
-    Effect.gen(function* () {
-      const { written, layer } = recordingStores()
-      const start = (text: string) =>
-        StartConversation({ workspaceId, memberId, withMemberId: bobId, text }).effect.pipe(
-          Effect.provide(Layer.provide(StartConversation.layer, layer))
-        )
-      const text = `${ThreadMessage.mentionText(bobId, "Bob")} got a minute?`
-
-      yield* start(text)
-      yield* start("Got a minute?")
-
-      expect(written).toEqual([
-        { action: "DirectThreadStarted", payload: { memberIds: [bobId], text, mentions: [bobId] } },
-        { action: "DirectThreadStarted", payload: { memberIds: [bobId], text: "Got a minute?", mentions: [] } }
-      ])
+  describe("confirming the New message dialog", () => {
+    const conversationWithBobAndCarol = {
+      ...conversationWithBob,
+      id: GroupId.GroupId.make("bob-and-carol"),
+      memberIds: [memberId, bobId, carolId]
+    }
+    const withBobAndCarol = modifyFields(browsing, {
+      groups: (groups) => [...groups, { group: conversationWithBobAndCarol, pending: false, members: 3 }]
     })
-  )
+
+    /** The dialog open on a conversation with `memberIds` chosen. */
+    const choosing = (from: typeof browsing, memberIds: ReadonlyArray<MemberId.MemberId>) =>
+      modifyFields(from, {
+        starting: () => Option.some(Starting.Conversation({ memberIds })),
+        dialog: (dialog) => modifyFields(dialog, { isOpen: () => true })
+      })
+
+    it("report the people chosen, to start a conversation with, and close the dialog, when there is none with them", () => {
+      story(
+        update,
+        given(choosing(browsing, [bobId, carolId])),
+        message(Message.SubmittedConversation()),
+        Command.expectExact(Dialog.test.CloseDialog),
+        expectOutMessage(OutMessage.SelectedPeople({ memberIds: [bobId, carolId] })),
+        Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+        model((model) => {
+          expect(model.starting).toEqual(Option.none())
+          expect(model.dialog.isOpen).toBe(false)
+          expect(model.selected).toEqual(Option.none())
+        })
+      )
+    })
+
+    it("pick the conversation they have with exactly those people, as a click on its row does, and close the dialog", () => {
+      story(
+        update,
+        given(choosing(withBobAndCarol, [carolId, bobId])),
+        message(Message.SubmittedConversation()),
+        Command.expectExact(Dialog.test.CloseDialog),
+        expectOutMessage(OutMessage.SelectedGroup({ groupId: conversationWithBobAndCarol.id })),
+        Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+        model((model) => {
+          expect(model.selected).toEqual(Option.some(conversationWithBobAndCarol.id))
+          expect(model.starting).toEqual(Option.none())
+          expect(model.dialog.isOpen).toBe(false)
+        })
+      )
+    })
+
+    it("find no conversation with some of those people alone or with others besides them", () => {
+      story(
+        update,
+        given(choosing(withBobAndCarol, [carolId])),
+        message(Message.SubmittedConversation()),
+        Command.expectExact(Dialog.test.CloseDialog),
+        expectOutMessage(OutMessage.SelectedPeople({ memberIds: [carolId] })),
+        Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+      )
+    })
+
+    it("only close the dialog when the conversation they have with those people is the one open already", () => {
+      story(
+        update,
+        given(modifyFields(choosing(browsing, [bobId]), { selected: () => Option.some(conversationWithBob.id) })),
+        message(Message.SubmittedConversation()),
+        Command.expectExact(Dialog.test.CloseDialog),
+        expectNoOutMessage(),
+        Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+        model((model) => {
+          expect(model.selected).toEqual(Option.some(conversationWithBob.id))
+        })
+      )
+    })
+  })
 
   it("browse the groups they belong to, searching nothing, until the person says otherwise", () => {
     story(
@@ -783,7 +847,7 @@ describe("the groups", () => {
     )
   })
 
-  it("start a conversation with the member already chosen, in its dialog, when there is none with them alone", () => {
+  it("ask for a conversation with the member already chosen, in its dialog, when there is none with them alone", () => {
     story(
       update,
       given(listed),
@@ -791,22 +855,18 @@ describe("the groups", () => {
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       expectNoOutMessage(),
       model((model) => {
-        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberId: Option.some(bobId), text: "" })))
+        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberIds: [bobId] })))
         expect(model.dialog.isOpen).toBe(true)
         expect(model.selected).toEqual(Option.none())
       }),
-      message(Message.TypedConversationText({ text: "Got a minute?" })),
       message(Message.SubmittedConversation()),
-      Command.expectHas(
-        StartConversation({ workspaceId, memberId, withMemberId: bobId, text: "Got a minute?" }),
-        Dialog.test.CloseDialog
-      ),
-      Command.resolve(StartConversation, Message.WroteAction()),
+      Command.expectExact(Dialog.test.CloseDialog),
+      expectOutMessage(OutMessage.SelectedPeople({ memberIds: [bobId] })),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
     )
   })
 
-  it("start a conversation with a teammate the sidebar lists as asking for one with them does, in its dialog", () => {
+  it("ask for a conversation with a teammate the sidebar lists as asking for one with them does, in its dialog", () => {
     story(
       update,
       given(listed),
@@ -814,7 +874,7 @@ describe("the groups", () => {
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       expectNoOutMessage(),
       model((model) => {
-        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberId: Option.some(bobId), text: "" })))
+        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberIds: [bobId] })))
         expect(model.dialog.isOpen).toBe(true)
         expect(model.selected).toEqual(Option.none())
       })
@@ -997,27 +1057,40 @@ describe("the groups", () => {
     )
   })
 
-  it("find the conversation of the person and a member alone, and no other that holds them", () => {
-    const carolId = MemberId.MemberId.make("member-3")
+  it("find the conversation of the person with exactly the members given, in any order, and no other that holds them", () => {
     const withCarol = { ...conversationWithBob, id: GroupId.GroupId.make("with-carol"), memberIds: [memberId, carolId] }
+    const withBobAndCarol = {
+      ...conversationWithBob,
+      id: GroupId.GroupId.make("bob-and-carol"),
+      memberIds: [carolId, memberId, bobId]
+    }
     const among = modifyFields(listed, {
       groups: () => [
-        { group: { ...conversationWithBob, memberIds: [memberId, bobId, carolId] }, pending: false, members: 3 },
         {
-          group: { ...conversationWithBob, id: GroupId.GroupId.make("bob-and-carol"), memberIds: [bobId, carolId] },
+          group: {
+            ...conversationWithBob,
+            id: GroupId.GroupId.make("without-the-person"),
+            memberIds: [bobId, carolId]
+          },
           pending: false,
           members: 2
         },
+        { group: withBobAndCarol, pending: false, members: 3 },
         { group: withCarol, pending: false, members: 2 },
         { group: conversationWithBob, pending: true, members: 2 }
       ]
     })
 
-    expect(Option.map(conversationWith(among, bobId), ({ group }) => group.id)).toEqual(
-      Option.some(conversationWithBob.id)
+    expect(Option.map(conversationWith(among, [bobId]), ({ id }) => id)).toEqual(Option.some(conversationWithBob.id))
+    expect(Option.map(conversationWith(among, [carolId]), ({ id }) => id)).toEqual(Option.some(withCarol.id))
+    expect(Option.map(conversationWith(among, [bobId, carolId]), ({ id }) => id)).toEqual(
+      Option.some(withBobAndCarol.id)
     )
-    expect(Option.map(conversationWith(among, carolId), ({ group }) => group.id)).toEqual(Option.some(withCarol.id))
-    expect(conversationWith(among, MemberId.MemberId.make("member-4"))).toEqual(Option.none())
-    expect(conversationWith(listed, bobId)).toEqual(Option.none())
+    expect(Option.map(conversationWith(among, [carolId, bobId]), ({ id }) => id)).toEqual(
+      Option.some(withBobAndCarol.id)
+    )
+    expect(conversationWith(among, [MemberId.MemberId.make("member-4")])).toEqual(Option.none())
+    expect(conversationWith(among, [bobId, MemberId.MemberId.make("member-4")])).toEqual(Option.none())
+    expect(conversationWith(listed, [bobId])).toEqual(Option.none())
   })
 })

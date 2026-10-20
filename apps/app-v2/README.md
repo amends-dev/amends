@@ -139,8 +139,8 @@ put back in the box, as `apps/ui` keeps the draft of a send that failed. Foldkit
 gives the caret, so the composer reads the mention being typed at the end of the text, an "@" at its
 start or after a space and the letters after it with no space among them, and suggests members for
 that alone; a mention typed in the middle of the text is left as typed. A link written there, or by
-hand, still addresses its member, since a write reads the text. The textarea that edits a message,
-and the one that begins a conversation, are not the composer, and suggest no one.
+hand, still addresses its member, since a write reads the text. The textarea that edits a message is not the
+composer, and suggests no one.
 
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
@@ -552,7 +552,7 @@ below it counted at each level above.
   window below 48rem. Regular, 40rem by 37.5rem, is the group's settings, in each of its sections, a conversation's
   members, and the view a phone adds members in, creating a group, the invitations' history, and choosing an
   integration to add a connection through. Compact, 35rem wide and as tall as its content, is creating and joining a
-  workspace, each in the stage it is in once it is sent too, so that the dialog keeps its size, a new conversation,
+  workspace, each in the stage it is in once it is sent too, so that the dialog keeps its size, New message,
   inviting someone, revoking an invitation, handing the workspace over, removing a member, changing one's own name,
   removing an agent, replacing a connection's key, and removing a connection. Form, 40rem wide and as tall as its
   content, is adding an agent and configuring a connection. Wide, 45rem by 54rem, is for a long form with fields side by side, which
@@ -564,10 +564,9 @@ below it counted at each level above.
   `foldAccents` folds them, then by ID; the browse page's two tabs share this order, since they read the same
   groups, and so does the Jump to's Groups section, with `orderTargets`, so that its first five are the ones the person
   most likely wants, but not the channels' choice of group, which lists groups as the replica holds them); the public teams they may join are not in the sidebar, only on the browse page's Discover tab; and
-  where they start a team, or a conversation with another member, in a modal
+  where they start a team, or a conversation with other members, in a modal
   over the page: a dialog the Block binds from `@foldkit/ui/dialog` and renders with the design's
-  `modal`, a team as Create group and a conversation by the member and the first message, with the
-  member choice taking the focus, or the first message when the member is already chosen. Cancel, Close, Escape, a
+  `modal`, a team as Create group and a conversation as New message, as `apps/ui` has them. Cancel, Close, Escape, a
   click on the scrim, and a conversation's submit each close the dialog, which drops what was being started; a team's
   submit waits, as the next paragraph says.
   Create group is titled "Create group", with "Set a name, visibility, and members." under the title, and has the
@@ -580,7 +579,7 @@ below it counted at each level above.
   workspace's other active members, people and agents, with the person themself locked in it as "You", and a hint under
   it, "You're included automatically. Add others now or later.", which counts them once others are added, "3 members,
   including you.". Picking a member adds them as a chip and keeps the list open for the next; a chip's Remove button, named for the
-  member, and Backspace in the empty input take one off, and the input takes the focus again (`FocusTeamMembers`).
+  member, and Backspace in the empty input take one off, and the input takes the focus again (`FocusStartingMembers`).
   The Create group button is disabled until the name holds more than spaces, and while the group is being created.
   Sending the form writes `TeamCreated` once (`CreateTeam`) with the name trimmed, the visibility, and the person's own
   member ID first among the `memberIds`, since the host admits a team's creator only when listed; a name it would refuse
@@ -591,7 +590,18 @@ below it counted at each level above.
   store has kept the action). Once the group is both listed and kept, in whichever order the store says so, the dialog
   closes, the group is marked in the sidebar, and the Block reports `CreatedGroup` with its ID. Until then the form
   stays with its button disabled, and a write the store could not keep says why in the dialog (`failure`) and leaves the
-  form to send again. A group still on its way shows "Sending…" at the end
+  form to send again. New message is titled "New message", with "Everyone you choose sees every thread in your
+  conversation together." under the title, and asks only whom the conversation is with: the members picker, labelled
+  "To", with the placeholder "Add someone…" and the person themself not among the choices, which takes the focus as the
+  dialog opens (the picker's `attributes` carry the dialog's `initialFocus`). It is the team form's picker, one
+  combobox (`startingMembersId`) for whichever form is open, so choosing, removing a chip, and the focus after it are
+  the same. Under the picker a quiet line, a live region, says "You already have a conversation with them." while the
+  people chosen are exactly the others of a conversation the person has (`conversationWith`: the same people in any
+  order, no more and no fewer, so the conversation with Bob alone is not the one with Bob and Carol), and the dialog's
+  button is Open conversation then, and otherwise Start conversation, disabled until someone is chosen. Open
+  conversation closes the dialog and picks that conversation as a click on its row does, which does nothing more when
+  it is the one open already. Start conversation closes the dialog and reports the people (`SelectedPeople`), since no
+  conversation exists to pick; nothing is written by the dialog. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the thread open in that group, from its parent, as its title and the
   status of the task it tracks (`OpenThread`), which it shows under the group as a plain row, the drawing of that
@@ -626,8 +636,8 @@ below it counted at each level above.
   button too: it reports `RequestedBrowse` with the page on Your groups, as `apps/ui`'s `#groups` link does, and is
   current while the page it opens shows (the view input `isBrowsing`). The Direct messages section lists
   the conversations and has no line of its own for none, and its New message button is shown always, as `apps/ui`'s
-  is, whoever else is in the workspace: with nobody else its dialog, "New conversation", has a member choice with
-  only "Choose a member" to pick and a first message to write, and Start sends nothing until a member is chosen.
+  is, whoever else is in the workspace: with nobody else its dialog, "New message", has no one to choose, "Everyone in
+  the workspace is here.", and Start conversation stays disabled.
   A conversation's row is marked by the member it is with, in their tone as `memberMark` gives it, neutral for a
   person and lilac for an agent (`conversationMark` in `conversation.ts`), where it had their first letter alone.
   A conversation with several people, which core allows a direct group to be, has no one's mark to wear and `apps/ui`
@@ -643,8 +653,8 @@ below it counted at each level above.
   read it, each on their mark in their tone, and an agent among them with its patch and its logo as in a
   conversation; they have no count and no dot, since there is no group yet. A teammate's row sends `ClickedTeammate`,
   which does what `RequestedConversationWith` does for the parent: it opens the conversation of the two when one has
-  appeared since the row was drawn, and otherwise opens the New conversation dialog with the member chosen and the
-  focus on the first message, and Start writes the conversation as it does for a member chosen in the dialog. A
+  appeared since the row was drawn, and otherwise opens the New message dialog with the member chosen, and Start
+  conversation reports them as it does for a member chosen in the dialog. A
   row's count is read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
   `countName`). `browseView` is the page it asks for, a main pane titled Groups with two tabs, each counted once the groups are
   read: Your groups, the teams the person belongs to, and Discover, the public teams they do not, Your groups at
@@ -673,7 +683,7 @@ below it counted at each level above.
   document. The page lends it to the shell's `dialogs`, so the sidebar's "+" and Create group open it
   at every width. Its parent can ask for a conversation with a member (`requestConversationWith`,
   `RequestedConversationWith`): the Block selects the conversation the person already has with just
-  that member, and, when there is none, opens the dialog for a conversation with the member chosen.
+  that member, and, when there is none, opens the New message dialog with the member chosen.
 - `feature/search`: jumping anywhere in the workspace, as `apps/ui`'s Jump to does, in a palette that the Block binds
   from `@foldkit/ui/dialog` and renders with the design's `palette`: a modal of the palette size, 40rem by 30rem near
   the top of the window, which fills the screen below 48rem. It has no title, and is named Jump to, as is its field,
@@ -1374,9 +1384,6 @@ chosen from a menu, is theirs too. The assignee is an `AssigneeFilter`: `Anyone`
 member's ID. The menu reports a choice as a string, `Anyone`, `Unassigned`, or `Member:` and the ID
 (`assigneeChoiceOf`, `assigneeFilterOf`), and `assigneeChoices` lists the members still in the workspace, by name, with
 the mark `seen.ts` gives them (`memberMark`: their initials, lilac for an agent).
-`memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
-conversation form's and the task's assignee, each saying what its empty
-choice is.
 `memberPicker.ts`, the choice of several workspace members over the design's `memberPicker`, is the Create group form's
 and the group settings' Add members: it holds the combobox Block every picker binds (`MembersComboboxBlock`), the members as the picker offers them, with
 their name, mark, and whether they are a person or an agent (`pickerPeople`), the person themself locked as "You"
@@ -1537,7 +1544,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   else made, a failed write kept with its reason and sent again, a member's chip taken off with the input asked to
   take the focus, the command writing `TeamCreated` with its members and visibility and refusing a name the host would
   refuse, and a conversation in a dialog it opens on a blank form and closes when the form is submitted
-  or the dialog closes, dropping what was being started, and reporting the group picked once, asking
+  or the dialog closes, dropping what was being started, the people chosen for it taken off and added as for a team,
+  its submit doing nothing while no one is chosen, reporting the people when there is no conversation with exactly them
+  and picking the one there is, in any order of the people and not one that holds them and others, and reporting the
+  group picked once, asking
   to browse each time, Browse groups on Discover and the title on Your groups, keeping the browse page's search,
   the groups read once they are received, and their order, general first and then by name in any case and
   whatever the accents, a conversation among the teams by the others' names, the teams the person belongs to and the public teams they may
@@ -1734,9 +1744,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   with several people by the first letters of two names and all of them as its label, an agent's with its patch and
   why in a tooltip, "Scout, Needs setup", and with the logo moving and where it is at work, "Scout, Working in
   #General", wherever it is, its count and its dot, the members with no conversation yet after the conversations, by
-  name and each in their tone, with an agent among them carrying the same, a click on one opening the New
-  conversation dialog with them chosen and the focus on the first message and then writing the conversation, or
-  opening the conversation if it has appeared, a conversation still on
+  name and each in their tone, with an agent among them carrying the same, a click on one opening the New message
+  dialog with them chosen and then reporting them, or opening the conversation if it has appeared, a conversation still on
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, drawn by the status of
   the task it tracks in each of the six, with the word for it, in ink once the task is done, and by the message icon
   when it tracks none, under a conversation as under a team, what waits for the
@@ -1757,10 +1766,12 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   sidebar, a write that failed saying why and sent again, and the dialog closed by Cancel or by its Close button, only
   from someone who may create one, and Home opening the group created with the page confirming "Group created" with
   nothing left to offer, from the sidebar's heading and from the browse page, at a width that has the sidebar and at
-  one that does not, a conversation started with the member chosen in
+  one that does not, a conversation started with the people chosen in
   a dialog of its own, both in a view apart from the sidebar's, with the sidebar's buttons that open
-  them and the same team taken from the workspace's sidebar, the dialog for a conversation taking the
-  focus on its member choice, or on the first message when the member is chosen, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted
+  them and the same team taken from the workspace's sidebar, the dialog for a conversation titled New message with
+  its description, taking the focus on its To field with the placeholder Add someone…, several people chosen as chips
+  and one taken off, Start conversation disabled until someone is chosen and Open conversation with the line that
+  says the person has one when the people chosen are exactly a conversation's others, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted
   once the groups are read and chosen, each team's channel drawing, visibility, and members, no conversation among them,
   the teams in the sidebar's order, the search narrowing either tab in any case and with spaces ignored, its
   placeholder and the line over the list following the tab, nothing matching, every public team joined, no groups
@@ -2001,8 +2012,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   in one thread from its turns, by state and oldest first, and their line, and the most pressing state of a group's
   turns, whichever agents they are of, and `agentStanding.ts`: the patch of an agent that needs setup, with why, or is
   at work, with where, and none while it is idle or its change is on its way, and the words and motion of its logo,
-  and `feature/groups/conversation.ts`: whom a conversation is with, and its mark, one member's in their tone, or the
-  first letters of two names, or the letters of an ID before the members are read. `Drafts`'
+  and `feature/groups/conversation.ts`: whom a conversation is with, which conversation is with exactly some members,
+  and its mark, one member's in their tone, or the first letters of two names, or the letters of an ID before the
+  members are read. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

@@ -4,13 +4,12 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import type { Task } from "@amends-dev/core/task"
 import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
-import { Dialog, DialogBlock, RadioGroup } from "@foldkit/ui"
+import { Combobox, Dialog, DialogBlock, RadioGroup } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   Mount,
   all,
-  change,
   click,
   expect,
   expectAll,
@@ -42,11 +41,11 @@ import {
   scoutAgent,
   turnOf
 } from "../../../test/fixtures.ts"
-import { pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
+import { pickerClosed, pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { panelIs } from "../../../test/panelSize.ts"
 import { GroupsBlock } from "./block.ts"
-import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
-import { Message, type Model, type NewActivity, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
+import { CreateTeam, FocusStartingMembers, JoinGroup } from "./command.ts"
+import { Message, type Model, type NewActivity, OutMessage, VisibilityRadioGroupBlock } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -90,6 +89,12 @@ const visibilityFocused = Command.resolve(
  */
 const createDialog = role("dialog", { name: "Create group" })
 const createButton = within(createDialog, role("button", { name: "Create group" }))
+
+/** The dialog that takes the people for a new conversation, and the field that chooses them. */
+const messageDialog = role("dialog", { name: "New message" })
+const toField = role("combobox", { name: "To" })
+const startConversationButton = within(messageDialog, role("button", { name: "Start conversation" }))
+const openConversationButton = within(messageDialog, role("button", { name: "Open conversation" }))
 
 /** A public team the person does not belong to. */
 const announcements = Schema.decodeSync(Group.Group)({
@@ -466,7 +471,7 @@ describe("the groups", () => {
       ...pickerPicked,
       expect(text("3 members, including you.")).toExist(),
       click(role("button", { name: "Remove Bob" })),
-      Command.resolve(FocusTeamMembers, Message.CompletedFocusTeamMembers()),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
       expect(role("button", { name: "Remove Bob" })).toBeAbsent(),
       expect(text("2 members, including you.")).toExist(),
       expect(role("option", { name: /Bob/ })).toExist()
@@ -595,10 +600,12 @@ describe("the groups", () => {
       given(listed),
       click(role("button", { name: "New message" })),
       ...dialogOpened(),
-      expect(role("dialog", { name: "New conversation" })).toExist(),
-      click(within(role("dialog", { name: "New conversation" }), role("button", { name: "Close" }))),
+      pickerReady,
+      expect(messageDialog).toExist(),
+      click(within(messageDialog, role("button", { name: "Close" }))),
+      pickerEnded(),
       ...dialogClosed(),
-      expect(role("dialog", { name: "New conversation" })).toBeAbsent()
+      expect(messageDialog).toBeAbsent()
     )
   })
 
@@ -610,7 +617,8 @@ describe("the groups", () => {
       expect(role("button", { name: "New message" })).toExist(),
       click(role("button", { name: "New message" })),
       ...dialogOpened(),
-      expect(text("Choose a member")).toExist()
+      pickerReady,
+      expect(toField).toExist()
     )
   })
 
@@ -662,10 +670,13 @@ describe("the groups", () => {
       expect(role("button", { name: "New message" })).toExist(),
       click(role("button", { name: "New message" })),
       ...dialogOpened(),
-      expect(role("dialog", { name: "New conversation" })).toExist(),
-      expect(label("With")).toHaveValue(""),
+      pickerReady,
+      expect(messageDialog).toExist(),
+      focus(toField),
+      ...pickerOpened,
       expectAll(all.role("option")).toHaveCount(1),
-      expect(text("Choose a member")).toExist()
+      expect(text("Everyone in the workspace is here.")).toExist(),
+      expect(startConversationButton).toHaveAttr("aria-disabled", "true")
     )
   })
 
@@ -837,80 +848,172 @@ describe("the groups", () => {
     )
   })
 
-  it("start a conversation with a teammate the sidebar lists, in the dialog with them chosen and the message next", () => {
+  it("take New message in a compact dialog: a description, a To field holding the focus, and no one to start with yet", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      pickerReady,
+      expect(messageDialog).toExist(),
+      expect(messageDialog).toHaveAccessibleDescription(
+        "Everyone you choose sees every thread in your conversation together."
+      ),
+      expect(role("heading", { name: "New message", level: 2 })).toExist(),
+      expect(text("Everyone you choose sees every thread in your conversation together.")).toExist(),
+      expect(within(messageDialog, role("button", { name: "Close" }))).toExist(),
+      expect(within(messageDialog, role("button", { name: "Cancel" }))).toExist(),
+      expect(toField).toHaveAttr("placeholder", "Add someone…"),
+      expect(toField).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      expect(startConversationButton).toHaveAttr("type", "submit"),
+      expect(startConversationButton).toHaveAttr("aria-disabled", "true"),
+      expect(text("You already have a conversation with them.")).toBeAbsent(),
+      expect(label("First message")).toBeAbsent()
+    )
+  })
+
+  it("offer everyone in the workspace but the person, people and agents, to start a conversation with", () => {
+    scene(
+      { update, view: withDialog },
+      given(withConversations),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      pickerReady,
+      focus(toField),
+      ...pickerOpened,
+      expect(text("3 available")).toExist(),
+      expect(role("option", { name: /Bob/ })).toExist(),
+      expect(role("option", { name: /Carol/ })).toExist(),
+      expect(role("option", { name: /Scout/ })).toExist(),
+      expect(role("option", { name: /Alice/ })).toBeAbsent()
+    )
+  })
+
+  it("choose several people as chips, take one off again, and start only once someone is chosen", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      pickerReady,
+      expect(startConversationButton).toHaveAttr("aria-disabled", "true"),
+      focus(toField),
+      ...pickerOpened,
+      click(role("option", { name: /Bob/ })),
+      ...pickerPicked,
+      expect(role("button", { name: "Remove Bob" })).toExist(),
+      expect(toField).toHaveAttr("placeholder", "Add more…"),
+      expect(startConversationButton).not.toHaveAttr("aria-disabled"),
+      click(role("option", { name: /Scout/ })),
+      ...pickerPicked,
+      expect(role("button", { name: "Remove Bob" })).toExist(),
+      expect(role("button", { name: "Remove Scout" })).toExist(),
+      expect(within(messageDialog, text("You"))).toBeAbsent(),
+      click(role("button", { name: "Remove Bob" })),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
+      expect(role("button", { name: "Remove Bob" })).toBeAbsent(),
+      expect(role("option", { name: /Bob/ })).toExist(),
+      click(role("button", { name: "Remove Scout" })),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
+      expect(startConversationButton).toHaveAttr("aria-disabled", "true")
+    )
+  })
+
+  it("say the person already has a conversation with exactly the people chosen, and open it, not start one", () => {
+    scene(
+      { update, view: withDialog },
+      given(withConversations),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      pickerReady,
+      focus(toField),
+      ...pickerOpened,
+      expect(text("You already have a conversation with them.")).toBeAbsent(),
+      click(role("option", { name: /Bob/ })),
+      ...pickerPicked,
+      expect(role("status")).toHaveText("You already have a conversation with them."),
+      expect(openConversationButton).toExist(),
+      expect(startConversationButton).toBeAbsent(),
+      click(role("option", { name: /Scout/ })),
+      ...pickerPicked,
+      expect(text("You already have a conversation with them.")).toBeAbsent(),
+      expect(startConversationButton).toExist(),
+      expect(openConversationButton).toBeAbsent(),
+      click(role("button", { name: "Remove Scout" })),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
+      expect(text("You already have a conversation with them.")).toExist(),
+      click(role("option", { name: /Carol/ })),
+      ...pickerPicked,
+      expect(text("You already have a conversation with them.")).toExist(),
+      click(role("button", { name: "Remove Bob" })),
+      Command.resolve(FocusStartingMembers, Message.CompletedFocusStartingMembers()),
+      expect(text("You already have a conversation with them.")).toBeAbsent(),
+      expect(startConversationButton).toExist()
+    )
+  })
+
+  it("start a conversation with the people chosen: close the dialog, and report them to be started", () => {
+    scene(
+      { update, view: withDialog },
+      given(withPeople),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      pickerReady,
+      focus(toField),
+      ...pickerOpened,
+      click(role("option", { name: /Bob/ })),
+      ...pickerPicked,
+      click(role("option", { name: /Scout/ })),
+      ...pickerPicked,
+      click(startConversationButton),
+      pickerEnded(),
+      pickerClosed(),
+      Command.expectHas(Dialog.test.CloseDialog, Combobox.test.FocusInput),
+      expectOutMessage(OutMessage.SelectedPeople({ memberIds: [bob.id, scout.id] })),
+      ...pickerPicked,
+      ...dialogClosed(),
+      expect(messageDialog).toBeAbsent()
+    )
+  })
+
+  it("open the conversation they have with the people chosen, and close the dialog", () => {
+    scene(
+      { update, view: withDialog },
+      given(withConversations),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      pickerReady,
+      focus(toField),
+      ...pickerOpened,
+      click(role("option", { name: /Bob/ })),
+      ...pickerPicked,
+      click(openConversationButton),
+      pickerEnded(),
+      pickerClosed(),
+      Command.expectHas(Dialog.test.CloseDialog, Combobox.test.FocusInput),
+      expectOutMessage(OutMessage.SelectedGroup({ groupId: withBob.id })),
+      ...pickerPicked,
+      ...dialogClosed(),
+      expect(role("button", { name: "Bob" })).toHaveAttr("aria-current", "page")
+    )
+  })
+
+  it("start a conversation with a teammate the sidebar lists, in the dialog with them chosen", () => {
     scene(
       { update, view: withDialog },
       given(withConversations),
       click(role("button", { name: "Carol" })),
       ...dialogOpened(),
-      expect(role("dialog", { name: "New conversation" })).toExist(),
-      expect(label("With")).toHaveValue(carol.id),
-      expect(label("First message")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
-      expect(label("With")).not.toHaveAttr("data-foldkit-dialog-initial-focus"),
-      type(label("First message"), "Lunch?"),
-      click(role("button", { name: "Start" })),
-      Command.expectHas(
-        StartConversation({
-          workspaceId: workspace.id,
-          memberId: member.id,
-          withMemberId: carol.id,
-          text: "Lunch?"
-        }),
-        Dialog.test.CloseDialog
-      ),
-      Command.resolve(StartConversation, Message.WroteAction()),
+      pickerReady,
+      expect(messageDialog).toExist(),
+      expect(role("button", { name: "Remove Carol" })).toExist(),
+      expect(startConversationButton).not.toHaveAttr("aria-disabled"),
+      expect(toField).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      click(startConversationButton),
+      pickerEnded(),
+      Command.expectExact(Dialog.test.CloseDialog),
+      expectOutMessage(OutMessage.SelectedPeople({ memberIds: [carol.id] })),
       ...dialogClosed()
-    )
-  })
-
-  it("start a conversation with the member chosen, the first message written, in a dialog", () => {
-    scene(
-      { update, view: withDialog },
-      given(listed),
-      click(role("button", { name: "New message" })),
-      ...dialogOpened(),
-      expect(role("dialog", { name: "New conversation" })).toExist(),
-      expect(label("With")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
-      change(label("With"), "member-2"),
-      type(label("First message"), "Got a minute?"),
-      click(role("button", { name: "Start" })),
-      Command.expectHas(
-        StartConversation({
-          workspaceId: workspace.id,
-          memberId: member.id,
-          withMemberId: bob.id,
-          text: "Got a minute?"
-        }),
-        Dialog.test.CloseDialog
-      ),
-      Command.resolve(StartConversation, Message.WroteAction()),
-      ...dialogClosed(),
-      expect(role("button", { name: "Start" })).toBeAbsent()
-    )
-  })
-
-  it("open a conversation with the member chosen on its first message, and one with none chosen on the member", () => {
-    const starting = (memberId: Option.Option<typeof bob.id>) =>
-      modifyFields(listed, {
-        starting: () => Option.some(Starting.Conversation({ memberId, text: "" })),
-        dialog: (dialog) => modifyFields(dialog, { isOpen: () => true })
-      })
-
-    scene(
-      { update, view: withDialog },
-      given(starting(Option.some(bob.id))),
-      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "New conversation" })).toExist(),
-      expect(label("With")).toHaveValue(bob.id),
-      expect(label("First message")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
-      expect(label("With")).not.toHaveAttr("data-foldkit-dialog-initial-focus")
-    )
-    scene(
-      { update, view: withDialog },
-      given(starting(Option.none())),
-      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(label("With")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
-      expect(label("First message")).not.toHaveAttr("data-foldkit-dialog-initial-focus")
     )
   })
 
@@ -1513,6 +1616,7 @@ describe("the size of the dialogs for starting a group or a conversation, as @am
       given(listed),
       click(role("button", { name: "New message" })),
       ...dialogOpened(),
+      pickerReady,
       ...panelIs("groups-starting", "compact")
     )
   })

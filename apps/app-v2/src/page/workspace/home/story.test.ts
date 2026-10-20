@@ -810,9 +810,7 @@ describe("home", () => {
       model((model) => {
         expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
         expect(model.groups.dialog.isOpen).toBe(true)
-        expect(model.groups.starting).toEqual(
-          Option.some({ _tag: "Conversation", memberId: Option.some(bob.id), text: "" })
-        )
+        expect(model.groups.starting).toEqual(Option.some({ _tag: "Conversation", memberIds: [bob.id] }))
       })
     )
   })

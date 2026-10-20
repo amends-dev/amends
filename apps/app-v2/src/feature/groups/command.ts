@@ -1,17 +1,13 @@
-/**
- * Starting a team or a conversation, joining a public team, or reading a group, each an action written to the person's
- * store.
- */
+/** Starting a team, joining a public team, or reading a group, each an action written to the person's store. */
 
 import { Group, GroupId } from "@amends-dev/core/group"
-import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { focusMembersInput } from "../../memberPicker.ts"
 import * as Stores from "../../store/Stores.ts"
-import { GroupsDefinition, Message, teamMembersId } from "./definition.ts"
+import { GroupsDefinition, Message, startingMembersId } from "./definition.ts"
 
 const written = [Message.WroteAction, Message.FailedWriteAction]
 
@@ -46,30 +42,15 @@ export const CreateTeam = GroupsDefinition.command("CreateTeam", {
   }
 })
 
-/** Move focus to the input of the members picker of the team form, which the chip the person removed held. */
-export const FocusTeamMembers = GroupsDefinition.command("FocusTeamMembers", {
+/**
+ * Move focus to the input of the members picker of the form for what the person is starting, which the chip they
+ * removed held.
+ */
+export const FocusStartingMembers = GroupsDefinition.command("FocusStartingMembers", {
   args: {},
-  messages: [Message.CompletedFocusTeamMembers],
+  messages: [Message.CompletedFocusStartingMembers],
   handler: function* () {
-    return () => focusMembersInput(teamMembersId).pipe(Effect.as(Message.CompletedFocusTeamMembers()))
-  }
-})
-
-/** Start a conversation with `withMemberId`, `text` its first message. */
-export const StartConversation = GroupsDefinition.command("StartConversation", {
-  args: { ...Stores.AsMember, withMemberId: MemberId.MemberId, text: Schema.String },
-  messages: written,
-  handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ withMemberId, text, ...member }) =>
-      Stores.decoded(
-        Thread.StartDirectInput,
-        { memberIds: [withMemberId], text, mentions: ThreadMessage.mentionedIn(text) },
-        failed("A conversation needs a first message.")
-      ).pipe(
-        Effect.flatMap((input) => write(member, (store) => store.write("DirectThreadStarted", input))),
-        Effect.catch(Effect.succeed)
-      )
+    return () => focusMembersInput(startingMembersId).pipe(Effect.as(Message.CompletedFocusStartingMembers()))
   }
 })
 
@@ -98,8 +79,7 @@ export const MarkGroupRead = GroupsDefinition.command("MarkGroupRead", {
 
 export const EffectsLayer = Layer.mergeAll(
   CreateTeam.layer,
-  FocusTeamMembers.layer,
-  StartConversation.layer,
+  FocusStartingMembers.layer,
   JoinGroup.layer,
   MarkGroupRead.layer
 )

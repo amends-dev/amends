@@ -2,13 +2,15 @@
  * The groups the person can see in a workspace, as a list to pick one from: the teams they belong to, general first
  * and then by name, and their conversations by the other members in them; as a page to browse, the teams they belong
  * to and the public teams they may join, on a tab each, narrowed by a search; and the modal where they start a team,
- * or a conversation with another member. It reports the group the person picks and when they ask to browse, and its
- * parent tells it which group is open and when to talk with a member: the conversation of the two when there is one,
- * and otherwise a new one to write the first message of. The browse page's Discover tab joins a public team in place
- * and reports it, with where it is, to be confirmed. A group's row says what waits for the person in it, whether it has
- * activity they have not read, and whether an agent is at work in it, and the Block marks the group open as read. A
- * conversation's row is marked by the member it is with, an agent's with how it stands and what it is doing, and after
- * the conversations the sidebar lists the members the person has none with yet, to start one.
+ * or a conversation with other members: a team has a name, a visibility, and members, and a conversation only the
+ * people it is with. It reports the group the person picks, the people they pick to talk with when they have no
+ * conversation with exactly them, and when they ask to browse, and its parent tells it which group is open and when to
+ * talk with a member: the conversation of the two when there is one, and otherwise the person to start one with. The
+ * browse page's Discover tab joins a public team in place and reports it, with where it is, to be confirmed. A group's
+ * row says what waits for the person in it, whether it has activity they have not read, and whether an agent is at work
+ * in it, and the Block marks the group open as read. A conversation's row is marked by the member it is with, an
+ * agent's with how it stands and what it is doing, and after the conversations the sidebar lists the members the person
+ * has none with yet, to start one.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -29,6 +31,7 @@ import { modifyFields } from "foldkit/struct"
 import { MembersComboboxBlock } from "../../memberPicker.ts"
 import { foldAccents, groupName, isJoinable } from "../../seen.ts"
 import { activityOfAgent, AgentItem } from "../agents/definition.ts"
+import { conversationAmong } from "./conversation.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
@@ -61,7 +64,7 @@ export type CreatingTeam = typeof CreatingTeam.Type
 
 /**
  * What the person is starting: a team, by name, visibility, and the members to add besides themself, with, once it is
- * sent, that attempt and why the last one failed, or a conversation with another member.
+ * sent, that attempt and why the last one failed, or a conversation, with the members chosen to have it with.
  */
 export const Starting = defineTaggedUnion({
   Team: {
@@ -71,7 +74,7 @@ export const Starting = defineTaggedUnion({
     creating: Schema.Option(CreatingTeam),
     failure: Schema.Option(Schema.String)
   },
-  Conversation: { memberId: Schema.Option(MemberId.MemberId), text: Schema.String }
+  Conversation: { memberIds: Schema.Array(MemberId.MemberId) }
 })
 export type Starting = typeof Starting.Type
 
@@ -84,8 +87,11 @@ export const VisibilityRadioGroupBlock = RadioGroup.create<Group.Visibility>()
 /** The `id` of the radio group of the team form, which names its elements. */
 export const teamVisibilityId = "groups-visibility"
 
-/** The `id` of the members picker of the team form, which names its elements, such as the input that takes focus. */
-export const teamMembersId = "groups-members"
+/**
+ * The `id` of the members picker of the form for a team or a conversation, which names its elements, such as the input
+ * that takes focus.
+ */
+export const startingMembersId = "groups-members"
 
 /** Which groups the browse page lists: those the person belongs to, or the public teams they may join. */
 export const BrowseTab = Schema.Literals(["Yours", "Discover"])
@@ -150,14 +156,12 @@ export const Message = defineMessageUnion({
   FailedJoinGroup: { groupId: GroupId.GroupId, error: Schema.String },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
-  ClickedRemoveTeamMember: { memberId: Schema.String },
+  ClickedRemoveStartingMember: { memberId: Schema.String },
   SubmittedTeam: {},
   SucceededCreateTeam: {},
   FailedCreateTeam: { error: Schema.String },
-  CompletedFocusTeamMembers: {},
+  CompletedFocusStartingMembers: {},
   ClickedNewConversation: {},
-  ChoseConversationMember: { memberId: Schema.Option(MemberId.MemberId) },
-  TypedConversationText: { text: Schema.String },
   SubmittedConversation: {},
   ClickedTeammate: { memberId: MemberId.MemberId },
   RequestedConversationWith: { memberId: MemberId.MemberId },
@@ -167,12 +171,13 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 /**
- * What the Block asks of its parent: to open the group the person picked, to show the browse page, to confirm that the
- * person joined a group, with where it is as a line says it, "#launches", and to open the team the person created and
- * confirm it.
+ * What the Block asks of its parent: to open the group the person picked, to open a conversation with the people the
+ * person picked, which they have none with yet, to show the browse page, to confirm that the person joined a group,
+ * with where it is as a line says it, "#launches", and to open the team the person created and confirm it.
  */
 export const OutMessage = defineMessageUnion({
   SelectedGroup: { groupId: GroupId.GroupId },
+  SelectedPeople: { memberIds: Schema.Array(MemberId.MemberId) },
   RequestedBrowse: {},
   JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
   CreatedGroup: { groupId: GroupId.GroupId }
@@ -257,15 +262,15 @@ export const matching = <Item extends GroupItem>(
     : items.filter(({ group }) => groupName(group, model.members, model.memberId).toLowerCase().includes(wanted))
 }
 
-/** The conversation of the person and `memberId` alone, when there is one. */
-export const conversationWith = (model: Model, memberId: MemberId.MemberId): Option.Option<GroupItem> =>
-  Array.findFirst(
-    model.groups,
-    ({ group }) =>
-      group.kind !== "Team" &&
-      group.memberIds.length === 2 &&
-      group.memberIds.includes(model.memberId) &&
-      group.memberIds.includes(memberId)
+/** The conversation of the person with exactly the members `memberIds`, when there is one. */
+export const conversationWith = (
+  model: Model,
+  memberIds: ReadonlyArray<MemberId.MemberId>
+): Option.Option<Group.Direct> =>
+  conversationAmong(
+    model.groups.map(({ group }) => group),
+    model.memberId,
+    memberIds
   )
 
 /** The workspace's other active members, whom the person may start a conversation with. */
@@ -278,7 +283,7 @@ export const others = (model: Model): ReadonlyArray<Member.Member> =>
  */
 export const teammates = (model: Model): ReadonlyArray<Member.Member> =>
   Array.sort(
-    others(model).filter(({ id }) => Option.isNone(conversationWith(model, id))),
+    others(model).filter(({ id }) => Option.isNone(conversationWith(model, [id]))),
     Order.combine(
       Order.mapInput(Order.String, ({ name }: Member.Member) => foldAccents(name)),
       Order.mapInput(Order.String, ({ id }: Member.Member) => id)
@@ -307,6 +312,17 @@ export const activityOfAgentHere = (model: Model, item: AgentItem) =>
 export const onTeam = (change: (team: TeamForm) => TeamForm) =>
   Option.map(Starting.matchOrElse({ Team: change }, (same) => same))
 
+/** What `starting` becomes when the members chosen, of the team or of the conversation, are changed as `change` makes them. */
+export const onMemberIds = (
+  change: (memberIds: ReadonlyArray<MemberId.MemberId>) => ReadonlyArray<MemberId.MemberId>
+) =>
+  Option.map(
+    Starting.match({
+      Team: (team) => Starting.Team({ ...team, memberIds: change(team.memberIds) }),
+      Conversation: ({ memberIds }) => Starting.Conversation({ memberIds: change(memberIds) })
+    })
+  )
+
 /** The team form changed as `change` makes it, while the person is starting a team. */
 export const withTeam = (model: Model, change: (team: TeamForm) => TeamForm): Model =>
   modifyFields(model, { starting: onTeam(change) })
@@ -316,6 +332,13 @@ export const teamIn = (model: Model): Option.Option<TeamForm> =>
   Option.flatMap(
     model.starting,
     Starting.matchOrElse({ Team: (team) => Option.some(team) }, () => Option.none())
+  )
+
+/** The members chosen to have the conversation with, while the person is starting one. */
+export const conversationIn = (model: Model): Option.Option<ReadonlyArray<MemberId.MemberId>> =>
+  Option.flatMap(
+    model.starting,
+    Starting.matchOrElse({ Conversation: ({ memberIds }) => Option.some(memberIds) }, () => Option.none())
   )
 
 /** Whether the team form can be sent: it has a name, and no attempt to create the team is on its way. */
