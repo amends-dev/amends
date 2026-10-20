@@ -5,6 +5,13 @@ import { Model } from "./definition.ts"
 
 export const init = ActionsComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) => ({
-    model: Model.make({ workspaceId, memberId, actions: [], notice: Option.none() })
+    model: Model.make({
+      workspaceId,
+      memberId,
+      actions: [],
+      confirmations: [],
+      nextConfirmationId: 1,
+      notice: Option.none()
+    })
   })
 )

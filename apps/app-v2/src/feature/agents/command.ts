@@ -1,7 +1,7 @@
 /**
- * What the person does with the workspace's agents: adding one, renaming one, and changing how
- * one is set up are actions written to their store; listing the models a connection offers goes
- * over HTTP, since no replica holds them.
+ * What the person does with the workspace's agents: adding one, renaming one, changing how one
+ * is set up, and removing one are actions written to their store; listing the models a connection
+ * offers goes over HTTP, since no replica holds them.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -9,7 +9,7 @@ import { Agent } from "@amends-dev/core/agent"
 import { Role } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
 import { Identity } from "@amends-dev/core/identity"
-import { WorkspaceId } from "@amends-dev/core/workspace"
+import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
@@ -84,6 +84,21 @@ export const RenameAgent = AgentsDefinition.command("RenameAgent", {
   }
 })
 
+/** Remove `agentId`, which ends the membership `removeMemberId` of it in the workspace. */
+export const RemoveAgent = AgentsDefinition.command("RemoveAgent", {
+  args: { ...Stores.AsMember, agentId: Identity.AgentId, removeMemberId: MemberId.MemberId },
+  messages: outcomes,
+  handler: function* () {
+    const stores = yield* Stores.Stores
+    return ({ agentId, removeMemberId, ...member }) => {
+      const done = Written.Remove({ agentId })
+      return Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) =>
+        store.write("MemberRemoved", { memberId: removeMemberId })
+      )
+    }
+  }
+})
+
 /** List the models `connectionId` offers an agent. */
 export const LoadModels = AgentsDefinition.command("LoadModels", {
   args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
@@ -100,4 +115,10 @@ export const LoadModels = AgentsDefinition.command("LoadModels", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(CreateAgent.layer, ConfigureAgent.layer, RenameAgent.layer, LoadModels.layer)
+export const EffectsLayer = Layer.mergeAll(
+  CreateAgent.layer,
+  ConfigureAgent.layer,
+  RenameAgent.layer,
+  RemoveAgent.layer,
+  LoadModels.layer
+)

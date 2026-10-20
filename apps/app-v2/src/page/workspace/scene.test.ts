@@ -9,6 +9,7 @@ import {
   Mount,
   Subscription,
   all,
+  change,
   click,
   expect,
   expectAll,
@@ -44,6 +45,8 @@ import {
   offered,
   opening,
   reply,
+  reviewer,
+  reviewerAgent,
   roles,
   saying,
   scout,
@@ -54,9 +57,10 @@ import {
   thread
 } from "../../../test/fixtures.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
-import { Dismiss } from "../../feature/actions/command.ts"
+import { Dismiss, ExpireConfirmation } from "../../feature/actions/command.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
-import { LoadModels } from "../../feature/agents/command.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "../../feature/agents/command.ts"
+import { Written as AgentWritten } from "../../feature/agents/definition.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
@@ -324,6 +328,13 @@ const withChannel = modifyFields(opened, {
 })
 
 const models = keylessConnection("models-1", "test-models", "Models")
+
+/** The dialog of the agents acknowledged open: its element shown, and the resources it holds acquired. */
+const agentsDialogOpened = () =>
+  [
+    Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+    Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources())
+  ] as const
 
 /** The agents as an owner reads them: scout runs on the models connection, which the host listed. */
 const withAgent = modifyFields(opened, {
@@ -726,13 +737,123 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens the form to add an agent from the agents' sidebar", () => {
+  it("opens the dialog to add an agent from the agents' sidebar, over the destination that shows", () => {
     scene(
       { update, view: sceneView },
       given(withAgent),
       click(railButton("Agents")),
       click(sidebarButton("Add agent")),
-      expect(role("form", { name: "Add an agent" })).toExist()
+      ...agentsDialogOpened(),
+      expect(role("dialog", { name: "Add agent" })).toExist(),
+      inside(role("dialog", { name: "Add agent" }), expect(text(workspace.name)).toExist()),
+      expect(role("main", { name: "Agents" })).toExist()
+    )
+  })
+
+  it("adds an agent in the dialog, confirms it in a toast that goes by itself, and opens its page", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(withAgent),
+      click(railButton("Agents")),
+      click(sidebarButton("Add agent")),
+      ...agentsDialogOpened(),
+      inside(
+        role("dialog", { name: "Add agent" }),
+        type(label("Agent name"), "Reviewer"),
+        change(label("Model connection"), models.id)
+      ),
+      Command.resolve(LoadModels, AgentsBlock.Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      inside(
+        role("dialog", { name: "Add agent" }),
+        change(label("Model"), "test-model"),
+        click(role("button", { name: "Create agent" }))
+      ),
+      Command.resolve(
+        CreateAgent,
+        AgentsBlock.Message.WroteAction({ written: AgentWritten.Create({ name: "Reviewer" }) })
+      ),
+      Subscription.emit(
+        workspaceSubscriptions["agents/agents"],
+        AgentsBlock.Message.ReceivedAgents({
+          agents: [scoutAgent, reviewerAgent].map((agent) => ({ agent, pending: false })),
+          members: [...withAgent.agents.members, reviewer],
+          connections: withAgent.agents.connections,
+          roles: withAgent.agents.roles,
+          workspace: withAgent.agents.workspace,
+          grants: withAgent.agents.grants
+        })
+      ),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      expect(role("dialog", { name: "Add agent" })).toBeAbsent(),
+      expect(within(role("status"), text("Reviewer created"))).toExist(),
+      inside(
+        role("main", { name: "Reviewer" }),
+        expect(role("heading", { name: "Reviewer", level: 1 })).toExist(),
+        expect(label("Agent name")).toHaveValue("Reviewer")
+      ),
+      expect(sidebarButton("Reviewer")).toHaveAttr("aria-current", "page"),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(role("status")).toBeAbsent()
+    )
+  })
+
+  it("confirms saving an agent's name in a toast that goes by itself, and keeps its page", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withAgent, { open: () => Open.Agent({ agentId: scoutAgent.id }) })),
+      type(label("Agent name"), "Scout Prime"),
+      click(role("button", { name: "Save name" })),
+      Command.resolve(
+        RenameAgent,
+        AgentsBlock.Message.WroteAction({ written: AgentWritten.Rename({ agentId: scoutAgent.id }) })
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      expect(within(role("status"), text("Name saved"))).toExist(),
+      expect(role("main", { name: "Scout" })).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(role("status")).toBeAbsent()
+    )
+  })
+
+  it("confirms saving an agent's setup in a toast, whichever destination shows its page", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withAgent, { open: () => Open.Agent({ agentId: scoutAgent.id }) })),
+      type(label("Instructions"), "Review it twice."),
+      click(role("button", { name: "Save setup" })),
+      Command.resolve(
+        ConfigureAgent,
+        AgentsBlock.Message.WroteAction({ written: AgentWritten.Configure({ agentId: scoutAgent.id }) })
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      expect(within(role("status"), text("Setup saved"))).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(role("status")).toBeAbsent()
+    )
+  })
+
+  it("removes an agent from its page after a question, confirms it in a toast, and shows the list", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withAgent, { open: () => Open.Agent({ agentId: scoutAgent.id }) })),
+      click(role("button", { name: "Remove agent" })),
+      ...agentsDialogOpened(),
+      expect(role("dialog", { name: "Remove agent?" })).toExist(),
+      click(within(role("dialog", { name: "Remove agent?" }), role("button", { name: "Remove agent" }))),
+      Command.resolve(
+        RemoveAgent,
+        AgentsBlock.Message.WroteAction({ written: AgentWritten.Remove({ agentId: scoutAgent.id }) })
+      ),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      expect(role("dialog", { name: "Remove agent?" })).toBeAbsent(),
+      expect(within(role("status"), text("Scout removed"))).toExist(),
+      expect(role("main", { name: "Agents" })).toExist(),
+      expect(sidebarButton("Agents")).toHaveAttr("aria-current", "page"),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
     )
   })
 

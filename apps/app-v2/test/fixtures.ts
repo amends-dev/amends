@@ -354,6 +354,22 @@ export const scoutAgent = Schema.decodeSync(ReplicaRecord.Agent)({
   readiness: { _tag: "Ready" }
 })
 
+/** The agent alice adds after scout: a member of the workspace of the same setup as scout, called Reviewer. */
+export const reviewer = Schema.decodeSync(Member.Member)({
+  id: "member-6",
+  workspaceId: "workspace-1",
+  identity: { _tag: "Agent", id: "agent-4" },
+  name: "Reviewer",
+  status: "active"
+})
+
+/** Reviewer's setup, as the store lists it once alice has added it. */
+export const reviewerAgent = Schema.decodeSync(ReplicaRecord.Agent)({
+  ...Schema.encodeSync(ReplicaRecord.Agent)(scoutAgent),
+  id: "agent-4",
+  memberId: "member-6"
+})
+
 /** What the models connection offers: the test model, which reasons with a low or high effort, and any other. */
 export const offered = Schema.decodeSync(Connection.Models)({
   listed: [

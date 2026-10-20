@@ -164,12 +164,18 @@ const foldSearchOutMessage = SearchBlock.OutMessage.match({
 
 /**
  * Asking to browse the agents shows the list as any destination is gone to, and picking one opens its page. Asking
- * again for the integrations lists them again.
+ * again for the integrations lists them again. What the person did to an agent is confirmed to them in a toast:
+ * saving its name or its setup, adding one, which opens its page, and removing one, which shows the list.
  */
 const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
   RequestedIntegrations: () => loadIntegrationsAgain,
   RequestedBrowse: () => goTo(showAgents),
-  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId))
+  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
+  SavedName: () => ActionsBinding.confirm({ text: "Name saved" }),
+  SavedSetup: () => ActionsBinding.confirm({ text: "Setup saved" }),
+  CreatedAgent: ({ agentId, name }) =>
+    Update.combine([ActionsBinding.confirm({ text: `${name} created` }), goTo(showAgent(agentId))]),
+  RemovedAgent: ({ name }) => Update.combine([ActionsBinding.confirm({ text: `${name} removed` }), goTo(showAgents)])
 })
 
 /**

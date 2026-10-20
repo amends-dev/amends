@@ -15,7 +15,7 @@ search for anything in the workspace, groups, threads, and people, from the side
 the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
 rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, and a
-page of its own, to add, rename, and set up again; and its channels, which bring in conversations from them, to add,
+page of its own, to add, rename, set up again, and remove; and its channels, which bring in conversations from them, to add,
 send to another group, and remove. A reply or a new thread they have not sent is kept as a draft in
 their browser, through a reload and offline, until they send it. While the host can be reached, a
 thread shows who else is typing in it. What they do shows at once, marked as sending, even offline,
@@ -104,8 +104,8 @@ line of what it is for, and a secondary button to change it, which a `form` of a
 and a quiet Cancel replaces while the person does; the members and the invitations waiting are
 `entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
 quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its email and role. The
-connections, the agents, and the channels are each a `paneColumn` of what failed, the list, and the
-form open among it: the list is an `entryList` of `entry`s, or a `paneEmpty` that says what adding
+connections and the channels are each a `paneColumn` of what failed, the list, and the
+form open among it, and so are the agents without the form, which is a `modal`: the list is an `entryList` of `entry`s, or a `paneEmpty` that says what adding
 one does, and the form is a `paneForm` titled as the form is named, holding the design's fields,
 selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of its submit and a
 quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit while the
@@ -415,7 +415,7 @@ the pages that compose them; the root composes the pages.
   `OpenedConnection` for a connection picked, and `RequestedChannels` for the channels; the page
   shows the connections or the channels for them.
 - `feature/agents`: the workspace's agents, as the store holds them, once the store has answered
-  (`isLoaded`, which keeps "No agents yet" from showing before). The Block has two views. Its
+  (`isLoaded`, which keeps "No agents yet" from showing before). The Block has four views. Its
   `sidebarView`, which the page puts in the sidebar for the Agents destination, is a section named
   Agents: each agent by its membership's first letter on a lilac mark and its name, with Browse
   (`list`, "Browse agents") and, where the person may create agents and a connection gives models,
@@ -424,7 +424,7 @@ the pages that compose them; the root composes the pages.
   setup" on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
   ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
   Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
-  many agents it holds, an "Add agent" button, a search that narrows the tab by name, in any case
+  many agents it holds, an "Add agent" button that opens the dialog, a search that narrows the tab by name, in any case
   and whatever the accents, and a row for each agent in the design's columns Agent, Harness,
   Model, and Activity: the lilac 32px mark and name, the harness (a connection's name, or "Auto")
   over its sandbox (a connection's name, or "No sandbox"), the model's id over its connection's
@@ -433,10 +433,9 @@ the pages that compose them; the root composes the pages.
   the first reason, in a sentence on its mark. With no agents the list offers adding the first
   ("An administrator can add agents to your workspace." for a person who may not), the Needs setup
   tab says every agent can run, and a search with no match says so and clears from "Clear search".
-  The Block reports `RequestedBrowse` when the person browses from the sidebar or adds from it, since
-  the form Add opens is in the list, and `OpenedAgent` with the agent picked, from the sidebar or
-  the list, asking once for the models of the agent's connection to show its model and its efforts;
-  the page opens the agent's page for it. That page, `agentView`, with the view inputs `agentId` and
+  The Block reports `RequestedBrowse` when the person browses from the sidebar, and `OpenedAgent`
+  with the agent picked, from the sidebar or the list, asking once for the models of the agent's
+  connection to show its model and its efforts; the page opens the agent's page for it. That page, `agentView`, with the view inputs `agentId` and
   `workspaceName`, is a pane titled by the agent's name on a 24px lilac mark with the patch of how it
   stands, and, on a phone, the workspace's name under the title. One `paneColumn` holds, in order: where the
   agent can't run, a boxed note, "This agent can't run as it is set up", with a line for each reason; a Name
@@ -448,27 +447,45 @@ the pages that compose them; the root composes the pages.
   same fields disabled, with no buttons; an agent the workspace does not list says "This agent isn't here" and
   offers "Show all agents", and nothing shows before the agents are read. The Block keeps what the person
   changed on each agent's page (`edits`: a name and a whole setup, each saved apart, from the name the agent
-  has and the setup it has), and drops the edits of an agent that is gone.
-  Where they may create agents, they add one with a name, a role they may give, instructions, a harness,
+  has and the setup it has), and drops the edits of an agent that is gone. Below Details the page has
+  Removal, for a person who may remove members and an agent that is not on its way: "Removing this agent ends
+  its membership. Its messages stay in their threads." and a secondary "Remove agent", which asks to confirm.
+  Adding and removing happen in a dialog, a `DialogBlock` the Block binds as `dialog` (`DialogBinding`, id
+  `agents-dialog`) and its `dialogView` lends the shell, with the view input `workspaceName`, so it is in the
+  frame whichever page the buttons that open it are on, the sidebar's, the list's, and the agent's. The
+  dialog opens over the page that shows, without leaving it. Where they may create agents, they add one, in
+  a `modal` titled "Add agent" with the workspace's name beside it, with an "Agent name" (with "How the
+  workspace calls and mentions it.", holding the focus), a role they may start it with, a "Role" select of
+  Member and Administrator, the latter listed as unavailable, "Only the owner can give this role", to anyone
+  but the owner, instructions, a harness,
   `Auto` or a connection that gives harnesses, a model connection, a model from what that connection offers
   or any model's ID where the connection takes one, an effort, and a sandbox, none or a connection that gives
-  sandboxes. These setup fields (`setupFields.ts`) are the same on the agent's page and in the form that adds
-  one. The host's integrations, which say what each
+  sandboxes. "Create agent" waits, disabled, until a name, a role, and a model are chosen. These setup fields
+  (`setupFields.ts`) are the same on the agent's page and in the dialog that adds one. The host's integrations, which say what each
   connection gives, are listed by the workspace page, once, which informs the Block of them or of
   why they could not be reached; the person then asks again, and the Block asks the page, by its out
   message `RequestedIntegrations`. Choosing a model connection lists its models over HTTP, kept for each
   connection apart, so that an answer arriving late is the models of the connection it was asked of.
-  Adding, renaming, and setting up again are actions written to the store. A setup that can't be saved as it is
+  Adding, renaming, setting up again, and removing are actions written to the store. A request from the
+  dialog is on its way until the store keeps it, and an agent being added until the store lists it, which
+  the Block tells from the agents it had when the form was sent, by who made it and its name: the fields
+  are disabled, the button says "Creating…" or "Removing…", and closing the dialog opens it again to show
+  how the request ends, as the workspaces page does. The dialog then closes, and the Block reports
+  `CreatedAgent` with the agent, for the page to open, or `RemovedAgent`, for the page to show the list.
+  Saving a name or a setup reports `SavedName` or `SavedSetup`. A setup that can't be saved as it is
   sends nothing: `checkSetup` marks each part beside its field, a model connection, harness, or sandbox that
   was removed or no longer gives what the part needs, a model that its connection, which lists only its own,
   does not offer, a harness that works only in a sandbox the setup has none of, and what `agentSetup.ts` finds
   it still wants, a model connection, a model, instructions the store can't keep, or a model ID of 1 to 200
   characters. A save the store could not keep, or a name or setup it refused to decode, is worded under the form
-  that made it: "Use 1 to 80 characters, with no invisible ones.", "Check the instructions and model, then save
-  again.", "Check the name, instructions, and model, then try again.", and, for the store, "The name couldn't be
-  saved. Try again when the host is available." and its likes. What the server refuses afterwards comes back as a
-  rejection, which `feature/actions` shows as a toast, and is not routed back to the form. An agent's role and
-  its removal are its membership's, in the settings.
+  that made it, the dialog's under its fields: "Use 1 to 80 characters, with no invisible ones.", "Check the
+  instructions and model, then save again.", "Check the name, instructions, and model, then try again.", and,
+  for the store, "The name couldn't be saved. Try again when the host is available." and its likes, "The agent
+  couldn't be removed. Try again when the host is available." among them. The removal asks for no checking of
+  its own, and which agents the person may remove it reads from their permission to remove members alone, not
+  from the delegation rule the settings apply, which the server still applies. What the server refuses
+  afterwards comes back as a rejection, which `feature/actions` shows as a toast, and is not routed back to the
+  form. An agent's role is its membership's, in the settings.
 - `feature/channels`: the workspace's channels, each by its name with the connection that receives
   its conversations and the group they open in, whether they open as tasks, and marked as sending
   while a change to it is on its way. Where they may manage a channel, they send its conversations
@@ -482,7 +499,11 @@ the pages that compose them; the root composes the pages.
   the connections feature's `connectionsGiving`; the person then asks again, and the Block asks the
   page, by its out message `RequestedIntegrations`. A form about a channel that is gone closes.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
-  refused, until they dismiss it, shown as toasts over the shell's corner.
+  refused, until they dismiss it, shown as toasts over the shell's corner; and what the page confirms to the
+  person that they did, which a Block reports and the page hands it with `confirm`, such as "Name saved",
+  shown in the same stack as a status toast with a Dismiss that goes by itself after five seconds
+  (`ExpireConfirmation`), each under an ID of its own (`nextConfirmationId`) so that the time of one the person
+  dismissed cannot take another's.
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
   which the person can change the email or ask for a new code to the same address; it keeps the
   session a right code gives, and reports it. It starts with an address, which the root gives when it
@@ -594,7 +615,7 @@ the pages that compose them; the root composes the pages.
   in the open group, or beside the open inbox (`inbox-thread`, the inbox's `threadView`), only while
   one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
   under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width, and
-  so is the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
+  so is the agents' `dialogView`, for adding an agent or confirming its removal, and the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
   the drawer and the side pane's dialog, so the one opened last is over the rest. `ClickedSearch` and
   `RequestedSearch`, which the root sends, ask the search to open. The search reports what was opened
   and the page folds it as it folds the same thing from elsewhere: a group is opened alone, as a group
@@ -627,7 +648,9 @@ the pages that compose them; the root composes the pages.
   decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
   at `Split`) as the open group or the inbox reports `OpenedThread`, and as a task's thread opens
   its group, and closes it (`hideAside`) as the group or the inbox reports `ClosedThread` and in every
-  navigation, since the thread goes with its group. Every navigation that leaves the inbox, those that
+  navigation, since the thread goes with its group. What the agents report that the person did is confirmed in
+  a toast: saving a name or a setup ("Name saved", "Setup saved"), adding one ("{name} created", with its page
+  opened), and removing one ("{name} removed", with the list shown). Every navigation that leaves the inbox, those that
   hide the dialog and a group or a task's thread opened, also asks the inbox to close its thread
   (`requestCloseThread`), since the inbox keeps its state while another destination shows, so that
   coming back shows no stale pane. When the dialog closes by itself, by Escape or its scrim, the
@@ -852,13 +875,22 @@ browser's storage. Each Block's tests sit beside it:
   has answered, asking the page to show the connections when the person browses, picks one, or adds,
   and the channels when they browse them, and why a read or a write could not
   be kept; the agents keeping the integrations the page informs them of or why they could not be
-  listed, asking the page to list them again, adding an agent as an action
-  with the configuration its draft makes and refusing a draft with what it still wants, loading the
+  listed, asking the page to list them again, opening the dialog on a blank form that adds an agent without
+  leaving the page, sending nothing from it until it has a name and a model, adding an agent as an action
+  with the configuration its draft makes and marking beside its fields what a draft can't be saved with,
+  keeping the dialog open on the request on its way, since closing it then opens it again, and until the
+  store has listed the agent, which it tells from the agents it had by who made it and its name, then closing
+  the dialog and reporting the agent for the page to open, in either order of the store keeping the action and
+  listing the agent, asking for the models of its connection if the form had not, saying under the form that an
+  agent could not be created, loading the
   models of the model connection the form chooses over HTTP and keeping those of each connection
   apart, so that a late answer is the models of the connection it was asked of, choosing the model
-  again when the connection changes, offering the roles the person may give, being read once the store has answered, narrowing the list by tab and by name
+  again when the connection changes, offering a new agent the roles it may start with and which the person may give, being read once the store has answered, narrowing the list by tab and by name
   without regard to case or accents, counting those that need setup and not those on their way, asking the
-  page to show the agents when the person browses or adds, and reporting the agent picked, asking once for
+  page to show the agents when the person browses, opening the confirmation that removes an agent only
+  where the person may remove it and it is not on its way, removing its membership once confirmed and
+  once, closing the dialog and reporting the name it had, saying under the question that it could not be
+  removed, closing the question of an agent somebody else removed, and reporting the agent picked, asking once for
   the models of its connection, keeping what the person changed on the page of an agent, a name and a setup
   apart, from the name and the setup it has, saving each as an action only once it differs and the person may
   configure the agent, once while it is on its way, marking what a setup can't be saved with beside its field
@@ -873,7 +905,8 @@ browser's storage. Each Block's tests sit beside it:
   person, one name at a time, changing a member's role from the assignments seen, removing a member,
   handing the workspace over from the owner's assignment seen, inviting by email with the role
   chosen, revoking an invitation, and what an owner, an administrator, and a member may do to the
-  members; a workspace listing the integrations once as it opens, informing its connections, agents,
+  members; the actions confirming what the page says the person did, each under an ID of its own, going when
+  its own time is up or the person dismisses it, apart from what the server refused; a workspace listing the integrations once as it opens, informing its connections, agents,
   and channels of them or of why they could not be listed, and listing them again when one asks,
   opening the group picked, showing
   the inbox, the tasks in triage, every open task, the groups to browse, the connections, the agents, the settings, or the channels in its
@@ -1003,7 +1036,15 @@ browser's storage. Each Block's tests sit beside it:
   or the name it has not saved, its setup set up again as a whole and saved once, discarded, with a part
   that can't be saved marked beside its field and nothing sent, and the failure under the setup, read
   disabled and without buttons by a person who may not configure the agent, on its way, the agent that
-  is not there with a way to the list, and nothing before the agents are read; the settings' two names renamed, the
+  is not there with a way to the list, and nothing before the agents are read, the Removal section for a person
+  who may remove the agent and not for any other or an agent on its way; the dialog for adding an agent
+  named for it with the workspace beside the title, holding its focus on the name, with Create agent waiting
+  for a name and a model, loading the models of the connection chosen, taking a model it does not list by its
+  id, offering Administrator as unavailable with why to a person who is not the owner, marking a connection
+  that is gone beside its field, keeping the dialog open under a failure, creating the agent and closing once it
+  is listed, and closing with Cancel and Close to open a fresh form the next time; the dialog for confirming
+  a removal, naming the agent and saying it leaves and its messages stay, removing it once confirmed, saying
+  under the question that it could not be, and left alone on Cancel; the settings' two names renamed, the
   members listed with their roles as badges, or as a select to change for the members the person may
   act on, changed, removed, and handed the workspace by the owner, the invitations listed by their
   address, role, and end, revoked, and sent, what is on its way marked in each section, a name
@@ -1040,7 +1081,10 @@ browser's storage. Each Block's tests sit beside it:
   the scrim, which also closes the thread, a notification's thread opened the same way beside the inbox,
   which stays with its row current and loses both as the thread closes or the person leaves the inbox,
   and what the server refused as toasts, over the shell and
-  inside the side pane's dialog while it is open, and the connections listing the integrations
+  inside the side pane's dialog while it is open, and what the person did to an agent confirmed in a
+  toast that goes by itself, the dialog of the agents opened from the sidebar over the destination that shows,
+  an agent added, shown by its page with its row current, and one removed, shown by the list, and the
+  connections listing the integrations
   again after the host could not be reached. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar, its Menu button
   appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse,

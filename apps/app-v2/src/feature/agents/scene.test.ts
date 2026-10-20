@@ -4,9 +4,11 @@ import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
 import {
   Command,
+  Mount,
   Subscription,
   all,
   change,
@@ -36,6 +38,9 @@ import {
   keylessConnection,
   membership,
   offered,
+  reviewer,
+  reviewerAgent,
+  roleOf,
   roles,
   scout,
   scoutAgent
@@ -43,12 +48,12 @@ import {
 import { calendarDate } from "../../seen.ts"
 import { Integrations } from "../connections/definition.ts"
 import { AgentsBlock } from "./block.ts"
-import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
 import { Message, type Model, OfferedModels, OutMessage, Reason, Written } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { agentView, sidebarView, view } from "./view.ts"
+import { agentView, dialogView, sidebarView, view } from "./view.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }
@@ -63,6 +68,27 @@ const harness = keylessConnection("harness-1", "test-harness", "Harness")
 const sandbox = keylessConnection("sandbox-1", "test-sandbox", "Sandbox")
 
 const agentId = scoutAgent.id
+
+const dialog = withViewInputs(dialogView, { workspaceName: workspace.name })()
+
+/** The list and the dialog for adding an agent or confirming its removal, which the shell keeps beside them. */
+const withDialog: typeof dialog = (model, h) => h.div([], [view(model, h), dialog(model, h)])
+
+const addDialog = role("dialog", { name: "Add agent" })
+
+/** The dialog acknowledged open: its element shown, and the resources it holds acquired. */
+const dialogOpened = () =>
+  [
+    Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+    Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources())
+  ] as const
+
+/** The dialog acknowledged closed: its element hidden, and the resources it held released. */
+const dialogClosed = () =>
+  [
+    Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+    Mount.expectEnded(Dialog.test.AcquireResources)
+  ] as const
 
 /** Scout as the server says it can't run: the connection of its model was removed. */
 const incompleteAgent = Schema.decodeSync(ReplicaRecord.Agent)({
@@ -89,17 +115,22 @@ const opened: Model = {
 }
 
 describe("the agents", () => {
-  it("are added by an owner, on a harness, a model of a connection, and a sandbox the connections give", () => {
+  it("are added by an owner in a dialog, on a harness, a model of a connection, and a sandbox the connections give", () => {
     scene(
-      { update, view, subscriptions: AgentsBlock.subscriptions },
+      { update, view: withDialog, subscriptions: AgentsBlock.subscriptions },
       given(modifyFields(opened, { agents: () => [] })),
       expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
+      expect(role("dialog", { name: "Add agent" })).toBeAbsent(),
       click(first(all.role("button", { name: "Add agent" }))),
-      expectOutMessage(OutMessage.RequestedBrowse()),
-      expect(role("region", { name: "Add an agent" })).toExist(),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "Add agent" })).toExist(),
       inside(
-        role("form", { name: "Add an agent" }),
-        type(label("Name"), "Reviewer"),
+        addDialog,
+        expect(text("Studio")).toExist(),
+        expect(label("Agent name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+        expect(text("How the workspace calls and mentions it.")).toExist(),
+        expect(role("button", { name: "Create agent" })).toBeDisabled(),
+        type(label("Agent name"), "Reviewer"),
         change(label("Role"), BuiltinRoles.AdministratorId),
         type(label("Instructions"), "Review what is asked."),
         change(label("Harness"), harness.id),
@@ -109,20 +140,23 @@ describe("the agents", () => {
       ),
       Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
       inside(
-        role("form", { name: "Add an agent" }),
+        addDialog,
         expect(text("Loading this connection's models…")).toExist(),
-        expect(label("Model")).toBeDisabled()
+        expect(label("Model")).toBeDisabled(),
+        expect(role("button", { name: "Create agent" })).toBeDisabled()
       ),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
       inside(
-        role("form", { name: "Add an agent" }),
+        addDialog,
         expect(text("Loading this connection's models…")).toBeAbsent(),
         expect(label("Model")).not.toBeDisabled(),
         expect(label("Effort")).toBeAbsent(),
+        expect(role("button", { name: "Create agent" })).toBeDisabled(),
         change(label("Model"), "test-model"),
+        expect(role("button", { name: "Create agent" })).not.toBeDisabled(),
         change(label("Effort"), "high"),
         change(label("Sandbox"), sandbox.id),
-        click(role("button", { name: "Add" }))
+        click(role("button", { name: "Create agent" }))
       ),
       Command.expectExact(
         CreateAgent({
@@ -137,41 +171,46 @@ describe("the agents", () => {
           })
         })
       ),
+      inside(
+        addDialog,
+        expect(role("button", { name: "Creating…" })).toBeDisabled(),
+        expect(label("Agent name")).toBeDisabled(),
+        expect(label("Instructions")).toBeDisabled(),
+        expect(label("Role")).toBeDisabled()
+      ),
       Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) })),
-      expect(role("form", { name: "Add an agent" })).toBeAbsent(),
+      expect(role("dialog", { name: "Add agent" })).toExist(),
       Subscription.emit(
         subscriptions.agents,
         Message.ReceivedAgents({
-          agents: opened.agents,
-          members: opened.members,
+          agents: [scoutAgent, reviewerAgent].map((agent) => ({ agent, pending: false })),
+          members: [alice, bob, scout, reviewer],
           connections: opened.connections,
           roles: opened.roles,
           workspace: opened.workspace,
           grants: opened.grants
         })
       ),
-      expect(role("button", { name: "Scout" })).toHaveAttr(
-        "aria-description",
-        "Auto · No sandbox · test-model · Models"
-      )
+      expectOutMessage(OutMessage.CreatedAgent({ agentId: reviewerAgent.id, name: "Reviewer" })),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Add agent" })).toBeAbsent(),
+      expect(role("button", { name: "Reviewer" })).toExist()
     )
   })
 
   it("are added with a model the connection does not list, named by its id", () => {
     scene(
-      { update, view },
+      { update, view: withDialog },
       given(opened),
       click(role("button", { name: "Add agent" })),
-      inside(
-        role("form", { name: "Add an agent" }),
-        type(label("Name"), "Builder"),
-        change(label("Model connection"), models.id)
-      ),
+      ...dialogOpened(),
+      inside(addDialog, type(label("Agent name"), "Builder"), change(label("Model connection"), models.id)),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
       inside(
-        role("form", { name: "Add an agent" }),
+        addDialog,
+        expect(text("Choose one it lists, or enter any model's ID.")).toExist(),
         type(label("Model ID"), "other-model"),
-        click(role("button", { name: "Add" }))
+        click(role("button", { name: "Create agent" }))
       ),
       Command.expectExact(
         CreateAgent({
@@ -190,46 +229,163 @@ describe("the agents", () => {
     )
   })
 
-  it("are refused, with why beside the field, until the draft names the connection and the model of the agent", () => {
+  it("wait for a name and a model before an agent can be created", () => {
     scene(
-      { update, view },
+      { update, view: withDialog },
       given(opened),
       click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
       inside(
-        role("form", { name: "Add an agent" }),
-        type(label("Name"), "Reviewer"),
-        click(role("button", { name: "Add" }))
+        addDialog,
+        expect(role("button", { name: "Create agent" })).toBeDisabled(),
+        type(label("Agent name"), "Reviewer"),
+        expect(role("button", { name: "Create agent" })).toBeDisabled(),
+        change(label("Model connection"), models.id)
       ),
-      Command.expectNone(),
-      expect(text("Choose a model connection.")).toExist(),
-      expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toExist(),
-      inside(role("form", { name: "Add an agent" }), change(label("Model connection"), models.id)),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
-      expect(text("Choose a model connection.")).toBeAbsent(),
-      expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toBeAbsent(),
-      inside(role("form", { name: "Add an agent" }), click(role("button", { name: "Add" }))),
+      inside(
+        addDialog,
+        expect(role("button", { name: "Create agent" })).toBeDisabled(),
+        change(label("Model"), "test-model"),
+        expect(role("button", { name: "Create agent" })).not.toBeDisabled(),
+        type(label("Agent name"), "   "),
+        expect(role("button", { name: "Create agent" })).toBeDisabled()
+      )
+    )
+  })
+
+  it("say under the fields, with the dialog kept open, that an agent could not be created", () => {
+    scene(
+      { update, view: withDialog },
+      given(opened),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      inside(addDialog, type(label("Agent name"), "Reviewer"), change(label("Model connection"), models.id)),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      inside(addDialog, change(label("Model"), "test-model"), click(role("button", { name: "Create agent" }))),
+      Command.expectExact(
+        CreateAgent({
+          ...asMember,
+          name: "Reviewer",
+          roleId: BuiltinRoles.MemberId,
+          configuration: Schema.decodeSync(Agent.Configuration)({
+            instructions: "",
+            harness: { _tag: "Auto" },
+            model: { connectionId: models.id, id: "test-model" },
+            sandbox: null
+          })
+        })
+      ),
+      Command.resolve(
+        CreateAgent,
+        Message.FailedWriteAction({ written: Written.Create({ name: "Reviewer" }), reason: Reason.Unwritable() })
+      ),
+      inside(
+        addDialog,
+        expect(text("The agent couldn't be created. Try again when the host is available.")).toExist(),
+        expect(label("Agent name")).toHaveValue("Reviewer"),
+        expect(label("Agent name")).not.toBeDisabled(),
+        expect(role("button", { name: "Create agent" })).not.toBeDisabled()
+      ),
+      expect(role("dialog", { name: "Add agent" })).toExist()
+    )
+  })
+
+  it("mark a connection of the setup that is gone beside its field, and send nothing", () => {
+    scene(
+      { update, view: withDialog, subscriptions: AgentsBlock.subscriptions },
+      given(opened),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      inside(addDialog, type(label("Agent name"), "Reviewer"), change(label("Model connection"), models.id)),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      inside(addDialog, change(label("Model"), "test-model")),
+      Subscription.emit(
+        subscriptions.agents,
+        Message.ReceivedAgents({
+          agents: opened.agents,
+          members: opened.members,
+          connections: [harness, sandbox].map((connection) => ({ connection, pending: false })),
+          roles: opened.roles,
+          workspace: opened.workspace,
+          grants: opened.grants
+        })
+      ),
+      inside(addDialog, click(role("button", { name: "Create agent" }))),
       Command.expectNone(),
-      expect(text("Choose a model.")).toExist(),
-      click(role("button", { name: "Cancel" })),
-      expect(role("form", { name: "Add an agent" })).toBeAbsent(),
-      expect(role("button", { name: "Add agent" })).toExist()
+      inside(
+        addDialog,
+        expect(text("This connection is no longer available to you. Choose another.")).toExist(),
+        expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toExist()
+      )
+    )
+  })
+
+  it("show a role the person may not give as unavailable, with why", () => {
+    const administrator = modifyFields(opened, {
+      grants: () => grantsOf([roleOf("assignment-3", alice.id, BuiltinRoles.AdministratorId)]),
+      workspace: () => Option.some({ workspace: { ...workspace, ownerMemberId: bob.id }, pending: false })
+    })
+    scene(
+      { update, view: withDialog },
+      given(administrator),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      inside(
+        addDialog,
+        expect(text("What it may do in the workspace, as a member with this role.")).toExist(),
+        expect(label("Role")).toHaveValue(BuiltinRoles.MemberId),
+        expect(role("option", { name: "Member" })).not.toBeDisabled(),
+        expect(role("option", { name: "Administrator · Only the owner can give this role" })).toBeDisabled(),
+        expect(role("option", { name: /^Owner/ })).toBeAbsent()
+      )
+    )
+    scene(
+      { update, view: withDialog },
+      given(opened),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      inside(addDialog, expect(role("option", { name: "Administrator" })).not.toBeDisabled())
     )
   })
 
   it("say why the models of a connection could not be listed, and take the id of a model all the same", () => {
     scene(
-      { update, view },
+      { update, view: withDialog },
       given(opened),
       click(role("button", { name: "Add agent" })),
-      inside(role("form", { name: "Add an agent" }), change(label("Model connection"), models.id)),
+      ...dialogOpened(),
+      inside(addDialog, change(label("Model connection"), models.id)),
       Command.resolve(
         LoadModels,
         Message.FailedLoadModels({ connectionId: models.id, error: "The host could not be reached. Try again." })
       ),
-      expect(text("The host could not be reached. Try again.")).toExist(),
-      expect(text("Its models couldn't be loaded. You can still enter a model's ID.")).toExist(),
-      inside(role("form", { name: "Add an agent" }), type(label("Model"), "any-model")),
-      expect(label("Model")).toHaveValue("any-model")
+      inside(
+        addDialog,
+        expect(text("The host could not be reached. Try again.")).toExist(),
+        expect(text("Its models couldn't be loaded. You can still enter a model's ID.")).toExist(),
+        type(label("Model"), "any-model"),
+        expect(label("Model")).toHaveValue("any-model")
+      )
+    )
+  })
+
+  it("close the dialog with Cancel and with Close, and open a fresh form the next time", () => {
+    scene(
+      { update, view: withDialog },
+      given(opened),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      inside(addDialog, type(label("Agent name"), "Reviewer"), click(role("button", { name: "Cancel" }))),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Add agent" })).toBeAbsent(),
+      click(role("button", { name: "Add agent" })),
+      ...dialogOpened(),
+      expect(label("Agent name")).toHaveValue(""),
+      click(within(addDialog, role("button", { name: "Close" }))),
+      ...dialogClosed(),
+      expect(role("dialog", { name: "Add agent" })).toBeAbsent()
     )
   })
 
@@ -625,8 +781,7 @@ describe("the agents' section of the sidebar", () => {
       click(role("button", { name: "Browse agents" })),
       expectOutMessage(OutMessage.RequestedBrowse()),
       click(role("button", { name: "Add agent" })),
-      expectOutMessage(OutMessage.RequestedBrowse()),
-      Command.expectNone()
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
     )
   })
 
@@ -721,6 +876,10 @@ describe("an agent's page", () => {
     offered: () => [OfferedModels.Loaded({ connectionId: models.id, models: offered })]
   })
   const readOnly = modifyFields(withModels, { grants: () => memberGrants })
+
+  /** The page and the dialog for confirming its agent's removal, which the shell keeps beside it. */
+  const pageWithDialog: typeof dialog = (model, h) => h.div([], [page()(model, h), dialog(model, h)])
+  const removeDialog = role("dialog", { name: "Remove agent?" })
 
   it("shows the agent by its name on a lilac mark, with the workspace under it on a phone", () => {
     scene(
@@ -965,6 +1124,88 @@ describe("an agent's page", () => {
         })
       ),
       expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist()
+    )
+  })
+
+  it("offers removing the agent to a person who may, saying what it does, and to nobody else", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      expect(role("heading", { name: "Removal" })).toExist(),
+      expect(text("Removing this agent ends its membership. Its messages stay in their threads.")).toExist(),
+      expect(role("button", { name: "Remove agent" })).toExist()
+    )
+    scene(
+      { update, view: page() },
+      given(readOnly),
+      expect(role("heading", { name: "Removal" })).toBeAbsent(),
+      expect(role("button", { name: "Remove agent" })).toBeAbsent()
+    )
+    scene(
+      { update, view: page() },
+      given(modifyFields(withModels, { agents: () => [{ agent: incompleteAgent, pending: true }] })),
+      expect(role("heading", { name: "Removal" })).toBeAbsent()
+    )
+  })
+
+  it("asks to confirm in a dialog naming the agent, and removes its membership once confirmed", () => {
+    scene(
+      { update, view: pageWithDialog },
+      given(withModels),
+      expect(removeDialog).toBeAbsent(),
+      click(role("button", { name: "Remove agent" })),
+      ...dialogOpened(),
+      expect(removeDialog).toExist(),
+      inside(
+        removeDialog,
+        expect(role("heading", { name: "Remove agent?" })).toExist(),
+        expect(text("Scout")).toExist(),
+        expect(text("Scout will leave the workspace. Its messages stay in their threads.")).toExist(),
+        expect(role("button", { name: "Cancel" })).toExist()
+      ),
+      click(within(removeDialog, role("button", { name: "Remove agent" }))),
+      Command.expectExact(RemoveAgent({ ...asMember, agentId, removeMemberId: scout.id })),
+      inside(removeDialog, expect(role("button", { name: "Removing…" })).toBeDisabled()),
+      Command.resolve(RemoveAgent, Message.WroteAction({ written: Written.Remove({ agentId }) })),
+      expectOutMessage(OutMessage.RemovedAgent({ name: "Scout" })),
+      ...dialogClosed(),
+      expect(removeDialog).toBeAbsent()
+    )
+  })
+
+  it("says under the question, with the dialog kept open, that the agent could not be removed", () => {
+    scene(
+      { update, view: pageWithDialog },
+      given(withModels),
+      click(role("button", { name: "Remove agent" })),
+      ...dialogOpened(),
+      click(within(removeDialog, role("button", { name: "Remove agent" }))),
+      Command.expectExact(RemoveAgent({ ...asMember, agentId, removeMemberId: scout.id })),
+      Command.resolve(
+        RemoveAgent,
+        Message.FailedWriteAction({ written: Written.Remove({ agentId }), reason: Reason.Unwritable() })
+      ),
+      inside(
+        removeDialog,
+        expect(text("The agent couldn't be removed. Try again when the host is available.")).toExist(),
+        expect(role("button", { name: "Remove agent" })).not.toBeDisabled()
+      ),
+      expect(removeDialog).toExist()
+    )
+  })
+
+  it("leaves the agent be when the person cancels the question", () => {
+    scene(
+      { update, view: pageWithDialog },
+      given(withModels),
+      click(role("button", { name: "Remove agent" })),
+      ...dialogOpened(),
+      click(within(removeDialog, role("button", { name: "Cancel" }))),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(removeDialog).toBeAbsent(),
+      expect(label("Agent name")).toHaveValue("Scout"),
+      expect(role("button", { name: "Remove agent" })).toExist()
     )
   })
 })

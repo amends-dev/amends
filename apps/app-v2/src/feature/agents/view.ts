@@ -16,14 +16,15 @@ import { detailList } from "@amends-dev/design/details"
 import { cellWithDetail, columns, row } from "@amends-dev/design/directory"
 import { form } from "@amends-dev/design/form"
 import type { MarkStatus } from "@amends-dev/design/mark"
+import { modal } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
+import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { calendarDate, memberName } from "../../seen.ts"
 import { connectionItemsGiving, Integrations } from "../connections/definition.ts"
-import { givableRoles } from "../settings/definition.ts"
-import { AgentsComposition, type AgentsViewBuilder } from "./composition.ts"
+import { AgentsComposition, type AgentsViewBuilder, DialogBinding } from "./composition.ts"
 import {
   type Adding,
   type AgentAction,
@@ -34,21 +35,25 @@ import {
   failureMessage,
   findEdit,
   findListedAgent,
+  isAddingReady,
   isNameChanged,
   isSetupChanged,
   listedAgents,
   mayAdd,
   mayConfigure,
   mayCreate,
+  mayRemove,
   Message,
   type Model,
   nameDraftOf,
   nameOfAgent,
   needsSetup,
   problemsOf,
+  type Removing,
   SetupTarget,
   setupDraftOf,
-  shownAgents
+  shownAgents,
+  startingRoles
 } from "./definition.ts"
 import { setupFields } from "./setupFields.ts"
 
@@ -245,9 +250,7 @@ const noAgents = (model: Model, h: AgentsViewBuilder): Html =>
     copy: mayCreate(model)
       ? "Add an agent: a member that works on a harness and a model your connections give."
       : "An administrator can add agents to your workspace.",
-    ...(mayAdd(model) && Option.isNone(model.adding)
-      ? { action: button(h, "Add agent", Message.ClickedAdd(), { variant: "primary" }) }
-      : {})
+    ...(mayAdd(model) ? { action: button(h, "Add agent", Message.ClickedAdd(), { variant: "primary" }) } : {})
   })
 
 /** The tabs over the list, All and Needs setup, each with how many agents are on it once they are read. */
@@ -275,42 +278,10 @@ const listBody = (model: Model, h: AgentsViewBuilder): Html => {
   return listedAgents(model).length === 0 ? noAgents(model, h) : agentList(model, h)
 }
 
-/** The form that adds an agent, under the list: its name, its role, how it is set up, and why the last try failed. */
-const addingForm = (adding: Adding, model: Model, h: AgentsViewBuilder): Html =>
-  paneForm(h, { title: "Add an agent", onSubmit: Message.SubmittedAdding() }, [
-    field(
-      h,
-      {
-        id: "add-agent-name",
-        label: "Name",
-        type: "text",
-        value: adding.name,
-        onInput: (name) => Message.TypedAddingName({ name })
-      },
-      Option.none()
-    ),
-    choiceSelect(h, {
-      id: "add-agent-role",
-      label: "Role",
-      choices: givableRoles(model).map(({ id, name }) => [id, name] as const),
-      value: adding.roleId,
-      onChange: (roleId) => Message.ChoseRole({ roleId })
-    }),
-    ...setupFields(h, model, {
-      idPrefix: "add-agent",
-      target: SetupTarget.Adding(),
-      setup: adding.setup,
-      problems: problemsOf(adding.failure),
-      isDisabled: false
-    }),
-    notice(h, Option.map(adding.failure, failureMessage)),
-    buttonRow(h, [submit(h, "Add"), button(h, "Cancel", Message.ClickedCancelAdding(), { variant: "quiet" })])
-  ])
-
 /**
  * The agents as the list page, the main content: All and those that need setup on a tab each, with the button to add
- * one for a person who may, a search that narrows the tab by name, and a row for each agent, which picking opens as
- * its own page. The form that adds an agent is under the list.
+ * one for a person who may, which opens the dialog `dialogView` renders, a search that narrows the tab by name, and a
+ * row for each agent, which picking opens as its own page.
  */
 export const view = AgentsComposition.makeView((model, h) =>
   pane(h, {
@@ -319,18 +290,13 @@ export const view = AgentsComposition.makeView((model, h) =>
     header: {
       title: "Agents",
       icon: "mark-agents",
-      actions: mayAdd(model) && Option.isNone(model.adding) ? [button(h, "Add agent", Message.ClickedAdd())] : [],
+      actions: mayAdd(model) ? [button(h, "Add agent", Message.ClickedAdd())] : [],
       tabs: browseTabs(model, h)
     },
     body: [
       paneColumn(
         h,
-        [
-          notice(h, model.notice),
-          mayCreate(model) && Option.isNone(model.adding) ? integrationsView(model, h) : h.empty,
-          listBody(model, h),
-          Option.match(model.adding, { onNone: () => h.empty, onSome: (adding) => addingForm(adding, model, h) })
-        ],
+        [notice(h, model.notice), mayCreate(model) ? integrationsView(model, h) : h.empty, listBody(model, h)],
         { isWide: true }
       )
     ]
@@ -441,6 +407,19 @@ const detailsSection = (item: AgentItem, model: Model, h: AgentsViewBuilder): Ht
     ]
   })
 
+/** What removing the agent does, and the button that asks to confirm it, for a person who may remove it. */
+const removalSection = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html =>
+  mayRemove(model, item.agent) && !item.pending
+    ? paneSection(h, {
+        title: "Removal",
+        hasStitch: true,
+        children: [
+          hint(h, "Removing this agent ends its membership. Its messages stay in their threads."),
+          buttonRow(h, [button(h, "Remove agent", Message.ClickedRemove({ agentId: item.agent.id }))])
+        ]
+      })
+    : h.empty
+
 /** Why the agent can't run as it is set up, as a note over the page, one line for each reason; nothing when it can. */
 const readinessNote = ({ agent, pending }: AgentItem, h: AgentsViewBuilder): Html =>
   pending
@@ -451,7 +430,7 @@ const readinessNote = ({ agent, pending }: AgentItem, h: AgentsViewBuilder): Htm
           noticeBox(h, { title: "This agent can't run as it is set up", lines: issues.map(issueSentence) })
       })
 
-/** The page of an agent: why it can't run, its name, its setup, its details, in one column. */
+/** The page of an agent: why it can't run, its name, its setup, its details, and its removal, in one column. */
 const agentPage = (item: AgentItem, model: Model, workspaceName: string, h: AgentsViewBuilder): Html => {
   const name = nameOfAgent(model, item.agent)
   const edit = findEdit(model, item.agent.id)
@@ -472,7 +451,8 @@ const agentPage = (item: AgentItem, model: Model, workspaceName: string, h: Agen
         readinessNote(item, h),
         nameForm(item, model, edit, isEditable, h),
         setupForm(item, model, edit, isEditable, h),
-        detailsSection(item, model, h)
+        detailsSection(item, model, h),
+        removalSection(item, model, h)
       ])
     ]
   })
@@ -495,9 +475,10 @@ const missingAgent = (workspaceName: string, h: AgentsViewBuilder): Html =>
   })
 
 /**
- * The page of one agent, the main content: why it can't run, its name, its setup, and its details. A person who
- * may configure it renames it and sets it up again, each saved apart; another reads the same values. An agent the
- * workspace does not list says so, and offers the list; nothing shows before the agents are read.
+ * The page of one agent, the main content: why it can't run, its name, its setup, its details, and, for a person who
+ * may remove it, its removal, which asks to confirm in the dialog `dialogView` renders. A person who may configure
+ * it renames it and sets it up again, each saved apart; another reads the same values. An agent the workspace does
+ * not list says so, and offers the list; nothing shows before the agents are read.
  */
 export const agentView = AgentsComposition.makeView.withInputs<AgentInputs>((model, { agentId, workspaceName }, h) =>
   Option.match(findListedAgent(model, agentId), {
@@ -512,4 +493,113 @@ export const agentView = AgentsComposition.makeView.withInputs<AgentInputs>((mod
           }),
     onSome: (item) => agentPage(item, model, workspaceName, h)
   })
+)
+
+/** The name of the workspace, which the dialog that adds an agent says it adds the agent to. */
+export type DialogInputs = Readonly<{ workspaceName: string }>
+
+/**
+ * The dialog that adds an agent: its name, the role it starts with, which a person who may not give shows as
+ * unavailable, and how it is set up, with Create agent disabled until a name, a role, and a model are chosen. What
+ * could not be made shows under the fields.
+ */
+const addingModal = (
+  render: RenderInfo,
+  adding: Adding,
+  model: Model,
+  workspaceName: string,
+  h: AgentsViewBuilder
+): Html => {
+  const isSending = Option.isSome(adding.creating)
+
+  return modal(h, render, {
+    title: "Add agent",
+    context: workspaceName,
+    width: "wide",
+    body: [
+      field(
+        h,
+        {
+          id: "add-agent-name",
+          label: "Agent name",
+          type: "text",
+          value: adding.name,
+          hint: "How the workspace calls and mentions it.",
+          isAutofocus: false,
+          isDisabled: isSending,
+          attributes: render.initialFocus,
+          onInput: (name) => Message.TypedAddingName({ name })
+        },
+        Option.none()
+      ),
+      choiceSelect(h, {
+        id: "add-agent-role",
+        label: "Role",
+        choices: startingRoles(model).map(({ role, isGivable }) =>
+          isGivable
+            ? ([role.id, role.name] as const)
+            : ([role.id, role.name, { description: "Only the owner can give this role", isDisabled: true }] as const)
+        ),
+        value: adding.roleId,
+        hint: "What it may do in the workspace, as a member with this role.",
+        isDisabled: isSending,
+        onChange: (roleId) => Message.ChoseRole({ roleId })
+      }),
+      ...setupFields(h, model, {
+        idPrefix: "add-agent",
+        target: SetupTarget.Adding(),
+        setup: adding.setup,
+        problems: problemsOf(adding.failure),
+        isDisabled: isSending
+      }),
+      notice(h, Option.map(adding.failure, failureMessage))
+    ],
+    cancelLabel: "Cancel",
+    footer: [submit(h, isSending ? "Creating…" : "Create agent", { isDisabled: !isAddingReady(adding) || isSending })],
+    onSubmit: Message.SubmittedAdding()
+  })
+}
+
+/**
+ * The dialog that confirms removing an agent, named in its context, saying it leaves the workspace and its messages
+ * stay, with why the last try failed.
+ */
+const removingModal = (render: RenderInfo, removing: Removing, h: AgentsViewBuilder): Html =>
+  modal(h, render, {
+    title: "Remove agent?",
+    context: removing.name,
+    description: `${removing.name} will leave the workspace. Its messages stay in their threads.`,
+    body: [notice(h, Option.map(removing.failure, failureMessage))],
+    cancelLabel: "Cancel",
+    footer: [submit(h, removing.isSending ? "Removing…" : "Remove agent", { isDisabled: removing.isSending })],
+    onSubmit: Message.ConfirmedRemoval()
+  })
+
+/** What the dialog shows: the form that adds an agent, or the confirmation that removes one; an empty frame while it has neither. */
+const dialogModal = (render: RenderInfo, model: Model, workspaceName: string, h: AgentsViewBuilder): Html =>
+  Option.match(model.adding, {
+    onSome: (adding) => addingModal(render, adding, model, workspaceName, h),
+    onNone: () =>
+      Option.match(model.removing, {
+        onSome: (removing) => removingModal(render, removing, h),
+        onNone: () => modal(h, render, { title: "", body: [] })
+      })
+  })
+
+/**
+ * The dialog for adding an agent or confirming its removal, which the page lends the shell: it renders its `dialog`
+ * element, with nothing in it while it is closed, wherever the page puts the buttons that open it, the sidebar's, the
+ * list's, and the agent's, whether or not the sidebar is on the page.
+ */
+export const dialogView = AgentsComposition.makeView.withInputs<DialogInputs>((model, { workspaceName }, h) =>
+  h.block(
+    DialogBinding.embedView({
+      slotId: "dialog",
+      model: model.dialog,
+      viewInputs: {
+        hasDescription: Option.isNone(model.adding) && Option.isSome(model.removing),
+        toView: (render) => dialogModal(render, model, workspaceName, h)
+      }
+    })
+  )
 )

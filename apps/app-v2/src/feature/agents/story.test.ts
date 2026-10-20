@@ -4,8 +4,10 @@ import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, type MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Result, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
   bob,
@@ -15,6 +17,8 @@ import {
   keylessConnection,
   membership,
   offered,
+  reviewer,
+  reviewerAgent,
   roleOf,
   roles,
   scout,
@@ -23,15 +27,21 @@ import {
 import { type Draft, empty } from "../../agentSetup.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
 import { givableRoles } from "../settings/definition.ts"
-import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
+import { DialogBinding } from "./composition.ts"
 import {
+  type Adding,
   checkSetup,
   connectionChoices,
   failureMessage,
   findAgentName,
+  findCreatedAgent,
+  isAddingReady,
+  isDialogBusy,
   isNameChanged,
   isSetupChanged,
   listedAgents,
+  mayRemove,
   type Model,
   Message,
   nameDraftOf,
@@ -43,6 +53,7 @@ import {
   setupDraftOf,
   SetupTarget,
   shownAgents,
+  startingRoles,
   Written
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -133,6 +144,53 @@ const setupOfScout: Draft = {
 
 const adding = SetupTarget.Adding()
 const onScout = SetupTarget.Agent({ agentId })
+
+/** What the dialog reports, as the agents receive it. */
+const fromDialog = (message: typeof DialogBlock.Message.Type) =>
+  DialogBinding.embedView({
+    slotId: "dialog",
+    model: listed.dialog,
+    viewInputs: { toView: () => null }
+  }).toParentMessage(message)
+
+/** The dialog asked for, on a blank form that adds an agent. */
+const addingDialog = [
+  message(Message.ClickedAdd()),
+  Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+] as const
+
+/** The agents once the store lists the one the form adds. */
+const withReviewer = Message.ReceivedAgents({
+  ...agentsOf(alice.id, [aliceOwns]),
+  agents: [scoutAgent, reviewerAgent].map((agent) => ({ agent, pending: false })),
+  members: [alice, bob, scout, reviewer]
+})
+
+const openDialog = (model: typeof opened) =>
+  modifyFields(model, { dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }) })
+
+/** The form filled in, whose request is on its way, among the agents alice sees. */
+const sendingAdding = openDialog(
+  modifyFields(opened, {
+    offered: () => [OfferedModels.Loaded({ connectionId: modelsId, models: offered })],
+    adding: () =>
+      Option.some<Adding>({
+        name: "Reviewer",
+        roleId: BuiltinRoles.MemberId,
+        setup: { ...setupOfScout, effort: "high" },
+        failure: Option.none(),
+        creating: Option.some({ name: "Reviewer", knownAgentIds: [agentId], isWritten: false })
+      })
+  })
+)
+
+/** The confirmation that removes scout, with its request on its way or not. */
+const removingAgent = (isSending: boolean) =>
+  openDialog(
+    modifyFields(opened, {
+      removing: () => Option.some({ agentId, name: "Scout", isSending, failure: Option.none() })
+    })
+  )
 
 describe("the agents", () => {
   it("wait for the page to list the integrations, and keep what it informs them of or why it could not", () => {
@@ -253,7 +311,7 @@ describe("the agents", () => {
     expect(needsSetup({ agent: scoutAgent, pending: false })).toBe(false)
   })
 
-  it("ask the page to show the agents when the person browses, and when they add one, since its form is in the list", () => {
+  it("ask the page to show the agents when the person browses, and nothing when they add one, since the form is a dialog", () => {
     story(
       update,
       given(listed),
@@ -262,11 +320,34 @@ describe("the agents", () => {
       expectOutMessage(OutMessage.RequestedBrowse()),
       Command.expectNone(),
       message(Message.ClickedAdd()),
-      expectOutMessage(OutMessage.RequestedBrowse()),
+      expectNoOutMessage(),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+    )
+  })
+
+  it("open the dialog on a blank form that adds an agent, and not on a confirmation", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
       model((model) => {
+        expect(model.dialog.isOpen).toBe(false)
+        expect(model.adding).toEqual(Option.none())
+      }),
+      message(Message.ClickedAdd()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
         expect(model.adding).toEqual(
-          Option.some({ name: "", roleId: BuiltinRoles.MemberId, setup: empty, failure: Option.none() })
+          Option.some({
+            name: "",
+            roleId: BuiltinRoles.MemberId,
+            setup: empty,
+            failure: Option.none(),
+            creating: Option.none()
+          })
         )
+        expect(model.removing).toEqual(Option.none())
       })
     )
   })
@@ -328,42 +409,40 @@ describe("the agents", () => {
     )
   })
 
-  it("add an agent as an action once its setup is complete, and mark what a draft still wants beside its field", () => {
+  it("send nothing from the form until it has a name, a role, and a model, and mark nothing before then", () => {
     story(
       update,
       given(listed),
       ...read,
-      message(Message.ClickedAdd()),
+      ...addingDialog,
       message(Message.TypedAddingName({ name: "Reviewer" })),
       message(Message.SubmittedAdding()),
       Command.expectNone(),
       model((model) => {
-        expect(model.adding).toMatchObject(
-          Option.some({
-            failure: Option.some({
-              action: "Create",
-              reason: Reason.Incomplete({
-                problems: [{ field: "ModelConnection", message: "Choose a model connection." }]
-              })
-            })
-          })
-        )
+        expect(model.adding).toMatchObject(Option.some({ failure: Option.none(), creating: Option.none() }))
+        expect(Option.exists(model.adding, isAddingReady)).toBe(false)
       }),
       message(Message.ChoseModelConnection({ target: adding, connectionId: modelsId })),
-      Command.expectExact(LoadModels({ workspaceId, connectionId: modelsId })),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered })),
       message(Message.SubmittedAdding()),
       Command.expectNone(),
+      message(Message.ChoseModel({ target: adding, modelId: "test-model" })),
       model((model) => {
-        expect(model.adding).toMatchObject(
-          Option.some({
-            failure: Option.some({
-              action: "Create",
-              reason: Reason.Incomplete({ problems: [{ field: "Model", message: "Choose a model." }] })
-            })
-          })
-        )
-      }),
+        expect(Option.exists(model.adding, isAddingReady)).toBe(true)
+      })
+    )
+  })
+
+  it("add an agent as an action once its setup is complete, and open the page of the agent the store lists", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...addingDialog,
+      message(Message.TypedAddingName({ name: " Reviewer " })),
+      message(Message.ChoseModelConnection({ target: adding, connectionId: modelsId })),
+      Command.expectExact(LoadModels({ workspaceId, connectionId: modelsId })),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered })),
       message(Message.ChoseModel({ target: adding, modelId: "test-model" })),
       message(Message.ChoseEffort({ target: adding, effort: "high" })),
       message(Message.TypedInstructions({ target: adding, instructions: "  Review what is asked.  " })),
@@ -378,9 +457,80 @@ describe("the agents", () => {
         })
       ),
       model((model) => {
-        expect(model.adding).toEqual(Option.none())
+        expect(model.adding).toMatchObject(
+          Option.some({ creating: Option.some({ name: "Reviewer", knownAgentIds: [agentId], isWritten: false }) })
+        )
+        expect(isDialogBusy(model)).toBe(true)
       }),
-      Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) }))
+      // The store keeping the action is not the agent listed yet, so the dialog waits for it.
+      Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) })),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.adding).toMatchObject(
+          Option.some({ creating: Option.some({ name: "Reviewer", knownAgentIds: [agentId], isWritten: true }) })
+        )
+        expect(isDialogBusy(model)).toBe(false)
+      }),
+      message(withReviewer),
+      expectOutMessage(OutMessage.CreatedAgent({ agentId: reviewerAgent.id, name: "Reviewer" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+        expect(model.removing).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("finish adding the agent when it is listed before the store says it kept the action, and ask for no models it has", () => {
+    story(
+      update,
+      given(sendingAdding),
+      message(withReviewer),
+      expectOutMessage(OutMessage.CreatedAgent({ agentId: reviewerAgent.id, name: "Reviewer" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      message(Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) })),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("ask for the models of the new agent's connection when the form had not loaded them", () => {
+    story(
+      update,
+      given(modifyFields(sendingAdding, { offered: () => [] })),
+      message(withReviewer),
+      expectOutMessage(OutMessage.CreatedAgent({ agentId: reviewerAgent.id, name: "Reviewer" })),
+      Command.expectHas(Dialog.test.CloseDialog, LoadModels({ workspaceId, connectionId: modelsId })),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("not take for the new agent one that somebody else made, or one the workspace already had", () => {
+    story(
+      update,
+      given(sendingAdding),
+      message(
+        Message.ReceivedAgents({
+          ...agentsOf(alice.id, [aliceOwns]),
+          agents: [scoutAgent, { ...reviewerAgent, createdBy: bob.id }].map((agent) => ({ agent, pending: false })),
+          members: [alice, bob, scout, reviewer]
+        })
+      ),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(Option.isSome(model.adding)).toBe(true)
+      })
     )
   })
 
@@ -389,7 +539,7 @@ describe("the agents", () => {
       update,
       given(listed),
       ...read,
-      message(Message.ClickedAdd()),
+      ...addingDialog,
       message(Message.TypedAddingName({ name: " Builder " })),
       message(Message.ChoseHarness({ target: adding, harness: harness.id })),
       message(Message.ChoseSandbox({ target: adding, sandbox: sandbox.id })),
@@ -410,22 +560,39 @@ describe("the agents", () => {
           })
         })
       ),
+      // Sent once, whatever else is pressed while it is on its way.
       Command.resolve(
         CreateAgent,
         Message.FailedWriteAction({ written: Written.Create({ name: "Builder" }), reason: Reason.Invalid() })
       ),
       model((model) => {
-        expect(model.notice).toEqual(Option.some("Check the name, instructions, and model, then try again."))
+        expect(model.adding).toMatchObject(
+          Option.some({
+            creating: Option.none(),
+            failure: Option.some({ action: "Create", reason: Reason.Invalid() })
+          })
+        )
+        expect(
+          Option.map(
+            Option.flatMap(model.adding, ({ failure }) => failure),
+            failureMessage
+          )
+        ).toEqual(Option.some("Check the name, instructions, and model, then try again."))
+        expect(model.dialog.isOpen).toBe(true)
       })
     )
   })
 
-  it("mark the instructions that can't be stored beside them, and let the draft be sent again once it changes", () => {
+  it("send a form that is on its way once, and nothing else of it", () => {
+    story(update, given(sendingAdding), message(Message.SubmittedAdding()), Command.expectNone())
+  })
+
+  it("mark the parts of the setup that can't be saved beside their fields, send nothing, and let the form be sent again once it changes", () => {
     story(
       update,
       given(listed),
       ...read,
-      message(Message.ClickedAdd()),
+      ...addingDialog,
       message(Message.TypedAddingName({ name: "Reviewer" })),
       message(Message.ChoseModelConnection({ target: adding, connectionId: modelsId })),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered })),
@@ -436,6 +603,7 @@ describe("the agents", () => {
       model((model) => {
         expect(model.adding).toMatchObject(
           Option.some({
+            creating: Option.none(),
             failure: Option.some({
               action: "Create",
               reason: Reason.Incomplete({
@@ -452,41 +620,50 @@ describe("the agents", () => {
       model((model) => {
         expect(model.adding).toMatchObject(Option.some({ failure: Option.none() }))
       }),
+      message(Message.ChoseEffort({ target: adding, effort: "high" })),
       message(Message.SubmittedAdding()),
       Command.expectExact(
         CreateAgent({
           ...asMember,
           name: "Reviewer",
           roleId: BuiltinRoles.MemberId,
-          configuration: Schema.decodeSync(Agent.Configuration)({
-            instructions: "Review what is asked.",
-            harness: { _tag: "Auto" },
-            model: { connectionId: modelsId, id: "test-model" },
-            sandbox: null
-          })
+          configuration: reviewing
         })
       ),
       Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) }))
     )
   })
 
-  it("say that an agent could not be added, until another is", () => {
+  it("say under the form, which stays open, that an agent could not be added, until it is sent again", () => {
     story(
       update,
-      given(listed),
-      ...read,
+      given(sendingAdding),
       message(
         Message.FailedWriteAction({ written: Written.Create({ name: "Reviewer" }), reason: Reason.Unwritable() })
       ),
       model((model) => {
-        expect(model.notice).toEqual(
-          Option.some("The agent couldn't be created. Try again when the host is available.")
+        expect(model.adding).toMatchObject(
+          Option.some({
+            creating: Option.none(),
+            failure: Option.some({ action: "Create", reason: Reason.Unwritable() })
+          })
         )
-      }),
-      message(Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) })),
-      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
         expect(model.notice).toEqual(Option.none())
-      })
+      }),
+      message(Message.SubmittedAdding()),
+      Command.expectExact(
+        CreateAgent({
+          ...asMember,
+          name: "Reviewer",
+          roleId: BuiltinRoles.MemberId,
+          configuration: reviewing
+        })
+      ),
+      model((model) => {
+        expect(model.adding).toMatchObject(Option.some({ failure: Option.none() }))
+      }),
+      Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) }))
     )
   })
 
@@ -495,7 +672,7 @@ describe("the agents", () => {
       update,
       given(listed),
       ...read,
-      message(Message.ClickedAdd()),
+      ...addingDialog,
       model((model) => {
         expect(model.offered).toEqual([])
       }),
@@ -557,7 +734,7 @@ describe("the agents", () => {
       update,
       given(listed),
       ...read,
-      message(Message.ClickedAdd()),
+      ...addingDialog,
       message(Message.ChoseModelConnection({ target: adding, connectionId: modelsId })),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered })),
       message(Message.ChoseModel({ target: adding, modelId: "test-model" })),
@@ -584,20 +761,235 @@ describe("the agents", () => {
     )
   })
 
-  it("close the form that adds an agent when the person cancels it", () => {
+  it("close the dialog that adds an agent when the person closes it, forgetting the form", () => {
     story(
       update,
       given(listed),
       ...read,
-      message(Message.ClickedAdd()),
+      ...addingDialog,
       message(Message.TypedAddingName({ name: "Reviewer" })),
-      message(Message.ClickedCancelAdding()),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       model((model) => {
         expect(model.adding).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
       }),
       // Sending a form that is not open sends nothing.
       message(Message.SubmittedAdding()),
       Command.expectNone()
+    )
+  })
+
+  it("keep the dialog open on the request on its way when the person closes it then, to show how it ends", () => {
+    story(
+      update,
+      given(modifyFields(sendingAdding, { adding: Option.map((open) => ({ ...open, name: "Reviewer" })) })),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.expectHas(Dialog.test.CloseDialog, Dialog.test.ShowDialog),
+      model((model) => {
+        expect(model.adding).toMatchObject(Option.some({ name: "Reviewer" }))
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(
+        Message.FailedWriteAction({ written: Written.Create({ name: "Reviewer" }), reason: Reason.Unwritable() })
+      ),
+      model((model) => {
+        expect(model.adding).toMatchObject(
+          Option.some({
+            creating: Option.none(),
+            failure: Option.some({ action: "Create", reason: Reason.Unwritable() })
+          })
+        )
+        expect(model.dialog.isOpen).toBe(true)
+      })
+    )
+  })
+
+  it("let the dialog close once the store has kept the action, since only the agent being listed is awaited", () => {
+    story(
+      update,
+      given(
+        modifyFields(sendingAdding, {
+          adding: Option.map((open) => ({
+            ...open,
+            creating: Option.map(open.creating, (sent) => ({ ...sent, isWritten: true }))
+          }))
+        })
+      ),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+})
+
+describe("removing an agent", () => {
+  it("asks to confirm in the dialog, naming the agent as it is called, where the person may remove it", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedRemove({ agentId })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.adding).toEqual(Option.none())
+        expect(model.removing).toEqual(
+          Option.some({ agentId, name: "Scout", isSending: false, failure: Option.none() })
+        )
+      })
+    )
+  })
+
+  it("asks nothing of a person who may not remove the agent, for an agent on its way, or for one that is gone", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ReceivedAgents(agentsOf(bob.id, [bobIsMember]))),
+      message(Message.ClickedRemove({ agentId })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+    story(
+      update,
+      given(listed),
+      message(
+        Message.ReceivedAgents({ ...agentsOf(alice.id, [aliceOwns]), agents: [{ agent: scoutAgent, pending: true }] })
+      ),
+      message(Message.ClickedRemove({ agentId })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+      })
+    )
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedRemove({ agentId: Identity.AgentId.make("agent-9") })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("removes the agent's membership once confirmed, says it is sending, and closes the dialog with the name it had", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedRemove({ agentId })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.ConfirmedRemoval()),
+      Command.expectExact(RemoveAgent({ ...asMember, agentId, removeMemberId: scout.id })),
+      model((model) => {
+        expect(model.removing).toEqual(Option.some({ agentId, name: "Scout", isSending: true, failure: Option.none() }))
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(RemoveAgent, Message.WroteAction({ written: Written.Remove({ agentId }) })),
+      expectOutMessage(OutMessage.RemovedAgent({ name: "Scout" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("sends the removal once, whatever is pressed while it is on its way, and nothing of a confirmation that is not open", () => {
+    story(update, given(removingAgent(true)), message(Message.ConfirmedRemoval()), Command.expectNone())
+    story(update, given(listed), ...read, message(Message.ConfirmedRemoval()), Command.expectNone())
+  })
+
+  it("says under the confirmation, which stays open, that the agent could not be removed, until it is sent again", () => {
+    story(
+      update,
+      given(removingAgent(true)),
+      message(Message.FailedWriteAction({ written: Written.Remove({ agentId }), reason: Reason.Unwritable() })),
+      model((model) => {
+        expect(model.removing).toEqual(
+          Option.some({
+            agentId,
+            name: "Scout",
+            isSending: false,
+            failure: Option.some({ action: "Remove", reason: Reason.Unwritable() })
+          })
+        )
+        expect(
+          Option.map(
+            Option.flatMap(model.removing, ({ failure }) => failure),
+            failureMessage
+          )
+        ).toEqual(Option.some("The agent couldn't be removed. Try again when the host is available."))
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      message(Message.ConfirmedRemoval()),
+      Command.expectExact(RemoveAgent({ ...asMember, agentId, removeMemberId: scout.id })),
+      model((model) => {
+        expect(model.removing).toEqual(Option.some({ agentId, name: "Scout", isSending: true, failure: Option.none() }))
+      }),
+      Command.resolve(RemoveAgent, Message.WroteAction({ written: Written.Remove({ agentId }) })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("keeps the dialog open on the request on its way when the person closes it then, and lets it close when it is not", () => {
+    story(
+      update,
+      given(removingAgent(true)),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.expectHas(Dialog.test.CloseDialog, Dialog.test.ShowDialog),
+      model((model) => {
+        expect(Option.isSome(model.removing)).toBe(true)
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+    )
+    story(
+      update,
+      given(removingAgent(false)),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("closes the confirmation of an agent somebody else removed, unless the person's own request is on its way", () => {
+    const gone = Message.ReceivedAgents({ ...agentsOf(alice.id, [aliceOwns]), members: [alice, bob] })
+    story(
+      update,
+      given(removingAgent(false)),
+      message(gone),
+      Command.expectExact(Dialog.test.CloseDialog),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+    story(
+      update,
+      given(removingAgent(true)),
+      message(gone),
+      Command.expectNone(),
+      model((model) => {
+        expect(Option.isSome(model.removing)).toBe(true)
+        expect(model.dialog.isOpen).toBe(true)
+      })
     )
   })
 })
@@ -1133,6 +1525,10 @@ describe("the setup of an agent", () => {
     expect(failureMessage({ action: "Configure", reason: Reason.Unwritable() })).toBe(
       "The setup couldn't be saved. Try again when the host is available."
     )
+    expect(failureMessage({ action: "Remove", reason: Reason.Invalid() })).toBe("That change isn't possible.")
+    expect(failureMessage({ action: "Remove", reason: Reason.Unwritable() })).toBe(
+      "The agent couldn't be removed. Try again when the host is available."
+    )
     for (const action of ["Create", "Configure"] as const) {
       expect(failureMessage({ action, reason: Reason.Incomplete({ problems: [] }) })).toBe(
         "This setup can't be saved as it is. Change what's marked, then try again."
@@ -1152,5 +1548,76 @@ describe("the setup of an agent", () => {
       BuiltinRoles.AdministratorId
     ])
     expect(givableRoles(readAs(bob.id, administrators)).map(({ id }) => id)).toEqual([BuiltinRoles.MemberId])
+  })
+
+  it("offers a new agent Member and Administrator to start with, Administrator unavailable to all but the owner", () => {
+    const administrators = [aliceOwns, roleOf("assignment-3", bob.id, BuiltinRoles.AdministratorId)]
+    const readAs = (memberId: MemberId.MemberId, assignments: ReadonlyArray<Assignment.Assignment>) => ({
+      ...init(workspace.id, memberId).model,
+      ...agentsOf(memberId, assignments)
+    })
+    const offeredTo = (model: ReturnType<typeof readAs>) =>
+      startingRoles(model).map(({ role, isGivable }) => [role.id, isGivable])
+    expect(offeredTo(readAs(alice.id, [aliceOwns, bobIsMember]))).toEqual([
+      [BuiltinRoles.MemberId, true],
+      [BuiltinRoles.AdministratorId, true]
+    ])
+    expect(offeredTo(readAs(bob.id, administrators))).toEqual([
+      [BuiltinRoles.MemberId, true],
+      [BuiltinRoles.AdministratorId, false]
+    ])
+    expect(startingRoles(listed)).toEqual([])
+  })
+
+  it("wants a name and a model before an agent can be added", () => {
+    const ready: Adding = {
+      name: "Reviewer",
+      roleId: BuiltinRoles.MemberId,
+      setup: setupOfScout,
+      failure: Option.none(),
+      creating: Option.none()
+    }
+    expect(isAddingReady(ready)).toBe(true)
+    expect(isAddingReady({ ...ready, name: "   " })).toBe(false)
+    expect(isAddingReady({ ...ready, setup: { ...setupOfScout, modelConnectionId: "" } })).toBe(false)
+    expect(isAddingReady({ ...ready, setup: { ...setupOfScout, modelId: " " } })).toBe(false)
+  })
+
+  it("tells the agent the person added by who made it, the name it was sent under, and that it was not there before", () => {
+    const creating = { name: "Reviewer", knownAgentIds: [agentId], isWritten: false }
+    const listedAfter = {
+      ...opened,
+      agents: [scoutAgent, reviewerAgent].map((agent) => ({ agent, pending: false })),
+      members: [alice, bob, scout, reviewer]
+    }
+    expect(findCreatedAgent(listedAfter, creating)).toEqual(Option.some({ agent: reviewerAgent, pending: false }))
+    expect(findCreatedAgent(listedAfter, { ...creating, name: "Builder" })).toEqual(Option.none())
+    expect(findCreatedAgent(listedAfter, { ...creating, knownAgentIds: [agentId, reviewerAgent.id] })).toEqual(
+      Option.none()
+    )
+    expect(findCreatedAgent({ ...listedAfter, memberId: bob.id }, creating)).toEqual(Option.none())
+    expect(findCreatedAgent({ ...listedAfter, members: [alice, bob, scout] }, creating)).toEqual(Option.none())
+  })
+
+  it("lets only a person with the permission to remove members remove an agent", () => {
+    expect(mayRemove(opened, scoutAgent)).toBe(true)
+    expect(mayRemove({ ...opened, ...agentsOf(bob.id, [bobIsMember]) }, scoutAgent)).toBe(false)
+  })
+
+  it("is busy only while a request from the dialog is on its way, until the store keeps it", () => {
+    expect(isDialogBusy(listed)).toBe(false)
+    expect(isDialogBusy(sendingAdding)).toBe(true)
+    expect(
+      isDialogBusy(
+        modifyFields(sendingAdding, {
+          adding: Option.map((open) => ({
+            ...open,
+            creating: Option.map(open.creating, (sent) => ({ ...sent, isWritten: true }))
+          }))
+        })
+      )
+    ).toBe(false)
+    expect(isDialogBusy(removingAgent(true))).toBe(true)
+    expect(isDialogBusy(removingAgent(false))).toBe(false)
   })
 })

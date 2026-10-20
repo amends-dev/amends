@@ -1,24 +1,29 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import type { Identity } from "@amends-dev/core/identity"
+import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import { modifyFields } from "foldkit/struct"
+import * as Update from "foldkit/update"
 import * as AgentSetup from "../../agentSetup.ts"
 import { Integrations } from "../connections/definition.ts"
-import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
-import { AgentsComposition } from "./composition.ts"
+import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "./command.ts"
+import { AgentsComposition, DialogBinding, leaveDialog } from "./composition.ts"
 import {
   type Adding,
   type AgentAction,
+  AgentsDefinition,
   checkSetup,
   type Edit,
   type Failure,
-  failureMessage,
+  findCreatedAgent,
   findEdit,
   findListedAgent,
+  isAddingReady,
   isNameChanged,
   isSetupChanged,
   mayConfigure,
+  mayRemove,
   Message,
   type Model,
   nameDraftOf,
@@ -27,6 +32,7 @@ import {
   OfferedModels,
   OutMessage,
   Reason,
+  type Removing,
   SetupTarget,
   setupDraftOf,
   Written
@@ -60,6 +66,10 @@ const unlessAbout = (action: AgentAction) => Option.filter((failure: Failure) =>
 /** The model with the form that adds an agent as `change` makes it, while one is open. */
 const atAdding = (model: Model, change: (adding: Adding) => Adding): Model =>
   modifyFields(model, { adding: Option.map(change) })
+
+/** The model with the confirmation that removes an agent as `change` makes it, while one is open. */
+const atRemoving = (model: Model, change: (removing: Removing) => Removing): Model =>
+  modifyFields(model, { removing: Option.map(change) })
 
 /** The model with the setup of `target` as `change` makes it, wanting nothing yet, while its form is there. */
 const atSetup = (model: Model, target: SetupTarget, change: (setup: AgentSetup.Draft) => AgentSetup.Draft): Model =>
@@ -105,12 +115,40 @@ const blankAdding: Adding = {
   name: "",
   roleId: BuiltinRoles.MemberId,
   setup: AgentSetup.empty,
-  failure: Option.none()
+  failure: Option.none(),
+  creating: Option.none()
 }
 
-/** Send the form that adds an agent as an action, or keep it open with the parts of its setup that can't be saved as they are. */
+/** Ask for the dialog on a blank form that adds an agent. */
+const openAdding = AgentsDefinition.stepFields(() => ({
+  adding: () => Option.some(blankAdding),
+  removing: () => Option.none()
+}))
+
+/** Ask for the dialog on the confirmation that removes `agentId`, which is called `name` now. */
+const openRemoving = (agentId: Identity.AgentId, name: string) =>
+  AgentsDefinition.stepFields(() => ({
+    adding: () => Option.none(),
+    removing: () => Option.some({ agentId, name, isSending: false, failure: Option.none() })
+  }))
+
+/** Ask for the models of the connection `connectionId` unless they are loaded or on their way. */
+const askForModelsOnceStep = (connectionId: string) =>
+  AgentsDefinition.step((model: Model) => askForModelsOnce(model, connectionId))
+
+/** Close the dialog, whose form or confirmation is done with. */
+const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
+
+/**
+ * Send the form that adds an agent as an action, or keep it open with the parts of its setup that can't be saved
+ * as they are. A form that wants a name or a model, or is on its way already, sends nothing.
+ */
 const submitAdding = (model: Model, adding: Adding) => {
   const { workspaceId, memberId } = model
+
+  if (!isAddingReady(adding) || Option.isSome(adding.creating)) {
+    return { model }
+  }
 
   return Result.match(checkSetup(model, adding.setup), {
     onFailure: (problems) => ({
@@ -121,7 +159,17 @@ const submitAdding = (model: Model, adding: Adding) => {
       )
     }),
     onSuccess: (configuration) => ({
-      model: modifyFields(model, { adding: () => Option.none() }),
+      model: atAdding(model, (open) =>
+        modifyFields(open, {
+          failure: () => Option.none(),
+          creating: () =>
+            Option.some({
+              name: adding.name.trim(),
+              knownAgentIds: model.agents.map(({ agent }) => agent.id),
+              isWritten: false
+            })
+        })
+      ),
       commands: [
         CreateAgent({
           workspaceId,
@@ -134,6 +182,32 @@ const submitAdding = (model: Model, adding: Adding) => {
     })
   })
 }
+
+/** Ask to remove the agent the confirmation names, unless its request is on its way or the agent is gone. */
+const submitRemoval = (model: Model) =>
+  Option.match(model.removing, {
+    onNone: () => ({ model }),
+    onSome: ({ agentId, isSending }) =>
+      Option.match(findListedAgent(model, agentId), {
+        onNone: () => ({ model }),
+        onSome: ({ agent }) =>
+          isSending
+            ? { model }
+            : {
+                model: atRemoving(model, (removing) =>
+                  modifyFields(removing, { isSending: () => true, failure: () => Option.none() })
+                ),
+                commands: [
+                  RemoveAgent({
+                    workspaceId: model.workspaceId,
+                    memberId: model.memberId,
+                    agentId,
+                    removeMemberId: agent.memberId
+                  })
+                ]
+              }
+      })
+  })
 
 /** Send the name the person typed for `agentId` as an action, when there is a new one to save and nothing else is being saved. */
 const submitName = (model: Model, agentId: Identity.AgentId) =>
@@ -198,30 +272,20 @@ const submitSetup = (model: Model, agentId: Identity.AgentId) =>
     }
   })
 
-/** The model once the store kept the action `written`: what the person entered for it is done with. */
-const keep = (model: Model, written: Written): Model =>
-  Written.match(written, {
-    Create: () => modifyFields(model, { notice: () => Option.none() }),
-    Rename: ({ agentId }) =>
-      modifyFields(
-        atEdit(model, agentId, (edit) =>
-          modifyFields(edit, { name: () => Option.none(), saving: () => Option.none(), failure: () => Option.none() })
-        ),
-        { notice: () => Option.none() }
-      ),
-    Configure: ({ agentId }) =>
-      modifyFields(
-        atEdit(model, agentId, (edit) =>
-          modifyFields(edit, { setup: () => Option.none(), saving: () => Option.none(), failure: () => Option.none() })
-        ),
-        { notice: () => Option.none() }
-      )
-  })
+/** The model with the edit of `agentId` as `change` makes it, once the store has kept the action it was for, so that no failure of an earlier read or write is left to show. */
+const keepEdit = (model: Model, agentId: Identity.AgentId, change: (edit: Edit) => Edit): Model =>
+  modifyFields(atEdit(model, agentId, change), { notice: () => Option.none() })
 
 /** The model once the action `written` could not be made, for `reason`: said under the form that made it. */
 const refuse = (model: Model, written: Written, reason: Reason): Model =>
   Written.match(written, {
-    Create: () => modifyFields(model, { notice: () => Option.some(failureMessage({ action: "Create", reason })) }),
+    Create: () =>
+      atAdding(model, (adding) =>
+        modifyFields(adding, {
+          creating: () => Option.none(),
+          failure: () => Option.some({ action: "Create" as const, reason })
+        })
+      ),
     Rename: ({ agentId }) =>
       atEdit(model, agentId, (edit) =>
         modifyFields(edit, {
@@ -235,11 +299,94 @@ const refuse = (model: Model, written: Written, reason: Reason): Model =>
           saving: () => Option.none(),
           failure: () => Option.some({ action: "Configure" as const, reason })
         })
+      ),
+    Remove: () =>
+      atRemoving(model, (removing) =>
+        modifyFields(removing, {
+          isSending: () => false,
+          failure: () => Option.some({ action: "Remove" as const, reason })
+        })
       )
   })
 
-export const update = AgentsComposition.makeUpdate((model, message) =>
-  Message.match(message, {
+export const update = AgentsComposition.makeUpdate((model, message) => {
+  /**
+   * Finish adding an agent once the store has kept the action and has listed the agent it made: close the dialog,
+   * ask for the models the agent's page shows, and report the agent for the page to open.
+   */
+  const finishAdding = (current: typeof model) =>
+    Option.match(
+      Option.flatMap(current.adding, ({ creating }) =>
+        Option.flatMap(creating, (sent) => findCreatedAgent(current, sent))
+      ),
+      {
+        onNone: () => ({ model: current }),
+        onSome: ({ agent }) =>
+          pipe(
+            Update.combine(current, [askForModelsOnceStep(agent.model.connectionId), closeDialog]),
+            Update.withOutMessage(OutMessage.CreatedAgent({ agentId: agent.id, name: nameOfAgent(current, agent) }))
+          )
+      }
+    )
+
+  /**
+   * Close the confirmation that removes an agent the workspace no longer lists, when it was removed by someone else
+   * and the person's own request is not on its way.
+   */
+  const closeRemovalOfGoneAgent = (current: typeof model) =>
+    Option.exists(
+      current.removing,
+      ({ agentId, isSending }) => !isSending && Option.isNone(findListedAgent(current, agentId))
+    )
+      ? Update.combine(current, [closeDialog])
+      : { model: current }
+
+  /** Open the confirmation that removes `agentId`, where the person may remove it. */
+  const askToRemove = (agentId: Identity.AgentId) =>
+    Option.match(findListedAgent(model, agentId), {
+      onNone: () => ({ model }),
+      onSome: (item) =>
+        mayRemove(model, item.agent) && !item.pending
+          ? Update.combine(model, [openRemoving(agentId, nameOfAgent(model, item.agent)), DialogBinding.requestOpen()])
+          : { model }
+    })
+
+  /** What follows the store keeping the action `written`: what the person entered for it is done with. */
+  const keep = (written: Written) =>
+    Written.match(written, {
+      Create: () =>
+        finishAdding(
+          modifyFields(model, {
+            adding: Option.map((adding) =>
+              modifyFields(adding, { creating: Option.map((sent) => ({ ...sent, isWritten: true })) })
+            ),
+            notice: () => Option.none()
+          })
+        ),
+      Rename: ({ agentId }) => ({
+        model: keepEdit(model, agentId, (edit) =>
+          modifyFields(edit, { name: () => Option.none(), saving: () => Option.none(), failure: () => Option.none() })
+        ),
+        outMessage: OutMessage.SavedName()
+      }),
+      Configure: ({ agentId }) => ({
+        model: keepEdit(model, agentId, (edit) =>
+          modifyFields(edit, { setup: () => Option.none(), saving: () => Option.none(), failure: () => Option.none() })
+        ),
+        outMessage: OutMessage.SavedSetup()
+      }),
+      Remove: ({ agentId }) =>
+        Option.match(
+          Option.filter(model.removing, (removing) => removing.agentId === agentId),
+          {
+            onNone: () => ({ model }),
+            onSome: ({ name }) =>
+              pipe(Update.combine(model, [closeDialog]), Update.withOutMessage(OutMessage.RemovedAgent({ name })))
+          }
+        )
+    })
+
+  return Message.match(message, {
     ReceivedAgents: ({ agents, members, connections, roles, workspace, grants }) => {
       const received = modifyFields(model, {
         isLoaded: () => true,
@@ -251,11 +398,10 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
         grants: () => grants
       })
       // What the person changed on the page of an agent no longer there, as one removed, is dropped.
-      return {
-        model: modifyFields(received, {
-          edits: (edits) => edits.filter(({ agentId }) => Option.isSome(findListedAgent(received, agentId)))
-        })
-      }
+      const withoutGone = modifyFields(received, {
+        edits: (edits) => edits.filter(({ agentId }) => Option.isSome(findListedAgent(received, agentId)))
+      })
+      return Option.isSome(withoutGone.adding) ? finishAdding(withoutGone) : closeRemovalOfGoneAgent(withoutGone)
     },
     ReceivedIntegrations: ({ integrations }) => ({
       model: modifyFields(model, { integrations: () => Integrations.Loaded({ integrations }) })
@@ -286,10 +432,7 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
         onSome: ({ agent }) => ({ ...askForModelsOnce(model, agent.model.connectionId), outMessage })
       })
     },
-    ClickedAdd: () => ({
-      model: modifyFields(model, { adding: () => Option.some(blankAdding) }),
-      outMessage: OutMessage.RequestedBrowse()
-    }),
+    ClickedAdd: () => Update.combine(model, [openAdding, DialogBinding.requestOpen()]),
     TypedAddingName: ({ name }) => ({
       model: atAdding(model, (adding) => modifyFields(adding, { name: () => name, failure: () => Option.none() }))
     }),
@@ -298,7 +441,8 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
     }),
     SubmittedAdding: () =>
       Option.match(model.adding, { onNone: () => ({ model }), onSome: (adding) => submitAdding(model, adding) }),
-    ClickedCancelAdding: () => ({ model: modifyFields(model, { adding: () => Option.none() }) }),
+    ClickedRemove: ({ agentId }) => askToRemove(agentId),
+    ConfirmedRemoval: () => submitRemoval(model),
     TypedName: ({ agentId, name }) => ({
       model: Option.match(findListedAgent(model, agentId), {
         onNone: () => model,
@@ -338,7 +482,7 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
     FailedLoadModels: ({ connectionId, error }) => ({
       model: withOffered(model, OfferedModels.Failed({ connectionId, error }))
     }),
-    WroteAction: ({ written }) => ({ model: keep(model, written) }),
+    WroteAction: ({ written }) => keep(written),
     FailedWriteAction: ({ written, reason }) => ({ model: refuse(model, written, reason) })
   })
-)
+})

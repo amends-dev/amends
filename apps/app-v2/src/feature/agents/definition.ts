@@ -2,23 +2,26 @@
  * The workspace's agents, as a section of the sidebar to pick one from, each by its name with how it
  * stands; as a list page, All and those that need setup on a tab each, narrowed by a search, each
  * with its harness and sandbox, its model and connection; as the page of one, where, for a person
- * who may configure it, they rename it and set it up again, and see why it can't run; and adding
- * one, for a person who may, on the harnesses, models, and sandboxes the workspace's connections
- * give. It reports when the person asks to browse and the agent they pick; the workspace page shows
- * the list and the agent's page. An agent's role, and its removal, are its membership's, in the
- * settings. The workspace page lists the host's integrations once and informs the Block of them,
+ * who may configure it, they rename it and set it up again, and see why it can't run, and, for a person
+ * who may remove members, remove it; and adding one, for a person who may, on the harnesses, models,
+ * and sandboxes the workspace's connections give. Adding and removing happen in a dialog the workspace
+ * page lends the shell. The Block reports when the person asks to browse, the agent they pick, and what
+ * they did, which the workspace page shows the list or the agent's page for, and confirms. An agent's
+ * role is its membership's, in the settings. The workspace page lists the host's integrations once and
+ * informs the Block of them,
  * which say what each connection gives, and a model connection lists its models over HTTP as a
  * setup chooses it.
  */
 
 import { Connection as ConnectionContract, type Integration } from "@amends-dev/connection"
 import { Agent, AgentPermissions } from "@amends-dev/core/agent"
-import { Grant, Role } from "@amends-dev/core/authorization"
+import { BuiltinRoles, Grant, Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
-import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { Member, MemberId, MemberPermissions, WorkspaceId } from "@amends-dev/core/workspace"
 import type { Choice } from "@amends-dev/design/control"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
@@ -29,14 +32,14 @@ import * as AgentSetup from "../../agentSetup.ts"
 import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
 import { foldAccents } from "../../seen.ts"
 import { ConnectionItem, connectionItemsGiving, findIntegration, Integrations } from "../connections/definition.ts"
-import { WorkspaceItem } from "../settings/definition.ts"
+import { givableRoles, WorkspaceItem } from "../settings/definition.ts"
 
 /** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
 export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
 export type AgentItem = typeof AgentItem.Type
 
-/** What the person asks of the agents: adding one, renaming one, and setting one up again. */
-export const AgentAction = Schema.Literals(["Create", "Rename", "Configure"])
+/** What the person asks of the agents: adding one, renaming one, setting one up again, and removing one. */
+export const AgentAction = Schema.Literals(["Create", "Rename", "Configure", "Remove"])
 export type AgentAction = typeof AgentAction.Type
 
 /**
@@ -62,21 +65,48 @@ export type Failure = typeof Failure.Type
 export const Written = defineTaggedUnion({
   Create: { name: Schema.String },
   Rename: { agentId: Identity.AgentId },
-  Configure: { agentId: Identity.AgentId }
+  Configure: { agentId: Identity.AgentId },
+  Remove: { agentId: Identity.AgentId }
 })
 export type Written = typeof Written.Type
 
 /**
- * The form that adds an agent: the name it starts with, the role it starts with, how it is set up, and why the
- * last attempt to add it failed.
+ * An agent being added, once its form is sent: the name it was sent under and which agents the workspace had
+ * then, so that the one the store makes is told from the others, and whether the store has kept the action. The
+ * dialog stays on it until the new agent is listed.
+ */
+export const Creating = Schema.Struct({
+  name: Schema.String,
+  knownAgentIds: Schema.Array(Identity.AgentId),
+  isWritten: Schema.Boolean
+})
+export type Creating = typeof Creating.Type
+
+/**
+ * The form that adds an agent, in the dialog: the name it starts with, the role it starts with, how it is set up,
+ * why the last attempt to add it failed, and, while one is on its way, that attempt.
  */
 export const Adding = Schema.Struct({
   name: Schema.String,
   roleId: Role.RoleId,
   setup: AgentSetup.Draft,
-  failure: Schema.Option(Failure)
+  failure: Schema.Option(Failure),
+  creating: Schema.Option(Creating)
 })
 export type Adding = typeof Adding.Type
+
+/**
+ * The confirmation, in the dialog, that removes an agent: which, by the name it had when the person asked, since
+ * its membership leaving the workspace takes its name from the list; whether the request is on its way; and why the
+ * last one failed.
+ */
+export const Removing = Schema.Struct({
+  agentId: Identity.AgentId,
+  name: Schema.String,
+  isSending: Schema.Boolean,
+  failure: Schema.Option(Failure)
+})
+export type Removing = typeof Removing.Type
 
 /**
  * What the person has changed on an agent's page and not saved: the name they typed, the setup they edited, the
@@ -111,9 +141,9 @@ export type BrowseTab = typeof BrowseTab.Type
 /**
  * The workspace's agents, once they are read, and the members they are, the connections they run on and the
  * integrations that say what those give, the roles and the workspace that say which role a new
- * agent may start with, what the person may do, the list page's tab and search, the form that adds
- * an agent, what they changed on the agents' pages, the models the connections offer, and why the
- * last read or write failed.
+ * agent may start with, what the person may do, the list page's tab and search, the dialog and what it is
+ * for, adding an agent or confirming one's removal, what they changed on the agents' pages, the models the
+ * connections offer, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -127,7 +157,9 @@ export const Model = Schema.Struct({
   workspace: Schema.Option(WorkspaceItem),
   grants: Schema.Array(Grant.Grant),
   browse: Schema.Struct({ tab: BrowseTab, query: Schema.String }),
+  dialog: DialogBlock.Model,
   adding: Schema.Option(Adding),
+  removing: Schema.Option(Removing),
   edits: Schema.Array(Edit),
   offered: Schema.Array(OfferedModels),
   notice: Schema.Option(Schema.String)
@@ -155,7 +187,8 @@ export const Message = defineMessageUnion({
   TypedAddingName: { name: Schema.String },
   ChoseRole: { roleId: Role.RoleId },
   SubmittedAdding: {},
-  ClickedCancelAdding: {},
+  ClickedRemove: { agentId: Identity.AgentId },
+  ConfirmedRemoval: {},
   TypedName: { agentId: Identity.AgentId, name: Schema.String },
   SubmittedName: { agentId: Identity.AgentId },
   SubmittedSetup: { agentId: Identity.AgentId },
@@ -175,13 +208,17 @@ export type Message = typeof Message.Type
 
 /**
  * What the Block asks of the workspace page: to list the integrations again, once the host could not be reached;
- * to show the agents, which the sidebar's title and Browse and the form Add opens ask; and to open the agent
- * picked.
+ * to show the agents, which the sidebar's title and Browse ask; to open the agent picked; and to confirm to the
+ * person what they did, with the page of the agent that was added opening and the list showing once one is removed.
  */
 export const OutMessage = defineMessageUnion({
   RequestedIntegrations: {},
   RequestedBrowse: {},
-  OpenedAgent: { agentId: Identity.AgentId }
+  OpenedAgent: { agentId: Identity.AgentId },
+  SavedName: {},
+  SavedSetup: {},
+  CreatedAgent: { agentId: Identity.AgentId, name: Schema.String },
+  RemovedAgent: { name: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -219,6 +256,10 @@ export const connectionName = (model: Pick<Model, "connections">, connectionId: 
 /** Whether the person may rename the agent and change how it is set up. */
 export const mayConfigure = (model: Pick<Model, "workspaceId" | "grants">, agent: AgentItem["agent"]): boolean =>
   may(model.grants, AgentPermissions.Configure, memberTarget(model.workspaceId, agent.memberId))
+
+/** Whether the person may remove the agent, which ends its membership. */
+export const mayRemove = (model: Pick<Model, "workspaceId" | "grants">, agent: AgentItem["agent"]): boolean =>
+  may(model.grants, MemberPermissions.Remove, memberTarget(model.workspaceId, agent.memberId))
 
 /** Whether the person may create agents, which they need a connection that gives models to run on to do. */
 export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean =>
@@ -376,13 +417,15 @@ export const problemsOf = (failure: Option.Option<Failure>): ReadonlyArray<Agent
 const invalidMessages: Readonly<Record<AgentAction, string>> = {
   Create: "Check the name, instructions, and model, then try again.",
   Rename: "Use 1 to 80 characters, with no invisible ones.",
-  Configure: "Check the instructions and model, then save again."
+  Configure: "Check the instructions and model, then save again.",
+  Remove: "That change isn't possible."
 }
 
 const unwritableMessages: Readonly<Record<AgentAction, string>> = {
   Create: "The agent couldn't be created. Try again when the host is available.",
   Rename: "The name couldn't be saved. Try again when the host is available.",
-  Configure: "The setup couldn't be saved. Try again when the host is available."
+  Configure: "The setup couldn't be saved. Try again when the host is available.",
+  Remove: "The agent couldn't be removed. Try again when the host is available."
 }
 
 /** What a failure says under the form that made it, for the action it belongs to. */
@@ -442,3 +485,44 @@ const unavailableChoice = (model: Pick<Model, "connections" | "integrations">, c
       }
     ]
   })
+
+/** A role a new agent may start with, and whether the person may give it. */
+export type StartingRole = Readonly<{ role: Role.Role; isGivable: boolean }>
+
+/**
+ * The roles a new agent may start with: Member, and Administrator, which only the owner gives. Owner passes by
+ * transfer alone, so it is not offered.
+ */
+export const startingRoles = (model: Pick<Model, "roles" | "workspace" | "memberId">): ReadonlyArray<StartingRole> => {
+  const givable = givableRoles(model)
+
+  return model.roles
+    .filter(({ id }) => id === BuiltinRoles.MemberId || id === BuiltinRoles.AdministratorId)
+    .map((role) => ({ role, isGivable: givable.some(({ id }) => id === role.id) }))
+}
+
+/** Whether the form that adds an agent has what an agent needs to be made: a name, a role, and a model. */
+export const isAddingReady = ({ name, roleId, setup }: Adding): boolean =>
+  name.trim() !== "" && roleId !== "" && setup.modelConnectionId !== "" && setup.modelId.trim() !== ""
+
+/** Whether a request from the dialog is on its way, so that closing it must wait to show how it ends. */
+export const isDialogBusy = (model: Pick<Model, "adding" | "removing">): boolean =>
+  Option.exists(model.adding, ({ creating }) => Option.exists(creating, ({ isWritten }) => !isWritten)) ||
+  Option.exists(model.removing, ({ isSending }) => isSending)
+
+/**
+ * The agent the person added, once it is listed: one they made under the name they sent that the workspace did not
+ * have when they sent the form.
+ */
+export const findCreatedAgent = (
+  model: Pick<Model, "agents" | "members" | "memberId">,
+  creating: Creating
+): Option.Option<AgentItem> =>
+  Option.fromUndefinedOr(
+    listedAgents(model).find(
+      ({ agent }) =>
+        agent.createdBy === model.memberId &&
+        !creating.knownAgentIds.includes(agent.id) &&
+        nameOfAgent(model, agent) === creating.name
+    )
+  )

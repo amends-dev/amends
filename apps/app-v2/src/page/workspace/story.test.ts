@@ -1,3 +1,4 @@
+import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
@@ -12,17 +13,26 @@ import {
   design,
   general,
   keylessConnection,
+  membership,
   notificationOf,
   now,
+  offered,
   opening,
   reply,
+  reviewer,
+  reviewerAgent,
+  scout,
   scoutAgent,
   support,
   task,
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { ActionsBlock } from "../../feature/actions/block.ts"
+import { ExpireConfirmation } from "../../feature/actions/command.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
+import { LoadModels } from "../../feature/agents/command.ts"
+import { Written as AgentWritten } from "../../feature/agents/definition.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
@@ -69,6 +79,62 @@ const otherGroupId = GroupId.GroupId.make("design")
 const opened = init(workspaceId, memberId, "Studio", "Split").model
 
 const unreachable = "The host could not be reached. Try again."
+
+const agentId = scoutAgent.id
+
+const models = keylessConnection("models-1", "test-models", "Models")
+
+/** The model with the dialog of the agents open. */
+const openAgentsDialog = (model: typeof opened) =>
+  modifyFields(model, {
+    agents: (agents) => modifyFields(agents, { dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }) })
+  })
+
+/** The agents as alice reads them, scout among them. */
+const readAgents = (agents: typeof opened.agents) =>
+  modifyFields(agents, {
+    isLoaded: () => true,
+    agents: () => [{ agent: scoutAgent, pending: false }],
+    members: () => [membership.member, bob, scout]
+  })
+
+/** Scout's page open among the agents alice reads. */
+const withAgentPage = modifyFields(opened, { open: () => Open.Agent({ agentId }), agents: readAgents })
+
+/** The form that adds Reviewer sent, and stored, among the agents alice reads, in the dialog. */
+const addingAgent = openAgentsDialog(
+  modifyFields(opened, {
+    agents: (agents) =>
+      modifyFields(readAgents(agents), {
+        adding: () =>
+          Option.some({
+            name: "Reviewer",
+            roleId: BuiltinRoles.MemberId,
+            setup: {
+              instructions: "",
+              harness: "",
+              modelConnectionId: "models-1",
+              modelId: "test-model",
+              effort: "",
+              sandbox: ""
+            },
+            failure: Option.none(),
+            creating: Option.some({ name: "Reviewer", knownAgentIds: [agentId], isWritten: true })
+          })
+      })
+  })
+)
+
+/** The confirmation that removes scout, sent, in the dialog, over scout's page. */
+const removingAgent = openAgentsDialog(
+  modifyFields(opened, {
+    open: () => Open.Agent({ agentId }),
+    agents: (agents) =>
+      modifyFields(readAgents(agents), {
+        removing: () => Option.some({ agentId, name: "Scout", isSending: true, failure: Option.none() })
+      })
+  })
+)
 
 /** The state of the integrations in the connections, the agents, and the channels. */
 const integrationsOf = (model: typeof opened) => [
@@ -328,7 +394,6 @@ describe("a workspace", () => {
       Message.ClickedWorkspace(),
       Message.ClickedMembers(),
       fromAgents(AgentsBlock.Message.ClickedBrowse()),
-      fromAgents(AgentsBlock.Message.ClickedAdd()),
       fromAgents(AgentsBlock.Message.ClickedAgent({ agentId: scoutAgent.id })),
       fromConnections(ConnectionsBlock.Message.ClickedBrowse()),
       fromConnections(ConnectionsBlock.Message.ClickedAdd()),
@@ -394,9 +459,83 @@ describe("a workspace", () => {
         expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
       }),
       message(fromAgents(AgentsBlock.Message.ClickedAdd())),
+      dialogShown,
+      model((model) => {
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+        expect(model.agents.dialog.isOpen).toBe(true)
+      })
+    )
+  })
+
+  it("confirms to the person in a toast that they saved an agent's name or setup, and stays on its page", () => {
+    story(
+      update,
+      given(withAgentPage),
+      message(fromAgents(AgentsBlock.Message.WroteAction({ written: AgentWritten.Rename({ agentId }) }))),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Name saved" }])
+        expect(model.open).toEqual(Open.Agent({ agentId }))
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      message(fromAgents(AgentsBlock.Message.WroteAction({ written: AgentWritten.Configure({ agentId }) }))),
+      Command.expectExact(ExpireConfirmation({ id: 2 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Setup saved" }])
+        expect(model.open).toEqual(Open.Agent({ agentId }))
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([])
+      })
+    )
+  })
+
+  it("confirms an agent added in a toast and opens its page once the store lists it, closing the dialog", () => {
+    story(
+      update,
+      given(addingAgent),
+      message(
+        fromAgents(
+          AgentsBlock.Message.ReceivedAgents({
+            agents: [scoutAgent, reviewerAgent].map((agent) => ({ agent, pending: false })),
+            members: [membership.member, bob, scout, reviewer],
+            connections: [{ connection: models, pending: false }],
+            roles: [],
+            workspace: Option.none(),
+            grants: []
+          })
+        )
+      ),
+      Command.expectHas(
+        Dialog.test.CloseDialog,
+        ExpireConfirmation({ id: 1 }),
+        LoadModels({ workspaceId, connectionId: models.id })
+      ),
+      model((model) => {
+        expect(model.open).toEqual(Open.Agent({ agentId: reviewerAgent.id }))
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Reviewer created" }])
+        expect(model.agents.adding).toEqual(Option.none())
+      }),
+      dialogClosed,
+      Command.resolve(LoadModels, AgentsBlock.Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
+    )
+  })
+
+  it("confirms an agent removed in a toast and shows the list of agents, closing the dialog", () => {
+    story(
+      update,
+      given(removingAgent),
+      message(fromAgents(AgentsBlock.Message.WroteAction({ written: AgentWritten.Remove({ agentId }) }))),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
       model((model) => {
         expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
-      })
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Scout removed" }])
+        expect(model.agents.removing).toEqual(Option.none())
+      }),
+      dialogClosed,
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
     )
   })
 

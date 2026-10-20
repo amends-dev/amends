@@ -6,7 +6,11 @@ import { sidebar, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } fr
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { agentView, sidebarView as agentsSidebarView } from "../../feature/agents/view.ts"
+import {
+  agentView,
+  dialogView as agentsDialogView,
+  sidebarView as agentsSidebarView
+} from "../../feature/agents/view.ts"
 import { sidebarView as connectionsSidebarView } from "../../feature/connections/view.ts"
 import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
@@ -265,8 +269,9 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
 /**
  * The open workspace on the shell: the rail of destinations, the sidebar, the main pane, the thread's side pane,
  * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
- * pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, and of the search,
- * which the shell keeps in the frame whether or not the sidebar or the page that opens them is on the page.
+ * pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, of the agents, for
+ * adding one or confirming its removal, and of the search, which the shell keeps in the frame whether or not the
+ * sidebar or the page that opens them is on the page.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   const { now } = inputs
@@ -307,6 +312,14 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     },
     dialogs: [
       h.block(GroupsBinding.embedView({ slotId: "groups-dialog", model: model.groups, view: dialogView })),
+      h.block(
+        AgentsBinding.embedView({
+          slotId: "agents-dialog",
+          model: model.agents,
+          view: agentsDialogView,
+          viewInputs: { workspaceName: nameOf(model) }
+        })
+      ),
       h.block(SearchBinding.embedView({ slotId: "search", model: model.search }))
     ]
   })

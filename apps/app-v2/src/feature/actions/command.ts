@@ -16,3 +16,12 @@ export const Dismiss = ActionsDefinition.command("Dismiss", {
         .pipe(Effect.ignore, Effect.as(Message.CompletedDismiss()))
   }
 })
+
+/** Wait five seconds, then report that the confirmation `id` has had its time. */
+export const ExpireConfirmation = ActionsDefinition.command("ExpireConfirmation", {
+  args: { id: Schema.Finite },
+  messages: [Message.ExpiredConfirmation],
+  handler: function* () {
+    return ({ id }) => Effect.sleep("5 seconds").pipe(Effect.as(Message.ExpiredConfirmation({ id })))
+  }
+})
