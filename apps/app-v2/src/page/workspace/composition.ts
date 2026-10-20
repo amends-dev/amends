@@ -11,6 +11,7 @@ import { ActionsBlock } from "../../feature/actions/block.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
+import { connectionsToast } from "../../feature/connections/wording.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
@@ -187,13 +188,25 @@ const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
 
 /**
  * Asking to browse the connections shows the list as any destination is gone to, picking one opens its page, and
- * asking to browse the channels shows them. Asking again for the integrations lists them again.
+ * asking to browse the channels shows them. Asking again for the integrations lists them again. What the person did to
+ * a connection is confirmed to them in a toast: saving its name or its settings, replacing its key, adding one, which
+ * opens its page, and removing one, which shows the list.
  */
 const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
   RequestedIntegrations: () => loadIntegrationsAgain,
   RequestedBrowse: () => goTo(showConnections),
   OpenedConnection: ({ connectionId }) => goTo(showConnection(connectionId)),
-  RequestedChannels: () => goTo(showChannels)
+  RequestedChannels: () => goTo(showChannels),
+  SavedName: () => ActionsBinding.confirm({ text: connectionsToast.nameSaved }),
+  SavedSettings: () => ActionsBinding.confirm({ text: connectionsToast.settingsSaved }),
+  ReplacedKey: () => ActionsBinding.confirm({ text: connectionsToast.keyReplaced }),
+  CreatedConnection: ({ connectionId, name }) =>
+    Update.combine([
+      ActionsBinding.confirm({ text: connectionsToast.created(name) }),
+      goTo(showConnection(connectionId))
+    ]),
+  RemovedConnection: ({ name }) =>
+    Update.combine([ActionsBinding.confirm({ text: connectionsToast.removed(name) }), goTo(showConnections)])
 })
 
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */

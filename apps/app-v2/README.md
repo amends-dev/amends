@@ -13,8 +13,8 @@ which marks it seen, or to mark all of them seen at once; the tasks they can see
 open one, as a table to narrow by assignee, by status, and by search, each to open in its group; and a
 search for anything in the workspace, groups, threads, and people, from the sidebar or from the keyboard;
 the workspace's settings, its name and their own, its members and their roles,
-and its invitations; the workspace's connections to the integrations the host installs, to add,
-rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, and a
+and its invitations; the workspace's connections to the integrations the host installs, each with a
+page of its own, to add, check, rename, set up, replace the key of, and remove; its agents, each with how ready it is and what it runs on, and a
 page of its own, to add, rename, set up again, and remove; and its channels, which bring in conversations from them, to add,
 send to another group, and remove. A reply or a new thread they have not sent is kept as a draft in
 their browser, through a reload and offline, until they send it. While the host can be reached, a
@@ -54,7 +54,7 @@ outside a workspace are composed from it: the root view frames the sign-in page 
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, rows, and the modal that creates a workspace or joins one from the design's `centered`, `control`, `form`, `directory`, `pane` (its empty state), `toast`, and `modal` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
-and the pane of each destination, `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations, `feature/groups` the pane where the
+and the pane of each destination, `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations and the modals they open, `feature/groups` the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
 a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. The panes that read or are filled in, the settings, the connections,
@@ -104,20 +104,24 @@ line of what it is for, and a secondary button to change it, which a `form` of a
 and a quiet Cancel replaces while the person does; the members and the invitations waiting are
 `entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
 quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its email and role. The
-connections and the channels are each a `paneColumn` of what failed, the list, and the
-form open among it, and so are the agents without the form, which is a `modal`: the list is an `entryList` of `entry`s, or a `paneEmpty` that says what adding
-one does, and the form is a `paneForm` titled as the form is named, holding the design's fields,
-selects, switches, and textarea, its failure as a `notice`, and a `buttonRow` of its submit and a
-quiet Cancel, which holds "Adding…" or "Replacing…" in place of the submit while the
-host answers. Adding is the secondary button among the header's actions, shown only when the person
-may, the host's integrations are listed, and a connection gives what the thing needs; the line
-that says the integrations are loading, or that no connection gives models or channels, is a
-`hint` in the body, and a failure to list them a `notice` over a quiet Try again in a `column`. Each
-connection is an entry of its name, its integration and how ready it is as `badge`s, a hint of why it can't be
-used, what its last check found, and its quiet buttons; each agent a `row` under `columns` of its lilac mark with
+channels are a `paneColumn` of what failed, the list, and the form open among it: the list is an `entryList` of
+`entry`s, or a `paneEmpty` that says what adding one does, and the form is a `paneForm` titled as the form is
+named, holding the design's fields, selects, switches, and textarea, its failure as a `notice`, and a
+`buttonRow` of its submit and a quiet Cancel, which holds "Adding…" in place of the submit while the host
+answers. Adding is the secondary button among the header's actions, shown only when the person may, the host's
+integrations are listed, and a connection gives what the thing needs; the line that says the integrations are
+loading, or that no connection gives channels, is a `hint` in the body, and a failure to list them a `notice`
+over a quiet Try again in a `column`. The agents are a list and pages, and their adding and removing a `modal`: each
+agent a `row` under `columns` of its lilac mark with
 the patch of how it stands, its name, its harness over its sandbox, and its model over its connection, and
 an agent's own page a `paneColumn` of a `noticeBox` for why it can't run, the `form` of its name, the `paneForm`
-of its setup under a stitch, and a `paneSection` of its `detailList`; each channel an entry of its name, a badge when it opens tasks, a hint of where its
+of its setup under a stitch, and a `paneSection` of its `detailList`. The connections are a list and pages the
+same way, and their adding, key replacing, and removing a `modal`: each connection a `row` under `columns` of a
+drawing of the connections icon on its mark with the patch of how it stands, its name over its integration and
+what it gives, and how it authenticates as a cell, and a connection's own page a `paneColumn` of a `noticeBox` for
+why it can't be used, a Check `paneSection` whose result is a `noticeBox` in a live region, the `form` of its name,
+the `paneForm` of its integration's settings under a stitch, and `paneSection`s of how it authenticates, of its
+`detailList`, which links its integration's documentation with `link`, and of its removal; each channel an entry of its name, a badge when it opens tasks, a hint of where its
 conversations come from and open, and its quiet buttons. The group's settings are the design's
 `modal` of `paneTabs`: the General tab is a `field` for the team's name with a `hint`, and a
 `settingRow` each for the visibility and the person's membership, with Leave or Join as its action; the
@@ -384,36 +388,78 @@ the pages that compose them; the root composes the pages.
   waiting, the section says so. The invite form's email field does not take focus, since the form is there as the page opens.
   It reports nothing: the workspace page reads the workspace's name from it, so a rename shows in the
   page's sidebar and home pane.
-- `feature/connections`: the workspace's connections, each by its name with its integration and how
-  ready it is, as the store holds it, marked as sending while a change to it is on its way. The
-  host's integrations are listed by the workspace page, once, which informs the Block of them or of
-  why they could not be reached; the person then asks again, and the Block asks the page, by its out
-  message `RequestedIntegrations`. Where they may manage a connection, they rename it, change its
-  settings by the form its integration gives, replace its key, check it with its system, which says
-  whether it answers and accepts the key, and remove it; where they may create connections, they add
-  one to an integration, choosing a name, how it authenticates, a key when it takes one, and its
-  settings. Renaming, changing the settings, and removing are actions written to the store; adding a
-  connection, replacing a key, and checking go over HTTP, since a key never enters an action. A form
-  about a connection that is gone closes. `connectionItemsGiving` lists the connections whose
-  integration gives a capability, from the connections and integrations a Model keeps, and
-  `connectionsGiving` names them, for the agents and channels features to choose among. The Block's
-  `sidebarView`, which the page puts in the sidebar for the Connections and Channels destinations,
-  has a section for each thing a connection gives, Models, Tools, Sandboxes, and Harnesses, listing
-  the connections whose integration gives it, so one that gives two is in both, then a last
-  section, Channels. A connection is a row on the connections icon, with its status as a shape at the
-  end of the row, named after the status and with it on hover: Needs setup, a caution triangle, with
-  why, when it can't be used, and Unavailable, a danger square with a bar, when its integration
-  isn't installed on this host (such a connection gives nothing the sidebar can tell, so it is in no
-  section while the Connections pane lists it); a connection that is ready shows nothing, and so
-  does one still on its way, which says "Sending…". Each section has a title that opens the
-  connections, Browse ("Browse models"), and, where the person may add a connection and the host
-  listed its integrations, Add ("Add model connection"), which opens the form in the connections
-  pane, the same one for every section. Channels has the title and Browse, which open the channels
-  and mark the title current while they show (the view input `isChannelsOpen`), and no Add. A
-  section with no connections says "None yet" only once the connections are read (`isLoaded`) and
-  the integrations are listed. The Block reports `RequestedBrowse` for the titles, Browse, and Add,
-  `OpenedConnection` for a connection picked, and `RequestedChannels` for the channels; the page
-  shows the connections or the channels for them.
+- `feature/connections`: the workspace's connections, as the store holds them, once the store has
+  answered (`isLoaded`, which keeps "No connections yet" from showing before), marked as sending while a
+  change to one is on its way; the members who made them, and what the person may do. The host's
+  integrations are listed by the workspace page, once, which informs the Block of them or of why they
+  could not be reached; the person then asks again, and the Block asks the page, by its out message
+  `RequestedIntegrations`, which Refresh asks too, where what the person sees is out of date. The Block has four
+  views. Its `sidebarView`, which the page puts in the sidebar for the Connections, Connection, and Channels
+  destinations, has a section for each thing a connection gives, Models, Tools, Sandboxes, and Harnesses, listing
+  the connections whose integration gives it, so one that gives two is in both, then a last section, Channels. A
+  connection is a row on the connections icon, with its status as a shape at the end of the row, named after the
+  status and with it on hover: Needs setup, a caution triangle, with why, when it can't be used, and
+  Unavailable, a danger square with a bar, when its integration isn't installed on this host (such a connection
+  gives nothing the sidebar can tell, so it is in no section while the list shows it); a connection that is ready
+  shows nothing, and so does one still on its way, which says "Sending…". The row of the connection whose page
+  is open is current, in every section it is in. Each section has a title that opens the list on its tab, and is
+  current while the list shows on it, Browse ("Browse models"), which does the same, and, where the person may
+  add a connection and the host listed its integrations, Add ("Add model connection"), which opens the dialog
+  narrowed to what the section gives. Channels has the title and Browse, which open the channels and mark the
+  title current while they show (the view input `isChannelsOpen`), and no Add. A section with no connections says
+  "None yet" only once the connections are read and the integrations are listed. `view` is the list, the
+  main content: All, Models, Tools, Sandboxes, Harnesses, and Channels on a tab each, with how many connections
+  each holds once the connections and integrations are read (`connectionsOnTab`, a connection being on the tab of
+  each thing its integration gives, and on All alone once its integration is not installed), a search that
+  narrows the tab by the name of a connection or of its integration in any case and whatever the accents
+  (`shownConnections`), the labels of its columns, Connection and Authentication, which a phone leaves out, and a
+  row for each: the connections drawing on a mark with the status's patch, the name over the integration and
+  what it gives ("Anthropic · Models", or "Integration not installed"), and how it authenticates ("API key", or
+  "No authentication"). With none it says "No connections yet", and what a person who may add one can do, with
+  the primary Add connection in its body as the header has it; a tab with none says "No sandboxes connections
+  yet." and a search that matches none says what it searched for, with Clear search. `connectionView` is a
+  connection's page, in one column, for the view inputs `connectionId` and `workspaceName`: a note when its
+  integration refuses its setup ("MCP server refuses this setup", with why) or is not installed, which nothing can
+  use the connection for, and no Check then; for a person who may manage it, Check, which asks its system over
+  HTTP whether it answers and accepts the key and shows what it found in place (Working, Key refused, Settings
+  don't work, Couldn't reach it, each with its line, or the integration's own words), and Check again; the
+  connection's name with Save name; the settings its integration asks for, as `settingsFields` draws them, with
+  what the integration says of each and which are optional, with Save settings, which waits for a change and for
+  the settings to be whole, or, once the integration is gone, the settings it saved to read; how it
+  authenticates, "API key saved", whose key is never shown, with Replace key where the person may and its
+  integration is installed, or "No authentication"; its details, the integration with a link to its
+  documentation, what it gives, and who made it and when; and its removal. A person who may not manage the
+  connection reads the same values with nothing to check, save, replace, or remove. A connection the workspace
+  does not list says "This connection isn't here", and offers the list. `dialogView`, which the page lends the
+  shell's `dialogs`, is the one dialog of the Block, which a `DialogBlock` keeps: the integrations to choose among
+  ("Add connection", or "Add model connection" from a section, with the workspace's name, a search that takes the
+  focus, the `modalList` of each integration with what it gives and how it authenticates, and "No integrations
+  available" when the host installs none that does); the form for the integration chosen ("Configure connection",
+  with the integration and what it gives, its name, which starts as the integration's, with the hint "A name
+  your workspace will recognize.", its settings, how it authenticates, a choice when it has several ways, and the
+  masked API key where one is used, with "Stored securely. Once saved, it cannot be viewed or copied.", and Back
+  and Create connection); the dialog that replaces a key ("Replace API key", which says the current key stays until
+  the new one is saved); and the confirmation that removes a connection ("Remove connection?", which says its saved
+  key goes with it, if it has one). Closing the dialog forgets what the person entered, except while a request
+  from it is on its way, when it stays open to show how it ends. Renaming, changing the settings, and removing are
+  actions written to the store, which show under their forms why this browser could not keep them; adding a
+  connection, replacing a key, and checking go over HTTP, since a key never enters an action, and no replica holds
+  what a system answers. `failureOf` maps what each of those calls answers into the reasons the Block tells apart:
+  that the person may not (`Denied`), that what they name is gone (`Gone`), that the host no longer installs the
+  integration (`Uninstalled`), that the integration refuses what it was given, saying why (`Refused`), that the
+  connection takes no key (`Changed`), that the host keeps no keys (`StorageUnavailable`), that what they entered
+  does not hold (`Invalid`), and, of anything else, including a host that could not be reached, that the call
+  failed (`Failed`); `connectionsMessage` words each, for the action under whose form it shows, with Refresh where
+  `needsRefresh` says what the person sees is out of date. Adding sends a request key, a new one for each form and
+  the same one on every retry of it, so that a retry returns the connection the host first made and not a
+  second; a change to the form drops it, and the failure with it. The dialog stays on the connection the host made
+  until the store lists it, then closes, checks it, and reports `CreatedConnection`. The Block's other out
+  messages are `RequestedBrowse`, for the titles, Browse, and the list's tabs, `OpenedConnection` for a connection
+  picked, `RequestedChannels`, `SavedName`, `SavedSettings`, `ReplacedKey`, and `RemovedConnection`; the page shows
+  the list, the connection's page, or the channels, and confirms in a toast (`connectionsToast`). A form about a
+  connection that is gone closes. `connectionItemsGiving` lists the connections whose integration gives a
+  capability, from the connections and integrations a Model keeps, and `connectionsGiving` names them, for the
+  agents and channels features to choose among.
 - `feature/agents`: the workspace's agents, as the store holds them, once the store has answered
   (`isLoaded`, which keeps "No agents yet" from showing before). The Block has four views. Its
   `sidebarView`, which the page puts in the sidebar for the Agents destination, is a section named
@@ -584,8 +630,8 @@ the pages that compose them; the root composes the pages.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
   rail has "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings". Each
   destination is marked while it is open; Home is open while nothing, the inbox, the tasks in triage,
-  every open task, the groups to browse, or a group is, and Connections while the connections or the
-  channels are. Search is no destination: it is never marked, and it sends `ClickedSearch`, as the
+  every open task, the groups to browse, or a group is, and Connections while the connections, one
+  connection, or the channels are. Search is no destination: it is never marked, and it sends `ClickedSearch`, as the
   sidebar's Find anything… does. The rail picks a destination and the sidebar lists its items, so the
   sidebar changes with the rail. The
   sidebar, named by the workspace, has the workspace's name over a button to all workspaces and,
@@ -602,7 +648,8 @@ the pages that compose them; the root composes the pages.
   reads ⌘K on an Apple platform and Ctrl K on any other, the key it names being Command+K or Control+K, by
   the view input `isApplePlatform`. The main pane shows one destination: nothing yet, titled by the
   workspace, the inbox, the tasks in triage, every open task, the groups to browse, the connections,
-  the agents, one agent's page (`Open.Agent`, with the agents Block's `agentView` in the slot `agent`), the
+  the agents, one agent's page (`Open.Agent`, with the agents Block's `agentView` in the slot `agent`), one
+  connection's page (`Open.Connection`, with the connections Block's `connectionView` in the slot `connection`), the
   settings, or the channels, which are always read, or the open group, a keyed
   occurrence. The tasks Block, which the page binds as `tasks` (`TasksBinding`), is the same child
   under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened
@@ -615,7 +662,8 @@ the pages that compose them; the root composes the pages.
   in the open group, or beside the open inbox (`inbox-thread`, the inbox's `threadView`), only while
   one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
   under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width, and
-  so is the agents' `dialogView`, for adding an agent or confirming its removal, and the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
+  so are the connections' `dialogView`, for adding a connection, replacing its key, or confirming its removal, and the
+  agents' `dialogView`, for adding an agent or confirming its removal, and the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
   the drawer and the side pane's dialog, so the one opened last is over the rest. `ClickedSearch` and
   `RequestedSearch`, which the root sends, ask the search to open. The search reports what was opened
   and the page folds it as it folds the same thing from elsewhere: a group is opened alone, as a group
@@ -634,7 +682,7 @@ the pages that compose them; the root composes the pages.
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
   Menu button asks it to open (`ClickedMenu`), and every navigation to an item of a sidebar, the
   sidebar's Inbox, Triage, Tasks, Workspace, Members, and Browse groups, what the agents and the
-  connections Blocks ask to be shown by their titles, Browse, Add, and rows, a group picked, and a
+  connections Blocks ask to be shown by their titles, Browse, Add, and rows, and what the connections ask to be shown by a connection picked, a group picked, and a
   task's thread opened, asks it to close (a close of a closed dialog does nothing), which is
   `goTo`. A destination picked on the rail does not: it switches to the destination
   (`switchTo`), showing it in the main pane and closing the side pane's dialog and the thread
@@ -650,7 +698,10 @@ the pages that compose them; the root composes the pages.
   its group, and closes it (`hideAside`) as the group or the inbox reports `ClosedThread` and in every
   navigation, since the thread goes with its group. What the agents report that the person did is confirmed in
   a toast: saving a name or a setup ("Name saved", "Setup saved"), adding one ("{name} created", with its page
-  opened), and removing one ("{name} removed", with the list shown). Every navigation that leaves the inbox, those that
+  opened), and removing one ("{name} removed", with the list shown); and what the connections report, in the words of
+  `connectionsToast`: saving a name or the settings ("Name saved", "Settings saved"), replacing a key ("API key
+  replaced"), adding one ("{name} created", with its page opened), and removing one ("{name} removed", with the list
+  shown). Every navigation that leaves the inbox, those that
   hide the dialog and a group or a task's thread opened, also asks the inbox to close its thread
   (`requestCloseThread`), since the inbox keeps its state while another destination shows, so that
   coming back shows no stale pane. When the dialog closes by itself, by Escape or its scrim, the
@@ -867,13 +918,17 @@ browser's storage. Each Block's tests sit beside it:
   Block is made for and No one a task with none, and a search keep, latest active first, however they
   are given, leaving out the status for a list that has no choice of it, and reporting the thread of
   the task picked with its group; the connections keeping the integrations the page
-  informs them of or why they could not be listed, asking the page to list them again, adding a connection over
-  HTTP once its integration, name, required settings, and key are in, once while it sends, and
-  refused with why, renaming, changing the settings of, and removing one as actions from what was
-  seen, replacing a key and checking over HTTP, closing a form about a connection that is gone,
-  listing and naming the connections whose integration gives a capability, being read once the store
-  has answered, asking the page to show the connections when the person browses, picks one, or adds,
-  and the channels when they browse them, and why a read or a write could not
+  informs them of or why they could not be listed, asking the page to list them again, reading the connections by
+  name once the store has answered, who may add one and who may manage one, putting a connection on All and on
+  the tab of each thing its integration gives, narrowing the list by tab and by search, opening the dialog on the
+  integrations, narrowed to what a section gives, and choosing one, which starts the form on its defaults, going
+  back, sending a connection over HTTP once its name, required settings, and key are in, once while it sends,
+  with the same request key on a retry and a new one once the form changes, keeping what failed, the dialog
+  waiting for the store to list the connection the host made and then closing, checking it, and reporting it,
+  closing the dialog except while its request is on its way, renaming, changing the settings of, and removing
+  one as actions from what was seen, replacing a key and checking over HTTP, closing a form about a connection
+  that is gone, wording each failure for the form it shows under, and the page's toasts, asking the page to show
+  the list, a connection, or the channels, and why a read or a write could not
   be kept; the agents keeping the integrations the page informs them of or why they could not be
   listed, asking the page to list them again, opening the dialog on a blank form that adds an agent without
   leaving the page, sending nothing from it until it has a name and a model, adding an agent as an action
@@ -944,10 +999,15 @@ browser's storage. Each Block's tests sit beside it:
   nothing, on request, and end as creating does; for the listing they keep the list when reading it again
   fails and say the host was not reached when the first read does, and report the session ended when any
   request is rejected as unauthorized; the `LoadWorkspaces`, `CreateWorkspace`, and `AcceptInvitation`
-  handlers run over a stub `HttpClient` that gives a canned status and body, to show the path, key, and names
+  handlers run over `test/host.ts`, a stub `HttpClient` that gives a canned status and body, to show the path, key, and names
   they send and each refusal as the person reads it, and that a session the host does not know (status 401,
   `Authentication.Unauthorized`) ends each of them in `RejectedSession`; `FocusWorkspaceRow` runs over a button
-  in the document, which it focuses, and `ExpireToast` over `TestClock`, which it waits five seconds on.
+  in the document, which it focuses, and `ExpireToast` over `TestClock`, which it waits five seconds on. The connections'
+  `CheckConnection`, `AddConnection`, and `ReplaceConnectionKey` run over the same stub host, to show the path they call,
+  the request key `AddConnection` sends, new or the earlier attempt's, and the reason each of the host's refusals, and
+  a host that answers what the contract does not say or cannot be reached, is read as; `RenameConnection`,
+  `ConfigureConnection`, and `RemoveConnection` run over `test/recordingStores.ts`, and `FocusField` over a field in the
+  document.
   The sign-in Block's stories and scenes show the notice it starts with, kept as the address is typed and
   gone once it is sent.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
@@ -1008,16 +1068,20 @@ browser's storage. Each Block's tests sit beside it:
   triage alone, or those neither done nor dismissed, latest active first, narrowed by an assignee, by
   a status of an open task, which Triage has no choice of and ignores, and by a search, in any case,
   and together, saying there are none to triage, no open tasks, or that none match, why they could
-  not be read, and opening a task's thread by its row; the connections added by an owner
-  to an integration, with a key field only for the method that takes one, then checked, with their
-  settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
-  member without the controls until the person is given the role that manages them, marked as
-  sending with none while a change is on its way, by how ready each is, with why the integrations
-  could not be listed and a way to ask again, and why they could not be read; the connections'
-  sections of the sidebar, Models, Tools, Sandboxes, and Harnesses, then Channels, each connection
+  not be read, and opening a task's thread by its row; the connections as a list, with tabs and their counts,
+  a search by name or by integration, its rows with their status and how they authenticate, and what it says
+  when there are none, none on a tab, or none that match; a connection's page, with a note of why it can't be
+  used, its check and what it found in place, its name and its settings saved apart with a failure shown under
+  each, how it authenticates, its details, and its removal, read by an ordinary member without the controls,
+  marked as sending with none while a change is on its way, and missing when the workspace does not list it; the
+  dialog that adds a connection, narrowed to a section's integrations and searched, then the form for the one
+  chosen, with a key field only for the method that takes one, sent once, with its failure shown, and a retry
+  of the same values sent under the same key; the dialog that replaces a key and the one that removes a
+  connection; why the integrations could not be listed and a way to ask again, and why they could not be read; the
+  connections' sections of the sidebar, Models, Tools, Sandboxes, and Harnesses, then Channels, each connection
   under every thing it gives with the shape of its status at the end of its row and none while it is
   ready or on its way, "None yet" only once the connections and the integrations are read, the
-  titles, Browse, and Add opening the connections for a person who may add one and the channels
+  titles, Browse, and Add opening the list on a tab, or the dialog, for a person who may add one and the channels
   opening their own, and the connection picked reported; the agents added by an
   owner with a harness, a model connection whose models load, a model, an effort, and a sandbox, or
   a model the connection does not list by its id, refused with why until the connection and the
@@ -1065,7 +1129,8 @@ browser's storage. Each Block's tests sit beside it:
   items and the groups, with the Groups title opening the groups to browse and marked while they show;
   the agents' section with its rows and its title marked, and, with an agent's page open from a row of
   it or of the list, that row marked in place of the title; the connections' sections, by what they give,
-  and Channels, marked while the channels show; and the settings' Workspace and Members, which open the
+  with a connection's page open from a row of one or of the list, that row marked in place of the title, and
+  Channels, marked while the channels show; and the settings' Workspace and Members, which open the
   settings; the groups to browse opened from the
   sidebar's button, from an open group and its thread, and from the drawer, which it closes, with
   a group opened from its row and a team started from Create group, also at `Phone` where the sidebar is
@@ -1083,7 +1148,9 @@ browser's storage. Each Block's tests sit beside it:
   and what the server refused as toasts, over the shell and
   inside the side pane's dialog while it is open, and what the person did to an agent confirmed in a
   toast that goes by itself, the dialog of the agents opened from the sidebar over the destination that shows,
-  an agent added, shown by its page with its row current, and one removed, shown by the list, and the
+  an agent added, shown by its page with its row current, and one removed, shown by the list, a connection's
+  name and settings, key, adding, and removal confirmed the same way, the dialog of the connections opened from
+  the sidebar and from the list, a connection added, shown by its page after it is checked, and the
   connections listing the integrations
   again after the host could not be reached. The root's own scenes show
   the open workspace with no header of its own, signing out from its sidebar, its Menu button
@@ -1151,7 +1218,7 @@ browser's storage. Each Block's tests sit beside it:
   refused, and a thread started as a task shows its task in its group's list at once in triage and then as the
   server made it, and a task in each of two groups lists with the name of its group and the replies its
   thread has, as it is written and once the server has it; and a connection added over HTTP, to an integration the test host installs, reaches the
-  store, and its rename and removal show at once, then as the server made them; and an agent added
+  store, and its rename and removal show at once, then as the server made them (the stub host the page's and the connections' command tests send their requests through is `test/host.ts`); and an agent added
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
   and its move shows at once; and the settings' reads, as the settings Block reads them together,

@@ -1,9 +1,12 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
+import { Request } from "@amends-dev/core/request"
 import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
 import {
   Command,
+  Mount,
   Subscription,
   all,
   change,
@@ -38,12 +41,20 @@ import {
 } from "../../../test/fixtures.ts"
 import { calendarDate } from "../../seen.ts"
 import { ConnectionsBlock } from "./block.ts"
-import { CheckConnection, ConfigureConnection, RenameConnection } from "./command.ts"
-import { Integrations, Message, type Model, OutMessage } from "./definition.ts"
+import {
+  AddConnection,
+  CheckConnection,
+  ConfigureConnection,
+  FocusField,
+  RemoveConnection,
+  RenameConnection,
+  ReplaceConnectionKey
+} from "./command.ts"
+import { Integrations, Message, type Model, OutMessage, Written } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { connectionView, sidebarView, view } from "./view.ts"
+import { connectionView, dialogView, sidebarView, view } from "./view.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
@@ -250,7 +261,7 @@ describe("the connections list", () => {
           connections: [runner, team, support].map((connection) => ({ connection, pending: false }))
         })
       ),
-      expect(first(all.role("button"))).toHaveAccessibleName("amends")
+      expect(first(all.role("button", { name: /^(amends|Anthropic|Support)/ }))).toHaveAccessibleName("amends")
     )
   })
 
@@ -1068,6 +1079,702 @@ describe("the connections", () => {
       ),
       expect(role("note", { name: "Working" })).toBeAbsent(),
       expect(text("Ask MCP server whether this connection works as it is set up.")).toExist()
+    )
+  })
+})
+
+const dialog = withViewInputs(dialogView, { workspaceName: workspace.name })()
+
+/**
+ * A view and the dialog for adding a connection, replacing a key, or confirming a removal, which the shell keeps beside
+ * it.
+ */
+const withDialog =
+  (inner: typeof listView): typeof listView =>
+  (model, h) =>
+    h.div([], [inner(model, h), dialog(model, h)])
+
+/** The dialog acknowledged open: its element shown, and the resources it holds acquired. */
+const dialogOpened = () =>
+  [
+    Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+    Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources())
+  ] as const
+
+/** The dialog acknowledged closed: its element hidden, and the resources it held released. */
+const dialogClosed = () =>
+  [
+    Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+    Mount.expectEnded(Dialog.test.AcquireResources)
+  ] as const
+
+const withSeveralAdded = withDialog(listView)
+
+const chooserDialog = role("dialog", { name: "Add connection" })
+const configureDialog = role("dialog", { name: "Configure connection" })
+
+const key = Request.Key.make("key-1")
+
+/** The connection the host makes for the form filled in as the tests do, once the store lists it. */
+const created = connectionTo("connection-9", "search-api", "MCP server", "apiKey", {
+  url: "https://search.example.com/mcp",
+  verbose: false,
+  region: "eu"
+})
+
+describe("adding a connection", () => {
+  it("is offered to a person who may add one once the integrations are listed, in the header and the empty list", () => {
+    scene({ update, view: listView }, given(withSeveral), expect(role("button", { name: "Add connection" })).toExist())
+    scene(
+      { update, view: listView },
+      given(modifyFields(opened, { connections: () => [] })),
+      expectAll(all.role("button", { name: "Add connection" })).toHaveCount(2)
+    )
+    for (const hidden of [
+      modifyFields(withSeveral, { grants: () => memberGrants }),
+      modifyFields(withSeveral, { integrations: () => Integrations.Loading() }),
+      modifyFields(withSeveral, { integrations: () => Integrations.Failed({ error: "Unreachable." }) })
+    ]) {
+      scene(
+        { update, view: listView },
+        given(hidden),
+        expect(role("heading", { name: "Connections", level: 1 })).toExist(),
+        expect(role("button", { name: "Add connection" })).toBeAbsent()
+      )
+    }
+  })
+
+  it("opens a dialog on the integrations the host installs, with what each gives and how it authenticates", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      expect(chooserDialog).toBeAbsent(),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(
+        chooserDialog,
+        expect(text("Studio")).toExist(),
+        expect(label("Search integrations")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+        expect(role("list", { name: "Integrations" })).toExist(),
+        expect(role("button", { name: "Anthropic" })).toHaveAttr("aria-description", "Models · API key"),
+        expect(role("button", { name: "MCP server" })).toHaveAttr(
+          "aria-description",
+          "Tools · API key or no authentication"
+        ),
+        expect(role("button", { name: "This machine" })).toHaveAttr(
+          "aria-description",
+          "Sandboxes · No authentication"
+        ),
+        expect(role("button", { name: "Cancel" })).toExist()
+      )
+    )
+  })
+
+  it("narrows the integrations to what a section of the sidebar gives, when asked from its Create", () => {
+    const sidebar = withViewInputs(sidebarView, {
+      isListOpen: false,
+      openConnectionId: Option.none(),
+      isChannelsOpen: false
+    })()
+    scene(
+      { update, view: withDialog(sidebar) },
+      given(withSeveral),
+      click(role("button", { name: "Add tool connection" })),
+      ...dialogOpened(),
+      inside(
+        role("dialog", { name: "Add tool connection" }),
+        expect(role("button", { name: "MCP server" })).toExist(),
+        expect(role("button", { name: "Anthropic" })).toBeAbsent(),
+        expect(role("button", { name: "This machine" })).toBeAbsent()
+      )
+    )
+    scene(
+      { update, view: withDialog(sidebar) },
+      given(modifyFields(withSeveral, { integrations: () => Integrations.Loaded({ integrations: [searchApi] }) })),
+      click(role("button", { name: "Add model connection" })),
+      ...dialogOpened(),
+      inside(
+        role("dialog", { name: "Add model connection" }),
+        expect(text("No integrations available")).toExist(),
+        expect(text("This host installs no integration that gives models.")).toExist(),
+        expect(label("Search integrations")).toBeAbsent()
+      )
+    )
+    scene(
+      { update, view: withDialog(sidebar) },
+      given(modifyFields(withSeveral, { integrations: () => Integrations.Loaded({ integrations: [searchApi] }) })),
+      click(role("button", { name: "Add harness connection" })),
+      ...dialogOpened(),
+      inside(
+        role("dialog", { name: "Add harness connection" }),
+        expect(text("This host installs no integration that gives harnesses.")).toExist()
+      )
+    )
+  })
+
+  it("is offered in a section of the sidebar to a person who may add one, but not for the channels", () => {
+    const sidebar = withViewInputs(sidebarView, {
+      isListOpen: false,
+      openConnectionId: Option.none(),
+      isChannelsOpen: false
+    })()
+    scene(
+      { update, view: sidebar },
+      given(withSeveral),
+      expect(role("button", { name: "Add model connection" })).toExist(),
+      expect(role("button", { name: "Add tool connection" })).toExist(),
+      expect(role("button", { name: "Add sandbox connection" })).toExist(),
+      expect(role("button", { name: "Add harness connection" })).toExist(),
+      expect(role("button", { name: "Add channel connection" })).toBeAbsent()
+    )
+    scene(
+      { update, view: sidebar },
+      given(modifyFields(withSeveral, { grants: () => memberGrants })),
+      expect(role("button", { name: "Add model connection" })).toBeAbsent()
+    )
+  })
+
+  it("lists only the integrations a search matches, in any case, and says when none do, with a way to clear it", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(
+        chooserDialog,
+        type(label("Search integrations"), "MCP"),
+        expect(role("button", { name: "MCP server" })).toExist(),
+        expect(role("button", { name: "Anthropic" })).toBeAbsent(),
+        type(label("Search integrations"), "ánthropic"),
+        expect(role("button", { name: "Anthropic" })).toExist(),
+        expect(role("button", { name: "MCP server" })).toBeAbsent(),
+        type(label("Search integrations"), "zzz"),
+        expect(text("No integrations match “zzz”.")).toExist(),
+        expect(role("list", { name: "Integrations" })).toBeAbsent(),
+        click(role("button", { name: "Clear search" })),
+        expect(role("button", { name: "Anthropic" })).toExist(),
+        expect(role("button", { name: "MCP server" })).toExist()
+      )
+    )
+  })
+
+  it("closes with Cancel, and opens on the integrations again the next time", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, type(label("Search integrations"), "MCP"), click(role("button", { name: "Cancel" }))),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(chooserDialog).toBeAbsent(),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      expect(label("Search integrations")).toHaveValue("")
+    )
+  })
+
+  it("asks for the connection to the integration chosen: its name from the integration's, its settings, how it authenticates, and its key", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.expectExact(FocusField({ id: "add-connection-name" })),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      expect(chooserDialog).toBeAbsent(),
+      inside(
+        configureDialog,
+        expect(text("MCP server · Tools")).toExist(),
+        expect(label("Connection name")).toHaveValue("MCP server"),
+        expect(label("Connection name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+        expect(text("A name your workspace will recognize.")).toExist(),
+        expect(label("Server URL")).toHaveValue(""),
+        expect(text("Where the MCP server answers over Streamable HTTP.")).toExist(),
+        expect(label("Key header · Optional")).toExist(),
+        expect(role("switch", { name: "Verbose · Optional" })).toHaveAttr("aria-checked", "false"),
+        expect(label("Region · Optional")).toExist(),
+        expect(label("Authentication")).toHaveValue("apiKey"),
+        expect(label("API key")).toHaveAttr("type", "password"),
+        expect(text("Stored securely. Once saved, it cannot be viewed or copied.")).toExist(),
+        expect(role("button", { name: "Back" })).toExist(),
+        expect(role("button", { name: "Create connection" })).toBeDisabled()
+      )
+    )
+  })
+
+  it("lets the person create the connection once it has a name, the settings that are required, and its key, or no key where it takes none", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        type(label("Connection name"), "  "),
+        type(label("Server URL"), "https://search.example.com/mcp"),
+        type(label("API key"), "secret"),
+        expect(role("button", { name: "Create connection" })).toBeDisabled(),
+        type(label("Connection name"), "Search"),
+        expect(role("button", { name: "Create connection" })).toBeEnabled(),
+        type(label("API key"), ""),
+        expect(role("button", { name: "Create connection" })).toBeDisabled(),
+        change(label("Authentication"), "none"),
+        expect(label("API key")).toBeAbsent(),
+        expect(text("Use this only when the system accepts requests without credentials.")).toExist(),
+        expect(role("button", { name: "Create connection" })).toBeEnabled(),
+        change(label("Authentication"), "apiKey"),
+        expect(label("API key")).toExist(),
+        expect(role("button", { name: "Create connection" })).toBeDisabled(),
+        type(label("Server URL"), "")
+      )
+    )
+  })
+
+  it("goes back to the integrations it was chosen among, still narrowed to what its section gives", () => {
+    const sidebar = withViewInputs(sidebarView, {
+      isListOpen: false,
+      openConnectionId: Option.none(),
+      isChannelsOpen: false
+    })()
+    scene(
+      { update, view: withDialog(sidebar) },
+      given(withSeveral),
+      click(role("button", { name: "Add tool connection" })),
+      ...dialogOpened(),
+      inside(role("dialog", { name: "Add tool connection" }), click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(configureDialog, click(role("button", { name: "Back" }))),
+      Command.expectExact(FocusField({ id: "search-integrations" })),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      expect(configureDialog).toBeAbsent(),
+      inside(
+        role("dialog", { name: "Add tool connection" }),
+        expect(role("button", { name: "MCP server" })).toExist(),
+        expect(role("button", { name: "Anthropic" })).toBeAbsent()
+      )
+    )
+  })
+
+  it("sends the connection once, and shows that it is on its way with nothing to change but waiting", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        type(label("Server URL"), "https://search.example.com/mcp"),
+        type(label("API key"), "secret"),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.expectExact(
+        AddConnection({
+          workspaceId,
+          integration: "search-api",
+          name: "MCP server",
+          auth: "apiKey",
+          apiKey: "secret",
+          settings: { url: "https://search.example.com/mcp", verbose: false, region: "eu" },
+          key: Option.none()
+        })
+      ),
+      inside(
+        configureDialog,
+        expect(label("Connection name")).toBeDisabled(),
+        expect(label("Server URL")).toBeDisabled(),
+        expect(label("API key")).toBeDisabled(),
+        expect(role("button", { name: "Creating…" })).toBeDisabled(),
+        expect(role("button", { name: "Back" })).toBeDisabled()
+      ),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "StorageUnavailable", description: Option.none() }
+        })
+      )
+    )
+  })
+
+  it("says under the fields why the connection could not be made, keeps them, and sends the same key to try again, but a new one once they change", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        type(label("Server URL"), "https://search.example.com/mcp"),
+        type(label("API key"), "secret"),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      ),
+      inside(
+        configureDialog,
+        expect(
+          text("The connection couldn't be created. Try again when the host is available; it won't be created twice.")
+        ).toExist(),
+        expect(label("Server URL")).toHaveValue("https://search.example.com/mcp"),
+        expect(label("API key")).toHaveValue("secret"),
+        expect(role("button", { name: "Refresh" })).toBeAbsent(),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.expectExact(
+        AddConnection({
+          workspaceId,
+          integration: "search-api",
+          name: "MCP server",
+          auth: "apiKey",
+          apiKey: "secret",
+          settings: { url: "https://search.example.com/mcp", verbose: false, region: "eu" },
+          key: Option.some(key)
+        })
+      ),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      ),
+      inside(
+        configureDialog,
+        type(label("Connection name"), "Search"),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.expectExact(
+        AddConnection({
+          workspaceId,
+          integration: "search-api",
+          name: "Search",
+          auth: "apiKey",
+          apiKey: "secret",
+          settings: { url: "https://search.example.com/mcp", verbose: false, region: "eu" },
+          key: Option.none()
+        })
+      ),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(Request.Key.make("key-2")),
+          failure: { action: "Create", reason: "Refused", description: Option.some("No such region.") }
+        })
+      ),
+      inside(configureDialog, expect(text("No such region.")).toExist())
+    )
+  })
+
+  it("offers Refresh where what the person sees is out of date, which asks the page to list the integrations again", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        type(label("Server URL"), "https://search.example.com/mcp"),
+        type(label("API key"), "secret"),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Uninstalled", description: Option.none() }
+        })
+      ),
+      inside(
+        configureDialog,
+        expect(text("This integration isn't installed on this host anymore.")).toExist(),
+        click(role("button", { name: "Refresh" })),
+        expect(text("This integration isn't installed on this host anymore.")).toBeAbsent()
+      ),
+      expectOutMessage(OutMessage.RequestedIntegrations())
+    )
+  })
+
+  it("waits for the store to list the connection the host made, and then closes, checks it, and reports it", () => {
+    scene(
+      { update, view: withSeveralAdded, subscriptions: ConnectionsBlock.subscriptions },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        type(label("Server URL"), "https://search.example.com/mcp"),
+        type(label("API key"), "secret"),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.resolve(AddConnection, Message.AddedConnection({ connectionId: created.id, name: "MCP server" })),
+      inside(configureDialog, expect(role("button", { name: "Creating…" })).toBeDisabled()),
+      Subscription.emit(
+        subscriptions.connections,
+        Message.ReceivedConnections({
+          connections: [runner, team, support, search, machine, created].map((connection) => ({
+            connection,
+            pending: false
+          }))
+        })
+      ),
+      expectOutMessage(OutMessage.CreatedConnection({ connectionId: created.id, name: "MCP server" })),
+      Command.expectHas(CheckConnection({ workspaceId, connectionId: created.id }), Dialog.test.CloseDialog),
+      Command.resolve(
+        CheckConnection,
+        Message.CheckedConnection({ connectionId: created.id, health: { status: "healthy" } })
+      ),
+      ...dialogClosed(),
+      expect(configureDialog).toBeAbsent()
+    )
+  })
+
+  it("lets the dialog be closed once the host made the connection, though the store lists it later", () => {
+    scene(
+      { update, view: withSeveralAdded },
+      given(withSeveral),
+      click(role("button", { name: "Add connection" })),
+      ...dialogOpened(),
+      inside(chooserDialog, click(role("button", { name: "MCP server" }))),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      inside(
+        configureDialog,
+        type(label("Server URL"), "https://search.example.com/mcp"),
+        type(label("API key"), "secret"),
+        click(role("button", { name: "Create connection" }))
+      ),
+      Command.resolve(AddConnection, Message.AddedConnection({ connectionId: created.id, name: "MCP server" })),
+      inside(configureDialog, click(role("button", { name: "Close" }))),
+      ...dialogClosed(),
+      expect(configureDialog).toBeAbsent()
+    )
+  })
+})
+
+describe("replacing a connection's key", () => {
+  const replaceDialog = role("dialog", { name: "Replace API key" })
+  const withSearch: Model = modifyFields(opened, { connections: () => [{ connection: search, pending: false }] })
+  const onPage = withDialog(
+    withViewInputs(connectionView, { connectionId: search.id, workspaceName: workspace.name })()
+  )
+
+  it("is offered on the page of a connection with a key, to a person who may manage it, while its integration is installed", () => {
+    scene(
+      { update, view: onPage },
+      given(withSearch),
+      inside(role("region", { name: "Authentication" }), expect(role("button", { name: "Replace key" })).toExist())
+    )
+    for (const hidden of [
+      modifyFields(withSearch, { grants: () => memberGrants }),
+      modifyFields(withSearch, { integrations: () => Integrations.Loading() }),
+      modifyFields(withSearch, {
+        connections: () => [{ connection: connectionTo("connection-2", "search-api", "Search tools"), pending: false }]
+      })
+    ]) {
+      scene(
+        { update, view: onPage },
+        given(hidden),
+        inside(role("region", { name: "Authentication" }), expect(role("button", { name: "Replace key" })).toBeAbsent())
+      )
+    }
+  })
+
+  it("asks for the new key, masked, saying the current one stays until it is saved", () => {
+    scene(
+      { update, view: onPage },
+      given(withSearch),
+      click(role("button", { name: "Replace key" })),
+      ...dialogOpened(),
+      inside(
+        replaceDialog,
+        expect(text("Search tools")).toExist(),
+        expect(text("The current key stays in place until the new key is saved.")).toExist(),
+        expect(label("New API key")).toHaveAttr("type", "password"),
+        expect(label("New API key")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+        expect(text("Stored securely. Once saved, it cannot be viewed or copied.")).toExist(),
+        expect(role("button", { name: "Replace key" })).toBeDisabled(),
+        type(label("New API key"), "   "),
+        expect(role("button", { name: "Replace key" })).toBeDisabled(),
+        type(label("New API key"), "sk-new"),
+        expect(role("button", { name: "Replace key" })).toBeEnabled(),
+        click(role("button", { name: "Cancel" }))
+      ),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      click(role("button", { name: "Replace key" })),
+      ...dialogOpened(),
+      expect(label("New API key")).toHaveValue("")
+    )
+  })
+
+  it("sends the key, shows that it is on its way, and closes once it is replaced, reporting it", () => {
+    scene(
+      { update, view: onPage },
+      given(withSearch),
+      click(role("button", { name: "Replace key" })),
+      ...dialogOpened(),
+      inside(replaceDialog, type(label("New API key"), "sk-new"), click(role("button", { name: "Replace key" }))),
+      Command.expectExact(ReplaceConnectionKey({ workspaceId, connectionId: search.id, apiKey: "sk-new" })),
+      inside(
+        replaceDialog,
+        expect(label("New API key")).toBeDisabled(),
+        expect(role("button", { name: "Replacing…" })).toBeDisabled()
+      ),
+      Command.resolve(ReplaceConnectionKey, Message.ReplacedConnectionKey({ connectionId: search.id })),
+      expectOutMessage(OutMessage.ReplacedKey()),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(replaceDialog).toBeAbsent()
+    )
+  })
+
+  it("says why the key could not be replaced, keeps what was typed, and lets the person send it again", () => {
+    scene(
+      { update, view: onPage },
+      given(withSearch),
+      click(role("button", { name: "Replace key" })),
+      ...dialogOpened(),
+      inside(replaceDialog, type(label("New API key"), "sk-new"), click(role("button", { name: "Replace key" }))),
+      Command.resolve(
+        ReplaceConnectionKey,
+        Message.FailedReplaceConnectionKey({
+          connectionId: search.id,
+          failure: { action: "ReplaceKey", reason: "Invalid", description: Option.none() }
+        })
+      ),
+      inside(
+        replaceDialog,
+        expect(text("Enter the key as the system issued it.")).toExist(),
+        expect(label("New API key")).toHaveValue("sk-new"),
+        type(label("New API key"), "sk-newer"),
+        expect(text("Enter the key as the system issued it.")).toBeAbsent(),
+        click(role("button", { name: "Replace key" }))
+      ),
+      Command.resolve(
+        ReplaceConnectionKey,
+        Message.FailedReplaceConnectionKey({
+          connectionId: search.id,
+          failure: { action: "ReplaceKey", reason: "Changed", description: Option.none() }
+        })
+      ),
+      inside(
+        replaceDialog,
+        expect(text("This connection changed meanwhile. Refresh to review it, then try again.")).toExist(),
+        click(role("button", { name: "Refresh" }))
+      ),
+      expectOutMessage(OutMessage.RequestedIntegrations())
+    )
+  })
+})
+
+describe("removing a connection", () => {
+  const removeDialog = role("dialog", { name: "Remove connection?" })
+  const onPage = (connection: typeof search) =>
+    withDialog(withViewInputs(connectionView, { connectionId: connection.id, workspaceName: workspace.name })())
+  const withSearch: Model = modifyFields(opened, { connections: () => [{ connection: search, pending: false }] })
+
+  it("is offered on the page of a connection to a person who may manage it, in a section of its own", () => {
+    scene(
+      { update, view: onPage(search) },
+      given(withSearch),
+      inside(
+        role("region", { name: "Removal" }),
+        expect(text("Removing this connection removes it from the workspace, along with its saved key.")).toExist(),
+        expect(role("button", { name: "Remove connection" })).toExist()
+      )
+    )
+    scene(
+      { update, view: onPage(machine) },
+      given(modifyFields(opened, { connections: () => [{ connection: machine, pending: false }] })),
+      inside(
+        role("region", { name: "Removal" }),
+        expect(text("Removing this connection removes it from the workspace.")).toExist()
+      )
+    )
+    scene(
+      { update, view: onPage(search) },
+      given(modifyFields(withSearch, { grants: () => memberGrants })),
+      expect(role("region", { name: "Removal" })).toBeAbsent()
+    )
+  })
+
+  it("asks to confirm in a dialog that names the connection and says its key goes with it, if it has one", () => {
+    scene(
+      { update, view: onPage(search) },
+      given(withSearch),
+      click(role("button", { name: "Remove connection" })),
+      ...dialogOpened(),
+      inside(
+        removeDialog,
+        expect(text("Search tools")).toExist(),
+        expect(text("Search tools will be removed from the workspace, along with its saved key.")).toExist(),
+        click(role("button", { name: "Cancel" }))
+      ),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(removeDialog).toBeAbsent()
+    )
+    scene(
+      { update, view: onPage(machine) },
+      given(modifyFields(opened, { connections: () => [{ connection: machine, pending: false }] })),
+      click(role("button", { name: "Remove connection" })),
+      ...dialogOpened(),
+      inside(removeDialog, expect(text("This machine will be removed from the workspace.")).toExist())
+    )
+  })
+
+  it("sends the removal once, closes once the store keeps it, and reports the connection by the name it had", () => {
+    scene(
+      { update, view: onPage(search) },
+      given(withSearch),
+      click(role("button", { name: "Remove connection" })),
+      ...dialogOpened(),
+      inside(removeDialog, click(role("button", { name: "Remove connection" }))),
+      Command.expectExact(RemoveConnection({ ...asMember, connectionId: search.id })),
+      inside(removeDialog, expect(role("button", { name: "Removing…" })).toBeDisabled()),
+      Command.resolve(RemoveConnection, Message.WroteAction({ written: Written.Remove({ connectionId: search.id }) })),
+      expectOutMessage(OutMessage.RemovedConnection({ name: "Search tools" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(removeDialog).toBeAbsent()
+    )
+  })
+
+  it("says under the confirmation, which stays open, that the connection could not be removed, until it is sent again", () => {
+    scene(
+      { update, view: onPage(search) },
+      given(withSearch),
+      click(role("button", { name: "Remove connection" })),
+      ...dialogOpened(),
+      inside(removeDialog, click(role("button", { name: "Remove connection" }))),
+      Command.resolve(
+        RemoveConnection,
+        Message.FailedWriteAction({ written: Written.Remove({ connectionId: search.id }), reason: "Failed" })
+      ),
+      inside(
+        removeDialog,
+        expect(text("The connection couldn't be removed. Try again when the host is available.")).toExist(),
+        click(role("button", { name: "Remove connection" }))
+      ),
+      Command.resolve(RemoveConnection, Message.WroteAction({ written: Written.Remove({ connectionId: search.id }) })),
+      expectOutMessage(OutMessage.RemovedConnection({ name: "Search tools" })),
+      ...dialogClosed()
     )
   })
 })

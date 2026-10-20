@@ -1,5 +1,7 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
+import { Request } from "@amends-dev/core/request"
 import { describe, expect, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
@@ -14,27 +16,53 @@ import {
   roleOf,
   searchApi
 } from "../../../test/fixtures.ts"
-import { CheckConnection, ConfigureConnection, RenameConnection } from "./command.ts"
 import {
+  AddConnection,
+  CheckConnection,
+  ConfigureConnection,
+  FocusField,
+  RemoveConnection,
+  RenameConnection,
+  ReplaceConnectionKey
+} from "./command.ts"
+import { DialogBinding } from "./composition.ts"
+import {
+  Adding,
   byName,
   checkOf,
+  configuringOf,
   connectionItemsGiving,
   connectionsGiving,
   connectionsOnTab,
   findEdit,
+  integrationsToAdd,
   Integrations,
+  isDialogBusy,
   isNameChanged,
   isSettingsChanged,
+  mayAdd,
   mayCreate,
   mayManage,
   Message,
   nameDraftOf,
   OutMessage,
-  shownConnections
+  settingsToAdd,
+  shownConnections,
+  shownIntegrations,
+  startConfiguring,
+  Written
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { connectionStatus, connectionsMessage, integrationLine, needsRefresh } from "./wording.ts"
+import {
+  addLabel,
+  authOptionsLabel,
+  connectionsMessage,
+  connectionsToast,
+  connectionStatus,
+  integrationLine,
+  needsRefresh
+} from "./wording.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
@@ -628,5 +656,917 @@ describe("the connections", () => {
     expect(
       (["Invalid", "Failed", "Refused", "StorageUnavailable"] as const).some((reason) => needsRefresh(reason))
     ).toBe(false)
+  })
+})
+
+/** What the dialog reports, as the connections receive it. */
+const fromDialog = (message: typeof DialogBlock.Message.Type) =>
+  DialogBinding.embedView({
+    slotId: "dialog",
+    model: listed.dialog,
+    viewInputs: { toView: () => null }
+  }).toParentMessage(message)
+
+const key = Request.Key.make("key-1")
+
+const created = connectionTo("connection-9", "search-api", "MCP server", "apiKey", {
+  url: "https://search.example.com/mcp",
+  verbose: false,
+  region: "eu"
+})
+
+const dialogShown = Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+
+/** The dialog asked for on the integrations, among all or those that give `capability`. */
+const choosingDialog = (capability: Option.Option<"models" | "tools" | "sandboxes" | "harnesses" | "channels">) =>
+  [message(Message.ClickedAdd({ capability })), dialogShown] as const
+
+/** The dialog on the form that adds a connection through the search server, filled in as the tests do. */
+const filledIn = [
+  ...choosingDialog(Option.none()),
+  message(Message.ChoseIntegration({ integrationId: "search-api" })),
+  Command.resolve(FocusField, Message.CompletedFocusField()),
+  message(Message.ChangedAddingSetting({ name: "url", value: "https://search.example.com/mcp" })),
+  message(Message.TypedApiKey({ apiKey: "secret" }))
+] as const
+
+const addSearchArgs = {
+  workspaceId,
+  integration: "search-api",
+  name: "MCP server",
+  auth: "apiKey",
+  apiKey: "secret",
+  settings: { url: "https://search.example.com/mcp", verbose: false, region: "eu" },
+  key: Option.none()
+} as const
+
+const addSearch = AddConnection(addSearchArgs)
+
+describe("adding a connection", () => {
+  it("is for a person who may create connections once the host listed its integrations", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      model((model) => {
+        expect(mayAdd(model)).toBe(true)
+      })
+    )
+    story(
+      update,
+      given(listed),
+      message(Message.ReceivedGrants({ grants: grantsOf([aliceOwns]) })),
+      model((model) => {
+        expect(mayCreate(model)).toBe(true)
+        expect(mayAdd(model)).toBe(false)
+      }),
+      message(Message.FailedLoadIntegrations({ error: "Unreachable." })),
+      model((model) => {
+        expect(mayAdd(model)).toBe(false)
+      })
+    )
+    story(
+      update,
+      given(listed),
+      ...readAsMember,
+      model((model) => {
+        expect(mayAdd(model)).toBe(false)
+      })
+    )
+  })
+
+  it("opens the dialog on the integrations, among those a section gives when it asked, and not twice, nor for a person who may not", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedAdd({ capability: Option.some("tools") })),
+      dialogShown,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.adding).toEqual(Option.some(Adding.Choosing({ capability: Option.some("tools"), query: "" })))
+        expect(model.replacing).toEqual(Option.none())
+        expect(model.removing).toEqual(Option.none())
+      }),
+      // Asking while it is open changes nothing.
+      message(Message.ClickedAdd({ capability: Option.none() })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.adding).toEqual(Option.some(Adding.Choosing({ capability: Option.some("tools"), query: "" })))
+      })
+    )
+    story(
+      update,
+      given(listed),
+      ...readAsMember,
+      message(Message.ClickedAdd({ capability: Option.none() })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("names what adds a connection after what a section gives", () => {
+    expect(addLabel(Option.none())).toBe("Add connection")
+    expect(addLabel(Option.some("models"))).toBe("Add model connection")
+    expect(addLabel(Option.some("sandboxes"))).toBe("Add sandbox connection")
+    expect(authOptionsLabel(["apiKey"])).toBe("API key")
+    expect(authOptionsLabel(["apiKey", "none"])).toBe("API key or no authentication")
+  })
+
+  it("lists the integrations to add through: those that give what was asked for, whose name or ID matches the search", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...choosingDialog(Option.none()),
+      model((model) => {
+        expect(integrationsToAdd(model, Option.none()).map(({ id }) => id)).toEqual([
+          "anthropic",
+          "search-api",
+          "local"
+        ])
+        expect(integrationsToAdd(model, Option.some("tools")).map(({ id }) => id)).toEqual(["search-api"])
+        expect(integrationsToAdd(model, Option.some("channels"))).toEqual([])
+      }),
+      message(Message.TypedIntegrationQuery({ query: " ÁNTHROP " })),
+      model((model) => {
+        const choosing = Option.getOrThrow(model.adding)
+        expect(
+          Adding.isAnyOf(["Choosing"])(choosing) && shownIntegrations(model, choosing).map(({ id }) => id)
+        ).toEqual(["anthropic"])
+      }),
+      message(Message.TypedIntegrationQuery({ query: "SEARCH-API" })),
+      model((model) => {
+        const choosing = Option.getOrThrow(model.adding)
+        expect(
+          Adding.isAnyOf(["Choosing"])(choosing) && shownIntegrations(model, choosing).map(({ id }) => id)
+        ).toEqual(["search-api"])
+      })
+    )
+  })
+
+  it("starts the form on the integration chosen: its name, its settings on their defaults, and its first way of authenticating", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...choosingDialog(Option.some("tools")),
+      message(Message.ChoseIntegration({ integrationId: "search-api" })),
+      Command.expectExact(FocusField({ id: "add-connection-name" })),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      model((model) => {
+        expect(model.adding).toEqual(Option.some(startConfiguring(searchApi, Option.some("tools"))))
+        expect(model.adding).toMatchObject(
+          Option.some({
+            _tag: "Configuring",
+            integrationId: "search-api",
+            name: "MCP server",
+            auth: "apiKey",
+            apiKey: "",
+            settings: { url: "", verbose: false, region: "eu" },
+            key: Option.none(),
+            failure: Option.none(),
+            creating: Option.none()
+          })
+        )
+      })
+    )
+  })
+
+  it("chooses no integration that is not among those it lists, nor when it is not choosing", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...choosingDialog(Option.some("models")),
+      message(Message.ChoseIntegration({ integrationId: "search-api" })),
+      Command.expectNone(),
+      message(Message.ChoseIntegration({ integrationId: "vertex" })),
+      Command.expectNone(),
+      model((model) => {
+        expect(Option.exists(model.adding, Adding.isAnyOf(["Choosing"]))).toBe(true)
+      })
+    )
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ChoseIntegration({ integrationId: "search-api" })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("goes back from the form to the integrations it came from, forgetting the form", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.ClickedBack()),
+      Command.expectExact(FocusField({ id: "search-integrations" })),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      model((model) => {
+        expect(model.adding).toEqual(Option.some(Adding.Choosing({ capability: Option.none(), query: "" })))
+      }),
+      // There is nowhere to go back to from the integrations.
+      message(Message.ClickedBack()),
+      Command.expectNone()
+    )
+  })
+
+  it("sends nothing until the form has a name, the settings that are required, and its key, or none where it takes none", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...choosingDialog(Option.none()),
+      message(Message.ChoseIntegration({ integrationId: "search-api" })),
+      Command.resolve(FocusField, Message.CompletedFocusField()),
+      message(Message.SubmittedAdding()),
+      Command.expectNone(),
+      message(Message.ChangedAddingSetting({ name: "url", value: "https://search.example.com/mcp" })),
+      message(Message.SubmittedAdding()),
+      Command.expectNone(),
+      message(Message.TypedApiKey({ apiKey: "  " })),
+      message(Message.SubmittedAdding()),
+      Command.expectNone(),
+      message(Message.TypedApiKey({ apiKey: "secret" })),
+      model((model) => {
+        const configuring = Option.getOrThrow(configuringOf(model))
+        expect(Option.isSome(settingsToAdd(searchApi, configuring))).toBe(true)
+      }),
+      message(Message.TypedAddingName({ name: "   " })),
+      message(Message.SubmittedAdding()),
+      Command.expectNone(),
+      message(Message.TypedAddingName({ name: "Search" })),
+      message(Message.ChoseAuth({ auth: "none" })),
+      message(Message.TypedApiKey({ apiKey: "" })),
+      message(Message.SubmittedAdding()),
+      Command.expectExact(
+        AddConnection({
+          workspaceId,
+          integration: "search-api",
+          name: "Search",
+          auth: "none",
+          apiKey: "",
+          settings: { url: "https://search.example.com/mcp", verbose: false, region: "eu" },
+          key: Option.none()
+        })
+      ),
+      Command.resolve(AddConnection, Message.AddedConnection({ connectionId: created.id, name: "Search" }))
+    )
+  })
+
+  it("sends the connection once, with its name trimmed and what the settings make, and says it is on its way", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.TypedAddingName({ name: " MCP server " })),
+      message(Message.ChangedAddingSetting({ name: "verbose", value: true })),
+      message(Message.SubmittedAdding()),
+      Command.expectExact(
+        AddConnection({
+          workspaceId,
+          integration: "search-api",
+          name: "MCP server",
+          auth: "apiKey",
+          apiKey: "secret",
+          settings: { url: "https://search.example.com/mcp", verbose: true, region: "eu" },
+          key: Option.none()
+        })
+      ),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(
+          Option.some({ creating: Option.some({ name: "MCP server", connectionId: Option.none() }) })
+        )
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      )
+    )
+  })
+
+  it("does not send the connection again while its request is on its way, nor change what was sent", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.SubmittedAdding()),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      )
+    )
+    const sending = modifyFields(listed, {
+      isLoaded: () => true,
+      integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+      grants: () => grantsOf([aliceOwns]),
+      adding: () =>
+        Option.some(
+          Adding.Configuring({
+            ...startConfiguring(searchApi, Option.none()),
+            settings: { url: "https://search.example.com/mcp", verbose: false, region: "eu" },
+            apiKey: "secret",
+            creating: Option.some({ name: "MCP server", connectionId: Option.none() })
+          })
+        )
+    })
+    story(
+      update,
+      given(sending),
+      message(Message.SubmittedAdding()),
+      Command.expectNone(),
+      message(Message.TypedAddingName({ name: "Other" })),
+      message(Message.ClickedBack()),
+      Command.expectNone(),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(Option.some({ name: "MCP server" }))
+      })
+    )
+  })
+
+  it("keeps what failed with the key it was sent under, and sends the same key to try again, until the form changes", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.SubmittedAdding()),
+      Command.expectExact(addSearch),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      ),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(
+          Option.some({
+            key: Option.some(key),
+            creating: Option.none(),
+            failure: Option.some({ action: "Create", reason: "Failed", description: Option.none() })
+          })
+        )
+        expect(isDialogBusy(model)).toBe(false)
+      }),
+      message(Message.SubmittedAdding()),
+      Command.expectExact(AddConnection({ ...addSearchArgs, key: Option.some(key) })),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Refused", description: Option.some("No such region.") }
+        })
+      ),
+      // What the person changes is not what the key was sent for: it and the failure are dropped.
+      message(Message.ChangedAddingSetting({ name: "region", value: "us" })),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(Option.some({ key: Option.none(), failure: Option.none() }))
+      }),
+      message(Message.SubmittedAdding()),
+      Command.expectExact(
+        AddConnection({
+          ...addSearchArgs,
+          settings: { url: "https://search.example.com/mcp", verbose: false, region: "us" },
+          key: Option.none()
+        })
+      ),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(Request.Key.make("key-2")),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      ),
+      message(Message.TypedAddingName({ name: "Search" })),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(Option.some({ key: Option.none(), failure: Option.none() }))
+      }),
+      message(Message.TypedApiKey({ apiKey: "other" })),
+      message(Message.ChoseAuth({ auth: "none" })),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(Option.some({ auth: "none", apiKey: "other" }))
+      })
+    )
+  })
+
+  it("says the integration is no longer listed when it was removed from the host meanwhile, and sends nothing", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.ReceivedIntegrations({ integrations: [modelsApi] })),
+      message(Message.SubmittedAdding()),
+      Command.expectNone(),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(
+          Option.some({ failure: Option.some({ action: "Create", reason: "Uninstalled", description: Option.none() }) })
+        )
+      })
+    )
+  })
+
+  it("waits for the connection the host made to be listed, and then closes, checks it, and reports it", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.SubmittedAdding()),
+      Command.resolve(AddConnection, Message.AddedConnection({ connectionId: created.id, name: "MCP server" })),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(configuringOf(model)).toMatchObject(
+          Option.some({ creating: Option.some({ name: "MCP server", connectionId: Option.some(created.id) }) })
+        )
+        // The host made it, so the dialog may be closed meanwhile.
+        expect(isDialogBusy(model)).toBe(false)
+      }),
+      message(Message.ReceivedConnections({ connections: unpending(team, search, machine, created) })),
+      expectOutMessage(OutMessage.CreatedConnection({ connectionId: created.id, name: "MCP server" })),
+      Command.expectHas(Dialog.test.CloseDialog, CheckConnection({ workspaceId, connectionId: created.id })),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+        expect(Option.map(checkOf(model, created.id), (check) => check._tag)).toEqual(Option.some("Checking"))
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(
+        CheckConnection,
+        Message.CheckedConnection({ connectionId: created.id, health: { status: "healthy" } })
+      )
+    )
+  })
+
+  it("finishes at once when the store already lists the connection the host made", () => {
+    const sending = modifyFields(listed, {
+      isLoaded: () => true,
+      integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+      grants: () => grantsOf([aliceOwns]),
+      connections: () => unpending(team, search, machine, created),
+      dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
+      adding: () =>
+        Option.some(
+          Adding.Configuring({
+            ...startConfiguring(searchApi, Option.none()),
+            creating: Option.some({ name: "MCP server", connectionId: Option.none() })
+          })
+        )
+    })
+    story(
+      update,
+      given(sending),
+      message(Message.AddedConnection({ connectionId: created.id, name: "MCP server" })),
+      expectOutMessage(OutMessage.CreatedConnection({ connectionId: created.id, name: "MCP server" })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(
+        CheckConnection,
+        Message.CheckedConnection({ connectionId: created.id, health: { status: "healthy" } })
+      ),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("closes the dialog when the person closes it, forgetting the form, except while the request is on its way", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.adding).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      // Sending a form that is not open sends nothing.
+      message(Message.SubmittedAdding()),
+      Command.expectNone()
+    )
+    const sending = modifyFields(listed, {
+      dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
+      adding: () =>
+        Option.some(
+          Adding.Configuring({
+            ...startConfiguring(searchApi, Option.none()),
+            creating: Option.some({ name: "MCP server", connectionId: Option.none() })
+          })
+        )
+    })
+    story(
+      update,
+      given(sending),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.expectHas(Dialog.test.CloseDialog, Dialog.test.ShowDialog),
+      model((model) => {
+        expect(Option.isSome(model.adding)).toBe(true)
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(
+        Message.FailedAddConnection({
+          key: Option.none(),
+          failure: { action: "Create", reason: "Failed", description: Option.none() }
+        })
+      ),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(Option.some({ creating: Option.none() }))
+        expect(model.dialog.isOpen).toBe(true)
+      })
+    )
+  })
+
+  it("drops the failures the dialog shows when the person refreshes, and asks the page to list the integrations again", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      ...filledIn,
+      message(Message.SubmittedAdding()),
+      Command.resolve(
+        AddConnection,
+        Message.FailedAddConnection({
+          key: Option.some(key),
+          failure: { action: "Create", reason: "Uninstalled", description: Option.none() }
+        })
+      ),
+      message(Message.ClickedRefresh()),
+      expectOutMessage(OutMessage.RequestedIntegrations()),
+      model((model) => {
+        expect(configuringOf(model)).toMatchObject(Option.some({ failure: Option.none(), key: Option.some(key) }))
+      })
+    )
+  })
+})
+
+describe("replacing a connection's key", () => {
+  const onSearch = [...read, message(Message.ClickedReplaceKey({ connectionId: search.id })), dialogShown] as const
+
+  /** The dialog on the key being replaced, whose request is on its way. */
+  const sendingKey = modifyFields(listed, {
+    isLoaded: () => true,
+    integrations: () => Integrations.Loaded({ integrations: [modelsApi, searchApi, sandboxApi] }),
+    grants: () => grantsOf([aliceOwns]),
+    connections: () => unpending(team, search, machine),
+    dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
+    replacing: () =>
+      Option.some({
+        connectionId: search.id,
+        name: "Search",
+        apiKey: "sk-new",
+        isSending: true,
+        failure: Option.none()
+      })
+  })
+
+  it("opens the dialog on a blank key for a connection that has one, where the person may manage it", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.replacing).toEqual(
+          Option.some({ connectionId: search.id, name: "Search", apiKey: "", isSending: false, failure: Option.none() })
+        )
+        expect(model.adding).toEqual(Option.none())
+      })
+    )
+    for (const [grants, id] of [
+      [readAsMember, search.id],
+      [read, machine.id],
+      [read, "connection-404"]
+    ] as const) {
+      story(
+        update,
+        given(listed),
+        ...grants,
+        message(Message.ClickedReplaceKey({ connectionId: id as typeof search.id })),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.replacing).toEqual(Option.none())
+        })
+      )
+    }
+  })
+
+  it("keeps what the person types, and sends it as the key, which cannot be changed while it is on its way", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      message(Message.TypedNewKey({ apiKey: "sk-new" })),
+      model((model) => {
+        expect(model.replacing).toMatchObject(Option.some({ apiKey: "sk-new" }))
+      }),
+      message(Message.SubmittedNewKey()),
+      Command.expectExact(ReplaceConnectionKey({ workspaceId, connectionId: search.id, apiKey: "sk-new" })),
+      model((model) => {
+        expect(model.replacing).toMatchObject(Option.some({ apiKey: "sk-new", isSending: true }))
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(ReplaceConnectionKey, Message.ReplacedConnectionKey({ connectionId: search.id })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+    story(
+      update,
+      given(sendingKey),
+      message(Message.TypedNewKey({ apiKey: "other" })),
+      message(Message.SubmittedNewKey()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.replacing).toMatchObject(Option.some({ apiKey: "sk-new", isSending: true }))
+      })
+    )
+  })
+
+  it("sends nothing for a blank key, nor a second time, nor for a connection that is gone", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      message(Message.SubmittedNewKey()),
+      Command.expectNone(),
+      message(Message.TypedNewKey({ apiKey: "   " })),
+      message(Message.SubmittedNewKey()),
+      Command.expectNone(),
+      message(Message.TypedNewKey({ apiKey: "sk-new" })),
+      message(Message.SubmittedNewKey()),
+      Command.resolve(
+        ReplaceConnectionKey,
+        Message.FailedReplaceConnectionKey({
+          connectionId: search.id,
+          failure: { action: "ReplaceKey", reason: "Gone", description: Option.none() }
+        })
+      ),
+      message(Message.ReceivedConnections({ connections: unpending(team, machine) })),
+      model((model) => {
+        // Closed, since the connection is not there.
+        expect(model.replacing).toEqual(Option.none())
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      message(Message.SubmittedNewKey()),
+      Command.expectNone()
+    )
+  })
+
+  it("closes and reports once the key is replaced, and says why it could not be, keeping what was typed", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      message(Message.TypedNewKey({ apiKey: "sk-new" })),
+      message(Message.SubmittedNewKey()),
+      Command.resolve(
+        ReplaceConnectionKey,
+        Message.FailedReplaceConnectionKey({
+          connectionId: search.id,
+          failure: { action: "ReplaceKey", reason: "Invalid", description: Option.none() }
+        })
+      ),
+      model((model) => {
+        expect(model.replacing).toMatchObject(
+          Option.some({
+            apiKey: "sk-new",
+            isSending: false,
+            failure: Option.some({ action: "ReplaceKey", reason: "Invalid", description: Option.none() })
+          })
+        )
+      }),
+      message(Message.TypedNewKey({ apiKey: "sk-newer" })),
+      model((model) => {
+        expect(model.replacing).toMatchObject(Option.some({ failure: Option.none() }))
+      }),
+      message(Message.SubmittedNewKey()),
+      Command.resolve(ReplaceConnectionKey, Message.ReplacedConnectionKey({ connectionId: search.id })),
+      expectOutMessage(OutMessage.ReplacedKey()),
+      Command.expectExact(Dialog.test.CloseDialog),
+      model((model) => {
+        expect(model.replacing).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("is not closed by an answer about another connection", () => {
+    story(
+      update,
+      given(sendingKey),
+      message(Message.ReplacedConnectionKey({ connectionId: team.id })),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(Option.isSome(model.replacing)).toBe(true)
+      }),
+      message(
+        Message.FailedReplaceConnectionKey({
+          connectionId: team.id,
+          failure: { action: "ReplaceKey", reason: "Failed", description: Option.none() }
+        })
+      ),
+      model((model) => {
+        expect(model.replacing).toMatchObject(Option.some({ isSending: true, failure: Option.none() }))
+      })
+    )
+  })
+})
+
+describe("removing a connection", () => {
+  const onSearch = [...read, message(Message.ClickedRemove({ connectionId: search.id })), dialogShown] as const
+
+  it("opens the confirmation for a connection the person may manage, which says whether its key goes with it", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      model((model) => {
+        expect(model.removing).toEqual(
+          Option.some({
+            connectionId: search.id,
+            name: "Search",
+            hasKey: true,
+            isSending: false,
+            failure: Option.none()
+          })
+        )
+      }),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      message(Message.ClickedRemove({ connectionId: machine.id })),
+      dialogShown,
+      model((model) => {
+        expect(model.removing).toMatchObject(Option.some({ connectionId: machine.id, hasKey: false }))
+      })
+    )
+    story(
+      update,
+      given(listed),
+      ...readAsMember,
+      message(Message.ClickedRemove({ connectionId: search.id })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("sends the removal once as an action, and closes and reports it with the name the connection had", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      message(Message.ConfirmedRemoval()),
+      Command.expectExact(RemoveConnection({ ...asMember, connectionId: search.id })),
+      model((model) => {
+        expect(model.removing).toMatchObject(Option.some({ isSending: true }))
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(RemoveConnection, Message.WroteAction({ written: Written.Remove({ connectionId: search.id }) })),
+      expectOutMessage(OutMessage.RemovedConnection({ name: "Search" })),
+      Command.expectExact(Dialog.test.CloseDialog),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+    story(update, given(listed), ...read, message(Message.ConfirmedRemoval()), Command.expectNone())
+  })
+
+  it("says under the confirmation, which stays open, that the connection could not be removed, until it is sent again", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      message(Message.ConfirmedRemoval()),
+      Command.resolve(
+        RemoveConnection,
+        Message.FailedWriteAction({ written: Written.Remove({ connectionId: search.id }), reason: "Failed" })
+      ),
+      model((model) => {
+        expect(model.removing).toMatchObject(
+          Option.some({
+            isSending: false,
+            failure: Option.some({ action: "Remove", reason: "Failed", description: Option.none() })
+          })
+        )
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      message(Message.ConfirmedRemoval()),
+      Command.resolve(RemoveConnection, Message.WroteAction({ written: Written.Remove({ connectionId: search.id }) })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+    )
+  })
+
+  it("closes the confirmation of a connection somebody else removed, unless the person's own request is on its way", () => {
+    story(
+      update,
+      given(listed),
+      ...onSearch,
+      message(Message.ReceivedConnections({ connections: unpending(team, machine) })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.removing).toEqual(Option.none())
+      })
+    )
+    story(
+      update,
+      given(
+        modifyFields(listed, {
+          dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
+          removing: () =>
+            Option.some({
+              connectionId: search.id,
+              name: "Search",
+              hasKey: true,
+              isSending: true,
+              failure: Option.none()
+            })
+        })
+      ),
+      message(Message.ReceivedConnections({ connections: unpending(team, machine) })),
+      Command.expectNone(),
+      model((model) => {
+        expect(Option.isSome(model.removing)).toBe(true)
+      })
+    )
+  })
+
+  it("keeps the dialog open on the request on its way when the person closes it then, and lets it close when it is not", () => {
+    story(
+      update,
+      given(
+        modifyFields(listed, {
+          dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }),
+          removing: () =>
+            Option.some({
+              connectionId: search.id,
+              name: "Search",
+              hasKey: true,
+              isSending: true,
+              failure: Option.none()
+            })
+        })
+      ),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.expectHas(Dialog.test.CloseDialog, Dialog.test.ShowDialog),
+      model((model) => {
+        expect(Option.isSome(model.removing)).toBe(true)
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+    )
+  })
+})
+
+describe("what the connections confirm", () => {
+  it("says what was done, naming the connection where it is not the page's own", () => {
+    expect(connectionsToast.created("MCP server")).toBe("MCP server created")
+    expect(connectionsToast.nameSaved).toBe("Name saved")
+    expect(connectionsToast.settingsSaved).toBe("Settings saved")
+    expect(connectionsToast.keyReplaced).toBe("API key replaced")
+    expect(connectionsToast.removed("MCP server")).toBe("MCP server removed")
+  })
+
+  it("reports a name and settings that were saved, once the store keeps them", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.TypedName({ connectionId: search.id, name: "Search servers" })),
+      message(Message.SubmittedName({ connectionId: search.id })),
+      Command.resolve(RenameConnection, Message.WroteAction({ written: Written.Rename({ connectionId: search.id }) })),
+      expectOutMessage(OutMessage.SavedName()),
+      message(Message.ChangedSetting({ connectionId: search.id, name: "region", value: "us" })),
+      message(Message.SubmittedSettings({ connectionId: search.id })),
+      Command.resolve(
+        ConfigureConnection,
+        Message.WroteAction({ written: Written.Configure({ connectionId: search.id }) })
+      ),
+      expectOutMessage(OutMessage.SavedSettings())
+    )
   })
 })

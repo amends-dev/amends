@@ -20,12 +20,37 @@ export const capabilityLabels: Readonly<Record<Integration.Capability, string>> 
   channels: "Channels"
 }
 
+/** "model", "tool", "sandbox", "harness", or "channel", as in "Add tool connection". */
+export const capabilityNouns: Readonly<Record<Integration.Capability, string>> = {
+  models: "model",
+  tools: "tool",
+  sandboxes: "sandbox",
+  harnesses: "harness",
+  channels: "channel"
+}
+
+/**
+ * What adds a connection is called, and the dialog it opens: "Add connection", or, from one section, "Add tool
+ * connection".
+ */
+export const addLabel = (capability: Option.Option<Integration.Capability>): string =>
+  Option.match(capability, {
+    onNone: () => "Add connection",
+    onSome: (wanted) => `Add ${capabilityNouns[wanted]} connection`
+  })
+
 /** How a tab of the list is called: All, or what its connections give. */
 export const tabLabel = (tab: ConnectionsTab): string => (tab === "all" ? "All" : capabilityLabels[tab])
 
 export const authLabels: Readonly<Record<ConnectionContract.AuthMethod, string>> = {
   apiKey: "API key",
   none: "No authentication"
+}
+
+/** "API key", or "API key or no authentication". */
+export const authOptionsLabel = (methods: ReadonlyArray<ConnectionContract.AuthMethod>): string => {
+  const [first, ...rest] = methods.map((method) => authLabels[method])
+  return [first, ...rest.map((label) => label.toLowerCase())].filter(Boolean).join(" or ")
 }
 
 /** "Tools", or "Models and tools". */
@@ -127,3 +152,12 @@ export const connectionsMessage = (failure: Failure): string => messageOfReason[
 /** Whether the person must refresh before changing anything more: what they see is out of date. */
 export const needsRefresh = (reason: Reason): boolean =>
   reason === "Changed" || reason === "Denied" || reason === "Gone" || reason === "Uninstalled"
+
+/** What confirms a change that was made, for a toast: `created` and `removed` say which connection by its name. */
+export const connectionsToast = {
+  created: (name: string) => `${name} created`,
+  nameSaved: "Name saved",
+  settingsSaved: "Settings saved",
+  keyReplaced: "API key replaced",
+  removed: (name: string) => `${name} removed`
+}

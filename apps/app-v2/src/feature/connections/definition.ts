@@ -2,18 +2,23 @@
  * The workspace's connections, as a section of the sidebar for each thing a connection gives; as a list page, All and
  * each thing they give on a tab, narrowed by a search, each with its integration and how it authenticates and a mark
  * on its tile when it can't be used; and as the page of one, where, for a person who may manage it, they check
- * whether it works, rename it, and change its settings, and see why it can't be used. The workspace page lists the
- * host's integrations once and informs the Block of them. Other features read here which connections give what they
- * need, by `connectionsGiving`. The Block reports when the person asks to browse and the connection they pick, which
- * the workspace page shows the list or the connection's page for.
+ * whether it works, rename it, change its settings and replace its key, remove it, and see why it can't be used; and
+ * adding one, for a person who may, through an integration the host installs. Adding, replacing a key, and removing
+ * happen in a dialog the workspace page lends the shell. The workspace page lists the host's integrations once and
+ * informs the Block of them. Other features read here which connections give what they need, by
+ * `connectionsGiving`. The Block reports when the person asks to browse, the connection they pick, and what they did,
+ * which the workspace page shows the list or the connection's page for, and confirms.
  */
 
 import { Connection as ConnectionContract, Integration } from "@amends-dev/connection"
 import { Grant } from "@amends-dev/core/authorization"
 import { Connection, ConnectionPermissions } from "@amends-dev/core/connection"
 import { ReplicaRecord } from "@amends-dev/core/replica"
+import { Request } from "@amends-dev/core/request"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -91,7 +96,8 @@ export type CheckItem = typeof CheckItem.Type
  */
 export const Written = defineTaggedUnion({
   Rename: { connectionId: ConnectionContract.ConnectionId },
-  Configure: { connectionId: ConnectionContract.ConnectionId }
+  Configure: { connectionId: ConnectionContract.ConnectionId },
+  Remove: { connectionId: ConnectionContract.ConnectionId }
 })
 export type Written = typeof Written.Type
 
@@ -110,9 +116,70 @@ export const Edit = Schema.Struct({
 export type Edit = typeof Edit.Type
 
 /**
+ * A connection being added: the name it was sent under, and, once the host made it, its ID, which the dialog
+ * stays on until the store lists the connection.
+ */
+export const Creating = Schema.Struct({
+  name: Schema.String,
+  connectionId: Schema.Option(ConnectionContract.ConnectionId)
+})
+export type Creating = typeof Creating.Type
+
+/**
+ * What the dialog that adds a connection shows: the integrations to choose among, narrowed to what the person asked
+ * for from a sidebar section and by a search; or the connection to one of them, as the person fills it in. The key
+ * of the request is the one an earlier attempt sent, so that a retry of the same values returns the connection the
+ * first made and not a second; a change to what is filled in drops it.
+ */
+export const Adding = defineTaggedUnion({
+  Choosing: { capability: Schema.Option(Integration.Capability), query: Schema.String },
+  Configuring: {
+    capability: Schema.Option(Integration.Capability),
+    integrationId: Schema.String,
+    name: Schema.String,
+    settings: SettingsForm.Draft,
+    auth: ConnectionContract.AuthMethod,
+    apiKey: Schema.String,
+    key: Schema.Option(Request.Key),
+    failure: Schema.Option(Failure),
+    creating: Schema.Option(Creating)
+  }
+})
+export type Adding = typeof Adding.Type
+export type Choosing = Extract<Adding, { readonly _tag: "Choosing" }>
+export type Configuring = Extract<Adding, { readonly _tag: "Configuring" }>
+
+/**
+ * The dialog that replaces a connection's key: which connection, by the name it had when the person asked, the key
+ * they are typing, whether the request is on its way, and why the last one failed.
+ */
+export const Replacing = Schema.Struct({
+  connectionId: ConnectionContract.ConnectionId,
+  name: Schema.String,
+  apiKey: Schema.String,
+  isSending: Schema.Boolean,
+  failure: Schema.Option(Failure)
+})
+export type Replacing = typeof Replacing.Type
+
+/**
+ * The confirmation, in the dialog, that removes a connection: which, by the name it had when the person asked,
+ * whether it has a key that goes with it, whether the request is on its way, and why the last one failed.
+ */
+export const Removing = Schema.Struct({
+  connectionId: ConnectionContract.ConnectionId,
+  name: Schema.String,
+  hasKey: Schema.Boolean,
+  isSending: Schema.Boolean,
+  failure: Schema.Option(Failure)
+})
+export type Removing = typeof Removing.Type
+
+/**
  * The workspace's connections, whether they are read yet, the members who made them, the integrations the host
- * installs, what the person may do, the list page's tab and search, what they changed on the connections' pages, the
- * last check of each, and why the last read failed.
+ * installs, what the person may do, the list page's tab and search, the dialog and what it is for, adding a
+ * connection, replacing a key, or confirming a removal, what they changed on the connections' pages, the last check
+ * of each, and why the last read failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -123,6 +190,10 @@ export const Model = Schema.Struct({
   integrations: Integrations,
   grants: Schema.Array(Grant.Grant),
   browse: Schema.Struct({ tab: ConnectionsTab, query: Schema.String }),
+  dialog: DialogBlock.Model,
+  adding: Schema.Option(Adding),
+  replacing: Schema.Option(Replacing),
+  removing: Schema.Option(Removing),
   edits: Schema.Array(Edit),
   checks: Schema.Array(CheckItem),
   notice: Schema.Option(Schema.String)
@@ -141,6 +212,25 @@ export const Message = defineMessageUnion({
   ClickedBrowse: { tab: ConnectionsTab },
   ClickedBrowseChannels: {},
   ClickedConnection: { connectionId: ConnectionContract.ConnectionId },
+  ClickedAdd: { capability: Schema.Option(Integration.Capability) },
+  TypedIntegrationQuery: { query: Schema.String },
+  ChoseIntegration: { integrationId: Schema.String },
+  ClickedBack: {},
+  TypedAddingName: { name: Schema.String },
+  ChangedAddingSetting: { name: Schema.String, value: Schema.Union([Schema.String, Schema.Boolean]) },
+  ChoseAuth: { auth: ConnectionContract.AuthMethod },
+  TypedApiKey: { apiKey: Schema.String },
+  SubmittedAdding: {},
+  AddedConnection: { connectionId: ConnectionContract.ConnectionId, name: Schema.String },
+  FailedAddConnection: { key: Schema.Option(Request.Key), failure: Failure },
+  ClickedReplaceKey: { connectionId: ConnectionContract.ConnectionId },
+  TypedNewKey: { apiKey: Schema.String },
+  SubmittedNewKey: {},
+  ReplacedConnectionKey: { connectionId: ConnectionContract.ConnectionId },
+  FailedReplaceConnectionKey: { connectionId: ConnectionContract.ConnectionId, failure: Failure },
+  ClickedRemove: { connectionId: ConnectionContract.ConnectionId },
+  ConfirmedRemoval: {},
+  CompletedFocusField: {},
   ChoseBrowseTab: { tab: ConnectionsTab },
   TypedBrowseQuery: { query: Schema.String },
   TypedName: { connectionId: ConnectionContract.ConnectionId, name: Schema.String },
@@ -162,13 +252,19 @@ export type Message = typeof Message.Type
 /**
  * What the Block asks of the workspace page: to list the integrations again, once the host could not be reached or
  * the person asks to refresh what they see; to show the connections, which browsing them asks; to open the
- * connection picked; and to show the channels.
+ * connection picked; to show the channels; and to confirm to the person what they did, with the page of the
+ * connection that was added opening and the list showing once one is removed.
  */
 export const OutMessage = defineMessageUnion({
   RequestedIntegrations: {},
   RequestedBrowse: {},
   OpenedConnection: { connectionId: ConnectionContract.ConnectionId },
-  RequestedChannels: {}
+  RequestedChannels: {},
+  SavedName: {},
+  SavedSettings: {},
+  ReplacedKey: {},
+  CreatedConnection: { connectionId: ConnectionContract.ConnectionId, name: Schema.String },
+  RemovedConnection: { name: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -232,6 +328,16 @@ export const isUninstalled = ({ connection }: ConnectionItem): boolean =>
 /** Whether the person may create connections. */
 export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean =>
   may(model.grants, ConnectionPermissions.Create, workspaceTarget(model.workspaceId))
+
+/**
+ * Whether the host has listed its integrations, which say what each connection gives and which a new one goes through.
+ */
+export const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
+  Integrations.isAnyOf(["Loaded"])(model.integrations)
+
+/** Whether the person may add a connection now: they may create connections and the host listed its integrations. */
+export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "integrations">): boolean =>
+  mayCreate(model) && areIntegrationsListed(model)
 
 /** Whether the person may rename the connection, change its settings and key, check it, and remove it. */
 export const mayManage = (model: Pick<Model, "workspaceId" | "grants">, { connection }: ConnectionItem): boolean =>
@@ -323,3 +429,76 @@ export const checkOf = (
   connectionId: ConnectionContract.ConnectionId
 ): Option.Option<Check> =>
   Option.fromUndefinedOr(model.checks.find((item) => item.connectionId === connectionId)?.check)
+
+/** The form that adds a connection, while the dialog shows one. */
+export const configuringOf = (model: Pick<Model, "adding">): Option.Option<Configuring> =>
+  Option.flatMap(model.adding, (adding) =>
+    Adding.matchOrElse(adding, { Configuring: (configuring) => Option.some(configuring) }, () => Option.none())
+  )
+
+/** The integrations a connection may be added through: those that give `capability`, when the person asked from one. */
+export const integrationsToAdd = (
+  model: Pick<Model, "integrations">,
+  capability: Option.Option<Integration.Capability>
+): ReadonlyArray<Connection.IntegrationView> =>
+  integrationsOf(model).filter(({ provides }) =>
+    Option.match(capability, {
+      onNone: () => true,
+      onSome: (wanted) => provides.includes(wanted)
+    })
+  )
+
+/**
+ * The integrations the dialog lists: those to add through, whose name or ID contains the search, in any case and
+ * whatever the accents.
+ */
+export const shownIntegrations = (
+  model: Pick<Model, "integrations">,
+  choosing: Choosing
+): ReadonlyArray<Connection.IntegrationView> => {
+  const wanted = foldAccents(choosing.query.trim())
+
+  return integrationsToAdd(model, choosing.capability).filter(
+    ({ id, name }) => foldAccents(name).includes(wanted) || foldAccents(id).includes(wanted)
+  )
+}
+
+/**
+ * The form that adds a connection through `integration`, which starts as the integration is called, on its defaults and
+ * its first way of authenticating.
+ */
+export const startConfiguring = (
+  integration: Connection.IntegrationView,
+  capability: Option.Option<Integration.Capability>
+): Configuring =>
+  Adding.Configuring({
+    capability,
+    integrationId: integration.id,
+    name: integration.name,
+    settings: SettingsForm.draftOf(integration.settings),
+    auth: integration.auth[0] ?? "none",
+    apiKey: "",
+    key: Option.none(),
+    failure: Option.none(),
+    creating: Option.none()
+  })
+
+/**
+ * The settings a form that adds a connection makes, once it has a name, every setting the integration requires and
+ * is whole, and, when it authenticates with a key, the key.
+ */
+export const settingsToAdd = (
+  integration: Connection.IntegrationView,
+  configuring: Configuring
+): Option.Option<Connection.Settings> =>
+  configuring.name.trim() !== "" && (configuring.auth === "none" || configuring.apiKey.trim() !== "")
+    ? Result.getSuccess(SettingsForm.settingsOf(integration.settings, configuring.settings))
+    : Option.none()
+
+/** Whether a request from the dialog is on its way, so that closing it must wait to show how it ends. */
+export const isDialogBusy = (model: Pick<Model, "adding" | "replacing" | "removing">): boolean =>
+  Option.exists(configuringOf(model), ({ creating }) =>
+    Option.exists(creating, ({ connectionId }) => Option.isNone(connectionId))
+  ) ||
+  Option.exists(model.replacing, ({ isSending }) => isSending) ||
+  Option.exists(model.removing, ({ isSending }) => isSending)

@@ -1,17 +1,22 @@
 /**
- * What the person does with the workspace's connections: renaming one and changing its settings are actions written
- * to their store; checking a connection goes over HTTP, since no replica holds what its system answers.
+ * What the person does with the workspace's connections: renaming one, changing its settings, and removing it are
+ * actions written to their store; adding a connection, replacing a key, and checking a connection go over HTTP, since
+ * a key never enters an action and no replica holds what a system answers. And moving focus in the dialog.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
+import { Request } from "@amends-dev/core/request"
 import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Cause from "effect/Cause"
+import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
+import * as Dom from "foldkit/dom"
 import * as Api from "../../api.ts"
 import * as Stores from "../../store/Stores.ts"
 import {
@@ -123,6 +128,105 @@ export const ConfigureConnection = ConnectionsDefinition.command("ConfigureConne
   }
 })
 
+/** Remove `connectionId` from the workspace. */
+export const RemoveConnection = ConnectionsDefinition.command("RemoveConnection", {
+  args: { ...Stores.AsMember, connectionId: ConnectionContract.ConnectionId },
+  messages: outcomes,
+  handler: function* () {
+    const stores = yield* Stores.Stores
+    return ({ connectionId, ...member }) => {
+      const done = Written.Remove({ connectionId })
+      return Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) =>
+        store.write("ConnectionRemoved", { connectionId })
+      )
+    }
+  }
+})
+
+/** A request key no other request has. */
+const newRequestKey = Effect.gen(function* () {
+  const crypto = yield* Crypto.Crypto
+  return Request.Key.make(yield* crypto.randomUUIDv4())
+})
+
+/**
+ * Add a connection through `integration` called `name`, with its settings, and its key when it authenticates with
+ * one. Each attempt at the same values sends the same request key, so that one made again after an uncertain outcome
+ * returns the connection the first made, and not a second; a `key` is the one an earlier attempt sent, and none
+ * starts a new request.
+ */
+export const AddConnection = ConnectionsDefinition.command("AddConnection", {
+  args: {
+    workspaceId: WorkspaceId.WorkspaceId,
+    integration: Schema.String,
+    name: Schema.String,
+    auth: ConnectionContract.AuthMethod,
+    apiKey: Schema.String,
+    settings: Connection.Settings,
+    key: Schema.Option(Request.Key)
+  },
+  messages: [Message.AddedConnection, Message.FailedAddConnection],
+  handler: function* () {
+    return ({ workspaceId, apiKey, key, ...connection }) =>
+      Effect.gen(function* () {
+        const payload = yield* Stores.decoded(
+          Schema.toType(Connection.CreateInput),
+          { ...connection, ...(connection.auth === "apiKey" ? { apiKey: Redacted.make(apiKey.trim()) } : {}) },
+          Message.FailedAddConnection({ key, failure: failure("Create", "Invalid") })
+        )
+        const requestKey = Option.isSome(key)
+          ? key.value
+          : yield* newRequestKey.pipe(
+              Effect.mapError(() => Message.FailedAddConnection({ key, failure: failure("Create", "Failed") }))
+            )
+        const created = yield* Effect.gen(function* () {
+          const client = yield* Api.asMember(workspaceId)
+          return yield* client.connections.create({ headers: { "idempotency-key": requestKey }, payload })
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.fail(
+              Message.FailedAddConnection({
+                key: Option.some(requestKey),
+                failure: failureOf("Create", Cause.squash(cause))
+              })
+            )
+          )
+        )
+        return Message.AddedConnection({ connectionId: created.id, name: created.name })
+      }).pipe(Effect.catch(Effect.succeed))
+  }
+})
+
+/** Replace the key of `connectionId` with `apiKey`. */
+export const ReplaceConnectionKey = ConnectionsDefinition.command("ReplaceConnectionKey", {
+  args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId, apiKey: Schema.String },
+  messages: [Message.ReplacedConnectionKey, Message.FailedReplaceConnectionKey],
+  handler: function* () {
+    return ({ workspaceId, connectionId, apiKey }) =>
+      Effect.gen(function* () {
+        const key = yield* Stores.decoded(
+          Schema.toType(Connection.ApiKey),
+          Redacted.make(apiKey.trim()),
+          Message.FailedReplaceConnectionKey({ connectionId, failure: failure("ReplaceKey", "Invalid") })
+        )
+        yield* Effect.gen(function* () {
+          const client = yield* Api.asMember(workspaceId)
+          yield* client.connections.replaceKey({ params: { connectionId }, payload: { apiKey: key } })
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.fail(
+              Message.FailedReplaceConnectionKey({
+                connectionId,
+                failure: failureOf("ReplaceKey", Cause.squash(cause))
+              })
+            )
+          )
+        )
+        return Message.ReplacedConnectionKey({ connectionId })
+      }).pipe(Effect.catch(Effect.succeed))
+  }
+})
+
 /** Check `connectionId` with its system: whether it answers, and accepts the connection's key. */
 export const CheckConnection = ConnectionsDefinition.command("CheckConnection", {
   args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
@@ -143,4 +247,21 @@ export const CheckConnection = ConnectionsDefinition.command("CheckConnection", 
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(RenameConnection.layer, ConfigureConnection.layer, CheckConnection.layer)
+/** Move focus to the field `id`, such as the name of the connection a person has just chosen an integration for. */
+export const FocusField = ConnectionsDefinition.command("FocusField", {
+  args: { id: Schema.String },
+  messages: [Message.CompletedFocusField],
+  handler: function* () {
+    return ({ id }) => Dom.focus(`#${CSS.escape(id)}`).pipe(Effect.ignore, Effect.as(Message.CompletedFocusField()))
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(
+  RenameConnection.layer,
+  ConfigureConnection.layer,
+  RemoveConnection.layer,
+  AddConnection.layer,
+  ReplaceConnectionKey.layer,
+  CheckConnection.layer,
+  FocusField.layer
+)

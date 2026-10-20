@@ -35,6 +35,7 @@ import {
   bob,
   bobIsMember,
   connectionOf,
+  connectionTo,
   design,
   general,
   grantsOf,
@@ -52,6 +53,7 @@ import {
   saying,
   scout,
   scoutAgent,
+  searchApi,
   support,
   task,
   testApi,
@@ -66,7 +68,16 @@ import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
-import { Integrations } from "../../feature/connections/definition.ts"
+import {
+  AddConnection,
+  CheckConnection,
+  ConfigureConnection,
+  FocusField,
+  RemoveConnection,
+  RenameConnection,
+  ReplaceConnectionKey
+} from "../../feature/connections/command.ts"
+import { Integrations, Written as ConnectionWritten } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { CreateTeam } from "../../feature/groups/command.ts"
@@ -337,6 +348,34 @@ const agentsDialogOpened = () =>
     Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
     Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources())
   ] as const
+
+const connectionsDialogOpened = agentsDialogOpened
+
+const searchConnection = connectionTo("connection-2", "search-api", "Search tools", "apiKey", {
+  url: "https://search.example.com/mcp",
+  verbose: false,
+  region: "eu"
+})
+
+/** What a connection of the models integration is, which the host lists beside the search server. */
+const createdConnection = connectionTo("connection-9", "test-models", "Test models")
+
+/**
+ * The connections as an owner reads them: the host lists a models integration and a search server, and one connection
+ * to the latter is read.
+ */
+const withSearchConnection = modifyFields(opened, {
+  connections: (connections) =>
+    modifyFields(connections, {
+      isLoaded: () => true,
+      integrations: () =>
+        Integrations.Loaded({
+          integrations: [integrationGiving("test-models", "Test models", ["models"]), searchApi]
+        }),
+      grants: () => grantsOf([aliceOwns]),
+      connections: () => [{ connection: searchConnection, pending: false }]
+    })
+})
 
 /** The agents as an owner reads them: scout runs on the models connection, which the host listed. */
 const withAgent = modifyFields(opened, {
@@ -987,6 +1026,175 @@ describe("a workspace", () => {
       expect(role("heading", { name: "This connection isn't here", level: 2 })).toExist(),
       click(role("button", { name: "Show all connections" })),
       expect(role("main", { name: "Connections" })).toExist()
+    )
+  })
+
+  it("adds a connection in the dialog, confirms it in a toast that goes by itself, opens its page, and checks it", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(withSearchConnection),
+      click(railButton("Connections")),
+      click(sidebarButton("Add model connection")),
+      ...connectionsDialogOpened(),
+      inside(
+        role("dialog", { name: "Add model connection" }),
+        expect(text(workspace.name)).toExist(),
+        click(role("button", { name: "Test models" }))
+      ),
+      Command.resolve(FocusField, ConnectionsBlock.Message.CompletedFocusField()),
+      inside(role("dialog", { name: "Configure connection" }), click(role("button", { name: "Create connection" }))),
+      Command.expectExact(
+        AddConnection({
+          workspaceId: workspace.id,
+          integration: "test-models",
+          name: "Test models",
+          auth: "none",
+          apiKey: "",
+          settings: {},
+          key: Option.none()
+        })
+      ),
+      Command.resolve(
+        AddConnection,
+        ConnectionsBlock.Message.AddedConnection({ connectionId: createdConnection.id, name: "Test models" })
+      ),
+      Subscription.emit(
+        workspaceSubscriptions["connections/connections"],
+        ConnectionsBlock.Message.ReceivedConnections({
+          connections: [searchConnection, createdConnection].map((connection) => ({ connection, pending: false }))
+        })
+      ),
+      Command.expectHas(
+        Dialog.test.CloseDialog,
+        ExpireConfirmation({ id: 1 }),
+        CheckConnection({ workspaceId: workspace.id, connectionId: createdConnection.id })
+      ),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(
+        CheckConnection,
+        ConnectionsBlock.Message.CheckedConnection({
+          connectionId: createdConnection.id,
+          health: { status: "healthy" }
+        })
+      ),
+      expect(role("dialog", { name: "Configure connection" })).toBeAbsent(),
+      expect(text("Test models created")).toExist(),
+      inside(
+        role("main", { name: "Test models" }),
+        expect(role("heading", { name: "Test models", level: 1 })).toExist(),
+        expect(role("note", { name: "Working" })).toExist()
+      ),
+      expect(sidebarButton("Test models")).toHaveAttr("aria-current", "page"),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(text("Test models created")).toBeAbsent()
+    )
+  })
+
+  it("opens the dialog on the integrations from the list's Add connection, which the shell keeps over the page", () => {
+    scene(
+      { update, view: sceneView },
+      given(withSearchConnection),
+      click(railButton("Connections")),
+      click(within(role("main", { name: "Connections" }), role("button", { name: "Add connection" }))),
+      ...connectionsDialogOpened(),
+      inside(
+        role("dialog", { name: "Add connection" }),
+        expect(text(workspace.name)).toExist(),
+        expect(role("button", { name: "MCP server" })).toExist(),
+        expect(role("button", { name: "Test models" })).toExist()
+      ),
+      expect(role("main", { name: "Connections" })).toExist()
+    )
+  })
+
+  it("confirms saving a connection's name and settings in a toast that goes by itself, and keeps its page", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withSearchConnection, { open: () => Open.Connection({ connectionId: searchConnection.id }) })),
+      type(label("Connection name"), "Search"),
+      click(role("button", { name: "Save name" })),
+      Command.resolve(
+        RenameConnection,
+        ConnectionsBlock.Message.WroteAction({
+          written: ConnectionWritten.Rename({ connectionId: searchConnection.id })
+        })
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      expect(text("Name saved")).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      type(label("Server URL"), "https://search.example.com/v2/mcp"),
+      click(role("button", { name: "Save settings" })),
+      Command.resolve(
+        ConfigureConnection,
+        ConnectionsBlock.Message.WroteAction({
+          written: ConnectionWritten.Configure({ connectionId: searchConnection.id })
+        })
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 2 })),
+      expect(text("Settings saved")).toExist(),
+      expect(role("main", { name: "Search tools" })).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 })),
+      expect(text("Settings saved")).toBeAbsent()
+    )
+  })
+
+  it("replaces a connection's key from its page in a dialog, and confirms it in a toast", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withSearchConnection, { open: () => Open.Connection({ connectionId: searchConnection.id }) })),
+      click(role("button", { name: "Replace key" })),
+      ...connectionsDialogOpened(),
+      inside(
+        role("dialog", { name: "Replace API key" }),
+        type(label("New API key"), "sk-new"),
+        click(role("button", { name: "Replace key" }))
+      ),
+      Command.expectExact(
+        ReplaceConnectionKey({ workspaceId: workspace.id, connectionId: searchConnection.id, apiKey: "sk-new" })
+      ),
+      Command.resolve(
+        ReplaceConnectionKey,
+        ConnectionsBlock.Message.ReplacedConnectionKey({ connectionId: searchConnection.id })
+      ),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      expect(role("dialog", { name: "Replace API key" })).toBeAbsent(),
+      expect(text("API key replaced")).toExist(),
+      expect(role("main", { name: "Search tools" })).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
+    )
+  })
+
+  it("removes a connection from its page after a question, confirms it in a toast, and shows the list", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withSearchConnection, { open: () => Open.Connection({ connectionId: searchConnection.id }) })),
+      click(role("button", { name: "Remove connection" })),
+      ...connectionsDialogOpened(),
+      expect(role("dialog", { name: "Remove connection?" })).toExist(),
+      click(within(role("dialog", { name: "Remove connection?" }), role("button", { name: "Remove connection" }))),
+      Command.expectExact(
+        RemoveConnection({
+          workspaceId: workspace.id,
+          memberId: membership.member.id,
+          connectionId: searchConnection.id
+        })
+      ),
+      Command.resolve(
+        RemoveConnection,
+        ConnectionsBlock.Message.WroteAction({
+          written: ConnectionWritten.Remove({ connectionId: searchConnection.id })
+        })
+      ),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      expect(role("dialog", { name: "Remove connection?" })).toBeAbsent(),
+      expect(text("Search tools removed")).toExist(),
+      expect(role("main", { name: "Connections" })).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
     )
   })
 

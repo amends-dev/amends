@@ -7,11 +7,14 @@ import { Option } from "effect"
 import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import {
+  aliceOwns,
   bob,
   connectionOf,
+  connectionTo,
   conversationWithBob,
   design,
   general,
+  grantsOf,
   keylessConnection,
   membership,
   notificationOf,
@@ -23,6 +26,7 @@ import {
   reviewerAgent,
   scout,
   scoutAgent,
+  searchApi,
   support,
   task,
   testApi,
@@ -37,7 +41,13 @@ import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
-import { Integrations } from "../../feature/connections/definition.ts"
+import { CheckConnection } from "../../feature/connections/command.ts"
+import {
+  Adding,
+  Integrations,
+  startConfiguring,
+  Written as ConnectionWritten
+} from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { ThreadsBinding } from "../../feature/group/composition.ts"
 import { init as initGroup } from "../../feature/group/init.ts"
@@ -132,6 +142,79 @@ const removingAgent = openAgentsDialog(
     agents: (agents) =>
       modifyFields(readAgents(agents), {
         removing: () => Option.some({ agentId, name: "Scout", isSending: true, failure: Option.none() })
+      })
+  })
+)
+
+const searchConnection = connectionTo("connection-2", "search-api", "Search tools", "apiKey", {
+  url: "https://search.example.com/mcp",
+  verbose: false,
+  region: "eu"
+})
+const connectionId = searchConnection.id
+
+const createdConnection = connectionTo("connection-9", "search-api", "MCP server", "apiKey", {
+  url: "https://search.example.com/mcp",
+  verbose: false,
+  region: "eu"
+})
+
+/** The model with the dialog of the connections open. */
+const openConnectionsDialog = (model: typeof opened) =>
+  modifyFields(model, {
+    connections: (connections) =>
+      modifyFields(connections, { dialog: (dialog) => modifyFields(dialog, { isOpen: () => true }) })
+  })
+
+/** The connections as alice, who owns the workspace, reads them: one to the search server, which the host lists. */
+const readConnections = (connections: typeof opened.connections) =>
+  modifyFields(connections, {
+    isLoaded: () => true,
+    integrations: () => Integrations.Loaded({ integrations: [searchApi] }),
+    grants: () => grantsOf([aliceOwns]),
+    connections: () => [{ connection: searchConnection, pending: false }]
+  })
+
+/** The page of the connection to the search server open among the connections alice reads. */
+const withConnectionPage = modifyFields(opened, {
+  open: () => Open.Connection({ connectionId }),
+  connections: readConnections
+})
+
+/** The key of the search connection being replaced, its request on its way, in the dialog. */
+const replacingKey = openConnectionsDialog(
+  modifyFields(withConnectionPage, {
+    connections: (connections) =>
+      modifyFields(connections, {
+        replacing: () =>
+          Option.some({ connectionId, name: "Search tools", apiKey: "sk-new", isSending: true, failure: Option.none() })
+      })
+  })
+)
+
+/** The form that adds the MCP server made by the host, and not yet listed by the store, in the dialog. */
+const addingConnection = openConnectionsDialog(
+  modifyFields(opened, {
+    connections: (connections) =>
+      modifyFields(readConnections(connections), {
+        adding: () =>
+          Option.some(
+            Adding.Configuring({
+              ...startConfiguring(searchApi, Option.none()),
+              creating: Option.some({ name: "MCP server", connectionId: Option.some(createdConnection.id) })
+            })
+          )
+      })
+  })
+)
+
+/** The confirmation that removes the search connection, its request on its way, in the dialog. */
+const removingConnection = openConnectionsDialog(
+  modifyFields(withConnectionPage, {
+    connections: (connections) =>
+      modifyFields(connections, {
+        removing: () =>
+          Option.some({ connectionId, name: "Search tools", hasKey: true, isSending: true, failure: Option.none() })
       })
   })
 )
@@ -547,6 +630,113 @@ describe("a workspace", () => {
       }),
       dialogClosed,
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
+    )
+  })
+
+  it("confirms to the person in a toast that they saved a connection's name or settings or replaced its key, and stays on its page", () => {
+    story(
+      update,
+      given(withConnectionPage),
+      message(
+        fromConnections(ConnectionsBlock.Message.WroteAction({ written: ConnectionWritten.Rename({ connectionId }) }))
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Name saved" }])
+        expect(model.open).toEqual(Open.Connection({ connectionId }))
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      message(
+        fromConnections(
+          ConnectionsBlock.Message.WroteAction({ written: ConnectionWritten.Configure({ connectionId }) })
+        )
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 2 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Settings saved" }])
+        expect(model.open).toEqual(Open.Connection({ connectionId }))
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 }))
+    )
+    story(
+      update,
+      given(replacingKey),
+      message(fromConnections(ConnectionsBlock.Message.ReplacedConnectionKey({ connectionId }))),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "API key replaced" }])
+        expect(model.open).toEqual(Open.Connection({ connectionId }))
+        expect(model.connections.replacing).toEqual(Option.none())
+      }),
+      dialogClosed,
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
+    )
+  })
+
+  it("confirms a connection added in a toast and opens its page once the store lists it, closing the dialog and checking it", () => {
+    story(
+      update,
+      given(addingConnection),
+      message(
+        fromConnections(
+          ConnectionsBlock.Message.ReceivedConnections({
+            connections: [searchConnection, createdConnection].map((connection) => ({ connection, pending: false }))
+          })
+        )
+      ),
+      Command.expectHas(
+        Dialog.test.CloseDialog,
+        ExpireConfirmation({ id: 1 }),
+        CheckConnection({ workspaceId, connectionId: createdConnection.id })
+      ),
+      model((model) => {
+        expect(model.open).toEqual(Open.Connection({ connectionId: createdConnection.id }))
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "MCP server created" }])
+        expect(model.connections.adding).toEqual(Option.none())
+      }),
+      dialogClosed,
+      Command.resolve(
+        CheckConnection,
+        ConnectionsBlock.Message.CheckedConnection({
+          connectionId: createdConnection.id,
+          health: { status: "healthy" }
+        })
+      ),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
+    )
+  })
+
+  it("confirms a connection removed in a toast and shows the list of connections, closing the dialog", () => {
+    story(
+      update,
+      given(removingConnection),
+      message(
+        fromConnections(ConnectionsBlock.Message.WroteAction({ written: ConnectionWritten.Remove({ connectionId }) }))
+      ),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(Open.isAnyOf(["Connections"])(model.open)).toBe(true)
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Search tools removed" }])
+        expect(model.connections.removing).toEqual(Option.none())
+      }),
+      dialogClosed,
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
+    )
+  })
+
+  it("opens the dialog on the integrations for the sidebar's Create, whatever destination shows, and not the page's list", () => {
+    story(
+      update,
+      given(withConnectionPage),
+      message(fromConnections(ConnectionsBlock.Message.ClickedAdd({ capability: Option.some("tools") }))),
+      dialogShown,
+      model((model) => {
+        expect(model.connections.dialog.isOpen).toBe(true)
+        expect(model.connections.adding).toEqual(
+          Option.some(Adding.Choosing({ capability: Option.some("tools"), query: "" }))
+        )
+        expect(model.open).toEqual(Open.Connection({ connectionId }))
+      })
     )
   })
 
