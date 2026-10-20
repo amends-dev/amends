@@ -13,6 +13,7 @@ import { Group, GroupId } from "@amends-dev/core/group"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import { Thread, ThreadId, ThreadMessage, ThreadMessageId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import type { MarkContent } from "@amends-dev/design/mark"
 import type { TextRun } from "@amends-dev/design/message"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -241,10 +242,10 @@ const notificationAuthor = (item: InboxItem, model: Model): Option.Option<Readon
 export const notificationHeadline = (
   item: InboxItem,
   model: Model
-): Readonly<{ mark: string; author: string; activity: string }> =>
+): Readonly<{ mark: MarkContent; author: string; activity: string }> =>
   Option.match(Option.all([notificationAuthor(item, model), notificationReason(item, model.memberId)]), {
-    onNone: () => ({ mark: "?", author: "Activity", activity: "in a thread" }),
-    onSome: ([{ name, mark }, reason]) => ({ mark, author: name, activity: doneForReason[reason] })
+    onNone: () => ({ mark: { text: "?" }, author: "Activity", activity: "in a thread" }),
+    onSome: ([{ name, mark }, reason]) => ({ mark: { text: mark }, author: name, activity: doneForReason[reason] })
   })
 
 /**

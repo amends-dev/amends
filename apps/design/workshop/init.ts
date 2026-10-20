@@ -22,6 +22,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     isNotificationsOn: true,
     isDigestOn: false,
     isGroupPrivate: false,
+    isNameSending: false,
     modalTab: "general",
     integrationQuery: "",
     plan: "team",

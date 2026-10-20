@@ -163,8 +163,39 @@ describe("modal over a dialog's published groups", () => {
   })
 })
 
+describe("modal width", () => {
+  const widthView = (width?: ModalConfig<Message>["width"]) => (_: Model, h: HtmlBuilder<Message>) =>
+    modal(h, visibleRender, {
+      title: "Your name",
+      body: [],
+      onSubmit: Message.SubmittedSettings(),
+      ...(width === undefined ? {} : { width })
+    })
+
+  it("is 26rem wide unless it is told otherwise, 32rem for wide, and 35rem for compact, less than the window by a gutter", () => {
+    scene(
+      { update, view: widthView() },
+      given(initial),
+      expect(selector("form")).toHaveClass("w-[min(26rem,calc(100%-2rem))]")
+    )
+    scene(
+      { update, view: widthView("wide") },
+      given(initial),
+      expect(selector("form")).toHaveClass("w-[min(32rem,calc(100%-2rem))]")
+    )
+    scene(
+      { update, view: widthView("compact") },
+      given(initial),
+      expect(selector("form")).toHaveClass("w-[min(35rem,calc(100%-2rem))]")
+    )
+  })
+})
+
 describe("modal footer", () => {
-  type Footer = Pick<ModalConfig<Message>, "cancelLabel" | "footer" | "isCancelLeading" | "leading">
+  type Footer = Pick<
+    ModalConfig<Message>,
+    "cancelLabel" | "footer" | "isCancelDisabled" | "isCancelLeading" | "leading"
+  >
 
   const footerView = (footer: (h: HtmlBuilder<Message>) => Footer) => (_: Model, h: HtmlBuilder<Message>) =>
     modal(h, visibleRender, {
@@ -190,6 +221,28 @@ describe("modal footer", () => {
       expect(nth(buttons, 1)).toHaveText("Cancel"),
       expect(nth(buttons, 2)).toHaveText("Replace key"),
       expectAll(all.selector("div.me-auto")).toHaveCount(0)
+    )
+  })
+
+  it("dims the Cancel when it is disabled, and leaves the footer's actions as they are", () => {
+    scene(
+      {
+        update,
+        view: footerView((h) => ({
+          cancelLabel: "Cancel",
+          isCancelDisabled: true,
+          footer: [button(h, "Save name", Message.ClickedOpen())]
+        }))
+      },
+      given(initial),
+      expect(role("button", { name: "Cancel" })).toHaveAttr("aria-disabled", "true"),
+      expect(role("button", { name: "Cancel" })).toHaveAttr("type", "button"),
+      expect(role("button", { name: "Save name" })).not.toHaveAttr("aria-disabled")
+    )
+    scene(
+      { update, view: footerView(() => ({ cancelLabel: "Cancel" })) },
+      given(initial),
+      expect(role("button", { name: "Cancel" })).not.toHaveAttr("aria-disabled")
     )
   })
 
@@ -328,6 +381,7 @@ const parentView = ParentComposition.makeView((model, h) =>
                   )
                 ],
                 cancelLabel: "Cancel",
+                isCancelDisabled: model.name === "saving",
                 footer: [submit(h, "Save changes")],
                 onSubmit: ParentMessage.SubmittedSettings()
               })
@@ -373,6 +427,23 @@ describe("modal in a Block that binds the dialog", () => {
       ...dialogClosed(),
       expect(role("heading", { name: "Group settings" })).toBeAbsent(),
       expect(role("status")).toHaveText("Saved 0")
+    )
+  })
+
+  it("cannot be closed with a Cancel that is disabled, and can once it is not", () => {
+    scene(
+      { update: parentUpdate, view: parentView },
+      given(parentInit().model),
+      click(role("button", { name: "Open settings" })),
+      ...dialogOpened(),
+      type(label("Group name"), "saving"),
+      expect(role("button", { name: "Cancel" })).toBeDisabled(),
+      expect(role("heading", { name: "Group settings" })).toExist(),
+      type(label("Group name"), "saved"),
+      expect(role("button", { name: "Cancel" })).not.toBeDisabled(),
+      click(role("button", { name: "Cancel" })),
+      ...dialogClosed(),
+      expect(role("heading", { name: "Group settings" })).toBeAbsent()
     )
   })
 

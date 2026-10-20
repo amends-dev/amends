@@ -25,6 +25,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
+  announcement,
   answerKeys,
   button,
   buttonClass,
@@ -1293,6 +1294,31 @@ describe("loadingLine", () => {
       given(initial),
       expect(role("status")).toHaveText("Loading your inbox…"),
       expect(selector('p[role="status"]')).toExist()
+    )
+  })
+})
+
+describe("announcement", () => {
+  const announcing = (words: Option.Option<string>) => (_: Model, h: HtmlBuilder<Message>) =>
+    h.div([], [announcement(h, words)])
+
+  it("says what happened, in a live region", () => {
+    scene(
+      { update, view: announcing(Option.some("We sent a new code. Use the latest one.")) },
+      given(initial),
+      expect(role("status")).toHaveText("We sent a new code. Use the latest one."),
+      expect(selector('p[role="status"]')).toExist(),
+      expect(role("status")).not.toHaveClass("hidden")
+    )
+  })
+
+  it("is in place before it has anything to say, empty and taking back a gap of the column it lies in", () => {
+    scene(
+      { update, view: announcing(Option.none()) },
+      given(initial),
+      expect(role("status")).toExist(),
+      expect(role("status")).toHaveText(""),
+      expect(role("status")).toHaveClass("empty:-mb-4")
     )
   })
 })

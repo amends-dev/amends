@@ -5,6 +5,7 @@ import type { Html } from "foldkit/html"
 import { centered, centeredAccount, copy, heading, screenContent } from "../src/centered.ts"
 import { composer } from "../src/composer.ts"
 import {
+  announcement,
   button,
   buttonRow,
   type Choice,
@@ -119,6 +120,7 @@ import {
   ApplicationComposition,
   AssigneeFilterBinding,
   ChooserModalBinding,
+  CompactModalBinding,
   ConfirmModalBinding,
   MemberFilterBinding,
   MembersPaneFilterBinding,
@@ -806,7 +808,7 @@ const emailScreen = (h: ApplicationViewBuilder, signInEmail: string): Html =>
     ]
   })
 
-const codeScreen = (h: ApplicationViewBuilder, code: string): Html =>
+const codeScreen = (h: ApplicationViewBuilder, code: string, news: Option.Option<string>): Html =>
   centered(h, {
     width: "form",
     children: [
@@ -832,6 +834,7 @@ const codeScreen = (h: ApplicationViewBuilder, code: string): Html =>
           ),
           hint(h, "Use your most recent code."),
           submit(h, "Verify code", { size: "large", wide: true }),
+          announcement(h, news),
           inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedButton(), { variant: "link" })])
         ])
       ])
@@ -1444,7 +1447,18 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
       [h.div([h.Class(screenFrame)], [emailScreen(h, signInEmail)])],
       "flex flex-col"
     ),
-    sample(h, "Form width, code step", [h.div([h.Class(screenFrame)], [codeScreen(h, code)])], "flex flex-col"),
+    sample(
+      h,
+      "Form width, code step",
+      [h.div([h.Class(screenFrame)], [codeScreen(h, code, Option.none())])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Form width, code step after a new code was sent",
+      [h.div([h.Class(screenFrame)], [codeScreen(h, code, Option.some("We sent a new code. Use the latest one."))])],
+      "flex flex-col"
+    ),
     sample(
       h,
       "Directory width, with workspaces and invitations",
@@ -1860,7 +1874,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             divider(h, "Today"),
             notification(h, {
               key: "sara",
-              mark: "S",
+              mark: { text: "S" },
               author: "Sara",
               activity: "mentioned you",
               place: "#general",
@@ -1870,9 +1884,9 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               onOpen: press
             }),
             notification(h, {
-              key: "alex",
-              mark: "AM",
-              author: "Alex",
+              key: "atlas",
+              mark: { text: "AT", tone: "lilac" },
+              author: "Atlas",
               activity: "replied",
               place: "#engineering",
               text: "The retry now keeps the original request. Ready for another look.",
@@ -1882,7 +1896,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             }),
             notification(h, {
               key: "oliver",
-              mark: "O",
+              mark: { text: "O" },
               author: "Oliver",
               activity: "replied",
               place: "#product",
@@ -1893,7 +1907,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             divider(h, "Yesterday"),
             notification(h, {
               key: "caleb",
-              mark: "C",
+              mark: { text: "C" },
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
@@ -1903,7 +1917,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             }),
             notification(h, {
               key: "activity",
-              mark: "?",
+              mark: { icon: "message" },
               author: "Activity",
               activity: "in a thread",
               place: "Unavailable thread",
@@ -1925,7 +1939,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             divider(h, "Today"),
             notification(h, {
               key: "current-sara",
-              mark: "S",
+              mark: { text: "S" },
               author: "Sara",
               activity: "mentioned you",
               place: "#general",
@@ -1936,7 +1950,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             }),
             notification(h, {
               key: "current-alex",
-              mark: "AM",
+              mark: { text: "AM" },
               author: "Alex",
               activity: "replied",
               place: "#engineering",
@@ -1947,7 +1961,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             }),
             notification(h, {
               key: "current-oliver",
-              mark: "O",
+              mark: { text: "O" },
               author: "Oliver",
               activity: "replied",
               place: "#product",
@@ -1970,7 +1984,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
             divider(h, "Yesterday"),
             notification(h, {
               key: "paged-caleb",
-              mark: "C",
+              mark: { text: "C" },
               author: "Caleb",
               activity: "mentioned you",
               place: "Caleb · Direct message",
@@ -3950,6 +3964,40 @@ const confirmModal = (h: ApplicationViewBuilder, render: RenderInfo): Html =>
     onSubmit: Message.SubmittedConfirmModal()
   })
 
+const compactModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Your name",
+    context: "Mercier & Co",
+    description: "What people in this workspace call you. Others keep their own.",
+    body: [
+      field(
+        h,
+        {
+          id: "modal-own-name",
+          label: "Name",
+          type: "text",
+          value: model.fullName,
+          isAutofocus: false,
+          isDisabled: model.isNameSending,
+          attributes: render.initialFocus,
+          onInput: (value) => Message.TypedFullName({ value })
+        },
+        Option.none()
+      ),
+      toggle(h, {
+        id: "modal-name-sending",
+        label: "The request is on its way",
+        isOn: model.isNameSending,
+        onToggle: (isOn) => Message.ToggledNameSending({ isOn })
+      })
+    ],
+    cancelLabel: "Cancel",
+    isCancelDisabled: model.isNameSending,
+    footer: [submit(h, model.isNameSending ? "Saving…" : "Save name", { isDisabled: model.isNameSending })],
+    onSubmit: Message.SubmittedCompactModal(),
+    width: "compact"
+  })
+
 type IntegrationSample = Readonly<{ name: string; detail: string }>
 
 const integrationSamples: ReadonlyArray<IntegrationSample> = [
@@ -4036,6 +4084,16 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
         )
       ]
     ),
+    sample(h, "Compact, with a description; while its request is on its way, Cancel and the action are dimmed", [
+      button(h, "Open the compact modal", Message.ClickedOpenCompactModal()),
+      h.block(
+        CompactModalBinding.embedView({
+          slotId: "compact-modal",
+          model: model.compactModal,
+          viewInputs: { hasDescription: true, toView: (render) => compactModal(h, render, model) }
+        })
+      )
+    ]),
     sample(h, "A search over rows that run to the panel's edges", [
       button(h, "Open the chooser", Message.ClickedOpenChooserModal()),
       h.block(

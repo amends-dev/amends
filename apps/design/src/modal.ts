@@ -28,7 +28,8 @@ const panelBase = "relative flex max-h-[calc(100dvh-4rem)] flex-col bg-raised sh
 
 const panelWidths = {
   form: "w-[min(26rem,calc(100%-2rem))]",
-  wide: "w-[min(32rem,calc(100%-2rem))]"
+  wide: "w-[min(32rem,calc(100%-2rem))]",
+  compact: "w-[min(35rem,calc(100%-2rem))]"
 }
 
 const headerBand = "flex flex-none flex-col px-6 shadow-[inset_0_-1px_0_var(--amends-divider)]"
@@ -84,9 +85,11 @@ export type ModalConfig<Message> = Readonly<{
   cancelLabel?: string
   /** Puts the `cancelLabel` button at the start of the footer, ahead of the `leading` controls, and not at its end. */
   isCancelLeading?: boolean
+  /** Disables the `cancelLabel` button, for a form that cannot be left while its request is on its way. */
+  isCancelDisabled?: boolean
   /** Makes the panel a form that sends this when submitted, so a `submit` in the footer sends it. */
   onSubmit?: Message
-  /** `form` (the default) is 26rem, `wide` 32rem, each less than the window by a 1rem gutter. */
+  /** `form` (the default) is 26rem, `wide` 32rem, and `compact` 35rem, each less than the window by a 1rem gutter. */
   width?: ModalWidth
 }>
 
@@ -124,10 +127,12 @@ const renderFooter = <Message, Requirements>(
     return h.empty
   }
 
+  const cancelAttributes =
+    config.isCancelDisabled === true
+      ? [h.Type("button"), h.AriaDisabled(true), h.DataAttribute("disabled", "")]
+      : render.closeButton
   const cancel =
-    config.cancelLabel === undefined
-      ? []
-      : [buttonWith(h, render.closeButton, config.cancelLabel, { variant: "quiet" })]
+    config.cancelLabel === undefined ? [] : [buttonWith(h, cancelAttributes, config.cancelLabel, { variant: "quiet" })]
   const leading = [...(config.isCancelLeading === true ? cancel : []), ...(config.leading ?? [])]
 
   return h.div(
@@ -159,8 +164,9 @@ export const modalList = <Message, Requirements>(
  * The dialog `render` describes, as a panel over a scrim while it is visible, and nothing while it is not: a
  * header of the `title`, the `context` after it, and a Close button, with the `tabs` under it; the `body`,
  * which scrolls, led by the `description`; and a footer of the `leading` controls at the start, and at the end a
- * quiet Cancel and the `footer`'s actions, or, with `isCancelLeading`, the Cancel at the start. The panel is 26rem
- * wide, or 32rem for `wide`, and less than the window by a gutter.
+ * quiet Cancel and the `footer`'s actions, or, with `isCancelLeading`, the Cancel at the start. A Cancel that
+ * `isCancelDisabled` is dimmed and closes nothing. The panel is 26rem wide, 32rem for `wide`, or 35rem for `compact`,
+ * and less than the window by a gutter.
  */
 export const modal = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

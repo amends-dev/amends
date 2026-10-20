@@ -132,19 +132,23 @@ describe("the inbox", () => {
   })
 
   it("tells who wrote what a notification is about and what they did, or that there was activity", () => {
-    expect(notificationHeadline(itemOf(older), known)).toEqual({ mark: "B", author: "Bob", activity: "replied" })
+    expect(notificationHeadline(itemOf(older), known)).toEqual({
+      mark: { text: "B" },
+      author: "Bob",
+      activity: "replied"
+    })
     expect(notificationHeadline({ ...itemOf(older), message: Option.some(mention) }, known)).toEqual({
-      mark: "B",
+      mark: { text: "B" },
       author: "Bob",
       activity: "mentioned you"
     })
     expect(notificationHeadline({ ...itemOf(older), message: Option.some(opening) }, known)).toEqual({
-      mark: "A",
+      mark: { text: "A" },
       author: "Alice",
       activity: "started a thread"
     })
     expect(notificationHeadline(withoutThread(older), known)).toEqual({
-      mark: "?",
+      mark: { text: "?" },
       author: "Activity",
       activity: "in a thread"
     })

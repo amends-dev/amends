@@ -31,12 +31,12 @@ directory's section and rows, a row with cells and no action, a table of agents 
 named for their workspaces, with a footnote after them, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
-sign-in's two steps and as the workspace picker five times, each with its pieces in `screenContent` as the app's
+sign-in's two steps, the second again with the announcement of a new code, and as the workspace picker five times, each with its pieces in `screenContent` as the app's
 pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header but the one after something went wrong, which is outside the session, with the brand alone in the header and Reload a link to the page itself; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+Members tab has an action at the start of its footer and Done at its end, as a compact one with a context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -44,7 +44,7 @@ conversation's messages as a list with a current row whose text opens the thread
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with a form in place of the text, and set apart by dividers, centered and at the
-start, and notifications under the days Today and Yesterday, unread with a dot and read, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a pane's empty state with a title
+start, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a pane's empty state with a title
 and a line of copy under a header with an action, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
@@ -227,6 +227,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   technology, which reads the input and its label.
 - `loadingLine(h, text)` is a quiet line of what a pane or a page is waiting for, such as "Loading your inbox…", in
   a live region, a `status`, so that it is announced. A list that is being read shows `loadingRows` instead.
+- `announcement(h, text)` is a quiet line, at hint size in `ink-secondary`, of what just happened, such as "We sent
+  a new code. Use the latest one.", given as an `Option<string>`. It is a live region, a `status`, that is on the page
+  before it has anything to say, so that assistive technology announces the words as they arrive. With none it is
+  empty, has no height, and takes back the 16px gap of the form column it lies in (`empty:-mb-4`), so it takes no room.
 - `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
   `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
   that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
@@ -812,7 +816,9 @@ What a conversation is made of.
   `aria-current="true"`. A row has 10px of space above and below and reaches 12px into the pane's
   gutter, so the fill of the current row reaches past the text.
 - `notification(h, config)` is a row of the same list for a notification, keyed by `config.key` and set
-  like `message`: the `mark` letters at 32px, then a column of a first line, the place, and the text.
+  like `message`: the `mark` at 32px, which is a `MarkContent` (see `mark`): the author's letters on the ground of
+  their tone, `neutral` unless given and `lilac` for an agent, or, for a notification that has no author to show, an
+  icon such as `message`; then a column of a first line, the place, and the text.
   The first line is the `author` at item size in medium weight, then the `activity` after it in the
   same size, weight, and `ink`, such as "Sara" and "mentioned you", and at its end the `age`, already
   formatted, such as "2m ago" or "Yesterday", at `meta` size in `ink-muted`. While `isUnread`, a round 6px dot of `ink`, hidden from assistive
@@ -928,11 +934,13 @@ the `dialog` element, the focus inside it, Escape, the click on the scrim, and t
     `cancelLabel`, then the `footer`'s controls, the one the modal exists for last, such as a `submit`. The `leading`
     controls, such as Back to the step before or an action that opens another dialog, sit at the start, apart from the
     rest, and `isCancelLeading` puts the Cancel there too, ahead of them, as a confirmation does with the primary
-    action alone at the end.
+    action alone at the end. With `isCancelDisabled` the Cancel is dimmed and closes nothing, for a form whose request
+    is on its way.
   - `onSubmit`, which makes the panel a form that sends it, so a `submit` in the footer sends it.
     Close and Cancel are `type="button"`, so they close without sending it. Without `onSubmit` the
     panel is a `div`.
-  - `width`, `"form"` (the default) for a panel 26rem wide, or `"wide"` for 32rem. A panel is
+  - `width`, `"form"` (the default) for a panel 26rem wide, `"wide"` for 32rem, or `"compact"` for 35rem, the width
+    of `@amends-dev/ui`'s compact modals, such as the one that changes a name. A panel is
     never wider than the window less a 1rem gutter on each side, nor taller than the window less
     4rem. It is `raised` with `shadow-modal` and no rounding, over a `scrim-strong` scrim.
 - `modalList(h, label, rows)` is for a modal that is a choice among things, such as the integrations
@@ -1044,7 +1052,7 @@ landmarks, a heading's action on its line, a form by its label, with the pane va
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; the logo the same, with a
 class for each motion and none without one; each state art drawn, hidden from assistive technology, and moving in
 the part its kind moves; the code input's six cells, the digits it keeps, its completion at the sixth, its
-outlined cell and its refusal, and its loading line as a `status`; a list that is loading by its `status` line and
+outlined cell and its refusal, and its loading line as a `status`, and an announcement by the `status` that is there while it says nothing and the words once it does; a list that is loading by its `status` line and
 its rows hidden from assistive technology; a rail
 destination by `role("button", { name })` with `aria-current`, and the search beside them, which is never current and
 sends what it is given, and the account at its foot, a button named for the person that opens a menu to the right with their
@@ -1071,11 +1079,13 @@ toast by `role("alert")`, or `role("status")` for a confirmation, with its text,
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the buttons of the footer in the order they sit, the leading ones and a
 Cancel told to lead at the start and the rest at the end, the control given `initialFocus` by its marker, and Close and
-Cancel by closing the dialog without sending the form, and a list of rows by its label, a row each
+Cancel by closing the dialog without sending the form, a Cancel that is disabled by `aria-disabled` and by closing
+nothing when pressed, the panel's width by its class for each of the three widths, and a list of rows by its label, a row each
 with its meta as its description, the side and bottom padding it cancels, and the message a row sends; a message by
 its text button, `aria-current`, its note, actions, meta, and body, a mention in its text by the
 chip that holds it and a button by the words joined, a notification by its
-text button named by its author and activity and described by its text, its place and age,
+text button named by its author and activity and described by its text, its mark by its tone and by the icon that
+takes the place of letters, its place and age,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
 and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, and the

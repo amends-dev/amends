@@ -44,6 +44,12 @@ export const ConfirmModalBinding = ApplicationDefinition.bindChild(DialogBlock, 
   outMessage: { fold: foldDialogOutMessage }
 })
 
+export const CompactModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "compactModal",
+  init: { contextToArgs: () => [{ id: "workshop-compact-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
 export const MemberFilterBinding = ApplicationDefinition.bindChild(MemberFilterMenu, {
   field: "memberFilterMenu",
   init: { contextToArgs: () => [{ id: "workshop-member-filter" }] },
@@ -183,6 +189,7 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     WideModalBinding,
     ChooserModalBinding,
     ConfirmModalBinding,
+    CompactModalBinding,
     MemberFilterBinding,
     AssigneeFilterBinding,
     TaskFilterBinding,

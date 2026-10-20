@@ -6,6 +6,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
+import type { MarkContent } from "./mark.ts"
 import { description, divider, event, message, messageList, notification, replyLine, type TextRun } from "./message.ts"
 
 const Message = defineMessageUnion({
@@ -291,7 +292,7 @@ describe("notification", () => {
   const sara = (h: HtmlBuilder<Message>, options: Options) =>
     notification(h, {
       key: "notification-1",
-      mark: "S",
+      mark: { text: "S" },
       author: "Sara",
       activity: "mentioned you",
       ...(options.place === undefined ? {} : { place: options.place }),
@@ -326,6 +327,64 @@ describe("notification", () => {
       { update, view: viewOf(notifications()) },
       given(initial),
       expect(within(selector("li"), text("S"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("draws the author's letters on the neutral ground unless it is given a tone, as the lilac of an agent", () => {
+    const marked = (content: MarkContent) => (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Notifications",
+        children: [
+          notification(h, {
+            key: "notification-1",
+            mark: content,
+            author: "Atlas",
+            activity: "replied",
+            text: "Done.",
+            age: "1m ago"
+          })
+        ]
+      })
+
+    scene(
+      { update, view: marked({ text: "S" }) },
+      given(initial),
+      expect(text("S")).toHaveClass("bg-avatar-neutral-bg"),
+      expect(text("S")).toHaveClass("size-8")
+    )
+    scene(
+      { update, view: marked({ text: "AT", tone: "lilac" }) },
+      given(initial),
+      expect(text("AT")).toHaveClass("bg-avatar-lilac-bg"),
+      expect(text("AT")).toHaveClass("text-avatar-lilac-fg")
+    )
+  })
+
+  it("draws an icon in place of letters for a notification that has no author to show, hidden from assistive technology", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Notifications",
+            children: [
+              notification(h, {
+                key: "notification-1",
+                mark: { icon: "message" },
+                author: "Activity",
+                activity: "in a thread",
+                text: "You can no longer see this thread.",
+                age: "1m ago"
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(within(selector("li"), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(selector("li"), selector('span[aria-hidden="true"]'))).toHaveClass("size-8"),
+      expect(text("Activity")).toExist(),
+      expect(text(" in a thread")).toExist()
     )
   })
 
@@ -413,7 +472,7 @@ describe("notification", () => {
               sara(h, { isCurrent: true }),
               notification(h, {
                 key: "notification-2",
-                mark: "A",
+                mark: { text: "A" },
                 author: "Alex",
                 activity: "replied",
                 text: "Looks good.",

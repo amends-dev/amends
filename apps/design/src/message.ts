@@ -8,7 +8,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { icon } from "./icon.ts"
-import { mark } from "./mark.ts"
+import { type MarkContent, mark } from "./mark.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
 
@@ -246,8 +246,9 @@ const renderAge = <Message, Requirements>(
   )
 
 /**
- * One notification, a row of a `messageList` beside `message`, keyed by `key` and set like it: the `mark` letters,
- * then a first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
+ * One notification, a row of a `messageList` beside `message`, keyed by `key` and set like it: the `mark`, the
+ * author's letters on the ground of their tone, or an icon for a notification that has no author to show, then a
+ * first line of the `author` in medium weight followed by the `activity` in the same size and `ink`, such
  * as "Sara" and "mentioned you", under it the `place` it comes from, at `meta` size in `ink-muted`, and the
  * `text`, a string or `TextRun`s, in which a mention is a chip. At the end of the first line is the `age`, already
  * formatted, such as "2m ago". While `isUnread`, a 6px dot of `ink` comes before the age, hidden from assistive
@@ -261,7 +262,7 @@ export const notification = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
     key: string
-    mark: string
+    mark: MarkContent
     author: string
     activity: string
     place?: string | undefined
@@ -278,7 +279,7 @@ export const notification = <Message, Requirements>(
     config.key,
     [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(rowLook)],
     [
-      mark(h, { text: config.mark, size: "md" }),
+      mark(h, { ...config.mark, size: "md" }),
       h.div(
         [h.Class(rowColumn)],
         [

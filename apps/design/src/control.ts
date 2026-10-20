@@ -1,8 +1,8 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row they lie in, a link
  * to another page, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a list, a
- * six-digit code, a line of hint, what is being waited for, why an entry was refused, a boxed note for a page as a
- * whole, that an action is on its way, and the column that holds a few of these together. Each renders with the
+ * six-digit code, a line of hint, what is being waited for, what just happened, why an entry was refused, a boxed note
+ * for a page as a whole, that an action is on its way, and the column that holds a few of these together. Each renders with the
  * caller's builder and messages, and carries the look.
  */
 
@@ -138,6 +138,8 @@ const sendingMark = "text-meta text-ink-muted"
 const hintText = "text-hint text-ink-muted"
 
 const loadingText = "m-0 text-control text-ink-secondary"
+
+const announcementText = "m-0 text-hint text-ink-secondary empty:-mb-4"
 
 const codeCells = "group relative grid grid-cols-6 gap-3 max-tablet:gap-2"
 
@@ -464,6 +466,20 @@ export const hint = <Message, Requirements>(h: HtmlBuilder<Message, Requirements
  */
 export const loadingLine = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Role("status"), h.Class(loadingText)], [text])
+
+/**
+ * A quiet line of what just happened, such as that a new code was sent, in a live region, a `status`, that is on the
+ * page before it has anything to say, so that assistive technology announces the words when they arrive. Without
+ * words it has no height and takes back the 16px gap of the form column it lies in (`-mb-4`), so it takes no room.
+ */
+export const announcement = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  text: Option.Option<string>
+): Html =>
+  Option.match(text, {
+    onNone: () => h.p([h.Role("status"), h.Class(announcementText)]),
+    onSome: (words) => h.p([h.Role("status"), h.Class(announcementText)], [words])
+  })
 
 /** That what the person did is on its way to the server, while it is. */
 export const sending = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, pending: boolean): Html =>
