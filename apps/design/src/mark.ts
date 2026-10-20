@@ -15,6 +15,7 @@ const markBase = "relative grid flex-none place-items-center font-medium upperca
 
 const markTones = {
   neutral: "bg-avatar-neutral-bg text-avatar-neutral-fg",
+  slate: "bg-avatar-slate-bg text-avatar-slate-fg",
   lilac: "bg-avatar-lilac-bg text-avatar-lilac-fg"
 }
 
@@ -125,8 +126,9 @@ export const statusTooltip = <Message, Requirements>(
   })
 
 /**
- * The `text` letters, upper-cased, or the `icon`, in a square on the ground of its `tone`, `neutral` unless given:
- * `xs` 20px, `choice` 22px, `sm` (the default) 24px, `account` 28px, `md` 32px, or `lg` 40px. An icon is drawn at the
+ * The `text` letters, upper-cased, or the `icon`, in a square on the ground of its `tone`: `neutral` unless given,
+ * `slate` for the person who wrote a message, and `lilac` for an agent. The square is `xs` 20px, `choice` 22px, `sm`
+ * (the default) 24px, `account` 28px, `md` 32px, or `lg` 40px. An icon is drawn at the
  * size that fits its square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md`) and takes the color of the ground's text. A mark
  * with a `status` has its patch over the bottom end corner, overhanging it by 2px, in a notch 2px wider all round that
  * is cut from the surface behind it, in the color of `status-knockout`, which a row that is hovered or current sets to

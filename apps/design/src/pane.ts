@@ -55,6 +55,8 @@ const bodyScroll = "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
 
 const bodyScrollUnderToolbar = "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-0 pb-5"
 
+const bodyAtEnd = "flex flex-col *:flex-none [&>:first-child]:mt-auto"
+
 const toolbarStack = "flex flex-col gap-3"
 
 const toolbarBand = `${toolbarStack} flex-none px-6 pt-5 max-desktop:pt-4 max-tablet:pb-3`
@@ -211,6 +213,10 @@ const renderHeader = <Message, Requirements>(
  * The `toolbar` is what stays under the header while the list scrolls: a `paneToolbar` of the search, the filters,
  * and the actions, then, if the list has them, the line that says what it holds and its `columns`. The body then
  * starts flush under it, so the first row is the one under the columns.
+ *
+ * The body's first element rests against its start unless the `anchor` is `bottom`, which a conversation takes: where
+ * it is shorter than the body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is
+ * taller the body scrolls as it does for any other.
  */
 export const pane = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -220,14 +226,16 @@ export const pane = <Message, Requirements>(
     header: PaneHeader
     toolbar?: ReadonlyArray<Html>
     body: ReadonlyArray<Html>
+    anchor?: "top" | "bottom"
     footer?: ReadonlyArray<Html>
   }>
 ): Html => {
   const attributes = [...(config.label === undefined ? [] : [h.AriaLabel(config.label)]), h.Class(paneRoot)]
+  const scroll = config.toolbar === undefined ? bodyScroll : bodyScrollUnderToolbar
   const children = [
     renderHeader(h, config.variant, config.header),
     config.toolbar === undefined ? h.empty : h.div([h.Class(toolbarBand)], config.toolbar),
-    h.div([h.Class(config.toolbar === undefined ? bodyScroll : bodyScrollUnderToolbar)], config.body),
+    h.div([h.Class(config.anchor === "bottom" ? `${scroll} ${bodyAtEnd}` : scroll)], config.body),
     config.footer === undefined ? h.empty : h.div([h.Class(footerBar)], config.footer)
   ]
 

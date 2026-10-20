@@ -17,7 +17,9 @@ import {
   type MessageText,
   note,
   notification,
-  replyLine,
+  repliesButton,
+  replyInThreadButton,
+  taskChip,
   turnLog,
   turnRow
 } from "./message.ts"
@@ -74,8 +76,8 @@ const threads = (model: Model, h: HtmlBuilder<Message>) =>
         author: "Alex",
         time: "9:41 AM",
         text: "The preview is ready for another look.",
-        onOpen: Message.OpenedThread({ key: "thread-1" }),
-        isCurrent: model.current === "thread-1"
+        isCurrent: model.current === "thread-1",
+        meta: [replyInThreadButton(h, { onClick: Message.OpenedThread({ key: "thread-1" }) })]
       }),
       message(h, {
         key: "thread-2",
@@ -84,14 +86,37 @@ const threads = (model: Model, h: HtmlBuilder<Message>) =>
         time: "10:02 AM",
         note: "Sending…",
         text: "found a bug. composer crashes when I paste an image",
-        onOpen: Message.OpenedThread({ key: "thread-2" }),
         isCurrent: model.current === "thread-2",
-        meta: [h.span([], ["2 new"]), h.span([], ["Doing"])]
+        meta: [
+          h.span([], ["2 new"]),
+          h.span([], ["Doing"]),
+          replyInThreadButton(h, { onClick: Message.OpenedThread({ key: "thread-2" }) })
+        ]
       })
     ]
   })
 
 describe("messageList", () => {
+  it("has the id it is given, for a Command to find, and none unless it is given one", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          h.div(
+            [],
+            [
+              messageList(h, { label: "Threads", id: "threads-general", children: [] }),
+              messageList(h, { label: "Replies", children: [] })
+            ]
+          )
+        )
+      },
+      given(initial),
+      expect(role("list", { name: "Threads" })).toHaveAttr("id", "threads-general"),
+      expect(role("list", { name: "Replies" })).not.toHaveAttr("id")
+    )
+  })
+
   it("is a list named by its label with one item for each message", () => {
     scene(
       { update, view: viewOf(threads) },
@@ -139,16 +164,6 @@ describe("message", () => {
       given(initial),
       expect(text("9:41 AM")).toExist(),
       expect(text(/·/)).toBeAbsent()
-    )
-  })
-
-  it("makes its text a button named by it that sends onOpen, when it has one", () => {
-    scene(
-      { update, view: viewOf(threads) },
-      given(initial),
-      expect(role("button", { name: "The preview is ready for another look." })).toExist(),
-      click(role("button", { name: "The preview is ready for another look." })),
-      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
     )
   })
 
@@ -211,62 +226,6 @@ describe("message", () => {
     )
   })
 
-  it("makes text with a mention a button named by its words, with the mention a chip in it", () => {
-    scene(
-      {
-        update,
-        view: viewOf((_, h) =>
-          messageList(h, {
-            label: "Threads",
-            children: [
-              message(h, {
-                key: "thread-1",
-                mark: "S",
-                author: "Sara",
-                text: mentionText,
-                onOpen: Message.OpenedThread({ key: "thread-1" })
-              })
-            ]
-          })
-        )
-      },
-      given(initial),
-      expect(within(role("button", { name: mention }), text("@Jamie"))).toHaveClass("bg-mention"),
-      click(role("button", { name: mention })),
-      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
-    )
-  })
-
-  it("makes markdown in a button its preview, words and mentions that hold no block, link, or other button", () => {
-    scene(
-      {
-        update,
-        view: viewOf((_, h) =>
-          messageList(h, {
-            label: "Threads",
-            children: [
-              message(h, {
-                key: "thread-1",
-                mark: "S",
-                author: "Sara",
-                text: formatted,
-                onOpen: Message.OpenedThread({ key: "thread-1" })
-              })
-            ]
-          })
-        )
-      },
-      given(initial),
-      expect(role("button", { name: formattedWords })).toExist(),
-      expect(selector("button p")).toBeAbsent(),
-      expect(selector("button strong")).toBeAbsent(),
-      expect(selector("button a")).toBeAbsent(),
-      expect(selector("button li")).toBeAbsent(),
-      click(role("button", { name: formattedWords })),
-      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
-    )
-  })
-
   it("marks the current row with aria-current and no other", () => {
     scene(
       { update, view: viewOf(threads) },
@@ -274,9 +233,58 @@ describe("message", () => {
       expect(selector('[aria-current="true"]')).toExist(),
       expect(within(selector('[aria-current="true"]'), text("AJ"))).toExist(),
       expect(within(selector('[aria-current="true"]'), text("Alex"))).toBeAbsent(),
-      click(role("button", { name: "The preview is ready for another look." })),
+      click(within(nth(all.role("listitem"), 0), role("button", { name: "Reply in thread" }))),
       expect(within(selector('[aria-current="true"]'), text("Alex"))).toExist(),
       expect(within(selector('[aria-current="true"]'), text("AJ"))).toBeAbsent()
+    )
+  })
+
+  it("draws a person's mark on the slate ground, and an agent's on the lilac with its name in the agent's color", () => {
+    const authors = (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Messages",
+        children: [
+          message(h, { key: "sara", mark: "S", author: "Sara", text: "Looks good." }),
+          message(h, { key: "yumi", mark: "Y", author: "Yumi", isAgent: true, text: "Checked the build." })
+        ]
+      })
+
+    scene(
+      { update, view: viewOf(authors) },
+      given(initial),
+      expect(text("S")).toHaveClass("bg-avatar-slate-bg"),
+      expect(text("S")).toHaveClass("text-avatar-slate-fg"),
+      expect(text("S")).toHaveClass("size-8"),
+      expect(text("Sara")).toHaveClass("text-ink"),
+      expect(text("Sara")).not.toHaveClass("text-agent"),
+      expect(text("Y")).toHaveClass("bg-avatar-lilac-bg"),
+      expect(text("Y")).toHaveClass("text-avatar-lilac-fg"),
+      expect(text("Yumi")).toHaveClass("text-agent"),
+      expect(text("Yumi")).not.toHaveClass("text-ink")
+    )
+  })
+
+  it("puts the attributes it is given on its row", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Messages",
+            children: [
+              message(h, {
+                key: "message-1",
+                mark: "S",
+                author: "Sara",
+                text: "Looks good.",
+                attributes: [h.DataAttribute("probe", "")]
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(selector("li")).toHaveAttr("data-probe", "")
     )
   })
 
@@ -289,7 +297,7 @@ describe("message", () => {
     )
   })
 
-  it("is plain text, not a button, without onOpen, with its actions as buttons at the end of the author line", () => {
+  it("is plain text, not a button, with its actions as buttons at the end of the author line", () => {
     scene(
       {
         update,
@@ -356,58 +364,183 @@ describe("message", () => {
     )
   })
 
-  it("shows (edited) after the words of a text that is a button too, inside it", () => {
+  it("shows the words that say it was deleted quiet and slanted, in place of text", () => {
     scene(
       {
         update,
         view: viewOf((_, h) =>
           messageList(h, {
-            label: "Threads",
+            label: "Messages",
             children: [
-              message(h, {
-                key: "thread-1",
-                mark: "S",
-                author: "Sara",
-                text: "Reproduced on both.",
-                isEdited: true,
-                onOpen: Message.OpenedThread({ key: "thread-1" })
-              })
+              message(h, { key: "message-1", mark: "Y", author: "Yumi", text: { deleted: "Message deleted" } })
             ]
           })
         )
       },
       given(initial),
-      expect(role("button", { name: "Reproduced on both. (edited)" })).toExist()
-    )
-  })
-
-  it("shows the words that say it was deleted quiet and slanted, in place of text, as a button's too", () => {
-    const deleted = (onOpen: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
-      messageList(h, {
-        label: "Messages",
-        children: [
-          message(h, {
-            key: "message-1",
-            mark: "Y",
-            author: "Yumi",
-            text: { deleted: "Message deleted" },
-            ...(onOpen ? { onOpen: Message.OpenedThread({ key: "message-1" }) } : {})
-          })
-        ]
-      })
-
-    scene(
-      { update, view: viewOf(deleted(false)) },
-      given(initial),
       expect(text("Message deleted")).toHaveClass("italic"),
       expect(text("Message deleted")).toHaveClass("text-ink-muted"),
       expect(role("button", { name: "Message deleted" })).toBeAbsent()
     )
-    scene(
-      { update, view: viewOf(deleted(true)) },
-      given(initial),
-      expect(within(role("button", { name: "Message deleted" }), text("Message deleted"))).toHaveClass("italic")
-    )
+  })
+
+  describe("stacked under its author's message", () => {
+    const stacking = (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Messages",
+        children: [
+          message(h, { key: "first", mark: "S", author: "Sara", time: "9:44 AM", text: "deploy went out clean" }),
+          message(h, {
+            key: "second",
+            mark: "S",
+            author: "Sara",
+            time: "9:46 AM",
+            text: "and the numbers are up",
+            isStacked: true,
+            shortTime: "9:46"
+          })
+        ]
+      })
+
+    it("has no mark, and keeps the author and the time for assistive technology", () => {
+      scene(
+        { update, view: viewOf(stacking) },
+        given(initial),
+        expectAll(all.text("S")).toHaveCount(1),
+        expectAll(all.text("Sara")).toHaveCount(2),
+        expect(within(nth(all.role("listitem"), 1), selector("div.sr-only"))).toHaveText("Sara9:46 AM"),
+        expect(within(nth(all.role("listitem"), 0), selector("div.sr-only"))).toBeAbsent(),
+        expect(within(nth(all.role("listitem"), 1), text("and the numbers are up"))).toExist()
+      )
+    })
+
+    it("shows its short time in the place of the mark, hidden from assistive technology and shown while hovered or focused", () => {
+      scene(
+        { update, view: viewOf(stacking) },
+        given(initial),
+        expect(text("9:46")).toHaveAttr("aria-hidden", "true"),
+        expect(text("9:46")).toHaveClass("invisible"),
+        expect(text("9:46")).toHaveClass("group-hover/message:visible"),
+        expect(text("9:46")).toHaveClass("group-focus-within/message:visible"),
+        expect(text("9:46")).toHaveClass("w-8")
+      )
+    })
+
+    it("sits closer to the message above it than a message that stands on its own", () => {
+      scene(
+        { update, view: viewOf(stacking) },
+        given(initial),
+        expect(nth(all.role("listitem"), 1)).toHaveClass("-mt-1"),
+        expect(nth(all.role("listitem"), 1)).toHaveClass("pt-0"),
+        expect(nth(all.role("listitem"), 0)).not.toHaveClass("-mt-1")
+      )
+    })
+  })
+
+  describe("hover actions", () => {
+    const hovering = (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Threads",
+        children: [
+          message(h, {
+            key: "thread-1",
+            mark: "AM",
+            author: "Alex",
+            text: "The preview is ready for another look.",
+            hoverActions: [
+              {
+                icon: "mark-reply",
+                label: "Reply in thread",
+                onClick: Message.OpenedThread({ key: "thread-1" }),
+                description: "The preview is ready for another look."
+              }
+            ]
+          }),
+          message(h, { key: "thread-2", mark: "S", author: "Sara", text: "Looks good." })
+        ]
+      })
+
+    it("are buttons in a group named Message actions, each named by its label and described by the words it opens", () => {
+      scene(
+        { update, view: viewOf(hovering) },
+        given(initial),
+        expectAll(all.role("group", { name: "Message actions" })).toHaveCount(1),
+        expect(
+          within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))
+        ).toHaveAttr("aria-description", "The preview is ready for another look."),
+        click(role("button", { name: "Reply in thread" })),
+        expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+      )
+    })
+
+    it("float over the end of the message's column, out of sight and out of reach until the message is hovered or focused", () => {
+      scene(
+        { update, view: viewOf(hovering) },
+        given(initial),
+        expect(role("group", { name: "Message actions" })).toHaveClass("absolute"),
+        expect(role("group", { name: "Message actions" })).toHaveClass("opacity-0"),
+        expect(role("group", { name: "Message actions" })).toHaveClass("pointer-events-none"),
+        expect(role("group", { name: "Message actions" })).toHaveClass("group-hover/message:opacity-100"),
+        expect(role("group", { name: "Message actions" })).toHaveClass("group-has-focus-visible/message:opacity-100")
+      )
+    })
+
+    it("say what they do in a tooltip over the button, hidden from assistive technology", () => {
+      scene(
+        { update, view: viewOf(hovering) },
+        given(initial),
+        expect(within(role("group", { name: "Message actions" }), selector('span[aria-hidden="true"]'))).toHaveText(
+          "Reply in thread"
+        )
+      )
+    })
+
+    it("say whether what they open is open, when they are told", () => {
+      const withExpanded = (isExpanded: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+        messageList(h, {
+          label: "Threads",
+          children: [
+            message(h, {
+              key: "thread-1",
+              mark: "AM",
+              author: "Alex",
+              text: "The preview is ready for another look.",
+              hoverActions: [
+                {
+                  icon: "mark-reply",
+                  label: "Reply in thread",
+                  onClick: Message.OpenedThread({ key: "thread-1" }),
+                  isExpanded
+                }
+              ]
+            })
+          ]
+        })
+
+      scene(
+        { update, view: viewOf(withExpanded(true)) },
+        given(initial),
+        expect(role("button", { name: "Reply in thread" })).toHaveAttr("aria-expanded", "true")
+      )
+      scene(
+        { update, view: viewOf(withExpanded(false)) },
+        given(initial),
+        expect(role("button", { name: "Reply in thread" })).toHaveAttr("aria-expanded", "false")
+      )
+      scene(
+        { update, view: viewOf(hovering) },
+        given(initial),
+        expect(role("button", { name: "Reply in thread" })).not.toHaveAttr("aria-expanded")
+      )
+    })
+
+    it("are not drawn for a message that has none", () => {
+      scene(
+        { update, view: viewOf(hovering) },
+        given(initial),
+        expect(within(nth(all.role("listitem"), 1), role("group", { name: "Message actions" }))).toBeAbsent()
+      )
+    })
   })
 
   it("shows its body in place of its text", () => {
@@ -688,63 +821,335 @@ describe("notification", () => {
   })
 })
 
-describe("replyLine", () => {
-  const withReplies = (marks: ReadonlyArray<string>, label: string) => (_: Model, h: HtmlBuilder<Message>) =>
-    messageList(h, {
-      label: "Threads",
-      children: [
-        message(h, {
-          key: "thread-1",
-          mark: "AJ",
-          author: "AJ",
-          time: "10:02 AM",
-          text: "found a bug. composer crashes when I paste an image",
-          meta: [replyLine(h, { marks, label })]
-        })
-      ]
-    })
+describe("repliesButton", () => {
+  type Replies = Parameters<typeof repliesButton<Message, never>>[1]
 
-  it("shows the marks of those who replied and what it says of the replies, under the message's text", () => {
+  const withReplies =
+    (replies: Partial<Replies> = {}) =>
+    (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Threads",
+        children: [
+          message(h, {
+            key: "thread-1",
+            mark: "AJ",
+            author: "AJ",
+            time: "10:02 AM",
+            text: "found a bug. composer crashes when I paste an image",
+            meta: [
+              repliesButton(h, {
+                marks: [{ text: "AM" }, { text: "Y" }, { text: "S" }],
+                label: "4 replies",
+                onClick: Message.OpenedThread({ key: "thread-1" }),
+                ...replies
+              })
+            ]
+          })
+        ]
+      })
+
+  it("is a button under the message's text, named by what it says of the replies, that sends its message", () => {
     scene(
-      { update, view: viewOf(withReplies(["AM", "Y", "S"], "4 replies")) },
+      { update, view: viewOf(withReplies()) },
       given(initial),
-      expect(within(role("listitem"), text("4 replies"))).toExist(),
-      expect(within(role("listitem"), text("AM"))).toExist(),
-      expect(within(role("listitem"), text("Y"))).toExist(),
-      expect(within(role("listitem"), text("S"))).toExist(),
+      expect(within(role("listitem"), role("button", { name: "4 replies" }))).toExist(),
+      expect(within(role("button", { name: "4 replies" }), text("4 replies"))).toExist(),
+      click(role("button", { name: "4 replies" })),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+
+  it("is described by the words of the thread it opens, when it has them", () => {
+    scene(
+      { update, view: viewOf(withReplies({ description: "found a bug" })) },
+      given(initial),
+      expect(role("button", { name: "4 replies" })).toHaveAttr("aria-description", "found a bug")
+    )
+    scene(
+      { update, view: viewOf(withReplies()) },
+      given(initial),
+      expect(role("button", { name: "4 replies" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("says whether its thread is open, when it is told", () => {
+    scene(
+      { update, view: viewOf(withReplies({ isExpanded: true })) },
+      given(initial),
+      expect(role("button", { name: "4 replies" })).toHaveAttr("aria-expanded", "true")
+    )
+    scene(
+      { update, view: viewOf(withReplies({ isExpanded: false })) },
+      given(initial),
+      expect(role("button", { name: "4 replies" })).toHaveAttr("aria-expanded", "false")
+    )
+    scene(
+      { update, view: viewOf(withReplies()) },
+      given(initial),
+      expect(role("button", { name: "4 replies" })).not.toHaveAttr("aria-expanded")
+    )
+  })
+
+  it("shows a dot before the label while the replies are unread, and says so in its name", () => {
+    scene(
+      { update, view: viewOf(withReplies({ isUnread: true })) },
+      given(initial),
+      expect(role("button", { name: "4 replies, unread" })).toExist(),
+      expect(within(role("button"), selector("span.bg-indicator"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button"), selector("span.bg-indicator"))).toHaveClass("rounded-full")
+    )
+    scene(
+      { update, view: viewOf(withReplies()) },
+      given(initial),
+      expect(role("button", { name: "4 replies" })).toExist(),
+      expect(selector("span.bg-indicator")).toBeAbsent()
+    )
+  })
+
+  it("shows the marks of those who replied, on a person's tone unless they have their own", () => {
+    scene(
+      {
+        update,
+        view: viewOf(withReplies({ marks: [{ text: "AM" }, { text: "Y", tone: "lilac" }, { text: "S" }] }))
+      },
+      given(initial),
+      expect(within(role("button"), text("AM"))).toHaveClass("bg-avatar-slate-bg"),
+      expect(within(role("button"), text("Y"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(within(role("button"), text("S"))).toHaveClass("bg-avatar-slate-bg"),
+      expect(within(role("button"), text("S"))).toHaveClass("size-5.5"),
       expect(text(/^\+\d+$/)).toBeAbsent()
     )
   })
 
-  it("hides its tree line and its marks from assistive technology, and leaves its label to be read", () => {
+  it("hides its elbow and its marks from assistive technology, and leaves its label to be read", () => {
     scene(
-      { update, view: viewOf(withReplies(["AM", "Y", "S"], "4 replies")) },
+      { update, view: viewOf(withReplies()) },
       given(initial),
       expect(text("Y")).toHaveAttr("aria-hidden", "true"),
-      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(5),
+      expect(within(role("button"), selector("svg"))).toHaveAttr("aria-hidden", "true"),
       expect(text("4 replies")).not.toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("hangs a stitched elbow from the row's mark", () => {
+    scene(
+      { update, view: viewOf(withReplies()) },
+      given(initial),
+      expect(within(role("button"), selector("svg"))).toHaveClass("text-stitch"),
+      expect(within(role("button"), selector("svg"))).toHaveClass("absolute"),
+      expect(within(role("button"), selector("svg path"))).toHaveAttr("stroke-dasharray", "7 4")
     )
   })
 
   it("shows the first three marks and counts the rest after them", () => {
     scene(
-      { update, view: viewOf(withReplies(["AM", "Y", "S", "O", "G"], "9 replies")) },
+      {
+        update,
+        view: viewOf(
+          withReplies({
+            marks: [{ text: "AM" }, { text: "Y" }, { text: "S" }, { text: "O" }, { text: "G" }],
+            label: "9 replies"
+          })
+        )
+      },
       given(initial),
-      expect(text("S")).toExist(),
+      expect(within(role("button"), text("S"))).toExist(),
       expect(text("O")).toBeAbsent(),
       expect(text("G")).toBeAbsent(),
-      expect(text("+2")).toHaveAttr("aria-hidden", "true"),
+      expect(text("+2")).toExist(),
       expect(text("9 replies")).toExist()
     )
   })
 
-  it("shows one mark for one reply", () => {
+  it("counts the rest in its own span, beside the overlapping marks, and keeps its label on one line", () => {
     scene(
-      { update, view: viewOf(withReplies(["Y"], "1 reply")) },
+      {
+        update,
+        view: viewOf(
+          withReplies({
+            marks: [{ text: "AM" }, { text: "Y" }, { text: "S" }, { text: "O" }],
+            label: "9 replies"
+          })
+        )
+      },
       given(initial),
-      expect(text("Y")).toExist(),
-      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(3),
-      expect(text("1 reply")).toExist()
+      expect(text("+1")).toHaveClass("text-ink-muted"),
+      expect(text("9 replies")).toHaveClass("whitespace-nowrap")
+    )
+  })
+
+  it("shows no marks while it does not know who replied", () => {
+    scene(
+      { update, view: viewOf(withReplies({ marks: [], label: "1 reply" })) },
+      given(initial),
+      expect(role("button", { name: "1 reply" })).toExist(),
+      expect(within(role("button"), selector("span.bg-avatar-slate-bg"))).toBeAbsent()
+    )
+  })
+
+  it("shows the agents at work in the thread and who types in it after the label, inside the button", () => {
+    scene(
+      {
+        update,
+        view: viewOf(
+          withReplies({
+            working: [
+              { state: "working", label: "Yumi working" },
+              { state: "queued", label: "Atlas queued" }
+            ],
+            typing: "Ada is typing…"
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("button", { name: "4 replies" }), text("Yumi working"))).toHaveClass("text-hint"),
+      expect(within(role("button", { name: "4 replies" }), text("Atlas queued"))).toExist(),
+      expect(within(role("button", { name: "4 replies" }), text("Ada is typing…"))).toHaveClass("text-ink-muted"),
+      click(text("Ada is typing…")),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+
+  it("says nothing of work or typing while there is none", () => {
+    scene(
+      { update, view: viewOf(withReplies()) },
+      given(initial),
+      expect(text(/working|queued|stopping|typing/)).toBeAbsent()
+    )
+  })
+})
+
+describe("replyInThreadButton", () => {
+  type Reply = Parameters<typeof replyInThreadButton<Message, never>>[1]
+
+  const withoutReplies =
+    (reply: Partial<Reply> = {}) =>
+    (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Threads",
+        children: [
+          message(h, {
+            key: "thread-1",
+            mark: "AM",
+            author: "Alex",
+            text: "The preview is ready for another look.",
+            meta: [replyInThreadButton(h, { onClick: Message.OpenedThread({ key: "thread-1" }), ...reply })]
+          })
+        ]
+      })
+
+  it("is a button named Reply in thread under the message's text, that sends its message", () => {
+    scene(
+      { update, view: viewOf(withoutReplies()) },
+      given(initial),
+      expect(within(role("listitem"), role("button", { name: "Reply in thread" }))).toExist(),
+      click(role("button", { name: "Reply in thread" })),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+
+  it("is described by the words of the thread it opens, when it has them", () => {
+    scene(
+      { update, view: viewOf(withoutReplies({ description: "The preview is ready" })) },
+      given(initial),
+      expect(role("button", { name: "Reply in thread" })).toHaveAttr("aria-description", "The preview is ready")
+    )
+  })
+
+  it("says whether its thread is open, when it is told", () => {
+    scene(
+      { update, view: viewOf(withoutReplies({ isExpanded: true })) },
+      given(initial),
+      expect(role("button", { name: "Reply in thread" })).toHaveAttr("aria-expanded", "true")
+    )
+    scene(
+      { update, view: viewOf(withoutReplies()) },
+      given(initial),
+      expect(role("button", { name: "Reply in thread" })).not.toHaveAttr("aria-expanded")
+    )
+  })
+
+  it("shows its words only where there is no pointer to hover, and is not there at all where there is, with nothing to say", () => {
+    scene(
+      { update, view: viewOf(withoutReplies()) },
+      given(initial),
+      expect(role("button", { name: "Reply in thread" })).toHaveClass("[@media(hover:hover)]:not-data-noted:hidden"),
+      expect(role("button", { name: "Reply in thread" })).not.toHaveAttr("data-noted"),
+      expect(within(role("button"), text("Reply in thread"))).toHaveClass("[@media(hover:hover)]:hidden")
+    )
+  })
+
+  it("stays where there is a pointer while an agent is at work or someone types, saying so without its words", () => {
+    scene(
+      {
+        update,
+        view: viewOf(withoutReplies({ working: [{ state: "working", label: "Yumi working" }] }))
+      },
+      given(initial),
+      expect(role("button", { name: "Reply in thread" })).toHaveAttr("data-noted", ""),
+      expect(within(role("button"), text("Yumi working"))).toExist()
+    )
+    scene(
+      { update, view: viewOf(withoutReplies({ typing: "Ada is typing…" })) },
+      given(initial),
+      expect(role("button", { name: "Reply in thread" })).toHaveAttr("data-noted", ""),
+      expect(within(role("button"), text("Ada is typing…"))).toExist(),
+      click(text("Ada is typing…")),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+})
+
+describe("taskChip", () => {
+  const tracking = (title: string) => (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Threads",
+      children: [
+        message(h, {
+          key: "thread-1",
+          mark: "AM",
+          author: "Alex",
+          text: "The preview is ready for another look.",
+          meta: [
+            taskChip(h, {
+              shape: "progress",
+              status: "Doing",
+              title,
+              onClick: Message.OpenedThread({ key: "thread-1" })
+            })
+          ]
+        })
+      ]
+    })
+
+  it("is a button under the message's text, named by the task's title and its status, that sends its message", () => {
+    scene(
+      { update, view: viewOf(tracking("Composer paste crash")) },
+      given(initial),
+      expect(within(role("listitem"), role("button", { name: "Composer paste crash, Doing" }))).toExist(),
+      click(role("button", { name: "Composer paste crash, Doing" })),
+      expect(role("status")).toHaveText("Current thread-1, edits 0, deletions 0")
+    )
+  })
+
+  it("draws where the task stands before the title, hidden from assistive technology", () => {
+    scene(
+      { update, view: viewOf(tracking("Composer paste crash")) },
+      given(initial),
+      expect(within(role("button"), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button"), selector("svg"))).toHaveAttr("width", "0.9375rem"),
+      expect(within(role("button"), text("Composer paste crash"))).toHaveClass("truncate")
+    )
+  })
+
+  it("is bordered on the panel, in the size of a hint, and has no task key", () => {
+    scene(
+      { update, view: viewOf(tracking("Composer paste crash")) },
+      given(initial),
+      expect(role("button")).toHaveClass("border-outline"),
+      expect(role("button")).toHaveClass("bg-panel"),
+      expect(role("button")).toHaveClass("text-hint"),
+      expect(role("button")).toHaveText("Composer paste crash")
     )
   })
 })
@@ -858,6 +1263,19 @@ describe("description", () => {
       given(initial),
       expect(text("Ask *about* the limit.")).toExist(),
       expect(selector("em")).toBeAbsent()
+    )
+  })
+
+  it("puts the attributes it is given on itself", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          description(h, { text: "Ask about the limit.", attributes: [h.DataAttribute("probe", "")] })
+        )
+      },
+      given(initial),
+      expect(selector("[data-probe]")).toHaveText("Ask about the limit.")
     )
   })
 

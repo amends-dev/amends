@@ -1,33 +1,48 @@
 /**
  * What a conversation is made of: the list of messages, each by its author with its time and, under the first
- * message of a thread, who replied to it, the notifications that tell of them, the line that tells what happened
- * to the thing the conversation is about, the quiet line that tells who took part or stopped, an agent's turn where
- * it took on the work and the log that follows it, the text that describes it, and the rule that sets a part of the
- * list apart, such as a day or the replies.
+ * message of a thread, the task it tracks, the button that opens it with who replied to it and who is at work there,
+ * the notifications that tell of them, the line that tells what happened to the thing the conversation is about, the
+ * quiet line that tells who took part or stopped, an agent's turn where it took on the work and the log that follows
+ * it, the text that describes it, and the rule that sets a part of the list apart, such as a day or the replies.
  */
 
 import * as Button from "@foldkit/ui/button"
-import type { Html, HtmlBuilder } from "foldkit/html"
-import { icon } from "./icon.ts"
-import { type MarkContent, mark } from "./mark.ts"
+import type { Attribute, Html, HtmlBuilder } from "foldkit/html"
+import { iconButtonWith } from "./control.ts"
+import { type TurnState, turnActivity } from "./details.ts"
+import { type IconName, icon } from "./icon.ts"
+import { type MarkContent, mark, type TaskStatusShape, taskStatus } from "./mark.ts"
 import { type Markdown, richText, richTextWords } from "./richText.ts"
+import { tooltip } from "./tooltip.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
 
 const rowLook =
-  "relative -mx-3 flex gap-3 px-3 py-2.5 aria-[current=true]:bg-selected aria-[current=true]:indicator-bar"
+  "relative -mx-3 flex gap-3 px-3 py-2.5 aria-[current=true]:bg-selected aria-[current=true]:[--amends-status-knockout:var(--amends-selected)] aria-[current=true]:indicator-bar"
 
-const rowColumn = "flex min-w-0 flex-1 flex-col gap-0.5"
+const messageLook = `group/message ${rowLook}`
+
+const stackedLook = "-mt-1 pt-0"
+
+const rowColumn = "relative flex min-w-0 flex-1 flex-col gap-0.5"
 
 const authorLine = "flex min-w-0 items-baseline gap-2"
 
-const authorName = "min-w-0 truncate text-item font-medium text-ink"
+const authorName = "min-w-0 truncate text-item font-medium"
+
+const hiddenLabel = "sr-only"
+
+const gutterTime =
+  "invisible w-8 flex-none self-start text-end text-meta leading-5.75 whitespace-nowrap text-ink-muted group-hover/message:visible group-focus-within/message:visible"
 
 const timeLine = "flex-none text-meta text-ink-muted"
 
 const placeLine = "m-0 text-meta text-ink-muted"
 
 const actionsRow = "-my-1.5 ms-auto flex flex-none items-center gap-1 self-center"
+
+const hoverActionsLook =
+  "absolute -top-4.5 end-0 z-10 flex items-center gap-0.5 border border-outline bg-popover p-0.5 opacity-0 shadow-popover pointer-events-none group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-has-focus-visible/message:pointer-events-auto group-has-focus-visible/message:opacity-100"
 
 type Ink = "text-ink" | "text-ink-secondary"
 
@@ -40,7 +55,7 @@ const editedLook = "text-meta text-ink-muted"
 const textButton = (ink: Ink) =>
   `cursor-pointer self-start bg-transparent p-0 text-start text-body wrap-break-word ${ink} focus-ring hover:underline`
 
-const metaRow = "mt-1 flex flex-wrap items-center gap-3 text-hint text-ink-muted"
+const metaColumn = "mt-0.5 flex flex-col items-start gap-1"
 
 const headline = "min-w-0 truncate text-item text-ink"
 
@@ -52,19 +67,36 @@ const unreadDot = "size-1.5 flex-none rounded-full bg-ink"
 
 const unreadLabel = "sr-only"
 
-const replyLineLook = "relative flex items-center gap-3"
+const taskChipLook =
+  "mt-3 inline-flex min-h-8 max-w-full cursor-pointer items-center gap-2 self-start border border-outline bg-panel px-2.5 text-hint text-ink-secondary focus-ring hover:border-outline-strong max-desktop:min-h-11"
 
-const treeStub = "absolute -start-7 bottom-2.5 size-3 border-s border-b border-outline"
+const taskChipTitle = "min-w-0 truncate"
 
-const markStack = "flex items-center"
+const repliesLook =
+  "group/replies relative inline-flex h-9 max-w-full cursor-pointer items-center gap-3 self-start border-0 bg-transparent p-0 pt-2 focus-ring max-tablet:h-11 max-tablet:pt-0"
 
-const stackedMark = "-ms-1 flex flex-none ring-1 ring-outline first:ms-0 first:z-30 nth-2:z-20 nth-3:z-10"
+const repliesElbow =
+  "pointer-events-none absolute start-[-1.75rem] top-0 h-[1.4375rem] w-[1.125rem] overflow-visible text-stitch"
 
-const moreMarks = "ms-1.5 text-meta text-ink-muted"
+const repliersLook = "inline-flex items-center gap-1.5"
 
-const replyLabel = "text-meta text-ink-muted"
+const overlappingMarks = "inline-flex items-center [&>*+*]:-ms-1.25"
 
-/** How many marks a reply line shows before it counts the rest. */
+const moreMarks = "text-meta text-ink-muted"
+
+const repliesCount =
+  "inline-flex h-6.5 flex-none items-center bg-subtle px-2 text-control whitespace-nowrap font-medium text-ink-secondary group-hover/replies:text-ink max-tablet:bg-transparent max-tablet:text-item max-tablet:leading-5"
+
+const unreadMark = "me-1.75 inline-block size-1.75 flex-none rounded-full bg-indicator"
+
+const typingNote = "min-w-0 truncate text-meta whitespace-nowrap text-ink-muted"
+
+const replyInThreadLook =
+  "inline-flex min-h-6 max-w-full cursor-pointer items-center gap-2.5 self-start border-0 bg-transparent p-0 text-ink-muted focus-ring hover:text-ink [@media(hover:hover)]:not-data-noted:hidden"
+
+const replyInThreadLabel = "text-control font-medium [@media(hover:hover)]:hidden"
+
+/** How many marks the replies button shows before it counts the rest. */
 const shownMarks = 3
 
 const descriptionLook =
@@ -114,11 +146,18 @@ export type DividerOptions = Readonly<{
   align?: "center" | "start"
 }>
 
-/** The messages of a conversation as an ordered list named by `label`, in one column. */
+/**
+ * The messages of a conversation as an ordered list named by `label`, in one column. Given an `id`, a Command can find
+ * the list to keep the pane that scrolls around it at its end.
+ */
 export const messageList = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; children: ReadonlyArray<Html> }>
-): Html => h.ol([h.AriaLabel(config.label), h.Class(listColumn)], config.children)
+  config: Readonly<{ label: string; id?: string; children: ReadonlyArray<Html> }>
+): Html =>
+  h.ol(
+    [...(config.id === undefined ? [] : [h.Id(config.id)]), h.AriaLabel(config.label), h.Class(listColumn)],
+    config.children
+  )
 
 const renderRule = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>): Html =>
   h.div([h.AriaHidden(true), h.Class(dividerRule)])
@@ -211,54 +250,132 @@ const renderText = <Message, Requirements>(
 }
 
 /**
- * One message, a row of a `messageList` keyed by `key`: the author's `mark` letters, then the `author`
- * with the `time` after it and a `note` after that, such as "Sending…", and the `text`, words as written, markdown
- * as `richText` shows it, with its mentions as chips, or the words that say it was deleted, with " (edited)" quiet
- * after it while `isEdited`. Under the text, `meta` is a row of quiet facts, such as how
- * much is new, and at the end of the author line, `actions` are quiet buttons, such as Edit and Delete.
- * `onOpen` makes the text a button named by it that sends `onOpen`, for a message that is the start of a
- * thread, and a button holds markdown as its preview, one run of words and mentions; `body` takes the text's place,
- * for the form that changes it. The current row is filled with the 2px bar and `aria-current="true"`, and a row
- * reaches 12px into the pane's gutter so its fill reaches past the text.
+ * What a hovered or focused message offers: an icon button named `label`, which a tooltip says, that sends `onClick`,
+ * and is described by `description`, such as the words of the thread it opens. With `isExpanded` it says whether what
+ * it opens is open.
+ */
+export type HoverAction<Message> = Readonly<{
+  icon: IconName
+  label: string
+  onClick: Message
+  description?: string | undefined
+  isExpanded?: boolean | undefined
+}>
+
+const renderHoverActions = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  actions: ReadonlyArray<HoverAction<Message>>
+): Html =>
+  actions.length === 0
+    ? h.empty
+    : h.div(
+        [h.Role("group"), h.AriaLabel("Message actions"), h.Class(hoverActionsLook)],
+        actions.map((action) =>
+          tooltip(h, {
+            title: action.label,
+            children: [
+              Button.view(
+                {
+                  onClick: action.onClick,
+                  toView: (attributes) =>
+                    iconButtonWith(
+                      h,
+                      [
+                        ...attributes.button,
+                        ...(action.description === undefined ? [] : [h.AriaDescription(action.description)]),
+                        ...(action.isExpanded === undefined ? [] : [h.AriaExpanded(action.isExpanded)])
+                      ],
+                      { icon: action.icon, label: action.label },
+                      { size: "compact" }
+                    )
+                },
+                h
+              )
+            ]
+          })
+        )
+      )
+
+/** What every message shows, whether it stands on its own or stacks under its author's message before it. */
+type MessageContent<Message, Requirements> = Readonly<{
+  key: string
+  mark: string
+  author: string
+  isAgent?: boolean
+  time?: string | undefined
+  note?: string | undefined
+  text: MessageText
+  isEdited?: boolean
+  body?: Html | undefined
+  meta?: ReadonlyArray<Html>
+  hoverActions?: ReadonlyArray<HoverAction<Message>>
+  isCurrent?: boolean
+  attributes?: ReadonlyArray<Attribute<Message, Requirements>>
+}>
+
+/**
+ * A message either stands on its own, with `actions` at the end of its author line, or stacks under the message of
+ * the same author before it and shows `shortTime` in the place of the mark, which it has none of.
+ */
+export type MessageConfig<Message, Requirements> = MessageContent<Message, Requirements> &
+  (
+    | Readonly<{ actions?: ReadonlyArray<Html>; isStacked?: false; shortTime?: never }>
+    | Readonly<{ isStacked: true; shortTime?: string; actions?: never }>
+  )
+
+/**
+ * One message, a row of a `messageList` keyed by `key`: the author's `mark` letters on the ground of a person's tone,
+ * or an agent's when `isAgent`, then the `author`, in the agent's color for an agent, with the `time` after it and a
+ * `note` after that, such as "Sending…", and the `text`, words as written, markdown as `richText` shows it, with its
+ * mentions as chips, or the words that say it was deleted, with " (edited)" quiet after it while `isEdited`. Under the
+ * text, `meta` is a column of what belongs to the message, such as the `taskChip` of the task it tracks and the
+ * `repliesButton` that opens its thread. At the end of the author line, `actions` are quiet buttons, such as Edit and
+ * Delete; and `hoverActions` float at the column's top end, over the row above, while the pointer is on the message
+ * or the keyboard is in it, such as the button that opens its thread. `body` takes the text's place, for the form that
+ * changes it. The current row is filled with the 2px bar and `aria-current="true"`, and a row reaches 12px into the
+ * pane's gutter so its fill reaches past the text. `attributes` go onto the row, such as the mount that brings the
+ * current message into view.
+ *
+ * A message that `isStacked` follows its author's message just before, as `apps/ui`'s timeline stacks them: it has
+ * no mark and no author line, its text sits 6px under the text above it instead of 20px, and its `shortTime` shows in
+ * the mark's place while the pointer is on it or the keyboard is in it. Assistive technology still hears the author
+ * and the time.
  */
 export const message = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{
-    key: string
-    mark: string
-    author: string
-    time?: string | undefined
-    note?: string | undefined
-    text: MessageText
-    isEdited?: boolean
-    onOpen?: Message
-    body?: Html | undefined
-    actions?: ReadonlyArray<Html>
-    meta?: ReadonlyArray<Html>
-    isCurrent?: boolean
-  }>
+  config: MessageConfig<Message, Requirements>
 ): Html => {
   const actions = config.actions ?? []
   const meta = config.meta ?? []
+  const isStacked = config.isStacked === true
+  const byline = [
+    h.span([h.Class(`${authorName} ${config.isAgent === true ? "text-agent" : "text-ink"}`)], [config.author]),
+    renderTime(h, config)
+  ]
 
   return h.keyed("li")(
     config.key,
-    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(rowLook)],
     [
-      mark(h, { text: config.mark, size: "md" }),
+      ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
+      ...(config.attributes ?? []),
+      h.Class(isStacked ? `${messageLook} ${stackedLook}` : messageLook)
+    ],
+    [
+      isStacked
+        ? h.span([h.AriaHidden(true), h.Class(gutterTime)], [config.shortTime ?? ""])
+        : mark(h, { text: config.mark, size: "md", tone: config.isAgent === true ? "lilac" : "slate" }),
       h.div(
         [h.Class(rowColumn)],
         [
-          h.div(
-            [h.Class(authorLine)],
-            [
-              h.span([h.Class(authorName)], [config.author]),
-              renderTime(h, config),
-              actions.length === 0 ? h.empty : h.div([h.Class(actionsRow)], actions)
-            ]
-          ),
+          isStacked
+            ? h.div([h.Class(hiddenLabel)], byline)
+            : h.div(
+                [h.Class(authorLine)],
+                [...byline, actions.length === 0 ? h.empty : h.div([h.Class(actionsRow)], actions)]
+              ),
           config.body ?? renderText(h, { ...config, ink: "text-ink", isInline: false }),
-          meta.length === 0 ? h.empty : h.div([h.Class(metaRow)], meta)
+          meta.length === 0 ? h.empty : h.div([h.Class(metaColumn)], meta),
+          renderHoverActions(h, config.hoverActions ?? [])
         ]
       )
     ]
@@ -266,34 +383,173 @@ export const message = <Message, Requirements>(
 }
 
 /**
- * What the first message of a thread shows under its text, for the message's `meta`: a short tree line that
- * hangs from the row's mark, then the `marks` of those who replied, the letters of each, small and overlapping by
- * 4px, up to three and then "+N" for the rest, then the `label`, such as "4 replies". The line and the marks are
- * hidden from assistive technology, since the label is what the line says.
+ * An agent at work in a thread: how its turn stands, which its mark moves as, and `label`, what it says in words,
+ * such as "Yumi working".
  */
-export const replyLine = <Message, Requirements>(
-  h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ marks: ReadonlyArray<string>; label: string }>
-): Html => {
-  const rest = config.marks.length - shownMarks
+export type ThreadWork = Readonly<{ state: TurnState; label: string }>
 
-  return h.div(
-    [h.Class(replyLineLook)],
-    [
-      h.span([h.AriaHidden(true), h.Class(treeStub)]),
-      h.span(
-        [h.Class(markStack)],
+/** What the buttons that open a thread say besides their own words: who types in it, and which agents are at work. */
+type ThreadNotes = Readonly<{
+  typing?: string | undefined
+  working?: ReadonlyArray<ThreadWork>
+}>
+
+const renderThreadNotes = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  notes: ThreadNotes
+): ReadonlyArray<Html> => [
+  ...(notes.working ?? []).map(({ state, label }) => turnActivity(h, { state, label })),
+  notes.typing === undefined ? h.empty : h.span([h.Class(typingNote)], [notes.typing])
+]
+
+const hasThreadNotes = (notes: ThreadNotes): boolean => notes.typing !== undefined || (notes.working ?? []).length > 0
+
+const renderRepliers = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  marks: ReadonlyArray<MarkContent>
+): Html => {
+  const rest = marks.length - shownMarks
+
+  return marks.length === 0
+    ? h.empty
+    : h.span(
+        [h.AriaHidden(true), h.Class(repliersLook)],
         [
-          ...config.marks
-            .slice(0, shownMarks)
-            .map((text) => h.span([h.Class(stackedMark)], [mark(h, { text, size: "xs" })])),
-          rest > 0 ? h.span([h.AriaHidden(true), h.Class(moreMarks)], [`+${rest}`]) : h.empty
+          h.span(
+            [h.Class(overlappingMarks)],
+            marks
+              .slice(0, shownMarks)
+              .map((content) => mark(h, { ...content, tone: content.tone ?? "slate", size: "choice" }))
+          ),
+          rest > 0 ? h.span([h.Class(moreMarks)], [`+${rest}`]) : h.empty
         ]
-      ),
-      h.span([h.Class(replyLabel)], [config.label])
+      )
+}
+
+const renderElbow = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>): Html =>
+  h.svg(
+    [
+      h.Xmlns("http://www.w3.org/2000/svg"),
+      h.ViewBox("0 0 18 23"),
+      h.Fill("none"),
+      h.AriaHidden(true),
+      h.Class(repliesElbow)
+    ],
+    [
+      h.path([
+        h.D("M1 1 V18 Q1 22 5 22 H18"),
+        h.Stroke("currentColor"),
+        h.StrokeWidth("0.3"),
+        h.StrokeDasharray("7 4"),
+        h.StrokeLinecap("round")
+      ])
     ]
   )
+
+/**
+ * What the first message of a thread shows under its text, for the message's `meta`, when the thread has replies: one
+ * button that sends `onClick` to open the thread, as `apps/ui`'s replies button does. A stitched elbow hangs from the
+ * row's mark to it, then the `marks` of those who replied, small and overlapping by 5px, up to three and then "+N" for
+ * the rest, each on a person's tone unless it has its own, then the `label` on a tile, such as "4 replies", with a dot
+ * before it while the replies are unread, then what is going on there: the agents at `working`, such as "Yumi
+ * working", and who is `typing`, such as "Yumi is typing…". The button is named by the label, and by "unread" after
+ * it, and described by `description`, such as the words of the thread. The elbow and the marks are hidden from
+ * assistive technology. With `isExpanded` it says whether the thread is open.
+ */
+export const repliesButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: ThreadNotes &
+    Readonly<{
+      marks: ReadonlyArray<MarkContent>
+      label: string
+      isUnread?: boolean
+      onClick: Message
+      description?: string | undefined
+      isExpanded?: boolean | undefined
+    }>
+): Html => {
+  const isUnread = config.isUnread === true
+
+  return Button.view(
+    {
+      onClick: config.onClick,
+      toView: (attributes) =>
+        h.button(
+          [
+            ...attributes.button,
+            h.AriaLabel(isUnread ? `${config.label}, unread` : config.label),
+            ...(config.description === undefined ? [] : [h.AriaDescription(config.description)]),
+            ...(config.isExpanded === undefined ? [] : [h.AriaExpanded(config.isExpanded)]),
+            h.Class(repliesLook)
+          ],
+          [
+            renderElbow(h),
+            renderRepliers(h, config.marks),
+            h.span(
+              [h.Class(repliesCount)],
+              [isUnread ? h.span([h.AriaHidden(true), h.Class(unreadMark)]) : h.empty, config.label]
+            ),
+            ...renderThreadNotes(h, config)
+          ]
+        )
+    },
+    h
+  )
 }
+
+/**
+ * What the first message of a thread without replies offers under its text, for the message's `meta`: a button named
+ * "Reply in thread" that sends `onClick` to open the thread, and is described by `description`. Where there is no
+ * pointer to hover, it always shows, as the words "Reply in thread"; where there is, the message's `hoverActions` offer
+ * the reply, and the button shows only while there is something to say beside it: the agents at `working` and who is
+ * `typing`, as `repliesButton` says them, and then without its words. With `isExpanded` it says whether the thread is
+ * open.
+ */
+export const replyInThreadButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: ThreadNotes &
+    Readonly<{ onClick: Message; description?: string | undefined; isExpanded?: boolean | undefined }>
+): Html =>
+  Button.view(
+    {
+      onClick: config.onClick,
+      toView: (attributes) =>
+        h.button(
+          [
+            ...attributes.button,
+            h.AriaLabel("Reply in thread"),
+            ...(config.description === undefined ? [] : [h.AriaDescription(config.description)]),
+            ...(config.isExpanded === undefined ? [] : [h.AriaExpanded(config.isExpanded)]),
+            ...(hasThreadNotes(config) ? [h.DataAttribute("noted", "")] : []),
+            h.Class(replyInThreadLook)
+          ],
+          [h.span([h.Class(replyInThreadLabel)], ["Reply in thread"]), ...renderThreadNotes(h, config)]
+        )
+    },
+    h
+  )
+
+/**
+ * The task a thread tracks, for the message's `meta`: a button that sends `onClick` to open it, bordered on the panel,
+ * with where the task stands drawn as `shape`, 0.9375rem, before its `title`, which is cut short where there is no
+ * room, as `apps/ui`'s task reference draws it. It is named by the title and the `status` in words, since the drawing
+ * is hidden from assistive technology.
+ */
+export const taskChip = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ shape: TaskStatusShape; status: string; title: string; onClick: Message }>
+): Html =>
+  Button.view(
+    {
+      onClick: config.onClick,
+      toView: (attributes) =>
+        h.button(
+          [...attributes.button, h.AriaLabel(`${config.title}, ${config.status}`), h.Class(taskChipLook)],
+          [taskStatus(h, config.shape, { size: "0.9375rem" }), h.span([h.Class(taskChipTitle)], [config.title])]
+        )
+    },
+    h
+  )
 
 const renderAge = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -492,7 +748,7 @@ export const turnLog = <Message, Requirements>(
  * written or markdown as `richText` shows it, with its mentions as chips, 11px under the caption above it. `body` takes
  * the text's place, for the form that changes it, and `actions` are quiet buttons under it, such as Edit and Delete,
  * level with its words. While `isCurrent` it is filled with the 2px bar and `aria-current="true"`, reaching 12px into
- * the pane's gutter, as a message's row does.
+ * the pane's gutter, as a message's row does. `attributes` go onto it, as they go onto a message's row.
  */
 export const description = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -501,12 +757,17 @@ export const description = <Message, Requirements>(
     body?: Html | undefined
     actions?: ReadonlyArray<Html>
     isCurrent?: boolean
+    attributes?: ReadonlyArray<Attribute<Message, Requirements>>
   }>
 ): Html => {
   const actions = config.actions ?? []
 
   return h.div(
-    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(descriptionLook)],
+    [
+      ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
+      ...(config.attributes ?? []),
+      h.Class(descriptionLook)
+    ],
     [
       config.body ?? h.div([h.Class(descriptionText)], [renderWords(h, config.text, false)]),
       actions.length === 0 ? h.empty : h.div([h.Class(descriptionActions)], actions)

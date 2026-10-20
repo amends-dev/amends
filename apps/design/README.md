@@ -71,10 +71,9 @@ with the mark at its top edge, and below its mark; what a pane says about one th
 list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
-conversation's messages as a list with a current row whose text opens the thread, with a note,
-an edited mark after the text, a deleted message, actions, and meta, with the replies under a row as one reply, three people, and more people than the
-line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
-the current row, with markdown in the text as blocks in a plain row and as a preview in a row that opens a thread and in a notification, with a form in place of the text, and set apart by dividers, centered and at the
+conversation's messages as the threads of a group under their day, with the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, the button that opens each thread, and a reply as the action the pointer brings up, the open thread's row filled and following a click; a person's messages within five minutes stacked under the one before; the button of a thread with replies, with one reply, three people, more people than it shows, replies not read yet, and while an agent works and someone types; a thread with no replies yet, with Reply in thread and what is going on beside it; the chip of a task in each drawing a status has; and, as a list, with a note,
+an edited mark after the text, a deleted message, actions, and meta, with a mention in the text as a chip, in a message and in
+the current row, with markdown in the text as blocks in a message and as a preview in a notification, with a form in place of the text, and set apart by dividers, centered and at the
 start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a turn's log opened under its row, a stop that did not go through, a turn that replied with View turn log among its message's actions and its log under it, and a turn's row in a column 20rem wide, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
@@ -82,7 +81,7 @@ groups, each in a frame wider than the measure; the composer empty, whose Send w
 frame of fixed height, its inbox, triage, and a group with their counts read aloud with what they count, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
-as a plain row under its group and the second with its notices; the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
+as a plain row under its group and its group's threads resting against the composer, one of them filled, with its task chip, the button of its replies, an agent at work, and, under the last, someone typing, and the second with its notices; the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close, as do the menus, whose choices are kept. The first shell's rail has the account menu that opens, and the other shells draw its button closed, since a menu's Block owns the ids of its button and its list. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
@@ -370,12 +369,12 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `mark(h, { text | icon, size?, tone?, status? })` is the square that stands for a person, a workspace, an agent, or
   a connection: the `text` letters in capitals, or, for a thing that has no name to abbreviate, an `icon` drawn at the
   size that fits the square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
-  (the default, `avatar-neutral`) or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, as a reply line shows those who
-  replied), `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
+  (the default, `avatar-neutral`), `"slate"` (`avatar-slate`, which is the person who wrote a message, as `apps/ui` draws them), or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, the smallest),
+  `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people, and the people who replied under a thread), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
   `"account"` (28px, 13px text, as `@amends-dev/ui` draws the signed-in address in a centered screen's header),
   `"md"` (32px, `hint` text, as a message shows its author and an agent's row in a list), or `"lg"` (40px, `item` text, as a
   directory row shows it). A mark is `aria-hidden`: the name it abbreviates is always beside it. `sidebarHeader`,
-  `sidebarItem`, `row`, `pane`, `message`, and `replyLine` draw their marks with it.
+  `sidebarItem`, `row`, `pane`, `message`, and `repliesButton` draw their marks with it.
   - A mark with a `status`, `{ kind, label, detail? }`, has a patch over its bottom end corner. The patch overhangs the
     corner by 2px, in a notch 2px wider all round that is cut from the surface behind it, `status-knockout`. Its
     shape carries the state, so it reads without color: `"available"` (online, or at work) a filled square in
@@ -736,12 +735,16 @@ The frame of the first four layout patterns, which the modules below fill.
 
 The third and fourth layout patterns share one structure.
 
-- `pane(h, { variant, label?, header, toolbar?, body, footer? })` is a column of a header, a `body` that
+- `pane(h, { variant, label?, header, toolbar?, body, anchor?, footer? })` is a column of a header, a `body` that
   scrolls, and a `footer` that stays in place. The `toolbar`, for a list, is what stays under the header while the body
   scrolls: a `paneToolbar`, then, over a list, the `summary` line and the `columns`. The body then starts flush under it,
   with no padding above, so the first row is the one under the column labels. The `"main"` variant is the page's `main` landmark,
   its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
-  `h2` at body size, in medium weight. A `label` names the main landmark too.
+  `h2` at body size, in medium weight. A `label` names the main landmark too. The body's first element rests against
+  the header, unless the `anchor` is `"bottom"`: a conversation takes that, so that where it is shorter than the
+  body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is taller the body
+  scrolls as any other does, because the element's top margin is automatic (`mt-auto`), which is no space once there is
+  none to spare. The body is then a column whose children keep their own height.
 - The `header` is `{ title, icon?, taskStatus?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
   96px tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
   row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
@@ -845,6 +848,10 @@ What a pane says about one thing.
   `"stopped"`, "Stopped", with a dash. The logo is cut out of the tile's own surface, and the marks are hidden from
   assistive technology, since the word says it. The tile is a live region (`role="status"`), so that a state that
   changes is announced.
+- `turnActivity(h, { state, label })` is where an agent is at work, quietly, as `apps/ui`'s `TurnActivity` draws it
+  under a message: the state's mark at 0.875rem, the same as `turnStatus`'s, then the `label`, such as "Yumi working", 5px
+  after it at `hint` size in `ink-secondary`, with no tile behind it and no live region. The logo is cut out of the
+  surface behind it, `status-knockout`, which a message that is current sets to its own fill.
 - `entryList(h, { label, children })` is a `ul` named by `label`, a column with no list style, of
   `entry`s. It is for lists of people and of what stands for them, such as a workspace's members, the invitations
   waiting, a group's members, and the channels a workspace brings conversations in from.
@@ -868,21 +875,37 @@ What a pane says about one thing.
 
 What a conversation is made of.
 
-- `messageList(h, { label, children })` is an `ol` named by `label`, a column with no list style, of
-  `message`s, `notification`s, `divider`s, `event`s, `note`s, `turnRow`s, and `turnLog`s.
+- `messageList(h, { label, id?, children })` is an `ol` named by `label`, a column with no list style, of
+  `message`s, `notification`s, `divider`s, `event`s, `note`s, `turnRow`s, and `turnLog`s. Given an `id`, a Command can find
+  the list to keep the pane that scrolls around it at its end.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
-  then a column of the author line, the text, and the meta row. The author line is the
+  then a column of the author line, the text, and what lies under it. The mark is on the `slate` ground of a person,
+  or the `lilac` of an agent when `isAgent`, whose name is then in the agent's color (`text-agent`), as `apps/ui` draws
+  both. The author line is the
   `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
   formatted, and a `note` after that as ` · ${note}`, such as "Sending…"; `actions` are
-  quiet buttons at its end, such as Edit and Delete. The `text` is at body size, a `MessageText` (below); with `onOpen`
-  it is a button named by the text that sends `onOpen`, aligned to the start, underlined on hover, for a message that
-  is the start of a thread, and `body` takes its place, such as the form that edits it. While `isEdited`, " (edited)"
+  quiet buttons at its end, such as Edit and Delete. The `text` is at body size, a `MessageText` (below), and `body` takes
+  its place, such as the form that edits it. While `isEdited`, " (edited)"
   follows the text at `meta` size in `ink-muted`, as `apps/ui`'s timeline has it: after the last block of markdown, on
-  a line of its own, and inside the button when the text is one. `meta` is a row of quiet
-  facts under the text at hint size, such as a `replyLine`, "2 new", and a task's status. `isCurrent` fills the row
+  a line of its own. `meta` is a column of what belongs to the message, 4px apart and 2px under the text,
+  each at the column's start: a `taskChip`, then the `repliesButton` or the `replyInThreadButton` that opens its thread.
+  `isCurrent` fills the row
   with `selected`, draws the `indicator-bar` at its start as the sidebar's current row has, and makes it
-  `aria-current="true"`. A row has 10px of space above and below and reaches 12px into the pane's
-  gutter, so the fill of the current row reaches past the text.
+  `aria-current="true"`; a logo drawn in the row is cut out of that fill. A row has 10px of space above and below and
+  reaches 12px into the pane's gutter, so the fill of the current row reaches past the text. `attributes` go onto the
+  row, such as the mount that brings the current message into view when its thread opens.
+  - `hoverActions` are `{ icon, label, onClick, description?, isExpanded? }` buttons that float over the end of the message's column,
+    at its top edge, in a `group` named "Message actions", as `apps/ui`'s message actions do: out of sight and out of
+    reach (`opacity-0`, `pointer-events-none`) until the pointer is on the message or the keyboard is in it, so that a
+    pointer finds the reply to a message where it is, and Tab reaches it, since the button is there for it. Each is a
+    compact icon button named by its `label`, described by its `description`, such as the words of the thread it opens,
+    with a tooltip that says the label, and `aria-expanded` when `isExpanded` is given.
+  - A message with `isStacked` follows its author's message just before it, as `apps/ui`'s timeline stacks them
+    (see [`app-v2`](../app-v2/README.md) for when). It has no mark and no author line: the author and the `time` are there for
+    assistive technology only (`sr-only`), and the `shortTime`, such as "10:02", shows in the mark's place, 32px wide
+    and right-aligned, hidden from assistive technology, while the pointer is on the message or the keyboard is in it. Its
+    text sits 6px under the text above it, where the text of a message that stands on its own sits 20px under it, and it
+    has no `actions`.
 - `notification(h, config)` is a row of the same list for a notification, keyed by `config.key` and set
   like `message`: the `mark` at 32px, which is a `MarkContent` (see `mark`): the author's letters on the ground of
   their tone, `neutral` unless given and `lilac` for an agent, or, for a notification that has no author to show, an
@@ -905,20 +928,39 @@ What a conversation is made of.
   markdown, or `{ deleted }`. A string is words as written, whatever characters it holds, such as a thread's title, which its author
   wrote as plain text. Markdown, `{ text, mentions? }` as `richText` takes it (below), is a message's text with the
   members its mentions may name: it shows as `richText`'s blocks, with a mention a chip with the member's current name,
-  in a `message` that is not a button and in a `description`. A button may hold no block, link, or other button, so a
-  `message` with `onOpen` shows its markdown as `richText`'s preview, one run of words and mentions, and a
-  `notification`, a row of previews, always does. What a text says as words, "@Jamie can you check the composer fix"
+  in a `message` and in a `description`. A button may hold no block, link, or other button, so a
+  `notification`, a row of previews with a button for its text, shows its markdown as `richText`'s preview, one run
+  of words and mentions. What a text says as words, "@Jamie can you check the composer fix"
   or "Release notes Shipped it, see the docs", is `messageTextWords`: a button's name when it has no other, and a
-  notification's `aria-description`; it is also what a caller searches or titles by. `{ deleted }` is the words that say
-  a message was deleted, such as "Message deleted", which show in `ink-muted` and in italics wherever the text is, a
-  button's too.
-- `replyLine(h, { marks, label })` is what the first message of a thread shows in its `meta`, under its
-  text: a short tree line that hangs from the row's mark, 12px by 12px with a border at its start and
-  its bottom in `outline`, then the `marks`, the letters of those who replied, as `xs` marks overlapping
-  by 4px, the first on top so that its letters stay whole, each with a 1px `outline` ring so that the
-  ones that overlap stay apart, up to three and then "+N" for the rest, then the `label`, such as
-  "4 replies", at `meta` size in `ink-muted`. The tree line, the marks, and the "+N" are hidden from
-  assistive technology, since the label says what the line is.
+  notification's `aria-description`; it is also what a caller searches or titles by, and what the buttons that open a
+  thread are described by. `{ deleted }` is the words that say
+  a message was deleted, such as "Message deleted", which show in `ink-muted` and in italics wherever the text is.
+- `repliesButton(h, { marks, label, isUnread?, onClick, description?, isExpanded?, working?, typing? })` is what the first message of
+  a thread with replies shows in its `meta`, as `apps/ui`'s replies button does: one button that sends `onClick`, which
+  opens the thread. A dashed `stitch` elbow, drawn as an SVG 18px by 23px with a hairline stroke, hangs from the row's mark
+  to it; then the `marks` of those who replied, each a `MarkContent` on the `slate` ground unless it has a tone of its own
+  (an agent's is `lilac`), at 22px (`choice`) overlapping by 5px, the later on top, up to three and then "+N" for the rest,
+  6px after the last; then the `label`, such as "4 replies", on a tile of `subtle` in medium weight at `control` size
+  (plain text at item size below 48rem), on one line, turning `ink` when the button is hovered, with a 7px dot of `indicator` before it while the replies
+  are unread. After the label come what goes on in the thread, as the button's own words: the `working` agents, each a
+  `{ state, label }` drawn as a `turnActivity`, such as "Yumi working", and who is `typing`, such as "Yumi is typing…",
+  at `meta` size in `ink-muted`. The button is 36px tall with the elbow's end level with its contents, and 44px
+  below 48rem. It is named by its label, with ", unread" after it while the dot shows, and described by `description`,
+  such as the words of the thread, and carries `aria-expanded` when `isExpanded` is given, for the thread being open;
+  the elbow, the marks, and the dot are hidden from assistive technology.
+- `replyInThreadButton(h, { onClick, description?, isExpanded?, working?, typing? })` is what a thread without replies shows in a
+  message's `meta`: a button named "Reply in thread" that sends `onClick`. Where there is no pointer to hover, it shows
+  always, as the words "Reply in thread" in medium weight at `control` size in `ink-muted`. Where there is, the message's
+  `hoverActions` offer the reply and the button is not shown, unless something is going on there: while agents are at
+  `working` or someone is `typing`, as `repliesButton` says them, the button shows them alone, without its words, and
+  carries `data-noted`. It is named "Reply in thread" and described by `description` either way, and carries
+  `aria-expanded` when `isExpanded` is given.
+- `taskChip(h, { shape, status, title, onClick })` is the task a thread tracks, for a message's `meta`, as `apps/ui`'s
+  task reference draws it without its key, which the app's tasks lack: a button that sends `onClick`, 32px tall (44px
+  below 64rem), with a 1px `outline` border on the `panel`, 12px above it, holding where the task stands drawn as
+  `shape` (`taskStatus`, 0.9375rem) 8px before its `title`, which is cut short where there is no room, at `hint` size in
+  `ink-secondary`. It is named by the title and the `status` in words, "Composer paste crash, Doing", since the drawing
+  is hidden from assistive technology.
 - `divider(h, label, options?)` is an item of the list with a dashed `stitch` rule and the `label` in
   capitals at `meta` size in `ink-muted`: `options.align` is `"center"` (the default), the label between
   two rules, as a day sets apart the messages after it, or `"start"`, the label before one rule that
@@ -952,7 +994,8 @@ What a conversation is made of.
   a mention in it a chip, as `apps/ui`'s task pane sets it, 11px under the `property` caption above it. `body` takes the text's place, such as
   the form that changes it, and `actions` are quiet buttons under it, 8px down and level with its words, such as Edit
   and Delete. `isCurrent` fills it with `selected`, draws the `indicator-bar` at its start, and makes it
-  `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does.
+  `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does. `attributes` go onto it as
+  they go onto a message's row.
 
 ### `@amends-dev/design/richText`
 
@@ -1294,7 +1337,8 @@ checked and named "(selected)", a choice that closes it and is reported, the arr
 Escape, a click on the backdrop, and the button pressed again, which each close it with the focus back on the button, its
 placement as the anchor its Mount is given, a header with a line under it, a heading over a group, the line between groups,
 and a plain button holding its content; a pane's toolbar by its search found by its label, its menus and its actions at the
-end, kept out of the body that scrolls, which starts flush under it, and a pane without one with its usual padding; the quiet
+end, kept out of the body that scrolls, which starts flush under it, and a pane without one with its usual padding; a pane
+whose body is anchored to the bottom by the classes that rest its first element there; the quiet
 search by its hidden label, its placeholder and its magnifier, hidden from assistive technology; the theme's two dark
 blocks, which give the same values, by `theme.test.ts`; a sidebar item by its name, which has the status's word after the label, with
 `aria-current` and its count, read as "5 unread" when the row names what it counts, the row under it as a button or as a plain row, the working logo at the end of a row at
@@ -1318,13 +1362,19 @@ Cancel by closing the dialog without sending the form, a Cancel that is disabled
 nothing when pressed, the panel's width by its class for each of the three widths, its Close button named by `closeLabel`,
 a Back button named by `back` before the title in place of Close, and a list of rows by its label, a row each
 with its meta as its description, the side and bottom padding it cancels, and the message a row sends; a message by
-its text button, `aria-current`, its note, its edited mark, actions, meta, and body, the words of a deleted one, its markdown as the blocks of `richText` and as the
-preview a button holds, a string as the words it is, a mention in its text by the chip that holds it and a button by the
-words joined, a notification by its
+its `aria-current`, its note, its edited mark, actions, meta, and body, the words of a deleted one, its markdown as the blocks of `richText`, a string as the words it is, a mention in its text by the chip that holds it,
+its mark on the slate ground of a person and the lilac of an agent with its name in the agent's color, the attributes it is
+given, one stacked under its author's with no mark, its author and time kept for assistive technology and its short time
+in the mark's place, hidden from it, and its hover actions as the buttons of a group named Message actions, named by their
+label, described by the thread they open, out of sight and reach until the message is hovered or focused; a
+notification by its
 text button named by its author and activity and described by its text, its mark by its tone and by the icon that
 takes the place of letters, its place and age,
-and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
-label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
+and an unread one by its dot, hidden from assistive technology, and its "Unread", a thread's replies button by its
+label, with ", unread" after it while the dot shows, its description, its marks on a person's tone or their own and the count of the rest,
+the elbow and the marks hidden from assistive technology, and the agents at work and who types inside it, a
+Reply in thread button by its name, its description, and the `data-noted` it carries while something is going on there, with its words
+for the touch screen alone, and a task chip by the title and status that name it, its drawing hidden from assistive technology,
 and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; rich text by its paragraphs with a line break where the text has one, each form of emphasis and code, a code block as written with its language, quotes, lists numbered from where the text starts, task boxes by role and name, tables and the alignment of their columns, links by their address, target, and `rel`, images as links and never loaded, raw HTML and entity references as text, mentions as chips with the member's current name or the recorded one, and the inline form as one run of words, with `richTextWords` as plain tests; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
 send button, which is unavailable while the box holds nothing or only spaces, Enter that sends the form and Shift+Enter, Control+Enter, Alt+Enter, and Meta+Enter that
 are left to the browser, and its list of people by the listbox named for it, its options with the active one selected and

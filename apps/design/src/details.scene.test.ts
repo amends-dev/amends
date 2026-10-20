@@ -17,6 +17,7 @@ import {
   property,
   propertyIcon,
   propertyValue,
+  turnActivity,
   turnStatus
 } from "./details.ts"
 import { taskStatus } from "./mark.ts"
@@ -421,6 +422,54 @@ describe("turnStatus", () => {
       expect(within(selector("#failed"), role("status"))).toHaveClass("text-caution-text"),
       expect(within(selector("#failed"), role("status"))).toHaveClass("inset-ring-caution-border"),
       expect(within(selector("#failed"), role("status"))).not.toHaveClass("bg-subtle")
+    )
+  })
+})
+
+describe("turnActivity", () => {
+  const states = ["queued", "working", "stopping", "done"] as const
+
+  const activities = (h: HtmlBuilder<Message>) =>
+    h.div(
+      [],
+      states.map((state) => h.div([h.Id(state)], [turnActivity(h, { state, label: `Yumi ${state}` })]))
+    )
+
+  for (const [state, motion] of [
+    ["queued", "thread"],
+    ["working", "working"],
+    ["stopping", "tug"]
+  ] as const) {
+    it(`says what the agent does in words, with the logo in its ${motion} motion while the turn is ${state}`, () => {
+      scene(
+        { update, view: viewOf(activities) },
+        given(initial),
+        expect(selector(`#${state}`)).toHaveText(`Yumi ${state}`),
+        expect(selector(`#${state} svg`)).toHaveClass(`logo-${motion}`),
+        expect(selector(`#${state} svg`)).toHaveAttr("aria-hidden", "true"),
+        expect(selector(`#${state} svg`)).toHaveAttr("width", "0.875rem")
+      )
+    })
+  }
+
+  it("draws a still mark once the turn is done", () => {
+    scene(
+      { update, view: viewOf(activities) },
+      given(initial),
+      expect(selector("#done svg")).not.toHaveClass("logo-working"),
+      expect(selector("#done [aria-hidden]")).toHaveClass("size-3.5")
+    )
+  })
+
+  it("is quiet text at hint size with no tile behind it, 5px from its mark", () => {
+    scene(
+      { update, view: viewOf(activities) },
+      given(initial),
+      expect(selector("#working span")).toHaveClass("text-hint"),
+      expect(selector("#working span")).toHaveClass("text-ink-secondary"),
+      expect(selector("#working span")).toHaveClass("gap-1.25"),
+      expect(selector("#working span")).not.toHaveClass("bg-subtle"),
+      expect(within(selector("#working"), role("status"))).toBeAbsent()
     )
   })
 })

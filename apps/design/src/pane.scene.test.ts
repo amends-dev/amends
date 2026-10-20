@@ -905,3 +905,41 @@ describe("pane with a toolbar", () => {
     )
   })
 })
+
+describe("pane with its body anchored to the bottom", () => {
+  const conversationPane = (anchor: "top" | "bottom" | undefined) => (_: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "main",
+      header: { title: "general", icon: "mark-channel" },
+      body: [h.ol([h.AriaLabel("Threads")], [h.li([], ["Looks good."])])],
+      ...(anchor === undefined ? {} : { anchor }),
+      footer: [h.p([], ["Composer"])]
+    })
+
+  const scrollingBody = selector("div.overflow-y-auto")
+
+  it("rests its body's first element against the footer, and keeps scrolling past what fits", () => {
+    scene(
+      { update, view: paneView(conversationPane("bottom")) },
+      given(initial),
+      expect(scrollingBody).toHaveClass("flex"),
+      expect(scrollingBody).toHaveClass("flex-col"),
+      expect(scrollingBody).toHaveClass("[&>:first-child]:mt-auto"),
+      expect(scrollingBody).toHaveClass("*:flex-none"),
+      expect(scrollingBody).toHaveClass("overflow-y-auto"),
+      expect(scrollingBody).toHaveClass("min-h-0")
+    )
+  })
+
+  it("rests its body's first element against the header unless it is anchored to the bottom", () => {
+    for (const anchor of [undefined, "top"] as const) {
+      scene(
+        { update, view: paneView(conversationPane(anchor)) },
+        given(initial),
+        expect(scrollingBody).toHaveClass("overflow-y-auto"),
+        expect(scrollingBody).not.toHaveClass("flex-col"),
+        expect(scrollingBody).not.toHaveClass("[&>:first-child]:mt-auto")
+      )
+    }
+  })
+})

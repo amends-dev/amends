@@ -68,6 +68,23 @@ describe("mark", () => {
   })
 })
 
+describe("mark on the slate ground", () => {
+  it("is the ground of a person who wrote a message, between the neutral and the lilac of an agent", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div([], [mark(h, { text: "S", tone: "slate" }), mark(h, { text: "Y", tone: "lilac" })])
+      },
+      given(null),
+      expect(text("S")).toHaveClass("bg-avatar-slate-bg"),
+      expect(text("S")).toHaveClass("text-avatar-slate-fg"),
+      expect(text("S")).not.toHaveClass("bg-avatar-neutral-bg"),
+      expect(text("Y")).toHaveClass("bg-avatar-lilac-bg")
+    )
+  })
+})
+
 describe("mark beside a choice", () => {
   it("is 22px, between the reply line's 20 and the row's 24, with letters of 10px, hidden from assistive technology", () => {
     scene(

@@ -197,6 +197,19 @@ export const turnStatus = <Message, Requirements>(h: HtmlBuilder<Message, Requir
     [renderTurnMark(h, state), turnStateWords[state]]
   )
 
+const turnActivityLook = "inline-flex min-w-0 items-center gap-1.25 text-hint whitespace-nowrap text-ink-secondary"
+
+/**
+ * Where an agent is at work, as `apps/ui`'s `TurnActivity` draws it under a message: the state's mark 0.875rem before
+ * the `label`, such as "Yumi working", 5px from it, at `hint` size in `ink-secondary` with no tile behind it. The mark
+ * moves as `turnStatus`'s does, and is hidden from assistive technology, since the label says what it does. The logo is
+ * cut out of the surface behind it, `status-knockout`, which a row that is current sets to its own.
+ */
+export const turnActivity = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ state: TurnState; label: string }>
+): Html => h.span([h.Class(turnActivityLook)], [renderTurnMark(h, config.state), config.label])
+
 /**
  * One place an agent is at work: the `key` of its turn, the `state` of the turn in words, how its logo `motion` goes,
  * and the `place`, which a turn has none of until its group is read. A line with an `action` is a button named

@@ -99,7 +99,10 @@ import {
   type MessageText,
   note,
   notification,
-  replyLine,
+  repliesButton,
+  replyInThreadButton,
+  taskChip,
+  type ThreadWork,
   turnLog,
   turnRow
 } from "../src/message.ts"
@@ -1834,33 +1837,89 @@ const tooltipGroup = (h: ApplicationViewBuilder): Html =>
     )
   ])
 
-const openableThreads: ReadonlyArray<
-  Readonly<{
-    key: string
-    mark: string
-    author: string
-    time: string
-    text: string
-    replies?: Readonly<{ marks: ReadonlyArray<string>; label: string }>
-  }>
-> = [
+/** A thread of the workshop's group as its list draws it: the message that opened it, and what hangs under it. */
+type ThreadSample = Readonly<{
+  key: string
+  mark: string
+  author: string
+  isAgent?: boolean
+  time: string
+  /** Given, the message stacks under its author's before it and shows this in the mark's place. */
+  shortTime?: string
+  text: string
+  task?: Readonly<{ shape: TaskStatusShape; status: string; title: string }>
+  replies?: Readonly<{ marks: ReadonlyArray<MarkContent>; label: string; isUnread?: boolean }>
+  typing?: string
+  working?: ReadonlyArray<ThreadWork>
+}>
+
+const preview = { key: "preview-ready", mark: "AM", author: "Alex", time: "4:01 PM" } as const
+
+const yumiWorking: ThreadWork = { state: "working", label: "Yumi working" }
+
+const openableThreads: ReadonlyArray<ThreadSample> = [
   {
-    key: "preview-ready",
-    mark: "AM",
-    author: "Alex",
-    time: "Yesterday",
-    text: "The preview is ready for another look. I've linked the latest notes in the task."
+    ...preview,
+    text: "The preview is ready for another look. I've linked the latest notes in the task.",
+    replies: { marks: [{ text: "S" }, { text: "Y", tone: "lilac" }], label: "2 replies", isUnread: true }
   },
-  { key: "deploy-clean", mark: "S", author: "Sara", time: "9:44 AM", text: "deploy went out clean last night!" },
+  {
+    key: "release-notes",
+    mark: "Y",
+    author: "Yumi",
+    isAgent: true,
+    time: "4:20 PM",
+    text: "Checked the build: all green. The release notes are ready too."
+  },
   {
     key: "composer-paste-crash",
     mark: "AJ",
     author: "AJ",
     time: "10:02 AM",
     text: "found a bug. composer crashes when I paste an image from clipboard lol",
-    replies: { marks: ["AM", "Y", "S"], label: "4 replies" }
+    task: { shape: "progress", status: "Doing", title: "Composer paste crash" },
+    replies: { marks: [{ text: "AM" }, { text: "Y", tone: "lilac" }, { text: "S" }], label: "4 replies" }
   }
 ]
+
+/**
+ * A thread as the group lists it: its opening as a message, the task it tracks as a chip, and under it the button that
+ * opens it, whether it has replies or not, with the reply as the hover action. Clicking any of them opens it.
+ */
+const threadRow = (h: ApplicationViewBuilder, thread: ThreadSample, openThread: string): Html => {
+  const open = Message.OpenedThread({ key: thread.key })
+  const common = {
+    key: thread.key,
+    mark: thread.mark,
+    author: thread.author,
+    ...(thread.isAgent === true ? { isAgent: true } : {}),
+    time: thread.time,
+    text: thread.text,
+    isCurrent: thread.key === openThread,
+    hoverActions: [{ icon: "mark-reply", label: "Reply in thread", onClick: open, description: thread.text }],
+    meta: [
+      ...(thread.task === undefined ? [] : [taskChip(h, { ...thread.task, onClick: open })]),
+      thread.replies === undefined
+        ? replyInThreadButton(h, {
+            onClick: open,
+            description: thread.text,
+            ...(thread.typing === undefined ? {} : { typing: thread.typing }),
+            ...(thread.working === undefined ? {} : { working: thread.working })
+          })
+        : repliesButton(h, {
+            ...thread.replies,
+            onClick: open,
+            description: thread.text,
+            ...(thread.typing === undefined ? {} : { typing: thread.typing }),
+            ...(thread.working === undefined ? {} : { working: thread.working })
+          })
+    ]
+  } as const
+
+  return thread.shortTime === undefined
+    ? message(h, common)
+    : message(h, { ...common, isStacked: true, shortTime: thread.shortTime })
+}
 
 /** The members a text of the workshop may mention. */
 const mentionable = [
@@ -1891,21 +1950,193 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
   return group(h, "Messages", [
     sample(
       h,
-      "A list with a current row, whose text opens the thread",
+      "The threads of a group under their day: the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, and under each the button that opens it, with a reply as the action the pointer brings up; the open thread is filled, and follows a click",
       [
         messageList(h, {
           label: "Threads",
-          children: openableThreads.map((thread) =>
-            message(h, {
-              key: thread.key,
-              mark: thread.mark,
-              author: thread.author,
-              time: thread.time,
-              text: thread.text,
-              onOpen: Message.OpenedThread({ key: thread.key }),
-              isCurrent: thread.key === openThread,
-              ...(thread.replies === undefined ? {} : { meta: [replyLine(h, thread.replies)] })
-            })
+          children: [divider(h, "Today"), ...openableThreads.map((thread) => threadRow(h, thread, openThread))]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A person's messages within five minutes stacked under the one before, with no mark or name and the short time in the mark's place while the pointer or the keyboard is on it",
+      [
+        messageList(h, {
+          label: "Stacked threads",
+          children: [
+            threadRow(
+              h,
+              {
+                key: "deploy-clean",
+                mark: "S",
+                author: "Sara",
+                time: "9:44 AM",
+                text: "deploy went out clean last night!"
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "numbers-up",
+                mark: "S",
+                author: "Sara",
+                time: "9:46 AM",
+                shortTime: "9:46",
+                text: "and the numbers are up"
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "dashboards",
+                mark: "S",
+                author: "Sara",
+                time: "9:47 AM",
+                shortTime: "9:47",
+                text: "the dashboards agree with them"
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              { key: "morning-all", mark: "O", author: "Oliver", time: "9:52 AM", text: "morning all! ☕" },
+              openThread
+            )
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "The button that opens a thread with replies: with one reply, three people, more people than it shows, replies not yet read, and while Yumi works and Ada types",
+      [
+        messageList(h, {
+          label: "Threads with replies",
+          children: [
+            threadRow(
+              h,
+              {
+                key: "one-reply",
+                mark: "S",
+                author: "Sara",
+                time: "9:44 AM",
+                text: "deploy went out clean last night!",
+                replies: { marks: [{ text: "O" }], label: "1 reply" }
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "three-people",
+                mark: "AJ",
+                author: "AJ",
+                time: "10:02 AM",
+                text: "found a bug. composer crashes when I paste an image from clipboard lol",
+                replies: { marks: [{ text: "AM" }, { text: "Y", tone: "lilac" }, { text: "S" }], label: "4 replies" }
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "many-people",
+                mark: "G",
+                author: "Graeme",
+                time: "10:08 AM",
+                text: "Can everyone look at the release notes before noon?",
+                replies: {
+                  marks: [{ text: "AM" }, { text: "Y", tone: "lilac" }, { text: "S" }, { text: "O" }, { text: "AJ" }],
+                  label: "12 replies",
+                  isUnread: true
+                }
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "busy",
+                mark: "S",
+                author: "Sara",
+                time: "10:15 AM",
+                text: "Atlas, can you take the release checklist?",
+                replies: { marks: [{ text: "AM" }, { text: "Y", tone: "lilac" }], label: "3 replies" },
+                working: [yumiWorking, { state: "queued", label: "Atlas queued" }],
+                typing: "Ada is typing…"
+              },
+              openThread
+            )
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A thread with no replies yet: Reply in thread as the words where there is no pointer to hover, a reply as the action where there is, and the button staying beside what is going on there",
+      [
+        messageList(h, {
+          label: "Threads without replies",
+          children: [
+            threadRow(
+              h,
+              { key: "quiet", mark: "O", author: "Oliver", time: "9:41 AM", text: "morning all! ☕" },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "typed-in",
+                mark: "S",
+                author: "Sara",
+                time: "10:12 AM",
+                text: "Can Yumi check the release notes?",
+                typing: "Yumi is typing…"
+              },
+              openThread
+            ),
+            threadRow(
+              h,
+              {
+                key: "worked-in",
+                mark: "S",
+                author: "Sara",
+                time: "10:14 AM",
+                text: "Yumi, please check the release notes",
+                working: [yumiWorking]
+              },
+              openThread
+            )
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "The task a thread tracks, as a chip with where it stands drawn before its title, in every drawing a status has",
+      [
+        messageList(h, {
+          label: "Tasks",
+          children: taskStatusChoices.map(([status, statusLabel]) =>
+            threadRow(
+              h,
+              {
+                key: `task-${status}`,
+                mark: "AJ",
+                author: "AJ",
+                time: "10:02 AM",
+                text: "found a bug. composer crashes when I paste an image from clipboard lol",
+                task: { shape: taskStatusDrawings[status], status: statusLabel, title: "Composer paste crash" }
+              },
+              openThread
+            )
           )
         })
       ],
@@ -1960,7 +2191,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A mention in the text as a chip: in plain text, in a row that opens a thread, and in the current row",
+      "A mention in the text as a chip: in a message, and in the current row",
       [
         messageList(h, {
           label: "Mentions",
@@ -1973,20 +2204,11 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               text: written("[@Caleb](member:caleb) Let's grab some coffee")
             }),
             message(h, {
-              key: "openable-mention",
-              mark: "S",
-              author: "Sara",
-              time: "10:12 AM",
-              text: written("[@Jamie](member:jamie) can you check the composer fix before we ship?"),
-              onOpen: press
-            }),
-            message(h, {
               key: "current-mention",
               mark: "AJ",
               author: "AJ",
               time: "10:15 AM",
               text: written("Thanks [@Sara](member:sara) and [@Yumi](member:yumi), both fixes are in."),
-              onOpen: press,
               isCurrent: true
             })
           ]
@@ -1996,7 +2218,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "Markdown in the text: as blocks in a plain row, and as a preview in a row that opens a thread and in a notification",
+      "Markdown in the text: as blocks in a message, and as a preview in a notification",
       [
         messageList(h, {
           label: "Markdown",
@@ -2008,14 +2230,6 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               time: "10:20 AM",
               text: written(markdownMessage)
             }),
-            message(h, {
-              key: "markdown-preview",
-              mark: "S",
-              author: "Sara",
-              time: "10:22 AM",
-              text: written(markdownMessage),
-              onOpen: press
-            }),
             notification(h, {
               key: "markdown-notification",
               mark: { text: "S" },
@@ -2026,45 +2240,6 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               age: "3m ago",
               isUnread: true,
               onOpen: press
-            })
-          ]
-        })
-      ],
-      conversationColumn
-    ),
-    sample(
-      h,
-      "A thread's replies under its row: one reply, three people, and more people than it shows",
-      [
-        messageList(h, {
-          label: "Threads with replies",
-          children: [
-            message(h, {
-              key: "one-reply",
-              mark: "S",
-              author: "Sara",
-              time: "9:44 AM",
-              text: "deploy went out clean last night!",
-              onOpen: press,
-              meta: [replyLine(h, { marks: ["O"], label: "1 reply" })]
-            }),
-            message(h, {
-              key: "three-people",
-              mark: "AJ",
-              author: "AJ",
-              time: "10:02 AM",
-              text: "found a bug. composer crashes when I paste an image from clipboard lol",
-              onOpen: press,
-              meta: [replyLine(h, { marks: ["AM", "Y", "S"], label: "4 replies" })]
-            }),
-            message(h, {
-              key: "many-people",
-              mark: "G",
-              author: "Graeme",
-              time: "10:08 AM",
-              text: "Can everyone look at the release notes before noon?",
-              onOpen: press,
-              meta: [replyLine(h, { marks: ["AM", "Y", "S", "O", "AJ"], label: "12 replies" }), h.span([], ["2 new"])]
             })
           ]
         })
@@ -3650,62 +3825,51 @@ const agentsPane = (h: ApplicationViewBuilder, query: string): Html =>
   })
 
 const groupThreads = (h: ApplicationViewBuilder): Html => {
-  const press = Message.ClickedButton()
+  const openThread = "composer-paste-crash"
+  const thread = (sample: ThreadSample) => threadRow(h, sample, openThread)
 
   return messageList(h, {
     label: "Threads",
     children: [
       divider(h, "Yesterday"),
-      message(h, {
-        key: "preview-ready",
-        mark: "AM",
-        author: "Alex",
-        time: "Yesterday",
-        text: "The preview is ready for another look. I've linked the latest notes in the task.",
-        onOpen: press
+      thread({
+        ...preview,
+        time: "4:01 PM",
+        text: "The preview is ready for another look. I've linked the latest notes in the task."
       }),
-      message(h, {
+      thread({
         key: "release-morning",
         mark: "S",
         author: "Sara",
-        time: "Yesterday",
-        text: "Looks good. I'll keep an eye on the release this morning.",
-        onOpen: press
+        time: "4:30 PM",
+        text: "Looks good. I'll keep an eye on the release this morning."
       }),
       divider(h, "Today"),
-      message(h, {
-        key: "morning-all",
-        mark: "O",
-        author: "Oliver",
-        time: "9:41 AM",
-        text: "morning all! ☕",
-        onOpen: press
-      }),
-      message(h, {
+      thread({ key: "morning-all", mark: "O", author: "Oliver", time: "9:41 AM", text: "morning all! ☕" }),
+      thread({
         key: "deploy-clean",
         mark: "S",
         author: "Sara",
         time: "9:44 AM",
-        text: "deploy went out clean last night! 🎉",
-        onOpen: press
+        text: "deploy went out clean last night! 🎉"
       }),
-      message(h, {
+      thread({
         key: "composer-paste-crash",
         mark: "AJ",
         author: "AJ",
         time: "10:02 AM",
         text: "found a bug. composer crashes when I paste an image from clipboard lol",
-        onOpen: press,
-        isCurrent: true,
-        meta: [replyLine(h, { marks: ["AM", "Y", "S"], label: "4 replies" })]
+        task: { shape: "progress", status: "Doing", title: "Composer paste crash" },
+        replies: { marks: [{ text: "AM" }, { text: "Y", tone: "lilac" }, { text: "S" }], label: "4 replies" },
+        working: [yumiWorking]
       }),
-      message(h, {
+      thread({
         key: "coffee",
         mark: "G",
         author: "Graeme",
         time: "10:08 AM",
         text: "@Caleb Let's grab some coffee",
-        onOpen: press
+        typing: "Caleb is typing…"
       })
     ]
   })
@@ -3748,6 +3912,7 @@ const groupPane = (h: ApplicationViewBuilder, paneTab: PaneTab, composerText: st
             ["Retry keeps the original request", "AND-209 · Ready for another look"]
           ])
     ],
+    anchor: paneTab === "threads" ? "bottom" : "top",
     footer: [
       composer(h, {
         id: "composer",
