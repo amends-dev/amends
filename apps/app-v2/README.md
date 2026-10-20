@@ -3,7 +3,7 @@
 The workspace app, being built on [Foldkit](https://foldkit.dev) Blocks: a browser app that signs
 people in over the [HTTP API](../../packages/http/README.md) and keeps each workspace they open in
 sync through [`@amends-dev/sync`](../../packages/sync/README.md), so it reads, and will write,
-offline. It signs in, lists the person's workspaces, and opens one: the groups they can see, to
+offline. It signs in, lists the person's workspaces, creates one or opens one: the groups they can see, to
 pick one or to browse, those they belong to and those they may join; a group's threads with who replied to each and how much of it is new, where they start a thread, and its tasks, the threads that track one, as a table to narrow by status and by search, where they start a task; and a thread's
 messages, where they reply, rename the thread, edit or delete their own messages, and follow or
 stop following it, which opening reads through its latest activity; their inbox, their
@@ -52,7 +52,7 @@ The look is [`@amends-dev/design`](../design/README.md)'s. `vite.config.ts` runs
 no class: classes come from a renderer, and the renderers live in the design package. The screens
 outside a workspace are composed from it: the root view frames the sign-in page and the workspace
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
-forms, fields, and rows from the design's `centered`, `control`, `form`, and `directory` modules.
+forms, fields, rows, and the modal that creates a workspace from the design's `centered`, `control`, `form`, `directory`, and `modal` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups` renders the sidebar's sections, the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
@@ -428,7 +428,23 @@ the pages that compose them; the root composes the pages.
   which the person can change the email or ask for a new code to the same address; it keeps the
   session a right code gives, and reports it.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
-  members it has and the name the person goes by in it; it reports the one picked.
+  members it has, "Owner" when they own it, and the name they go by in it, such as "4 members · Owner · as
+  Alex"; it reports the one picked. A failed listing says why and offers Try again, which reads it again. A
+  "Create workspace" button at the end of the heading's line, in every state of the listing, opens a modal
+  on a `DialogBlock` bound as `dialog`, which asks for the workspace's name and what people there will call
+  the person, and creates it over HTTP, `client.workspaces.create`, as its owner and first member. The model's
+  `create` is nothing, the form, the request on its way, or the workspace created while the listing is read
+  again to open it, and the page reports the opened workspace once the listing has it. Each attempt sends a
+  request key as the `idempotency-key`, made by the command with the browser's `Crypto`, and a failed attempt
+  keeps the key it used so that the request sent again after an uncertain outcome returns the workspace the
+  first created, not a second; changing a name starts a new request, since it is no longer the one that was
+  sent. The command takes the names without the space around them and words each refusal for the person: at
+  the name or the member name ("Use 1 to 80 characters, with no invisible ones."), or about the whole form
+  for an identity that may not create workspaces, values the host did not accept, and a host that was
+  unavailable, unsure, or not reached, the last three as "try again", which is safe with the same key.
+  Closing the dialog ends what was being created, except while the request is on its way: it opens again,
+  so that a workspace is not created unseen. If the listing cannot be read once the workspace exists, the
+  dialog says so, with Try again, and Close leaves the listing to say the same.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
   rail has "Home", "Connections", "Agents", and "Channels" buttons and, below them, "Settings", each
   marked while its destination is open; Home is open while nothing, the inbox, the tasks in triage,
@@ -733,7 +749,14 @@ browser's storage. Each Block's tests sit beside it:
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
   one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
   `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
-  with the members their text mentions, and with none when it mentions no one.
+  with the members their text mentions, and with none when it mentions no one. The workspaces page's
+  stories open an empty form, send its names with no key and read the list again once the workspace
+  exists to report it opened, keep the key of a failed request for the request sent again and start a
+  new one once a name changes, clear the refusal at the field typed in and the one about the form, ignore
+  a close while the request is on its way, which opens the dialog again, end on a close at any other
+  point, and show the list alone when the workspace is not in it or the dialog was closed; its
+  `CreateWorkspace` handler runs over a stub `HttpClient` that gives a canned status and body, to show the
+  key and names it sends and each refusal as the person reads it.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
@@ -851,7 +874,12 @@ browser's storage. Each Block's tests sit beside it:
   assistive technology and written ⌘K on an Apple platform and Ctrl K on another, opening in a dialog from
   it and, at `Phone`, from the drawer over the drawer, and a group found opening and closing the search.
   The root's show the key that opens the search opening it in an open workspace and doing nothing before
-  one is open, and the shortcut it gives the workspace by the platform. A scene opens and closes
+  one is open, and the shortcut it gives the workspace by the platform. The workspaces page's scenes
+  show each row with the name the person goes by and "Owner" only for a workspace they own, the heading's
+  Create workspace button in every state of the listing, a failed listing read again, the empty listing
+  saying what to do, and the dialog taking a workspace's names, sending them, saying at each field and for
+  the form why they were refused, and opening the workspace created, or saying the list could not be
+  read, with a way to try again. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through
   its Binding's `embedView`.

@@ -42,7 +42,9 @@ const signedOut: Model = {
 const choosing: Model = {
   page: Page.SignedIn({
     account: session.account,
-    workspaces: WorkspacesBlock.Model.make({ workspaces: Workspaces.Loaded({ memberships: [membership] }) }),
+    workspaces: modifyFields(WorkspacesBlock.init().model, {
+      workspaces: () => Workspaces.Loaded({ memberships: [membership] })
+    }),
     workspace: Option.none()
   }),
   viewport: "Split",
@@ -54,7 +56,9 @@ const choosing: Model = {
 const inWorkspace: Model = {
   page: Page.SignedIn({
     account: session.account,
-    workspaces: WorkspacesBlock.Model.make({ workspaces: Workspaces.Loaded({ memberships: [membership] }) }),
+    workspaces: modifyFields(WorkspacesBlock.init().model, {
+      workspaces: () => Workspaces.Loaded({ memberships: [membership] })
+    }),
     workspace: Option.some({
       workspaceId: membership.workspace.id,
       model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, membership.workspace.name, "Split")
