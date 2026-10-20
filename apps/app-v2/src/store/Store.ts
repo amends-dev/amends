@@ -1,12 +1,11 @@
 /**
- * A store open in the browser: one person's of one workspace, as eventlog keeps it, the replica
- * its changes keep, and the person's drafts there. Its event log journals into an IndexedDB database of its own. The actions the
- * person writes, `write`, are held in the replica as pending, with what each is expected to create,
- * until the server runs them; each `ReplicaChanged` the server writes back is applied to the
- * replica. The host's sync server is the log's remote, reached in the background once the browser's
- * sync key is registered, and tried again until it is, so a store opens, reads, and takes actions
- * offline; eventlog sends what was written while it could not. A store's databases are named for
- * the host, the person, and the workspace, since positions and entry IDs are only unique within one.
+ * A store open in the browser: one person's of one workspace, as eventlog keeps it, the replica its changes keep, and
+ * the person's drafts there. Its event log journals into an IndexedDB database of its own. The actions the person
+ * writes, `write`, are held in the replica as pending, with what each is expected to create, until the server runs
+ * them; each `ReplicaChanged` the server writes back is applied to the replica. The host's sync server is the log's
+ * remote, reached in the background once the browser's sync key is registered, and tried again until it is, so a store
+ * opens, reads, and takes actions offline; eventlog sends what was written while it could not. A store's databases are
+ * named for the host, the person, and the workspace, since positions and entry IDs are only unique within one.
  */
 
 import { type Grant, GrantResolver } from "@amends-dev/core/authorization"
@@ -168,9 +167,9 @@ const messagesByThread = (
 }
 
 /**
- * The `tasks` in the order given, each with its thread, the place its group is as the person reads it among
- * `members`, and the summary of the thread's messages. A task whose thread or group the replica lacks is left out, since it
- * could not be opened.
+ * The `tasks` in the order given, each with its thread, the place its group is as the person reads it among `members`,
+ * and the summary of the thread's messages. A task whose thread or group the replica lacks is left out, since it could
+ * not be opened.
  */
 export const viewTasks = ({
   memberId,
@@ -245,7 +244,10 @@ export interface GroupMatch {
   readonly name: string
 }
 
-/** A thread a search found, with the name of its group and the words the person reads it by: its title, or its opening's. */
+/**
+ * A thread a search found, with the name of its group and the words the person reads it by: its title, or its
+ * opening's.
+ */
 export interface ThreadMatch {
   readonly thread: Thread.Thread
   readonly groupName: string

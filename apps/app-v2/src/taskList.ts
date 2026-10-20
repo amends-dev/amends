@@ -51,11 +51,11 @@ const assigneeOf = (
 }
 
 /**
- * A task as a row, keyed by its thread: its status drawn and said, its thread's title or opening, quiet once the task
- * is done or dismissed, its group's place when it has one, its assignee if it has one, and how long ago the thread was
- * last written in, or "Sending…" while it is being started.
+ * A task as the design's list row, keyed by its thread: its status drawn and said, its thread's title or opening, quiet
+ * once the task is done or dismissed, its group's place when it has one, its assignee if it has one, and how long ago
+ * the thread was last written in, or "Sending…" while it is being started.
  */
-const renderRow = <Message>(
+const listRowOf = <Message>(
   { task, thread, opening, pending, lastActiveAt, place, isCurrent, onClick }: TaskRow<Message>,
   { members, now }: TaskRowsView
 ): TaskListRow<Message> => ({
@@ -78,5 +78,5 @@ export const taskRows = <Message, Requirements>(
 ): Html =>
   taskList(
     h,
-    rows.map((row) => renderRow(row, view))
+    rows.map((row) => listRowOf(row, view))
   )
