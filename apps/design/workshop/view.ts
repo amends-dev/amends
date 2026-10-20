@@ -4650,7 +4650,9 @@ const paletteSectionsOf = (
   }))
 }
 
-/** What the arrow keys and Enter do in the palette's field: move through the places, wrapping, or pick the one reached. */
+/**
+ * What the arrow keys and Enter do in the palette's field: move through the places, wrapping, or pick the one reached.
+ */
 const answerPaletteKey = (key: string, count: number, activeIndex: number): Option.Option<Message> => {
   if (count === 0) {
     return Option.none()

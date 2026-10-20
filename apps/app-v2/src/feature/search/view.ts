@@ -89,7 +89,9 @@ const emptyTextOf = (model: Model): string =>
     Failed: ({ error }) => error
   })
 
-/** The palette: the field, which takes the focus as it opens and walks the items with the arrow keys, over the items. */
+/**
+ * The palette: the field, which takes the focus as it opens and walks the items with the arrow keys, over the items.
+ */
 const searchPalette = (render: RenderInfo, model: Model, h: SearchViewBuilder): Html => {
   const active = activeItem(model)
   const count = shownItems(model).length

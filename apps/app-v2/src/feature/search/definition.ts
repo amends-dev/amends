@@ -1,10 +1,10 @@
 /**
  * Jumping anywhere in the workspace, as `apps/ui`'s Jump to does: a palette over the page, with a field and, under it,
  * the places that match what is typed, in sections: the pages (Go to), the groups, the people, the agents, and, after
- * `apps/ui`'s sections, the threads, which the arrow keys walk and Enter or a click opens. Before anything is typed each
- * section lists its first five, and while typing its best eight. The palette reads where the person can jump to from
- * their store while it is open, and ranks it as they type. It opens when its parent asks, and reports the page, the
- * group, the thread, the person, or the agent the item opened is.
+ * `apps/ui`'s sections, the threads, which the arrow keys walk and Enter or a click opens. Before anything is typed
+ * each section lists its first five, and while typing its best eight. The palette reads where the person can jump to
+ * from their store while it is open, and ranks it as they type. It opens when its parent asks, and reports the page,
+ * the group, the thread, the person, or the agent the item opened is.
  */
 
 import { Group, GroupId } from "@amends-dev/core/group"
@@ -22,12 +22,9 @@ import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
 import { foldAccents } from "../../seen.ts"
 
-/** A page the person can go to, as the rail or the account menu does. */
+/** A page the person can go to, as the rail or the account menu does, in the order `apps/ui`'s Go to lists them. */
 export const Destination = Schema.Literals(["Inbox", "Agents", "Connections", "Settings"])
 export type Destination = typeof Destination.Type
-
-/** The pages under Go to, in the order `apps/ui` lists them. */
-export const destinations: ReadonlyArray<Destination> = ["Inbox", "Agents", "Connections", "Settings"]
 
 /** A group the person can jump to, with its name as they read it. */
 export const NamedGroup = Schema.Struct({ group: Group.Group, name: Schema.String })
@@ -173,7 +170,7 @@ export const sectionsOf = (targets: JumpTargets, typed: string): ReadonlyArray<I
   const query = queryOf(typed)
   const limit = query === "" ? browsingLimit : searchingLimit
   const sections: ReadonlyArray<ItemSection> = [
-    { title: "Go to", items: destinations.map((destination) => Item.Destination({ destination })) },
+    { title: "Go to", items: Destination.literals.map((destination) => Item.Destination({ destination })) },
     { title: "Groups", items: targets.groups.map((named) => Item.Group(named)) },
     { title: "People", items: targets.people.map((member) => Item.Person({ member })) },
     { title: "Agents", items: targets.agents.map((named) => Item.Agent(named)) },

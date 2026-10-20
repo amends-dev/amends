@@ -110,7 +110,9 @@ export type ModalConfig<Message> = Readonly<{
   isCancelDisabled?: boolean
   /** Makes the panel a form that sends this when submitted, so a `submit` in the footer sends it. */
   onSubmit?: Message
-  /** `regular` (the default) is 40rem by 37.5rem, `compact` 35rem wide, `form` 40rem wide, and `wide` 45rem by 54rem. */
+  /**
+   * `regular` (the default) is 40rem by 37.5rem, `compact` 35rem wide, `form` 40rem wide, and `wide` 45rem by 54rem.
+   */
   size?: Exclude<ModalSize, "palette">
 }>
 

@@ -126,9 +126,9 @@ const goToDestination = (destination: Destination) =>
 
 /**
  * What the search opened is shown as the rail, the sidebar, and the tasks show it: a page as the rail goes to it, with
- * the navigation drawer shut, Inbox being Home, which opens on it, and Settings the Workspace page the account menu goes
- * to; a group or a thread in Home, as picking it in the sidebar does; an agent on its page. A person is opened as a
- * conversation, which Home's groups find or start.
+ * the navigation drawer shut, Inbox being Home, which opens on it, and Settings the Workspace page the account menu
+ * goes to; a group or a thread in Home, as picking it in the sidebar does; an agent on its page. A person is opened as
+ * a conversation, which Home's groups find or start.
  */
 const foldSearchOutMessage = SearchBlock.OutMessage.match({
   OpenedDestination: ({ destination }) => goToDestination(destination),
