@@ -166,6 +166,8 @@ import {
   MemberFilterBinding,
   MembersPaneFilterBinding,
   ModalBinding,
+  NewMessageModalBinding,
+  NewMessagePickerBinding,
   RailAccountBinding,
   TaskAssigneeBinding,
   TaskFilterBinding,
@@ -5564,6 +5566,52 @@ const createGroupModal = (h: ApplicationViewBuilder, render: RenderInfo, model: 
     onSubmit: Message.SubmittedCreateModal()
   })
 
+/** The person the reader already has a conversation with, in the workshop's New message modal. */
+const talkedWith = "alex"
+
+/** Whether the people chosen in the New message modal are exactly the person the reader already talks to. */
+const hasConversation = (model: Model): boolean =>
+  model.newMessageMembers.length === 1 && model.newMessageMembers.includes(talkedWith)
+
+const newMessageModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "New message",
+    description: "Everyone you choose sees every thread in your conversation together.",
+    size: "compact",
+    body: [
+      memberPicker(h, {
+        id: "workshop-new-message-picker",
+        label: "To",
+        placeholder: "Add someone…",
+        chosen: peopleOf(model.newMessageMembers),
+        candidates: pickerPeople,
+        query: model.newMessagePicker.inputValue,
+        isOpen: model.newMessagePicker.isOpen,
+        attributes: render.initialFocus,
+        onRemove: (id) => Message.ClickedRemoveMember({ place: "newMessage", id }),
+        embed: (viewInputs) =>
+          h.block(
+            NewMessagePickerBinding.embedView({
+              slotId: "new-message-picker",
+              model: model.newMessagePicker,
+              viewInputs
+            })
+          )
+      }),
+      announcement(
+        h,
+        hasConversation(model) ? Option.some("You already have a conversation with them.") : Option.none()
+      )
+    ],
+    cancelLabel: "Cancel",
+    footer: [
+      submit(h, hasConversation(model) ? "Open conversation" : "Start conversation", {
+        isDisabled: model.newMessageMembers.length === 0
+      })
+    ],
+    onSubmit: Message.SubmittedNewMessageModal()
+  })
+
 /** The people a group holds, as the settings' Members tab lists them: the reader first, then who was added. */
 const heldMembers = (model: Model): ReadonlyArray<GroupMember<Message>> => [
   { key: "you", name: "Jamie Morgan", mark: { text: "JM" }, note: "You" },
@@ -5747,6 +5795,20 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
             slotId: "create-modal",
             model: model.createModal,
             viewInputs: { hasDescription: true, toView: (render) => createGroupModal(h, render, model) }
+          })
+        )
+      ]
+    ),
+    sample(
+      h,
+      "Compact, with a description and a members picker that takes the initial focus; the line under it says when the reader already talks to the person chosen (Alex Morgan), and the action waits for someone",
+      [
+        button(h, "Open the new message modal", Message.ClickedOpenNewMessageModal()),
+        h.block(
+          NewMessageModalBinding.embedView({
+            slotId: "new-message-modal",
+            model: model.newMessageModal,
+            viewInputs: { hasDescription: true, toView: (render) => newMessageModal(h, render, model) }
           })
         )
       ]

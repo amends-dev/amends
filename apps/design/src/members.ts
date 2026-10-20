@@ -18,7 +18,7 @@
 import { type Multi, inputId } from "@foldkit/ui/combobox"
 import * as Option from "effect/Option"
 import { type Html, type HtmlBuilder, childAttributes } from "foldkit/html"
-import { answerKeys, button } from "./control.ts"
+import { type PublishedAttributes, answerKeys, button } from "./control.ts"
 import { icon } from "./icon.ts"
 import { type MarkContent, mark } from "./mark.ts"
 
@@ -185,6 +185,8 @@ export type MemberPickerConfig<Message> = Readonly<{
   hint?: string
   /** A control after the field, such as the button that adds who is chosen, level with its top. */
   action?: Html
+  /** Go onto the input: the `initialFocus` of a dialog whose first field this is, which takes focus as it opens. */
+  attributes?: PublishedAttributes
   /** What removing a chip sends, from its button and from Backspace in the empty field, which removes the last. */
   onRemove: (id: string) => Message
   /** Embeds the bound combobox Block with the view inputs the design built. */
@@ -231,14 +233,17 @@ const viewInputsOf = <Message, Requirements>(
     }),
     inputPlaceholder: config.chosen.length > 0 ? "Add more…" : (config.placeholder ?? "Search workspace members…"),
     inputClassName: inputLook,
-    inputAttributes: childAttributes([
-      ...(config.hint === undefined ? [] : [h.AriaDescribedBy(`${config.id}-hint`)]),
-      answerKeys(h, (key) =>
-        key === "Backspace" && config.query === "" && last !== undefined
-          ? Option.some(config.onRemove(last.id))
-          : Option.none()
-      )
-    ]),
+    inputAttributes: [
+      ...childAttributes([
+        ...(config.hint === undefined ? [] : [h.AriaDescribedBy(`${config.id}-hint`)]),
+        answerKeys(h, (key) =>
+          key === "Backspace" && config.query === "" && last !== undefined
+            ? Option.some(config.onRemove(last.id))
+            : Option.none()
+        )
+      ]),
+      ...(config.attributes ?? [])
+    ],
     inputWrapperClassName: inputWrapperLook,
     inputWrapperAttributes: childAttributes([h.Id(`${config.id}-field`)]),
     className: comboboxLook,
@@ -261,7 +266,8 @@ const viewInputsOf = <Message, Requirements>(
  * keys move through the list, Enter picks, Escape closes it, and Backspace in the empty field removes the last chip.
  * Under the list a line says how to use it, or that no one matches, or that everyone is in. The field opens the list
  * as it takes focus, and a button at its end shows or hides it. The `hint` is under the field and describes the input;
- * the `action` is a control level with the field's top, such as the button that adds who is chosen.
+ * the `action` is a control level with the field's top, such as the button that adds who is chosen; the `attributes`
+ * go onto the input, such as a dialog's `initialFocus` when the picker is the first thing the dialog asks.
  *
  * The list is the framework's, which the combobox places against the whole field and not against its input, so that it
  * is as wide as the field wherever the chips leave the input. For that the field carries the `-input-wrapper` id the

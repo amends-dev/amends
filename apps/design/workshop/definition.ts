@@ -71,7 +71,7 @@ export const VisibilityRadioGroup = RadioGroup.create<Visibility>()
 /**
  * Which of the workshop's pickers a message is about: the empty one, the one with chips, and the ones in the modals.
  */
-export const MemberPlace = Schema.Literals(["empty", "chosen", "create", "add", "list"])
+export const MemberPlace = Schema.Literals(["empty", "chosen", "create", "newMessage", "add", "list"])
 export type MemberPlace = typeof MemberPlace.Type
 
 export const Destination = Schema.Literals(["home", "agents", "connections", "settings"])
@@ -123,6 +123,7 @@ export const Model = Schema.Struct({
   confirmModal: DialogBlock.Model,
   compactModal: DialogBlock.Model,
   createModal: DialogBlock.Model,
+  newMessageModal: DialogBlock.Model,
   addViewModal: DialogBlock.Model,
   emptyPicker: MembersPicker.Model,
   emptyMembers: Schema.Array(Schema.String),
@@ -130,6 +131,8 @@ export const Model = Schema.Struct({
   chosenMembers: Schema.Array(Schema.String),
   createPicker: MembersPicker.Model,
   createMembers: Schema.Array(Schema.String),
+  newMessagePicker: MembersPicker.Model,
+  newMessageMembers: Schema.Array(Schema.String),
   addPicker: MembersPicker.Model,
   addMembers: Schema.Array(Schema.String),
   heldMembers: Schema.Array(Schema.String),
@@ -199,6 +202,7 @@ export const Message = defineMessageUnion({
   ClickedOpenConfirmModal: {},
   ClickedOpenCompactModal: {},
   ClickedOpenCreateModal: {},
+  ClickedOpenNewMessageModal: {},
   ClickedOpenAddViewModal: {},
   ClickedCloseAddViewModal: {},
   TypedMemberListQuery: { value: Schema.String },
@@ -224,6 +228,7 @@ export const Message = defineMessageUnion({
   SubmittedConfirmModal: {},
   SubmittedCompactModal: {},
   SubmittedCreateModal: {},
+  SubmittedNewMessageModal: {},
   SubmittedAddViewModal: {},
   ChangedPlan: { plan: Plan },
   ChangedTaskStatus: { status: TaskStatus },

@@ -35,6 +35,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     emptyMembers: [],
     chosenMembers: ["alex", "sara"],
     createMembers: [],
+    newMessageMembers: [],
     addMembers: [],
     heldMembers: ["alex", "yumi"],
     listMembers: [],

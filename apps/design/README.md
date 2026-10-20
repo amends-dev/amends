@@ -41,8 +41,10 @@ the title in place of Close, the list of people always shown, and a wide action,
 Close settings button whose Members tab has the picker beside its Add button, the count of the people held over a
 dashed rule, their list, an action at the start of its footer, and Done at its end, and as a search over rows of
 integrations that run to the panel's edges; compact, as a confirmation with Cancel at the start of the footer and the
-primary button at its end, and as one with a context and a description whose Cancel and primary button are dimmed
-while a toggle says its request is on its way; form, with two fields, a hint, and a control at the start of the
+primary button at its end, as New message, with a description, a members picker that takes the initial focus, the line
+that says the reader already talks to the person chosen, and an action that waits for someone, and as one with a
+context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way;
+form, with two fields, a hint, and a control at the start of the
 footer; and wide, with fields side by side over a taller box; the palette, opened by a button, with the places under
 the title of their section, the one reached filled, the arrow keys moving through them, Enter picking one, and a
 message for what matches nothing; and a regular modal and the palette each in a frame 360px wide, as a phone shows
@@ -1321,7 +1323,7 @@ holds, and the list of them. The field is the look of `@foldkit/ui`'s headless m
 keeps the input, the arrow keys through the list, Enter, Escape, the focus, and the labels.
 
 - `memberPicker(h, config)` is a field of chips under a `label`. The `config` is
-  `{ id, label, isLabelHidden?, placeholder?, locked?, chosen, candidates, query, isOpen, hint?, action?, onRemove, embed }`.
+  `{ id, label, isLabelHidden?, placeholder?, locked?, chosen, candidates, query, isOpen, hint?, action?, attributes?, onRemove, embed }`.
   - The `locked` people, such as the reader as "You", are chips with no button. The `chosen` ones after them are chips
     28px tall with a 22px mark, their name, and a Remove button named for them, such as "Remove Sara", which sends
     `onRemove(id)`. Backspace in the empty input sends the same for the last chosen. Chips and input wrap inside a
@@ -1337,7 +1339,8 @@ keeps the input, the arrow keys through the list, Enter, Escape, the focus, and 
     here." when no one is left to offer. That line is a disabled item of the list, which no key chooses.
   - The `hint` is a line under the field, in the look of `hint`, that describes the input, such as "3 members,
     including you." The `action` is a control in a column 88px wide beside the field, level with its top, such as the
-    button that adds who is chosen, "Add" or "Add 2".
+    button that adds who is chosen, "Add" or "Add 2". The `attributes` go onto the input, such as a dialog's
+    `initialFocus` when the picker is the first thing the dialog asks, as in a New message.
   - A Block creates `Combobox.Multi.create()` from `@foldkit/ui/combobox` once, binds it as a child with an `id` for
     the combobox through `init`, and folds its `Selected({ value })` out message into the people it holds. A pick
     does not empty the text the person typed, so the fold also asks the Block to `requestClose()` and `requestOpen()`
@@ -1397,7 +1400,7 @@ and values, a value that is a button, a person's mark in its size and tone, hidd
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
-those with a modifier, left to the browser; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; the list under a
+those with a modifier, left to the browser; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, with the attributes it is given on its input and its placeholder, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; the list under a
 field of chips by the label of its search, with no combobox, the people offered as buttons named by their name and kind, how many are available, the
 line for none matching and for everyone being in, a pick that becomes a chip and leaves the list, and Backspace that removes the last chip in the empty
 input and leaves them while there is text; a

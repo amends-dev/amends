@@ -3,7 +3,7 @@ import { Combobox } from "@foldkit/ui"
 import { Multi } from "@foldkit/ui/combobox"
 import { Schema } from "effect"
 import { makeApplicationDefinition } from "foldkit"
-import type { HtmlBuilder } from "foldkit/html"
+import { type HtmlBuilder, childAttributes } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
   Command,
@@ -91,6 +91,22 @@ const view = Composition.makeView((model, h) =>
     query: model.picker.inputValue,
     isOpen: model.picker.isOpen,
     hint: "You're included automatically. Add others now or later.",
+    onRemove: (id) => Message.ClickedRemove({ id }),
+    embed: (viewInputs) => h.block(PickerBinding.embedView({ slotId: "members", model: model.picker, viewInputs }))
+  })
+)
+
+/** The picker as a dialog's first field: a label of its own, no one locked, a placeholder, and attributes on its input. */
+const viewWithAttributes = Composition.makeView((model, h) =>
+  memberPicker(h, {
+    id: "members",
+    label: "To",
+    placeholder: "Add someone…",
+    chosen: model.chosen.flatMap((id) => people.filter((person) => person.id === id)),
+    candidates: people,
+    query: model.picker.inputValue,
+    isOpen: model.picker.isOpen,
+    attributes: childAttributes([h.DataAttribute("probe", "")]),
     onRemove: (id) => Message.ClickedRemove({ id }),
     embed: (viewInputs) => h.block(PickerBinding.embedView({ slotId: "members", model: model.picker, viewInputs }))
   })
@@ -323,6 +339,17 @@ describe("memberPicker", () => {
       expect(role("button", { name: "Remove Caleb" })).toExist(),
       expect(role("button", { name: "Remove Alex Morgan" })).toExist()
     )
+  })
+
+  it("puts the attributes it is given on its input, such as a dialog's initial focus, and no others", () => {
+    scene(
+      { update, view: viewWithAttributes },
+      given(initial),
+      toggleReady,
+      expect(role("combobox", { name: "To" })).toHaveAttr("data-probe", ""),
+      expect(role("combobox", { name: "To" })).toHaveAttr("placeholder", "Add someone…")
+    )
+    scene({ update, view }, given(initial), toggleReady, expect(combobox).not.toHaveAttr("data-probe"))
   })
 
   it("shows or hides the list from the button at the end of the field", () => {

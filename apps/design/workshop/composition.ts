@@ -83,6 +83,12 @@ export const CreateModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
   outMessage: { fold: foldDialogOutMessage }
 })
 
+export const NewMessageModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "newMessageModal",
+  init: { contextToArgs: () => [{ id: "workshop-new-message-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
 /** Choosing a person adds them to the field, empties what was typed, and keeps the list open for the next. */
 export const EmptyPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
   field: "emptyPicker",
@@ -126,6 +132,22 @@ export const CreatePickerBinding = ApplicationDefinition.bindChild(MembersPicker
           ApplicationDefinition.stepFields(() => ({ createMembers: (members) => [...members, value] })),
           CreatePickerBinding.requestClose(),
           CreatePickerBinding.requestOpen()
+        ]),
+      ClearedSelection: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const NewMessagePickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+  field: "newMessagePicker",
+  init: { contextToArgs: () => [{ id: "workshop-new-message-picker" }] },
+  outMessage: {
+    fold: MembersPicker.OutMessage.match({
+      Selected: ({ value }) =>
+        Update.combine([
+          ApplicationDefinition.stepFields(() => ({ newMessageMembers: (members) => [...members, value] })),
+          NewMessagePickerBinding.requestClose(),
+          NewMessagePickerBinding.requestOpen()
         ]),
       ClearedSelection: () => ApplicationDefinition.stepNoop()
     })
@@ -322,10 +344,12 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     ConfirmModalBinding,
     CompactModalBinding,
     CreateModalBinding,
+    NewMessageModalBinding,
     AddViewModalBinding,
     EmptyPickerBinding,
     ChosenPickerBinding,
     CreatePickerBinding,
+    NewMessagePickerBinding,
     AddPickerBinding,
     VisibilityBinding,
     LockedVisibilityBinding,
