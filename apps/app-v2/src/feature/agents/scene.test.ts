@@ -567,16 +567,17 @@ describe("the agents", () => {
     )
   })
 
-  it("offer to add an agent only when a connection gives models", () => {
+  it("offer to add an agent when no connection gives models, and say so beside the model connection", () => {
     scene(
-      { update, view },
+      { update, view: withDialog },
       given(
         modifyFields(opened, {
           connections: () => [harness, sandbox].map((connection) => ({ connection, pending: false }))
         })
       ),
-      expect(text("An agent needs a connection that gives models.")).toExist(),
-      expect(role("button", { name: "Add agent" })).toBeAbsent()
+      click(first(all.role("button", { name: "Add agent" }))),
+      ...dialogOpened(),
+      inside(addDialog, expect(text("No connection gives models yet. Add one in Connections.")).toExist())
     )
   })
 

@@ -261,13 +261,20 @@ export const mayConfigure = (model: Pick<Model, "workspaceId" | "grants">, agent
 export const mayRemove = (model: Pick<Model, "workspaceId" | "grants">, agent: AgentItem["agent"]): boolean =>
   may(model.grants, MemberPermissions.Remove, memberTarget(model.workspaceId, agent.memberId))
 
-/** Whether the person may create agents, which they need a connection that gives models to run on to do. */
+/** Whether the host has listed its integrations, which say what each connection gives. */
+const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
+  Integrations.isAnyOf(["Loaded"])(model.integrations)
+
+/** Whether the person may create agents. */
 export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean =>
   may(model.grants, AgentPermissions.Create, workspaceTarget(model.workspaceId))
 
-/** Whether the person may add an agent now: they may create agents and a connection gives models to run it on. */
-export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "connections" | "integrations">): boolean =>
-  mayCreate(model) && connectionItemsGiving(model, "models").length > 0
+/**
+ * Whether the person may add an agent now: they may create agents and the integrations are listed, so the dialog
+ * knows what each connection gives. With no connection that gives models, the dialog says so beside the field.
+ */
+export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "integrations">): boolean =>
+  mayCreate(model) && areIntegrationsListed(model)
 
 /** The name of the agent, its membership's, or "An agent" while the members are not read. */
 export const nameOfAgent = (model: Pick<Model, "members">, agent: AgentItem["agent"]): string =>
@@ -356,10 +363,6 @@ export const sandboxProblem = (
           ? Option.some(`${connection.name} works only in a sandbox. Choose one.`)
           : Option.none()
       )
-
-/** Whether the host has listed its integrations, which say what each connection gives. */
-const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
-  Integrations.isAnyOf(["Loaded"])(model.integrations)
 
 /** Whether a connection chosen for `capability` is one that gives it, which is unknown until the integrations are listed. */
 const isUnavailable = (

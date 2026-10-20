@@ -418,8 +418,8 @@ the pages that compose them; the root composes the pages.
   (`isLoaded`, which keeps "No agents yet" from showing before). The Block has four views. Its
   `sidebarView`, which the page puts in the sidebar for the Agents destination, is a section named
   Agents: each agent by its membership's first letter on a lilac mark and its name, with Browse
-  (`list`, "Browse agents") and, where the person may create agents and a connection gives models,
-  "Add agent", and the title a button that opens the list and is current while it shows (the view
+  (`list`, "Browse agents") and, where the person may create agents and the host listed its integrations,
+  "Add agent", whose dialog says beside the model connection when no connection gives models, and the title a button that opens the list and is current while it shows (the view
   input `isListOpen`), an agent's row being current instead while its page shows (`openAgentId`); an agent that needs setup has a caution triangle on its mark, with "Needs
   setup" on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
   ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
@@ -1025,7 +1025,7 @@ browser's storage. Each Block's tests sit beside it:
   on, picked to be reported, with the patch and the sentence for one that needs setup and none for one that is ready, by an
   ordinary member without the controls until the person is given the role that manages them, marked as
   sending with none while a change is on its way, offering to add only once the host listed its
-  integrations and a connection gives models, and why they could not be read; the list's tabs with their
+  integrations, saying in the dialog when no connection gives models, and why they could not be read; the list's tabs with their
   counts, its search and the quiet line and Clear search for no match, its empty states, its columns,
   and nothing shown before the agents are read; the sidebar's section with its title, Browse, and Add
   agent, the agents by name with a patch on those that need setup, the one whose page is open marked

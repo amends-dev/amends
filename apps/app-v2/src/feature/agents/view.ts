@@ -23,7 +23,7 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { calendarDate, memberName } from "../../seen.ts"
-import { connectionItemsGiving, Integrations } from "../connections/definition.ts"
+import { Integrations } from "../connections/definition.ts"
 import { AgentsComposition, type AgentsViewBuilder, DialogBinding } from "./composition.ts"
 import {
   type Adding,
@@ -100,10 +100,7 @@ const integrationsView = (model: Model, h: AgentsViewBuilder): Html =>
         notice(h, Option.some(error)),
         buttonRow(h, [button(h, "Try again", Message.ClickedReloadIntegrations(), { variant: "quiet" })])
       ]),
-    Loaded: () =>
-      connectionItemsGiving(model, "models").length === 0
-        ? hint(h, "An agent needs a connection that gives models.")
-        : h.empty
+    Loaded: () => h.empty
   })
 
 /**
