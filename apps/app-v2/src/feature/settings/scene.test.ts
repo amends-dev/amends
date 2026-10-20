@@ -10,6 +10,7 @@ import {
   change,
   click,
   expect,
+  expectNoOutMessage,
   expectOutMessage,
   given,
   inside,
@@ -47,11 +48,11 @@ import {
   SelectOnFocus,
   TransferOwnership
 } from "./command.ts"
-import { MemberStatusMenu, Message, type Model, OutMessage, Written } from "./definition.ts"
+import { AccountMenu, MemberStatusMenu, Message, type Model, OutMessage, Written } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { dialogView, memberView, membersView, view } from "./view.ts"
+import { accountView, dialogView, memberView, membersView, view } from "./view.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }
@@ -77,6 +78,15 @@ const membersPage = withViewInputs(membersView, { now, viewport: "Desktop", open
 const phoneMembersPage = withViewInputs(membersView, { now, viewport: "Phone", openMemberId: Option.none() })()
 
 const dialog = withViewInputs(dialogView, { now })()
+
+/** The account at the foot of the rail, which the settings draw for the person signed in with alice's address. */
+const account = withViewInputs(accountView, { email: "alice@example.com", appearance: "System" })()
+
+/** A view and the account at the foot of the rail, whose menu opens the dialog that changes the person's name. */
+const withAccount =
+  (inner: typeof membersPage): typeof membersPage =>
+  (model, h) =>
+    h.div([], [inner(model, h), account(model, h)])
 
 /** A view and the dialog for inviting, revoking, handing the workspace over, and removing, which the shell keeps beside it. */
 const withDialog =
@@ -162,14 +172,15 @@ describe("the Workspace page of the settings", () => {
     )
   })
 
-  it("changes the person's own name in a compact dialog the page asks for, which starts from the name they have", () => {
+  it("changes the person's own name in a compact dialog the account menu opens, which starts from the name they have", () => {
     const nameDialog = role("dialog", { name: "Change your name" })
 
     scene(
-      { update, view: withDialog(view), subscriptions: SettingsBlock.subscriptions },
+      { update, view: withDialog(withAccount(view)) },
       given(owner),
       expect(nameDialog).toBeAbsent(),
-      Subscription.emit(subscriptions.settings, Message.RequestedChangeName()),
+      ...chooseFromMenu(AccountMenu, "Account: Alice", "Change your name…"),
+      expectNoOutMessage(),
       ...dialogOpened(),
       Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
       inside(
@@ -203,9 +214,9 @@ describe("the Workspace page of the settings", () => {
     const nameDialog = role("dialog", { name: "Change your name" })
 
     scene(
-      { update, view: withDialog(view), subscriptions: SettingsBlock.subscriptions },
+      { update, view: withDialog(withAccount(view)) },
       given(owner),
-      Subscription.emit(subscriptions.settings, Message.RequestedChangeName()),
+      ...chooseFromMenu(AccountMenu, "Account: Alice", "Change your name…"),
       ...dialogOpened(),
       Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
       inside(

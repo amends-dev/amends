@@ -26,7 +26,10 @@ const statusTones: Readonly<Record<Task.Status, BadgeTone>> = {
   dismissed: "neutral"
 }
 
-/** A task to list: the thread that tracks it, with its opening, replies, and last activity, its group, and the message that opens it. */
+/**
+ * A task to list: the thread that tracks it, with its opening, replies, and last activity, its group, and the message
+ * that opens it.
+ */
 export type TaskRow<Message> = Readonly<{
   task: Task.Task
   thread: Thread.Thread

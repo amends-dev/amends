@@ -24,8 +24,7 @@ export const init = SettingsComposition.makeInit(
       selected: Option.none(),
       entering: Option.none(),
       copyAttempts: 0,
-      copiedAttempt: Option.none(),
-      nameChangeRequests: 0
+      copiedAttempt: Option.none()
     }
   })
 )

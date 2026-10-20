@@ -1,8 +1,8 @@
 /**
- * What the workshop remembers: the text of its fields, boxes, and composers, among them the search over its agents, which switches are on, the plan
- * chosen, a task's status, priority, and assignee, which rail destination, pane tab, and thread are current,
- * the group settings typed in the modals, which section of the wide one shows, whether each modal is open,
- * what each menu chose and whether it is open, and how often a button was pressed.
+ * What the workshop remembers: the text of its fields, boxes, and composers, among them the search over its agents,
+ * which switches are on, the plan chosen, a task's status, priority, and assignee, which rail destination, pane tab,
+ * and thread are current, the group settings typed in the modals, which section of the wide one shows, whether each
+ * modal is open, what each menu chose and whether it is open, and how often a button was pressed.
  */
 
 import { DialogBlock } from "@foldkit/ui/dialog"

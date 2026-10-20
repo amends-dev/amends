@@ -1,7 +1,6 @@
 import { iconButton } from "@amends-dev/design/control"
-import type { MenuGroup } from "@amends-dev/design/menu"
 import { pane } from "@amends-dev/design/pane"
-import { rail, railAccount } from "@amends-dev/design/rail"
+import { rail } from "@amends-dev/design/rail"
 import { shell } from "@amends-dev/design/shell"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "@amends-dev/design/sidebar"
 import type * as DateTime from "effect/DateTime"
@@ -23,17 +22,15 @@ import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import { threadView as inboxThreadView } from "../../feature/inbox/view.ts"
-import { ownName } from "../../feature/settings/definition.ts"
 import {
+  accountView as settingsAccountView,
   dialogView as settingsDialogView,
   memberView as settingsMemberView,
   membersView as settingsMembersView
 } from "../../feature/settings/view.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../feature/tasks/view.ts"
-import { initials } from "../../seen.ts"
 import {
-  AccountBinding,
   ActionsBinding,
   AgentsBinding,
   AsideBinding,
@@ -49,16 +46,7 @@ import {
   WorkspaceComposition,
   type WorkspaceViewBuilder
 } from "./composition.ts"
-import {
-  type AccountEntry,
-  Message,
-  type Model,
-  nameOf,
-  Open,
-  openMemberId,
-  openThreadTitle,
-  type SettingsPage
-} from "./definition.ts"
+import { Message, type Model, nameOf, Open, openMemberId, openThreadTitle, type SettingsPage } from "./definition.ts"
 
 /**
  * Who is signed in, which the account menu names under the person's name, their Appearance, which the menu checks, the
@@ -71,42 +59,6 @@ export type ViewInputs = Readonly<{
   now: DateTime.Utc
   isApplePlatform: boolean
 }>
-
-const appearances = ["System", "Light", "Dark"] as const satisfies ReadonlyArray<Appearance>
-
-/** The account menu's choices: the Appearances, the entries that go somewhere, and the one that ends the session. */
-const accountGroups = (appearance: Appearance): ReadonlyArray<MenuGroup<AccountEntry>> => [
-  {
-    label: "Appearance",
-    choices: appearances.map((value) => ({ value, label: value, isChecked: value === appearance }))
-  },
-  {
-    choices: [
-      { value: "SwitchWorkspace", label: "Switch workspace" },
-      { value: "WorkspaceSettings", label: "Workspace settings" },
-      { value: "ChangeName", label: "Change your name…" }
-    ]
-  },
-  { choices: [{ value: "SignOut", label: "Sign out" }] }
-]
-
-/**
- * The person's account at the foot of the rail: their initials, and a menu that names them over the address they
- * signed in with, which they choose their Appearance from, and which goes to another workspace, to the workspace's
- * settings, to the dialog that changes their name, and out.
- */
-const accountView = (model: Model, { email, appearance }: ViewInputs, h: WorkspaceViewBuilder): Html => {
-  const name = ownName(model.settings)
-  const hasName = name !== ""
-
-  return railAccount(h, {
-    name: hasName ? name : email,
-    initials: initials(hasName ? name : email),
-    header: hasName ? { title: name, detail: email } : { title: email },
-    groups: accountGroups(appearance),
-    embed: (viewInputs) => h.block(AccountBinding.embedView({ slotId: "account", model: model.account, viewInputs }))
-  })
-}
 
 /** The destinations of the rail, as the open workspace shows them. */
 const railItems = (model: Model) => [
@@ -401,13 +353,13 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
   )
 
 /**
- * The open workspace on the shell: the rail of destinations and the person's account, the sidebar, the main pane, the thread's side pane, and
- * the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side pane lent to
- * the shell, and the dialogs of the groups, for starting a team or a conversation, of the connections, for adding one,
- * replacing its key, or confirming its removal, of the agents, for adding one or confirming its removal, of the
- * settings, for inviting someone, reading the invitations, revoking one, handing the workspace over, or removing a
- * member, and of the search, which the shell keeps in the frame whether or not the sidebar or the page that opens them
- * is on the page.
+ * The open workspace on the shell: the rail of destinations and the person's account, the sidebar, the main pane, the
+ * thread's side pane, and the notices, laid out for the window's width, with the dialogs of the navigation drawer and
+ * of the side pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, of the
+ * connections, for adding one, replacing its key, or confirming its removal, of the agents, for adding one or
+ * confirming its removal, of the settings, for inviting someone, reading the invitations, revoking one, handing the
+ * workspace over, or removing a member, and of the search, which the shell keeps in the frame whether or not the
+ * sidebar or the page that opens them is on the page.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   const { now } = inputs
@@ -427,7 +379,14 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
           onClick: Message.ClickedSettings()
         }
       ],
-      account: accountView(model, inputs, h)
+      account: h.block(
+        SettingsBinding.embedView({
+          slotId: "account",
+          model: model.settings,
+          view: settingsAccountView,
+          viewInputs: { email: inputs.email, appearance: inputs.appearance }
+        })
+      )
     }),
     sidebar: sidebarView(model, inputs, h),
     main: mainView(model, now, h),

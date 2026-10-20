@@ -1,9 +1,9 @@
 /**
- * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row
- * they lie in, a link to another page, labelled fields and boxes and the grid they lie in, a labelled
- * switch, a choice from a list, a six-digit code, a line of hint, what is being waited for, why an entry was refused, a boxed note for a page as a
- * whole, that an action is on its way, and the column that holds a few of these together. Each renders
- * with the caller's builder and messages, and carries the look.
+ * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row they lie in, a link
+ * to another page, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a list, a
+ * six-digit code, a line of hint, what is being waited for, why an entry was refused, a boxed note for a page as a
+ * whole, that an action is on its way, and the column that holds a few of these together. Each renders with the
+ * caller's builder and messages, and carries the look.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -168,8 +168,8 @@ export type ButtonOptions = Readonly<{
   hasChevron?: boolean
   isDisabled?: boolean
   /**
-   * What assistive technology calls the button when its label alone does not tell it from the buttons around it, such as
-   * "Revoke invitation for casey@mercier.example" for "Revoke". It begins with the label.
+   * What assistive technology calls the button when its label alone does not tell it from the buttons around it, such
+   * as "Revoke invitation for casey@mercier.example" for "Revoke". It begins with the label.
    */
   name?: string
 }>
@@ -385,7 +385,9 @@ export const buttonRow = <Message, Requirements>(
   options: ButtonRowOptions = {}
 ): Html => h.div([h.Class(joinClasses(buttonRowLook, options.isCentered === true && centeredLook))], children)
 
-/** A few pieces that belong together inside a section, one under another, 12px apart, such as a notice and its button. */
+/**
+ * A few pieces that belong together inside a section, one under another, 12px apart, such as a notice and its button.
+ */
 export const column = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   children: ReadonlyArray<Html>
@@ -456,7 +458,10 @@ export const loadingLine = <Message, Requirements>(h: HtmlBuilder<Message, Requi
 export const sending = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, pending: boolean): Html =>
   pending ? h.span([h.Class(sendingMark)], [" · Sending…"]) : h.empty
 
-/** What follows an input: why its value was refused, then what to know about it. The refusal describes the input, and the hint does while there is none. */
+/**
+ * What follows an input: why its value was refused, then what to know about it. The refusal describes the input, and
+ * the hint does while there is none.
+ */
 const describeField = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   descriptionAttributes: ReadonlyArray<Attribute<Message>>,

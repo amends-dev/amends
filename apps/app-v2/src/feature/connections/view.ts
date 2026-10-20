@@ -684,7 +684,9 @@ const missingConnection = (workspaceName: string, h: ConnectionsViewBuilder): Ht
     ]
   })
 
-/** What the page of a connection says before the connections are read, and why they could not be when they could not. */
+/**
+ * What the page of a connection says before the connections are read, and why they could not be when they could not.
+ */
 const readingConnection = (model: Model, workspaceName: string, h: ConnectionsViewBuilder): Html =>
   pane(h, {
     variant: "main",

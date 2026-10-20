@@ -104,12 +104,12 @@ export const railAccount = <Value extends string, Message, Requirements>(
   })
 
 /**
- * The column of destinations, a `nav` named Destinations: the `brand`, the logo with a short line under it,
- * the `items`, then the `search` when there is one, and at the bottom the `footer` items, such as Settings, and the
- * optional `account`, a `railAccount`, under them. The current item is `aria-current="true"`, filled, with a 2px bar at the rail's left edge.
- * The search is an item like the others in look and spacing, a magnifier named by its `label`, and is never
- * current. A brand with an `onClick` is a button named by its `label`, whose logo lifts its patch when hovered;
- * with none it is the logo as an image of that name. The logo is cut out of the canvas the rail lies on.
+ * The column of destinations, a `nav` named Destinations: the `brand`, the logo with a short line under it, the
+ * `items`, then the `search` when there is one, and at the bottom the `footer` items, such as Settings, and the
+ * optional `account`, a `railAccount`, under them. The current item is `aria-current="true"`, filled, with a 2px bar at
+ * the rail's left edge. The search is an item like the others in look and spacing, a magnifier named by its `label`,
+ * and is never current. A brand with an `onClick` is a button named by its `label`, whose logo lifts its patch when
+ * hovered; with none it is the logo as an image of that name. The logo is cut out of the canvas the rail lies on.
  */
 export const rail = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

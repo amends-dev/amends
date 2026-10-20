@@ -83,7 +83,9 @@ export const statusFilterMenu = <Message, Requirements>(
   }>
 ): Html => narrowingMenu(h, { kind: "Status", unchosen: "All", ...config })
 
-/** The menu that narrows a list to the tasks assigned to someone, whose button says Assignee while it narrows to none. */
+/**
+ * The menu that narrows a list to the tasks assigned to someone, whose button says Assignee while it narrows to none.
+ */
 export const assigneeFilterMenu = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ value: AssigneeFilter; embed: MenuConfig<AssigneeFilter>["embed"] }>

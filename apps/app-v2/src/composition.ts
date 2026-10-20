@@ -11,10 +11,10 @@ import { modifyFields } from "foldkit/struct"
 import type { Appearance } from "./appearance.ts"
 import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
 import { ApplicationDefinition } from "./definition.ts"
+import type { ReportedAccountEntry } from "./feature/settings/definition.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
-import type { AppEntry } from "./page/workspace/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
@@ -46,7 +46,10 @@ export const SignInBinding = ApplicationDefinition.bindChild(SignInBlock, {
   outMessage: { fold: foldSignInOutMessage }
 })
 
-/** Go to the sign-in form with the address kept and `notice` over it, if any, and forget the session, the person's stores, and their sync identity. */
+/**
+ * Go to the sign-in form with the address kept and `notice` over it, if any, and forget the session, the person's
+ * stores, and their sync identity.
+ */
 const signOutWithNotice = (notice: string | undefined) =>
   ApplicationDefinition.step((model: Model) =>
     SignInBinding.init({
@@ -56,7 +59,9 @@ const signOutWithNotice = (notice: string | undefined) =>
     })
   )
 
-/** Signing out leaves the address in the form, and forgets the session, the person's stores, and their sync identity. */
+/**
+ * Signing out leaves the address in the form, and forgets the session, the person's stores, and their sync identity.
+ */
 export const signOut = signOutWithNotice(undefined)
 
 /** A session the host no longer knows ends as signing out does, and says so over the form. */
@@ -101,9 +106,11 @@ const closeWorkspace = ApplicationDefinition.step((model: Model) => ({
 
 /**
  * What choosing an entry of the account menu does: an Appearance is shown and kept, another workspace is the list of
- * workspaces, signing out is signing out, and the settings are the open workspace's to show.
+ * workspaces, the workspace's settings are the open workspace's to show, and signing out is signing out.
  */
-const chooseAccountEntry = (workspaceId: WorkspaceId.WorkspaceId, entry: AppEntry) =>
+// NOTE: Workspace settings comes back to the workspace page as an operation, not handled where the menu reports it: a
+// fold that switches the page's destination takes the page's update past the depth TypeScript instantiates (TS2589).
+const chooseAccountEntry = (workspaceId: WorkspaceId.WorkspaceId, entry: ReportedAccountEntry) =>
   Match.value(entry).pipe(
     Match.whenOr("System", "Light", "Dark", chooseAppearance),
     Match.when("SwitchWorkspace", () => closeWorkspace),

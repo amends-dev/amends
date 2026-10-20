@@ -1,8 +1,21 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import type { Block } from "foldkit"
+import * as Update from "foldkit/update"
 import { SelectOnFocus } from "./command.ts"
-import { isDialogBusy, MemberStatusMenu, SettingsDefinition } from "./definition.ts"
+import {
+  AccountMenu,
+  Entering,
+  findMember,
+  isDialogBusy,
+  MemberStatusMenu,
+  type Model,
+  OutMessage,
+  ownName,
+  ReportedAccountEntry,
+  SettingsDefinition
+} from "./definition.ts"
 
 /** Stop what the person was doing in the dialog, whether the request in it was made or not. */
 export const leaveDialog = SettingsDefinition.stepFields(() => ({ entering: () => Option.none() }))
@@ -38,8 +51,42 @@ export const MemberStatusBinding = SettingsDefinition.bindChild(MemberStatusMenu
   }
 })
 
+/** Ask for the dialog, doing `entering`. */
+export const openDialog = (entering: Entering) =>
+  Update.combine([
+    SettingsDefinition.stepFields(() => ({ entering: () => Option.some(entering) })),
+    DialogBinding.requestOpen()
+  ])
+
+/** Ask for the dialog that changes the person's own name, from the one they have, once the replica holds them. */
+const askToChangeName = SettingsDefinition.step((model: Model) =>
+  Option.isSome(findMember(model, model.memberId))
+    ? openDialog(Entering.ChangingName({ name: ownName(model), isSending: false, failure: Option.none() }))
+    : SettingsDefinition.stepNoop()
+)
+
+/**
+ * Choosing to change their name opens the dialog that does it; every other entry of the account menu is reported, for
+ * the workspace page and the app to act on.
+ */
+export const AccountBinding = SettingsDefinition.bindChild(AccountMenu, {
+  field: "accountMenu",
+  init: { contextToArgs: () => [{ id: "account" }] },
+  outMessage: {
+    forward: AccountMenu.OutMessage.match({
+      Selected: ({ value }) =>
+        Schema.is(ReportedAccountEntry)(value) ? OutMessage.ChoseAccountEntry({ entry: value }) : undefined,
+      Closed: () => undefined
+    }),
+    fold: AccountMenu.OutMessage.match({
+      Selected: ({ value }) => (value === "ChangeName" ? askToChangeName : SettingsDefinition.stepNoop()),
+      Closed: () => SettingsDefinition.stepNoop()
+    })
+  }
+})
+
 export const SettingsComposition = SettingsDefinition.makeComposition({
-  bindings: [DialogBinding, MemberStatusBinding],
+  bindings: [DialogBinding, MemberStatusBinding, AccountBinding],
   mounts: [SelectOnFocus]
 })
 export type SettingsViewBuilder = Block.ViewBuilderFor<typeof SettingsComposition>

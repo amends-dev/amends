@@ -15,7 +15,7 @@ import {
   RevokeInvitation,
   TransferOwnership
 } from "./command.ts"
-import { DialogBinding, leaveDialog, SettingsComposition } from "./composition.ts"
+import { DialogBinding, leaveDialog, openDialog, SettingsComposition } from "./composition.ts"
 import {
   Entering,
   type Failure,
@@ -31,7 +31,6 @@ import {
   mayTransferOwnership,
   type NameEdit,
   OutMessage,
-  SettingsDefinition,
   ownerAssignment,
   ownName,
   type Reason,
@@ -132,13 +131,6 @@ const refuseEntering = (
   isFor: (entering: Entering) => boolean
 ): Model =>
   atEntering(model, (entering) => (isFor(entering) ? refusedEntering(failureOf(action, reason))(entering) : entering))
-
-/** Ask for the dialog, doing `entering`. */
-const openDialog = (entering: Entering) =>
-  Update.combine([
-    SettingsDefinition.stepFields(() => ({ entering: () => Option.some(entering) })),
-    DialogBinding.requestOpen()
-  ])
 
 /** Close the dialog, whose request is done with. */
 const closeDialog = Update.combine([leaveDialog, DialogBinding.requestClose()])
@@ -265,14 +257,6 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
           openDialog(
             Entering.Inviting({ email: "", roleId: BuiltinRoles.MemberId, isSending: false, failure: Option.none() })
           )
-        ])
-      : { model }
-
-  /** Ask for the dialog that changes the person's own name, from the one they have, once the replica holds them. */
-  const askToChangeName = () =>
-    Option.isSome(findMember(model, model.memberId))
-      ? Update.combine(model, [
-          openDialog(Entering.ChangingName({ name: ownName(model), isSending: false, failure: Option.none() }))
         ])
       : { model }
 
@@ -572,7 +556,6 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
     }),
     SubmittedOwnName: () => submitOwnName(model),
     CompletedSelectOnFocus: () => ({ model }),
-    RequestedChangeName: () => askToChangeName(),
     ClickedCopyId: () => ({
       model: modifyFields(model, { copyAttempts: (attempts) => attempts + 1 }),
       commands: [CopyWorkspaceId({ workspaceId: model.workspaceId, attempt: model.copyAttempts + 1 })]

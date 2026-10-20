@@ -106,7 +106,9 @@ export type PaneHeader = Readonly<{
   status?: MarkStatus | undefined
   /** A quieter word after the title, such as where it is. */
   context?: string
-  /** A quieter line under the title on phones only, such as the workspace's name, which they have no room for beside it. */
+  /**
+   * A quieter line under the title on phones only, such as the workspace's name, which they have no room for beside it.
+   */
   phoneContext?: string
   /** A control before the title that brings its own spacing, such as `paneBack`. */
   leading?: Html

@@ -2282,7 +2282,9 @@ const taskSortChoices: ReadonlyArray<readonly [TaskSort, string]> = [
   ["oldest", "Oldest"]
 ]
 
-/** Where a menu is shown: among the menu samples, or in the pane whose toolbar holds it. Each place has its own Block. */
+/**
+ * Where a menu is shown: among the menu samples, or in the pane whose toolbar holds it. Each place has its own Block.
+ */
 type Place = "sample" | "pane"
 
 const memberFilterMenu = (h: ApplicationViewBuilder, model: Model, place: Place): Html =>

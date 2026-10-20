@@ -21,15 +21,7 @@ import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
-import {
-  AccountMenu,
-  isAsideFloating,
-  type Model,
-  Open,
-  OutMessage,
-  type SettingsPage,
-  WorkspaceDefinition
-} from "./definition.ts"
+import { isAsideFloating, type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
 const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
@@ -253,7 +245,8 @@ const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
     Update.combine([closeMember, hideAside, ActionsBinding.confirm({ text: settingsToast.memberRemoved(name) })]),
   TransferredOwnership: ({ name }) => ActionsBinding.confirm({ text: settingsToast.ownerChanged(name) }),
   InvitedMember: () => ActionsBinding.confirm({ text: settingsToast.invitationCreated }),
-  RevokedInvitation: () => ActionsBinding.confirm({ text: settingsToast.invitationRevoked })
+  RevokedInvitation: () => ActionsBinding.confirm({ text: settingsToast.invitationRevoked }),
+  ChoseAccountEntry: () => WorkspaceDefinition.stepNoop()
 })
 
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
@@ -357,32 +350,21 @@ export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   field: "settings",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldSettingsOutMessage }
-})
-
-/** Ask the settings for the dialog that changes the person's name, which opens it. */
-const askSettingsToChangeName = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, {
-    settings: (settings) => modifyFields(settings, { nameChangeRequests: (requests) => requests + 1 })
-  })
-}))
-
-/**
- * The entry the person chooses in the account menu is reported to the app, which acts on it, except changing their
- * name, which the settings' dialog does.
- */
-export const AccountBinding = WorkspaceDefinition.bindChild(AccountMenu, {
-  field: "account",
-  init: { contextToArgs: () => [{ id: "account" }] },
   outMessage: {
-    forward: AccountMenu.OutMessage.match({
-      Selected: ({ value }) => (value === "ChangeName" ? undefined : OutMessage.ChoseAccountEntry({ entry: value })),
-      Closed: () => undefined
+    /** The entry the person chooses in the account menu is reported to the app, which acts on it. */
+    forward: SettingsBlock.OutMessage.match({
+      OpenedMember: () => undefined,
+      ClosedMember: () => undefined,
+      RenamedWorkspace: () => undefined,
+      RenamedSelf: () => undefined,
+      ChangedRole: () => undefined,
+      RemovedMember: () => undefined,
+      TransferredOwnership: () => undefined,
+      InvitedMember: () => undefined,
+      RevokedInvitation: () => undefined,
+      ChoseAccountEntry: ({ entry }) => OutMessage.ChoseAccountEntry({ entry })
     }),
-    fold: AccountMenu.OutMessage.match({
-      Selected: ({ value }) => (value === "ChangeName" ? askSettingsToChangeName : WorkspaceDefinition.stepNoop()),
-      Closed: () => WorkspaceDefinition.stepNoop()
-    })
+    fold: foldSettingsOutMessage
   }
 })
 
@@ -429,8 +411,7 @@ export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
     AgentsBinding,
     SettingsBinding,
     ChannelsBinding,
-    GroupBinding,
-    AccountBinding
+    GroupBinding
   ]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

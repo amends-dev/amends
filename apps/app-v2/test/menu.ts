@@ -1,7 +1,7 @@
 /**
  * Steps for scenes that open a menu and choose from it. A menu is a button that opens a list: opening it focuses the
- * list, anchors it to the button, and puts a backdrop behind it, and choosing from it closes the list, returns the focus
- * to the button, and ends the anchor and the backdrop. A scene acknowledges each, as the browser would.
+ * list, anchors it to the button, and puts a backdrop behind it, and choosing from it closes the list, returns the
+ * focus to the button, and ends the anchor and the backdrop. A scene acknowledges each, as the browser would.
  */
 
 import * as Menu from "@foldkit/ui/menu"

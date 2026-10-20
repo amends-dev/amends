@@ -13,6 +13,7 @@ import {
   click,
   expect,
   expectAll,
+  expectNoOutMessage,
   expectOutMessage,
   filter,
   first,
@@ -25,8 +26,8 @@ import {
   selector,
   text,
   type,
-  withViewInputs,
-  within
+  within,
+  withViewInputs
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
@@ -89,12 +90,12 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import { Search } from "../../feature/search/command.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { RenameSelf, SelectOnFocus } from "../../feature/settings/command.ts"
-import { Written as SettingsWritten } from "../../feature/settings/definition.ts"
+import { AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { timeOf } from "../../seen.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { LoadIntegrations } from "./command.ts"
-import { AccountMenu, Message, Open, OutMessage } from "./definition.ts"
+import { Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -1634,8 +1635,7 @@ describe("a workspace", () => {
       expect(nameDialog).toBeAbsent(),
       ...openMenu(AccountMenu, "Account: Alice"),
       ...chooseMenuItem(AccountMenu, "Change your name…"),
-      // The menu tells the app nothing of this entry: the settings are asked to open their dialog.
-      Subscription.emit(workspaceSubscriptions["settings/settings"], SettingsBlock.Message.RequestedChangeName()),
+      expectNoOutMessage(),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       Mount.resolve(SelectOnFocus, SettingsBlock.Message.CompletedSelectOnFocus()),

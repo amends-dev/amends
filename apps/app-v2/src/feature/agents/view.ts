@@ -93,7 +93,10 @@ const harnessLine = (agent: AgentItem["agent"], model: Model): string =>
 const sandboxLine = (agent: AgentItem["agent"], model: Model): string =>
   agent.sandbox === null ? "No sandbox" : connectionName(model, agent.sandbox.connectionId)
 
-/** What the host's integrations say while the person waits for them, or why they could not be listed, with a way to ask again. */
+/**
+ * What the host's integrations say while the person waits for them, or why they could not be listed, with a way to ask
+ * again.
+ */
 const integrationsView = (model: Model, h: AgentsViewBuilder): Html =>
   Integrations.match(model.integrations, {
     Loading: () => hint(h, "Loading the integrations…"),
@@ -193,7 +196,9 @@ const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => 
   )
 }
 
-/** What the list says when it has no row to show: nothing is there to browse, nothing needs setup, or nothing matches. */
+/**
+ * What the list says when it has no row to show: nothing is there to browse, nothing needs setup, or nothing matches.
+ */
 const emptyList = (model: Model, h: AgentsViewBuilder): Html => {
   const { tab, query } = model.browse
 
@@ -412,7 +417,10 @@ const setupForm = (
   ])
 }
 
-/** What the agent's page says about it that is not set up by the person: its role, what it is at work on, and who made it. */
+/**
+ * What the agent's page says about it that is not set up by the person: its role, what it is at work on, and who made
+ * it.
+ */
 const detailsSection = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html =>
   paneSection(h, {
     title: "Details",
@@ -480,7 +488,10 @@ const agentPage = (item: AgentItem, model: Model, workspaceName: string, h: Agen
   })
 }
 
-/** What the page of an agent says when the workspace does not list it: it was removed, or the person can no longer see it. */
+/**
+ * What the page of an agent says when the workspace does not list it: it was removed, or the person can no longer see
+ * it.
+ */
 const missingAgent = (workspaceName: string, h: AgentsViewBuilder): Html =>
   pane(h, {
     variant: "main",
@@ -598,7 +609,10 @@ const removingModal = (render: RenderInfo, removing: Removing, h: AgentsViewBuil
     onSubmit: Message.ConfirmedRemoval()
   })
 
-/** What the dialog shows: the form that adds an agent, or the confirmation that removes one; an empty frame while it has neither. */
+/**
+ * What the dialog shows: the form that adds an agent, or the confirmation that removes one; an empty frame while it has
+ * neither.
+ */
 const dialogModal = (render: RenderInfo, model: Model, workspaceName: string, h: AgentsViewBuilder): Html =>
   Option.match(model.adding, {
     onSome: (adding) => addingModal(render, adding, model, workspaceName, h),

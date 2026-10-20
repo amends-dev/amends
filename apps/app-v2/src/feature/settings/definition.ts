@@ -4,10 +4,10 @@
  * roster the person searches and narrows to those who are still in the workspace or are not, and the invitations
  * waiting, with all of them in a history. A member opens in the side pane, where the person changes their role, reads
  * their access, and removes them; the invitations are issued, revoked, and read in dialogs, as is the handing over of
- * the workspace, the removal of a member, and the changing of the person's own name, which the workspace page asks for
- * from the account menu. A control shows only when the person's grants and the delegation rule allow it. The Block
- * reports the member opened and closed, and what the person did, which the workspace page shows the side pane for and
- * confirms.
+ * the workspace, the removal of a member, and the changing of the person's own name. That one opens from the person's
+ * account at the foot of the rail, a menu the Block draws, whose other entries it reports for the page and the app to
+ * act on. A control shows only when the person's grants and the delegation rule allow it. The Block reports the member
+ * opened and closed, and what the person did, which the workspace page shows the side pane for and confirms.
  */
 
 import {
@@ -117,6 +117,27 @@ export type MembersFilter = typeof MembersFilter.Type
 export const MemberStatusMenu = Menu.create<Member.Status>()
 
 /**
+ * The entries of the account menu that the Block reports: an Appearance, another workspace, the workspace's settings,
+ * and signing out.
+ */
+export const ReportedAccountEntry = Schema.Literals([
+  "System",
+  "Light",
+  "Dark",
+  "SwitchWorkspace",
+  "WorkspaceSettings",
+  "SignOut"
+])
+export type ReportedAccountEntry = typeof ReportedAccountEntry.Type
+
+/** What the account menu can be chosen for: the entries the Block reports, and the dialog that changes the name. */
+export const AccountEntry = Schema.Literals([...ReportedAccountEntry.literals, "ChangeName"])
+export type AccountEntry = typeof AccountEntry.Type
+
+/** The menu of the person's account at the foot of the rail. */
+export const AccountMenu = Menu.create<AccountEntry>()
+
+/**
  * The member open in the side pane: which, the role the person chose and has not saved, whether the save is on its
  * way, and why the last one failed.
  */
@@ -168,12 +189,11 @@ export const Entering = defineTaggedUnion({
 export type Entering = typeof Entering.Type
 
 /**
- * The workspace, its members and their role assignments, the roles, the invitations, what the person may do, the
- * name of the workspace they are changing, the roster's filter and its menu, the member open in the side pane, the
- * dialog and what is done in it, how many times they asked to copy the workspace's ID and which of them shows as done,
- * how many times the page asked for the dialog that changes their own name, and whether the settings could not be
- * read. `reads` counts how many times the person asked to read them again, which starts the read anew, and
- * `nameChangeRequests` how many times the page asked for that dialog, each of which opens it.
+ * The workspace, its members and their role assignments, the roles, the invitations, what the person may do, the name
+ * of the workspace they are changing, the roster's filter and its menu, the account menu, the member open in the side
+ * pane, the dialog and what is done in it, how many times they asked to copy the workspace's ID and which of them shows
+ * as done, and whether the settings could not be read. `reads` counts how many times the person asked to read them
+ * again, which starts the read anew.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -189,12 +209,12 @@ export const Model = Schema.Struct({
   workspaceName: Schema.Option(NameEdit),
   filter: MembersFilter,
   statusMenu: MemberStatusMenu.Model,
+  accountMenu: AccountMenu.Model,
   selected: Schema.Option(Selected),
   dialog: DialogBlock.Model,
   entering: Schema.Option(Entering),
   copyAttempts: Schema.Int,
-  copiedAttempt: Schema.Option(Schema.Int),
-  nameChangeRequests: Schema.Int
+  copiedAttempt: Schema.Option(Schema.Int)
 })
 export type Model = typeof Model.Type
 
@@ -214,7 +234,6 @@ export const Message = defineMessageUnion({
   TypedOwnName: { name: Schema.String },
   SubmittedOwnName: {},
   CompletedSelectOnFocus: {},
-  RequestedChangeName: {},
   ClickedCopyId: {},
   CopiedWorkspaceId: { attempt: Schema.Int },
   FailedCopyWorkspaceId: {},
@@ -254,7 +273,8 @@ export const OutMessage = defineMessageUnion({
   RemovedMember: { name: Schema.String },
   TransferredOwnership: { name: Schema.String },
   InvitedMember: {},
-  RevokedInvitation: {}
+  RevokedInvitation: {},
+  ChoseAccountEntry: { entry: ReportedAccountEntry }
 })
 export type OutMessage = typeof OutMessage.Type
 

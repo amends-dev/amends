@@ -16,7 +16,7 @@ import { columns, row, rowWithButton, section, summary } from "@amends-dev/desig
 import { form } from "@amends-dev/design/form"
 import type { IconName } from "@amends-dev/design/icon"
 import type { MarkContent } from "@amends-dev/design/mark"
-import { choiceMenu } from "@amends-dev/design/menu"
+import { choiceMenu, type MenuGroup } from "@amends-dev/design/menu"
 import { modal } from "@amends-dev/design/modal"
 import {
   pane,
@@ -28,15 +28,24 @@ import {
   paneSection,
   paneToolbar
 } from "@amends-dev/design/pane"
+import { railAccount } from "@amends-dev/design/rail"
 import type { Viewport } from "@amends-dev/design/viewport"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
+import type { Appearance } from "../../appearance.ts"
 import { initials } from "../../seen.ts"
 import { SelectOnFocus } from "./command.ts"
-import { DialogBinding, MemberStatusBinding, SettingsComposition, type SettingsViewBuilder } from "./composition.ts"
 import {
+  AccountBinding,
+  DialogBinding,
+  MemberStatusBinding,
+  SettingsComposition,
+  type SettingsViewBuilder
+} from "./composition.ts"
+import {
+  type AccountEntry,
   accessOf,
   creatorOf,
   Entering,
@@ -460,6 +469,47 @@ export const membersView = SettingsComposition.makeView.withInputs<MembersInputs
     })
   }
 )
+
+const appearances = ["System", "Light", "Dark"] as const satisfies ReadonlyArray<Appearance>
+
+/** The account menu's choices: the Appearances, the entries that go somewhere, and the one that ends the session. */
+const accountGroups = (appearance: Appearance): ReadonlyArray<MenuGroup<AccountEntry>> => [
+  {
+    label: "Appearance",
+    choices: appearances.map((value) => ({ value, label: value, isChecked: value === appearance }))
+  },
+  {
+    choices: [
+      { value: "SwitchWorkspace", label: "Switch workspace" },
+      { value: "WorkspaceSettings", label: "Workspace settings" },
+      { value: "ChangeName", label: "Change your name…" }
+    ]
+  },
+  { choices: [{ value: "SignOut", label: "Sign out" }] }
+]
+
+/** What the account menu is given besides the model: the address the person signed in with, and their Appearance. */
+export type AccountInputs = Readonly<{ email: string; appearance: Appearance }>
+
+/**
+ * The person's account at the foot of the rail: their initials, and a menu that names them over the address they
+ * signed in with, which they choose their Appearance from, and which goes to another workspace, to the workspace's
+ * settings, to the dialog that changes their name, and out. Before the replica holds their name, it names them by
+ * their address.
+ */
+export const accountView = SettingsComposition.makeView.withInputs<AccountInputs>((model, { email, appearance }, h) => {
+  const name = ownName(model)
+  const hasName = name !== ""
+
+  return railAccount(h, {
+    name: hasName ? name : email,
+    initials: initials(hasName ? name : email),
+    header: hasName ? { title: name, detail: email } : { title: email },
+    groups: accountGroups(appearance),
+    embed: (viewInputs) =>
+      h.block(AccountBinding.embedView({ slotId: "account", model: model.accountMenu, viewInputs }))
+  })
+})
 
 /** The roles the person may give, each with its name, to choose from. */
 const roleChoices = (model: Model) => givableRoles(model).map(({ id, name }) => [id, name] as const)

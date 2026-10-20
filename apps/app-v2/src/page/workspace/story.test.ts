@@ -61,14 +61,19 @@ import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Result } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
-import { Written as SettingsWritten } from "../../feature/settings/definition.ts"
+import { AccountBinding } from "../../feature/settings/composition.ts"
+import {
+  AccountEntry,
+  AccountMenu,
+  type ReportedAccountEntry,
+  Written as SettingsWritten
+} from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { LoadIntegrations } from "./command.ts"
 import {
-  AccountBinding,
   AgentsBinding,
   AsideBinding,
   ChannelsBinding,
@@ -81,16 +86,7 @@ import {
   SettingsBinding,
   TasksBinding
 } from "./composition.ts"
-import {
-  AccountMenu,
-  type AppEntry,
-  isThreadOpen,
-  Message,
-  Open,
-  OutMessage,
-  openMemberId,
-  openThreadTitle
-} from "./definition.ts"
+import { isThreadOpen, Message, Open, OutMessage, openMemberId, openThreadTitle } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -294,28 +290,15 @@ const fromAside = (message: typeof DialogBlock.Message.Type) =>
 /** The open group, before it is read, with no thread open. */
 const openGroupModel = initGroup(workspaceId, memberId, groupId, Option.none()).model
 
-/** What the account menu reports, as the workspace receives it. */
-const fromAccount = (message: typeof AccountMenu.Message.Type) =>
-  AccountBinding.embedView({
-    slotId: "account",
-    model: opened.account,
-    viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
-  }).toParentMessage(message)
-
-/** The account menu's entries, in the order it lists them, as it reports the one the person chooses. */
-const accountEntries = [
-  "System",
-  "Light",
-  "Dark",
-  "SwitchWorkspace",
-  "WorkspaceSettings",
-  "ChangeName",
-  "SignOut"
-] as const
-
-/** The account menu reporting that the person chose `entry`. */
-const choseAccountEntry = (entry: (typeof accountEntries)[number]) =>
-  fromAccount(AccountMenu.Message.SelectedItem({ index: accountEntries.indexOf(entry), item: entry }))
+/** The account menu, which the settings draw, reporting that the person chose `entry`, as the workspace receives it. */
+const choseAccountEntry = (entry: AccountEntry) =>
+  fromSettings(
+    AccountBinding.embedView({
+      slotId: "account",
+      model: opened.settings.accountMenu,
+      viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+    }).toParentMessage(AccountMenu.Message.SelectedItem({ index: AccountEntry.literals.indexOf(entry), item: entry }))
+  )
 
 /** The open group, before it is read, with no thread open. */
 const fromGroup = (message: typeof GroupBlock.Message.Type) =>
@@ -434,8 +417,8 @@ describe("a workspace", () => {
     )
   })
 
-  it("reports the entry the person chooses in the account menu that the app acts on, and nothing for the others", () => {
-    const appEntries: ReadonlyArray<AppEntry> = [
+  it("reports the entry the person chooses in the account menu that the app acts on, and nothing for a new name", () => {
+    const reported: ReadonlyArray<ReportedAccountEntry> = [
       "System",
       "Light",
       "Dark",
@@ -444,7 +427,7 @@ describe("a workspace", () => {
       "SignOut"
     ]
 
-    for (const entry of appEntries) {
+    for (const entry of reported) {
       story(
         update,
         given(opened),
@@ -452,27 +435,8 @@ describe("a workspace", () => {
         expectOutMessage(OutMessage.ChoseAccountEntry({ entry }))
       )
     }
-  })
 
-  it("asks the settings to open the dialog that changes the person's name, as often as they choose it, and tells the app nothing", () => {
-    story(
-      update,
-      given(opened),
-      model((model) => {
-        expect(model.settings.nameChangeRequests).toBe(0)
-      }),
-      message(choseAccountEntry("ChangeName")),
-      expectNoOutMessage(),
-      model((model) => {
-        expect(model.settings.nameChangeRequests).toBe(1)
-      }),
-      message(choseAccountEntry("ChangeName")),
-      expectNoOutMessage(),
-      model((model) => {
-        expect(model.settings.nameChangeRequests).toBe(2)
-        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
-      })
-    )
+    story(update, given(opened), message(choseAccountEntry("ChangeName")), expectNoOutMessage())
   })
 
   it("shows the workspace's settings page when the app asks, in place of what is open", () => {

@@ -27,8 +27,10 @@ import {
   RevokeInvitation,
   TransferOwnership
 } from "./command.ts"
-import { DialogBinding } from "./composition.ts"
+import { AccountBinding, DialogBinding } from "./composition.ts"
 import {
+  AccountEntry,
+  AccountMenu,
   Entering,
   givableRoles,
   invitationHistory,
@@ -199,7 +201,7 @@ describe("the settings", () => {
       update,
       given(opened),
       message(received(alice.id)),
-      message(Message.RequestedChangeName()),
+      message(choseAccountEntry("ChangeName")),
       dialogShown,
       model((model) => {
         expect(model.entering).toEqual(
@@ -237,7 +239,7 @@ describe("the settings", () => {
       update,
       given(opened),
       message(received(alice.id)),
-      message(Message.RequestedChangeName()),
+      message(choseAccountEntry("ChangeName")),
       dialogShown,
       message(Message.TypedOwnName({ name: "A" })),
       message(Message.SubmittedOwnName()),
@@ -263,27 +265,44 @@ describe("the settings", () => {
     )
   })
 
-  it("asks for the dialog each time the page asks, and not before the replica holds the person", () => {
+  it("opens the dialog each time the person chooses it in the account menu, and not before the replica holds them", () => {
     story(
       update,
       given(opened),
-      message(Message.RequestedChangeName()),
+      message(choseAccountEntry("ChangeName")),
+      expectNoOutMessage(),
       Command.expectNone(),
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
       }),
       message(received(alice.id)),
-      message(Message.RequestedChangeName()),
+      message(choseAccountEntry("ChangeName")),
       dialogShown,
       message(fromDialog(DialogBlock.Message.RequestedClose())),
       dialogClosed,
-      message(Message.RequestedChangeName()),
+      message(choseAccountEntry("ChangeName")),
       dialogShown,
       model((model) => {
         expect(Option.exists(model.entering, Entering.isAnyOf(["ChangingName"]))).toBe(true)
       })
     )
+  })
+
+  it("reports every other entry of the account menu, for the page and the app to act on, and opens no dialog", () => {
+    for (const entry of ["System", "Light", "Dark", "SwitchWorkspace", "WorkspaceSettings", "SignOut"] as const) {
+      story(
+        update,
+        given(opened),
+        message(received(alice.id)),
+        message(choseAccountEntry(entry)),
+        expectOutMessage(OutMessage.ChoseAccountEntry({ entry })),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.entering).toEqual(Option.none())
+        })
+      )
+    }
   })
 
   it("will not rename a person the replica no longer holds", () => {
@@ -593,6 +612,14 @@ const fromDialog = (message: typeof DialogBlock.Message.Type) =>
     model: opened.dialog,
     viewInputs: { toView: () => null }
   }).toParentMessage(message)
+
+/** The account menu reporting that the person chose `entry`, as the settings receive it. */
+const choseAccountEntry = (entry: AccountEntry) =>
+  AccountBinding.embedView({
+    slotId: "account",
+    model: opened.accountMenu,
+    viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+  }).toParentMessage(AccountMenu.Message.SelectedItem({ index: AccountEntry.literals.indexOf(entry), item: entry }))
 
 const dialogShown = Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
 const dialogClosed = Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
@@ -1070,7 +1097,7 @@ describe("what the settings tell the page the person did", () => {
       message(Message.SubmittedWorkspaceName()),
       Command.resolve(RenameWorkspace, Message.WroteAction({ written: Written.Rename() })),
       expectOutMessage(OutMessage.RenamedWorkspace()),
-      message(Message.RequestedChangeName()),
+      message(choseAccountEntry("ChangeName")),
       dialogShown,
       message(Message.TypedOwnName({ name: "Alice M." })),
       message(Message.SubmittedOwnName()),

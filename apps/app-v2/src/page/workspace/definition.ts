@@ -12,9 +12,10 @@
  * dialog of its own, which follows the thread opening and closing. It lists the host's integrations once, as it opens,
  * informs the connections, the agents, and the channels of them, and lists them again when one asks. Its search, in a
  * dialog over the page, opens from the sidebar and when its parent asks, and what it finds opens a group, a thread in
- * its group, or a conversation with a member. Its rail ends with the person's account, a menu of their Appearance, the
- * way to another workspace, the workspace's settings, a dialog that changes their name, which the settings hold, and
- * signing out. It reports when the person leaves it, and the entry they choose that the app acts on.
+ * its group, or a conversation with a member. Its rail ends with the person's account, which the settings draw: a menu
+ * of their Appearance, the way to another workspace, the workspace's settings, a dialog that changes their name, which
+ * the settings open, and signing out. It reports when the person leaves it, and every other entry they choose, which
+ * the app acts on; the workspace's settings show when the app asks.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -24,7 +25,6 @@ import { Identity } from "@amends-dev/core/identity"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { Viewport } from "@amends-dev/design/viewport"
 import { DialogBlock } from "@foldkit/ui/dialog"
-import * as Menu from "@foldkit/ui/menu"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
@@ -39,7 +39,7 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
-import { workspaceName } from "../../feature/settings/definition.ts"
+import { ReportedAccountEntry, workspaceName } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { titleOf } from "../../feature/thread/definition.ts"
 
@@ -69,20 +69,6 @@ export const Open = defineTaggedUnion({
 })
 export type Open = typeof Open.Type
 
-/**
- * The entries of the account menu that the app acts on: an Appearance, the way to another workspace, the workspace's
- * settings, which it asks the page to show, and signing out.
- */
-export const AppEntry = Schema.Literals(["System", "Light", "Dark", "SwitchWorkspace", "WorkspaceSettings", "SignOut"])
-export type AppEntry = typeof AppEntry.Type
-
-/** What the account menu can be chosen for: what the app acts on, and changing the person's name, which the page does. */
-export const AccountEntry = Schema.Literals([...AppEntry.literals, "ChangeName"])
-export type AccountEntry = typeof AccountEntry.Type
-
-/** The menu of the person's account at the foot of the rail. */
-export const AccountMenu = Menu.create<AccountEntry>()
-
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
@@ -102,9 +88,7 @@ export const Model = Schema.Struct({
   /** The navigation drawer, a dialog, which the shell shows only below 64rem. */
   menu: DialogBlock.Model,
   /** The thread's side pane, a dialog, which the shell shows only below 80rem. */
-  aside: DialogBlock.Model,
-  /** The account's menu on the rail. */
-  account: AccountMenu.Model
+  aside: DialogBlock.Model
 })
 export type Model = typeof Model.Type
 
@@ -173,7 +157,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ClosedWorkspace: {},
-  ChoseAccountEntry: { entry: AppEntry }
+  ChoseAccountEntry: { entry: ReportedAccountEntry }
 })
 export type OutMessage = typeof OutMessage.Type
 

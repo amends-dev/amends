@@ -440,12 +440,14 @@ the pages that compose them; the root composes the pages.
   stands (Pending, Accepted, Expired, or Revoked, which the state and the clock tell) and Revoke for each that
   waits, and Invite people; Revoke invitation?, naming the address; Transfer ownership, choosing the new owner
   among the people who can become it and saying who becomes the only owner; Remove {name}?, saying what they
-  lose and that they need a fresh invitation to rejoin; and Change your name (`ChangingName`), which the account menu on
-  the rail asks for, a compact dialog of one field, "Your name", that starts from the name the person has, takes the focus
-  with its text selected (the `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name that waits for a name that is not
-  blank and not the one they have. The page asks for it by raising `nameChangeRequests` in the Block's model, a count of the
-  times the person chose the entry, which the Block's one subscription turns into `RequestedChangeName`, since a message
-  to the Block would add a shape the workspace page's `makeUpdate` cannot carry (see `page/workspace`). Each says "Creating…", "Revoking…", "Transferring…", or
+  lose and that they need a fresh invitation to rejoin; and Change your name (`ChangingName`), a compact dialog of one
+  field, "Your name", that starts from the name the person has, takes the focus with its text selected (the
+  `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name that waits for a name that is not blank and not the one
+  they have. It opens from the person's account at the foot of the rail, which the Block draws (`accountView`, given the
+  address the person signed in with and their Appearance) as a Foldkit `Menu` Block it binds (`AccountBinding`, a menu
+  of `AccountEntry`, id `account`): choosing "Change your name…" opens the dialog once the replica holds the person, and
+  every other entry is reported as `ChoseAccountEntry`.
+  Each says "Creating…", "Revoking…", "Transferring…", or
   "Removing…" while its request is on its way, and closing the dialog then is ignored: it opens again to show how
   the request ends. A request that ends well closes the dialog; one that does not stays open under the failure.
   Revoking from the invitations replaces them in the same dialog, so Cancel and the end of the request close it
@@ -805,24 +807,20 @@ the pages that compose them; the root composes the pages.
   not be reached; it lists them again when one of the three asks. It keeps the window's width, which
   the root gives it as it opens and informs it of when the width changes (`informViewport`); once the
   sidebar is in place, from `Desktop`, it closes the drawer, so a window that grows past 64rem while
-  the drawer is open gets its sidebar back. It reports when the person leaves it and when they ask
-  to sign out.
+  the drawer is open gets its sidebar back. It reports when the person leaves it and the entries of the
+  account menu that the root acts on.
 
-  The account menu is a Foldkit `Menu` Block the page binds as `account` (`AccountBinding`, a menu of `AccountEntry`,
-  last among its bindings). The rail's account is a button named "Account: {name}", their initials on a mark, with their name
-  once the settings hold it, and the address they signed in with until then. It opens to the right of the rail with that
-  name over the address, an Appearance group of System, Light, and Dark with the current one checked, then Switch workspace,
-  Workspace settings, "Change your name…", and Sign out. The entries the app acts on (`AppEntry`: the Appearances, Switch
-  workspace, Workspace settings, and Sign out) are reported as `ChoseAccountEntry`, and the root acts on them: it shows and
-  keeps an Appearance, leaves the workspace for the list of the person's workspaces, signs out, and asks the workspace for
-  its settings (`RequestedWorkspaceSettings`, which shows the Workspace page as the rail's Settings does). Changing the
-  name is the page's alone and is reported to no one: it raises `nameChangeRequests` in the settings, and the settings open
-  their dialog. That goes through a count in the settings' model, not a message to the Block, and the workspace's settings
-  go to the root and back for the page, because TypeScript instantiates only so much for one `makeUpdate` call
-  (TS2589) and this page's, with thirteen bindings, is at that limit: a further binding, or a handler or fold of a shape
-  the call has not seen, tips it over, and silencing it with `@ts-expect-error` would leave `any` in the types downstream.
-  Menu items are `menuitem`s whose names say `(selected)` for the Appearance chosen, since the Block cannot draw a
-  `menuitemradio`.
+  The rail's account is the settings' `accountView`, which the page embeds with the address the person signed in with
+  and their Appearance: a button named "Account: {name}", their initials on a mark, with their name once the settings
+  hold it and the address until then. It opens to the right of the rail with that name over the address, an Appearance
+  group of System, Light, and Dark with the current one checked, then Switch workspace, Workspace settings, "Change your
+  name…", and Sign out. The settings open the name dialog themselves and report the other entries, which the page
+  forwards to the root as `ChoseAccountEntry`: the root shows and keeps an Appearance, leaves the workspace for the list
+  of the person's workspaces, signs out, or asks the workspace for its settings (`requestWorkspaceSettings`, which shows
+  the Workspace page as the rail's Settings does). The workspace's settings go to the root and back because a fold that
+  switches the page's destination takes the page's `makeUpdate`, over twelve bindings, past what TypeScript instantiates
+  (TS2589). Menu items are `menuitem`s whose names say `(selected)` for the Appearance chosen, since the Block cannot
+  draw a `menuitemradio`.
 
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,

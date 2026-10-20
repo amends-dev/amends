@@ -7,6 +7,8 @@ import { Command, given, message, model, story } from "foldkit/story"
 import { now } from "../test/fixtures.ts"
 import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
 import { SignInBinding, WorkspaceBinding, WorkspacesBinding } from "./composition.ts"
+import { AccountBinding } from "./feature/settings/composition.ts"
+import { AccountEntry, AccountMenu } from "./feature/settings/definition.ts"
 import { init } from "./init.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
@@ -15,8 +17,8 @@ import { CheckCode, SendCode } from "./page/signIn/command.ts"
 import { SignInForm } from "./page/signIn/definition.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { LoadIntegrations } from "./page/workspace/command.ts"
-import { AccountBinding } from "./page/workspace/composition.ts"
-import { AccountMenu, Open } from "./page/workspace/definition.ts"
+import { SettingsBinding } from "./page/workspace/composition.ts"
+import { Open } from "./page/workspace/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { LoadWorkspaces } from "./page/workspaces/command.ts"
 import { update } from "./update.ts"
@@ -70,25 +72,22 @@ const fromWorkspace = (message: typeof WorkspaceBlock.Message.Type) =>
     viewInputs: { email: session.account.email, appearance: "System", now, isApplePlatform: true }
   }).toParentMessage(message)
 
-/** The account menu's entries, in the order it lists them. */
-const accountEntries = [
-  "System",
-  "Light",
-  "Dark",
-  "SwitchWorkspace",
-  "WorkspaceSettings",
-  "ChangeName",
-  "SignOut"
-] as const
+/** The open workspace's settings, before they are read. */
+const settings = WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio", "Split").model.settings
 
-/** What the open workspace reports when the person chooses `entry` in its account menu, as the root receives it. */
-const choseAccountEntry = (entry: (typeof accountEntries)[number]) =>
+/**
+ * What the open workspace reports when the person chooses `entry` in its account menu, which its settings draw, as the
+ * root receives it.
+ */
+const choseAccountEntry = (entry: AccountEntry) =>
   fromWorkspace(
-    AccountBinding.embedView({
-      slotId: "account",
-      model: WorkspaceBlock.init(membership.workspace.id, membership.member.id, "Studio", "Split").model.account,
-      viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
-    }).toParentMessage(AccountMenu.Message.SelectedItem({ index: accountEntries.indexOf(entry), item: entry }))
+    SettingsBinding.embedView({ slotId: "settings", model: settings }).toParentMessage(
+      AccountBinding.embedView({
+        slotId: "account",
+        model: settings.accountMenu,
+        viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+      }).toParentMessage(AccountMenu.Message.SelectedItem({ index: AccountEntry.literals.indexOf(entry), item: entry }))
+    )
   )
 
 /** The app signed in with a workspace open, its integrations loaded. */
@@ -239,7 +238,7 @@ describe("the app", () => {
     )
   })
 
-  it("leaves changing the person's name to the open workspace, which asks its settings for the dialog", () => {
+  it("leaves changing the person's name to the open workspace, whose settings open the dialog", () => {
     story(
       update,
       given(
@@ -250,10 +249,8 @@ describe("the app", () => {
       message(choseAccountEntry("ChangeName")),
       Command.expectNone(),
       model((model) => {
-        expect(Option.map(openedIn(model), ({ model: opened }) => opened.settings.nameChangeRequests)).toEqual(
-          Option.some(1)
-        )
         expect(Option.isSome(openedIn(model))).toBe(true)
+        expect(model.appearance).toBe("System")
       })
     )
   })
