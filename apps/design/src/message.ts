@@ -434,8 +434,8 @@ export const note = <Message, Requirements>(
  * `turnStatus`, and the `actions` at the end, buttons 4px apart, such as View log, Stop, and Retry. Where the row is
  * narrower than 22.5rem the actions drop to a line of their own under the name. Under the first line, 4px down and in
  * line with the name, the `detail` says how the turn ended, such as "No reply posted.", at `control` size in
- * `ink-secondary`; the `problem` says why a stop or retry did not go through, in the caution color, as an alert; and the
- * `children` follow, 8px apart, such as the turn's log.
+ * `ink-secondary`; the `problem` says why a stop or retry did not go through, in the caution color, as an alert; and
+ * the `children` follow, 8px apart, such as the turn's log.
  */
 export const turnRow = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
