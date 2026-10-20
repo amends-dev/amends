@@ -75,6 +75,7 @@ const seen = (item: typeof bobsReply) => ({
 
 /** The inbox read, with the notification, general, and the workspace's members. */
 const opened = modifyFields(init(workspace.id, member.id).model, {
+  isLoaded: () => true,
   items: () => [bobsReply],
   groups: () => [general],
   members: () => [member, bob]
@@ -137,7 +138,8 @@ describe("the inbox", () => {
       expect(within(notifications, text("25m ago"))).toExist(),
       expect(within(notifications, role("button", { name: "Bob replied" }))).toExist(),
       expect(role("button", { name: "Bob replied" })).toHaveAttr("aria-description", "Sounds good"),
-      expect(text("Notifications about your threads arrive here.")).toBeAbsent()
+      expect(text("No activity yet")).toBeAbsent(),
+      expect(role("status")).toBeAbsent()
     )
   })
 
@@ -165,7 +167,7 @@ describe("the inbox", () => {
       expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "false"),
       expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
-      expect(text("Nothing new.")).toExist(),
+      expect(text("You've seen everything that came to you.")).toExist(),
       expect(notifications).toBeAbsent()
     )
   })
@@ -435,7 +437,7 @@ describe("the inbox", () => {
       expect(role("complementary", { name: "Thread" })).toBeAbsent(),
       expect(notifications).toBeAbsent(),
       expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
-      expect(text("Nothing new.")).toExist()
+      expect(text("You've seen everything that came to you.")).toExist()
     )
   })
 
@@ -484,17 +486,62 @@ describe("the inbox", () => {
     )
   })
 
-  it("says there is nothing yet on All, and that all is caught up on Unread, while nothing waits", () => {
+  it("says there is no activity yet on All, and that all is caught up on Unread, while nothing waits", () => {
     scene(
       { update, view: sceneView },
-      given(init(workspace.id, member.id).model),
-      expect(role("heading", { name: "Nothing here yet", level: 2 })).toExist(),
-      expect(text("Notifications about your threads arrive here.")).toExist(),
+      given(modifyFields(init(workspace.id, member.id).model, { isLoaded: () => true })),
+      expect(role("heading", { name: "No activity yet", level: 2 })).toExist(),
+      expect(text("Mentions, replies, and new threads in groups you follow appear here.")).toExist(),
+      expect(selector("svg g.art-breathing")).toBeAbsent(),
+      expect(selector("svg path.art-caret")).toExist(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
       click(role("tab", { name: "Unread" })),
       expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
-      expect(text("Nothing new.")).toExist(),
-      expect(role("heading", { name: "Nothing here yet" })).toBeAbsent()
+      expect(text("You've seen everything that came to you.")).toExist(),
+      expect(selector("svg g.art-breathing")).toExist(),
+      expect(role("heading", { name: "No activity yet" })).toBeAbsent(),
+      click(role("button", { name: "View all activity" })),
+      expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "true"),
+      expect(role("heading", { name: "No activity yet", level: 2 })).toExist()
+    )
+  })
+
+  it("says it is loading until the notifications are read, in a live region, with no list and no empty state", () => {
+    scene(
+      { update, view: sceneView },
+      given(init(workspace.id, member.id).model),
+      expect(role("status")).toHaveText("Loading your inbox…"),
+      expect(role("heading", { name: "No activity yet" })).toBeAbsent(),
+      expect(role("list", { name: "Notifications" })).toBeAbsent(),
+      click(role("tab", { name: "Unread" })),
+      expect(role("status")).toHaveText("Loading your inbox…"),
+      expect(role("heading", { name: "You're all caught up" })).toBeAbsent()
+    )
+  })
+
+  it("says it could not load the notifications, with why, in place of the loading line, when the first read failed", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(init(workspace.id, member.id).model, {
+          notice: () => Option.some("This browser could not read the workspace's copy.")
+        })
+      ),
+      expect(role("heading", { name: "Can't load your inbox", level: 2 })).toExist(),
+      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("status")).toBeAbsent(),
+      expect(selector("svg g.art-swinging")).toExist()
+    )
+  })
+
+  it("keeps the notifications it read and says why a later read failed", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { notice: () => Option.some("This browser could not read the workspace's copy.") })),
+      expect(role("alert")).toHaveText("This browser could not read the workspace's copy."),
+      expect(role("button", { name: "Bob replied" })).toExist(),
+      expect(role("heading", { name: "Can't load your inbox" })).toBeAbsent()
     )
   })
 })

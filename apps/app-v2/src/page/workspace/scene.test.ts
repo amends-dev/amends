@@ -163,6 +163,7 @@ const withConversation = modifyFields(withThread, {
               members: () => [member, bob],
               threads: (threads) =>
                 modifyFields(threads, {
+                  isLoaded: () => true,
                   threads: () => [
                     {
                       thread,
@@ -256,6 +257,7 @@ const withRefusal = modifyFields(opened, {
 const withNotification = modifyFields(opened, {
   inbox: (inbox) =>
     modifyFields(inbox, {
+      isLoaded: () => true,
       items: () => [
         {
           notification: notificationOf("notification-1", 2, 5),
@@ -430,7 +432,18 @@ describe("a workspace", () => {
       given(opened),
       expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-description"),
       click(role("button", { name: "Inbox" })),
-      expect(text("Notifications about your threads arrive here.")).toExist()
+      expect(within(role("main", { name: "Inbox" }), text("Loading your inbox…"))).toExist()
+    )
+  })
+
+  it("says nothing happened yet once the inbox is read and holds nothing", () => {
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(opened),
+      click(role("button", { name: "Inbox" })),
+      Subscription.emit(workspaceSubscriptions["inbox/inbox"], InboxBlock.Message.ReceivedInbox({ items: [] })),
+      expect(within(role("main", { name: "Inbox" }), role("heading", { name: "No activity yet" }))).toExist(),
+      expect(text("Mentions, replies, and new threads in groups you follow appear here.")).toExist()
     )
   })
 
@@ -720,15 +733,16 @@ describe("a workspace", () => {
     )
   })
 
-  it("lists Home, Agents, and Connections on the rail, then Search, and Settings at the bottom, with no Channels", () => {
+  it("lists the logo, then Home, Agents, and Connections on the rail, then Search, and Settings at the bottom, with no Channels", () => {
     scene(
       { update, view: sceneView },
       given(opened),
-      expect(nth(all.role("button"), 0)).toHaveAccessibleName("Home"),
-      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Agents"),
-      expect(nth(all.role("button"), 2)).toHaveAccessibleName("Connections"),
-      expect(nth(all.role("button"), 3)).toHaveAccessibleName("Search"),
-      expect(nth(all.role("button"), 4)).toHaveAccessibleName("Settings"),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("Amends home"),
+      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Home"),
+      expect(nth(all.role("button"), 2)).toHaveAccessibleName("Agents"),
+      expect(nth(all.role("button"), 3)).toHaveAccessibleName("Connections"),
+      expect(nth(all.role("button"), 4)).toHaveAccessibleName("Search"),
+      expect(nth(all.role("button"), 5)).toHaveAccessibleName("Settings"),
       expect(railButton("Channels")).toBeAbsent()
     )
   })
@@ -1460,12 +1474,17 @@ describe("a workspace", () => {
       expect(role("main", { name: "A group" })).toExist()
     )
   })
-  it("keeps the brand a mark and no button, and the workspaces one click away from the sidebar's header", () => {
+  it("draws the logo as the rail's brand, a button that goes Home, and the workspaces one click away from the sidebar's header", () => {
     scene(
       { update, view: sceneView },
-      given(opened),
-      expect(role("button", { name: "amends" })).toBeAbsent(),
-      expect(role("img", { name: "amends" })).toExist(),
+      given(withInbox),
+      expect(role("button", { name: "Amends home" })).toExist(),
+      expect(within(role("button", { name: "Amends home" }), selector("svg"))).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(within(role("button", { name: "Amends home" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      click(role("button", { name: "Amends home" })),
+      expect(role("main", { name: "Inbox" })).toBeAbsent(),
+      expect(railButton("Home")).toHaveAttr("aria-current", "true"),
       expect(within(role("navigation", { name: "Studio" }), role("button", { name: "All workspaces" }))).toExist(),
       click(role("button", { name: "All workspaces" })),
       expectOutMessage(OutMessage.ClosedWorkspace())

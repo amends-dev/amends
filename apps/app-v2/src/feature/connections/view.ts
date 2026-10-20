@@ -9,12 +9,13 @@ import {
   hint,
   iconButton,
   link,
+  loadingLine,
   notice,
   noticeBox,
   submit
 } from "@amends-dev/design/control"
 import { detailList } from "@amends-dev/design/details"
-import { columns, row } from "@amends-dev/design/directory"
+import { columns, loadingRows, row } from "@amends-dev/design/directory"
 import { form, settingRow } from "@amends-dev/design/form"
 import { modal, modalList } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "@amends-dev/design/pane"
@@ -230,14 +231,14 @@ const emptyList = (model: Model, h: ConnectionsViewBuilder): Html => {
 
   if (query.trim() !== "") {
     return paneEmpty(h, {
-      icon: "mark-search",
+      art: "nothing-here",
       title: `No connections match “${query.trim()}”.`,
       action: button(h, "Clear search", Message.TypedBrowseQuery({ query: "" }), { variant: "quiet" })
     })
   }
 
   return paneEmpty(h, {
-    icon: "mark-connections",
+    art: "reach",
     title: tab === "all" ? "No connections yet." : `No ${tabLabel(tab).toLowerCase()} connections yet.`
   })
 }
@@ -278,7 +279,7 @@ const connectionList = (model: Model, h: ConnectionsViewBuilder): Html => {
  */
 const noConnections = (model: Model, h: ConnectionsViewBuilder): Html =>
   paneEmpty(h, {
-    icon: "mark-connections",
+    art: "reach",
     title: "No connections yet",
     copy: mayCreate(model)
       ? "Connect the models, tools, sandboxes, harnesses, and channels your workspace works with."
@@ -309,10 +310,28 @@ const browseTabs = (model: Model, h: ConnectionsViewBuilder): Html => {
   })
 }
 
-/** The list, or what it says when the workspace has no connection; nothing before the connections are read. */
+/** Whether the connections could not be read, which is why there are none to show: nothing was read, and why. */
+const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)
+
+/** What a page says in place of the connections when they could not be read: why, as the line under the title. */
+const unreadConnections = (model: Model, h: ConnectionsViewBuilder): Html =>
+  paneEmpty(h, {
+    art: "came-apart",
+    title: "Couldn't load connections",
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) })
+  })
+
+/**
+ * The list, or what it says when the workspace has no connection; rows that stand in for it while the connections
+ * are read, and why they could not be when they could not.
+ */
 const listBody = (model: Model, h: ConnectionsViewBuilder): Html => {
+  if (isUnread(model)) {
+    return unreadConnections(model, h)
+  }
+
   if (!model.isLoaded) {
-    return h.empty
+    return loadingRows(h, { label: "Loading connections…", markSize: "md" })
   }
 
   return model.connections.length === 0 ? noConnections(model, h) : connectionList(model, h)
@@ -340,7 +359,11 @@ export const view = ConnectionsComposition.makeView.withInputs<ListInputs>((mode
     body: [
       paneColumn(
         h,
-        [notice(h, model.notice), mayCreate(model) ? integrationsView(model, h) : h.empty, listBody(model, h)],
+        [
+          isUnread(model) ? h.empty : notice(h, model.notice),
+          mayCreate(model) ? integrationsView(model, h) : h.empty,
+          listBody(model, h)
+        ],
         { isWide: true }
       )
     ]
@@ -651,7 +674,7 @@ const missingConnection = (workspaceName: string, h: ConnectionsViewBuilder): Ht
     header: { title: "Connection", icon: "mark-connections", phoneContext: workspaceName },
     body: [
       paneEmpty(h, {
-        icon: "mark-connections",
+        art: "lost-thread",
         title: "This connection isn't here",
         copy: "It may have been removed, or you can no longer see it.",
         action: button(h, "Show all connections", Message.ClickedBrowse({ tab: "all" }))
@@ -659,24 +682,25 @@ const missingConnection = (workspaceName: string, h: ConnectionsViewBuilder): Ht
     ]
   })
 
+/** What the page of a connection says before the connections are read, and why they could not be when they could not. */
+const readingConnection = (model: Model, workspaceName: string, h: ConnectionsViewBuilder): Html =>
+  pane(h, {
+    variant: "main",
+    label: "Connection",
+    header: { title: "Connection", icon: "mark-connections", phoneContext: workspaceName },
+    body: [isUnread(model) ? unreadConnections(model, h) : loadingLine(h, "Loading connection…")]
+  })
+
 /**
  * The page of one connection, the main content: why it can't be used, whether it works, its name, its settings, how
  * it authenticates, and its details. A person who may manage it checks it, renames it, and changes its settings, each
  * saved apart; another reads the same values. A connection the workspace does not list says so, and offers the list;
- * nothing shows before the connections are read.
+ * a line says the connections are being read until they are.
  */
 export const connectionView = ConnectionsComposition.makeView.withInputs<ConnectionInputs>(
   (model, { connectionId, workspaceName }, h) =>
     Option.match(findConnection(model, connectionId), {
-      onNone: () =>
-        model.isLoaded
-          ? missingConnection(workspaceName, h)
-          : pane(h, {
-              variant: "main",
-              label: "Connection",
-              header: { title: "Connection", icon: "mark-connections", phoneContext: workspaceName },
-              body: []
-            }),
+      onNone: () => (model.isLoaded ? missingConnection(workspaceName, h) : readingConnection(model, workspaceName, h)),
       onSome: (item) => connectionPage(item, model, workspaceName, h)
     })
 )

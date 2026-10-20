@@ -30,6 +30,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
+  art,
   bob,
   connectionReadAs,
   connectionTo,
@@ -297,6 +298,7 @@ describe("the connections list", () => {
       given(withSeveral),
       type(label("Search connections"), "zzz"),
       expect(role("heading", { name: "No connections match “zzz”.", level: 2 })).toExist(),
+      expect(art("nothing-here")).toExist(),
       expect(role("list", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Clear search" })),
       expect(role("heading", { name: "No connections match “zzz”." })).toBeAbsent(),
@@ -310,6 +312,7 @@ describe("the connections list", () => {
       given(modifyFields(withSeveral, { connections: () => [{ connection: team, pending: false }] })),
       click(role("tab", { name: "Sandboxes" })),
       expect(role("heading", { name: "No sandboxes connections yet.", level: 2 })).toExist(),
+      expect(art("reach")).toExist(),
       expect(label("Search connections")).toExist(),
       click(role("tab", { name: "All" })),
       expect(role("button", { name: "Anthropic · Team" })).toExist()
@@ -321,6 +324,7 @@ describe("the connections list", () => {
       { update, view: listView },
       given(modifyFields(opened, { connections: () => [] })),
       expect(role("heading", { name: "No connections yet", level: 2 })).toExist(),
+      expect(art("reach")).toExist(),
       expect(
         text("Connect the models, tools, sandboxes, harnesses, and channels your workspace works with.")
       ).toExist(),
@@ -337,13 +341,39 @@ describe("the connections list", () => {
     )
   })
 
-  it("shows nothing, not even that there are none, until the connections are read", () => {
+  it("shows rows that stand in for the list, and says so, not even that there are none, until the connections are read", () => {
     scene(
       { update, view: listView },
       given(modifyFields(opened, { isLoaded: () => false })),
+      expect(role("status")).toHaveText("Loading connections…"),
+      expectAll(all.selector('ul[aria-hidden="true"] li')).toHaveCount(3),
+      expect(selector('ul[aria-hidden="true"] li')).toHaveClass("loading-pulse"),
       expect(role("heading", { name: "No connections yet" })).toBeAbsent(),
       expect(label("Search connections")).toBeAbsent(),
       expect(role("main", { name: "Connections" })).toExist()
+    )
+    scene(
+      { update, view: listView },
+      given(opened),
+      expect(role("status")).toBeAbsent(),
+      expect(selector('ul[aria-hidden="true"]')).toBeAbsent()
+    )
+  })
+
+  it("says why the connections could not be read in place of the list, with the header kept, when none was read", () => {
+    scene(
+      { update, view: listView, subscriptions: ConnectionsBlock.subscriptions },
+      given(modifyFields(opened, { isLoaded: () => false })),
+      Subscription.emit(
+        subscriptions.connections,
+        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+      ),
+      expect(role("main", { name: "Connections" })).toExist(),
+      expect(role("heading", { name: "Couldn't load connections", level: 2 })).toExist(),
+      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(art("came-apart")).toExist(),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("status")).toBeAbsent()
     )
   })
 
@@ -991,17 +1021,35 @@ describe("a connection's page", () => {
       given(opened),
       expect(role("main", { name: "Connection" })).toExist(),
       expect(role("heading", { name: "This connection isn't here", level: 2 })).toExist(),
+      expect(art("lost-thread")).toExist(),
       expect(text("It may have been removed, or you can no longer see it.")).toExist(),
       click(role("button", { name: "Show all connections" })),
       expectOutMessage(OutMessage.RequestedBrowse())
     )
   })
 
-  it("shows nothing before the connections are read", () => {
+  it("says the connection is loading until the connections are read, and not that it isn't there", () => {
     scene(
       { update, view: page(search) },
       given(modifyFields(opened, { isLoaded: () => false })),
       expect(role("main", { name: "Connection" })).toExist(),
+      expect(role("status")).toHaveText("Loading connection…"),
+      expect(role("heading", { name: "This connection isn't here" })).toBeAbsent()
+    )
+  })
+
+  it("says why the connections could not be read in place of the connection, when none was read", () => {
+    scene(
+      { update, view: page(search) },
+      given(
+        modifyFields(opened, {
+          isLoaded: () => false,
+          notice: () => Option.some("This browser could not read the workspace's copy.")
+        })
+      ),
+      expect(role("heading", { name: "Couldn't load connections", level: 2 })).toExist(),
+      expect(art("came-apart")).toExist(),
+      expect(role("status")).toBeAbsent(),
       expect(role("heading", { name: "This connection isn't here" })).toBeAbsent()
     )
   })

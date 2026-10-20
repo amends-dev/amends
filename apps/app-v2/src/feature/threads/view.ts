@@ -1,7 +1,7 @@
 import { Task } from "@amends-dev/core/task"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
-import { choiceSelect, column, field, fieldGrid, hint, notice } from "@amends-dev/design/control"
+import { choiceSelect, column, field, fieldGrid, loadingLine, notice } from "@amends-dev/design/control"
 import { summary } from "@amends-dev/design/directory"
 import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
 import { paneEmpty, paneTabs } from "@amends-dev/design/pane"
@@ -91,19 +91,32 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
   })
 }
 
-/** The group's threads, oldest first under the days they were created on, each as a message of whoever opened it. */
+/** What the group says when nothing was said in it yet: it welcomes the person to a team, or to a conversation. */
+const welcome = (inputs: ViewInputs, h: ThreadsViewBuilder): Html =>
+  paneEmpty(h, {
+    art: "caret",
+    title: inputs.isTeam ? `Welcome to #${inputs.groupName}` : `Your conversation with ${inputs.groupName}`,
+    copy: "Send the first message to start the conversation."
+  })
+
+/**
+ * The group's threads, oldest first under the days they were created on, each as a message of whoever opened it, or
+ * a line that says they are being read, or what the group says when nothing was said in it.
+ */
 const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Html =>
   column(h, [
     notice(h, model.notice),
-    model.threads.length === 0
-      ? hint(h, "No threads yet.")
-      : messageList(h, {
-          label: "Threads",
-          children: byDay(model.threads, inputs.now).flatMap((day) => [
-            divider(h, day.label),
-            ...day.items.map((item) => threadRow(item, inputs, h))
-          ])
-        })
+    !model.isLoaded
+      ? loadingLine(h, "Loading the conversation…")
+      : model.threads.length === 0
+        ? welcome(inputs, h)
+        : messageList(h, {
+            label: "Threads",
+            children: byDay(model.threads, inputs.now).flatMap((day) => [
+              divider(h, day.label),
+              ...day.items.map((item) => threadRow(item, inputs, h))
+            ])
+          })
   ])
 
 /**
@@ -115,8 +128,8 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
   const shown = tasksOf(model, inputs.members)
   const none =
     query.trim() === "" && status === "All"
-      ? { title: "No tasks yet", copy: "Start one from the composer below." }
-      : { title: "No tasks match", copy: "Try a different search or status." }
+      ? ({ art: "fill", title: "No tasks yet", copy: "Start one from the composer below." } as const)
+      : ({ art: "nothing-here", title: "No tasks match", copy: "Try a different search or status." } as const)
 
   return column(h, [
     notice(h, model.notice),
@@ -149,7 +162,7 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
     ]),
     summary(h, { copy: "Threads that track a task.", count: pluralize(shown.length, "task", "tasks") }),
     ...(shown.length === 0
-      ? [paneEmpty(h, { icon: "mark-tasks", ...none })]
+      ? [paneEmpty(h, none)]
       : taskTable(
           h,
           shown.map(({ item, task }) => ({

@@ -23,7 +23,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, membership, now, opening, saying, task, thread } from "../../../test/fixtures.ts"
+import { art, bob, membership, now, opening, saying, task, thread } from "../../../test/fixtures.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -53,7 +53,11 @@ const sceneView = withViewInputs(view, inputs)()
 /** A thread titled Retro that is being started, whose opening is not read yet. */
 const retro = { ...thread, id: ThreadId.ThreadId.make("thread-2"), title: "Retro" }
 
-const empty = init(workspaceId, memberId, groupId).model
+/** The group's threads before they are read. */
+const unread = init(workspaceId, memberId, groupId).model
+
+/** The group's threads read, and none in it. */
+const empty = modifyFields(unread, { isLoaded: () => true })
 
 /** A thread opened by alice, in triage, with two messages new and no replies. */
 const alices = {
@@ -291,11 +295,33 @@ describe("a group's threads", () => {
     scene({ update, view: sceneView }, given(listed), expect(selector('[aria-current="true"]')).toBeAbsent())
   })
 
-  it("says so when there are none", () => {
+  it("welcomes the person to a team that has no threads yet, with its caret blinking and how to start one", () => {
     scene(
       { update, view: sceneView },
       given(empty),
-      expect(text("No threads yet.")).toExist(),
+      expect(role("heading", { name: "Welcome to #General", level: 2 })).toExist(),
+      expect(text("Send the first message to start the conversation.")).toExist(),
+      expect(selector("svg path.art-caret")).toExist(),
+      expect(role("list", { name: "Threads" })).toBeAbsent(),
+      expect(role("status")).toBeAbsent()
+    )
+  })
+
+  it("welcomes the person to a conversation by who it is with", () => {
+    scene(
+      { update, view: withViewInputs(view, { ...inputs, groupName: "Bob", isTeam: false })() },
+      given(empty),
+      expect(role("heading", { name: "Your conversation with Bob", level: 2 })).toExist(),
+      expect(text("Send the first message to start the conversation.")).toExist()
+    )
+  })
+
+  it("says the conversation is loading until the threads are read, and welcomes no one before", () => {
+    scene(
+      { update, view: sceneView },
+      given(unread),
+      expect(role("status")).toHaveText("Loading the conversation…"),
+      expect(role("heading", { name: "Welcome to #General" })).toBeAbsent(),
       expect(role("list", { name: "Threads" })).toBeAbsent()
     )
   })
@@ -530,6 +556,7 @@ describe("a group's tasks", () => {
       { update, view: sceneView },
       given(tasking(starting)),
       expect(role("heading", { name: "No tasks yet", level: 2 })).toExist(),
+      expect(art("fill")).toExist(),
       expect(text("Start one from the composer below.")).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist()
@@ -543,6 +570,7 @@ describe("a group's tasks", () => {
       given(tasking(alices, shipping)),
       type(label("Search tasks"), "zzz"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      expect(art("nothing-here")).toExist(),
       expect(text("Try a different search or status.")).toExist(),
       expect(role("heading", { name: "No tasks yet" })).toBeAbsent(),
       type(label("Search tasks"), "  "),

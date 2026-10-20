@@ -152,7 +152,7 @@ const loadedContent = (
         heading(h, "Choose a workspace"),
         summary,
         paneEmpty(h, {
-          icon: "mark-home",
+          art: "sew-in",
           title: "No workspaces yet",
           copy: "Create a workspace for your team. Invitations will appear here.",
           action: createButton(h, "primary")
@@ -167,18 +167,27 @@ const loadedContent = (
 }
 
 /**
+ * What the page says in place of its heading while the listing is on its way: the host is being asked, which
+ * also checks that the session it kept still holds.
+ */
+const checkingSession = (h: WorkspacesViewBuilder): Html =>
+  paneEmpty(h, {
+    art: "working",
+    title: "Checking your session",
+    copy: "Connecting to your workspace host…",
+    level: 1
+  })
+
+/**
  * What the page says under its heading, or in its place: that the listing is on its way, that the host was not
  * reached the first time, or what it holds.
  */
 const listing = (model: Model, now: DateTime.Utc, h: WorkspacesViewBuilder): ReadonlyArray<Html> =>
   Workspaces.match(model.workspaces, {
-    Loading: () => [
-      heading(h, "Choose a workspace", { action: createButton(h, "secondary") }),
-      copy(h, "Loading your workspaces…")
-    ],
+    Loading: () => [checkingSession(h)],
     Unreachable: () => [
       paneEmpty(h, {
-        icon: "mark-connections",
+        art: "lost-thread",
         title: "Can't reach your workspace host",
         copy: "You're still signed in. Try again once the host is running.",
         action: button(h, "Try again", Message.ClickedTryAgain(), { variant: "primary" }),

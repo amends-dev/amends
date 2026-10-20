@@ -1,5 +1,5 @@
 import { copy, heading, screenContent } from "@amends-dev/design/centered"
-import { button, field, hint, notice, submit } from "@amends-dev/design/control"
+import { button, codeInput, field, hint, notice, submit } from "@amends-dev/design/control"
 import { form, inline, valueWithAction } from "@amends-dev/design/form"
 import { SignInComposition } from "./composition.ts"
 import { Message, SignInForm } from "./definition.ts"
@@ -36,18 +36,18 @@ export const view = SignInComposition.makeView((model, h) =>
         copy(h, "Enter the six-digit code for"),
         valueWithAction(h, email, button(h, "Change email", Message.ClickedChangeEmail(), { variant: "link" })),
         form(h, { onSubmit: Message.SubmittedCode(), label: "Verification" }, [
-          field(
+          codeInput(
             h,
             {
               id: "code",
               label: "Verification code",
-              type: "text",
               value: code,
-              onInput: (code) => Message.TypedCode({ code })
+              hint: "Use your most recent code.",
+              onInput: (code) => Message.TypedCode({ code }),
+              onComplete: (code) => Message.CompletedCode({ code })
             },
             error
           ),
-          hint(h, "Use your most recent code."),
           submit(h, "Verify code", { size: "large", wide: true }),
           inline(h, ["Need a new code?", button(h, "Send again", Message.ClickedSendAgain(), { variant: "link" })])
         ])

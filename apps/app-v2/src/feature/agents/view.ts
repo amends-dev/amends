@@ -8,12 +8,13 @@ import {
   field,
   hint,
   iconButton,
+  loadingLine,
   notice,
   noticeBox,
   submit
 } from "@amends-dev/design/control"
 import { detailList } from "@amends-dev/design/details"
-import { cellWithDetail, columns, row } from "@amends-dev/design/directory"
+import { cellWithDetail, columns, loadingRows, row } from "@amends-dev/design/directory"
 import { form } from "@amends-dev/design/form"
 import type { MarkStatus } from "@amends-dev/design/mark"
 import { modal } from "@amends-dev/design/modal"
@@ -197,15 +198,15 @@ const emptyList = (model: Model, h: AgentsViewBuilder): Html => {
 
   if (query.trim() !== "") {
     return paneEmpty(h, {
-      icon: "mark-search",
+      art: "nothing-here",
       title: `No agents match “${query.trim()}”.`,
       action: button(h, "Clear search", Message.TypedBrowseQuery({ query: "" }), { variant: "quiet" })
     })
   }
 
   return tab === "NeedsSetup"
-    ? paneEmpty(h, { icon: "mark-done", title: "Every agent can run as it is set up." })
-    : paneEmpty(h, { icon: "mark-agents", title: "No agents yet" })
+    ? paneEmpty(h, { art: "rest", title: "Every agent can run as it is set up." })
+    : paneEmpty(h, { art: "sew-in", title: "No agents yet" })
 }
 
 /** The search over the agents, the labels of the columns, and a row for each agent shown. */
@@ -242,7 +243,7 @@ const agentList = (model: Model, h: AgentsViewBuilder): Html => {
 /** What the list says when the workspace has no agent at all, and what a person who may add one can do about it. */
 const noAgents = (model: Model, h: AgentsViewBuilder): Html =>
   paneEmpty(h, {
-    icon: "mark-agents",
+    art: "sew-in",
     title: "No agents yet",
     copy: mayCreate(model)
       ? "Add an agent: a member that works on a harness and a model your connections give."
@@ -266,10 +267,28 @@ const browseTabs = (model: Model, h: AgentsViewBuilder): Html => {
   })
 }
 
-/** The list, or what it says when the workspace has no agent; nothing before the agents are read. */
+/** Whether the agents could not be read, which is why there are none to show: nothing was read, and why. */
+const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)
+
+/** What a page says in place of the agents when they could not be read: why, as the line under the title. */
+const unreadAgents = (model: Model, h: AgentsViewBuilder): Html =>
+  paneEmpty(h, {
+    art: "came-apart",
+    title: "Couldn't load agents",
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) })
+  })
+
+/**
+ * The list, or what it says when the workspace has no agent; rows that stand in for it while the agents are read,
+ * and why they could not be when they could not.
+ */
 const listBody = (model: Model, h: AgentsViewBuilder): Html => {
+  if (isUnread(model)) {
+    return unreadAgents(model, h)
+  }
+
   if (!model.isLoaded) {
-    return h.empty
+    return loadingRows(h, { label: "Loading agents…", markSize: "md" })
   }
 
   return listedAgents(model).length === 0 ? noAgents(model, h) : agentList(model, h)
@@ -293,7 +312,11 @@ export const view = AgentsComposition.makeView((model, h) =>
     body: [
       paneColumn(
         h,
-        [notice(h, model.notice), mayCreate(model) ? integrationsView(model, h) : h.empty, listBody(model, h)],
+        [
+          isUnread(model) ? h.empty : notice(h, model.notice),
+          mayCreate(model) ? integrationsView(model, h) : h.empty,
+          listBody(model, h)
+        ],
         { isWide: true }
       )
     ]
@@ -463,7 +486,7 @@ const missingAgent = (workspaceName: string, h: AgentsViewBuilder): Html =>
     header: { title: "Agent", phoneContext: workspaceName },
     body: [
       paneEmpty(h, {
-        icon: "mark-agents",
+        art: "lost-thread",
         title: "This agent isn't here",
         copy: "It may have been removed, or you can no longer see it.",
         action: button(h, "Show all agents", Message.ClickedBrowse())
@@ -471,23 +494,24 @@ const missingAgent = (workspaceName: string, h: AgentsViewBuilder): Html =>
     ]
   })
 
+/** What the page of an agent says before the agents are read, and why they could not be when they could not. */
+const readingAgent = (model: Model, workspaceName: string, h: AgentsViewBuilder): Html =>
+  pane(h, {
+    variant: "main",
+    label: "Agent",
+    header: { title: "Agent", phoneContext: workspaceName },
+    body: [isUnread(model) ? unreadAgents(model, h) : loadingLine(h, "Loading agent…")]
+  })
+
 /**
  * The page of one agent, the main content: why it can't run, its name, its setup, its details, and, for a person who
  * may remove it, its removal, which asks to confirm in the dialog `dialogView` renders. A person who may configure
  * it renames it and sets it up again, each saved apart; another reads the same values. An agent the workspace does
- * not list says so, and offers the list; nothing shows before the agents are read.
+ * not list says so, and offers the list; a line says the agents are being read until they are.
  */
 export const agentView = AgentsComposition.makeView.withInputs<AgentInputs>((model, { agentId, workspaceName }, h) =>
   Option.match(findListedAgent(model, agentId), {
-    onNone: () =>
-      model.isLoaded
-        ? missingAgent(workspaceName, h)
-        : pane(h, {
-            variant: "main",
-            label: "Agent",
-            header: { title: "Agent", phoneContext: workspaceName },
-            body: []
-          }),
+    onNone: () => (model.isLoaded ? missingAgent(workspaceName, h) : readingAgent(model, workspaceName, h)),
     onSome: (item) => agentPage(item, model, workspaceName, h)
   })
 )

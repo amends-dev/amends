@@ -159,6 +159,7 @@ const openedAnnouncements = modifyFields(init(workspace.id, member.id, announcem
 const withTaskThread = modifyFields(opened, {
   threads: (threads) =>
     modifyFields(threads, {
+      isLoaded: () => true,
       threads: () => [
         {
           thread: { ...thread, groupId: design.id },
@@ -193,7 +194,7 @@ describe("a group's main pane", () => {
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("list", { name: "Members" })).toBeAbsent(),
       expect(role("dialog", { name: "Group settings" })).toBeAbsent(),
-      expect(text("No threads yet.")).toExist()
+      expect(text("Loading the conversation…")).toExist()
     )
   })
 
@@ -329,6 +330,7 @@ describe("a group's main pane", () => {
         modifyFields(withThread, {
           threads: (threads) =>
             modifyFields(threads, {
+              isLoaded: () => true,
               threads: () => [
                 {
                   thread: { ...thread, groupId: design.id },
@@ -367,7 +369,10 @@ describe("a group's main pane", () => {
       given(
         modifyFields(opened, {
           threads: (threads) =>
-            modifyFields(threads, { threads: () => [listed("thread-2", yesterday), listed("thread-1", opening)] })
+            modifyFields(threads, {
+              isLoaded: () => true,
+              threads: () => [listed("thread-2", yesterday), listed("thread-1", opening)]
+            })
         })
       ),
       expectAll(all.role("listitem")).toHaveCount(4),

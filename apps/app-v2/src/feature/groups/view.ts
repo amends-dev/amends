@@ -207,12 +207,12 @@ const browseTabs = {
   Yours: {
     copy: "Public and private groups you've joined.",
     placeholder: "Search your groups…",
-    none: { title: "No groups yet", copy: "The groups you join are listed here." }
+    none: { art: "sew-in", title: "No groups yet", copy: "The groups you join are listed here." }
   },
   Discover: {
     copy: "Public groups you can join.",
     placeholder: "Search groups to join…",
-    none: { title: "Nothing to discover", copy: "Every public group is one you're in." }
+    none: { art: "rest", title: "Nothing to discover", copy: "Every public group is one you're in." }
   }
 } as const satisfies Record<BrowseTab, unknown>
 
@@ -255,7 +255,9 @@ export const browseView = GroupsComposition.makeView((model, h) => {
   const { tab, query } = model.browse
   const shown = matching(model, listedOn(model, tab), query)
   const none =
-    query.trim() === "" ? browseTabs[tab].none : { title: "No groups match", copy: `Nothing matches "${query}".` }
+    query.trim() === ""
+      ? browseTabs[tab].none
+      : ({ art: "nothing-here", title: "No groups match", copy: `Nothing matches "${query}".` } as const)
 
   return pane(h, {
     variant: "main",
@@ -304,7 +306,7 @@ export const browseView = GroupsComposition.makeView((model, h) => {
             ),
             summary(h, { copy: browseTabs[tab].copy, count: pluralize(shown.length, "group", "groups") }),
             ...(shown.length === 0
-              ? [paneEmpty(h, { icon: "users", ...none })]
+              ? [paneEmpty(h, none)]
               : [
                   columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
                   h.ul(

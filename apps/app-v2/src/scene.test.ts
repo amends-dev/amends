@@ -11,12 +11,24 @@ import {
   label,
   role,
   scene,
+  selector,
   text,
   type,
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, general, membership, notificationOf, now, opening, reply, session, thread } from "../test/fixtures.ts"
+import {
+  art,
+  bob,
+  general,
+  membership,
+  notificationOf,
+  now,
+  opening,
+  reply,
+  session,
+  thread
+} from "../test/fixtures.ts"
 import { SignOut } from "./command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { Message } from "./message.ts"
@@ -51,6 +63,16 @@ const choosing: Model = {
   now,
   isApplePlatform: true
 }
+
+/** Signed in as alice, with the host not yet asked, or not answering, for the workspaces she belongs to. */
+const askingHost = (workspaces: Workspaces): Model => ({
+  ...choosing,
+  page: Page.SignedIn({
+    account: session.account,
+    workspaces: modifyFields(WorkspacesBlock.init(session.account.email).model, { workspaces: () => workspaces }),
+    workspace: Option.none()
+  })
+})
 
 /** Signed in as alice, with her workspace opened. */
 const inWorkspace: Model = {
@@ -106,6 +128,7 @@ const withInbox = inWorkspaceChanged((workspace) =>
     open: () => Open.Inbox(),
     inbox: (inbox) =>
       modifyFields(inbox, {
+        isLoaded: () => true,
         items: () => [
           {
             notification: notificationOf("notification-1", 2, 5),
@@ -133,6 +156,46 @@ describe("the app", () => {
       Command.expectExact(SendCode({ email: "alice@example.com" })),
       Command.resolve(SendCode, SignInBlock.Message.SucceededSendCode()),
       expect(within(role("main"), role("heading", { name: "Enter your code" }))).toExist()
+    )
+  })
+
+  it("marks the brand with the logo, which assistive technology does not read, signed out and signed in", () => {
+    scene(
+      { update, view },
+      given(signedOut),
+      expect(within(role("banner"), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("banner"), text("amends"))).toExist()
+    )
+    scene(
+      { update, view },
+      given(choosing),
+      expect(within(role("banner"), selector("svg"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("checks the session under the header, with the working mark, until the host answers", () => {
+    scene(
+      { update, view },
+      given(askingHost(Workspaces.Loading())),
+      expect(within(role("banner"), text("alice@example.com"))).toExist(),
+      expect(within(role("banner"), role("button", { name: "Sign out" }))).toExist(),
+      expect(within(role("main"), role("heading", { name: "Checking your session", level: 1 }))).toExist(),
+      expect(selector('div[role="status"] svg.logo-working')).toExist(),
+      expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
+      expect(role("button", { name: "Try again" })).toBeAbsent()
+    )
+  })
+
+  it("says the host cannot be reached, keeping the person signed in, with a way to try again", () => {
+    scene(
+      { update, view },
+      given(askingHost(Workspaces.Unreachable())),
+      expect(within(role("banner"), role("button", { name: "Sign out" }))).toExist(),
+      expect(within(role("main"), role("heading", { name: "Can't reach your workspace host", level: 1 }))).toExist(),
+      expect(text("You're still signed in. Try again once the host is running.")).toExist(),
+      expect(art("lost-thread")).toExist(),
+      expect(role("button", { name: "Try again" })).toExist(),
+      expect(selector("svg.logo-working")).toBeAbsent()
     )
   })
 

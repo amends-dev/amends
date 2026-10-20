@@ -56,15 +56,16 @@ export type Selected = typeof Selected.Type
 export const pageSize = 20
 
 /**
- * The person's notifications, which of them the inbox shows, how many of the newest it lists, the one they opened
- * with its thread, the groups and the people that name where they come from and who wrote them, and why the last
- * read or write failed.
+ * The person's notifications, whether they were read yet, which of them the inbox shows, how many of the newest it
+ * lists, the one they opened with its thread, the groups and the people that name where they come from and who wrote
+ * them, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   tab: Tab,
   shown: Schema.Int,
+  isLoaded: Schema.Boolean,
   items: Schema.Array(InboxItem),
   selected: Schema.Option(Selected),
   groups: Schema.Array(Group.Group),

@@ -12,6 +12,7 @@ export const init = ThreadsComposition.makeInit(
       memberId,
       groupId,
       threads: [],
+      isLoaded: false,
       tab: "Threads",
       taskFilter: { status: "All", query: "" },
       notice: Option.none()

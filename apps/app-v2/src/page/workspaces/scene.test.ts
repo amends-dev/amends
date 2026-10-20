@@ -23,6 +23,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import {
+  art,
   atlasInvitation,
   membership,
   northstar,
@@ -288,13 +289,17 @@ describe("the workspaces page", () => {
     )
   })
 
-  it("says the workspaces are loading, under the heading and its button", () => {
+  it("is a screen that checks the session while the listing is on its way: the logo working, in a live region", () => {
     scene(
       { update, view: sceneView },
       given(showing(Workspaces.Loading())),
-      expect(role("heading", { name: "Choose a workspace", level: 1 })).toExist(),
-      expect(text("Loading your workspaces…")).toExist(),
-      expect(role("button", { name: "Create workspace" })).toExist(),
+      expect(role("heading", { name: "Checking your session", level: 1 })).toExist(),
+      expect(text("Connecting to your workspace host…")).toExist(),
+      expect(within(selector('div[role="status"]'), role("heading", { name: "Checking your session" }))).toExist(),
+      expect(selector("svg.logo-working")).toHaveAttr("width", "3.5rem"),
+      expect(selector("svg")).toHaveAttr("aria-hidden", "true"),
+      expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
+      expect(role("button", { name: "Create workspace" })).toBeAbsent(),
       expect(role("heading", { name: "Your workspaces" })).toBeAbsent()
     )
   })
@@ -311,9 +316,10 @@ describe("a listing the host could not give", () => {
       expect(role("button", { name: "Create workspace" })).toBeAbsent(),
       expect(role("alert")).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toHaveClass("bg-action"),
+      expect(selector("svg path.art-recoiling-start")).toExist(),
       click(role("button", { name: "Try again" })),
       Command.expectExact(LoadWorkspaces()),
-      expect(text("Loading your workspaces…")).toExist(),
+      expect(role("heading", { name: "Checking your session" })).toExist(),
       expect(role("heading", { name: "Can't reach your workspace host" })).toBeAbsent(),
       Command.resolve(
         LoadWorkspaces,
@@ -366,6 +372,7 @@ describe("a listing with nothing in it", () => {
       expect(role("heading", { name: "Choose a workspace", level: 1 })).toExist(),
       expect(text("Create a workspace to get started.")).toExist(),
       expect(role("heading", { name: "No workspaces yet", level: 2 })).toExist(),
+      expect(art("sew-in")).toExist(),
       expect(text("Create a workspace for your team. Invitations will appear here.")).toExist(),
       expect(role("list", { name: "Workspaces" })).toBeAbsent(),
       expect(role("list", { name: "Invitations" })).toBeAbsent(),
@@ -387,7 +394,7 @@ describe("a listing with nothing in it", () => {
   })
 
   it("offers the heading's button, the secondary one, when there is anything to list", () => {
-    for (const workspaces of [Workspaces.Loading(), loaded([membership], []), loaded([], [northstarInvitation])]) {
+    for (const workspaces of [loaded([membership], []), loaded([], [northstarInvitation])]) {
       scene(
         { update, view: sceneView },
         given(showing(workspaces)),

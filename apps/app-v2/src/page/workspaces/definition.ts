@@ -109,6 +109,13 @@ export const Model = Schema.Struct({
 })
 export type Model = typeof Model.Type
 
+/**
+ * Whether the listing was read, which the screen around it is as wide as a list needs for: a screen that says it is
+ * on its way, or that the host was not reached, is as narrow as a form.
+ */
+export const hasListing = (model: Pick<Model, "workspaces">): boolean =>
+  Workspaces.isAnyOf(["Loaded"])(model.workspaces)
+
 export const Message = defineMessageUnion({
   SucceededLoadWorkspaces: {
     memberships: Schema.Array(WorkspaceDirectory.Membership),

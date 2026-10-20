@@ -1,4 +1,4 @@
-import { button, buttonRow, notice } from "@amends-dev/design/control"
+import { button, buttonRow, loadingLine, notice } from "@amends-dev/design/control"
 import { divider, messageList, notification } from "@amends-dev/design/message"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
@@ -28,11 +28,31 @@ import {
 /** The time now, which the days the notifications came on and how long ago they came are read from. */
 export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
-/** What the body says when a tab has nothing to list. */
-const nothingToList = {
-  All: { icon: "mark-mail", title: "Nothing here yet", copy: "Notifications about your threads arrive here." },
-  Unread: { icon: "mark-done", title: "You're all caught up", copy: "Nothing new." }
-} as const satisfies Record<Tab, Parameters<typeof paneEmpty>[1]>
+/** What the body says when a tab has nothing to list; on Unread, with the way to see what was seen. */
+const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
+  tab === "Unread"
+    ? paneEmpty(h, {
+        art: "rest",
+        title: "You're all caught up",
+        copy: "You've seen everything that came to you.",
+        action: button(h, "View all activity", Message.ChoseTab({ tab: "All" }))
+      })
+    : paneEmpty(h, {
+        art: "caret",
+        title: "No activity yet",
+        copy: "Mentions, replies, and new threads in groups you follow appear here."
+      })
+
+/** Whether the notifications could not be read, which is why there are none to show: nothing was read, and why. */
+const isUnread = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)
+
+/** What the body says in place of the notifications when they could not be read: why, as the line under the title. */
+const unreadInbox = (model: Model, h: InboxViewBuilder): Html =>
+  paneEmpty(h, {
+    art: "came-apart",
+    title: "Can't load your inbox",
+    ...Option.match(model.notice, { onNone: () => ({}), onSome: (copy) => ({ copy }) })
+  })
 
 /** The tabs under the title: every notification, and those waiting, counted while any wait. */
 const tabs = (model: Model, h: InboxViewBuilder): Html => {
@@ -73,14 +93,38 @@ const notificationRow = (item: InboxItem, model: Model, now: DateTime.Utc, h: In
 }
 
 /**
- * The notifications the tab lists, newest first, under the days they came, to open beside the inbox, with the one
- * open kept in its place, and Show older after them while the tab keeps older ones, or what a tab says when it has
- * none.
+ * The notifications the tab lists, newest first, under the days they came, or what the body says in their place:
+ * that they are being read, why they could not be, or that the tab has none.
  */
-export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) => {
+const notifications = (model: Model, now: DateTime.Utc, h: InboxViewBuilder): Html => {
+  if (isUnread(model)) {
+    return unreadInbox(model, h)
+  }
+
+  if (!model.isLoaded) {
+    return loadingLine(h, "Loading your inbox…")
+  }
+
   const items = shownItems(model)
 
-  return pane(h, {
+  return items.length === 0
+    ? nothingToList(model.tab, h)
+    : messageList(h, {
+        label: "Notifications",
+        children: byDay(items, now).flatMap((day) => [
+          divider(h, day.label),
+          ...day.items.map((item) => notificationRow(item, model, now, h))
+        ])
+      })
+}
+
+/**
+ * The notifications the tab lists, newest first, under the days they came, to open beside the inbox, with the one
+ * open kept in its place, and Show older after them while the tab keeps older ones, or what a tab says when it has
+ * none, and a line that says they are being read until they are.
+ */
+export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
+  pane(h, {
     variant: "main",
     label: "Inbox",
     header: {
@@ -93,16 +137,8 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
       paneColumn(
         h,
         [
-          notice(h, model.notice),
-          items.length === 0
-            ? paneEmpty(h, nothingToList[model.tab])
-            : messageList(h, {
-                label: "Notifications",
-                children: byDay(items, now).flatMap((day) => [
-                  divider(h, day.label),
-                  ...day.items.map((item) => notificationRow(item, model, now, h))
-                ])
-              }),
+          isUnread(model) ? h.empty : notice(h, model.notice),
+          notifications(model, now, h),
           ...(hasOlderItems(model)
             ? [
                 buttonRow(h, [button(h, "Show older", Message.ClickedShowOlder(), { variant: "quiet" })], {
@@ -115,7 +151,7 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
       )
     ]
   })
-})
+)
 
 /**
  * The thread of the notification the person opened as the side pane, with the message the notification is about

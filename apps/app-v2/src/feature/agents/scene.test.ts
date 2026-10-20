@@ -31,6 +31,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
+  art,
   bob,
   bobIsMember,
   grantsOf,
@@ -594,11 +595,32 @@ describe("the agents", () => {
     )
   })
 
-  it("show nothing, not even that there are none, until the agents are read", () => {
+  it("say why they could not be read in place of the list, with the header kept, when none was read", () => {
+    scene(
+      { update, view, subscriptions: AgentsBlock.subscriptions },
+      given(init(workspace.id, alice.id).model),
+      Subscription.emit(
+        subscriptions.agents,
+        Message.FailedRead({ error: "This browser could not read the workspace's copy." })
+      ),
+      expect(role("heading", { name: "Agents", level: 1 })).toExist(),
+      expect(role("heading", { name: "Couldn't load agents", level: 2 })).toExist(),
+      expect(text("This browser could not read the workspace's copy.")).toExist(),
+      expect(art("came-apart")).toExist(),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("status")).toBeAbsent(),
+      expect(role("heading", { name: "No agents yet" })).toBeAbsent()
+    )
+  })
+
+  it("show rows that stand in for the list, and say so, not even that there are none, until the agents are read", () => {
     scene(
       { update, view, subscriptions: AgentsBlock.subscriptions },
       given(init(workspace.id, alice.id).model),
       expect(role("heading", { name: "Agents", level: 1 })).toExist(),
+      expect(role("status")).toHaveText("Loading agents…"),
+      expectAll(all.selector('ul[aria-hidden="true"] li')).toHaveCount(3),
+      expect(selector('ul[aria-hidden="true"] li')).toHaveClass("loading-pulse"),
       expect(role("heading", { name: "No agents yet" })).toBeAbsent(),
       expect(role("list", { name: "Agents" })).toBeAbsent(),
       expect(role("tab", { name: "All" })).not.toHaveAttr("aria-description"),
@@ -614,6 +636,8 @@ describe("the agents", () => {
         })
       ),
       expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
+      expect(role("status")).toBeAbsent(),
+      expect(selector('ul[aria-hidden="true"]')).toBeAbsent(),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-description", "0")
     )
   })
@@ -723,6 +747,7 @@ describe("the agents list", () => {
       given(withSeveral),
       type(label("Search agents"), "zzz"),
       expect(role("heading", { name: "No agents match “zzz”.", level: 2 })).toExist(),
+      expect(art("nothing-here")).toExist(),
       expect(role("list", { name: "Agents" })).toBeAbsent(),
       click(role("button", { name: "Clear search" })),
       expect(role("heading", { name: "No agents match “zzz”." })).toBeAbsent(),
@@ -735,6 +760,7 @@ describe("the agents list", () => {
       { update, view },
       given(modifyFields(opened, { browse: () => ({ tab: "NeedsSetup", query: "" }) })),
       expect(role("heading", { name: "Every agent can run as it is set up.", level: 2 })).toExist(),
+      expect(art("rest")).toExist(),
       expect(role("button", { name: "Scout" })).toBeAbsent(),
       click(role("tab", { name: "All" })),
       expect(role("button", { name: "Scout" })).toExist()
@@ -746,6 +772,7 @@ describe("the agents list", () => {
       { update, view },
       given(modifyFields(opened, { agents: () => [] })),
       expect(role("heading", { name: "No agents yet", level: 2 })).toExist(),
+      expect(art("sew-in")).toExist(),
       expect(text("Add an agent: a member that works on a harness and a model your connections give.")).toExist(),
       expectAll(all.role("button", { name: "Add agent" })).toHaveCount(2)
     )
@@ -1093,18 +1120,35 @@ describe("an agent's page", () => {
       { update, view: withViewInputs(agentView, { agentId: Identity.AgentId.make("agent-9"), workspaceName })() },
       given(withModels),
       expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
+      expect(art("lost-thread")).toExist(),
       expect(text("It may have been removed, or you can no longer see it.")).toExist(),
       click(role("button", { name: "Show all agents" })),
       expectOutMessage(OutMessage.RequestedBrowse())
     )
   })
 
-  it("says nothing of the agent before the agents are read", () => {
+  it("says the agent is loading until the agents are read, and not that it isn't there", () => {
     scene(
       { update, view: page() },
       given(init(workspace.id, alice.id).model),
+      expect(role("status")).toHaveText("Loading agent…"),
       expect(role("heading", { name: "This agent isn't here" })).toBeAbsent(),
       expect(label("Agent name")).toBeAbsent()
+    )
+  })
+
+  it("says why the agents could not be read in place of the agent, when none was read", () => {
+    scene(
+      { update, view: page() },
+      given(
+        modifyFields(init(workspace.id, alice.id).model, {
+          notice: () => Option.some("This browser could not read the workspace's copy.")
+        })
+      ),
+      expect(role("heading", { name: "Couldn't load agents", level: 2 })).toExist(),
+      expect(art("came-apart")).toExist(),
+      expect(role("status")).toBeAbsent(),
+      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent()
     )
   })
 

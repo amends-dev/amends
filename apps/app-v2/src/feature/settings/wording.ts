@@ -7,6 +7,7 @@
 import { Assignment, Scope } from "@amends-dev/core/authorization"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { BadgeTone } from "@amends-dev/design/details"
+import type { StateArtKind } from "@amends-dev/design/stateArt"
 import type * as DateTime from "effect/DateTime"
 import { dayLabel, dayOf, expiryLabel } from "../../seen.ts"
 import {
@@ -43,6 +44,15 @@ export const emptyRoster = (filter: MembersFilter): string => {
   }
 
   return filter.status === "removed" ? "Nobody has been removed from this workspace." : "No members yet."
+}
+
+/** The art that goes with what the roster says when it has no row to show, as the reason is. */
+export const emptyRosterArt = (filter: MembersFilter): StateArtKind => {
+  if (filter.query.trim() !== "") {
+    return "nothing-here"
+  }
+
+  return filter.status === "removed" ? "rest" : "fill"
 }
 
 /** How an invitation's standing reads in the history. */

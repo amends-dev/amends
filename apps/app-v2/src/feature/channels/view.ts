@@ -130,7 +130,7 @@ export const view = ChannelsComposition.makeView((model, h) => {
         mayAdd ? integrationsView(model, h) : h.empty,
         model.channels.length === 0
           ? paneEmpty(h, {
-              icon: "mark-channel",
+              art: "reach",
               title: "No channels yet",
               copy: "Channels bring the conversations of a connection into a group."
             })

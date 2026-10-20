@@ -362,7 +362,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
   return shell(h, {
     viewport: model.viewport,
     rail: rail(h, {
-      brand: { letter: "a", label: "amends" },
+      brand: { label: "Amends home", onClick: Message.ClickedHome() },
       items: railItems(model),
       search: { label: "Search", onClick: Message.ClickedSearch() },
       footer: [

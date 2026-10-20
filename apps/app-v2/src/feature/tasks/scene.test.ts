@@ -19,7 +19,19 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, dana, design, general, membership, now, opening, saying, task, thread } from "../../../test/fixtures.ts"
+import {
+  art,
+  bob,
+  dana,
+  design,
+  general,
+  membership,
+  now,
+  opening,
+  saying,
+  task,
+  thread
+} from "../../../test/fixtures.ts"
 import { OutMessage, type TaskItem } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -148,11 +160,14 @@ describe("the tasks in triage", () => {
       triaging,
       given(modifyFields(read, { items: () => [shipping, logo] })),
       expect(role("heading", { name: "Nothing to triage", level: 2 })).toExist(),
+      expect(art("rest")).toExist(),
       expect(text("Tasks you can see will be listed here.")).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist(),
       type(label("Search tasks"), "ship"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      expect(art("nothing-here")).toExist(),
+      expect(art("rest")).toBeAbsent(),
       expect(role("heading", { name: "Nothing to triage" })).toBeAbsent()
     )
   })
@@ -295,6 +310,7 @@ describe("every open task", () => {
       tasking,
       given(modifyFields(read, { items: () => [logo] })),
       expect(role("heading", { name: "No open tasks", level: 2 })).toExist(),
+      expect(art("rest")).toExist(),
       expect(text("Tasks you can see will be listed here.")).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist()

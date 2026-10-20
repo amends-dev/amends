@@ -11,8 +11,10 @@ import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import { Invitation, Member, WorkspaceId } from "@amends-dev/core/workspace"
+import type { StateArtKind } from "@amends-dev/design/stateArt"
 import { Accounts, type SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { DateTime, Effect, Schema } from "effect"
+import { selector } from "foldkit/scene"
 
 export const apiUrl = "http://127.0.0.1:8787"
 
@@ -469,3 +471,19 @@ export const dana = Schema.decodeSync(Contact.Contact)({
   name: "Dana",
   createdAt: "2026-10-18T12:00:00Z"
 })
+
+/** The part of a state art that moves, by which one kind is told from the others. */
+const movingPart: Readonly<Record<StateArtKind, string>> = {
+  "sew-in": "g.art-sewing-in",
+  reach: "path.art-reaching",
+  fill: "rect.art-filling",
+  caret: "path.art-caret",
+  rest: "g.art-breathing",
+  "came-apart": "g.art-swinging",
+  "lost-thread": "path.art-recoiling-start",
+  "nothing-here": "path.art-scanning",
+  "held-back": "g.art-pulling"
+}
+
+/** The drawing of the state art of `kind`, which a view shows when it has nothing to list or something to say failed. */
+export const art = (kind: StateArtKind) => selector(`svg ${movingPart[kind]}`)

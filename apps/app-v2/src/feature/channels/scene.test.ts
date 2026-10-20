@@ -23,6 +23,7 @@ import {
   aliceInDesign,
   aliceInGeneral,
   aliceOwns,
+  art,
   bob,
   design,
   general,
@@ -84,6 +85,7 @@ describe("the channels", () => {
       { update, view, subscriptions: ChannelsBlock.subscriptions },
       given(opened),
       expect(role("heading", { name: "No channels yet", level: 2 })).toExist(),
+      expect(art("reach")).toExist(),
       click(role("button", { name: "Add a channel" })),
       expect(role("region", { name: "Add a channel" })).toExist(),
       inside(

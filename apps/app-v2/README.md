@@ -53,7 +53,21 @@ no class: classes come from a renderer, and the renderers live in the design pac
 outside a workspace are composed from it: the root view frames the sign-in page and the workspace
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, rows, and the modal that creates a workspace or joins one from the design's `centered`, `control`, `form`, `directory`, `pane` (its empty state), `toast`, and `modal` modules.
-The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
+The brand is the design's `logo`: the header of the centered screens holds it beside "amends", over `centeredAccount`
+and a Sign out for who is signed in, and the rail's is a button named "Amends home" that goes Home. What a pane says
+when it has nothing to list, or could not read what it lists, is the design's `paneEmpty` with the `stateArt` that
+`@amends-dev/ui` draws for the state, in `@amends-dev/ui`'s words: `sew-in` for a first thing to make (no agents,
+no workspaces, no groups), `reach` for nothing connected (no connections, no channels), `fill` for a place waiting
+for its first thing (a group's Tasks tab, a roster), `caret` for nothing said yet (no activity, a new conversation), `rest` for nothing
+left to do (all caught up, nothing to discover, every agent set up, no task to triage or open), `nothing-here` for a search
+or filter that finds none, `came-apart` for what could not be read, and `lost-thread` for what is gone or out of reach
+(a host that cannot be reached, an agent, connection, or member that is not there). A list read for the first time
+shows the design's `loadingRows` under a line, "Loading agents…" or "Loading connections…", and a pane or a page
+shows `loadingLine`, "Loading your inbox…", "Loading settings…", "Loading the conversation…", "Loading agent…", and
+"Loading connection…"; a destination's first read that failed says why in the place of the list, "Couldn't load
+agents", "Couldn't load connections", "Can't load your inbox", with no button to try again.
+A turn's `badge` carries the
+logo moving while the turn waits (`thread`), runs (`working`), or stops (`tug`). The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations and the modals they open, `feature/groups` the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
 a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
@@ -181,7 +195,7 @@ the pages that compose them; the root composes the pages.
   it could not be followed, which says why and offers to follow it again; one log at a time. Its
   view is a section titled Turns, a list of entries: each the agent's initials, name, and a badge
   that says how the turn stands (queued and stopped are neutral, running and stopping cautious,
-  completed a success, failed a danger), with who ran it again and "Sending…" after it, then why it
+  completed a success, failed a danger), the logo moving in it while the turn is queued, running, or stopping, with who ran it again and "Sending…" after it, then why it
   failed, the buttons Stop, Run again, and Show log or Hide log, and, while the log is shown, the log
   as a list, once it has items, with where following it stands under it (still opening, nothing
   written yet while it is followed with no items, the turn ended, or why it failed); a log still
@@ -206,7 +220,10 @@ the pages that compose them; the root composes the pages.
   that opens it, with "Sending…" while it is being started, under it,
   while the thread has replies, a reply line: the initials of those who replied, in the order of their
   first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then how much is new and where its
-  task stands; the thread open is the current row. On the Tasks tab it is the threads that track a
+  task stands; the thread open is the current row. Until the store has answered (`isLoaded`) the tab says "Loading the
+  conversation…", and once it has, a group with no thread welcomes the person, "Welcome to #General" for a team and
+  "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
+  caret blinking. On the Tasks tab it is the threads that track a
   task as a table, latest active first by `lastActiveAt`: under a search field, whose label is hidden and
   whose placeholder says "Search tasks…", beside a select of the status, All statuses or one by its name
   (`statusLabel`), whose label is hidden too, a line says "Threads that track a task." with how many
@@ -219,7 +236,7 @@ the pages that compose them; the root composes the pages.
   search finds the letters in the thread's title or in its
   opening's words, whatever their case and accents (`threadContains`); a mention in it is the member's current name. With
   no task the tab says "No tasks yet" and to start one from the composer, and with a search or a
-  status that leaves none, "No tasks match". `composerView` is the composer to start one, for the
+  status that leaves none, "No tasks match", each with its art. `composerView` is the composer to start one, for the
   pane's footer, whose box shows "Message" and the group's name until the person writes. On the Tasks
   tab it starts a thread that tracks a task, in triage: its box is named New task, shows "New task in"
   and the group's name, with a `#` before a team's, and its button says Create task. The draft is the
@@ -340,7 +357,10 @@ the pages that compose them; the root composes the pages.
   the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
   when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
   pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
-  nothing, since it asked. The Block offers a count of what waits for its parent to show. The store gives every
+  nothing, since it asked. The Block offers a count of what waits for its parent to show.
+  Until the store has answered (`isLoaded`) the list is a line, "Loading your inbox…", and when the first read failed
+  it is "Can't load your inbox" with why, in the place of the list. A tab with nothing says "No activity yet" on
+  All, and "You're all caught up" on Unread with a "View all activity" button that chooses All. The store gives every
   notification the person has at once, so the list is paged by the view: the model's `shown` is how
   many of the newest the list shows, `pageSize` (20) at first, and `ClickedShowOlder` adds a page. While
   the tab keeps notifications older than those listed (`hasOlderItems`), Show older, a quiet button,
@@ -423,7 +443,7 @@ the pages that compose them; the root composes the pages.
   workspace's name from the Block, so a rename shows in the page's sidebar and home pane.
 
 - `feature/connections`: the workspace's connections, as the store holds them, once the store has
-  answered (`isLoaded`, which keeps "No connections yet" from showing before), marked as sending while a
+  answered (`isLoaded`, which keeps "No connections yet" from showing before, and shows `loadingRows` until it has), marked as sending while a
   change to one is on its way; the members who made them, and what the person may do. The host's
   integrations are listed by the workspace page, once, which informs the Block of them or of why they
   could not be reached; the person then asks again, and the Block asks the page, by its out message
@@ -495,7 +515,7 @@ the pages that compose them; the root composes the pages.
   capability, from the connections and integrations a Model keeps, and `connectionsGiving` names them, for the
   agents and channels features to choose among.
 - `feature/agents`: the workspace's agents, as the store holds them, once the store has answered
-  (`isLoaded`, which keeps "No agents yet" from showing before). The Block has four views. Its
+  (`isLoaded`, which keeps "No agents yet" from showing before, and shows `loadingRows` until it has). The Block has four views. Its
   `sidebarView`, which the page puts in the sidebar for the Agents destination, is a section named
   Agents: each agent by its membership's first letter on a lilac mark and its name, with Browse
   (`list`, "Browse agents") and, where the person may create agents and the host listed its integrations,
@@ -588,7 +608,9 @@ the pages that compose them; the root composes the pages.
   which the person can change the email or ask for a new code to the same address; it keeps the
   session a right code gives, and reports it. It starts with an address, which the root gives when it
   has one, and a notice, such as that the session ended, which shows over the email field in the caution tone,
-  stays as the address is typed, and goes when the address is sent.
+  stays as the address is typed, and goes when the address is sent. The code is the design's `codeInput`, six cells
+  over one native input with the hint "Use your most recent code.", which keeps digits only and checks the code
+  as soon as the sixth is in (`CompletedCode`), as "Verify code" does (`SubmittedCode`), both through the one check.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
   members it has and "Owner" when they own it, such as "4 members · Owner"; it reports the one picked. It
   takes the account's email as its init argument, not a view input, since `update` needs it: the model keeps
@@ -596,7 +618,7 @@ the pages that compose them; the root composes the pages.
   (`suggestNameFromEmail`, "Dave" for dave@example.com), as the name a person joining is offered. The line under
   the heading counts what the listing holds, "2 workspaces · 2 pending invitations", the workspaces alone when
   none wait, "2 invitations waiting for you." when the person belongs to none, and "Create a workspace to get
-  started." when there is nothing, which also shows the design's `paneEmpty`, "No workspaces yet", its line, and a
+  started." when there is nothing, which also shows the design's `paneEmpty` (`sew-in`), "No workspaces yet", its line, and a
   primary "Create workspace" button with the `mark-new` icon, and no button at the end of the heading's line. The
   invitations still open to the person, which the host lists with the workspaces, follow them under an
   "Invitations" heading with their count, each keyed by its ID, as the design's `rowWithButton`: the first
@@ -605,8 +627,11 @@ the pages that compose them; the root composes the pages.
   and an "Accept invite" button named for the workspace; with invitations and no workspace, the design's
   `footnote` after them says "Accept an invitation above, or create your own workspace.". Each workspace's row
   is the design's `row` with an ID, `workspace-{id}` (`workspaceRowId`), which focus moves to.
-  - The listing, `Workspaces`, is `Loading`, `Loaded`, or `Unreachable`. The first read failing is
-    `Unreachable`, a screen of its own, the design's `paneEmpty` with `level: 1`: "Can't reach your workspace
+  - The listing, `Workspaces`, is `Loading`, `Loaded`, or `Unreachable`. Until the host answers the first read, a
+    session restored from the browser or a person who has just signed in, the screen is the design's `paneEmpty` with
+    the working logo and `level: 1`: "Checking your session", "Connecting to your workspace host…", in a live
+    region, under the header that holds the account and Sign out. The first read failing is
+    `Unreachable`, a screen of its own, the design's `paneEmpty` (`lost-thread`) with `level: 1`: "Can't reach your workspace
     host", "You're still signed in. Try again once the host is running.", and a primary Try again that reads it
     again, with no heading and no Create workspace button. A read after the list was shown, as it is once a
     workspace is created or joined, or on Try again, keeps what was listed: `Loaded` carries `reloadFailed`,
@@ -662,7 +687,7 @@ the pages that compose them; the root composes the pages.
     workspace is not created, nor an invitation accepted, unseen. Closing it while the listing is read again
     leaves the listing to show the result alone, without a toast.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
-  rail has "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings". Each
+  rail has the logo, a button named "Amends home" that goes Home, over "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings". Each
   destination is marked while it is open; Home is open while nothing, the inbox, the tasks in triage,
   every open task, the groups to browse, or a group is, and Connections while the connections, one
   connection, or the channels are. Search is no destination: it is never marked, and it sends `ClickedSearch`, as the
@@ -1113,7 +1138,8 @@ browser's storage. Each Block's tests sit beside it:
   which keeps the thread open, one's thread opened by its text, which marks it seen unless it was and
   fails visibly, its row current and moving as another is opened, kept on Unread once seen with only
   what waits counted, an empty All saying there is nothing yet and an empty Unread saying all is
-  caught up, only once the thread is closed, and the newest page with Show older after it, which goes
+  caught up, with a button back to All, and no activity yet on All, the list a line that says it is being read until the store has answered
+  and the reason it could not be read in its place, the list kept when a later read fails, only once the thread is closed, and the newest page with Show older after it, which goes
   once older ones are asked for and is not offered on a tab that keeps none; the inbox's side pane, titled by the thread under the
   group it is in, with the message the notification is about drawn current, the reply composer in
   its footer, closed by its Close or its Back, and absent while no thread is open; the tasks in triage as a main pane titled
@@ -1238,7 +1264,7 @@ browser's storage. Each Block's tests sit beside it:
   its own, the count line in each of its forms, the invitations under their heading, each by its
   workspace's mark and name or "Workspace invitation" with when it expires, read from the time now, and its
   Accept invite button named for the workspace, and the line after them when the person belongs to no
-  workspace; the heading's secondary Create workspace button while the listing loads or has anything to list;
+  workspace; the session being checked as a screen with the working logo until the host answers; the heading's secondary Create workspace button while the listing loads or has anything to list;
   the host not reached the first time as a screen of its own, with a primary Try again, read again; a read that
   failed after the list was shown as an alert over the list it kept, with a quiet Try again; the empty
   listing as its heading, its line, and the empty state with a primary Create workspace, which opens the
@@ -1253,6 +1279,11 @@ browser's storage. Each Block's tests sit beside it:
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, resolves the field's `SelectOnFocus` mount and expects it
   ended, and a story sends the dialog's own message through its Binding's `embedView`.
+- Every state that says it has nothing, is being read, or could not be read has a scene that finds its words and its
+  drawing, which `test/fixtures.ts`'s `art(kind)` finds by the part of it that moves, and a scene of the root view
+  holds the logo in the brand, the session being checked under the account's header, and the host that could not be
+  reached. A list that is being read is found by its `status` line and its rows hidden from assistive technology, and
+  a turn's badge by the motion class of the logo in it.
 - The flags' tests stub the browser's `navigator`: the page runs on an Apple platform by
   `userAgentData.platform` where the browser has it, over `navigator.platform`, and by the latter where it
   has not, and `namesApplePlatform` takes the names macOS, iOS, and iPadOS give and no other system's.

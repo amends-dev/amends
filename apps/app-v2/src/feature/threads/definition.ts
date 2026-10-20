@@ -45,14 +45,15 @@ export const TaskStatusFilter = Schema.Literals(["All", ...Task.Status.literals]
 export type TaskStatusFilter = typeof TaskStatusFilter.Type
 
 /**
- * The group's threads as they were read, the tab shown, what the Tasks tab is narrowed to, the composer, and
- * why the last read or write failed.
+ * The group's threads as they were read, whether they were yet, the tab shown, what the Tasks tab is narrowed to, the
+ * composer, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   groupId: GroupId.GroupId,
   threads: Schema.Array(ThreadItem),
+  isLoaded: Schema.Boolean,
   tab: ThreadsTab,
   taskFilter: Schema.Struct({ status: TaskStatusFilter, query: Schema.String }),
   composer: ComposerBlock.Model,

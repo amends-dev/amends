@@ -7,6 +7,7 @@ import {
   field,
   fieldGrid,
   hint,
+  loadingLine,
   notice,
   sending,
   submit
@@ -65,6 +66,7 @@ import {
   accessName,
   displayName,
   emptyRoster,
+  emptyRosterArt,
   filterChoices,
   invitationDetail,
   invitationStatusLabels,
@@ -138,12 +140,12 @@ const settingsPage = (
           )
         : model.isUnreadable
           ? paneEmpty(h, {
-              icon: config.icon,
+              art: "came-apart",
               title: "Can't load settings",
               copy: "Try again once the host is reachable.",
               action: button(h, "Try again", Message.ClickedRefresh())
             })
-          : h.div([h.Role("status")], [hint(h, "Loading settings…")])
+          : loadingLine(h, "Loading settings…")
     ]
   })
 }
@@ -385,7 +387,7 @@ const roster = (model: Model, openMemberId: Option.Option<MemberId.MemberId>, h:
       )
     ]),
     ...(shown.length === 0
-      ? [paneEmpty(h, { icon: "users", title: emptyRoster(model.filter) })]
+      ? [paneEmpty(h, { art: emptyRosterArt(model.filter), title: emptyRoster(model.filter) })]
       : [
           columns(h, { label: "Member", cells: ["Workspace role", "Status"] }),
           h.ul(
@@ -606,7 +608,7 @@ const missingMember = (h: SettingsViewBuilder, model: Model): Html =>
     },
     body: [
       paneEmpty(h, {
-        icon: "users",
+        art: "lost-thread",
         title: "This member isn't here",
         copy: "They may have been removed, or you can no longer see them."
       })

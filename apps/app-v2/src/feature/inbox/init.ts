@@ -10,6 +10,7 @@ export const init = InboxComposition.makeInit((workspaceId: WorkspaceId.Workspac
     memberId,
     tab: "All",
     shown: pageSize,
+    isLoaded: false,
     items: [],
     selected: Option.none(),
     groups: [],

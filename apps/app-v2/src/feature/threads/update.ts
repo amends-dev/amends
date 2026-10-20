@@ -5,7 +5,9 @@ import { Message, OutMessage } from "./definition.ts"
 
 export const update = ThreadsComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ReceivedThreads: ({ threads }) => ({ model: modifyFields(model, { threads: () => threads }) }),
+    ReceivedThreads: ({ threads }) => ({
+      model: modifyFields(model, { threads: () => threads, isLoaded: () => true })
+    }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
     ChoseTaskStatus: ({ status }) => ({

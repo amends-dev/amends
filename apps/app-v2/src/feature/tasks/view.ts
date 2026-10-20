@@ -128,7 +128,7 @@ const destinationView = (destination: Destination, model: Model, { now }: ViewIn
             ]),
             summary(h, { copy: destination.summary, count: pluralize(shown.length, "task", "tasks") }),
             ...(shown.length === 0
-              ? [paneEmpty(h, { icon: destination.icon, ...none })]
+              ? [paneEmpty(h, { art: isFiltered(narrowed) ? "nothing-here" : "rest", ...none })]
               : taskTable(
                   h,
                   shown.map((item) => ({

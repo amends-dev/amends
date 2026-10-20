@@ -31,7 +31,7 @@ const writeSeenWhenWaiting = (notificationId: Notification.NotificationId) =>
 export const update = InboxComposition.makeUpdate((model, message) => {
   const { workspaceId, memberId } = model
   return Message.match(message, {
-    ReceivedInbox: ({ items }) => ({ model: modifyFields(model, { items: () => items }) }),
+    ReceivedInbox: ({ items }) => ({ model: modifyFields(model, { items: () => items, isLoaded: () => true }) }),
     ReceivedGroups: ({ groups }) => ({ model: modifyFields(model, { groups: () => groups }) }),
     ReceivedPeople: ({ members, contacts }) => ({
       model: modifyFields(model, { members: () => members, contacts: () => contacts })

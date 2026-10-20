@@ -23,7 +23,7 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { aliceInDesign, aliceInGeneral, bob, design, general, membership } from "../../../test/fixtures.ts"
+import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership } from "../../../test/fixtures.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { Message, OutMessage, Starting } from "./definition.ts"
 import { init } from "./init.ts"
@@ -450,6 +450,7 @@ describe("the browse page", () => {
       given(withConversation),
       type(label("Search groups"), "zzz"),
       expect(role("heading", { name: "No groups match", level: 2 })).toExist(),
+      expect(art("nothing-here")).toExist(),
       expect(text('Nothing matches "zzz".')).toExist(),
       expect(role("list", { name: "Groups" })).toBeAbsent(),
       expect(text("0 groups")).toExist()
@@ -462,6 +463,7 @@ describe("the browse page", () => {
       given(modifyFields(listed, { groups: (groups) => groups.filter(({ group }) => group.id !== announcements.id) })),
       click(role("tab", { name: "Discover" })),
       expect(role("heading", { name: "Nothing to discover", level: 2 })).toExist(),
+      expect(art("rest")).toExist(),
       expect(text("Every public group is one you're in.")).toExist(),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "0")
     )
@@ -472,6 +474,7 @@ describe("the browse page", () => {
       { update, view: browseView },
       given(modifyFields(listed, { groups: () => [] })),
       expect(role("heading", { name: "No groups yet", level: 2 })).toExist(),
+      expect(art("sew-in")).toExist(),
       expect(text("The groups you join are listed here.")).toExist()
     )
   })

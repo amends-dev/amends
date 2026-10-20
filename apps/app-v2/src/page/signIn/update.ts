@@ -3,6 +3,12 @@ import { CheckCode, SendCode } from "./command.ts"
 import { SignInComposition } from "./composition.ts"
 import { Message, OutMessage, SignInForm } from "./definition.ts"
 
+/** Check `code`, which the person typed for the address `email` was sent a code at. */
+const checkCode = (email: string, code: string) => ({
+  model: { form: SignInForm.CheckingCode({ email, code }) },
+  commands: [CheckCode({ email, code })]
+})
+
 export const update = SignInComposition.makeUpdate((model, message) => {
   const { form } = model
   /** The form as `step` makes it, or as it is, when the step does not fit where the form has got to. */
@@ -76,17 +82,10 @@ export const update = SignInComposition.makeUpdate((model, message) => {
           () => undefined
         )
       ),
+    CompletedCode: ({ code }) =>
+      SignInForm.matchOrElse(form, { EnteringCode: ({ email }) => checkCode(email, code) }, () => ({ model })),
     SubmittedCode: () =>
-      SignInForm.matchOrElse(
-        form,
-        {
-          EnteringCode: ({ email, code }) => ({
-            model: { form: SignInForm.CheckingCode({ email, code }) },
-            commands: [CheckCode({ email, code })]
-          })
-        },
-        () => ({ model })
-      ),
+      SignInForm.matchOrElse(form, { EnteringCode: ({ email, code }) => checkCode(email, code) }, () => ({ model })),
     SucceededSignIn: ({ session }) =>
       SignInForm.matchOrElse(
         form,

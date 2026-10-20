@@ -4,7 +4,7 @@ import { ThreadId } from "@amends-dev/core/thread"
 import { Turn } from "@amends-dev/core/turn"
 import { describe, it } from "@effect/vitest"
 import { DateTime, Option } from "effect"
-import { Command, Subscription, click, expect, given, role, scene, text, within } from "foldkit/scene"
+import { Command, Subscription, click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { bob, membership, scout, turnOf } from "../../../test/fixtures.ts"
 import { TurnsBlock } from "./block.ts"
@@ -65,6 +65,29 @@ describe("a thread's turns", () => {
       expect(role("button", { name: "Stop" })).toBeAbsent(),
       expect(role("button", { name: "Run again" })).toBeAbsent(),
       expect(role("button", { name: "Show log" })).toExist()
+    )
+  })
+
+  it("move the mark of a turn that is waiting, working, or stopping, and no other", () => {
+    scene(
+      { update, view },
+      given(opened([itemOf(running), itemOf(failed), itemOf(turnOf("turn-4", "queued"))])),
+      expect(within(role("list", { name: "Turns" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("list", { name: "Turns" }), selector("svg.logo-thread"))).toExist(),
+      expect(within(role("list", { name: "Turns" }), selector("svg.logo-tug"))).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(opened([itemOf({ ...running, status: "cancelling" })], mayUseAgents)),
+      expect(selector("svg.logo-tug")).toExist(),
+      expect(selector("svg.logo-working")).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(opened([itemOf(failed), itemOf(completed)])),
+      expect(selector("svg.logo-working")).toBeAbsent(),
+      expect(selector("svg.logo-thread")).toBeAbsent(),
+      expect(selector("svg.logo-tug")).toBeAbsent()
     )
   })
 

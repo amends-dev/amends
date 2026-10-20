@@ -1,6 +1,21 @@
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { Command, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
+import {
+  Command,
+  all,
+  click,
+  expect,
+  expectAll,
+  given,
+  label,
+  nth,
+  role,
+  scene,
+  selector,
+  text,
+  type,
+  within
+} from "foldkit/scene"
 import { CheckCode, SendCode } from "./command.ts"
 import { Message, SignInForm } from "./definition.ts"
 import { init } from "./init.ts"
@@ -67,7 +82,7 @@ describe("the sign-in page", () => {
     scene({ update, view }, given(init(email).model), expect(role("alert")).toBeAbsent())
   })
 
-  it("asks for the code that was sent, and checks it", () => {
+  it("asks for the code that was sent as six cells over one input, and checks it as the sixth digit is typed", () => {
     scene(
       { update, view },
       given({ form: SignInForm.EnteringCode({ email, code: "", error: Option.none() }) }),
@@ -75,13 +90,52 @@ describe("the sign-in page", () => {
       expect(text("Enter the six-digit code for")).toExist(),
       expect(text(email)).toExist(),
       expect(text("Use your most recent code.")).toExist(),
+      expect(label("Verification code")).toHaveAttr("inputmode", "numeric"),
+      expect(label("Verification code")).toHaveAttr("autocomplete", "one-time-code"),
+      expectAll(all.selector('span[aria-hidden="true"]')).toHaveCount(6),
       type(label("Verification code"), "042816"),
-      click(role("button", { name: "Verify code" })),
       Command.expectExact(CheckCode({ email, code: "042816" })),
       expect(text("Checking the code…")).toExist(),
       expect(role("button", { name: "Verify code" })).toBeAbsent(),
       Command.resolve(CheckCode, Message.FailedSignIn({ error: "That code is wrong or has expired." })),
       expect(role("alert")).toHaveText("That code is wrong or has expired."),
+      expect(label("Verification code")).toHaveValue("042816"),
+      expect(selector("[data-invalid]")).toExist()
+    )
+  })
+
+  it("keeps the digits typed, and checks nothing until the sixth is in", () => {
+    scene(
+      { update, view },
+      given({ form: SignInForm.EnteringCode({ email, code: "", error: Option.none() }) }),
+      type(label("Verification code"), "04 28-x"),
+      Command.expectNone(),
+      expect(label("Verification code")).toHaveValue("0428"),
+      expect(nth(all.selector('span[aria-hidden="true"]'), 0)).toHaveText("0"),
+      expect(nth(all.selector('span[aria-hidden="true"]'), 3)).toHaveText("8"),
+      expect(nth(all.selector('span[aria-hidden="true"]'), 4)).toHaveText("")
+    )
+  })
+
+  it("checks the code from the button too, for a code typed in pieces", () => {
+    scene(
+      { update, view },
+      given({ form: SignInForm.EnteringCode({ email, code: "0428", error: Option.none() }) }),
+      click(role("button", { name: "Verify code" })),
+      Command.expectExact(CheckCode({ email, code: "0428" })),
+      expect(text("Checking the code…")).toExist(),
+      Command.resolve(CheckCode, Message.FailedSignIn({ error: "Enter the six digits of the code." })),
+      expect(role("alert")).toHaveText("Enter the six digits of the code.")
+    )
+  })
+
+  it("checks a code pasted whole at once, whatever separates its digits", () => {
+    scene(
+      { update, view },
+      given({ form: SignInForm.EnteringCode({ email, code: "", error: Option.none() }) }),
+      type(label("Verification code"), "042 816"),
+      Command.expectExact(CheckCode({ email, code: "042816" })),
+      Command.resolve(CheckCode, Message.FailedSignIn({ error: "That code is wrong or has expired." })),
       expect(label("Verification code")).toHaveValue("042816")
     )
   })

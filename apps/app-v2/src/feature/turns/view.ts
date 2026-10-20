@@ -1,6 +1,7 @@
 import { Turn } from "@amends-dev/core/turn"
 import { button, buttonRow, hint, notice, sending } from "@amends-dev/design/control"
 import { type BadgeTone, badge, entry, entryList, log } from "@amends-dev/design/details"
+import type { LogoMotion } from "@amends-dev/design/logo"
 import { paneSection } from "@amends-dev/design/pane"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -16,6 +17,19 @@ const turnStatusTone: Readonly<Record<Turn.Status, BadgeTone>> = {
   completed: "success",
   failed: "danger",
   cancelled: "neutral"
+}
+
+/**
+ * How the logo moves in the badge of a turn that is under way, as apps/ui moves it: the thread drawn through while it
+ * waits, the stitches lit while it runs, the patch tugged while it stops. A turn that has ended shows no logo.
+ */
+const turnStatusMotion: Readonly<Record<Turn.Status, Option.Option<LogoMotion>>> = {
+  queued: Option.some("thread"),
+  running: Option.some("working"),
+  cancelling: Option.some("tug"),
+  completed: Option.none(),
+  failed: Option.none(),
+  cancelled: Option.none()
 }
 
 /** One item of a turn's log, as the person reads it. */
@@ -59,7 +73,11 @@ const turnView = ({ turn, pending, retryOpen }: TurnItem, model: Model, h: Turns
     mark: initials(agent),
     title: agent,
     trailing: [
-      badge(h, { label: turnStatusLabel[turn.status], tone: turnStatusTone[turn.status] }),
+      badge(h, {
+        label: turnStatusLabel[turn.status],
+        tone: turnStatusTone[turn.status],
+        ...Option.match(turnStatusMotion[turn.status], { onNone: () => ({}), onSome: (motion) => ({ motion }) })
+      }),
       turn.retry === null ? h.empty : hint(h, `run again by ${memberName(model.members, turn.retry.by)}`),
       sending(h, pending)
     ],

@@ -23,6 +23,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
+  art,
   bob,
   bobIsMember,
   grantsOf,
@@ -217,13 +218,16 @@ describe("the Workspace page of the settings", () => {
     scene(
       { update, view, subscriptions: SettingsBlock.subscriptions },
       given(init(workspace.id, alice.id).model),
-      expect(text("Loading settings…")).toExist(),
+      expect(role("status")).toHaveText("Loading settings…"),
       expect(role("textbox", { name: "Workspace name" })).toBeAbsent(),
       Subscription.emit(subscriptions.settings, Message.FailedRead()),
       expect(text("Loading settings…")).toBeAbsent(),
-      expect(text("Can't load settings")).toExist(),
+      expect(role("heading", { name: "Can't load settings", level: 2 })).toExist(),
+      expect(text("Try again once the host is reachable.")).toExist(),
+      expect(art("came-apart")).toExist(),
       click(role("button", { name: "Try again" })),
-      expect(text("Loading settings…")).toExist()
+      expect(role("status")).toHaveText("Loading settings…"),
+      expect(art("came-apart")).toBeAbsent()
     )
   })
 
@@ -291,7 +295,8 @@ describe("the Members page of the settings", () => {
       ),
       type(label("Search members"), "zzz"),
       expect(role("list", { name: "Members" })).toBeAbsent(),
-      expect(text("No members match “zzz”.")).toExist()
+      expect(text("No members match “zzz”.")).toExist(),
+      expect(art("nothing-here")).toExist()
     )
   })
 
@@ -323,7 +328,8 @@ describe("the Members page of the settings", () => {
       { update, view: membersPage },
       given(owner),
       change(label("Show members"), "removed"),
-      expect(text("Nobody has been removed from this workspace.")).toExist()
+      expect(text("Nobody has been removed from this workspace.")).toExist(),
+      expect(art("rest")).toExist()
     )
   })
 
@@ -507,6 +513,7 @@ describe("a member in the side pane", () => {
         })
       ),
       expect(text("This member isn't here")).toExist(),
+      expect(art("lost-thread")).toExist(),
       expect(role("button", { name: "Back to Members" })).toExist()
     )
   })
