@@ -4,7 +4,10 @@ import { ComposerBlock } from "../composer/block.ts"
 import { StartConversation } from "./command.ts"
 import { type Model, UnsentConversationDefinition } from "./definition.ts"
 
-/** What the person sends from the composer starts the conversation; their typing changes nothing here. */
+/**
+ * What the person sends from the composer starts the conversation; their typing changes nothing here, and the composer
+ * offers no commands before the conversation exists.
+ */
 const foldComposerOutMessage = ComposerBlock.OutMessage.match({
   ChangedText: () => UnsentConversationDefinition.stepNoop(),
   SubmittedText: ({ text }) =>
@@ -18,7 +21,8 @@ const foldComposerOutMessage = ComposerBlock.OutMessage.match({
           text
         })
       ]
-    }))
+    })),
+  RanSlashCommand: () => UnsentConversationDefinition.stepNoop()
 })
 
 export const ComposerBinding = UnsentConversationDefinition.bindChild(ComposerBlock, {

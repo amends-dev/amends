@@ -6,6 +6,7 @@ import { Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import {
+  aliceInGeneral,
   bob,
   conversationWithBob,
   design,
@@ -19,8 +20,9 @@ import {
   thread
 } from "../../../../test/fixtures.ts"
 import { ComposerBlock } from "../../../feature/composer/block.ts"
-import { ReadDraft } from "../../../feature/composer/command.ts"
+import { ReadDraft, SaveDraft } from "../../../feature/composer/command.ts"
 import { GroupBlock } from "../../../feature/group/block.ts"
+import { FollowGroup, UnfollowGroup } from "../../../feature/group/command.ts"
 import { ThreadsBinding } from "../../../feature/group/composition.ts"
 import { init as initGroup } from "../../../feature/group/init.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
@@ -31,6 +33,7 @@ import { waitingCount } from "../../../feature/inbox/definition.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
 import { ThreadsBlock } from "../../../feature/threads/block.ts"
+import { ComposerBinding as ThreadsComposerBinding } from "../../../feature/threads/composition.ts"
 import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
 import { init as initUnsent } from "../../../feature/unsentConversation/init.ts"
 import * as Drafts from "../../../store/Drafts.ts"
@@ -967,5 +970,76 @@ describe("home", () => {
         })
       )
     })
+  })
+})
+
+/** What the open group's composer reports, as Home receives it. */
+const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
+  fromThreads(
+    ThreadsComposerBinding.embedView({
+      slotId: "composer",
+      model: openGroupModel.threads.composer,
+      viewInputs: { placeholder: "Message #General", members: [] }
+    }).toParentMessage(message)
+  )
+
+/** The open group read, with the person admitted to it. */
+const receivedGroup = message(
+  fromGroup(
+    GroupBlock.Message.ReceivedGroup({
+      group: Option.some({ group: general, pending: false }),
+      memberships: [{ membership: aliceInGeneral, pending: false }],
+      follow: Option.none()
+    })
+  )
+)
+
+describe("home with a group open running the slash commands of its composer", () => {
+  it("reports that the person followed the group, where it is, for the page to confirm", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      draftRead,
+      receivedGroup,
+      message(fromComposer(ComposerBlock.Message.TypedText({ text: "/fol" }))),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      message(fromComposer(ComposerBlock.Message.PickedSlashCommand({ command: "follow" }))),
+      expectOutMessage(OutMessage.FollowedGroup({ place: "#General" })),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(FollowGroup, GroupBlock.Message.WroteAction())
+    )
+  })
+
+  it("reports that the person stopped following the group, where it is, for the page to confirm", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      draftRead,
+      receivedGroup,
+      message(fromComposer(ComposerBlock.Message.TypedText({ text: "/unf" }))),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      message(fromComposer(ComposerBlock.Message.PickedSlashCommand({ command: "unfollow" }))),
+      expectOutMessage(OutMessage.UnfollowedGroup({ place: "#General" })),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(UnfollowGroup, GroupBlock.Message.WroteAction())
+    )
+  })
+
+  it("reports nothing of the group's settings opening to rename it, which stays in the group", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      draftRead,
+      receivedGroup,
+      message(fromComposer(ComposerBlock.Message.TypedText({ text: "/ren" }))),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      message(fromComposer(ComposerBlock.Message.PickedSlashCommand({ command: "rename" }))),
+      expectNoOutMessage(),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      dialogShown
+    )
   })
 })

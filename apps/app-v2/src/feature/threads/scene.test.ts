@@ -1239,3 +1239,48 @@ describe("a group's threads, with who types in them and which agents are at work
     )
   })
 })
+
+describe("a group's threads offering the composer slash commands", () => {
+  const offered = withViewInputs(composerView, {
+    ...inputs,
+    commands: [
+      { command: "follow", description: "Follow #General to take part in its new threads" },
+      { command: "rename", description: "Rename #General" }
+    ]
+  })()
+
+  it("gives the composer the commands on the Threads tab, and reports the one picked, starting no thread", () => {
+    scene(
+      { update, view: offered },
+      given(empty),
+      type(label("Message #General"), "/"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      expect(role("listbox", { name: "Commands" })).toExist(),
+      expectAll(all.role("option")).toHaveCount(2),
+      click(within(role("listbox"), text("/rename"))),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "rename" })),
+      Command.expectExact(SaveDraft({ workspaceId, memberId, place, text: "" })),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft())
+    )
+  })
+
+  it("gives the composer none on the Tasks tab, where it starts a task", () => {
+    scene(
+      { update, view: offered },
+      given(modifyFields(empty, { tab: () => "Tasks" as const })),
+      type(label("New task in #General"), "/"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("gives the composer none unless it is given some", () => {
+    scene(
+      { update, view: withViewInputs(composerView, inputs)() },
+      given(empty),
+      type(label("Message #General"), "/"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+})

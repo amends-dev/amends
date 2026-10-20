@@ -27,7 +27,8 @@ const foldReplyOutMessage = ComposerBlock.OutMessage.match({
         PostReply({ workspaceId: model.workspaceId, memberId: model.memberId, threadId: model.threadId, text }),
         TellTyping({ workspaceId: model.workspaceId, threadId: null })
       ]
-    }))
+    })),
+  RanSlashCommand: () => ThreadDefinition.stepNoop()
 })
 
 export const ReplyBinding = ThreadDefinition.bindChild(ComposerBlock, {

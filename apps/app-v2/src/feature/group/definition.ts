@@ -3,7 +3,7 @@
  * among them, and its settings in a modal: a team's name, visibility, and members, and the person's membership.
  * They follow a group or stop, rename a team, join a public team or leave one, and, where they manage
  * its members, admit several at once and remove them. It reports when its thread opens and when the person closes
- * it, and closes the thread when its parent asks.
+ * it, when they follow the group or stop with a slash command, and closes the thread when its parent asks.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -27,8 +27,13 @@ import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
 import { MembersComboboxBlock } from "../../memberPicker.ts"
 import { groupTarget, may } from "../../permissions.ts"
+import { placeName } from "../../seen.ts"
+import type { OfferedSlashCommand } from "../composer/definition.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
+
+/** Whose store an action on the group is written to, and the group it acts on. */
+export const inGroup = ({ workspaceId, memberId, groupId }: Model) => ({ workspaceId, memberId, groupId })
 
 /** The group, and whether it is still being created. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean })
@@ -133,7 +138,9 @@ export type Message = typeof Message.Type
 export const OutMessage = defineMessageUnion({
   OpenedThread: {},
   ClosedThread: {},
-  OpenedAgent: { agentId: Identity.AgentId }
+  OpenedAgent: { agentId: Identity.AgentId },
+  FollowedGroup: { place: Schema.String },
+  UnfollowedGroup: { place: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -191,6 +198,38 @@ export const mayRename = (model: Model): boolean =>
   Option.isSome(teamName(model)) &&
   belongs(model) &&
   may(model.grants, GroupPermissions.Rename, groupTarget(model.workspaceId, model.groupId))
+
+/** Whether the person follows the group. */
+export const isFollowing = (model: Model): boolean =>
+  Option.exists(model.follow, ({ follow }) => follow.status === "active")
+
+/** Whether a change to the person's follow of the group is on its way. */
+export const isFollowChanging = (model: Model): boolean => Option.exists(model.follow, ({ pending }) => pending)
+
+/** Where the group is, as a line says it, such as `#general`, once the group is read. */
+export const placeOf = (model: Model): Option.Option<string> =>
+  Option.map(model.group, ({ group }) => placeName(group, model.members, model.memberId))
+
+/**
+ * The slash commands the composer offers, as `apps/ui` does, in a team the person belongs to: following it, or stopping
+ * while they follow it, unless a change to that is on its way, and renaming it where they may.
+ */
+export const slashCommandsOf = (model: Model): ReadonlyArray<OfferedSlashCommand> =>
+  Option.match(placeOf(model), {
+    onNone: () => [],
+    onSome: (place) => {
+      if (Option.isNone(teamName(model)) || !belongs(model)) return []
+
+      const following: ReadonlyArray<OfferedSlashCommand> = isFollowing(model)
+        ? [{ command: "unfollow", description: `Stop following ${place}` }]
+        : [{ command: "follow", description: `Follow ${place} to take part in its new threads` }]
+      const renaming: ReadonlyArray<OfferedSlashCommand> = mayRename(model)
+        ? [{ command: "rename", description: `Rename ${place}` }]
+        : []
+
+      return [...(isFollowChanging(model) ? [] : following), ...renaming]
+    }
+  })
 
 /** Whether a change to the person's own admission is on its way: their joining, or their leaving. */
 export const isMembershipChanging = (model: Model): boolean =>

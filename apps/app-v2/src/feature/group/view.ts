@@ -49,12 +49,15 @@ import {
   type Availability,
   availabilityOf,
   belongs,
+  isFollowChanging,
+  isFollowing,
   isMembershipChanging,
   mayManageMembers,
   mayRename,
   Message,
   type Model,
   membersOf,
+  slashCommandsOf,
   teamName
 } from "./definition.ts"
 
@@ -88,10 +91,9 @@ const iconOf = (model: Model): "mark-channel" | "message" =>
  * which stops following, and unavailable while a change to it is on its way.
  */
 const followAction = (model: Model, h: GroupViewBuilder): Html => {
-  const isFollowing = Option.exists(model.follow, ({ follow }) => follow.status === "active")
-  const isPending = Option.exists(model.follow, ({ pending }) => pending)
+  const isPending = isFollowChanging(model)
 
-  return isFollowing
+  return isFollowing(model)
     ? iconButton(
         h,
         { icon: "bell-filled", label: "Following", onClick: Message.ClickedUnfollow() },
@@ -470,7 +472,8 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
     memberNames: welcomeNames(model),
     openThreadId: Option.map(model.thread, ({ threadId }) => threadId),
     present: model.present,
-    now
+    now,
+    commands: slashCommandsOf(model)
   }
 
   return pane(h, {

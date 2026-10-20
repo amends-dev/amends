@@ -5,14 +5,15 @@ import * as Drafts from "../../store/Drafts.ts"
 import { assigneeFilterOf, AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { StartThread } from "./command.ts"
-import { type Model, TaskSortMenu, ThreadsDefinition } from "./definition.ts"
+import { type Model, OutMessage, TaskSortMenu, ThreadsDefinition } from "./definition.ts"
 
 /**
  * What the person sends from the composer starts a thread, one that tracks a task, in triage, on the Tasks tab;
- * their typing changes nothing here.
+ * their typing changes nothing here, and a slash command they run is for whoever holds the threads.
  */
 const foldComposerOutMessage = ComposerBlock.OutMessage.match({
   ChangedText: () => ThreadsDefinition.stepNoop(),
+  RanSlashCommand: () => ThreadsDefinition.stepNoop(),
   SubmittedText: ({ text }) =>
     ThreadsDefinition.step((model: Model) => ({
       model,
@@ -28,6 +29,13 @@ const foldComposerOutMessage = ComposerBlock.OutMessage.match({
     }))
 })
 
+/** A slash command the person ran in the composer is reported as it is. */
+const forwardComposerOutMessage = ComposerBlock.OutMessage.match({
+  ChangedText: () => undefined,
+  SubmittedText: () => undefined,
+  RanSlashCommand: ({ command }) => OutMessage.RanSlashCommand({ command })
+})
+
 export const ComposerBinding = ThreadsDefinition.bindChild(ComposerBlock, {
   field: "composer",
   init: {
@@ -37,7 +45,7 @@ export const ComposerBinding = ThreadsDefinition.bindChild(ComposerBlock, {
       Drafts.Place.cases.Thread.make({ groupId })
     ]
   },
-  outMessage: { fold: foldComposerOutMessage }
+  outMessage: { forward: forwardComposerOutMessage, fold: foldComposerOutMessage }
 })
 
 export const StatusBinding = ThreadsDefinition.bindChild(StatusFilterMenu, {

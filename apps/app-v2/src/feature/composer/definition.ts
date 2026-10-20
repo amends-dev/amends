@@ -4,7 +4,8 @@
  * changed, to whatever holds it. While the person types a mention, `@` and some letters of a name, it
  * lists the people they may mean, and shows the one they pick as their name in the text. A button
  * starts a mention at the caret. A toolbar formats the selection as markdown, which a button shows and
- * hides, and which starts hidden on a phone.
+ * hides, and which starts hidden on a phone. While the whole draft is a slash and some letters, `/fol`, it lists the
+ * slash commands its holder offers; picking one clears the draft and reports the command.
  */
 
 import { type Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -17,11 +18,16 @@ import { PickedMention, type Written } from "../../mentions.ts"
 import { foldAccents } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 
+/** What the list being picked from holds: the people a mention may mean, or the slash commands a draft may run. */
+export const PickingKind = Schema.Literals(["Mention", "SlashCommand"])
+export type PickingKind = typeof PickingKind.Type
+
 /**
- * The mention being typed: where its "@" is in the text, the letters after it, which of the suggestions is active,
- * and whether the person dismissed the list for these letters.
+ * What is being typed for a list, a mention or a slash command: where its "@" or "/" is in the text, the letters
+ * after it, which of the suggestions is active, and whether the person dismissed the list for these letters.
  */
 export const Picking = Schema.Struct({
+  kind: PickingKind,
   from: Schema.Int,
   query: Schema.String,
   activeIndex: Schema.Int,
@@ -46,6 +52,16 @@ export const Format = Schema.Literals([
   "CodeBlock"
 ])
 export type Format = typeof Format.Type
+
+/**
+ * The commands a draft may run by typing a slash and their name, in place of being sent: following the group the
+ * composer is in, stopping, and renaming it.
+ */
+export const SlashCommand = Schema.Literals(["follow", "unfollow", "rename"])
+export type SlashCommand = typeof SlashCommand.Type
+
+/** A slash command the composer's holder offers, and what running it does, such as "Rename #general". */
+export type OfferedSlashCommand = Readonly<{ command: SlashCommand; description: string }>
 
 /** What the selection is read for: to start a mention where it is, or to format it. */
 export const Reading = Schema.TaggedUnion({ Mention: {}, Format: { format: Format } })
@@ -72,6 +88,7 @@ export const Message = defineMessageUnion({
   ReceivedDraft: { text: Schema.String },
   TypedText: { text: Schema.String },
   PickedMention: { memberId: MemberId.MemberId, name: Schema.String },
+  PickedSlashCommand: { command: SlashCommand },
   MovedSuggestion: { to: Schema.Int },
   DismissedSuggestions: {},
   ChoseFormat: { format: Format },
@@ -87,7 +104,8 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ChangedText: { text: Schema.String },
-  SubmittedText: { text: Schema.String }
+  SubmittedText: { text: Schema.String },
+  RanSlashCommand: { command: SlashCommand }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -130,29 +148,51 @@ export const mentionQueryAt = (text: string, caret: number): Option.Option<Reado
     })
   )
 
+const slashBeforeCaret = /^\/([\w-]*)$/u
+
 /**
- * The mention being typed once the box holds `written` with the caret at `caret`: not a picked mention, and, for the
- * letters it was dismissed for, as dismissed and as active as it was.
+ * The slash command being typed that the caret is at the end of, when it is: the whole text is a "/" and the letters
+ * after it, no space among them, and no mention picked. "/" later in the text, or after other words, is left as typed.
+ */
+export const slashQueryAt = (written: Written, caret: number): Option.Option<string> =>
+  written.mentions.length === 0 && caret === written.text.length
+    ? Option.map(Option.fromNullishOr(slashBeforeCaret.exec(written.text)), ({ 1: query }) => query ?? "")
+    : Option.none()
+
+/** The list being typed for once the box holds `written` with the caret at `caret`: what for, where, the letters. */
+const typedFor = (
+  written: Written,
+  caret: number
+): Option.Option<Readonly<{ kind: PickingKind; from: number; query: string }>> =>
+  Option.orElse(
+    Option.map(
+      Option.filter(
+        mentionQueryAt(written.text, caret),
+        ({ from, query }) =>
+          !written.mentions.some((mention) => mention.from < from + 1 + query.length && from < mention.to)
+      ),
+      (typed) => ({ kind: "Mention" as const, ...typed })
+    ),
+    () => Option.map(slashQueryAt(written, caret), (query) => ({ kind: "SlashCommand" as const, from: 0, query }))
+  )
+
+/**
+ * The mention or slash command being typed once the box holds `written` with the caret at `caret`: not a picked
+ * mention, and, for the letters it was dismissed for, as dismissed and as active as it was.
  */
 export const pickingAfterTyping = (
   written: Written,
   caret: number,
   picking: Option.Option<Picking>
 ): Option.Option<Picking> =>
-  Option.map(
-    Option.filter(
-      mentionQueryAt(written.text, caret),
-      ({ from, query }) =>
-        !written.mentions.some((mention) => mention.from < from + 1 + query.length && from < mention.to)
-    ),
-    ({ from, query }) =>
-      Option.match(
-        Option.filter(picking, (current) => current.query === query),
-        {
-          onNone: () => Picking.make({ from, query, activeIndex: 0, isDismissed: false }),
-          onSome: (current) => Picking.make({ ...current, from })
-        }
-      )
+  Option.map(typedFor(written, caret), ({ kind, from, query }) =>
+    Option.match(
+      Option.filter(picking, (current) => current.kind === kind && current.query === query),
+      {
+        onNone: () => Picking.make({ kind, from, query, activeIndex: 0, isDismissed: false }),
+        onSome: (current) => Picking.make({ ...current, from })
+      }
+    )
   )
 
 /** The most people the list suggests. */

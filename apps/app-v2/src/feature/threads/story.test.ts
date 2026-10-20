@@ -615,3 +615,30 @@ describe("who belongs to a team, as its welcome says it", () => {
     expect(membersLine(["Sara"])).toBe("Sara is a member.")
   })
 })
+
+describe("a group's threads reporting a slash command", () => {
+  it("reports the command the person ran in the composer, with the draft emptied, and starts no thread", () => {
+    const place = Drafts.Place.cases.Thread.make({ groupId })
+
+    story(
+      update,
+      given(listing),
+      message(fromComposer(ComposerBlock.Message.TypedText({ text: "/ren" }))),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      message(fromComposer(ComposerBlock.Message.PickedSlashCommand({ command: "rename" }))),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "rename" })),
+      Command.expectExact(SaveDraft({ workspaceId, memberId, place, text: "" })),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft())
+    )
+  })
+
+  it("reports nothing for the text the person types or sends", () => {
+    story(
+      update,
+      given(listing),
+      message(fromComposer(ComposerBlock.Message.TypedText({ text: "/ren" }))),
+      expectNoOutMessage(),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft())
+    )
+  })
+})

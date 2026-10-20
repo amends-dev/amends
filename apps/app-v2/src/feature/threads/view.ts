@@ -39,6 +39,7 @@ import {
 } from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
+import type { OfferedSlashCommand } from "../composer/definition.ts"
 import {
   AssigneeBinding,
   ComposerBinding,
@@ -64,8 +65,9 @@ import {
 
 /**
  * Who could have written the openings, what the group is called and whether it is a team, who belongs to a team as its
- * welcome names them, which of its threads is open, who is present and which thread each types in, and the time now,
- * which the days the threads were created on are read from.
+ * welcome names them, which of its threads is open, who is present and which thread each types in, the time now,
+ * which the days the threads were created on are read from, and the slash commands the composer offers on the Threads
+ * tab, none unless given.
  */
 export type ViewInputs = Readonly<{
   members: ReadonlyArray<Member.Member>
@@ -75,6 +77,7 @@ export type ViewInputs = Readonly<{
   openThreadId: Option.Option<ThreadId.ThreadId>
   present: ReadonlyArray<Presence.Present>
   now: DateTime.Utc
+  commands?: ReadonlyArray<OfferedSlashCommand>
 }>
 
 /** The group's name, which names its tabs. */
@@ -338,7 +341,7 @@ export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, i
  * task in #general".
  */
 export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>(
-  (model, { groupName, isTeam, members }, h) => {
+  (model, { groupName, isTeam, members, commands = [] }, h) => {
     const place = `${isTeam ? "#" : ""}${groupName}`
 
     return h.block(
@@ -347,7 +350,8 @@ export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>(
         model: model.composer,
         viewInputs: {
           placeholder: model.tab === "Tasks" ? `New task in ${place}` : `Message ${place}`,
-          members
+          members,
+          commands: model.tab === "Tasks" ? [] : commands
         }
       })
     )

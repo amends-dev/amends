@@ -66,7 +66,7 @@ const startMention = (model: Model, written: Written, { from, to }: Selection) =
   return changeWritten(
     model,
     replaceRange(written, from, to, typed),
-    Option.some(Picking.make({ from: caret - 1, query: "", activeIndex: 0, isDismissed: false })),
+    Option.some(Picking.make({ kind: "Mention", from: caret - 1, query: "", activeIndex: 0, isDismissed: false })),
     Option.some(caretAt(caret))
   )
 }
@@ -104,6 +104,23 @@ export const update = ComposerComposition.makeUpdate((model, message) =>
           return changeWritten(model, edit.written, Option.none(), Option.some(caretAt(edit.caret)))
         }
       }),
+    // The draft is a command run, not a message sent: the box is emptied as sending would, and the command reported.
+    PickedSlashCommand: ({ command }) =>
+      Option.match(
+        Option.filter(model.picking, ({ kind }) => kind === "SlashCommand"),
+        {
+          onNone: () => ({ model }),
+          onSome: () => ({
+            model: modifyFields(model, {
+              text: () => Option.some(""),
+              mentions: () => [],
+              picking: () => Option.none()
+            }),
+            commands: [saveDraft(model, { text: "", mentions: [] })],
+            outMessage: OutMessage.RanSlashCommand({ command })
+          })
+        }
+      ),
     // The view counts the suggestions, so it says which one is active.
     MovedSuggestion: ({ to }) => ({
       model: modifyFields(model, {

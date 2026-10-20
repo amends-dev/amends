@@ -114,7 +114,9 @@ export const OutMessage = defineMessageUnion({
   Navigated: {},
   JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
   CreatedGroup: { groupId: GroupId.GroupId },
-  OpenedAgent: { agentId: Identity.AgentId }
+  OpenedAgent: { agentId: Identity.AgentId },
+  FollowedGroup: { place: Schema.String },
+  UnfollowedGroup: { place: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 

@@ -1,16 +1,20 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
-import { Group, GroupId, GroupPermissions } from "@amends-dev/core/group"
+import { Group, GroupFollow, GroupId, GroupPermissions } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, bob, bobInDesign, design, membership, now, scout } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
+import * as Drafts from "../../store/Drafts.ts"
 import { unwritable } from "../../store/Stores.ts"
 import { ComposerBlock } from "../composer/block.ts"
-import { ReadDraft } from "../composer/command.ts"
+import { ReadDraft, SaveDraft } from "../composer/command.ts"
+import type { SlashCommand } from "../composer/definition.ts"
 import { ThreadsBlock } from "../threads/block.ts"
+import { ComposerBinding as ThreadsComposerBinding } from "../threads/composition.ts"
 import {
   AdmitMembers,
   FocusAdmitMembers,
@@ -22,7 +26,7 @@ import {
   UnfollowGroup
 } from "./command.ts"
 import { DialogBinding, ThreadsBinding } from "./composition.ts"
-import { availabilityOf, Message, OutMessage } from "./definition.ts"
+import { availabilityOf, Message, OutMessage, slashCommandsOf } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -581,4 +585,169 @@ describe("admitting members", () => {
       expect(result).toEqual(Message.FailedWriteAction({ error: unwritable }))
     })
   )
+})
+
+/** What the threads' composer reports, as the group receives it. */
+const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
+  fromThreads(
+    ThreadsComposerBinding.embedView({
+      slotId: "composer",
+      model: opened.threads.composer,
+      viewInputs: { placeholder: "Message #Design", members: [] }
+    }).toParentMessage(message)
+  )
+
+/** The person types `words` in the composer, which keeps the draft, and picks the command `command`. */
+const ranSlashCommand = (words: string, command: SlashCommand) => [
+  message(fromComposer(ComposerBlock.Message.TypedText({ text: words }))),
+  Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+  message(fromComposer(ComposerBlock.Message.PickedSlashCommand({ command })))
+]
+
+const emptiedDraft = SaveDraft({
+  workspaceId: workspace.id,
+  memberId: member.id,
+  place: Drafts.Place.cases.Thread.make({ groupId: design.id }),
+  text: ""
+})
+
+/** The person's follow of design. */
+const followOfDesign = Schema.decodeSync(GroupFollow.GroupFollow)({
+  id: "follow-1",
+  workspaceId: "workspace-1",
+  groupId: "design",
+  memberId: "member-1",
+  groupMembershipId: "membership-2",
+  followedAt: "2026-10-18T12:00:00Z",
+  status: "active",
+  endedAt: null
+})
+
+const renameGrant = Grant.make(GroupPermissions.Rename, Scope.Scope.cases.Workspace.make({ workspaceId: workspace.id }))
+
+/** The team read, with the person admitted to it, and what they may do. */
+const belonging = modifyFields(opened, {
+  group: () => Option.some({ group: design, pending: false }),
+  memberships: () => [{ membership: aliceInDesign, pending: false }]
+})
+
+describe("a group running the slash commands of its composer", () => {
+  it("follows the group as the bell does and reports it, with where the group is, for the page to confirm", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      ...ranSlashCommand("/fol", "follow"),
+      expectOutMessage(OutMessage.FollowedGroup({ place: "#Design" })),
+      Command.expectExact(emptiedDraft, FollowGroup(inDesign)),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(FollowGroup, Message.WroteAction())
+    )
+  })
+
+  it("stops following the group as the bell does and reports it", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      ...ranSlashCommand("/unf", "unfollow"),
+      expectOutMessage(OutMessage.UnfollowedGroup({ place: "#Design" })),
+      Command.expectExact(emptiedDraft, UnfollowGroup(inDesign)),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(UnfollowGroup, Message.WroteAction())
+    )
+  })
+
+  it("opens the settings on the General section as their button does, with the name started for someone who may rename", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      receivedRenameGrant,
+      ...ranSlashCommand("/ren", "rename"),
+      expectNoOutMessage(),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      dialogOpened,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.settingsTab).toBe("General")
+        expect(model.renaming).toEqual(Option.some("Design"))
+      })
+    )
+  })
+
+  it("starts no name for someone who may not rename", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      ...ranSlashCommand("/ren", "rename"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      dialogOpened,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.renaming).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("does nothing to follow a group that is not read yet, beyond emptying the draft", () => {
+    story(
+      update,
+      given(opened),
+      ...ranSlashCommand("/fol", "follow"),
+      expectNoOutMessage(),
+      Command.expectExact(emptiedDraft),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft())
+    )
+  })
+})
+
+describe("the slash commands a group offers", () => {
+  const names = (model: typeof opened) => slashCommandsOf(model).map(({ command }) => command)
+  const granted = modifyFields(belonging, { grants: () => [renameGrant] })
+
+  it("are none before the group is read, in a conversation, and for someone who does not belong to the team", () => {
+    expect(names(opened)).toEqual([])
+    expect(
+      names(modifyFields(belonging, { group: () => Option.some({ group: conversation, pending: false }) }))
+    ).toEqual([])
+    expect(names(modifyFields(belonging, { memberships: () => [] }))).toEqual([])
+    expect(names(modifyFields(opened, { group: () => Option.some({ group: announcements, pending: false }) }))).toEqual(
+      []
+    )
+  })
+
+  it("are following for a member who does not follow the team, and renaming where they may rename it", () => {
+    expect(names(belonging)).toEqual(["follow"])
+    expect(names(granted)).toEqual(["follow", "rename"])
+  })
+
+  it("are stopping in place of following for a member who follows the team", () => {
+    expect(
+      names(modifyFields(granted, { follow: () => Option.some({ follow: followOfDesign, pending: false }) }))
+    ).toEqual(["unfollow", "rename"])
+  })
+
+  it("leave out following and stopping while a change to the follow is on its way", () => {
+    expect(
+      names(modifyFields(granted, { follow: () => Option.some({ follow: followOfDesign, pending: true }) }))
+    ).toEqual(["rename"])
+    expect(
+      names(modifyFields(belonging, { follow: () => Option.some({ follow: followOfDesign, pending: true }) }))
+    ).toEqual([])
+  })
+
+  it("say what each does of the group's place, as a team's is written", () => {
+    expect(slashCommandsOf(granted)).toEqual([
+      { command: "follow", description: "Follow #Design to take part in its new threads" },
+      { command: "rename", description: "Rename #Design" }
+    ])
+    expect(
+      slashCommandsOf(modifyFields(granted, { follow: () => Option.some({ follow: followOfDesign, pending: false }) }))
+    ).toEqual([
+      { command: "unfollow", description: "Stop following #Design" },
+      { command: "rename", description: "Rename #Design" }
+    ])
+  })
 })

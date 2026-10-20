@@ -13,6 +13,7 @@ import {
   Message,
   OutMessage,
   Reading,
+  slashQueryAt,
   suggestMembers
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -101,12 +102,16 @@ describe("a composer mentioning a member", () => {
       given(composer),
       message(Message.TypedText({ text: "Hi @al" })),
       model((model) => {
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "al", activeIndex: 0, isDismissed: false }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "al", activeIndex: 0, isDismissed: false })
+        )
       }),
       Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
       message(Message.MovedSuggestion({ to: 1 })),
       model((model) => {
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "al", activeIndex: 1, isDismissed: false }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "al", activeIndex: 1, isDismissed: false })
+        )
       }),
       message(Message.PickedMention({ memberId: aliceId, name: "Alice" })),
       // What the box shows is the name, and the draft and the report say the link.
@@ -129,7 +134,9 @@ describe("a composer mentioning a member", () => {
       ...typed("Hi  there"),
       message(Message.TypedText({ text: "Hi @al there" })),
       model((model) => {
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "al", activeIndex: 0, isDismissed: false }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "al", activeIndex: 0, isDismissed: false })
+        )
       }),
       Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
       message(Message.PickedMention({ memberId: aliceId, name: "Alice" })),
@@ -168,16 +175,22 @@ describe("a composer mentioning a member", () => {
       ...typed("Hi @al"),
       message(Message.DismissedSuggestions()),
       model((model) => {
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "al", activeIndex: 0, isDismissed: true }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "al", activeIndex: 0, isDismissed: true })
+        )
       }),
       // The same letters, as the text is typed again, leave the list closed.
       ...typed("Hi @al"),
       model((model) => {
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "al", activeIndex: 0, isDismissed: true }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "al", activeIndex: 0, isDismissed: true })
+        )
       }),
       ...typed("Hi @ali"),
       model((model) => {
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "ali", activeIndex: 0, isDismissed: false }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "ali", activeIndex: 0, isDismissed: false })
+        )
       })
     )
   })
@@ -340,7 +353,9 @@ describe("a composer mentioning a member", () => {
       Command.resolve(SelectText, Message.CompletedSelectText()),
       model((model) => {
         expect(model.text).toEqual(Option.some("Hi @there"))
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "", activeIndex: 0, isDismissed: false }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "", activeIndex: 0, isDismissed: false })
+        )
       })
     )
   })
@@ -356,7 +371,9 @@ describe("a composer mentioning a member", () => {
       Command.resolve(SelectText, Message.CompletedSelectText()),
       model((model) => {
         expect(model.text).toEqual(Option.some("Hi @"))
-        expect(model.picking).toEqual(Option.some({ from: 3, query: "", activeIndex: 0, isDismissed: false }))
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 3, query: "", activeIndex: 0, isDismissed: false })
+        )
       })
     )
   })
@@ -599,6 +616,170 @@ describe("a composer formatting its text", () => {
       model((model) => {
         expect(isFormattingShown(model)).toBe(false)
       })
+    )
+  })
+})
+
+const slashPicking = (query: string, activeIndex = 0, isDismissed = false) =>
+  Option.some({ kind: "SlashCommand", from: 0, query, activeIndex, isDismissed })
+
+describe("a composer typing a slash command", () => {
+  it("lists the commands for a draft that is only a slash and the letters after it, up to the caret", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("/"),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking(""))
+      }),
+      ...typed("/fol"),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking("fol"))
+      }),
+      ...typed("/un-fo"),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking("un-fo"))
+      })
+    )
+  })
+
+  it("lists none once the draft is more than the command: a space, other words, a slash later, or a line", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("/fol"),
+      ...typed("/fol "),
+      model((model) => {
+        expect(model.picking).toEqual(Option.none())
+      }),
+      ...typed("a /fol"),
+      model((model) => {
+        expect(model.picking).toEqual(Option.none())
+      }),
+      ...typed("//"),
+      model((model) => {
+        expect(model.picking).toEqual(Option.none())
+      }),
+      ...typed("/fol\nmore"),
+      model((model) => {
+        expect(model.picking).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("does not list the commands for a draft that is read, or a slash typed before the end of the text", () => {
+    story(
+      update,
+      given(composer),
+      message(Message.ReceivedDraft({ text: "/fol" })),
+      model((model) => {
+        expect(model.picking).toEqual(Option.none())
+      }),
+      ...typed("/fol more"),
+      ...typed("/fo more"),
+      model((model) => {
+        expect(model.picking).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("keeps the list closed for the letters the person dismissed it for, and opens it for others", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("/fo"),
+      message(Message.MovedSuggestion({ to: 1 })),
+      message(Message.DismissedSuggestions()),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking("fo", 1, true))
+      }),
+      ...typed("/fo"),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking("fo", 1, true))
+      }),
+      ...typed("/fol"),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking("fol"))
+      })
+    )
+  })
+
+  it("lists the people for a mention typed where a slash command was dismissed, whose letters were the same", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("/"),
+      message(Message.DismissedSuggestions()),
+      model((model) => {
+        expect(model.picking).toEqual(slashPicking("", 0, true))
+      }),
+      ...typed("@"),
+      model((model) => {
+        expect(model.picking).toEqual(
+          Option.some({ kind: "Mention", from: 0, query: "", activeIndex: 0, isDismissed: false })
+        )
+      })
+    )
+  })
+
+  it("runs the command picked: it empties the draft as sending does, and reports the command instead of the text", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("/fol"),
+      message(Message.PickedSlashCommand({ command: "follow" })),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "follow" })),
+      Command.expectExact(draft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      model((model) => {
+        expect(model.text).toEqual(Option.some(""))
+        expect(model.mentions).toEqual([])
+        expect(model.picking).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("runs each command it is given by name", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("/"),
+      message(Message.PickedSlashCommand({ command: "rename" })),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "rename" })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      ...typed("/un"),
+      message(Message.PickedSlashCommand({ command: "unfollow" })),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "unfollow" })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+    )
+  })
+
+  it("runs no command while no slash command is being typed", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("Hi @al"),
+      message(Message.PickedSlashCommand({ command: "follow" })),
+      expectNoOutMessage(),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.text).toEqual(Option.some("Hi @al"))
+      })
+    )
+  })
+
+  it("finds the command being typed only in a draft of a slash and letters with the caret at its end", () => {
+    const written = (text: string) => ({ text, mentions: [] })
+
+    expect(slashQueryAt(written("/"), 1)).toEqual(Option.some(""))
+    expect(slashQueryAt(written("/follow"), 7)).toEqual(Option.some("follow"))
+    expect(slashQueryAt(written("/fol"), 2)).toEqual(Option.none())
+    expect(slashQueryAt(written(" /fol"), 5)).toEqual(Option.none())
+    expect(slashQueryAt(written("/fol "), 5)).toEqual(Option.none())
+    expect(slashQueryAt(written("fol"), 3)).toEqual(Option.none())
+    expect(slashQueryAt(written(""), 0)).toEqual(Option.none())
+    expect(slashQueryAt({ text: "/@Sara", mentions: [{ memberId: aliceId, from: 1, to: 6 }] }, 6)).toEqual(
+      Option.none()
     )
   })
 })

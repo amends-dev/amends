@@ -8,6 +8,7 @@ import { Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import {
+  aliceInGeneral,
   aliceOwns,
   bobIsMember,
   bob,
@@ -44,7 +45,7 @@ import { LoadModels } from "../../feature/agents/command.ts"
 import { Written as AgentWritten } from "../../feature/agents/definition.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
-import { ReadDraft } from "../../feature/composer/command.ts"
+import { ReadDraft, SaveDraft } from "../../feature/composer/command.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { CheckConnection } from "../../feature/connections/command.ts"
 import {
@@ -53,7 +54,8 @@ import {
   startConfiguring,
   Written as ConnectionWritten
 } from "../../feature/connections/definition.ts"
-import type { GroupBlock } from "../../feature/group/block.ts"
+import { GroupBlock } from "../../feature/group/block.ts"
+import { FollowGroup, UnfollowGroup } from "../../feature/group/command.ts"
 import { ThreadBinding as GroupThreadBinding, ThreadsBinding } from "../../feature/group/composition.ts"
 import { init as initGroup } from "../../feature/group/init.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
@@ -69,6 +71,7 @@ import { TasksBlock } from "../../feature/tasks/block.ts"
 import { TurnsBinding } from "../../feature/thread/composition.ts"
 import { init as initThread } from "../../feature/thread/init.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
+import { ComposerBinding as ThreadsComposerBinding } from "../../feature/threads/composition.ts"
 import { TurnsBlock } from "../../feature/turns/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { LoadIntegrations } from "./command.ts"
@@ -1744,6 +1747,58 @@ describe("a workspace, when the settings of the agent whose turn failed are aske
         expect(model.home.inbox.selected).toEqual(Option.none())
         expect(isThreadOpen(model.home)).toBe(false)
       })
+    )
+  })
+})
+
+/** What the open group's composer reports, as the workspace receives it. */
+const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
+  fromThreads(
+    ThreadsComposerBinding.embedView({
+      slotId: "composer",
+      model: openGroupModel.threads.composer,
+      viewInputs: { placeholder: "Message #General", members: [] }
+    }).toParentMessage(message)
+  )
+
+/** The person types `words` in the open group's composer, which keeps the draft, and picks the command `command`. */
+const ranSlashCommand = (words: string, command: "follow" | "unfollow") => [
+  message(fromComposer(ComposerBlock.Message.TypedText({ text: words }))),
+  Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+  message(fromComposer(ComposerBlock.Message.PickedSlashCommand({ command })))
+]
+
+describe("the workspace with a group open running the slash commands of its composer", () => {
+  it("confirms in a toast that the person followed the group or stopped, naming where it is, and stays put", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(
+        fromGroup(
+          GroupBlock.Message.ReceivedGroup({
+            group: Option.some({ group: general, pending: false }),
+            memberships: [{ membership: aliceInGeneral, pending: false }],
+            follow: Option.none()
+          })
+        )
+      ),
+      ...ranSlashCommand("/fol", "follow"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(FollowGroup, GroupBlock.Message.WroteAction()),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Following #General", offer: Option.none() }])
+        expect(HomeOpen.isAnyOf(["Group"])(model.home.open)).toBe(true)
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      ...ranSlashCommand("/unf", "unfollow"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(UnfollowGroup, GroupBlock.Message.WroteAction()),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Unfollowed #General", offer: Option.none() }])
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 }))
     )
   })
 })

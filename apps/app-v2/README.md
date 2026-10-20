@@ -166,6 +166,17 @@ is pressed while it is shown; the toolbar starts hidden in a window as narrow as
 each composer follows through its own subscription `WatchViewport`, until the person chooses, and then keeps
 their choice. The keys work while the toolbar is hidden.
 
+A draft that is only a slash and some letters, `/fol`, lists the slash commands the composer's holder offers, as
+a list named "Commands" in the look of the mentions' list, each row its name, such as `/follow`, and what it does after
+it, such as "Follow #general to take part in its new threads" (`slashQueryAt`; `OfferedSlashCommand`, the view input
+`commands`, none unless given). The letters narrow the list to the commands whose name starts with them, whatever their
+case, and the arrows, Enter or Tab, and Escape work as they do for mentions. A slash later in the text, after other
+words or a picked mention, or a draft that is read, lists nothing. Picking a command does not send the draft: it empties
+it, as sending does, and the composer reports `RanSlashCommand` with the command's name, `follow`, `unfollow`, or `rename`
+(`SlashCommand`), for whoever holds it to do. With no command offered, or none that fits the letters, the draft is a
+message like any other and Enter sends it. Only the group's composer on its Threads tab is given commands, as in
+`apps/ui`; a reply, a conversation, and the Tasks tab, which starts a task, are given none.
+
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
 turns its timeline embeds are the design's `turnRow`s, each its agent's mark and name with a `turnStatus` for how it
@@ -261,7 +272,9 @@ below it counted at each level above.
   (`ClickedFormattingToggle`; `isFormattingShown`, from the person's choice and the window's width, which the Block's
   subscription `WatchViewport` keeps current); a button reads the selection (`ChoseFormat`, `ReadSelection`) and the
   answer is formatted by `applyFormat` in `format.ts`, which says how each format writes its markdown, and the Block
-  keeps the draft and selects what was formatted (`SelectText`).
+  keeps the draft and selects what was formatted (`SelectText`). A draft that is only a slash and letters lists the
+  slash commands the view is given (`commands`, none unless given) as the list "Commands", and picking one
+  (`PickedSlashCommand`) empties the draft and reports `RanSlashCommand` in place of `SubmittedText`.
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
   part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
   composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
@@ -507,7 +520,9 @@ below it counted at each level above.
   pane's footer, whose box is named and shows "Message #general" for a team and "Message Bob" for a conversation
   until the person writes. On the Tasks tab it starts a thread that tracks a task, in triage: its box is named and
   shows "New task in #general", or "New task in Bob" for a conversation, which `apps/ui`'s Tasks tab has no composer
-  to word. The button says Send on both. The draft is the same on both tabs.
+  to word. The button says Send on both. The draft is the same on both tabs. Given the slash commands to offer
+  (`commands` in its view inputs), `composerView` passes them to the composer on the Threads tab only, and the composer
+  reports one run as `RanSlashCommand`, which the Block passes on as it is (`forward`), starting no thread.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
@@ -516,7 +531,16 @@ below it counted at each level above.
   hold the side pane in step, and `OpenedAgent` when they ask, from a turn that failed in the thread, for the settings
   of its agent; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
-  settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. It
+  settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. The
+  composer of its threads offers the slash commands of a team the person belongs to (`slashCommandsOf`): `/follow`,
+  "Follow #general to take part in its new threads", while they do not follow it, `/unfollow`, "Stop following
+  #general", while they do, neither while a change to their follow is on its way, as the bell is unavailable then,
+  and `/rename`, "Rename #general", where they may rename the team; a conversation is offered none, as in `apps/ui`.
+  Running one does what the bell and the settings' button do: `/follow` and `/unfollow` write the follow
+  (`FollowGroup`, `UnfollowGroup`) and report `FollowedGroup` or `UnfollowedGroup` with where the group is as a line
+  says it, for the page to confirm with "Following #general" or "Unfollowed #general", which the bell itself does not
+  report, as in `apps/ui`; `/rename` opens the settings on General (`openSettings`, as the settings' button does),
+  where the name field takes the focus and holds the team's name, for someone who may rename it. It
   has two views. `view`, its canonical one, is the group's main pane, anchored to the bottom while it lists threads, as
   the threads Block's `showsConversation` says, and to the top otherwise, titled by its name, with the drawing of a
   channel before it for a team and of a message for a conversation, as `apps/ui` marks them, and the workspace's name
@@ -1088,7 +1112,7 @@ below it counted at each level above.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it, shown as the design's `toast`s in its `toastStack` over the shell's bottom end
   corner, with Dismiss; and what the page confirms to the person that they did, which a Block reports and the page
-  hands it with `confirm`, such as "Name saved" or, for a group joined from the browse page, "Joined #launches", or for one created, "Group created", shown as the design's `confirmation`s in its `confirmationStack`,
+  hands it with `confirm`, such as "Name saved" or, for a group joined from the browse page, "Joined #launches", or for one created, "Group created", or, for the open group followed or stopped by a slash command, "Following #general" and "Unfollowed #general", shown as the design's `confirmation`s in its `confirmationStack`,
   centered at the bottom of the window, 24px above its edge and any home indicator, each with a check before its
   words, no Dismiss, and at most one thing it offers to do next. A confirmation goes by itself after five seconds
   (`ExpireConfirmation`, which waits with `Effect.sleep`, so a test moves the clock), each under an ID of its own
@@ -1359,7 +1383,9 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   its dialog and the card without closing the thread. The Block reports `Navigated` when the person moved within it,
   from the sidebar's Inbox, Triage, Tasks, and Browse groups, a group picked, or a task's thread opened, so the page
   closes the navigation drawer and the side pane's dialog and shows Home. It reports `JoinedGroup` too, from the groups
-  Block's, for the page to confirm to the person with the offer to open the group; joining moves nowhere. A group the
+  Block's, for the page to confirm to the person with the offer to open the group; joining moves nowhere. The open
+  group's `FollowedGroup` and `UnfollowedGroup` it reports as they are, keyed to the group, for the page to confirm;
+  following moves nowhere either. A group the
   person created, which the groups Block reports as `CreatedGroup`, Home opens without a thread, as picking it does, and
   reports as it is, for the page to confirm. The settings of an agent that a thread's turn asked for, which the open
   group and the inbox report as `OpenedAgent`, Home reports as they are, for the page to open the agent's page. The page
@@ -1611,14 +1637,20 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   selected, after a space or not, and formatting: each format's markdown, taken off again, for a caret and for
   a selection, for several lines and for a mention among them, a link with its address selected, the keys that ask
   for each and the ones left to the browser, the toolbar shown at first, hidden by its button and on a phone until the
-  person chooses; a thread's message loaded for editing with its mentions as names, saved as the
+  person chooses, and slash commands: listed for a draft that is only a slash and letters up to the caret, and not for
+  a space, other words, a mention, or a draft read, narrowed by the letters, run by Enter, Tab, or a click, which empty
+  the draft and report the command, closed on Escape for the letters, and offered to a composer only when it is given
+  some; a thread's message loaded for editing with its mentions as names, saved as the
   links, and as plain text once the name is edited, and `mentions.ts`: a markdown text read as text and spans and
   written back, whatever is escaped in a name, a range replaced, and an edit found by comparing the text before and
   after it, and a mention picked; a group
   opening its settings on General, with the draft of the team's name started only for someone who
   may rename it, renamed from the name seen, writing nothing when the name is unchanged, and closing
   its settings, which drop their drafts, whichever way they close, and close of themselves when the group is no
-  longer there; followed, left from its settings, which stay open, or joined, the members chosen to admit one at a
+  longer there; running the slash commands its composer offers, following and stopping as the bell does and reporting
+  it with where the group is, and renaming by opening the settings on General, offered to a member of a team who does
+  not follow it, who does, and who may rename it, and not in a conversation, to a member the team does not hold, while
+  the group is unread, nor on the Tasks tab; followed, left from its settings, which stay open, or joined, the members chosen to admit one at a
   time, once each and only from those who can be admitted, taken off again, and admitted in one command with a write
   for each, the phone's own view for it opened and left, and an admission removed,
   and the thread picked opened and closed, each reported, open already as the group opens without a
@@ -1784,7 +1816,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   open and chosen to show the tasks as rows by their assignee, title, who started them, replies, status,
   and age, latest active first, narrowed by search and by the status and assignee menus, ordered by the sort menu,
   with the menus in the toolbar's order and New task at its end, saying there are none yet or that none
-  match, opening a thread by its row, and a task started from the composer, named for the task; a composer, named and worded for the place it writes to, sending on Enter and not on Shift+Enter, nor while
+  match, opening a thread by its row, and a task started from the composer, named for the task, given the slash commands on the
+  Threads tab only, and reporting the one run, starting no thread; a composer, named and worded for the place it writes to, sending on Enter and not on Shift+Enter, nor while
   suggestions are open, which Enter picks from, and with a Send that waits for words, listing, up to eight, the members
   with a word of their names starting with the letters after the "@" that ends the text, accents and case aside, and not
   the person, each with its mark in its tone, saying which is active and

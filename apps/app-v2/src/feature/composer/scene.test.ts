@@ -1,3 +1,4 @@
+import { GroupId } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
@@ -667,6 +668,163 @@ describe("a composer formatting its text", () => {
       Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
       Command.resolve(SelectText, Message.CompletedSelectText()),
       expect(typingReply).toHaveValue("**hello**")
+    )
+  })
+})
+
+const thread = Drafts.Place.cases.Thread.make({ groupId: GroupId.GroupId.make("group-1") })
+
+const startingThread = init(workspaceId, memberId, thread).model
+
+const commandsView = withViewInputs(view, {
+  placeholder: "Message #general",
+  members: [membership.member, bob],
+  commands: [
+    { command: "follow", description: "Follow #general to take part in its new threads" },
+    { command: "rename", description: "Rename #general" }
+  ]
+})()
+
+const messageGeneral = label("Message #general")
+
+const savedThreadDraft = (text: string) => SaveDraft({ workspaceId, memberId, place: thread, text })
+
+/** The textarea's draft is kept as the person types it. */
+const typedGeneral = (text: string) => [
+  type(messageGeneral, text),
+  Command.expectExact(savedThreadDraft(text)),
+  Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+]
+
+describe("a composer offering slash commands", () => {
+  it("lists the commands it is given for a draft that is only a slash, named Commands, with what each does", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      expect(role("listbox", { name: "Commands" })).toBeAbsent(),
+      ...typedGeneral("/"),
+      expect(role("listbox", { name: "Commands" })).toHaveId("thread-group-1-commands"),
+      expectAll(all.role("option")).toHaveCount(2),
+      expect(within(role("listbox"), text("/follow"))).toExist(),
+      expect(within(role("listbox"), text("Follow #general to take part in its new threads"))).toExist(),
+      expect(within(role("listbox"), text("/rename"))).toExist(),
+      expect(within(role("listbox"), text("Rename #general"))).toExist(),
+      expect(role("textbox", { name: "Message #general" })).toHaveAttr("aria-autocomplete", "list"),
+      expect(role("textbox", { name: "Message #general" })).toHaveAttr("aria-controls", "thread-group-1-commands")
+    )
+  })
+
+  it("narrows the list to the commands whose name starts with the letters, in any case, and closes it for none", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      ...typedGeneral("/RE"),
+      expectAll(all.role("option")).toHaveCount(1),
+      expect(within(role("listbox"), text("/rename"))).toExist(),
+      ...typedGeneral("/fo"),
+      expectAll(all.role("option")).toHaveCount(1),
+      expect(within(role("listbox"), text("/follow"))).toExist(),
+      ...typedGeneral("/x"),
+      expect(role("listbox")).toBeAbsent(),
+      ...typedGeneral("/fol more"),
+      expect(role("listbox")).toBeAbsent(),
+      ...typedGeneral("Hi /fol"),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("lists none of the people to mention for a slash, and none of the commands for an @", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      ...typedGeneral("@"),
+      expect(role("listbox", { name: "People to mention" })).toExist(),
+      expect(role("listbox", { name: "Commands" })).toBeAbsent(),
+      ...typedGeneral("/"),
+      expect(role("listbox", { name: "People to mention" })).toBeAbsent(),
+      expect(role("listbox", { name: "Commands" })).toExist()
+    )
+  })
+
+  it("moves among the commands with the arrows and picks the active one with Enter, which empties the draft", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      ...typedGeneral("/"),
+      expect(role("option", { name: /follow/u })).toHaveAttr("aria-selected", "true"),
+      keydown(messageGeneral, "ArrowDown"),
+      expectHandled(),
+      expect(role("option", { name: /rename/u })).toHaveAttr("aria-selected", "true"),
+      expect(role("textbox", { name: "Message #general" })).toHaveAttr(
+        "aria-activedescendant",
+        "thread-group-1-commands-rename"
+      ),
+      keydown(messageGeneral, "ArrowDown"),
+      expect(role("option", { name: /follow/u })).toHaveAttr("aria-selected", "true"),
+      keydown(messageGeneral, "ArrowUp"),
+      expect(role("option", { name: /rename/u })).toHaveAttr("aria-selected", "true"),
+      keydown(messageGeneral, "Enter"),
+      expectHandled(),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "rename" })),
+      Command.expectExact(savedThreadDraft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(messageGeneral).toHaveValue(""),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("picks the active command with Tab too, and sends nothing", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      ...typedGeneral("/fol"),
+      keydown(messageGeneral, "Tab"),
+      expectHandled(),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "follow" })),
+      Command.expectExact(savedThreadDraft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(messageGeneral).toHaveValue("")
+    )
+  })
+
+  it("closes the list on Escape and leaves the draft as it was, to be sent", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      ...typedGeneral("/fol"),
+      keydown(messageGeneral, "Escape"),
+      expect(role("listbox")).toBeAbsent(),
+      expect(messageGeneral).toHaveValue("/fol"),
+      keydown(messageGeneral, "Enter"),
+      expectOutMessage(OutMessage.SubmittedText({ text: "/fol" })),
+      Command.expectExact(savedThreadDraft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+    )
+  })
+
+  it("runs the command whose row is clicked", () => {
+    scene(
+      { update, view: commandsView },
+      given(startingThread),
+      ...typedGeneral("/"),
+      click(within(role("listbox"), text("/follow"))),
+      expectOutMessage(OutMessage.RanSlashCommand({ command: "follow" })),
+      Command.expectExact(savedThreadDraft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(messageGeneral).toHaveValue("")
+    )
+  })
+
+  it("sends a slash as text where it is given no commands", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("/"),
+      expect(role("listbox")).toBeAbsent(),
+      keydown(typingReply, "Enter"),
+      expectOutMessage(OutMessage.SubmittedText({ text: "/" })),
+      Command.expectExact(draft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
     )
   })
 })

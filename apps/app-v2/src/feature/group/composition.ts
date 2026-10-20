@@ -1,13 +1,27 @@
 import { ThreadId } from "@amends-dev/core/thread"
 import { DialogBlock } from "@foldkit/ui/dialog"
+import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { MembersComboboxBlock } from "../../memberPicker.ts"
+import type { SlashCommand } from "../composer/definition.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ThreadsBlock } from "../threads/block.ts"
-import { admitMembersId, chooseToAdmit, GroupDefinition, type Model, OutMessage } from "./definition.ts"
+import { FollowGroup, UnfollowGroup } from "./command.ts"
+import {
+  admitMembersId,
+  chooseToAdmit,
+  GroupDefinition,
+  inGroup,
+  mayRename,
+  type Model,
+  OutMessage,
+  placeOf,
+  type SettingsTab,
+  teamName
+} from "./definition.ts"
 
 /** Open the thread `threadId` in the group. */
 export const openThread = (threadId: ThreadId.ThreadId) =>
@@ -19,14 +33,67 @@ export const openThread = (threadId: ThreadId.ThreadId) =>
     })
   )
 
-/** Picking a thread opens it in the group. */
+/** Show the settings' section `tab`. */
+const showSettingsTab = (tab: SettingsTab) => GroupDefinition.stepFields(() => ({ settingsTab: () => tab }))
+
+/** Start the draft of the team's name from its name, for someone who may rename the team, so its field is live. */
+const startRenaming = GroupDefinition.step((model: Model) => ({
+  model: mayRename(model) ? modifyFields(model, { renaming: () => teamName(model) }) : model
+}))
+
+/** Open the settings' section `tab`, with the draft of the team's name started for someone who may rename it. */
+export const openSettings = (tab: SettingsTab) =>
+  Update.combine([showSettingsTab(tab), startRenaming, DialogBinding.requestOpen()])
+
+/**
+ * Follow the group as the bell does, and report it, with where the group is, for the page to confirm; nothing happens
+ * before the group is read.
+ */
+const followBySlashCommand = GroupDefinition.step((model: Model) =>
+  Option.match(placeOf(model), {
+    onNone: () => ({ model }),
+    onSome: (place) => ({
+      model,
+      commands: [FollowGroup(inGroup(model))],
+      outMessage: OutMessage.FollowedGroup({ place })
+    })
+  })
+)
+
+/** Stop following the group as the bell does, and report it. */
+const unfollowBySlashCommand = GroupDefinition.step((model: Model) =>
+  Option.match(placeOf(model), {
+    onNone: () => ({ model }),
+    onSome: (place) => ({
+      model,
+      commands: [UnfollowGroup(inGroup(model))],
+      outMessage: OutMessage.UnfollowedGroup({ place })
+    })
+  })
+)
+
+/** Run the slash command the person picked in the composer, as the bell and the settings' button do. */
+const runSlashCommand = (command: SlashCommand) =>
+  Match.value(command).pipe(
+    Match.when("follow", () => followBySlashCommand),
+    Match.when("unfollow", () => unfollowBySlashCommand),
+    Match.when("rename", () => openSettings("General")),
+    Match.exhaustive
+  )
+
+/** Picking a thread opens it in the group, and a slash command picked runs. */
 const foldThreadsOutMessage = ThreadsBlock.OutMessage.match({
-  SelectedThread: ({ threadId }) => openThread(threadId)
+  SelectedThread: ({ threadId }) => openThread(threadId),
+  RanSlashCommand: ({ command }) => runSlashCommand(command)
 })
 
-/** Picking a thread, which opens it, is reported to the group's parent as the thread opening. */
+/**
+ * Picking a thread, which opens it, is reported to the group's parent as the thread opening. What the slash commands
+ * report is said when they run.
+ */
 const forwardThreadsOutMessage = ThreadsBlock.OutMessage.match({
-  SelectedThread: () => OutMessage.OpenedThread()
+  SelectedThread: () => OutMessage.OpenedThread(),
+  RanSlashCommand: () => undefined
 })
 
 export const ThreadsBinding = GroupDefinition.bindChild(ThreadsBlock, {

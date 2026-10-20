@@ -223,21 +223,29 @@ export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
 })
 
 /**
- * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it. The
- * settings of an agent that its thread's turn asked for are the page's to open, which Home reports as they are.
+ * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it.
+ * Following the group and stopping, and the settings of an agent its thread's turn asked for, change nothing in Home.
  */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
     OpenedThread: () => showAside,
     ClosedThread: () => hideAside,
-    OpenedAgent: () => HomeDefinition.stepNoop()
+    OpenedAgent: () => HomeDefinition.stepNoop(),
+    FollowedGroup: () => HomeDefinition.stepNoop(),
+    UnfollowedGroup: () => HomeDefinition.stepNoop()
   })
 
+/**
+ * What the open group reports for the page is reported as it is: the settings of an agent its thread's turn asked for,
+ * which the page opens, and the group being followed, or no longer, which the page confirms.
+ */
 const forwardGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
     OpenedThread: () => undefined,
     ClosedThread: () => undefined,
-    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
+    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+    FollowedGroup: ({ place }) => OutMessage.FollowedGroup({ place }),
+    UnfollowedGroup: ({ place }) => OutMessage.UnfollowedGroup({ place })
   })
 
 /**

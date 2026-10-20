@@ -3,7 +3,8 @@
  * created, each with its opening message, who replied to it, the task it tracks, and how much of it is new; and the
  * ones that track a task, as a table the person narrows by status, by assignee, and by what they search for, and sorts
  * by latest activity or by when the thread was started. A composer starts a thread, or on the Tasks tab a thread that
- * tracks a task, which the Tasks tab's New task moves the focus to. It reports the thread the person picks.
+ * tracks a task, which the Tasks tab's New task moves the focus to. It reports the thread the person picks, and the
+ * slash command they run in the composer.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -22,6 +23,7 @@ import { AgentAtWork } from "../../agentActivity.ts"
 import { type Day, groupByDay, isOpen, isStackedUnder, type Stackable, threadContains } from "../../seen.ts"
 import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
+import { SlashCommand } from "../composer/definition.ts"
 
 /**
  * A thread of the group, with its opening message, its task, how many messages follow the opening and who wrote
@@ -108,7 +110,8 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
-  SelectedThread: { threadId: ThreadId.ThreadId }
+  SelectedThread: { threadId: ThreadId.ThreadId },
+  RanSlashCommand: { command: SlashCommand }
 })
 export type OutMessage = typeof OutMessage.Type
 

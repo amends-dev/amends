@@ -18,10 +18,12 @@ import {
   click,
   expect,
   expectAll,
+  expectNoOutMessage,
   expectOutMessage,
   focus,
   given,
   inside,
+  keydown,
   label,
   nth,
   role,
@@ -54,6 +56,9 @@ import {
 } from "../../../test/fixtures.ts"
 import { pickerClosed, pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { panelIs } from "../../../test/panelSize.ts"
+import * as Drafts from "../../store/Drafts.ts"
+import { ComposerBlock } from "../composer/block.ts"
+import { SaveDraft } from "../composer/command.ts"
 import { ThreadBlock } from "../thread/block.ts"
 import { ScrollMessagesToEnd } from "../thread/command.ts"
 import { ThreadsBlock } from "../threads/block.ts"
@@ -1714,6 +1719,153 @@ describe("the size of the group's dialogs, as @amends-dev/ui gives it", () => {
         expect(role("button", { name: "Cancel" })).toHaveClass("border-outline"),
         expect(role("button", { name: "Cancel" })).toHaveClass("bg-action-secondary"),
         expect(role("button", { name: "Cancel" })).not.toHaveClass("bg-transparent")
+      )
+    )
+  })
+})
+
+const designDraftPlace = Drafts.Place.cases.Thread.make({ groupId: design.id })
+
+/** The draft at the group's composer emptied, as running a command does. */
+const emptiedDraft = SaveDraft({ workspaceId: workspace.id, memberId: member.id, place: designDraftPlace, text: "" })
+
+/** The person types `words` in the group's composer, whose draft is kept. */
+const typedInComposer = (words: string) => [
+  type(label("Message #Design"), words),
+  Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft())
+]
+
+/** The team the person follows. */
+const followingDesign = modifyFields(openedToRename, {
+  follow: () => Option.some({ follow: followOfDesign, pending: false })
+})
+
+describe("a group's composer offering commands", () => {
+  it("offers following to a member who does not follow the team, and renaming only if they may rename it", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...typedInComposer("/"),
+      expect(role("listbox", { name: "Commands" })).toExist(),
+      expectAll(all.role("option")).toHaveCount(1),
+      expect(within(role("listbox"), text("/follow"))).toExist(),
+      expect(within(role("listbox"), text("Follow #Design to take part in its new threads"))).toExist()
+    )
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...typedInComposer("/"),
+      expectAll(all.role("option")).toHaveCount(2),
+      expect(within(role("listbox"), text("/follow"))).toExist(),
+      expect(within(role("listbox"), text("/rename"))).toExist(),
+      expect(within(role("listbox"), text("Rename #Design"))).toExist()
+    )
+  })
+
+  it("offers stopping in place of following to a member who follows the team", () => {
+    scene(
+      { update, view },
+      given(followingDesign),
+      ...typedInComposer("/"),
+      expectAll(all.role("option")).toHaveCount(2),
+      expect(within(role("listbox"), text("/unfollow"))).toExist(),
+      expect(within(role("listbox"), text("Stop following #Design"))).toExist(),
+      expect(within(role("listbox"), text("/follow"))).toBeAbsent(),
+      expect(within(role("listbox"), text("/rename"))).toExist()
+    )
+  })
+
+  it("offers neither while a change to the follow is on its way, as the bell is unavailable", () => {
+    scene(
+      { update, view },
+      given(modifyFields(openedToRename, { follow: () => Option.some({ follow: followOfDesign, pending: true }) })),
+      expect(role("button", { name: "Following" })).toBeDisabled(),
+      ...typedInComposer("/"),
+      expectAll(all.role("option")).toHaveCount(1),
+      expect(within(role("listbox"), text("/rename"))).toExist()
+    )
+    scene(
+      { update, view },
+      given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: true }) })),
+      ...typedInComposer("/"),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("narrows to the commands the letters start, and offers none for letters that start none", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...typedInComposer("/re"),
+      expectAll(all.role("option")).toHaveCount(1),
+      expect(within(role("listbox"), text("/rename"))).toExist(),
+      ...typedInComposer("/x"),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("offers none in a conversation, nor on the Tasks tab, which starts a task", () => {
+    scene(
+      { update, view },
+      given(openedConversation),
+      type(label("Message Bob"), "/"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      expect(role("listbox")).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(openedToRename),
+      click(role("tab", { name: "Tasks" })),
+      type(label("New task in #Design"), "/"),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("follows the team when /follow is picked, as the bell does, clears the draft, and reports it", () => {
+    scene(
+      { update, view },
+      given(opened),
+      ...typedInComposer("/fol"),
+      keydown(label("Message #Design"), "Enter"),
+      expectOutMessage(OutMessage.FollowedGroup({ place: "#Design" })),
+      Command.expectExact(emptiedDraft, FollowGroup(inDesign)),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(FollowGroup, Message.WroteAction()),
+      expect(label("Message #Design")).toHaveValue(""),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("stops following the team when /unfollow is picked, and reports it", () => {
+    scene(
+      { update, view },
+      given(followingDesign),
+      ...typedInComposer("/unf"),
+      click(within(role("listbox"), text("/unfollow"))),
+      expectOutMessage(OutMessage.UnfollowedGroup({ place: "#Design" })),
+      Command.expectExact(emptiedDraft, UnfollowGroup(inDesign)),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      Command.resolve(UnfollowGroup, Message.WroteAction()),
+      expect(label("Message #Design")).toHaveValue("")
+    )
+  })
+
+  it("opens the settings at the name when /rename is picked, with the name ready to change, and reports nothing", () => {
+    scene(
+      { update, view },
+      given(openedToRename),
+      ...typedInComposer("/ren"),
+      keydown(label("Message #Design"), "Tab"),
+      expectNoOutMessage(),
+      Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
+      ...dialogOpened(),
+      expect(label("Message #Design")).toHaveValue(""),
+      inside(
+        role("dialog", { name: "Group settings" }),
+        expect(role("tab", { name: "General" })).toHaveAttr("aria-selected", "true"),
+        expect(label("Group name")).toHaveValue("Design"),
+        expect(label("Group name")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
       )
     )
   })

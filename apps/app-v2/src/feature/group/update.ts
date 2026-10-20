@@ -11,30 +11,18 @@ import {
   RenameGroup,
   UnfollowGroup
 } from "./command.ts"
-import { closeThread, DialogBinding, GroupComposition, MembersBinding } from "./composition.ts"
+import { closeThread, DialogBinding, GroupComposition, MembersBinding, openSettings } from "./composition.ts"
 import {
   chooseToAdmit,
   GroupDefinition,
+  inGroup,
   Message,
   type Model,
-  mayRename,
   OutMessage,
   ownAdmission,
-  type SettingsTab,
   teamName,
   unchooseToAdmit
 } from "./definition.ts"
-
-/** Whose store the action is written to, and the group it acts on. */
-const inGroup = ({ workspaceId, memberId, groupId }: Model) => ({ workspaceId, memberId, groupId })
-
-/** Show the settings' section `tab`. */
-const showSettingsTab = (tab: SettingsTab) => GroupDefinition.stepFields(() => ({ settingsTab: () => tab }))
-
-/** Start the draft of the team's name from its name, for someone who may rename the team, so its field is live. */
-const startRenaming = GroupDefinition.step((model: Model) => ({
-  model: mayRename(model) ? modifyFields(model, { renaming: () => teamName(model) }) : model
-}))
 
 /** Write the draft of the team's name, unless it is the name the team has. */
 const writeRenamingWhenChanged = GroupDefinition.step((model: Model) =>
@@ -72,10 +60,8 @@ export const update = GroupComposition.makeUpdate((model, message) =>
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
     }),
-    ClickedSettings: () =>
-      Update.combine(model, [showSettingsTab("General"), startRenaming, DialogBinding.requestOpen()]),
-    ClickedMembers: () =>
-      Update.combine(model, [showSettingsTab("Members"), startRenaming, DialogBinding.requestOpen()]),
+    ClickedSettings: () => Update.combine(model, [openSettings("General")]),
+    ClickedMembers: () => Update.combine(model, [openSettings("Members")]),
     ChoseSettingsTab: ({ tab }) => ({ model: modifyFields(model, { settingsTab: () => tab }) }),
     TypedName: ({ name }) => ({ model: modifyFields(model, { renaming: () => Option.some(name) }) }),
     SubmittedRename: () => Update.combine(model, [writeRenamingWhenChanged, DialogBinding.requestClose()]),
