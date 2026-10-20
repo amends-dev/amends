@@ -1,11 +1,12 @@
 /**
- * The workspace, its members, roles, role assignments, and invitations, and what the person may
- * do, read from their store as they change.
+ * The workspace, its members, roles, and role assignments, and what the person may do, read from
+ * their store as they change.
  */
 
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
@@ -18,34 +19,36 @@ export const readSettings = (store: Store.Store["Service"]) =>
     store.list("Member", Store.workspacePlace),
     store.list("Role", Store.workspacePlace),
     store.list("Assignment", Store.workspacePlace),
-    store.list("Invitation", Store.workspacePlace),
     store.grants
   ).pipe(
-    Stream.map(([workspaces, members, roles, assignments, invitations, grants]) =>
+    Stream.map(([workspaces, members, roles, assignments, grants]) =>
       Message.ReceivedSettings({
         workspace: Option.map(Array.head(workspaces), ({ record, pending }) => ({ workspace: record.value, pending })),
         members: members.map(({ record, pending }) => ({ member: record.value, pending })),
         roles: roles.map(({ record }) => record.value),
         assignments: assignments.map(({ record, pending }) => ({ assignment: record.value, pending })),
-        invitations: invitations.map(({ record, pending }) => ({ invitation: record.value, pending })),
         grants
       })
     )
   )
 
+/**
+ * The settings are read once the Block opens, and again each time the person asks to refresh them, which a failed read
+ * leaves them to ask for.
+ */
 export const subscriptions = SettingsDefinition.subscriptions((entry) => ({
   settings: entry(
     "ReadSettings",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
     {
       messages: [Message.ReceivedSettings, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
+      modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId }) =>
           stores
             .read(workspaceId, memberId, readSettings)
-            .pipe(Stream.catchCause(() => Stream.make(Message.FailedRead({ error: Stores.unreadable }))))
+            .pipe(Stream.catchCause(() => Stream.make(Message.FailedRead())))
       }
     }
   )

@@ -21,6 +21,7 @@ import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import { threadView as inboxThreadView } from "../../feature/inbox/view.ts"
+import { memberView as settingsMemberView, membersView as settingsMembersView } from "../../feature/settings/view.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../feature/tasks/view.ts"
 import {
@@ -39,7 +40,7 @@ import {
   WorkspaceComposition,
   type WorkspaceViewBuilder
 } from "./composition.ts"
-import { Message, type Model, nameOf, Open, openThreadTitle } from "./definition.ts"
+import { Message, type Model, nameOf, Open, openThreadTitle, type SettingsPage } from "./definition.ts"
 
 /**
  * Who is signed in, which the sidebar's footer shows beside the way to sign out, the time now, which the
@@ -150,21 +151,31 @@ const connectionsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArr
   )
 ]
 
-/** The settings' section of the sidebar: the workspace's and its members', which both open the settings. */
-const settingsSections = (h: WorkspaceViewBuilder): ReadonlyArray<Html> => [
-  sidebarSection(h, {
-    label: "Settings",
-    children: [
-      sidebarItem(h, {
-        icon: "mark-settings",
-        label: "Workspace",
-        isCurrent: false,
-        onClick: Message.ClickedWorkspace()
-      }),
-      sidebarItem(h, { icon: "users", label: "Members", isCurrent: false, onClick: Message.ClickedMembers() })
-    ]
-  })
-]
+/** The settings' section of the sidebar: the workspace's page and the members', each current while it shows. */
+const settingsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => {
+  const isOnPage = (page: SettingsPage) =>
+    Open.matchOrElse(model.open, { Settings: (open) => open.page === page }, () => false)
+
+  return [
+    sidebarSection(h, {
+      label: "Settings",
+      children: [
+        sidebarItem(h, {
+          icon: "mark-settings",
+          label: "Workspace",
+          isCurrent: isOnPage("Workspace"),
+          onClick: Message.ClickedWorkspace()
+        }),
+        sidebarItem(h, {
+          icon: "users",
+          label: "Members",
+          isCurrent: isOnPage("Members"),
+          onClick: Message.ClickedMembers()
+        })
+      ]
+    })
+  ]
+}
 
 /** The sections of the sidebar that belong to the destination open, Home's for every one that is Home's. */
 const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> =>
@@ -176,7 +187,7 @@ const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArr
       Connections: () => connectionsSections(model, h),
       Connection: () => connectionsSections(model, h),
       Channels: () => connectionsSections(model, h),
-      Settings: () => settingsSections(h)
+      Settings: () => settingsSections(model, h)
     },
     () => homeSections(model, h)
   )
@@ -258,7 +269,12 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
           viewInputs: { agentId, workspaceName: nameOf(model) }
         })
       ),
-    Settings: () => h.block(SettingsBinding.embedView({ slotId: "settings", model: model.settings })),
+    Settings: ({ page }) =>
+      page === "Workspace"
+        ? h.block(SettingsBinding.embedView({ slotId: "settings-workspace", model: model.settings }))
+        : h.block(
+            SettingsBinding.embedView({ slotId: "settings-members", model: model.settings, view: settingsMembersView })
+          ),
     Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
     Group: ({ groupId, model: open }) =>
       h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open, viewInputs: { now } }))
@@ -267,7 +283,10 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
 /** What the side pane is called, which names the dialog that holds it, and what it shows. */
 type Aside = Readonly<{ label: string; view: Html }>
 
-/** The side pane: the thread open, in the group open or beside the inbox, while there is one, given the time now. */
+/**
+ * The side pane: the thread open, in the group open or beside the inbox, or the member open in the settings, while
+ * there is one, given the time now.
+ */
 const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Option.Option<Aside> =>
   Open.matchOrElse(
     model.open,
@@ -297,6 +316,19 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
                   model: open,
                   view: groupThreadView,
                   viewInputs: { now }
+                })
+              )
+            })
+          : Option.none(),
+      Settings: ({ memberId }) =>
+        Option.isSome(memberId)
+          ? Option.some({
+              label: "Member details",
+              view: h.block(
+                SettingsBinding.embedView({
+                  slotId: "settings-member",
+                  model: model.settings,
+                  view: settingsMemberView
                 })
               )
             })

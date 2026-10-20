@@ -8,6 +8,7 @@ import { Command, expectOutMessage, given, message, model, story } from "foldkit
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
+  bobIsMember,
   bob,
   connectionOf,
   connectionTo,
@@ -24,6 +25,7 @@ import {
   reply,
   reviewer,
   reviewerAgent,
+  roles,
   scout,
   scoutAgent,
   searchApi,
@@ -58,7 +60,6 @@ import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Result } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
-import { Renaming as SettingsRenaming } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
@@ -77,7 +78,7 @@ import {
   SettingsBinding,
   TasksBinding
 } from "./composition.ts"
-import { isThreadOpen, Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
+import { isThreadOpen, Message, Open, OutMessage, openMemberId, openThreadTitle } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -331,6 +332,18 @@ const receivedTask = message(
 )
 
 const atDesktop = init(workspaceId, memberId, "Studio", "Desktop").model
+
+/** The settings read as alice reads them, who owns the workspace, bob being a member of it. */
+const settingsRead = modifyFields(opened, {
+  settings: (settings) =>
+    modifyFields(settings, {
+      workspace: () => Option.some({ workspace: membership.workspace, pending: false }),
+      members: () => [membership.member, bob].map((member) => ({ member, pending: false })),
+      roles: () => roles,
+      assignments: () => [aliceOwns, bobIsMember].map((assignment) => ({ assignment, pending: false })),
+      grants: () => grantsOf([aliceOwns])
+    })
+})
 
 /** The drafts read as a notification's thread opens its group: the group's new thread, and the thread's reply. */
 const draftsRead = [
@@ -1089,14 +1102,89 @@ describe("a workspace", () => {
     )
   })
 
-  it("hands the settings what the person does in them", () => {
+  it("hands the settings what the person does in them, and shows the member they open beside their page", () => {
     story(
       update,
-      given(opened),
+      given(settingsRead),
       message(Message.ClickedSettings()),
-      message(fromSettings(SettingsBlock.Message.ClickedRenameSelf())),
+      message(fromSettings(SettingsBlock.Message.TypedOwnName({ name: "Alice M." }))),
       model((model) => {
-        expect(model.settings.renaming).toEqual(Option.some(SettingsRenaming.OwnName({ name: "" })))
+        expect(Option.map(model.settings.ownName, ({ name }) => name)).toEqual(Option.some("Alice M."))
+        expect(openMemberId(model)).toEqual(Option.none())
+      }),
+      message(Message.ClickedMembers()),
+      message(fromSettings(SettingsBlock.Message.ClickedMember({ memberId: bob.id }))),
+      Command.expectNone(),
+      model((model) => {
+        expect(openMemberId(model)).toEqual(Option.some(bob.id))
+        expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Members")
+        // Beside the page at Split, there is no dialog to open.
+        expect(model.aside.isOpen).toBe(false)
+      }),
+      message(fromSettings(SettingsBlock.Message.ClickedCloseMember())),
+      model((model) => {
+        expect(openMemberId(model)).toEqual(Option.none())
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("opens the side pane's dialog for the member where the pane is one, and closes the member as it closes", () => {
+    story(
+      update,
+      given(modifyFields(settingsRead, { viewport: () => "Desktop" })),
+      message(Message.ClickedMembers()),
+      message(fromSettings(SettingsBlock.Message.ClickedMember({ memberId: bob.id }))),
+      dialogShown,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(true)
+        expect(openMemberId(model)).toEqual(Option.some(bob.id))
+      }),
+      message(fromAside(DialogBlock.Message.RequestedClose())),
+      dialogClosed,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(openMemberId(model)).toEqual(Option.none())
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("closes the member, and the dialog it is in, when another page or destination is shown", () => {
+    for (const leaving of [Message.ClickedWorkspace(), Message.ClickedMembers(), Message.ClickedHome()]) {
+      story(
+        update,
+        given(modifyFields(settingsRead, { viewport: () => "Desktop" })),
+        message(Message.ClickedMembers()),
+        message(fromSettings(SettingsBlock.Message.ClickedMember({ memberId: bob.id }))),
+        dialogShown,
+        message(leaving),
+        dialogClosed,
+        model((model) => {
+          expect(model.aside.isOpen).toBe(false)
+          expect(openMemberId(model)).toEqual(Option.none())
+        })
+      )
+    }
+  })
+
+  it("puts the member where the window's width puts the side pane as the window changes", () => {
+    story(
+      update,
+      given(settingsRead),
+      message(Message.ClickedMembers()),
+      message(fromSettings(SettingsBlock.Message.ClickedMember({ memberId: bob.id }))),
+      message(Message.InformedOfViewport({ viewport: "Desktop" })),
+      dialogShown,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(true)
+        expect(openMemberId(model)).toEqual(Option.some(bob.id))
+      }),
+      message(Message.InformedOfViewport({ viewport: "Split" })),
+      dialogClosed,
+      model((model) => {
+        expect(model.aside.isOpen).toBe(false)
+        expect(openMemberId(model)).toEqual(Option.some(bob.id))
       })
     )
   })

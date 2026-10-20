@@ -2,10 +2,11 @@
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
  * actions, their inbox, the tasks they can see, their connections, their agents, their settings, and their
  * channels, and what the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the
- * groups to browse, the connections, one connection, the agents, one agent, the settings, the channels, or a group,
- * with its threads and the thread open among them. A thread opens in the side pane, beside the group's threads or
- * beside the inbox, which stays. The rail picks a destination, and the sidebar lists that destination's items: Home's
- * inbox, tasks, and groups, the agents, the connections by what they give and the channels, or the settings. It
+ * groups to browse, the connections, one connection, the agents, one agent, a page of the settings, the channels, or a
+ * group, with its threads and the thread open among them. A thread opens in the side pane, beside the group's threads
+ * or beside the inbox, which stays, and a member beside the settings' Members. The rail picks a destination, and the
+ * sidebar lists that destination's items: Home's inbox, tasks, and groups, the agents, the connections by what they
+ * give and the channels, or the settings' Workspace and Members. It
  * lays itself out by the
  * window's width, which its parent informs it of: below 64rem the sidebar and the rail are in a navigation
  * drawer, a dialog that opening an item closes and picking a destination on the rail does not, so the person
@@ -42,10 +43,15 @@ import { workspaceName } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { titleOf } from "../../feature/thread/definition.ts"
 
+/** The pages of the settings, each of which the sidebar lists: the workspace's own, and its members. */
+export const SettingsPage = Schema.Literals(["Workspace", "Members"])
+export type SettingsPage = typeof SettingsPage.Type
+
 /**
  * What the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the groups to
- * browse, the connections or one connection among them, the agents or one agent among them, the settings, the
- * channels, or the group open in the workspace.
+ * browse, the connections or one connection among them, the agents or one agent among them, a page of the
+ * settings with the member open beside it, the channels, or the group open in the workspace. The member is part
+ * of what is open, so that going to another page or destination leaves it.
  */
 export const Open = defineTaggedUnion({
   Nothing: {},
@@ -57,7 +63,7 @@ export const Open = defineTaggedUnion({
   Connection: { connectionId: ConnectionContract.ConnectionId },
   Agents: {},
   Agent: { agentId: Identity.AgentId },
-  Settings: {},
+  Settings: { page: SettingsPage, memberId: Schema.Option(MemberId.MemberId) },
   Channels: {},
   Group: { groupId: GroupId.GroupId, model: GroupBlock.Model }
 })
@@ -108,6 +114,16 @@ export const openThreadTitle = (model: Model): Option.Option<string> =>
 
 /** Whether a thread is open, in the group open or beside the inbox. */
 export const isThreadOpen = (model: Model): boolean => Option.isSome(openThreadTitle(model))
+
+/** The member open in the settings, in the side pane, while there is one. */
+export const openMemberId = (model: Model): Option.Option<MemberId.MemberId> =>
+  Open.matchOrElse(model.open, { Settings: ({ memberId }) => memberId }, () => Option.none())
+
+/** Whether a member is open in the settings, which shows the side pane. */
+export const isMemberOpen = (model: Model): boolean => Option.isSome(openMemberId(model))
+
+/** Whether the side pane has something to show: the thread open, or the member open in the settings. */
+export const isAsideShowing = (model: Model): boolean => isThreadOpen(model) || isMemberOpen(model)
 
 /** Whether the side pane is in a dialog at `viewport`, not beside the main pane, which is from `Split` alone. */
 export const isAsideFloating = (viewport: Viewport): boolean => viewport !== "Split"

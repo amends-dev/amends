@@ -99,11 +99,11 @@ notifications as `notification`s in a `messageList`, under a `divider` for each 
 author's initials and name and what they did, its place, its text, which opens the thread, how long
 ago it came, and a dot while it waits, the row of the notification whose thread is open drawn
 current, with Mark all seen among the header's actions, a quiet Show older after the list, in a
-centered `buttonRow`, while there are older notifications, and `paneEmpty` when a tab has nothing. The settings are a `paneColumn` of `paneSection`s: each name is a `settingRow` of the name, a
-line of what it is for, and a secondary button to change it, which a `form` of a `field` with Save
-and a quiet Cancel replaces while the person does; the members and the invitations waiting are
-`entryList`s of `entry`s, each with a mark, a `badge` or a role select with no label shown, and its
-quiet buttons in a `buttonRow`, and the invite form is a `fieldGrid` of its email and role. The
+centered `buttonRow`, while there are older notifications, and `paneEmpty` when a tab has nothing. The settings' Workspace page is a `paneColumn` of a `form` of the workspace's name, and `paneSection`s
+whose `detailList` has the ID with a quiet Copy ID and who made the workspace as a `person`, and whose
+Ownership has the owner as a `person`; its Members page, which passes `isWide`, is a `fieldGrid` of a search
+and a `choiceSelect` over the `directory`'s `columns` and 24px `row`s, and a member opens in the side pane as
+a `person`, a `paneForm` of their role, and a `paneSection` of their access, under `paneBack`. The
 channels are a `paneColumn` of what failed, the list, and the form open among it: the list is an `entryList` of
 `entry`s, or a `paneEmpty` that says what adding one does, and the form is a `paneForm` titled as the form is
 named, holding the design's fields, selects, switches, and textarea, its failure as a `notice`, and a
@@ -367,26 +367,34 @@ the pages that compose them; the root composes the pages.
   no task the pane says "Nothing to triage" or "No open tasks" and that the tasks the person can see
   will be listed there, and with filters that leave none, "No tasks match" and to try different
   ones. `triageCount` is how many tasks wait in triage, for the sidebar to show.
-- `feature/settings`: the workspace's name and the person's own, each renamed in place from the name
-  seen, one at a time; the workspace's members with their roles, where, for each member the
-  delegation rule, by core's `Delegation.recipientDenial`, lets them act on, they change the role
-  to Member, or to Administrator when they own the workspace, replacing the roles they saw the
-  member hold, and remove the member, and, when they own the workspace, hand it to another person,
-  from the owner's assignment they saw; and the invitations still waiting, which they revoke, with a
-  form to invite someone by email with a role, valid for seven days, where they manage
-  invitations. A control shows only when their grants allow it, and what is on its way is marked as
-  sending. Its view is the settings pane, one column of sections titled Workspace name, Your name,
-  Members, and, where they manage invitations, Invitations. A name shows as a row of the name and
-  what it is for with the button to change it, or, while the person changes it, as a form of its
-  field, whose label is the section's title and not shown again, with Save and Cancel; a section
-  whose name is on its way says "Sending…" after its title.
-  Each member is an entry of their initials and name, with the role they hold as a badge, or, where
-  the person may change it, as a select named "Role of" and the member's name, "Sending…" while
-  they or their role is on its way, and under them Remove and Make owner, where the person may use
-  them. Each invitation waiting is an entry of the address's first letter and the address, the
-  role's name as a badge, "until" and the day it ends, and Revoke until it is on its way; with none
-  waiting, the section says so. The invite form's email field does not take focus, since the form is there as the page opens.
-  It reports nothing: the workspace page reads the workspace's name from it, so a rename shows in the
+- `feature/settings`: the workspace's settings as `apps/ui` has them, two pages and a member in the side
+  pane, read together from the store. The Workspace page (`view`) is the workspace's name in a form with Save
+  changes, which waits for a name that is new and which only the owner may use, the field being disabled with
+  "Only the workspace owner can rename it." for another; Details, with the workspace's ID, which Copy ID puts on
+  the browser's clipboard (the `Clipboard` service, which the browser's services provide, so the command
+  `CopyWorkspaceId` needs no `navigator`) and the button then says Copied for two seconds, the command
+  `ExpireCopied` ending the copy it was started for and no later one, and Created by, the member whose account made
+  the workspace; Ownership, with the owner as "{name} · You" when it is the person, "Workspace owner", and that a
+  workspace has one owner; and, at the end, the person's own name in a form with Save name, since the app has no
+  account menu to change it from. The Members page (`membersView`) is a search, "Search members…", and a filter of
+  Active or Removed members (`choiceSelect`, since the design has no menu), over the roster: `columns` for Member,
+  Workspace role, and Status, and a `row` for each member with a 24px mark (`markSize: "sm"`), their name, "Agent"
+  under an agent's, their role, and their status, the row of the member open drawn current. A phone shows the
+  role and status under the name. A row reports `OpenedMember` and the member opens in the side pane
+  (`memberView`, "Member details", with Back to Members on phones): who they are, "Workspace role" with Save role
+  where the delegation rule, by core's `Delegation.recipientDenial`, lets the person act on them, which replaces the
+  roles they saw the member hold with Member, or Administrator when the person owns the workspace; Access, the
+  member's assignments with where each reaches and whether it still does, or "No access is assigned.", where the
+  person may read them; and, for a member who left, Membership, which says the membership ended and that they can
+  be invited again. Closing it reports `ClosedMember`. What is on its way is marked "Sending…". Until the workspace
+  is read the page says "Loading settings…", and "Can't load settings" with Try again when it could not be. A
+  failure is worded by `settingsMessage` for the place the action was made, with Refresh where `needsRefresh` says
+  that what the person sees is out of date. The Block tells what it can: what was entered does not decode
+  (`Invalid`) and the browser could not keep it (`Failed`) come from the commands, and the person's grants and the
+  replica, which the Block holds, tell it that they may no longer do it (`Denied`) or that what they act on is gone
+  (`Gone`) before anything is sent, and a read that fails is `Outdated`. What the server refuses afterward is not
+  the Block's: the store replays it as a rejection, which `feature/actions` shows as a toast. It reports the member
+  opened and closed, and the workspace page reads the workspace's name from the Block, so a rename shows in the
   page's sidebar and home pane.
 - `feature/connections`: the workspace's connections, as the store holds them, once the store has
   answered (`isLoaded`, which keeps "No connections yet" from showing before), marked as sending while a
@@ -642,15 +650,17 @@ the pages that compose them; the root composes the pages.
   `sidebarView`, in the slot `agents-sidebar`, and the Connections destination's, and the Channels',
   the connections Block's, in `connections-sidebar`, which is how the channels are reached, since the
   rail has no button for them. The Settings destination's is one section, Settings, with the items
-  Workspace and Members, which both open the settings, the one pane, and neither of which is marked
-  while it shows. Over them, the sidebar's header has a button, Find anything…, with
+  Workspace and Members, which each open a page of their own and are marked while it shows (`Open.Settings`
+  takes `page`, Workspace or Members, so that the sidebar and the main pane agree on which; the rail's Settings
+  opens Workspace). Over them, the sidebar's header has a button, Find anything…, with
   the shortcut beside it, hidden from assistive technology, which sends `ClickedSearch`; the shortcut
   reads ⌘K on an Apple platform and Ctrl K on any other, the key it names being Command+K or Control+K, by
   the view input `isApplePlatform`. The main pane shows one destination: nothing yet, titled by the
   workspace, the inbox, the tasks in triage, every open task, the groups to browse, the connections,
   the agents, one agent's page (`Open.Agent`, with the agents Block's `agentView` in the slot `agent`), one
   connection's page (`Open.Connection`, with the connections Block's `connectionView` in the slot `connection`), the
-  settings, or the channels, which are always read, or the open group, a keyed
+  settings' Workspace page (`view`, in the slot `settings-workspace`) or Members page (`membersView`, in
+  `settings-members`), or the channels, which are always read, or the open group, a keyed
   occurrence. The tasks Block, which the page binds as `tasks` (`TasksBinding`), is the same child
   under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened
   there is opened in its group, which a notification's is not: its thread opens beside the inbox,
@@ -659,8 +669,14 @@ the pages that compose them; the root composes the pages.
   Block asks for with `RequestedBrowse`: the page goes there as it goes to any destination, closing
   the drawer, the side pane's dialog, and the thread beside the inbox, and marking no group open, and
   picking a group on that page opens it, which leaves the page. The side pane shows the thread open
-  in the open group, or beside the open inbox (`inbox-thread`, the inbox's `threadView`), only while
-  one is, and the actions' toasts come over both. The groups' `dialogView`, the same child
+  in the open group, or beside the open inbox (`inbox-thread`, the inbox's `threadView`), or the member open
+  beside the settings' Members (`settings-member`, the settings Block's `memberView`, labelled "Member
+  details"), only while one is, and the actions' toasts come over both. The member is part of what is open
+  (`Open.Settings` has `memberId`) and not only of the settings Block's model, so that showing another page or
+  destination leaves it; the Block asks to open and close it with `OpenedMember` and `ClosedMember`, which the page
+  folds, opening the side pane's dialog where the pane is one, and closing the member closes the dialog and the
+  dialog's closing closes the member, as it closes a thread. The shell is given the pane's label, which names its
+  dialog. The groups' `dialogView`, the same child
   under a third slot, is lent to the shell's `dialogs`, where it is in the frame at every width, and
   so are the connections' `dialogView`, for adding a connection, replacing its key, or confirming its removal, and the
   agents' `dialogView`, for adding an agent or confirming its removal, and the search, which the page binds as `search` (`SearchBinding`). Both are in the document after
@@ -957,10 +973,11 @@ browser's storage. Each Block's tests sit beside it:
   channels and the groups the person belongs to, by name, moving a channel's conversations to
   another group of theirs and removing it, closing a form about a channel that is gone, and why a
   read or a write could not be kept; the settings renaming the workspace from the name seen and the
-  person, one name at a time, changing a member's role from the assignments seen, removing a member,
-  handing the workspace over from the owner's assignment seen, inviting by email with the role
-  chosen, revoking an invitation, and what an owner, an administrator, and a member may do to the
-  members; the actions confirming what the page says the person did, each under an ID of its own, going when
+  person, sending nothing for a name that is not new, refusing a rename the person may not make or that has no
+  workspace to place it in, opening a member and reporting it, changing a member's role from the assignments seen
+  and refusing it when the person may no longer or the member is gone, copying the workspace's ID for the attempt
+  that was made and ending only that attempt's Copied, reading again on request, narrowing the roster by search and
+  by status, and what an owner, an administrator, and a member may do to the members; the actions confirming what the page says the person did, each under an ID of its own, going when
   its own time is up or the person dismisses it, apart from what the server refused; a workspace listing the integrations once as it opens, informing its connections, agents,
   and channels of them or of why they could not be listed, and listing them again when one asks,
   opening the group picked, showing
@@ -1108,12 +1125,14 @@ browser's storage. Each Block's tests sit beside it:
   that is gone beside its field, keeping the dialog open under a failure, creating the agent and closing once it
   is listed, and closing with Cancel and Close to open a fresh form the next time; the dialog for confirming
   a removal, naming the agent and saying it leaves and its messages stay, removing it once confirmed, saying
-  under the question that it could not be, and left alone on Cancel; the settings' two names renamed, the
-  members listed with their roles as badges, or as a select to change for the members the person may
-  act on, changed, removed, and handed the workspace by the owner, the invitations listed by their
-  address, role, and end, revoked, and sent, what is on its way marked in each section, a name
-  left as it was when renaming is cancelled, a member offered only their own name to change, and the
-  store's changes and failure to read shown; the channels listed with their
+  under the question that it could not be, and left alone on Cancel; the settings' Workspace page, with the name renamed when it is new
+  and the reason it could not be kept, the ID copied and shown Copied until its time is up, who made the
+  workspace and who owns it, the person's own name renamed, a member offered only their own name to change, what
+  is on its way marked, loading, not loading, and a way to read again, and the store's changes shown; the Members
+  page, with the members listed under their headings with their role and status, an agent said to be one,
+  narrowed by search and by whether they left, a row marking the member open and reporting it; and a member in the
+  side pane, with their role changed or refused and the reason said, with Refresh where what the person sees is
+  out of date, their access, a member who left, one the person may only read, and one the records no longer hold; the channels listed with their
   connection and group, a conversation's group by the others in it, added by an owner over a
   connection that gives channels into a group they belong to, refused with why when one is lacking,
   moved and removed with a failure shown, read by an ordinary member without the controls until the
@@ -1130,8 +1149,9 @@ browser's storage. Each Block's tests sit beside it:
   the agents' section with its rows and its title marked, and, with an agent's page open from a row of
   it or of the list, that row marked in place of the title; the connections' sections, by what they give,
   with a connection's page open from a row of one or of the list, that row marked in place of the title, and
-  Channels, marked while the channels show; and the settings' Workspace and Members, which open the
-  settings; the groups to browse opened from the
+  Channels, marked while the channels show; and the settings' Workspace and Members, which each open
+  their page and are marked while it shows, with a member opened in the side pane beside the Members, in its dialog
+  below `Split`, and left whenever another page or destination is picked; the groups to browse opened from the
   sidebar's button, from an open group and its thread, and from the drawer, which it closes, with
   a group opened from its row and a team started from Create group, also at `Phone` where the sidebar is
   in the shut drawer, the sidebar naming the workspace with
@@ -1222,8 +1242,7 @@ browser's storage. Each Block's tests sit beside it:
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
   and its move shows at once; and the settings' reads, as the settings Block reads them together,
-  give the owner the workspace with its members, roles, assignments, and invitations, and the grant
-  to rename it; and the members, the contacts, and the people together: a contact a channel heard
+  give the owner the workspace with its members, roles, and assignments, and the grant to rename it; and the members, the contacts, and the people together: a contact a channel heard
   from reaches them, and a member renamed here shows at once, then as the host has it; and a search
   finds a team, a thread, and a conversation the person started, and the member they are with,
   before the server has them and after, whatever the case or accents of the query, and not the

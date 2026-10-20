@@ -2,6 +2,7 @@ import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { ThreadId } from "@amends-dev/core/thread"
+import type { MemberId } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
@@ -19,7 +20,7 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
-import { isAsideFloating, type Model, Open, WorkspaceDefinition } from "./definition.ts"
+import { isAsideFloating, type Model, Open, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
 const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
@@ -84,9 +85,27 @@ export const showAgent = (agentId: Identity.AgentId) =>
     model: modifyFields(model, { open: () => Open.Agent({ agentId }) })
   }))
 
-/** Show the settings in the main content. */
-export const showSettings = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Settings() })
+/** Show the page `page` of the settings in the main content, with no member open beside it. */
+export const showSettings = (page: SettingsPage) =>
+  WorkspaceDefinition.step((model: Model) => ({
+    model: modifyFields(model, { open: () => Open.Settings({ page, memberId: Option.none() }) })
+  }))
+
+/** Open the member `memberId` beside the page of the settings that is showing. */
+const openMember = (memberId: MemberId.MemberId) =>
+  WorkspaceDefinition.step((model: Model) => ({
+    model: modifyFields(model, {
+      open: (open) =>
+        Open.isAnyOf(["Settings"])(open) ? Open.Settings({ page: open.page, memberId: Option.some(memberId) }) : open
+    })
+  }))
+
+/** Close the member open beside the page of the settings that is showing. */
+const closeMember = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, {
+    open: (open) =>
+      Open.isAnyOf(["Settings"])(open) ? Open.Settings({ page: open.page, memberId: Option.none() }) : open
+  })
 }))
 
 /** Show the channels in the main content. */
@@ -95,9 +114,9 @@ export const showChannels = WorkspaceDefinition.step((model: Model) => ({
 }))
 
 /**
- * Switch to a destination, as the rail does: close the side pane's dialog and the thread beside the inbox, leave
- * no group marked in the sidebar, and `show` it, leaving the navigation drawer as it is, so the person sees the
- * sidebar of the destination they picked.
+ * Switch to a destination, as the rail does: close the side pane's dialog, the thread beside the inbox, and the
+ * member beside the settings, leave no group marked in the sidebar, and `show` it, leaving the navigation drawer as
+ * it is, so the person sees the sidebar of the destination they picked.
  */
 export const switchTo = (show: typeof showNothing) =>
   Update.combine([
@@ -209,6 +228,15 @@ const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
     Update.combine([ActionsBinding.confirm({ text: connectionsToast.removed(name) }), goTo(showConnections)])
 })
 
+/**
+ * A member opening in the settings opens beside the page, and opens the side pane's dialog where the pane is one;
+ * closing it closes both.
+ */
+const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
+  OpenedMember: ({ memberId }) => Update.combine([openMember(memberId), showAside]),
+  ClosedMember: () => Update.combine([closeMember, hideAside])
+})
+
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
 const foldMenuOutMessage = DialogBlock.OutMessage.match({
   Opened: () => WorkspaceDefinition.stepNoop(),
@@ -218,14 +246,14 @@ const foldMenuOutMessage = DialogBlock.OutMessage.match({
 
 /**
  * The side pane's dialog opening and finishing its close change nothing else. Its closing, by Escape, its scrim,
- * or the page, closes the thread, except at `Split`: there it is the pane moving beside the main pane, not the
- * person leaving the thread.
+ * or the page, closes what it shows, the thread or the member, except at `Split`: there it is the pane moving beside
+ * the main pane, not the person leaving what it shows.
  */
 const foldAsideOutMessage = DialogBlock.OutMessage.match({
   Opened: () => WorkspaceDefinition.stepNoop(),
   Closed: () =>
     WorkspaceDefinition.step((model: Model) =>
-      isAsideFloating(model.viewport) ? closeOpenThread : WorkspaceDefinition.stepNoop()
+      isAsideFloating(model.viewport) ? closeWhatAsideShows : WorkspaceDefinition.stepNoop()
     ),
   CompletedClose: () => WorkspaceDefinition.stepNoop()
 })
@@ -250,13 +278,17 @@ export const showAside = WorkspaceDefinition.step((model: Model) =>
 /** Close the side pane's dialog; closing one that is closed does nothing. */
 export const hideAside = AsideBinding.requestClose()
 
-/** Close the thread open, in the group open or beside the inbox, if there is one. */
-const closeOpenThread = WorkspaceDefinition.step((model: Model) =>
+/**
+ * Close what the side pane shows, the thread open in the group open or beside the inbox, or the member open in the
+ * settings, if there is one.
+ */
+const closeWhatAsideShows = WorkspaceDefinition.step((model: Model) =>
   Open.matchOrElse(
     model.open,
     {
       Inbox: () => InboxBinding.requestCloseThread(),
-      Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId)
+      Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId),
+      Settings: () => closeMember
     },
     () => WorkspaceDefinition.stepNoop()
   )
@@ -305,7 +337,8 @@ export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
 
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   field: "settings",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: foldSettingsOutMessage }
 })
 
 export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {

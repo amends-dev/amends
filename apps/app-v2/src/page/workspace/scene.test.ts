@@ -1,4 +1,4 @@
-import { GrantResolver } from "@amends-dev/core/authorization"
+import { BuiltinRoles, GrantResolver } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
@@ -592,16 +592,16 @@ describe("a workspace", () => {
     )
   })
 
-  it("shows the settings on request, as the owner reads them", () => {
+  it("shows the workspace's settings on request, as the owner reads them", () => {
     scene(
       { update, view: sceneView },
       given(withSettings),
-      expect(role("main", { name: "Settings" })).toBeAbsent(),
+      expect(role("main", { name: "Workspace" })).toBeAbsent(),
       click(role("button", { name: "Settings" })),
       inside(
-        role("main", { name: "Settings" }),
-        expect(role("button", { name: "Rename workspace" })).toExist(),
-        expect(text("Bob")).toExist()
+        role("main", { name: "Workspace" }),
+        expect(role("textbox", { name: "Workspace name" })).toHaveValue("Studio"),
+        expect(role("region", { name: "Ownership" })).toExist()
       )
     )
   })
@@ -617,13 +617,15 @@ describe("a workspace", () => {
           members: withSettings.settings.members,
           roles: withSettings.settings.roles,
           assignments: withSettings.settings.assignments,
-          invitations: withSettings.settings.invitations,
           grants: withSettings.settings.grants
         })
       ),
-      expect(role("main", { name: "Settings" })).toBeAbsent(),
+      expect(role("main", { name: "Workspace" })).toBeAbsent(),
       click(role("button", { name: "Settings" })),
-      inside(role("main", { name: "Settings" }), expect(role("button", { name: "Rename workspace" })).toExist())
+      inside(
+        role("main", { name: "Workspace" }),
+        expect(role("textbox", { name: "Workspace name" })).toHaveValue("Studio")
+      )
     )
   })
 
@@ -1210,17 +1212,92 @@ describe("a workspace", () => {
     )
   })
 
-  it("shows the settings' section for Settings, with Workspace and Members, each opening the settings", () => {
+  it("shows the settings' section for Settings, with Workspace and Members, each opening its own page", () => {
     scene(
       { update, view: sceneView },
       given(withSettings),
       click(railButton("Settings")),
       expect(within(role("navigation", { name: "Studio" }), text("Settings"))).toExist(),
-      expect(sidebarButton("Workspace")).toExist(),
-      expect(sidebarButton("Members")).toExist(),
+      expect(sidebarButton("Workspace")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Members")).not.toHaveAttr("aria-current"),
       expect(sidebarButton("Inbox")).toBeAbsent(),
+      expect(role("main", { name: "Workspace" })).toExist(),
       click(sidebarButton("Members")),
-      expect(role("main", { name: "Settings" })).toExist()
+      expect(role("main", { name: "Members" })).toExist(),
+      expect(role("main", { name: "Workspace" })).toBeAbsent(),
+      expect(sidebarButton("Members")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Workspace")).not.toHaveAttr("aria-current"),
+      click(sidebarButton("Workspace")),
+      expect(role("main", { name: "Workspace" })).toExist(),
+      expect(sidebarButton("Workspace")).toHaveAttr("aria-current", "page")
+    )
+  })
+
+  it("opens a member in the side pane beside the members, and closes it with the pane's Close", () => {
+    scene(
+      { update, view: sceneView },
+      given(withSettings),
+      click(railButton("Settings")),
+      click(sidebarButton("Members")),
+      expect(role("complementary")).toBeAbsent(),
+      click(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))),
+      inside(
+        role("complementary", { name: "Member details" }),
+        expect(role("heading", { name: "Member details" })).toExist(),
+        expect(role("combobox", { name: "Workspace role" })).toHaveValue(BuiltinRoles.MemberId),
+        expect(role("button", { name: "Save role" })).toExist()
+      ),
+      expect(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))).toHaveAttr(
+        "aria-current",
+        "true"
+      ),
+      click(within(role("complementary", { name: "Member details" }), role("button", { name: "Close" }))),
+      expect(role("complementary")).toBeAbsent(),
+      expect(role("main", { name: "Members" })).toExist()
+    )
+  })
+
+  it("leaves the member when another page or destination is picked", () => {
+    scene(
+      { update, view: sceneView },
+      given(withSettings),
+      click(railButton("Settings")),
+      click(sidebarButton("Members")),
+      click(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))),
+      expect(role("complementary", { name: "Member details" })).toExist(),
+      click(sidebarButton("Workspace")),
+      expect(role("complementary")).toBeAbsent(),
+      click(sidebarButton("Members")),
+      expect(role("complementary")).toBeAbsent(),
+      click(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))),
+      click(railButton("Home")),
+      expect(role("complementary")).toBeAbsent(),
+      click(railButton("Settings")),
+      click(sidebarButton("Members")),
+      expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("opens a member in the side pane's dialog below Split, which closes the member with it", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withSettings, { viewport: () => "Desktop" })),
+      click(railButton("Settings")),
+      click(sidebarButton("Members")),
+      click(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      inside(
+        role("dialog", { name: "Member details" }),
+        expect(role("heading", { name: "Member details", level: 2 })).toExist(),
+        expect(role("complementary", { name: "Member details" })).toExist()
+      ),
+      click(within(role("dialog", { name: "Member details" }), role("button", { name: "Close" }))),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Member details" })).toBeAbsent(),
+      expect(role("complementary")).toBeAbsent(),
+      expect(within(role("main", { name: "Members" }), role("button", { name: "Bob" }))).not.toHaveAttr("aria-current")
     )
   })
 
