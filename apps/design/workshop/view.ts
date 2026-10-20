@@ -31,6 +31,7 @@ import {
   cellWithDetail,
   columns,
   footnote,
+  historyRow,
   loadingRows,
   row,
   rowWithButton,
@@ -73,6 +74,7 @@ import {
   type ApplicationViewBuilder,
   ApplicationComposition,
   ChooserModalBinding,
+  ConfirmModalBinding,
   MemberFilterBinding,
   MembersPaneFilterBinding,
   ModalBinding,
@@ -863,7 +865,8 @@ const memberList = (h: ApplicationViewBuilder): Html =>
         [
           row(h, {
             mark: { text: name.slice(0, 1), tone: isAgent ? "lilac" : "neutral" },
-            markSize: "sm",
+            markSize: "md",
+            isCompact: true,
             title: name,
             ...(isAgent ? { meta: "Agent" } : {}),
             cells: [h.span([], [role]), h.span([], [status])],
@@ -904,6 +907,56 @@ const pendingInvitationList = (h: ApplicationViewBuilder): Html =>
             isDisabled: isSending === true,
             variant: "quiet",
             onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
+
+type HistorySample = Readonly<{
+  recipient: string
+  detail: string
+  status: string
+  isRevocable?: boolean
+  isSending?: boolean
+}>
+
+const historySamples: ReadonlyArray<HistorySample> = [
+  { recipient: "casey@mercier.example", detail: "Member · Expires in 5 days", status: "Pending", isRevocable: true },
+  {
+    recipient: "taylor@mercier.example",
+    detail: "Administrator · Expires in 6 days · Sending…",
+    status: "Pending",
+    isRevocable: true,
+    isSending: true
+  },
+  { recipient: "caleb@mercier.example", detail: "Member · Created Sep 21", status: "Accepted" },
+  { recipient: "morgan@mercier.example", detail: "Member · Expired Oct 2", status: "Expired" },
+  { recipient: "riley@mercier.example", detail: "Member · Created Sep 27", status: "Revoked" }
+]
+
+const invitationHistoryList = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [h.AriaLabel("Invitation history")],
+    historySamples.map(({ recipient, detail, status, isRevocable, isSending }) =>
+      h.keyed("li")(
+        recipient,
+        [],
+        [
+          historyRow(h, {
+            title: recipient,
+            detail,
+            status,
+            ...(isRevocable === true
+              ? {
+                  action: {
+                    label: "Revoke",
+                    name: `Revoke invitation for ${recipient}`,
+                    isDisabled: isSending === true,
+                    onClick: Message.ClickedButton()
+                  }
+                }
+              : {})
           })
         ]
       )
@@ -1187,7 +1240,7 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
     ),
     sample(
       h,
-      "Table of members: 24px marks in rows 56px tall, the second the member open beside the list (filled, with the bar), an agent's lilac mark with Agent under its name, and the role and status as cells",
+      "Table of members: 32px marks in rows 56px tall, the second the member open beside the list (filled, with the bar), an agent's lilac mark with Agent under its name, and the role and status as cells",
       memberTable(h),
       "flex max-w-3xl flex-col"
     ),
@@ -1202,6 +1255,12 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
         }),
         pendingInvitationList(h)
       ],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "History of invitations: the address over what it gives, the status in words beside them, and a quiet Revoke at the end of a pending one, disabled while it is on its way",
+      [invitationHistoryList(h)],
       "flex max-w-2xl flex-col"
     ),
     sample(
@@ -3390,10 +3449,23 @@ const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mod
             groupPrivateToggle(h, "wide-modal-group-private", model)
           ]
         : [groupMembers(h)],
-    cancelLabel: "Cancel",
-    footer: [submit(h, "Save changes")],
+    ...(model.modalTab === "general"
+      ? { cancelLabel: "Cancel", footer: [submit(h, "Save changes")] }
+      : { leading: [button(h, "Invite people", Message.ClickedButton())], cancelLabel: "Done" }),
     onSubmit: Message.SubmittedWideModal(),
     width: "wide"
+  })
+
+const confirmModal = (h: ApplicationViewBuilder, render: RenderInfo): Html =>
+  modal(h, render, {
+    title: "Remove connection?",
+    context: "Search tools",
+    description: "Search tools will be removed from the workspace, along with its saved key.",
+    body: [],
+    cancelLabel: "Cancel",
+    isCancelLeading: true,
+    footer: [submit(h, "Remove connection")],
+    onSubmit: Message.SubmittedConfirmModal()
   })
 
 type IntegrationSample = Readonly<{ name: string; detail: string }>
@@ -3458,16 +3530,30 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
         })
       )
     ]),
-    sample(h, "Wide, with tabs and a description", [
-      button(h, "Open the wide modal", Message.ClickedOpenWideModal()),
+    sample(h, "A confirmation, with Cancel at the start of the footer and the primary action at its end", [
+      button(h, "Open the confirmation", Message.ClickedOpenConfirmModal()),
       h.block(
-        WideModalBinding.embedView({
-          slotId: "wide-modal",
-          model: model.wideModal,
-          viewInputs: { hasDescription: true, toView: (render) => settingsModal(h, render, model) }
+        ConfirmModalBinding.embedView({
+          slotId: "confirm-modal",
+          model: model.confirmModal,
+          viewInputs: { hasDescription: true, toView: (render) => confirmModal(h, render) }
         })
       )
     ]),
+    sample(
+      h,
+      "Wide, with tabs and a description; on Members, an action at the start of the footer and Done at its end",
+      [
+        button(h, "Open the wide modal", Message.ClickedOpenWideModal()),
+        h.block(
+          WideModalBinding.embedView({
+            slotId: "wide-modal",
+            model: model.wideModal,
+            viewInputs: { hasDescription: true, toView: (render) => settingsModal(h, render, model) }
+          })
+        )
+      ]
+    ),
     sample(h, "A search over rows that run to the panel's edges", [
       button(h, "Open the chooser", Message.ClickedOpenChooserModal()),
       h.block(

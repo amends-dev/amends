@@ -53,6 +53,8 @@ const listLook = "-mx-6 -mb-5 border-t border-divider"
 
 const footerRow = "flex flex-none items-center justify-end gap-2 border-t border-divider px-6 py-4"
 
+const footerLeading = "me-auto flex items-center gap-2"
+
 type DialogAttribute<Message, Requirements> = Parameters<HtmlBuilder<Message, Requirements>["dialog"]>[0][number]
 
 /**
@@ -76,8 +78,12 @@ export type ModalConfig<Message> = Readonly<{
   body: ReadonlyArray<Html>
   /** The actions at the end of the footer, the one the modal exists for last, such as a `submit`. */
   footer?: ReadonlyArray<Html>
-  /** Adds a quiet button before the footer's actions that closes the modal. */
+  /** Controls at the start of the footer, such as Back to the step before, or an action that opens another dialog. */
+  leading?: ReadonlyArray<Html>
+  /** Adds a quiet button that closes the modal, before the footer's actions, or at the start of the footer. */
   cancelLabel?: string
+  /** Puts the `cancelLabel` button at the start of the footer, ahead of the `leading` controls, and not at its end. */
+  isCancelLeading?: boolean
   /** Makes the panel a form that sends this when submitted, so a `submit` in the footer sends it. */
   onSubmit?: Message
   /** `form` (the default) is 26rem, `wide` 32rem, each less than the window by a 1rem gutter. */
@@ -113,18 +119,26 @@ const renderFooter = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   render: ModalRender<Message, Requirements>,
   config: ModalConfig<Message>
-): Html =>
-  config.footer === undefined && config.cancelLabel === undefined
-    ? h.empty
-    : h.div(
-        [h.Class(footerRow)],
-        [
-          config.cancelLabel === undefined
-            ? h.empty
-            : buttonWith(h, render.closeButton, config.cancelLabel, { variant: "quiet" }),
-          ...(config.footer ?? [])
-        ]
-      )
+): Html => {
+  if (config.footer === undefined && config.cancelLabel === undefined && config.leading === undefined) {
+    return h.empty
+  }
+
+  const cancel =
+    config.cancelLabel === undefined
+      ? []
+      : [buttonWith(h, render.closeButton, config.cancelLabel, { variant: "quiet" })]
+  const leading = [...(config.isCancelLeading === true ? cancel : []), ...(config.leading ?? [])]
+
+  return h.div(
+    [h.Class(footerRow)],
+    [
+      leading.length === 0 ? h.empty : h.div([h.Class(footerLeading)], leading),
+      ...(config.isCancelLeading === true ? [] : cancel),
+      ...(config.footer ?? [])
+    ]
+  )
+}
 
 /**
  * The `rows` to choose among, a `row` each, as a list named `label` that runs to the edges of the panel under
@@ -144,8 +158,9 @@ export const modalList = <Message, Requirements>(
 /**
  * The dialog `render` describes, as a panel over a scrim while it is visible, and nothing while it is not: a
  * header of the `title`, the `context` after it, and a Close button, with the `tabs` under it; the `body`,
- * which scrolls, led by the `description`; and a footer of a quiet Cancel and the `footer`'s actions at the
- * end. The panel is 26rem wide, or 32rem for `wide`, and less than the window by a gutter.
+ * which scrolls, led by the `description`; and a footer of the `leading` controls at the start, and at the end a
+ * quiet Cancel and the `footer`'s actions, or, with `isCancelLeading`, the Cancel at the start. The panel is 26rem
+ * wide, or 32rem for `wide`, and less than the window by a gutter.
  */
 export const modal = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

@@ -13,8 +13,10 @@ import {
   expectAll,
   given,
   label,
+  nth,
   role,
   scene,
+  selector,
   text,
   type,
   within
@@ -23,7 +25,7 @@ import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { button, field, submit } from "./control.ts"
 import { row } from "./directory.ts"
-import { type ModalRender, modal, modalList } from "./modal.ts"
+import { type ModalConfig, type ModalRender, modal, modalList } from "./modal.ts"
 import { paneTabs } from "./pane.ts"
 
 const Message = defineMessageUnion({
@@ -158,6 +160,100 @@ describe("modal over a dialog's published groups", () => {
       expect(role("heading", { name: "Group settings" })).toBeAbsent(),
       expect(role("button", { name: "Close" })).toBeAbsent()
     )
+  })
+})
+
+describe("modal footer", () => {
+  type Footer = Pick<ModalConfig<Message>, "cancelLabel" | "footer" | "isCancelLeading" | "leading">
+
+  const footerView = (footer: (h: HtmlBuilder<Message>) => Footer) => (_: Model, h: HtmlBuilder<Message>) =>
+    modal(h, visibleRender, {
+      title: "Replace API key",
+      body: [h.p([], ["The current key stays in place."])],
+      ...footer(h)
+    })
+
+  /** The Close button of the header comes first, so the footer's buttons are those after it, in the order they sit. */
+  const buttons = all.role("button")
+
+  it("puts a Cancel and the footer's actions together at the end, the action the modal exists for last", () => {
+    scene(
+      {
+        update,
+        view: footerView((h) => ({
+          cancelLabel: "Cancel",
+          footer: [button(h, "Replace key", Message.ClickedOpen())]
+        }))
+      },
+      given(initial),
+      expectAll(buttons).toHaveCount(3),
+      expect(nth(buttons, 1)).toHaveText("Cancel"),
+      expect(nth(buttons, 2)).toHaveText("Replace key"),
+      expectAll(all.selector("div.me-auto")).toHaveCount(0)
+    )
+  })
+
+  it("puts the Cancel at the start, apart from the footer's actions, when it is told to", () => {
+    scene(
+      {
+        update,
+        view: footerView((h) => ({
+          cancelLabel: "Cancel",
+          isCancelLeading: true,
+          footer: [button(h, "Replace key", Message.ClickedOpen())]
+        }))
+      },
+      given(initial),
+      expect(nth(buttons, 1)).toHaveText("Cancel"),
+      expect(nth(buttons, 2)).toHaveText("Replace key"),
+      expect(within(selector("div.me-auto"), role("button", { name: "Cancel" }))).toExist(),
+      expect(within(selector("div.me-auto"), role("button", { name: "Replace key" }))).toBeAbsent()
+    )
+  })
+
+  it("puts the leading controls at the start, and the Cancel and the footer's actions at the end", () => {
+    scene(
+      {
+        update,
+        view: footerView((h) => ({
+          leading: [button(h, "Back", Message.ClickedOpen())],
+          cancelLabel: "Cancel",
+          footer: [button(h, "Create connection", Message.ClickedOpen())]
+        }))
+      },
+      given(initial),
+      expect(nth(buttons, 1)).toHaveText("Back"),
+      expect(nth(buttons, 2)).toHaveText("Cancel"),
+      expect(nth(buttons, 3)).toHaveText("Create connection"),
+      expect(within(selector("div.me-auto"), role("button", { name: "Back" }))).toExist(),
+      expect(within(selector("div.me-auto"), role("button", { name: "Cancel" }))).toBeAbsent()
+    )
+  })
+
+  it("keeps a Cancel at the start ahead of the leading controls", () => {
+    scene(
+      {
+        update,
+        view: footerView((h) => ({
+          leading: [button(h, "Invite people", Message.ClickedOpen())],
+          cancelLabel: "Cancel",
+          isCancelLeading: true
+        }))
+      },
+      given(initial),
+      expect(nth(buttons, 1)).toHaveText("Cancel"),
+      expect(nth(buttons, 2)).toHaveText("Invite people"),
+      expect(within(selector("div.me-auto"), role("button", { name: "Invite people" }))).toExist()
+    )
+  })
+
+  it("is a footer for leading controls alone, and has none without leading controls, a Cancel, or actions", () => {
+    scene(
+      { update, view: footerView((h) => ({ leading: [button(h, "Invite people", Message.ClickedOpen())] })) },
+      given(initial),
+      expect(role("button", { name: "Invite people" })).toExist()
+    )
+    scene({ update, view: footerView(() => ({})) }, given(initial), expectAll(buttons).toHaveCount(1))
   })
 })
 

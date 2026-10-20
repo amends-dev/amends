@@ -11,6 +11,7 @@ import {
   cellWithDetail,
   columns,
   footnote,
+  historyRow,
   loadingRows,
   row,
   rowWithButton,
@@ -301,6 +302,93 @@ describe("rowWithButton as a pending invitation's", () => {
   })
 })
 
+describe("historyRow", () => {
+  const pending = (h: HtmlBuilder<Message>) =>
+    historyRow(h, {
+      title: "casey@mercier.example",
+      detail: "Member · Expires in 5 days",
+      status: "Pending",
+      action: {
+        label: "Revoke",
+        name: "Revoke invitation for casey@mercier.example",
+        onClick: Message.ClickedFieldwork()
+      }
+    })
+
+  it("reads as text: the title, the detail under it, and the status in words, with no mark", () => {
+    scene(
+      { update, view: viewOf((h) => [pending(h)]) },
+      given(initial),
+      expect(text("casey@mercier.example")).toExist(),
+      expect(text("Member · Expires in 5 days")).toExist(),
+      expect(text("Pending")).toExist(),
+      expectAll(all.selector('[aria-hidden="true"]')).toHaveCount(0)
+    )
+  })
+
+  it("is a grid of the title and detail, a 5.5rem column for the status, and a 4.75rem one for the action", () => {
+    scene(
+      { update, view: viewOf((h) => [pending(h)]) },
+      given(initial),
+      expect(selector("div.grid")).toHaveClass("grid-cols-[minmax(0,1fr)_5.5rem_4.75rem]"),
+      expect(text("casey@mercier.example")).toHaveClass("font-medium"),
+      expect(text("Member · Expires in 5 days")).toHaveClass("text-hint"),
+      expect(text("Pending")).toHaveClass("col-start-2"),
+      expect(
+        within(selector("div.col-start-3"), role("button", { name: "Revoke invitation for casey@mercier.example" }))
+      ).toExist()
+    )
+  })
+
+  it("has a quiet button named for what it acts on, which sends its message", () => {
+    scene(
+      { update, view: viewOf((h) => [pending(h)]) },
+      given(initial),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toHaveText("Revoke"),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toHaveClass("bg-transparent"),
+      click(role("button", { name: "Revoke invitation for casey@mercier.example" })),
+      expect(role("status")).toHaveText("Opened Fieldwork")
+    )
+  })
+
+  it("disables its button while it is told to, and has none when it is given no action", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          historyRow(h, {
+            title: "casey@mercier.example",
+            detail: "Member · Expires in 5 days · Sending…",
+            status: "Pending",
+            action: {
+              label: "Revoke",
+              name: "Revoke invitation for casey@mercier.example",
+              isDisabled: true,
+              onClick: Message.ClickedFieldwork()
+            }
+          }),
+          historyRow(h, { title: "caleb@mercier.example", detail: "Member · Created Sep 21", status: "Accepted" })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toBeDisabled(),
+      expectAll(all.role("button")).toHaveCount(1),
+      expect(text("Accepted")).toExist()
+    )
+  })
+
+  it("moves its action under the status below 48rem", () => {
+    scene(
+      { update, view: viewOf((h) => [pending(h)]) },
+      given(initial),
+      expect(selector("div.grid")).toHaveClass("max-tablet:grid-cols-[minmax(0,1fr)_auto]"),
+      expect(text("Pending")).toHaveClass("max-tablet:text-end"),
+      expect(selector("div.row-span-2")).toHaveClass("max-tablet:row-start-2"),
+      expect(selector("div.row-span-2")).toHaveClass("max-tablet:col-start-2")
+    )
+  })
+})
+
 describe("summary", () => {
   it("says what a list holds, with how many at its end", () => {
     scene(
@@ -582,6 +670,30 @@ describe("compact row", () => {
       given(initial),
       expect(role("button", { name: "Atlas" })).toHaveClass("min-h-19"),
       expect(role("button", { name: "Mercier" })).toHaveClass("min-h-19")
+    )
+  })
+
+  it("keeps its 56px with a 32px mark when it is compact, and starts the folded cells 48px in", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          row(h, {
+            mark: { text: "AM" },
+            markSize: "md",
+            isCompact: true,
+            title: "Alex Morgan",
+            cells: [h.span([], ["Member"]), h.span([], ["Active"])],
+            cellsText: "Member · Active",
+            onClick: Message.ClickedMercier()
+          })
+        ])
+      },
+      given(initial),
+      expect(within(role("button", { name: "Alex Morgan" }), text("AM"))).toHaveClass("size-8"),
+      expect(role("button", { name: "Alex Morgan" })).toHaveClass("min-h-14"),
+      expect(role("button", { name: "Alex Morgan" })).not.toHaveClass("min-h-19"),
+      expect(within(role("button", { name: "Alex Morgan" }), selector(".contents"))).toHaveClass("max-tablet:ps-12")
     )
   })
 

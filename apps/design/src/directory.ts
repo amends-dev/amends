@@ -1,7 +1,8 @@
 /**
  * What a directory screen lists: a label over each group, with how many it holds, a line that says what a
- * list holds, the labels of a table's columns, a row for each thing in it, to open it or to answer it with a
- * button, a quiet line after a list, and the placeholder rows that stand in for a list while it loads.
+ * list holds, the labels of a table's columns, a row for each thing in it, to open it, to answer it with a
+ * button, or to read in a history, a quiet line after a list, and the placeholder rows that stand in for a list
+ * while it loads.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -40,6 +41,8 @@ const rowShape = "flex w-full items-center gap-4 ps-3 pe-4"
 
 const rowHeights = { sm: "min-h-14", md: "min-h-19", lg: "min-h-19" }
 
+const compactRowHeight = "min-h-14"
+
 const rowButton = `${rowShape} group relative cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)] aria-[current=true]:bg-selected aria-[current=true]:[--amends-status-knockout:var(--amends-selected)] aria-[current=true]:indicator-bar`
 
 const rowFoldsCells = "max-tablet:flex-wrap max-tablet:gap-y-2 max-tablet:py-3"
@@ -61,6 +64,18 @@ const rowCell =
 const rowAction = "flex-none px-3 text-control font-medium whitespace-nowrap text-ink-secondary group-hover:text-ink"
 
 const rowActionAmongCells = `w-24 text-end max-desktop:w-20 max-tablet:hidden ${rowAction}`
+
+const historyShape =
+  "grid grid-cols-[minmax(0,1fr)_5.5rem_4.75rem] gap-x-4 gap-y-[0.4375rem] pt-2.5 pb-4 max-tablet:grid-cols-[minmax(0,1fr)_auto] max-tablet:gap-x-3"
+
+const historyTitle = "col-start-1 block truncate text-item font-medium text-ink"
+
+const historyDetail = "col-start-1 block truncate text-hint text-ink-secondary"
+
+const historyStatus = "col-start-2 row-start-1 mt-0.5 text-hint font-medium text-ink-secondary max-tablet:text-end"
+
+const historyAction =
+  "col-start-3 row-span-2 row-start-1 -mb-2.5 self-end justify-self-end max-tablet:col-start-2 max-tablet:row-start-2 max-tablet:mb-0"
 
 const placeholderRow = "loading-pulse"
 
@@ -230,14 +245,16 @@ export const activityCell = <Message, Requirements>(
   )
 
 /**
- * How big a row's mark is, which sets how tall the row is: a 24px mark makes a compact row, 32px and 40px a roomy one.
+ * How big a row's mark is, which sets how tall the row is: a 24px mark makes a compact row, 32px and 40px a roomy one,
+ * unless the row `isCompact`.
  */
 export type RowMarkSize = keyof typeof rowHeights
 
 /**
  * A whole row as one button that sends `onClick`: a square mark of the `mark` letter, 40px, or 32px with
  * `markSize` `md`, or 24px with `sm`, which makes the row 56px tall and not 76px, for a table of people, the `title`
- * over its `meta`, and the `action` at the right. The `status` is a patch on the mark, cut out of the row's own
+ * over its `meta`, and the `action` at the right. A row that `isCompact` is 56px tall whatever its mark's size, as a
+ * table of people is with a 32px mark. The `status` is a patch on the mark, cut out of the row's own
  * surface, which is `hover`'s while it is hovered. The button is named by the title and then the status's word,
  * "Atlas, Needs setup", and described by the meta. A row that `isCurrent` is the one whose details are open beside
  * the list: it is filled `selected`, with the 2px bar at its start, and is `aria-current="true"`.
@@ -269,6 +286,7 @@ export const row = <Message, Requirements>(
     cells?: ReadonlyArray<Html>
     cellsText?: string
     action?: string
+    isCompact?: boolean
     isCurrent?: boolean
     onClick: Message
   }>
@@ -276,6 +294,7 @@ export const row = <Message, Requirements>(
   const description = [config.meta, config.cellsText].filter((part) => part !== undefined).join(" · ")
   const hasCells = config.cells !== undefined
   const markSize = config.markSize ?? "lg"
+  const height = config.isCompact === true ? compactRowHeight : rowHeights[markSize]
 
   return Button.view(
     {
@@ -288,11 +307,7 @@ export const row = <Message, Requirements>(
             h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
             ...(description === "" ? [] : [h.AriaDescription(description)]),
             ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
-            h.Class(
-              hasCells
-                ? `${rowButton} ${rowHeights[markSize]} ${rowFoldsCells}`
-                : `${rowButton} ${rowHeights[markSize]}`
-            )
+            h.Class(hasCells ? `${rowButton} ${height} ${rowFoldsCells}` : `${rowButton} ${height}`)
           ],
           [
             mark(h, { ...config.mark, size: markSize, status: config.status }),
@@ -353,6 +368,51 @@ export const rowWithButton = <Message, Requirements>(
         },
         h
       )
+    ]
+  )
+}
+
+/**
+ * A row of a history, which is read and not opened, with no mark: the `title` over its `detail`, the `status` in words
+ * in a column beside them, and, when the row has one, a quiet `action` button at the end, level with the detail. The
+ * row is a grid of the title and detail, 5.5rem for the status, and 4.75rem for the action; below 48rem the action
+ * moves under the status. The button is named by `action.name`, which begins with the label, such as "Revoke
+ * invitation for casey@example.com", so that the buttons of several rows are told apart, and is disabled while
+ * `action.isDisabled`.
+ */
+export const historyRow = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    title: string
+    detail: string
+    status: string
+    action?: Readonly<{ label: string; name: string; isDisabled?: boolean; onClick: Message }>
+  }>
+): Html => {
+  const { action } = config
+
+  return h.div(
+    [h.Class(historyShape)],
+    [
+      h.span([h.Class(historyTitle)], [config.title]),
+      h.span([h.Class(historyDetail)], [config.detail]),
+      h.span([h.Class(historyStatus)], [config.status]),
+      action === undefined
+        ? h.empty
+        : h.div(
+            [h.Class(historyAction)],
+            [
+              Button.view(
+                {
+                  onClick: action.onClick,
+                  isDisabled: action.isDisabled ?? false,
+                  toView: (attributes) =>
+                    buttonWith(h, [...attributes.button, h.AriaLabel(action.name)], action.label, { variant: "quiet" })
+                },
+                h
+              )
+            ]
+          )
     ]
   )
 }
