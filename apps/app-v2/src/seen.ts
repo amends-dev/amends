@@ -111,13 +111,21 @@ export const calendarDate = (at: DateTime.DateTime): string =>
   DateTime.formatLocal(at, { month: "short", day: "numeric", year: "numeric" })
 
 /**
+ * How long the app's time now may be behind the clock: the root reads the time once a minute, so an invitation the host
+ * made a moment ago can end a week and some seconds after the time the app holds.
+ */
+const clockLag = millisPerMinute
+
+/**
  * How long after `now` it will be `at`, as an invitation says when it closes: "Expires in 7 days", by the days left
  * rounded up, and so at least one, as `apps/ui` says it, so that an invitation made for a week reads seven until
- * a day of it has passed, and "Expired" once `at` has come.
+ * a day of it has passed, and "Expired" once `at` has come. The days are counted from a minute after `now`, which
+ * the app's time may be behind by.
  */
 export const expiryLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
   const remaining = DateTime.toEpochMillis(at) - DateTime.toEpochMillis(now)
-  return remaining <= 0 ? "Expired" : `Expires in ${pluralize(Math.ceil(remaining / millisPerDay), "day", "days")}`
+  const days = Math.max(1, Math.ceil((remaining - clockLag) / millisPerDay))
+  return remaining <= 0 ? "Expired" : `Expires in ${pluralize(days, "day", "days")}`
 }
 
 /** `memberId` by their name among `members`, or their ID until names are read. */

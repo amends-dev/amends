@@ -442,12 +442,14 @@ describe("expiryLabel", () => {
   })
 
   it("is the days left rounded up, so that an invitation just made for a week says seven", () => {
-    expect(after({ days: 1, minutes: 1 })).toBe("Expires in 2 days")
+    expect(after({ days: 1, minutes: 2 })).toBe("Expires in 2 days")
     expect(after({ days: 3 })).toBe("Expires in 3 days")
     expect(after({ days: 6, hours: 23, minutes: 59 })).toBe("Expires in 7 days")
     expect(after({ days: 6, hours: 12 })).toBe("Expires in 7 days")
     expect(after({ days: 7 })).toBe("Expires in 7 days")
-    expect(after({ days: 7, minutes: 1 })).toBe("Expires in 8 days")
+    // The app's time now is read once a minute, so an invitation made since it was read ends a little after a week.
+    expect(after({ days: 7, seconds: 50 })).toBe("Expires in 7 days")
+    expect(after({ days: 7, minutes: 2 })).toBe("Expires in 8 days")
     expect(after({ days: 45 })).toBe("Expires in 45 days")
   })
 })
