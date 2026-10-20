@@ -36,7 +36,7 @@ import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
-import { modal } from "../src/modal.ts"
+import { modal, modalList } from "../src/modal.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
 import { rail } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
@@ -50,7 +50,13 @@ import {
   sidebarSections
 } from "../src/sidebar.ts"
 import { toast, toastStack } from "../src/toast.ts"
-import { type ApplicationViewBuilder, ApplicationComposition, ModalBinding, WideModalBinding } from "./composition.ts"
+import {
+  type ApplicationViewBuilder,
+  ApplicationComposition,
+  ChooserModalBinding,
+  ModalBinding,
+  WideModalBinding
+} from "./composition.ts"
 import {
   type Destination,
   Message,
@@ -2578,6 +2584,56 @@ const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mod
     width: "wide"
   })
 
+type IntegrationSample = Readonly<{ name: string; detail: string }>
+
+const integrationSamples: ReadonlyArray<IntegrationSample> = [
+  { name: "Anthropic", detail: "Models · API key" },
+  { name: "MCP server", detail: "Tools · API key or no authentication" },
+  { name: "Daytona", detail: "Sandboxes · API key" }
+]
+
+const chooserModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html => {
+  const words = model.integrationQuery.trim().toLowerCase()
+
+  return modal(h, render, {
+    title: "Add connection",
+    context: "Mercier & Co",
+    body: [
+      field(
+        h,
+        {
+          id: "modal-integration-search",
+          label: "Search integrations",
+          type: "search",
+          value: model.integrationQuery,
+          placeholder: "Search integrations…",
+          isAutofocus: false,
+          isLabelHidden: true,
+          attributes: render.initialFocus,
+          onInput: (value) => Message.TypedIntegrationQuery({ value })
+        },
+        Option.none()
+      ),
+      modalList(
+        h,
+        "Integrations",
+        integrationSamples
+          .filter(({ name }) => words === "" || name.toLowerCase().includes(words))
+          .map(({ name, detail }) =>
+            row(h, {
+              mark: { icon: "mark-connections" },
+              markSize: "md",
+              title: name,
+              meta: detail,
+              onClick: Message.PickedIntegration()
+            })
+          )
+      )
+    ],
+    cancelLabel: "Cancel"
+  })
+}
+
 const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
   group(h, "Modal", [
     sample(h, "A context, a field with the initial focus, a toggle, and a footer", [
@@ -2597,6 +2653,16 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           slotId: "wide-modal",
           model: model.wideModal,
           viewInputs: { hasDescription: true, toView: (render) => settingsModal(h, render, model) }
+        })
+      )
+    ]),
+    sample(h, "A search over rows that run to the panel's edges", [
+      button(h, "Open the chooser", Message.ClickedOpenChooserModal()),
+      h.block(
+        ChooserModalBinding.embedView({
+          slotId: "chooser-modal",
+          model: model.chooserModal,
+          viewInputs: { toView: (render) => chooserModal(h, render, model) }
         })
       )
     ])

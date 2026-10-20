@@ -34,8 +34,8 @@ folded, in a frame 360px wide; the centered screen as the
 sign-in's two steps and as the workspace picker five times, each with its pieces in `screenContent` as the app's
 pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; and with the host not reached, whose message is the screen's `h1`; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
-that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
-one with tabs and a description; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
+that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a wide
+one with tabs and a description, and as a search over rows of integrations that run to the panel's edges; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
 list, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -724,6 +724,12 @@ the `dialog` element, the focus inside it, Escape, the click on the scrim, and t
   - `width`, `"form"` (the default) for a panel 26rem wide, or `"wide"` for 32rem. A panel is
     never wider than the window less a 1rem gutter on each side, nor taller than the window less
     4rem. It is `raised` with `shadow-modal` and no rounding, over a `scrim-strong` scrim.
+- `modalList(h, label, rows)` is for a modal that is a choice among things, such as the integrations
+  a connection can go through. It lists the `rows`, each a `row` of `directory` with no cells, as a
+  list named `label`, and it runs to the edges of the panel: it cancels the body's `px-6` on both
+  sides and its bottom padding, so a row's hover fills the panel's width and the list ends at the
+  footer's line, with a line over it. Whatever comes before it in the body, such as a search `field`,
+  keeps the body's padding and its 16px gap.
 
 A Block uses it in four steps:
 
@@ -764,7 +770,8 @@ those with a modifier, left to the browser, and a log by `role("list")` with a l
 toast by `role("alert")`, or `role("status")` for a confirmation, with its text, detail, and button, in the stack's live region; a modal by its
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and
-Cancel by closing the dialog without sending the form; a message by
+Cancel by closing the dialog without sending the form, and a list of rows by its label, a row each
+with its meta as its description, the side and bottom padding it cancels, and the message a row sends; a message by
 its text button, `aria-current`, its note, actions, meta, and body, a mention in its text by the
 chip that holds it and a button by the words joined, a notification by its
 text button named by its author and activity and described by its text, its place and age,

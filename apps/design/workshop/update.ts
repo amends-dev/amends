@@ -1,5 +1,5 @@
 import { modifyFields } from "foldkit/struct"
-import { ApplicationComposition, ModalBinding, WideModalBinding } from "./composition.ts"
+import { ApplicationComposition, ChooserModalBinding, ModalBinding, WideModalBinding } from "./composition.ts"
 import { Message } from "./definition.ts"
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
@@ -26,6 +26,9 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     ToggledGroupPrivate: ({ isOn }) => ({ model: modifyFields(model, { isGroupPrivate: () => isOn }) }),
     ClickedOpenModal: () => ModalBinding.requestOpen()(model),
     ClickedOpenWideModal: () => WideModalBinding.requestOpen()(model),
+    ClickedOpenChooserModal: () => ChooserModalBinding.requestOpen()(model),
+    TypedIntegrationQuery: ({ value }) => ({ model: modifyFields(model, { integrationQuery: () => value }) }),
+    PickedIntegration: () => ChooserModalBinding.requestClose()(model),
     ChangedModalTab: ({ tab }) => ({ model: modifyFields(model, { modalTab: () => tab }) }),
     SubmittedModal: () => ModalBinding.requestClose()(model),
     SubmittedWideModal: () => WideModalBinding.requestClose()(model),

@@ -11,6 +11,9 @@
  *   `hasDescription: true` when the config has a `description`;
  * - spreads `render.initialFocus` onto the control that takes focus when the dialog opens, through the
  *   `attributes` of `field`, `textarea`, or `choiceSelect`, with a field's `isAutofocus` off.
+ *
+ * A modal that is a choice among things, such as the integrations a connection can go through, puts them in a
+ * `modalList` after its search, so that the rows run to the panel's edges.
  */
 
 import type { RenderInfo } from "@foldkit/ui/dialog"
@@ -45,6 +48,8 @@ const tabsSlot = "mt-auto flex"
 const bodyColumn = "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-6 py-5"
 
 const descriptionText = "m-0 text-hint text-ink-secondary"
+
+const listLook = "-mx-6 -mb-5 border-t border-divider"
 
 const footerRow = "flex flex-none items-center justify-end gap-2 border-t border-divider px-6 py-4"
 
@@ -120,6 +125,21 @@ const renderFooter = <Message, Requirements>(
           ...(config.footer ?? [])
         ]
       )
+
+/**
+ * The `rows` to choose among, a `row` each, as a list named `label` that runs to the edges of the panel under
+ * what comes before it in the body, and ends at the footer's line, so that a row's hover fills the panel's width.
+ * It cancels the body's padding on the sides and below; the field before it keeps the body's gap.
+ */
+export const modalList = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  rows: ReadonlyArray<Html>
+): Html =>
+  h.ul(
+    [h.AriaLabel(label), h.Class(listLook)],
+    rows.map((row) => h.li([], [row]))
+  )
 
 /**
  * The dialog `render` describes, as a panel over a scrim while it is visible, and nothing while it is not: a

@@ -20,7 +20,13 @@ export const WideModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
   outMessage: { fold: foldDialogOutMessage }
 })
 
+export const ChooserModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "chooserModal",
+  init: { contextToArgs: () => [{ id: "workshop-chooser-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
-  bindings: [ModalBinding, WideModalBinding]
+  bindings: [ModalBinding, WideModalBinding, ChooserModalBinding]
 })
 export type ApplicationViewBuilder = Block.ViewBuilderFor<typeof ApplicationComposition>

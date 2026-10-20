@@ -4,11 +4,26 @@ import { Option, Schema } from "effect"
 import { makeApplicationDefinition } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { Command, Mount, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
+import {
+  Command,
+  Mount,
+  all,
+  click,
+  expect,
+  expectAll,
+  given,
+  label,
+  role,
+  scene,
+  text,
+  type,
+  within
+} from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { button, field, submit } from "./control.ts"
-import { type ModalRender, modal } from "./modal.ts"
+import { row } from "./directory.ts"
+import { type ModalRender, modal, modalList } from "./modal.ts"
 import { paneTabs } from "./pane.ts"
 
 const Message = defineMessageUnion({
@@ -300,6 +315,66 @@ describe("modal in a Block that binds the dialog", () => {
       Command.expectExact(Dialog.test.CloseDialog),
       ...dialogClosed(),
       expect(role("status")).toHaveText("Saved 1")
+    )
+  })
+})
+
+describe("modalList", () => {
+  const integrations = (_: Model, h: HtmlBuilder<Message>) =>
+    modal(h, visibleRender, {
+      title: "Add connection",
+      context: "Mercier & Co",
+      body: [
+        modalList(h, "Integrations", [
+          row(h, {
+            mark: { icon: "mark-connections" },
+            markSize: "md",
+            title: "Anthropic",
+            meta: "Models · API key",
+            onClick: Message.ClickedOpen()
+          }),
+          row(h, {
+            mark: { icon: "mark-connections" },
+            markSize: "md",
+            title: "MCP server",
+            meta: "Tools · API key or no authentication",
+            onClick: Message.ChangedTab({ tab: "members" })
+          })
+        ])
+      ],
+      cancelLabel: "Cancel"
+    })
+
+  it("is a list named by its label with a row for each, which carry their meta as their description", () => {
+    scene(
+      { update, view: integrations },
+      given(initial),
+      expect(role("list", { name: "Integrations" })).toExist(),
+      expectAll(all.role("listitem")).toHaveCount(2),
+      expect(role("button", { name: "Anthropic" })).toHaveAttr("aria-description", "Models · API key"),
+      expect(role("button", { name: "MCP server" })).toHaveAttr(
+        "aria-description",
+        "Tools · API key or no authentication"
+      )
+    )
+  })
+
+  it("runs to the panel's edges, cancelling the body's padding on the sides and below, under a line", () => {
+    scene(
+      { update, view: integrations },
+      given(initial),
+      expect(role("list", { name: "Integrations" })).toHaveClass("-mx-6"),
+      expect(role("list", { name: "Integrations" })).toHaveClass("-mb-5"),
+      expect(role("list", { name: "Integrations" })).toHaveClass("border-t")
+    )
+  })
+
+  it("sends what the row picked says", () => {
+    scene(
+      { update, view: (model, h) => h.div([], [h.p([h.Role("status")], [model.tab]), integrations(model, h)]) },
+      given(initial),
+      click(role("button", { name: "MCP server" })),
+      expect(role("status")).toHaveText("members")
     )
   })
 })
