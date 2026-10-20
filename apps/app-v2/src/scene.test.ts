@@ -38,7 +38,7 @@ import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { SendCode } from "./page/signIn/command.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
-import { Open } from "./page/workspace/definition.ts"
+import { Open as HomeOpen } from "./page/workspace/home/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { Workspaces } from "./page/workspaces/definition.ts"
 import { subscriptions } from "./subscription.ts"
@@ -122,10 +122,14 @@ const inWorkspaceChanged = (
 /** Signed in as alice, with the thread of general open in her opened workspace. */
 const withThread = inWorkspaceChanged((workspace) =>
   modifyFields(workspace, {
-    open: () =>
-      Open.Group({
-        groupId: general.id,
-        model: GroupBlock.init(membership.workspace.id, membership.member.id, general.id, Option.some(thread.id)).model
+    home: (home) =>
+      modifyFields(home, {
+        open: () =>
+          HomeOpen.Group({
+            groupId: general.id,
+            model: GroupBlock.init(membership.workspace.id, membership.member.id, general.id, Option.some(thread.id))
+              .model
+          })
       })
   })
 )
@@ -133,20 +137,23 @@ const withThread = inWorkspaceChanged((workspace) =>
 /** Signed in as alice, with her opened workspace showing the inbox, which holds Bob's reply of 25 minutes ago. */
 const withInbox = inWorkspaceChanged((workspace) =>
   modifyFields(workspace, {
-    open: () => Open.Inbox(),
-    inbox: (inbox) =>
-      modifyFields(inbox, {
-        isLoaded: () => true,
-        items: () => [
-          {
-            notification: notificationOf("notification-1", 2, 5),
-            thread: Option.some(thread),
-            opening: Option.some(opening),
-            message: Option.some(reply)
-          }
-        ],
-        groups: () => [general],
-        members: () => [membership.member, bob]
+    home: (home) =>
+      modifyFields(home, {
+        open: () => HomeOpen.Inbox(),
+        inbox: (inbox) =>
+          modifyFields(inbox, {
+            isLoaded: () => true,
+            items: () => [
+              {
+                notification: notificationOf("notification-1", 2, 5),
+                thread: Option.some(thread),
+                opening: Option.some(opening),
+                message: Option.some(reply)
+              }
+            ],
+            groups: () => [general],
+            members: () => [membership.member, bob]
+          })
       })
   })
 )

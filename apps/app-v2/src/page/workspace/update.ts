@@ -6,32 +6,29 @@ import {
   ChannelsBinding,
   ConnectionsBinding,
   goTo,
+  HomeBinding,
   hideAside,
   MenuBinding,
   SearchBinding,
   showAgents,
   showAside,
   showConnections,
-  showInbox,
-  showNothing,
+  showHome,
   showSettings,
-  showTasks,
-  showTriage,
   switchTo,
   WorkspaceComposition
 } from "./composition.ts"
-import { isAsideShowing, Message, OutMessage, WorkspaceDefinition } from "./definition.ts"
+import { isMemberOpen, Message, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Lay the workspace out for a window of the width `viewport`. */
 const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))
 
 /**
- * Put what the side pane shows, the thread open or the member, if there is one, where the window's width puts
- * the side pane: in its dialog, which opens, or beside the main pane, which closes the dialog without closing
- * what it shows.
+ * Put the member open in the settings, if there is one, where the window's width puts the side pane: in its dialog,
+ * which opens, or beside the main pane, which closes the dialog without closing the member.
  */
 const placeAside = WorkspaceDefinition.step((model) => {
-  if (!isAsideShowing(model)) {
+  if (!isMemberOpen(model)) {
     return WorkspaceDefinition.stepNoop()
   }
 
@@ -48,10 +45,7 @@ const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
-    ClickedHome: () => Update.combine(model, [switchTo(showNothing)]),
-    ClickedInbox: () => Update.combine(model, [goTo(showInbox)]),
-    ClickedTriage: () => Update.combine(model, [goTo(showTriage)]),
-    ClickedTasks: () => Update.combine(model, [goTo(showTasks)]),
+    ClickedHome: () => Update.combine(model, [switchTo(showHome)]),
     ClickedConnections: () => Update.combine(model, [switchTo(showConnections)]),
     ClickedAgents: () => Update.combine(model, [switchTo(showAgents)]),
     ClickedSettings: () => Update.combine(model, [switchTo(showSettings("Workspace"))]),
@@ -65,7 +59,8 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
       Update.combine(model, [
         showViewport(viewport),
         ...(hasSidebarInPlace(viewport) ? [MenuBinding.requestClose()] : []),
-        placeAside
+        placeAside,
+        HomeBinding.informViewport({ viewport })
       ]),
     ReceivedIntegrations: ({ integrations }) =>
       Update.combine(model, [

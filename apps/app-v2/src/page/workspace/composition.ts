@@ -1,7 +1,5 @@
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
-import { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
-import type { ThreadId } from "@amends-dev/core/thread"
 import type { MemberId } from "@amends-dev/core/workspace"
 import { isAsideInDialog } from "@amends-dev/design/shell"
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -14,15 +12,12 @@ import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { connectionsToast } from "../../feature/connections/wording.ts"
-import { GroupBlock } from "../../feature/group/block.ts"
-import { GroupsBlock } from "../../feature/groups/block.ts"
-import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
-import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
 import { type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
+import { HomeBlock } from "./home/block.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
 const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
@@ -30,39 +25,9 @@ const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
   commands: [LoadIntegrations({ workspaceId: model.workspaceId })]
 }))
 
-/** Open the group `groupId` in the main content, with the thread `threadId` open in it, if there is one. */
-const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.ThreadId>) =>
-  WorkspaceDefinition.step((model: Model) =>
-    GroupBinding.init({
-      key: groupId,
-      args: [model.workspaceId, model.memberId, groupId, threadId],
-      toParentModel: (group) => modifyFields(model, { open: () => Open.Group({ groupId, model: group }) })
-    })
-  )
-
-/** Show nothing yet in the main content. */
-export const showNothing = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Nothing() })
-}))
-
-/** Show the inbox in the main content. */
-export const showInbox = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Inbox() })
-}))
-
-/** Show the tasks in triage in the main content. */
-export const showTriage = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Triage() })
-}))
-
-/** Show every open task in the main content. */
-export const showTasks = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Tasks() })
-}))
-
-/** Show the groups to browse in the main content. */
-export const showGroups = WorkspaceDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Groups() })
+/** Show Home in the main content. */
+export const showHome = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, { open: () => Open.Home() })
 }))
 
 /** Show the connections in the main content. */
@@ -116,79 +81,32 @@ export const showChannels = WorkspaceDefinition.step((model: Model) => ({
 }))
 
 /**
- * Switch to a destination, as the rail does: close the side pane's dialog, the thread beside the inbox, and the
- * member beside the settings, leave no group marked in the sidebar, and `show` it, leaving the navigation drawer as
- * it is, so the person sees the sidebar of the destination they picked.
+ * Switch to a destination, as the rail does: close the side pane's dialog, reset Home, which closes its thread and
+ * leaves no group marked in the sidebar, and `show` it, leaving the navigation drawer as it is, so the person sees the
+ * sidebar of the destination they picked.
  */
-export const switchTo = (show: typeof showNothing) =>
-  Update.combine([
-    hideAside,
-    InboxBinding.requestCloseThread(),
-    GroupsBinding.informOpenGroup({ groupId: Option.none() }),
-    show
-  ])
+export const switchTo = (show: typeof showHome) => Update.combine([hideAside, HomeBinding.requestReset(), show])
 
 /** Go to a destination, as picking an item of the sidebar does: close the navigation drawer, and switch to it. */
-export const goTo = (show: typeof showNothing) => Update.combine([MenuBinding.requestClose(), switchTo(show)])
+export const goTo = (show: typeof showHome) => Update.combine([MenuBinding.requestClose(), switchTo(show)])
 
-/**
- * Open the group `groupId` without a thread, and close the navigation drawer, the side pane's dialog, and the
- * thread beside the inbox.
- */
-const openGroupAlone = (groupId: GroupId.GroupId) =>
-  Update.combine([
-    MenuBinding.requestClose(),
-    hideAside,
-    InboxBinding.requestCloseThread(),
-    openGroup(groupId, Option.none())
-  ])
+/** Show Home, where the person moved, with the navigation drawer and the side pane's dialog closed. */
+const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, showHome])
 
-/**
- * Open the group `groupId` with the thread `threadId` open in it, mark the group open in the list, close the
- * navigation drawer and the thread beside the inbox, and open the side pane's dialog where the pane is one.
- */
-const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.ThreadId) =>
-  Update.combine([
-    MenuBinding.requestClose(),
-    InboxBinding.requestCloseThread(),
-    GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
-    openGroup(groupId, Option.some(threadId)),
-    showAside
-  ])
-
-/**
- * Picking a group opens it without a thread, and closes the navigation drawer and the side pane's dialog. Asking
- * to browse goes to the groups.
- */
-const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
-  SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
-  RequestedBrowse: () => goTo(showGroups)
+/** Home reports that the person moved within it, which shows it and closes the navigation drawer. */
+const foldHomeOutMessage = HomeBlock.OutMessage.match({
+  Navigated: () => goToHome()
 })
 
 /**
- * A notification's thread opening beside the inbox opens the side pane's dialog where the pane is one, and
- * closing it closes the dialog.
- */
-const foldInboxOutMessage = InboxBlock.OutMessage.match({
-  OpenedThread: () => showAside,
-  ClosedThread: () => hideAside
-})
-
-/** Opening a task's thread opens it in its group. */
-const foldTasksOutMessage = TasksBlock.OutMessage.match({
-  OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId)
-})
-
-/**
- * What the search found opens as it would from the sidebar and the tasks, except that the groups do not hear of a
- * group the search opened, so they are told which is open. A person is opened as a conversation, which the groups
- * find or start.
+ * What the search found opens in Home as it would from the sidebar and the tasks, and shows Home. A person is opened as
+ * a conversation, which Home's groups find or start.
  */
 const foldSearchOutMessage = SearchBlock.OutMessage.match({
-  OpenedGroup: ({ groupId }) =>
-    Update.combine([GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }), openGroupAlone(groupId)]),
-  OpenedThread: ({ groupId, threadId }) => openThreadInGroup(groupId, threadId),
-  OpenedPerson: ({ memberId }) => GroupsBinding.requestConversationWith({ memberId })
+  OpenedGroup: ({ groupId }) => Update.combine([HomeBinding.requestOpenGroup({ groupId }), goToHome()]),
+  OpenedThread: ({ groupId, threadId }) =>
+    Update.combine([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
+  OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId })
 })
 
 /**
@@ -258,15 +176,15 @@ const foldMenuOutMessage = DialogBlock.OutMessage.match({
 })
 
 /**
- * The side pane's dialog opening and finishing its close change nothing else. Its closing, by Escape, its scrim,
- * or the page, closes what it shows, the thread or the member, except at `Split`: there it is the pane moving beside
- * the main pane, not the person leaving what it shows.
+ * The side pane's dialog opening and finishing its close change nothing else. Its closing, by Escape, its scrim, or the
+ * page, closes the member it shows, except at `Split`: there it is the pane moving beside the main pane, not the
+ * person leaving the member.
  */
 const foldAsideOutMessage = DialogBlock.OutMessage.match({
   Opened: () => WorkspaceDefinition.stepNoop(),
   Closed: () =>
     WorkspaceDefinition.step((model: Model) =>
-      isAsideInDialog(model.viewport) ? closeWhatAsideShows : WorkspaceDefinition.stepNoop()
+      isAsideInDialog(model.viewport) ? closeMember : WorkspaceDefinition.stepNoop()
     ),
   CompletedClose: () => WorkspaceDefinition.stepNoop()
 })
@@ -291,49 +209,21 @@ export const showAside = WorkspaceDefinition.step((model: Model) =>
 /** Close the side pane's dialog; closing one that is closed does nothing. */
 export const hideAside = AsideBinding.requestClose()
 
-/**
- * Close what the side pane shows, the thread open in the group open or beside the inbox, or the member open in the
- * settings, if there is one.
- */
-const closeWhatAsideShows = WorkspaceDefinition.step((model: Model) =>
-  Open.matchOrElse(
-    model.open,
-    {
-      Inbox: () => InboxBinding.requestCloseThread(),
-      Group: ({ groupId }) => GroupBinding.requestCloseThread(groupId),
-      Settings: () => closeMember
-    },
-    () => WorkspaceDefinition.stepNoop()
-  )
-)
-
-export const GroupsBinding = WorkspaceDefinition.bindChild(GroupsBlock, {
-  field: "groups",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldGroupsOutMessage }
-})
-
 export const ActionsBinding = WorkspaceDefinition.bindChild(ActionsBlock, {
   field: "actions",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
-})
-
-export const InboxBinding = WorkspaceDefinition.bindChild(InboxBlock, {
-  field: "inbox",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldInboxOutMessage }
-})
-
-export const TasksBinding = WorkspaceDefinition.bindChild(TasksBlock, {
-  field: "tasks",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldTasksOutMessage }
 })
 
 export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
   field: "search",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
   outMessage: { fold: foldSearchOutMessage }
+})
+
+export const HomeBinding = WorkspaceDefinition.bindChild(HomeBlock, {
+  field: "home",
+  init: { contextToArgs: ({ workspaceId, memberId, viewport }) => [workspaceId, memberId, viewport] },
+  outMessage: { fold: foldHomeOutMessage }
 })
 
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
@@ -375,44 +265,17 @@ export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   outMessage: { fold: ChannelsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
 })
 
-/** The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it. */
-const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
-  GroupBlock.OutMessage.match(outMessage, {
-    OpenedThread: () => showAside,
-    ClosedThread: () => hideAside
-  })
-
-/**
- * The open group, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong
- * one.
- */
-export const GroupBinding = WorkspaceDefinition.bindChild(GroupBlock, {
-  readAll: (model) => (Open.isAnyOf(["Group"])(model.open) ? [model.open] : []),
-  key: (open) => open.groupId,
-  keySchema: GroupId.GroupId,
-  read: (open) => open.model,
-  writeAt: (model, groupId, nextGroup) =>
-    modifyFields(model, {
-      open: (open) =>
-        Open.isAnyOf(["Group"])(open) && open.groupId === groupId ? Open.Group({ groupId, model: nextGroup }) : open
-    }),
-  outMessage: { fold: foldGroupOutMessage }
-})
-
 export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
   bindings: [
     MenuBinding,
     AsideBinding,
-    GroupsBinding,
     ActionsBinding,
-    InboxBinding,
-    TasksBinding,
     SearchBinding,
+    HomeBinding,
     ConnectionsBinding,
     AgentsBinding,
     SettingsBinding,
-    ChannelsBinding,
-    GroupBinding
+    ChannelsBinding
   ]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

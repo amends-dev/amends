@@ -1,8 +1,8 @@
 import { iconButton } from "@amends-dev/design/control"
-import { pane } from "@amends-dev/design/pane"
 import { rail } from "@amends-dev/design/rail"
 import { shell } from "@amends-dev/design/shell"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "@amends-dev/design/sidebar"
+import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
@@ -18,35 +18,34 @@ import {
   sidebarView as connectionsSidebarView,
   view as connectionsView
 } from "../../feature/connections/view.ts"
-import { threadView as groupThreadView } from "../../feature/group/view.ts"
-import { browseView, dialogView } from "../../feature/groups/view.ts"
-import { waitingCount } from "../../feature/inbox/definition.ts"
-import { threadView as inboxThreadView } from "../../feature/inbox/view.ts"
 import {
   accountView as settingsAccountView,
   dialogView as settingsDialogView,
   memberView as settingsMemberView,
   membersView as settingsMembersView
 } from "../../feature/settings/view.ts"
-import { triageCount } from "../../feature/tasks/definition.ts"
-import { tasksView, triageView } from "../../feature/tasks/view.ts"
 import {
   ActionsBinding,
   AgentsBinding,
   AsideBinding,
   ChannelsBinding,
   ConnectionsBinding,
-  GroupBinding,
-  GroupsBinding,
-  InboxBinding,
+  HomeBinding,
   MenuBinding,
   SearchBinding,
   SettingsBinding,
-  TasksBinding,
   WorkspaceComposition,
   type WorkspaceViewBuilder
 } from "./composition.ts"
-import { Message, type Model, nameOf, Open, openMemberId, openThreadTitle, type SettingsPage } from "./definition.ts"
+import { Message, type Model, nameOf, Open, openMemberId, type SettingsPage } from "./definition.ts"
+import { isThreadOpen } from "./home/definition.ts"
+import {
+  asideDialogView as homeAsideDialogView,
+  dialogView as homeDialogView,
+  sidebarView as homeSidebarView,
+  threadView as homeThreadView,
+  view as homeView
+} from "./home/view.ts"
 
 /**
  * Who is signed in, which the account menu names under the person's name, their Appearance, which the menu checks, the
@@ -65,7 +64,7 @@ const railItems = (model: Model) => [
   {
     icon: "mark-home" as const,
     label: "Home",
-    isCurrent: Open.isAnyOf(["Nothing", "Inbox", "Triage", "Tasks", "Groups", "Group"])(model.open),
+    isCurrent: Open.isAnyOf(["Home"])(model.open),
     onClick: Message.ClickedHome()
   },
   {
@@ -81,45 +80,6 @@ const railItems = (model: Model) => [
     onClick: Message.ClickedConnections()
   }
 ]
-
-/** Home's sections of the sidebar: the inbox, the triage, the tasks, and the groups. */
-const homeSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => {
-  const waiting = waitingCount(model.inbox)
-  const inTriage = triageCount(model.tasks.items)
-  return [
-    sidebarSection(h, {
-      children: [
-        sidebarItem(h, {
-          icon: "mark-mail",
-          label: "Inbox",
-          ...(waiting > 0 ? { count: waiting } : {}),
-          isCurrent: Open.isAnyOf(["Inbox"])(model.open),
-          onClick: Message.ClickedInbox()
-        }),
-        sidebarItem(h, {
-          icon: "mark-triage",
-          label: "Triage",
-          ...(inTriage > 0 ? { count: inTriage } : {}),
-          isCurrent: Open.isAnyOf(["Triage"])(model.open),
-          onClick: Message.ClickedTriage()
-        }),
-        sidebarItem(h, {
-          icon: "mark-tasks",
-          label: "Tasks",
-          isCurrent: Open.isAnyOf(["Tasks"])(model.open),
-          onClick: Message.ClickedTasks()
-        })
-      ]
-    }),
-    h.block(
-      GroupsBinding.embedView({
-        slotId: "groups",
-        model: model.groups,
-        viewInputs: { openThread: openThreadTitle(model), isBrowsing: Open.isAnyOf(["Groups"])(model.open) }
-      })
-    )
-  ]
-}
 
 /**
  * The agents' section of the sidebar, whose title is current while the list of agents is what the main pane shows, and
@@ -188,20 +148,17 @@ const settingsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<
   ]
 }
 
-/** The sections of the sidebar that belong to the destination open, Home's for every one that is Home's. */
+/** The sections of the sidebar that belong to the destination open. */
 const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> =>
-  Open.matchOrElse(
-    model.open,
-    {
-      Agents: () => agentsSections(model, h),
-      Agent: () => agentsSections(model, h),
-      Connections: () => connectionsSections(model, h),
-      Connection: () => connectionsSections(model, h),
-      Channels: () => connectionsSections(model, h),
-      Settings: () => settingsSections(model, h)
-    },
-    () => homeSections(model, h)
-  )
+  Open.match(model.open, {
+    Home: () => [h.block(HomeBinding.embedView({ slotId: "home-sidebar", model: model.home, view: homeSidebarView }))],
+    Agents: () => agentsSections(model, h),
+    Agent: () => agentsSections(model, h),
+    Connections: () => connectionsSections(model, h),
+    Connection: () => connectionsSections(model, h),
+    Channels: () => connectionsSections(model, h),
+    Settings: () => settingsSections(model, h)
+  })
 
 /**
  * The sidebar: the workspace's name and the search, and the sections of the destination open.
@@ -230,27 +187,18 @@ const sidebarView = (model: Model, { isApplePlatform }: ViewInputs, h: Workspace
   })
 }
 
-/**
- * The main pane: the destination the person opened, or, while they have opened none, the way to pick one. The
- * inbox, the tasks, and the open group are given the time now.
- */
+/** The main pane: the destination the person opened. Home and the settings' members page are given the time now. */
 const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Html =>
   Open.match(model.open, {
-    Nothing: () => {
-      const name = nameOf(model)
-      return pane(h, {
-        variant: "main",
-        label: name,
-        header: { title: name, mark: { text: name.slice(0, 1) }, subtitle: "Pick a group, or open your inbox." },
-        body: []
-      })
-    },
-    Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),
-    Triage: () =>
-      h.block(TasksBinding.embedView({ slotId: "triage", model: model.tasks, view: triageView, viewInputs: { now } })),
-    Tasks: () =>
-      h.block(TasksBinding.embedView({ slotId: "tasks", model: model.tasks, view: tasksView, viewInputs: { now } })),
-    Groups: () => h.block(GroupsBinding.embedView({ slotId: "browse", model: model.groups, view: browseView })),
+    Home: () =>
+      h.block(
+        HomeBinding.embedView({
+          slotId: "home",
+          model: model.home,
+          view: homeView,
+          viewInputs: { now, workspaceName: nameOf(model) }
+        })
+      ),
     Connections: () =>
       h.block(
         ConnectionsBinding.embedView({
@@ -290,49 +238,48 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
               viewInputs: { now, viewport: model.viewport, openMemberId: openMemberId(model) }
             })
           ),
-    Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
-    Group: ({ groupId, model: open }) =>
-      h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open, viewInputs: { now } }))
+    Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels }))
   })
 
-/** What the side pane is called, which names the dialog that holds it, and what it shows. */
-type Aside = Readonly<{ label: string; view: Html }>
+/** How a dialog is drawn, given what it publishes. */
+type ToView = (render: RenderInfo) => Html
 
 /**
- * The side pane: the thread open, in the group open or beside the inbox, or the member open in the settings, while
- * there is one, given the time now.
+ * What the side pane is called, which names the dialog that holds it, what it shows, whether its dialog is open, and
+ * the dialog, which the shell draws.
+ */
+type Aside = Readonly<{ label: string; view: Html; isOpen: boolean; dialog: (toView: ToView) => Html }>
+
+/**
+ * The side pane: Home's thread, while Home shows one, or the member open in the settings, while there is one, given
+ * the time now.
  */
 const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Option.Option<Aside> =>
   Open.matchOrElse(
     model.open,
     {
-      Inbox: () =>
-        Option.isSome(model.inbox.selected)
+      Home: () =>
+        isThreadOpen(model.home)
           ? Option.some({
               label: "Thread",
               view: h.block(
-                InboxBinding.embedView({
-                  slotId: "inbox-thread",
-                  model: model.inbox,
-                  viewInputs: { now },
-                  view: inboxThreadView
-                })
-              )
-            })
-          : Option.none(),
-      Group: ({ groupId, model: open }) =>
-        Option.isSome(open.thread)
-          ? Option.some({
-              label: "Thread",
-              view: h.block(
-                GroupBinding.embedView({
-                  key: groupId,
-                  slotId: "group-thread",
-                  model: open,
-                  view: groupThreadView,
+                HomeBinding.embedView({
+                  slotId: "home-thread",
+                  model: model.home,
+                  view: homeThreadView,
                   viewInputs: { now }
                 })
-              )
+              ),
+              isOpen: model.home.aside.isOpen,
+              dialog: (toView: ToView) =>
+                h.block(
+                  HomeBinding.embedView({
+                    slotId: "home-aside",
+                    model: model.home,
+                    view: homeAsideDialogView,
+                    viewInputs: { toView }
+                  })
+                )
             })
           : Option.none(),
       Settings: ({ memberId }) =>
@@ -345,7 +292,10 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
                   model: model.settings,
                   view: settingsMemberView
                 })
-              )
+              ),
+              isOpen: model.aside.isOpen,
+              dialog: (toView: ToView) =>
+                h.block(AsideBinding.embedView({ slotId: "aside", model: model.aside, viewInputs: { toView } }))
             })
           : Option.none()
     },
@@ -354,8 +304,8 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
 
 /**
  * The open workspace on the shell: the rail of destinations and the person's account, the sidebar, the main pane, the
- * thread's side pane, and the notices, laid out for the window's width, with the dialogs of the navigation drawer and
- * of the side pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, of the
+ * side pane, and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the
+ * side pane lent to the shell, and the dialogs of Home's groups, for starting a team or a conversation, of the
  * connections, for adding one, replacing its key, or confirming its removal, of the agents, for adding one or
  * confirming its removal, of the settings, for inviting someone, reading the invitations, revoking one, handing the
  * workspace over, or removing a member, and of the search, which the shell keeps in the frame whether or not the
@@ -390,17 +340,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     }),
     sidebar: sidebarView(model, inputs, h),
     main: mainView(model, now, h),
-    ...(Option.isSome(aside)
-      ? {
-          aside: {
-            label: aside.value.label,
-            view: aside.value.view,
-            isOpen: model.aside.isOpen,
-            dialog: (toView) =>
-              h.block(AsideBinding.embedView({ slotId: "aside", model: model.aside, viewInputs: { toView } }))
-          }
-        }
-      : {}),
+    ...(Option.isSome(aside) ? { aside: aside.value } : {}),
     notices: h.block(ActionsBinding.embedView({ slotId: "actions", model: model.actions })),
     menu: {
       onOpen: Message.ClickedMenu(),
@@ -408,7 +348,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
       dialog: (toView) => h.block(MenuBinding.embedView({ slotId: "menu", model: model.menu, viewInputs: { toView } }))
     },
     dialogs: [
-      h.block(GroupsBinding.embedView({ slotId: "groups-dialog", model: model.groups, view: dialogView })),
+      h.block(HomeBinding.embedView({ slotId: "home-dialog", model: model.home, view: homeDialogView })),
       h.block(
         ConnectionsBinding.embedView({
           slotId: "connections-dialog",

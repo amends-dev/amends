@@ -6,12 +6,12 @@ import { Open } from "./definition.ts"
 
 /**
  * The workspace `workspaceId`, called `name`, as the member `memberId`, in a window of the width `viewport`,
- * with nothing open, listing the integrations.
+ * showing Home, listing the integrations.
  */
 export const init = WorkspaceComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, name: string, viewport: Viewport) => ({
-    childInitContext: { workspaceId, memberId },
-    model: { workspaceId, memberId, name, open: Open.Nothing(), viewport },
+    childInitContext: { workspaceId, memberId, viewport },
+    model: { workspaceId, memberId, name, open: Open.Home(), viewport },
     commands: [LoadIntegrations({ workspaceId })]
   })
 )
