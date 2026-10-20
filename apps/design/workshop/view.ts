@@ -102,6 +102,7 @@ import {
   paneToolbar
 } from "../src/pane.ts"
 import { rail, railAccount } from "../src/rail.ts"
+import { richText } from "../src/richText.ts"
 import { shell } from "../src/shell.ts"
 import {
   sidebar,
@@ -181,6 +182,12 @@ const toastFrame = "h-64 bg-canvas outline outline-outline [contain:layout]"
 const iconSizeRow = "flex items-end gap-4"
 
 const conversationColumn = "flex max-w-xl flex-col px-3"
+
+const richTextColumn = "flex max-w-xl flex-col px-3 text-body text-ink"
+
+const richTextNarrowColumn = "flex w-72 max-w-full flex-col p-3 text-body text-ink outline outline-outline"
+
+const richTextPreview = "m-0 max-w-xl px-3 text-body text-ink-secondary"
 
 const composerColumn = "flex max-w-md flex-col"
 
@@ -2145,6 +2152,77 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     )
   ])
 }
+
+/** A message that uses every form markdown has, and the mention of a member the workshop does not know. */
+const everyFormOfRichText = [
+  "# A heading keeps the size of the text",
+  "",
+  'A paragraph with *emphasis*, **strong text**, ~~strikethrough~~, `inline code`, and a [link](https://example.com "With a title").',
+  "A second line of the same paragraph, then a mention of [@Ada](member:ada) and of [@Gone](member:gone), whom the workshop does not know.",
+  "",
+  "> A block quote that runs over two lines,",
+  "> with a [mail link](mailto:ada@example.com) in it.",
+  "",
+  "1. A numbered item",
+  "2. Another, with a bulleted list inside:",
+  "   - first",
+  "   - second",
+  "",
+  "- [x] A task that is done",
+  "- [ ] A task still to do",
+  "",
+  "```ts",
+  "const answer = 42",
+  "```",
+  "",
+  "| Name | Count | Share |",
+  "| :--- | :---: | ---: |",
+  "| Ada | 3 | 60% |",
+  "| Grace | 2 | 40% |",
+  "",
+  "---",
+  "",
+  "An image ![A chart](https://example.com/chart.png) shows as a link, [an unsafe link](javascript:alert(1)) as its text, <b>raw HTML</b> as written, and &amp; &copy; &#169; as characters."
+].join("\n")
+
+const richTextMentions = [{ id: "ada", name: "Ada Lovelace" }]
+
+const richTextGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Rich text", [
+    sample(
+      h,
+      "A message's text with every form",
+      [richText(h, { text: everyFormOfRichText, mentions: richTextMentions })],
+      richTextColumn
+    ),
+    sample(
+      h,
+      "The inline form for a preview: one run of words and mentions",
+      [
+        h.p(
+          [h.Class(richTextPreview)],
+          [richText(h, { text: everyFormOfRichText, mentions: richTextMentions, isInline: true })]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "In a narrow column, a long word wraps and a wide table scrolls",
+      [
+        richText(h, {
+          text: [
+            "https://example.com/a/very/long/address/that/has/no/place/to/break/in/a/narrow/column",
+            "",
+            "| Identifier | Description | Responsibility | Status |",
+            "| - | - | - | - |",
+            "| authentication-service | retries-on-timeout | platform-team | operational |"
+          ].join("\n")
+        })
+      ],
+      richTextNarrowColumn
+    )
+  ])
 
 const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
   const press = Message.ClickedButton()
@@ -4466,6 +4544,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           tooltipGroup(h),
           detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
+          richTextGroup(h),
           paneEmptyGroup(h),
           stateArtGroup(h),
           loadingGroup(h),

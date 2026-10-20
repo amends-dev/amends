@@ -44,7 +44,7 @@ conversation's messages as a list with a current row whose text opens the thread
 actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with a form in place of the text, and set apart by dividers, centered and at the
-start, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a pane's empty state with a title
+start, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the shell twice, with and without its side pane, each in a
@@ -882,6 +882,39 @@ What a conversation is made of.
   and Delete. `isCurrent` fills it with `selected`, draws the `indicator-bar` at its start, and makes it
   `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does.
 
+### `@amends-dev/design/richText`
+
+A message's markdown as elements, as `apps/ui`'s `RichText` shows it. It is the one module here that depends on a
+library, `marked`, at the version `apps/ui` uses, which lexes the text; every token it lexes becomes an element of the
+caller's builder, and no HTML string is ever set on the page.
+
+- `richText(h, config)` renders `config.text`, markdown such as a message's text, in the type around it, as a column of
+  blocks 8px apart with `gfm` and a line break wherever the text has a newline. Its parts: paragraphs; emphasis, strong
+  text, and strikethrough; inline code, in the mono font on `subtle` with a border; code blocks, kept as written in a
+  box that scrolls sideways, with the language as `data-language`; block quotes, a 2px `outline` rule at the start and
+  `ink-secondary` text, holding blocks of their own; bulleted and numbered lists, the numbered from the number the text
+  starts at; task items, a read-only box where the bullet would be, a `checkbox` that is `aria-disabled` and named
+  Done or Not done, with a check drawn in the box when the text says it is done; headings, which keep the text's size
+  and only weigh more, as paragraphs rather than headings of the page; tables, which scroll sideways inside the
+  message when wide, their columns aligned as the text aligns them; rules; links; images; and mentions.
+- Only `http`, `https`, and `mailto` addresses link, in a new tab (`rel="noopener noreferrer"`) with the link's title
+  when it has one; any other link, such as `javascript:` or a relative address, shows its text. An image is never loaded,
+  which would tell its host who read the message: it shows as a link to it, named by its description, or by its
+  address when it has none, and as that name alone when it may not link. Raw HTML shows as written. Entity references,
+  such as `&amp;`, `&copy;`, and `&#169;`, show as the characters they name, except in code, where text is as written.
+- A mention is a link to `member:<id>`, as core writes it, `[@Ada](member:<id>)`. It is a chip, a `span` on `mention`
+  with 3px of space each side and semibold weight, with "@" and the name the member has now among `config.mentions`,
+  each `{ id, name }`, or the name the text recorded for anyone else. It is not a link, since nothing opens a member
+  yet.
+- `config.isInline` is the form for a preview, one `span` of words and mentions with no layout or formatting: blocks
+  and line breaks are single spaces, a link is its words, an image its description, code its text, and each mention
+  is a chip. It holds nothing a button may not hold.
+- `richTextWords(markdown)` is the words of that form as one string, for the caller that needs them, such as a
+  button's description or a search: `{ text, mentions? }` as the text a reader hears, a mention as "@" and the name the
+  member has now.
+- `apps/ui`'s `streaming` and `caret`, which close formatting left open at the end of text still arriving and mark
+  where it continues, are not here, since no text in the app arrives that way.
+
 ### `@amends-dev/design/composer`
 
 - `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, suggestions?, attributes? })` is where
@@ -1126,7 +1159,7 @@ text button named by its author and activity and described by its text, its mark
 takes the place of letters, its place and age,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
-and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
+and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; rich text by its paragraphs with a line break where the text has one, each form of emphasis and code, a code block as written with its language, quotes, lists numbered from where the text starts, task boxes by role and name, tables and the alignment of their columns, links by their address, target, and `rel`, images as links and never loaded, raw HTML and entity references as text, mentions as chips with the member's current name or the recorded one, and the inline form as one run of words, with `richTextWords` as plain tests; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
 send button, which is unavailable while the box holds nothing or only spaces, Enter that sends the form and Shift+Enter, Control+Enter, Alt+Enter, and Meta+Enter that
 are left to the browser, and its list of people by the listbox named for it, its options with the active one selected and
 each mark at 22px in its tone, the
