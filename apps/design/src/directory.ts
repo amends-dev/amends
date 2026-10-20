@@ -1,7 +1,7 @@
 /**
  * What a directory screen lists: a label over each group, with how many it holds, a line that says what a
- * list holds, the labels of a table's columns, and a row for each thing in it, to open it or to answer it with a
- * button.
+ * list holds, the labels of a table's columns, a row for each thing in it, to open it or to answer it with a
+ * button, and a quiet line after a list.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -33,6 +33,8 @@ const columnsCellLabel = "w-32 flex-none truncate max-desktop:w-24"
 const columnsActionSpace = "w-24 flex-none max-desktop:w-20"
 
 const columnsStitch = "h-0 border-t border-dashed border-stitch"
+
+const footnoteLine = "mt-6 text-control text-ink-secondary"
 
 const rowShape = "flex min-h-19 w-full items-center gap-4 ps-3 pe-4"
 
@@ -105,6 +107,10 @@ export const summary = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ copy: string; count: string }>
 ): Html => h.p([h.Class(summaryLine)], [h.span([], [config.copy]), h.span([h.Class(summaryCount)], [config.count])])
+
+/** A line of quiet text after a list, 24px under it, that says what else the person can do, such as accept an invitation. */
+export const footnote = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
+  h.p([h.Class(footnoteLine)], [text])
 
 /**
  * The labels of a table's columns over its `row`s, at the size and in the case of a quiet caption, over a dashed
@@ -183,10 +189,13 @@ export const activityCell = <Message, Requirements>(
  * as the line if it is wider, ending in an ellipsis. The action is not shown. The cells lie in one element that is
  * `contents` from 48rem, so that each is a column of the row, and that takes the whole width of its own line
  * below it, which is what breaks the row after the title.
+ *
+ * An `id` is the button's own, for the app to move focus to a row, such as the one it has just added.
  */
 export const row = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
+    id?: string
     mark: MarkContent
     markSize?: "md" | "lg"
     status?: MarkStatus | undefined
@@ -209,6 +218,7 @@ export const row = <Message, Requirements>(
         h.button(
           [
             ...attributes.button,
+            ...(config.id === undefined ? [] : [h.Id(config.id)]),
             h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
             ...(description === "" ? [] : [h.AriaDescription(description)]),
             h.Class(hasCells ? `${rowButton} ${rowFoldsCells}` : rowButton)

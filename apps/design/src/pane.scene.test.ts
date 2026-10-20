@@ -266,6 +266,26 @@ describe("paneEmpty", () => {
     )
   })
 
+  it("says its title as the screen's h1 with level 1, when its message is all the screen has", () => {
+    scene(
+      {
+        update,
+        view: paneView((_: Model, h: HtmlBuilder<Message>) =>
+          paneEmpty(h, {
+            icon: "mark-connections",
+            title: "Can't reach your workspace host",
+            copy: "You're still signed in. Try again once the host is running.",
+            level: 1
+          })
+        )
+      },
+      given(initial),
+      expect(role("heading", { name: "Can't reach your workspace host", level: 1 })).toExist(),
+      expect(role("heading", { level: 2 })).toBeAbsent(),
+      expect(text("You're still signed in. Try again once the host is running.")).toExist()
+    )
+  })
+
   it("shows no copy when it has none", () => {
     scene(
       { update, view: paneView(emptyPane()) },

@@ -1,6 +1,7 @@
 /**
- * What floats over the shell's corner: a message about something that went wrong, with the one thing
- * to do about it, until the person does it.
+ * What floats over a window's corner: a message about something that went wrong, or a confirmation of what the
+ * person did, with the one thing to do about it, such as dismissing it, until the person does it or the app takes
+ * it away.
  */
 
 import type { Html, HtmlBuilder } from "foldkit/html"
@@ -29,14 +30,21 @@ export const toastStack = <Message, Requirements>(
 
 /**
  * A raised card with its `text`, the `detail` quieter under it when there is one, and at the right the
- * quiet `action` button that sends its `onClick`, such as Dismiss. The card is an alert.
+ * quiet `action` button that sends its `onClick`, such as Dismiss. The card is an alert, for what went wrong,
+ * or with `role` `status` a status, for a confirmation of what the person did, which is announced without
+ * interrupting them.
  */
 export const toast = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ text: string; detail?: string; action: Readonly<{ label: string; onClick: Message }> }>
+  config: Readonly<{
+    text: string
+    detail?: string
+    role?: "alert" | "status"
+    action: Readonly<{ label: string; onClick: Message }>
+  }>
 ): Html =>
   h.div(
-    [h.Role("alert"), h.Class(toastCard)],
+    [h.Role(config.role ?? "alert"), h.Class(toastCard)],
     [
       h.div(
         [h.Class(toastBody)],

@@ -5,7 +5,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { badge } from "./details.ts"
-import { activityCell, cellWithDetail, columns, row, rowWithButton, section, summary } from "./directory.ts"
+import { activityCell, cellWithDetail, columns, footnote, row, rowWithButton, section, summary } from "./directory.ts"
 
 const Message = defineMessageUnion({ ClickedMercier: {}, ClickedFieldwork: {} })
 type Message = typeof Message.Type
@@ -47,7 +47,7 @@ describe("row", () => {
     row(h, {
       mark: { text: "M" },
       title: "Mercier & Co",
-      meta: "12 members · as Alex",
+      meta: "12 members · Owner",
       action: "Open →",
       onClick: Message.ClickedMercier()
     }),
@@ -58,7 +58,7 @@ describe("row", () => {
     scene(
       { update, view: viewOf(rows) },
       given(initial),
-      expect(role("button", { name: "Mercier & Co" })).toHaveAttr("aria-description", "12 members · as Alex"),
+      expect(role("button", { name: "Mercier & Co" })).toHaveAttr("aria-description", "12 members · Owner"),
       expect(role("button", { name: "Fieldwork" })).toExist(),
       click(role("button", { name: "Mercier & Co" })),
       click(role("button", { name: "Fieldwork" })),
@@ -71,7 +71,7 @@ describe("row", () => {
       { update, view: viewOf(rows) },
       given(initial),
       expect(within(role("button", { name: "Mercier & Co" }), text("M"))).toExist(),
-      expect(within(role("button", { name: "Mercier & Co" }), text("12 members · as Alex"))).toExist(),
+      expect(within(role("button", { name: "Mercier & Co" }), text("12 members · Owner"))).toExist(),
       expect(within(role("button", { name: "Mercier & Co" }), text("Open →"))).toExist()
     )
   })
@@ -81,6 +81,21 @@ describe("row", () => {
       { update, view: viewOf(rows) },
       given(initial),
       expect(within(role("button", { name: "Fieldwork" }), selector("span[aria-hidden]"))).toHaveText("F")
+    )
+  })
+
+  it("carries the id it is given on its button, for focus to be moved to it, and none otherwise", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          row(h, { id: "workspace-1", mark: { text: "M" }, title: "Mercier & Co", onClick: Message.ClickedMercier() }),
+          row(h, { mark: { text: "F" }, title: "Fieldwork", onClick: Message.ClickedFieldwork() })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Mercier & Co" })).toHaveAttr("id", "workspace-1"),
+      expect(role("button", { name: "Fieldwork" })).not.toHaveAttr("id")
     )
   })
 })
@@ -170,6 +185,20 @@ describe("summary", () => {
       given(initial),
       expect(text("Public groups you can join.")).toExist(),
       expect(text("4 groups")).toExist()
+    )
+  })
+})
+
+describe("footnote", () => {
+  it("says what else the person can do, in quiet text 24px under the list before it", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [footnote(h, "Accept an invitation above, or create your own workspace.")])
+      },
+      given(initial),
+      expect(text("Accept an invitation above, or create your own workspace.")).toHaveClass("mt-6"),
+      expect(text("Accept an invitation above, or create your own workspace.")).toHaveClass("text-ink-secondary")
     )
   })
 })

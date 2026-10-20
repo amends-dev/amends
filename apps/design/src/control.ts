@@ -130,8 +130,13 @@ export type IconButtonOptions = Readonly<{
  */
 export type PublishedAttributes = ReadonlyArray<ChildAttribute>
 
-/** The attributes a control takes: the caller's own, such as `answerKeys`, and the group a headless component publishes. */
-export type ControlAttributes<Message> = ReadonlyArray<Attribute<Message> | ChildAttribute>
+/**
+ * The attributes a control takes: the caller's own, such as `answerKeys`, or a mount its Block registers, and the
+ * group a headless component publishes.
+ */
+export type ControlAttributes<Message, Requirements = never> = ReadonlyArray<
+  Attribute<Message, Requirements> | ChildAttribute
+>
 
 export type ChoiceSelectOptions = Readonly<{
   /** The label names the select for assistive technology and is not shown, for a select in a row of its own. */
@@ -342,7 +347,7 @@ export const field = <Message, Requirements>(
     hint?: string
     isAutofocus?: boolean
     isLabelHidden?: boolean
-    attributes?: ControlAttributes<Message>
+    attributes?: ControlAttributes<Message, Requirements>
   }>,
   error: Option.Option<string>
 ) =>

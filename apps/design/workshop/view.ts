@@ -19,7 +19,16 @@ import {
   toggle
 } from "../src/control.ts"
 import { badge, detailList, entry, entryList, log } from "../src/details.ts"
-import { activityCell, cellWithDetail, columns, row, rowWithButton, section, summary } from "../src/directory.ts"
+import {
+  activityCell,
+  cellWithDetail,
+  columns,
+  footnote,
+  row,
+  rowWithButton,
+  section,
+  summary
+} from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
@@ -172,8 +181,8 @@ const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
 ]
 
 const workspaces: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
-  { name: "Mercier & Co", meta: "12 members · as Alex" },
-  { name: "Fieldwork", meta: "4 members · Owner · as Alex" }
+  { name: "Mercier & Co", meta: "12 members" },
+  { name: "Fieldwork", meta: "4 members · Owner" }
 ]
 
 const invitations: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
@@ -728,24 +737,67 @@ const agentTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   )
 ]
 
-const directoryScreen = (h: ApplicationViewBuilder): Html =>
+const directoryScreen = (h: ApplicationViewBuilder, children: ReadonlyArray<Html>): Html =>
   centered(h, {
     brand: "amends",
     actions: [inline(h, ["alex@mercier.example"]), button(h, "Sign out", Message.ClickedButton())],
     width: "directory",
-    children: [
-      screenContent(h, [
-        heading(h, "Choose a workspace", {
-          action: button(h, "Create workspace", Message.ClickedButton(), { icon: "mark-new" })
-        }),
-        copy(h, `${workspaces.length} workspaces · ${invitations.length} pending invitations`),
-        section(h, { label: "Your workspaces", count: workspaces.length }),
-        workspaceList(h),
-        section(h, { label: "Invitations", count: invitations.length }),
-        invitationList(h)
-      ])
-    ]
+    children: [screenContent(h, children)]
   })
+
+const createWorkspaceHeading = (h: ApplicationViewBuilder): Html =>
+  heading(h, "Choose a workspace", {
+    action: button(h, "Create workspace", Message.ClickedButton(), { icon: "mark-new" })
+  })
+
+const workspacesAndInvitations = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  createWorkspaceHeading(h),
+  copy(h, `${workspaces.length} workspaces · ${invitations.length} pending invitations`),
+  section(h, { label: "Your workspaces", count: workspaces.length }),
+  workspaceList(h),
+  section(h, { label: "Invitations", count: invitations.length }),
+  invitationList(h)
+]
+
+const invitationsOnly = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  createWorkspaceHeading(h),
+  copy(h, `${invitations.length} invitations waiting for you.`),
+  section(h, { label: "Invitations", count: invitations.length }),
+  invitationList(h),
+  footnote(h, "Accept an invitation above, or create your own workspace.")
+]
+
+const noWorkspacesYet = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  heading(h, "Choose a workspace"),
+  copy(h, "Create a workspace to get started."),
+  paneEmpty(h, {
+    icon: "mark-home",
+    title: "No workspaces yet",
+    copy: "Create a workspace for your team. Invitations will appear here.",
+    action: button(h, "Create workspace", Message.ClickedButton(), { variant: "primary", icon: "mark-new" })
+  })
+]
+
+const reloadFailed = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  createWorkspaceHeading(h),
+  column(h, [
+    copy(h, `${workspaces.length} workspaces`),
+    notice(h, Option.some("Couldn't refresh your workspaces.")),
+    buttonRow(h, [button(h, "Try again", Message.ClickedButton(), { variant: "quiet" })])
+  ]),
+  section(h, { label: "Your workspaces", count: workspaces.length }),
+  workspaceList(h)
+]
+
+const hostUnreachable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  paneEmpty(h, {
+    icon: "mark-connections",
+    title: "Can't reach your workspace host",
+    copy: "You're still signed in. Try again once the host is running.",
+    action: button(h, "Try again", Message.ClickedButton(), { variant: "primary" }),
+    level: 1
+  })
+]
 
 const directoryGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Directory", [
@@ -766,6 +818,16 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
       h,
       "Rows with a button: a section and two rows, the buttons named for their workspaces",
       [section(h, { label: "Invitations", count: invitations.length }), invitationList(h)],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Footnote: a quiet line 24px under the list before it",
+      [
+        section(h, { label: "Invitations", count: invitations.length }),
+        invitationList(h),
+        footnote(h, "Accept an invitation above, or create your own workspace.")
+      ],
       "flex max-w-2xl flex-col"
     ),
     sample(
@@ -882,7 +944,36 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
       "flex flex-col"
     ),
     sample(h, "Form width, code step", [h.div([h.Class(screenFrame)], [codeScreen(h, code)])], "flex flex-col"),
-    sample(h, "Directory width", [h.div([h.Class(screenFrame)], [directoryScreen(h)])], "flex flex-col")
+    sample(
+      h,
+      "Directory width, with workspaces and invitations",
+      [h.div([h.Class(screenFrame)], [directoryScreen(h, workspacesAndInvitations(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Directory width, with invitations only and a line after them",
+      [h.div([h.Class(screenFrame)], [directoryScreen(h, invitationsOnly(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Directory width, with nothing yet, and the empty state's action in place of the heading's",
+      [h.div([h.Class(screenFrame)], [directoryScreen(h, noWorkspacesYet(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Directory width, with a reload that failed over the list it kept",
+      [h.div([h.Class(screenFrame)], [directoryScreen(h, reloadFailed(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Directory width, with the host not reached: the message is the screen's h1",
+      [h.div([h.Class(screenFrame)], [directoryScreen(h, hostUnreachable(h))])],
+      "flex flex-col"
+    )
   ])
 
 const iconGroup = (h: ApplicationViewBuilder): Html =>
@@ -1951,6 +2042,13 @@ const postRefusal = (h: ApplicationViewBuilder): Html =>
     action: { label: "Dismiss", onClick: Message.ClickedButton() }
   })
 
+const joinedConfirmation = (h: ApplicationViewBuilder): Html =>
+  toast(h, {
+    text: "Joined Northstar Studio",
+    role: "status",
+    action: { label: "Dismiss", onClick: Message.ClickedButton() }
+  })
+
 const logLines: ReadonlyArray<string> = [
   "Read 2 messages",
   "Replied: Reproduced on both. Images over 5 MB hit the crash.",
@@ -2141,6 +2239,12 @@ const toastGroup = (h: ApplicationViewBuilder): Html =>
       h,
       "With the text it refused",
       [h.div([h.Class(toastFrame)], [toastStack(h, [postRefusal(h)])])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A confirmation, a status and not an alert",
+      [h.div([h.Class(toastFrame)], [toastStack(h, [joinedConfirmation(h)])])],
       "flex flex-col"
     ),
     sample(

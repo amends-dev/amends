@@ -26,11 +26,11 @@ field with its label hidden, in a section that names it; the toggle on and off; 
 tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, and a section of two rows with a button
-named for their workspaces, and a table of three groups' rows
+named for their workspaces, with a footnote after them, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
-sign-in's two steps and as the workspace picker, whose heading has a Create workspace action on its line and which lists its workspaces and its invitations, each with its pieces in `screenContent` as the app's
-pages return them; the toast alone, with a detail, and as a stack of
+sign-in's two steps and as the workspace picker five times, each with its pieces in `screenContent` as the app's
+pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; and with the host not reached, whose message is the screen's `h1`; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
 one with tabs and a description; the marks by size, each status at every size, the lilac tone, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
@@ -172,7 +172,8 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   name as its title, such as the one that renames the workspace. The `attributes` go onto the input:
   a group a headless component publishes, `PublishedAttributes`, such as a dialog's `initialFocus`,
   which a field in a dialog takes with `isAutofocus` off, and the caller's own, such as `answerKeys`
-  and an `aria-activedescendant`, for a field above a list its keys walk (`ControlAttributes`).
+  and an `aria-activedescendant`, for a field above a list its keys walk, or a mount its Block registers,
+  such as one that selects the field's text when it takes focus (`ControlAttributes`).
 - `answerKeys(h, onKeyDown)` is the attribute for a text control above a list that its keys walk, such
   as a search field above its results: `onKeyDown(key)` says what a key sends, or nothing to leave the
   key to the browser, and a key it answers does not do what the browser does for it, such as moving the
@@ -272,6 +273,10 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
   one, such as a page. It is `display: contents`, so they lie in the card's column as if it were not
   there, each spacing itself as `heading` and `copy` do. Use it, not `column`, whose gap would add to
   theirs.
+- What a screen says when it has nothing to show is the pane module's `paneEmpty`: an icon, a title, a
+  line, and an action under it, 64px under what is above it. Under the screen's `heading` it is an `h2`,
+  as a list that is empty says; when the message is all the screen has, such as the host not being
+  reached, it takes `level: 1` and is the screen's `h1`, with no `heading` of its own.
 
 ### `@amends-dev/design/form`
 
@@ -305,7 +310,9 @@ What a directory screen lists.
   cells keeps its action, so the labels stay over their cells. From 48rem to 64rem the columns are
   6rem wide and the bare end 5rem, as a row's are. Below 48rem the labels are not shown, since a
   row's cells fold under its title and no column is left to label.
-- `row(h, { mark, markSize?, status?, title, meta?, cells?, cellsText?, action?, onClick })` is one button the width of
+- `footnote(h, text)` is a quiet line after a list, 24px under it, at control size in `ink-secondary`, that
+  says what else the person can do, such as "Accept an invitation above, or create your own workspace."
+- `row(h, { id?, mark, markSize?, status?, title, meta?, cells?, cellsText?, action?, onClick })` is one button the width of
   its container, at least 76px tall: a square mark holding the `mark` letters, `{ text, tone? }`, 40px
   (`markSize` `"lg"`, the default) or 32px (`"md"`, as a list of agents draws it), on `avatar-neutral` unless
   given the `lilac` tone, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
@@ -316,7 +323,8 @@ What a directory screen lists.
   between the title and the action, at hint size in `ink-secondary`, under the labels `columns`
   gives them, and are hidden like the mark; `cellsText`, what they say in words, such as "Public ·
   12 members", describes the button after the meta. A row with cells keeps 6rem at its end for its
-  action, right-aligned, whether it has one or not. A page lists rows as `li` items of a `ul`.
+  action, right-aligned, whether it has one or not. An `id` is the button's own, for the app to move focus to
+  a row, such as the one for a workspace the person has just joined. A page lists rows as `li` items of a `ul`.
   - From 48rem to 64rem (`max-desktop:`) the cell columns are 6rem wide and the room for the action
     5rem, so a title keeps its room beside three cells, and `columns` follows with the same widths.
   - Below 48rem (`max-tablet:`) a row with cells folds, in CSS alone and from the same markup: the
@@ -503,11 +511,13 @@ The third and fourth layout patterns share one structure.
 onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
   a 2px `indicator` bar under it. The tab is named by its label and described by its `count`, which
   shows in a badge after it. Tabs are all in the tab order; arrow keys do not move between them.
-- `paneEmpty(h, { icon, title, copy?, action? })` is what a pane's body says when it has nothing to list, a
-  centered column 64px under the header and 20rem wide at most: a 40px square on `subtle` holding the
+- `paneEmpty(h, { icon, title, copy?, action?, level? })` is what a pane's body says when it has nothing to
+  list, a centered column 64px under the header and 20rem wide at most: a 40px square on `subtle` holding the
   `icon` at `md` in `ink-secondary`, the `title` as an `h2` at item size in medium weight, under the
   pane's `h1`, and the `copy` under it at hint size in `ink-muted`, then the `action`, such as the `button` that
-  does what the copy says, 12px below. The icon is hidden from assistive technology.
+  does what the copy says, 12px below. The icon is hidden from assistive technology. A centered screen uses it
+  too, for what it has nothing to show of (see `centered`); with `level: 1` the title is an `h1`, for a screen
+  whose message is all it has.
 - `paneColumn(h, children, options?)` is the one column of a pane's body, its sections 40px apart, with
   nothing beside it. By default it keeps a measure of 42.5rem (`max-w-170`), the right width for what
   is read and filled in: a page about one item, such as the settings, and a connection's form.
@@ -642,18 +652,22 @@ What a conversation is made of.
 
 ### `@amends-dev/design/toast`
 
-What floats over the shell's corner, for something that went wrong and the one thing to do about it.
+What floats over a window's corner, for something that went wrong or something the person did, and the
+one thing to do about it.
 
 - `toastStack(h, children)` is the column of toasts pinned to the bottom end corner of the window,
   16px from each edge and 25rem wide at most, with 8px between them, above the panes and the scrim.
   It is `fixed`, so it stays in that corner wherever it renders, in the shell's frame or inside an
-  open dialog, as the shell places it. A frame that shows it apart from a window, as the workshop's
+  open dialog, as the shell places it, or in a centered screen, which has no shell. A frame that shows it apart from a window, as the workshop's
   do, contains it with `contain: layout`. It is an `aria-live="polite"` region, there before the
   first toast so each is announced as it arrives. `children` are `toast`s, or a `notice`.
-- `toast(h, { text, detail?, action: { label, onClick } })` is a `role="alert"` card, `raised` with
+- `toast(h, { text, detail?, role?, action: { label, onClick } })` is a `role="alert"` card, `raised` with
   a border and `shadow-toast`: the `text` at body size, the `detail` under it at hint size in
   `ink-secondary`, clamped to three lines, such as the words an action carried, and at the right the
-  `action` as a quiet `button`, such as Dismiss.
+  `action` as a quiet `button`, such as Dismiss. A confirmation of what the person did, such as "Joined
+  Northstar Studio", is `role: "status"`, which the stack's live region announces without interrupting
+  them, and an alert is for what went wrong. The app takes a toast away, when the person dismisses it or
+  after a while; the card has no timer of its own.
 
 ### `@amends-dev/design/modal`
 
@@ -705,7 +719,7 @@ renderer family as a person does, through what the app's own tests query: a butt
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
 `aria-invalid`, and description, a switch by its label, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
-landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title; an
+landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, and a footnote by its text; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
 destination by `role("button", { name })` with `aria-current`, and the search beside them, which is never current and
 sends what it is given; a sidebar item by its name, which has the status's word after the label, with
@@ -713,13 +727,13 @@ sends what it is given; a sidebar item by its name, which has the status's word 
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
 section by `role("region")` and its `h3`, its trailing pieces and children; a pane's empty state by
-its `h2` under the pane's `h1`, its copy, its action, and its icon as `aria-hidden`; a detail list's labels
+its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, its action, and its icon as `aria-hidden`; a detail list's labels
 and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
 those with a modifier, left to the browser, and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
-toast by `role("alert")` with its text, detail, and button, in the stack's live region; a modal by its
+toast by `role("alert")`, or `role("status")` for a confirmation, with its text, detail, and button, in the stack's live region; a modal by its
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the control given `initialFocus` by its marker, and Close and
 Cancel by closing the dialog without sending the form; a message by

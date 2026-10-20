@@ -45,6 +45,26 @@ describe("toast", () => {
     )
   })
 
+  it("is a status, not an alert, for a confirmation of what the person did", () => {
+    scene(
+      {
+        update,
+        view: (_, h) =>
+          toastStack(h, [
+            toast(h, {
+              text: "Joined Northstar Studio",
+              role: "status",
+              action: { label: "Dismiss", onClick: Message.Dismissed({ key: "joined" }) }
+            })
+          ])
+      },
+      given(initial),
+      expect(role("alert")).toBeAbsent(),
+      expect(within(role("status"), text("Joined Northstar Studio"))).toExist(),
+      expect(within(role("status"), role("button", { name: "Dismiss" }))).toExist()
+    )
+  })
+
   it("shows no detail when it has none", () => {
     scene(
       { update, view: toasts },
