@@ -551,8 +551,11 @@ below it counted at each level above.
   stays with its button disabled, and a write the store could not keep says why in the dialog (`failure`) and leaves the
   form to send again. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
-  marked is the one shown. Its view takes the title of the thread open in that group, from its
-  parent, which it shows under the group. The groups are read by one subscription, `ReadGroups`, which zips the
+  marked is the one shown. Its view takes the thread open in that group, from its parent, as its title and the
+  status of the task it tracks (`OpenThread`), which it shows under the group as a plain row, the drawing of that
+  status in place of the icon when the thread tracks a task, with the status's word for a reader who does not see the
+  drawing, "Doing, Composer paste crash", and the message icon when it tracks none, as `apps/ui`'s thread under its
+  group is drawn. The groups are read by one subscription, `ReadGroups`, which zips the
   groups, the members, the person's admissions, and what they may do into one `ReceivedGroups`, so that `isLoaded` is
   true once all of them have been read: "No groups yet" is under the Groups title only then, and nothing is before,
   as `feature/agents` and `feature/connections` wait for theirs.
@@ -1183,7 +1186,9 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   inbox, which it opens on, the tasks in triage, every open task, the groups to browse, or the open group (`Open`:
   `Inbox`, `Triage`, `Tasks`, `Groups`, `Group`); it has no state of showing nothing. Its sidebar (`sidebarView`) is an
   "Inbox" item with how many notifications wait, read aloud as "5 unread", a "Triage" item with how many tasks wait in
-  triage (`triageCount`), read aloud as "5 to triage", a "Tasks" item, and the groups' sections; picking a group opens it and marks it in the list, and
+  triage (`triageCount`), read aloud as "5 to triage", a "Tasks" item, and the groups' sections, which are given the
+  thread open, as its title (`openThreadTitle`) and the status of the task it tracks (`openThreadTaskStatus`), in the
+  group open or beside the inbox; picking a group opens it and marks it in the list, and
   resetting Home, as showing any other destination does, leaves no group marked and shows the inbox. The tasks Block is the same child
   under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened there is opened in
   its group with the thread already open, and the group marked, which a notification's is not: its thread opens
@@ -1654,7 +1659,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   sidebar's sections, the teams to join not among them, in order, "No groups yet" only once the groups are read,
   no line for conversations, New message always and its dialog with no one to choose when nobody else is in the
   workspace, a conversation by its other member, one still on
-  its way marked "Sending…" at the end of its row, with the thread open under the group picked, what waits for the
+  its way marked "Sending…" at the end of its row, with the thread open under the group picked, drawn by the status of
+  the task it tracks in each of the six, with the word for it, in ink once the task is done, and by the message icon
+  when it tracks none, under a conversation as under a team, what waits for the
   person in a group as its count read aloud as "2 for you", a dot read aloud as "new activity" for a group with activity
   not read, with its name in the primary weight, and none beside a count, for a conversation as for a team, the dot
   shown as the store reports activity and taken away once the group is read, the logo at the end of a group's row
@@ -1803,7 +1810,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   the groups to browse on Discover and the Groups title on Your groups, marked while they show, then the inbox, the tasks in triage, and every open task in a main pane named for it,
   the inbox saying nothing waits or that it is being read, the group's threads as messages in the main pane with the composer to start
   one, the thread picked opened in the side pane beside the main pane with no dialog, with its messages and the composer to reply, marked in
-  the list and under the group in the sidebar, and closed by its button, a notification's thread opened the same way beside the inbox, which stays with
+  the list and under the group in the sidebar, drawn there by its task's status or the message icon, and closed by its button, a notification's thread opened the same way beside the inbox, which stays with
   its row current and loses both as the thread closes or the person leaves the inbox, the group's settings opened in a dialog from its
   main pane, a team started from the sidebar's heading and from Create group in the dialog the page keeps, and the groups to browse left to
   by an open group, whose thread's side pane goes with it. The root's own scenes show

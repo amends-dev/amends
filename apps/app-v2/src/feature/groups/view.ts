@@ -1,4 +1,5 @@
 import { GroupPermissions } from "@amends-dev/core/group"
+import type { Task } from "@amends-dev/core/task"
 import {
   button,
   choiceGroup,
@@ -22,7 +23,7 @@ import { type ActivityState, motionOfState, stateInGroup, stateWord } from "../.
 import { memberChoice } from "../../memberChoice.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
-import { groupName, pluralize, visibilityHint } from "../../seen.ts"
+import { groupName, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
 import {
   DialogBinding,
   GroupsComposition,
@@ -50,10 +51,29 @@ import {
 } from "./definition.ts"
 
 /**
- * The title of the thread open in the group open, which the page reads from the group, when one is, and whether the
- * browse page is the destination open, which marks the Groups title current.
+ * The thread open in the group open, which the page reads from the group, when one is: its title, and the status of
+ * the task it tracks, when it tracks one.
  */
-export type ViewInputs = Readonly<{ openThread: Option.Option<string>; isBrowsing: boolean }>
+export type OpenThread = Readonly<{ title: string; taskStatus: Option.Option<Task.Status> }>
+
+/**
+ * The thread open in the group open, and whether the browse page is the destination open, which marks the Groups title
+ * current.
+ */
+export type ViewInputs = Readonly<{ openThread: Option.Option<OpenThread>; isBrowsing: boolean }>
+
+/**
+ * The thread open as the row under its group draws it: the drawing of the status of the task it tracks, which the
+ * status's word goes with, or, when it tracks none, the message icon.
+ */
+const openThreadRow = ({ title, taskStatus }: OpenThread) => ({
+  ...Option.match(taskStatus, {
+    onNone: () => ({ icon: "message" as const }),
+    onSome: (status) => ({ taskStatus: { shape: statusShape[status], label: statusLabel[status] } })
+  }),
+  label: title,
+  isCurrent: true
+})
 
 /** What counts the notifications that wait for the person in a group, as `apps/ui` says it. */
 const waitingCountName = "for you"
@@ -70,7 +90,7 @@ const groupActivity = (state: ActivityState) => ({ activity: stateWord[state], a
 const groupRow = (
   { group, pending }: GroupItem,
   model: Model,
-  openThread: Option.Option<string>,
+  openThread: Option.Option<OpenThread>,
   h: GroupsViewBuilder
 ): Html => {
   const name = groupName(group, model.members, model.memberId)
@@ -86,9 +106,7 @@ const groupRow = (
     isPending: pending,
     isCurrent,
     onClick: Message.ClickedGroup({ groupId: group.id }),
-    ...(isCurrent && Option.isSome(openThread)
-      ? { children: [{ icon: "circle-frame" as const, label: openThread.value, isCurrent: true }] }
-      : {})
+    ...(isCurrent && Option.isSome(openThread) ? { children: [openThreadRow(openThread.value)] } : {})
   })
 }
 
@@ -194,7 +212,7 @@ const mayCreateTeam = (model: Model): boolean =>
 const teamRows = (
   teams: ReadonlyArray<GroupItem>,
   model: Model,
-  openThread: Option.Option<string>,
+  openThread: Option.Option<OpenThread>,
   h: GroupsViewBuilder
 ): ReadonlyArray<Html> => {
   if (teams.length > 0) {

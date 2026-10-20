@@ -10,6 +10,7 @@
  */
 
 import { GroupId } from "@amends-dev/core/group"
+import type { Task } from "@amends-dev/core/task"
 import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { Viewport } from "@amends-dev/design/viewport"
@@ -23,7 +24,7 @@ import { GroupBlock } from "../../../feature/group/block.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
-import { titleOf } from "../../../feature/thread/definition.ts"
+import { type Model as ThreadModel, titleOf } from "../../../feature/thread/definition.ts"
 
 /**
  * What Home's main pane shows: the inbox, the tasks in triage, every open task, the groups to browse, or the group
@@ -52,6 +53,10 @@ export const Model = Schema.Struct({
 })
 export type Model = typeof Model.Type
 
+/** The status of the task `thread` tracks, while it tracks one. */
+const taskStatusOf = (thread: ThreadModel): Option.Option<Task.Status> =>
+  Option.map(thread.task.task, ({ task }) => task.status)
+
 /** The title of the thread open, in the group open or beside the inbox, while there is one. */
 export const openThreadTitle = (model: Model): Option.Option<string> =>
   Open.matchOrElse(
@@ -59,6 +64,20 @@ export const openThreadTitle = (model: Model): Option.Option<string> =>
     {
       Inbox: () => Option.map(model.inbox.selected, ({ model: thread }) => titleOf(thread)),
       Group: ({ model: group }) => Option.map(group.thread, ({ model: thread }) => titleOf(thread))
+    },
+    () => Option.none()
+  )
+
+/**
+ * The status of the task the thread open tracks, in the group open or beside the inbox, while there is a thread open
+ * that tracks one.
+ */
+export const openThreadTaskStatus = (model: Model): Option.Option<Task.Status> =>
+  Open.matchOrElse(
+    model.open,
+    {
+      Inbox: () => Option.flatMap(model.inbox.selected, ({ model: thread }) => taskStatusOf(thread)),
+      Group: ({ model: group }) => Option.flatMap(group.thread, ({ model: thread }) => taskStatusOf(thread))
     },
     () => Option.none()
   )

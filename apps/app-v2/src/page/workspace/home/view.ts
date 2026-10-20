@@ -1,6 +1,7 @@
 import { sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
+import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { threadView as groupThreadView } from "../../../feature/group/view.ts"
 import { browseView, dialogView as groupsDialogView } from "../../../feature/groups/view.ts"
@@ -16,7 +17,7 @@ import {
   InboxBinding,
   TasksBinding
 } from "./composition.ts"
-import { Message, Open, openThreadTitle } from "./definition.ts"
+import { Message, Open, openThreadTaskStatus, openThreadTitle } from "./definition.ts"
 
 /**
  * The time now, which the inbox, the tasks, and the group open are given, and the workspace's name, which the inbox and
@@ -83,7 +84,13 @@ export const sidebarView = HomeComposition.makeView((model, h) => {
       GroupsBinding.embedView({
         slotId: "groups",
         model: model.groups,
-        viewInputs: { openThread: openThreadTitle(model), isBrowsing: Open.isAnyOf(["Groups"])(model.open) }
+        viewInputs: {
+          openThread: Option.map(openThreadTitle(model), (title) => ({
+            title,
+            taskStatus: openThreadTaskStatus(model)
+          })),
+          isBrowsing: Open.isAnyOf(["Groups"])(model.open)
+        }
       })
     )
   ])

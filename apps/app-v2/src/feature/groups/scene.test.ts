@@ -1,5 +1,6 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
+import type { Task } from "@amends-dev/core/task"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock, RadioGroup } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
@@ -49,6 +50,9 @@ import { update } from "./update.ts"
 import { browseView, dialogView, view } from "./view.ts"
 
 const { workspace, member } = membership
+
+/** The row under a group that says which thread is open, which is not a button. */
+const openThreadRow = selector('[aria-current="page"]:not(button)')
 
 /** When the latest activity of a group the person has not read was. */
 const later = DateTime.makeUnsafe("2026-10-18T12:05:00Z")
@@ -671,12 +675,100 @@ describe("the groups", () => {
 
   it("mark the group picked, with the thread open in it under it, and no button for that thread", () => {
     scene(
-      { update, view: sceneView({ openThread: Option.some("Composer paste crash"), isBrowsing: false }) },
+      {
+        update,
+        view: sceneView({
+          openThread: Option.some({ title: "Composer paste crash", taskStatus: Option.none() }),
+          isBrowsing: false
+        })
+      },
       given(modifyFields(listed, { selected: () => Option.some(design.id) })),
       expect(role("button", { name: "Design" })).toHaveAttr("aria-current", "page"),
-      expect(within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))).toExist(),
+      expect(within(openThreadRow, text("Composer paste crash"))).toExist(),
       expect(role("button", { name: "Composer paste crash" })).toBeAbsent(),
       expect(role("button", { name: "General" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("draw a thread that tracks no task with the message icon", () => {
+    scene(
+      {
+        update,
+        view: sceneView({
+          openThread: Option.some({ title: "Lunch on Friday?", taskStatus: Option.none() }),
+          isBrowsing: false
+        })
+      },
+      given(modifyFields(listed, { selected: () => Option.some(design.id) })),
+      expect(within(openThreadRow, selector("svg[viewBox='0 0 24 24']"))).toExist(),
+      expect(within(openThreadRow, selector("svg[viewBox='0 0 16 16']"))).toBeAbsent(),
+      expect(within(openThreadRow, selector("span.sr-only"))).toBeAbsent()
+    )
+  })
+
+  it("draw a thread that tracks a task with the drawing of its status, in each of the six, and say the status's word", () => {
+    const statuses = [
+      ["triage", "Triage", "M8 4.6 V8.8"],
+      ["todo", "To do", undefined],
+      ["doing", "Doing", "M8 3.6 A4.4 4.4 0 0 0 8 12.4 Z"],
+      ["held", "Held", "M6.5 5.8 V10.2"],
+      ["done", "Done", "M5.3 8.2 L7.2 10 L10.8 6.3"],
+      ["dismissed", "Dismissed", "M6.2 6.2 L9.8 9.8"]
+    ] as const
+
+    for (const [status, word, path] of statuses) {
+      scene(
+        {
+          update,
+          view: sceneView({
+            openThread: Option.some({ title: "Composer paste crash", taskStatus: Option.some(status) }),
+            isBrowsing: false
+          })
+        },
+        given(modifyFields(listed, { selected: () => Option.some(design.id) })),
+        expect(within(openThreadRow, selector("svg[viewBox='0 0 16 16']"))).toHaveAttr("aria-hidden", "true"),
+        expect(within(openThreadRow, selector("svg[viewBox='0 0 24 24']"))).toBeAbsent(),
+        expect(within(openThreadRow, selector("span.sr-only"))).toHaveText(`${word}, `),
+        expect(within(openThreadRow, text("Composer paste crash"))).toExist(),
+        ...(path === undefined
+          ? [expect(within(openThreadRow, selector("svg[viewBox='0 0 16 16'] path"))).toBeAbsent()]
+          : [expect(within(openThreadRow, selector(`svg[viewBox='0 0 16 16'] path[d^='${path}']`))).toExist()])
+      )
+    }
+  })
+
+  it("draw the drawing of a finished task in ink, and the others in gray", () => {
+    const drawn = (status: Task.Status) =>
+      sceneView({
+        openThread: Option.some({ title: "Release notes", taskStatus: Option.some(status) }),
+        isBrowsing: false
+      })
+
+    scene(
+      { update, view: drawn("done") },
+      given(modifyFields(listed, { selected: () => Option.some(design.id) })),
+      expect(within(openThreadRow, selector("svg[viewBox='0 0 16 16']"))).toHaveClass("text-ink")
+    )
+    scene(
+      { update, view: drawn("doing") },
+      given(modifyFields(listed, { selected: () => Option.some(design.id) })),
+      expect(within(openThreadRow, selector("svg[viewBox='0 0 16 16']"))).toHaveClass("text-ink-secondary")
+    )
+  })
+
+  it("show the thread open under the group it is open in and no other, a conversation as a team", () => {
+    scene(
+      {
+        update,
+        view: sceneView({
+          openThread: Option.some({ title: "Lunch on Friday?", taskStatus: Option.some("todo") }),
+          isBrowsing: false
+        })
+      },
+      given(modifyFields(withConversation, { selected: () => Option.some(withBob.id) })),
+      expect(role("button", { name: "Bob" })).toHaveAttr("aria-current", "page"),
+      expect(within(openThreadRow, text("Lunch on Friday?"))).toExist(),
+      expectAll(all.text("Lunch on Friday?")).toHaveCount(1)
     )
   })
 

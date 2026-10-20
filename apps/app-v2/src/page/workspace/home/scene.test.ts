@@ -137,6 +137,33 @@ const withThread = modifyFields(opened, {
     })
 })
 
+/** The same, with the thread open tracking the task `task`, which stands in `status`. */
+const withTrackedTask = (status: typeof task.status) =>
+  modifyFields(withThread, {
+    open: (open) =>
+      Open.matchOrElse(
+        open,
+        {
+          Group: ({ groupId, model: group }) =>
+            Open.Group({
+              groupId,
+              model: modifyFields(group, {
+                thread: Option.map((openThread) => ({
+                  ...openThread,
+                  model: modifyFields(openThread.model, {
+                    task: (taskModel) =>
+                      modifyFields(taskModel, {
+                        task: () => Option.some({ task: { ...task, status }, pending: false })
+                      })
+                  })
+                }))
+              })
+            })
+        },
+        () => open
+      )
+  })
+
 /** The general group read, which Alice belongs to, with three members, and nothing open. */
 const withBrowsableGroup = modifyFields(opened, {
   groups: (groups) =>
@@ -473,6 +500,32 @@ describe("home", () => {
           within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))
         )
       ).toExist()
+    )
+  })
+
+  it("draws the thread under the group by the status of the task it tracks, and by the message icon when it tracks none", () => {
+    const underGroup = within(role("navigation", { name: "Studio" }), selector('[aria-current="page"]:not(button)'))
+
+    scene(
+      { update, view: sceneView },
+      given(withTrackedTask("triage")),
+      expect(within(underGroup, text("Composer paste crash"))).toExist(),
+      expect(within(underGroup, selector("svg[viewBox='0 0 16 16'] path[d^='M8 4.6 V8.8']"))).toExist(),
+      expect(within(underGroup, selector("span.sr-only"))).toHaveText("Triage, "),
+      expect(within(underGroup, selector("svg[viewBox='0 0 24 24']"))).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView },
+      given(withTrackedTask("done")),
+      expect(within(underGroup, selector("svg[viewBox='0 0 16 16']"))).toHaveClass("text-ink"),
+      expect(within(underGroup, selector("span.sr-only"))).toHaveText("Done, ")
+    )
+    scene(
+      { update, view: sceneView },
+      given(withThread),
+      expect(within(underGroup, selector("svg[viewBox='0 0 24 24']"))).toExist(),
+      expect(within(underGroup, selector("svg[viewBox='0 0 16 16']"))).toBeAbsent(),
+      expect(within(underGroup, selector("span.sr-only"))).toBeAbsent()
     )
   })
 
