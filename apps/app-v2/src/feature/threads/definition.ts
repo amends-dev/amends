@@ -121,12 +121,20 @@ export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): Read
 
 const memberNamesList = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 
+/** What the welcome calls the person among the members' names. */
+export const selfName = "You"
+
 /**
  * Who belongs to a team as its welcome says it, from `names`: "You, Alex Morgan, and Sara are members.", "You and Sara
- * are members.", and "You is a member." for one.
+ * are members.", and for one "You are a member." or "Sara is a member.".
  */
-export const membersLine = (names: ReadonlyArray<string>): string =>
-  `${memberNamesList.format(names)} ${names.length === 1 ? "is a member" : "are members"}.`
+export const membersLine = (names: ReadonlyArray<string>): string => {
+  if (names.length !== 1) {
+    return `${memberNamesList.format(names)} are members.`
+  }
+
+  return names[0] === selfName ? `${selfName} are a member.` : `${names[0]} is a member.`
+}
 
 /** Whether the threads could not be read, which is why none are shown: nothing was read, and why. */
 export const isReadFailed = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)

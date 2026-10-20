@@ -299,7 +299,7 @@ below it counted at each level above.
   "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
   caret blinking. A team's welcome says who belongs to it first, "You, Alex Morgan, and Sara are members." as
   `apps/ui` words it, with `Intl.ListFormat` (`membersLine`): the person as "You" and first, then the others by name in
-  the order of the admissions, and "You is a member." for a team of one, which `apps/ui` reads the same way; a
+  the order of the admissions, and "You are a member." for a team of one (`apps/ui` would say "You is a member."); a
   conversation's welcome lists no one. When the first read failed (`isReadFailed`: not loaded, and why in `notice`),
   either tab says "Can't load this conversation" with "Try again once the host is reachable." and a Try again
   (`cantLoadConversation`) in place of the loading line, which `ClickedTryAgain` replaces again while it reads: it clears

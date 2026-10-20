@@ -115,9 +115,9 @@ export type OutMessage = typeof OutMessage.Type
 export const GroupDefinition = Block.makeDefinition("Group", { Model, Message, OutMessage, ChildInitContext })
 
 /**
- * Whether the person's replica has the group, so that it is shown: `Loading` until the store has answered, `Failed` when
- * it could not be read, and, once it answered without the group, `Unavailable`, as it is for a group the person never
- * had or lost the right to read.
+ * Whether the person's replica has the group, so that it is shown: `Loading` until the store has answered, `Failed`
+ * when it could not be read, and, once it answered without the group, `Unavailable`, as it is for a group the person
+ * never had or lost the right to read.
  */
 export type Availability = "Available" | "Loading" | "Failed" | "Unavailable"
 

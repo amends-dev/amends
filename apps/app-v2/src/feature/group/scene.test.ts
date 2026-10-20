@@ -1052,7 +1052,7 @@ describe("a group's welcome", () => {
   })
 
   it("says a team of one has one member, and lists no members for a conversation", () => {
-    scene({ update, view }, given(withThreadsRead(openedGeneral)), expect(text("You is a member.")).toExist())
+    scene({ update, view }, given(withThreadsRead(openedGeneral)), expect(text("You are a member.")).toExist())
     scene(
       { update, view },
       given(withThreadsRead(openedConversation)),

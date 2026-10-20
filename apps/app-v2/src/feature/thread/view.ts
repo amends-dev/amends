@@ -55,9 +55,9 @@ const renamingView = (model: Model, h: ThreadViewBuilder): Html =>
   })
 
 /**
- * The person's part in the thread as a bell in the pane's header, as `apps/ui` has it: named Follow thread, or Following
- * thread, filled and pressed, while they follow it, which stops following, and unavailable while a change to that is on
- * its way.
+ * The person's part in the thread as a bell in the pane's header, as `apps/ui` has it: named Follow thread, or
+ * Following thread, filled and pressed, while they follow it, which stops following, and unavailable while a change to
+ * that is on its way.
  */
 export const followView = ThreadComposition.makeView((model, h) => {
   const isFollowing = Option.exists(model.following, ({ active }) => active)

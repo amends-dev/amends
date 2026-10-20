@@ -465,9 +465,10 @@ describe("a group's threads being read", () => {
 })
 
 describe("who belongs to a team, as its welcome says it", () => {
-  it("lists them with the commas and the and of the English list, and is a member for one", () => {
+  it("lists them with the commas and the and of the English list, and a member for one", () => {
     expect(membersLine(["You", "Alex Morgan", "Sara"])).toBe("You, Alex Morgan, and Sara are members.")
     expect(membersLine(["You", "Sara"])).toBe("You and Sara are members.")
-    expect(membersLine(["You"])).toBe("You is a member.")
+    expect(membersLine(["You"])).toBe("You are a member.")
+    expect(membersLine(["Sara"])).toBe("Sara is a member.")
   })
 })

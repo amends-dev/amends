@@ -348,7 +348,7 @@ describe("a group's threads", () => {
       given(empty),
       expect(text("You and Sara are members.")).toExist()
     )
-    scene({ update, view: welcomeTo(["You"]) }, given(empty), expect(text("You is a member.")).toExist())
+    scene({ update, view: welcomeTo(["You"]) }, given(empty), expect(text("You are a member.")).toExist())
   })
 
   it("says the members before how to start, as two paragraphs", () => {

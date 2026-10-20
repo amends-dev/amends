@@ -24,6 +24,7 @@ import { memberChoice } from "../../memberChoice.ts"
 import { groupTarget, may } from "../../permissions.ts"
 import { groupName, initials, isJoinable, memberMark, memberName, pluralize } from "../../seen.ts"
 import { followView, replyView, sidePane } from "../thread/view.ts"
+import { selfName } from "../threads/definition.ts"
 import {
   cantLoadConversation,
   composerView,
@@ -129,12 +130,12 @@ const membersActions = (model: Model, h: GroupViewBuilder): ReadonlyArray<Html> 
       ]
 }
 
-/** The names of a team's members as its welcome says them: the person as "You", first, and the others by name. */
+/** The names of a team's members as its welcome says them: the person as `selfName`, first, and the others by name. */
 const welcomeNames = (model: Model): ReadonlyArray<string> => {
   const memberIds = membersOf(model)
 
   return [
-    ...(memberIds.includes(model.memberId) ? ["You"] : []),
+    ...(memberIds.includes(model.memberId) ? [selfName] : []),
     ...memberIds
       .filter((memberId) => memberId !== model.memberId)
       .map((memberId) => memberName(model.members, memberId))
@@ -322,7 +323,9 @@ const settingsModal = (render: RenderInfo, model: Model, h: GroupViewBuilder): H
     }
   })
 
-/** What the group says when the person's replica lacks it, as it does for a group they never had or can no longer read. */
+/**
+ * What the group says when the person's replica lacks it, as it does for a group they never had or can no longer read.
+ */
 const unavailableGroup = (h: GroupViewBuilder): Html =>
   paneEmpty(h, {
     art: "held-back",

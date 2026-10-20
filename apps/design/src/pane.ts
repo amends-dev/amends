@@ -305,13 +305,13 @@ const copyLines = (copy: string | ReadonlyArray<string> | undefined): ReadonlyAr
 }
 
 /**
- * What a pane's body says when it has nothing to list, or a centered screen when it has nothing to show: 64px
- * under the header, centered, the `art` that draws the state, then the `title` as an `h2`, under the pane's `h1`,
- * and the `copy` under it, a line of what to do or why, in quiet text, or several lines, each its own paragraph, and
- * the `action` under that, such as a `button` that does it, 12px below. The text is centered and 20rem wide at most. The `art` is one of the
- * `stateArt` kinds, or `working`, the logo at 3.5rem in its working motion, for what is waited on: the column is
- * then a live region, a `status`, so that what it says is announced. A screen whose message is all it has, such as
- * one that says the host cannot be reached, makes the title its `h1` with `level` 1; under a heading, as a list
+ * What a pane's body says when it has nothing to list, or a centered screen when it has nothing to show: 64px under the
+ * header, centered, the `art` that draws the state, then the `title` as an `h2`, under the pane's `h1`, and the `copy`
+ * under it, a line of what to do or why, in quiet text, or several lines, each its own paragraph, and the `action`
+ * under that, such as a `button` that does it, 12px below. The text is centered and 20rem wide at most. The `art` is
+ * one of the `stateArt` kinds, or `working`, the logo at 3.5rem in its working motion, for what is waited on: the
+ * column is then a live region, a `status`, so that what it says is announced. A screen whose message is all it has,
+ * such as one that says the host cannot be reached, makes the title its `h1` with `level` 1; under a heading, as a list
  * that is empty does, it stays an `h2`.
  */
 export const paneEmpty = <Message, Requirements>(
