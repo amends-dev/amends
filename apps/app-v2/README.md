@@ -514,7 +514,8 @@ below it counted at each level above.
   the name. Where the person manages invitations, Invite people is in the page's header, and after the roster are
   the Pending invitations, with how many, each a `rowWithButton` of the address over what it gives and when it ends
   ("Member · Expires in 7 days", the days left rounded up as `apps/ui` rounds them and at least one, so that an
-  invitation just made for a week says seven: `expiryLabel`) with a quiet Revoke named for the address, held while the
+  invitation just made for a week says seven: `expiryInDaysLabel`, which tells days alone, as `apps/ui`'s member
+  settings do, where the workspace picker's `expiryLabel` tells hours too) with a quiet Revoke named for the address, held while the
   invitation is itself on
   its way, or "No invitations are waiting.", and View history; on a phone the invitations are one card, "1 pending
   invitation" over "View and manage invitations", that opens the same history. A row reports `OpenedMember` and
@@ -537,16 +538,17 @@ below it counted at each level above.
   and a quiet Revoke at the end of each that waits, with Invite people at the start of the footer and Done at its
   end; Revoke invitation?, naming the address; Transfer ownership, choosing the new owner
   among the people who can become it and saying who becomes the only owner; Remove {name}?, saying what they
-  lose and that they need a fresh invitation to rejoin; and Change your name (`ChangingName`), a compact dialog of one
-  field, "Your name", that starts from the name the person has, takes the focus with its text selected (the
-  `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name that waits for a name that is not blank and not the one
-  they have. It opens from the person's account at the foot of the rail, which the Block draws (`accountView`, given the
+  lose and that they need a fresh invitation to rejoin; and Your name (`ChangingName`, opened by "Change your name…"),
+  a compact dialog (`width: "compact"`) titled "Your name" with the workspace's name beside the title, "What people in
+  this workspace call you. Others keep their own." under it, and one field, "Name", that starts from the name the
+  person has, takes the focus with its text selected (the `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name
+  that waits for a name that is not blank and not the one they have, as `apps/ui`'s change-name dialog does. Its
+  Cancel is disabled while the name is being saved (`isCancelDisabled`). It opens from the person's account at the foot of the rail, which the Block draws (`accountView`, given the
   address the person signed in with and their Appearance) as a Foldkit `Menu` Block it binds (`AccountBinding`, a menu
   of `AccountEntry`, id `account`): choosing "Change your name…" opens the dialog once the replica holds the person, and
   every other entry is reported as `ChoseAccountEntry`.
-  Each says "Creating…", "Revoking…", "Transferring…", or
-  "Removing…" while its request is on its way, and closing the dialog then is ignored: it opens again to show how
-  the request ends. A request that ends well closes the dialog; one that does not stays open under the failure.
+  Each says "Creating…", "Revoking…", "Transferring…", "Removing…", or "Saving…" while its request is on its way, and
+  closing the dialog then is ignored: it opens again to show how the request ends. A request that ends well closes the dialog; one that does not stays open under the failure.
   Revoking from the invitations replaces them in the same dialog, so Cancel and the end of the request close it
   and do not return to them. A failure is worded by `settingsMessage` for the place the action was made, with
   Refresh where `needsRefresh` says that what the person sees is out of date. The Block tells what it can: what
@@ -778,8 +780,11 @@ below it counted at each level above.
   invitations still open to the person, which the host lists with the workspaces, follow them under an
   "Invitations" heading with their count, each keyed by its ID, as the design's `rowWithButton`: the first
   letter of the workspace's name ("?" when the host has none), the name or "Workspace invitation", "Pending
-  invitation · Expires in 7 days" (`expiryLabel` in `seen.ts`, from the time now, which the root gives the view),
-  and an "Accept invite" button named for the workspace; with invitations and no workspace, the design's
+  invitation · Expires in 7 days" (`expiryLabel` in `seen.ts`, from the time now, which the root gives the view, as
+  `apps/ui` words it: "Expires in 5 hours" while less than a day is left, "Expires tomorrow" once the days left
+  rounded up are one, "Expires in N days" up to thirty days, the date, "Expires Oct 6, 2026", beyond, and "Expired"
+  once it has; what is left is counted from a minute after the time now, which the app's time may be behind by, so
+  that an invitation made for a week says seven days until a day of it has passed), and an "Accept invite" button named for the workspace; with invitations and no workspace, the design's
   `footnote` after them says "Accept an invitation above, or create your own workspace.". Each workspace's row
   is the design's `row` with an ID, `workspace-{id}` (`workspaceRowId`), which focus moves to.
   - The listing, `Workspaces`, is `Loading`, `Loaded`, or `Unreachable`. Until the host answers the first read, a
@@ -799,8 +804,11 @@ below it counted at each level above.
     `Opening`, once the workspace exists, with its ID, its name, and whether the listing could be read again;
     and for joining, filling the form (`FillingJoin`), the request on its way (`SendingJoin`), and `Joined`,
     once the person is in the workspace, with the invitation and whether the listing could be read again.
-  - Creating asks for the workspace's name and what people there will call the person, and creates it over HTTP,
-    `client.workspaces.create`, as its owner and first member. Each attempt sends a request key as the
+  - Creating asks for the workspace's name and what people there will call the person ("What people there will call
+    you. You can change it later."), and creates it over HTTP, `client.workspaces.create`, as its owner and first
+    member. Create workspace waits for a workspace name, spaces being none (`hasWorkspaceName`), as well as while the
+    request is on its way, and `SubmittedCreate` sends nothing without one, since a disabled button does not stop
+    the Enter key from submitting the form. Each attempt sends a request key as the
     `idempotency-key`, made by the command with the browser's `Crypto`, and a failed attempt keeps the key it
     used so that the request sent again after an uncertain outcome returns the workspace the first created, not
     a second; changing a name starts a new request, since it is no longer the one that was sent. The command
@@ -1418,8 +1426,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a removal, naming the agent and saying it leaves and its messages stay, removing it once confirmed, saying
   under the question that it could not be, and left alone on Cancel; the settings' Workspace page, with the name renamed when it is new
   and the reason it could not be kept, the ID copied and shown Copied until its time is up, who made the
-  workspace and who owns it, the person's own name changed in a compact dialog the page asks for, which starts from the name they have with it
-  selected, saves only a name that is new, says why it could not, and closes once it is kept, with no form for it on the page, what
+  workspace and who owns it, the person's own name changed in a compact dialog titled "Your name" with the workspace's name beside it,
+  which the page asks for and which starts from the name they have with it selected, saves only a name that is new,
+  cannot be cancelled while it saves, says why it could not, and closes once it is kept, with no form for it on the page, what
   is on its way marked, loading, not loading, and a way to read again, and the store's changes shown; the Members
   page, with the members listed under their headings with their role and status, an agent said to be one,
   narrowed by search and by a menu of whether they left, its labels kept under the toolbar only while it has someone to show, a row marking the member open and reporting it; and a member in the
@@ -1499,8 +1508,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   the host not reached the first time as a screen of its own, with a primary Try again, read again; a read that
   failed after the list was shown as an alert over the list it kept, with a quiet Try again; the empty
   listing as its heading, its line, and the empty state with a primary Create workspace, which opens the
-  form, in place of the heading's button; and the dialog taking a workspace's names, sending them, saying at each
-  field and for the form why they were refused, and opening the workspace created, or saying the list could not
+  form, in place of the heading's button; each invitation's end told in hours, as tomorrow, in days, or by its date;
+  and the dialog taking a workspace's names, its Create waiting for a workspace name and for the request, sending
+  them, saying at each field and for the form why they were refused, and opening the workspace created, or saying the list could not
   be refreshed, with Close and a way to try again; the dialog from an invitation's button, "Join {workspace}" or
   "Join this workspace", described by its line, with its field filled in with the name suggested, taking the
   focus and watching it to select the text, the sending state, each refusal at the field and under it, and

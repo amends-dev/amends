@@ -16,6 +16,7 @@ import {
   role,
   scene,
   selector,
+  submit,
   text,
   type,
   withViewInputs,
@@ -32,6 +33,7 @@ import {
   session,
   unnamedInvitation
 } from "../../../test/fixtures.ts"
+import { calendarDate } from "../../seen.ts"
 import {
   AcceptInvitation,
   CreateWorkspace,
@@ -275,17 +277,41 @@ describe("the workspaces page", () => {
       given(showing(loaded([], [unnamedInvitation]))),
       expect(within(role("list", { name: "Invitations" }), text("Workspace invitation"))).toExist(),
       expect(within(role("list", { name: "Invitations" }), text("?"))).toHaveAttr("aria-hidden", "true"),
-      expect(text("Pending invitation · Expires in 1 day")).toExist(),
+      expect(text("Pending invitation · Expires in 3 hours")).toExist(),
       expect(role("button", { name: "Accept invite to Workspace invitation" })).toExist()
     )
   })
 
-  it("reads when an invitation expires from the time now, in days rounded up, and says so once it has", () => {
+  it("reads when an invitation expires from the time now: in hours while less than a day is left, and says so once it has", () => {
     scene(
       { update, view: withViewInputs(view, { now })({ now: DateTime.add(now, { days: 6, hours: 23, minutes: 45 }) }) },
       given(showing(loaded([], [northstarInvitation, atlasInvitation]))),
-      expect(text("Pending invitation · Expires in 1 day")).toExist(),
+      expect(text("Pending invitation · Expires in 1 hour")).toExist(),
       expect(text("Pending invitation · Expired")).toExist()
+    )
+  })
+
+  it("reads an invitation a day from ending as tomorrow, and one days away in days", () => {
+    scene(
+      { update, view: withViewInputs(view, { now })({ now: DateTime.add(now, { days: 5, hours: 23, minutes: 59 }) }) },
+      given(showing(loaded([], [northstarInvitation, atlasInvitation]))),
+      expect(text("Pending invitation · Expires tomorrow")).toExist(),
+      expect(text("Pending invitation · Expired")).toExist()
+    )
+    scene(
+      { update, view: withViewInputs(view, { now })({ now: DateTime.add(now, { days: 4 }) }) },
+      given(showing(loaded([], [northstarInvitation, atlasInvitation]))),
+      expect(text("Pending invitation · Expires in 3 days")).toExist(),
+      expect(text("Pending invitation · Expired")).toExist()
+    )
+  })
+
+  it("reads an invitation more than thirty days from ending by the day it ends", () => {
+    const earlier = DateTime.subtract(now, { days: 30 })
+    scene(
+      { update, view: withViewInputs(view, { now })({ now: earlier }) },
+      given(showing(loaded([], [northstarInvitation]))),
+      expect(text(`Pending invitation · Expires ${calendarDate(northstarInvitation.details.expiresAt)}`)).toExist()
     )
   })
 
@@ -419,8 +445,10 @@ describe("creating a workspace", () => {
       expect(label("Workspace name")).toHaveValue(""),
       expect(label("Your name")).toHaveValue(""),
       expect(text("You'll be the owner of this workspace.")).toExist(),
-      expect(text("What people there will call you.")).toExist(),
+      expect(text("What people there will call you. You can change it later.")).toExist(),
+      expect(inDialog("Create workspace")).toBeDisabled(),
       type(label("Workspace name"), "Acme"),
+      expect(inDialog("Create workspace")).not.toBeDisabled(),
       type(label("Your name"), "Alex"),
       click(inDialog("Create workspace")),
       Command.expectExact(CreateWorkspace({ name: "Acme", memberName: "Alex", key: Option.none() })),
@@ -443,6 +471,26 @@ describe("creating a workspace", () => {
       expectOutMessage(OutMessage.OpenedWorkspace({ membership: acme })),
       ...dialogClosed(),
       expect(createdDialog).toBeAbsent()
+    )
+  })
+
+  it("keeps Create disabled until the workspace has a name, spaces being none, and sends nothing without one", () => {
+    scene(
+      { update, view: sceneView },
+      given(listed),
+      ...formOpened(),
+      expect(inDialog("Create workspace")).toBeDisabled(),
+      type(label("Your name"), "Alex"),
+      expect(inDialog("Create workspace")).toBeDisabled(),
+      submit(selector("form")),
+      type(label("Workspace name"), "   "),
+      expect(inDialog("Create workspace")).toBeDisabled(),
+      submit(selector("form")),
+      expect(text("Creating your workspace…")).toBeAbsent(),
+      type(label("Workspace name"), "Acme"),
+      expect(inDialog("Create workspace")).not.toBeDisabled(),
+      type(label("Workspace name"), ""),
+      expect(inDialog("Create workspace")).toBeDisabled()
     )
   })
 
@@ -481,8 +529,9 @@ describe("creating a workspace", () => {
       { update, view: sceneView },
       given(listed),
       ...formOpened(),
+      type(label("Workspace name"), "Acme​"),
       click(inDialog("Create workspace")),
-      Command.expectExact(CreateWorkspace({ name: "", memberName: "", key: Option.none() })),
+      Command.expectExact(CreateWorkspace({ name: "Acme​", memberName: "", key: Option.none() })),
       Command.resolve(
         CreateWorkspace,
         Message.FailedCreate({
@@ -577,6 +626,7 @@ describe("creating a workspace", () => {
       { update, view: sceneView },
       given(listed),
       ...formOpened(),
+      type(label("Workspace name"), "Acme"),
       click(inDialog("Create workspace")),
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
       Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),

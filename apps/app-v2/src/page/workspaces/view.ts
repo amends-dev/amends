@@ -15,6 +15,7 @@ import { DialogBinding, WorkspacesComposition, type WorkspacesViewBuilder } from
 import {
   Entering,
   type FormErrors,
+  hasWorkspaceName,
   type JoinErrors,
   Message,
   type Model,
@@ -236,7 +237,7 @@ const createFormModal = (
           label: "Your name",
           type: "text",
           value: names.memberName,
-          hint: "What people there will call you.",
+          hint: "What people there will call you. You can change it later.",
           onInput: (memberName) => Message.TypedMemberName({ memberName }),
           isAutofocus: false
         },
@@ -246,7 +247,7 @@ const createFormModal = (
       isSending ? hint(h, "Creating your workspace…") : h.empty
     ],
     cancelLabel: "Cancel",
-    footer: [submit(h, createTitle, { isDisabled: isSending })],
+    footer: [submit(h, createTitle, { isDisabled: isSending || !hasWorkspaceName(names.name) })],
     onSubmit: Message.SubmittedCreate()
   })
 

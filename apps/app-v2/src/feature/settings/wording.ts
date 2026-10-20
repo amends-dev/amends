@@ -8,7 +8,7 @@ import { Assignment, Scope } from "@amends-dev/core/authorization"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { StateArtKind } from "@amends-dev/design/stateArt"
 import type * as DateTime from "effect/DateTime"
-import { dayLabel, dayOf, expiryLabel } from "../../seen.ts"
+import { dayLabel, dayOf, expiryInDaysLabel } from "../../seen.ts"
 import {
   type Failure,
   type InvitationItem,
@@ -72,7 +72,7 @@ export const invitationDetail = (item: InvitationItem, model: Pick<Model, "roles
   const status = invitationStatus(item, now)
 
   if (status === "pending") {
-    return `${role} · ${expiryLabel(details.expiresAt, now)}`
+    return `${role} · ${expiryInDaysLabel(details.expiresAt, now)}`
   }
 
   if (status === "expired") {

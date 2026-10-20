@@ -1599,7 +1599,7 @@ describe("a workspace", () => {
   })
 
   it("changes the person's name from the account menu in a compact dialog, and confirms it in a toast", () => {
-    const nameDialog = role("dialog", { name: "Change your name" })
+    const nameDialog = role("dialog", { name: "Your name" })
 
     scene(
       { update, view: sceneView, subscriptions: workspaceSubscriptions },
@@ -1618,9 +1618,9 @@ describe("a workspace", () => {
       Mount.resolve(SelectOnFocus, SettingsBlock.Message.CompletedSelectOnFocus()),
       inside(
         nameDialog,
-        expect(role("textbox", { name: "Your name" })).toHaveValue("Alice"),
+        expect(role("textbox", { name: "Name" })).toHaveValue("Alice"),
         expect(role("button", { name: "Save name" })).toBeDisabled(),
-        type(role("textbox", { name: "Your name" }), "Alice M."),
+        type(role("textbox", { name: "Name" }), "Alice M."),
         click(role("button", { name: "Save name" }))
       ),
       Command.expectExact(RenameSelf({ workspaceId: workspace.id, memberId: member.id, name: "Alice M." })),

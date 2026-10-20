@@ -20,6 +20,7 @@ import {
   calendarDate,
   dayLabel,
   dayOf,
+  expiryInDaysLabel,
   expiryLabel,
   foldAccents,
   groupByDay,
@@ -470,6 +471,59 @@ describe("expiryLabel", () => {
     expect(expiryLabel(now, now)).toBe("Expired")
     expect(expiryLabel(DateTime.subtract(now, { seconds: 1 }), now)).toBe("Expired")
     expect(expiryLabel(DateTime.subtract(now, { days: 3 }), now)).toBe("Expired")
+  })
+
+  it("is the hours left, rounded up and at least one, while less than a day is left", () => {
+    expect(after({ seconds: 1 })).toBe("Expires in 1 hour")
+    expect(after({ minutes: 30 })).toBe("Expires in 1 hour")
+    expect(after({ hours: 5 })).toBe("Expires in 5 hours")
+    expect(after({ hours: 12, minutes: 30 })).toBe("Expires in 13 hours")
+    expect(after({ hours: 23, minutes: 59 })).toBe("Expires in 24 hours")
+  })
+
+  it("counts the hours from a minute after now, which the app's time may be behind by", () => {
+    expect(after({ hours: 1, minutes: 1 })).toBe("Expires in 1 hour")
+    expect(after({ hours: 1, minutes: 2 })).toBe("Expires in 2 hours")
+    expect(after({ hours: 5, minutes: 1 })).toBe("Expires in 5 hours")
+    expect(after({ hours: 5, minutes: 2 })).toBe("Expires in 6 hours")
+  })
+
+  it("is tomorrow at one day, and the hours until then, and the days after it, either side of it", () => {
+    expect(after({ days: 1 })).toBe("Expires in 24 hours")
+    expect(after({ days: 1, minutes: 1 })).toBe("Expires tomorrow")
+    expect(after({ days: 1, minutes: 1, seconds: 1 })).toBe("Expires in 2 days")
+  })
+
+  it("is the days left rounded up, from two to thirty, so that an invitation just made for a week says seven", () => {
+    expect(after({ days: 2 })).toBe("Expires in 2 days")
+    expect(after({ days: 3 })).toBe("Expires in 3 days")
+    expect(after({ days: 6, hours: 12 })).toBe("Expires in 7 days")
+    expect(after({ days: 7 })).toBe("Expires in 7 days")
+    expect(after({ days: 7, seconds: 50 })).toBe("Expires in 7 days")
+    expect(after({ days: 7, minutes: 2 })).toBe("Expires in 8 days")
+    expect(after({ days: 29, hours: 6 })).toBe("Expires in 30 days")
+    expect(after({ days: 30 })).toBe("Expires in 30 days")
+    expect(after({ days: 30, minutes: 1 })).toBe("Expires in 30 days")
+  })
+
+  it("is the date once more than thirty days are left", () => {
+    const dateOf = (at: DateTime.DateTime) => spelled(at, { month: "short", day: "numeric", year: "numeric" })
+    const justBeyond = DateTime.add(now, { days: 30, minutes: 1, seconds: 1 })
+    const far = DateTime.add(now, { days: 45 })
+
+    expect(expiryLabel(justBeyond, now)).toBe(`Expires ${dateOf(justBeyond)}`)
+    expect(expiryLabel(far, now)).toBe(`Expires ${dateOf(far)}`)
+    expect(expiryLabel(far, now)).toContain("2026")
+  })
+})
+
+describe("expiryInDaysLabel", () => {
+  const after = (parts: Partial<DateTime.DateTime.PartsForMath>) => expiryInDaysLabel(DateTime.add(now, parts), now)
+
+  it("is Expired once the time has come, and for one that came before", () => {
+    expect(expiryInDaysLabel(now, now)).toBe("Expired")
+    expect(expiryInDaysLabel(DateTime.subtract(now, { seconds: 1 }), now)).toBe("Expired")
+    expect(expiryInDaysLabel(DateTime.subtract(now, { days: 3 }), now)).toBe("Expired")
   })
 
   it("is a day, the singular, for as little as is left of the last one", () => {

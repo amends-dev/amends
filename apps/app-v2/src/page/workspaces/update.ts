@@ -7,6 +7,7 @@ import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, Load
 import { DialogBinding, leaveEntering, WorkspacesComposition } from "./composition.ts"
 import {
   Entering,
+  hasWorkspaceName,
   Message,
   type Model,
   noFormErrors,
@@ -214,12 +215,15 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
     SubmittedCreate: () =>
       Option.match(enteringAs(model, "FillingCreate"), {
         onNone: () => ({ model }),
-        onSome: ({ name, memberName, key }) => ({
-          model: modifyFields(model, {
-            entering: () => Option.some(Entering.SendingCreate({ name, memberName, key }))
-          }),
-          commands: [CreateWorkspace({ name, memberName, key })]
-        })
+        onSome: ({ name, memberName, key }) =>
+          hasWorkspaceName(name)
+            ? {
+                model: modifyFields(model, {
+                  entering: () => Option.some(Entering.SendingCreate({ name, memberName, key }))
+                }),
+                commands: [CreateWorkspace({ name, memberName, key })]
+              }
+            : { model }
       }),
     SubmittedJoin: () =>
       Option.match(enteringAs(model, "FillingJoin"), {

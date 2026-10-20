@@ -111,6 +111,31 @@ describe("creating a workspace", () => {
     )
   })
 
+  it("sends nothing while the workspace has no name, spaces being none, and sends once it has", () => {
+    const blank = Entering.FillingCreate({ name: "", memberName: "Alex", key: Option.none(), errors: noFormErrors })
+    const spaces = Entering.FillingCreate({ name: "   ", memberName: "Alex", key: Option.none(), errors: noFormErrors })
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedCreate()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.TypedMemberName({ memberName: "Alex" })),
+      message(Message.SubmittedCreate()),
+      model((model) => {
+        expect(model.entering).toEqual(Option.some(blank))
+      }),
+      message(Message.TypedName({ name: "   " })),
+      message(Message.SubmittedCreate()),
+      model((model) => {
+        expect(model.entering).toEqual(Option.some(spaces))
+      }),
+      message(Message.TypedName({ name: "Acme" })),
+      message(Message.SubmittedCreate()),
+      Command.expectExact(CreateWorkspace({ name: "Acme", memberName: "Alex", key: Option.none() })),
+      Command.resolve(CreateWorkspace, Message.FailedCreate({ key: Option.none(), error: refusedForm(unreachable) }))
+    )
+  })
+
   it("sends the names with no key, and once the workspace exists reads the list and reports it opened", () => {
     story(
       update,
@@ -218,6 +243,7 @@ describe("creating a workspace", () => {
       given(listed),
       message(Message.ClickedCreate()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      message(Message.TypedName({ name: "Acme" })),
       message(Message.SubmittedCreate()),
       Command.resolve(CreateWorkspace, Message.FailedCreate({ key: Option.none(), error: refused })),
       message(Message.TypedName({ name: "A" })),

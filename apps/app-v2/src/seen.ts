@@ -117,16 +117,51 @@ export const calendarDate = (at: DateTime.DateTime): string =>
  */
 const clockLag = millisPerMinute
 
+/** How long is left until `at` by the app's time `now`, and what is left once its lag of a minute is counted. */
+const timeLeft = (at: DateTime.DateTime, now: DateTime.DateTime): Readonly<{ remaining: number; counted: number }> => {
+  const remaining = DateTime.toEpochMillis(at) - DateTime.toEpochMillis(now)
+  return { remaining, counted: remaining - clockLag }
+}
+
 /**
- * How long after `now` it will be `at`, as an invitation says when it closes: "Expires in 7 days", by the days left
- * rounded up, and so at least one, as `apps/ui` says it, so that an invitation made for a week reads seven until
- * a day of it has passed, and "Expired" once `at` has come. The days are counted from a minute after `now`, which
- * the app's time may be behind by.
+ * How long after `now` it will be `at`, as the member settings say when an invitation closes, as `apps/ui` says it:
+ * "Expires in 7 days", by the days left rounded up, and so at least one, so that an invitation made for a week reads
+ * seven until a day of it has passed, and "Expired" once `at` has come. The days are counted from a minute after `now`,
+ * which the app's time may be behind by.
+ */
+export const expiryInDaysLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
+  const { remaining, counted } = timeLeft(at, now)
+  const days = Math.max(1, Math.ceil(counted / millisPerDay))
+  return remaining <= 0 ? "Expired" : `Expires in ${pluralize(days, "day", "days")}`
+}
+
+/** The most days an invitation's end is told in days, as `apps/ui` tells it; a later end is told by its date. */
+const mostDaysToldInDays = 30
+
+/**
+ * How long after `now` it will be `at`, as the workspace list says when an invitation closes, as `apps/ui` says it: in
+ * hours, rounded up and at least one, while less than a day is left ("Expires in 5 hours"), "Expires tomorrow" once
+ * the days left, rounded up, are one, "Expires in 3 days" up to thirty days, the date after that ("Expires Oct 6,
+ * 2026"), and "Expired" once `at` has come. What is left is counted from a minute after `now`, which the app's time
+ * may be behind by, so that an invitation made for a week reads seven days until a day of it has passed.
  */
 export const expiryLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
-  const remaining = DateTime.toEpochMillis(at) - DateTime.toEpochMillis(now)
-  const days = Math.max(1, Math.ceil((remaining - clockLag) / millisPerDay))
-  return remaining <= 0 ? "Expired" : `Expires in ${pluralize(days, "day", "days")}`
+  const { remaining, counted } = timeLeft(at, now)
+
+  if (remaining <= 0) {
+    return "Expired"
+  }
+
+  if (counted < millisPerDay) {
+    return `Expires in ${pluralize(Math.max(1, Math.ceil(counted / millisPerHour)), "hour", "hours")}`
+  }
+
+  if (counted > mostDaysToldInDays * millisPerDay) {
+    return `Expires ${calendarDate(at)}`
+  }
+
+  const days = Math.ceil(counted / millisPerDay)
+  return days === 1 ? "Expires tomorrow" : `Expires in ${pluralize(days, "day", "days")}`
 }
 
 /** Whether the member is an agent. */

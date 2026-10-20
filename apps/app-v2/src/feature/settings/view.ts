@@ -817,8 +817,9 @@ const removingModal = (render: RenderInfo, removing: RemovingEntering, model: Mo
   })
 
 /**
- * The dialog that changes the person's own name, which they see as it is now with its text selected: how others in the
- * workspace see them. Saving waits for a name that is not blank and not the one they have.
+ * The compact dialog that changes the person's own name in the workspace it names, which they see as it is now with its
+ * text selected: what people there call them, while others keep their own. Saving waits for a name that is not blank
+ * and not the one they have, and neither saving nor cancelling can be done while it is on its way.
  */
 const changingNameModal = (
   render: RenderInfo,
@@ -829,16 +830,18 @@ const changingNameModal = (
   const refusal = Option.filter(changing.failure, ({ reason }) => reason === "Invalid")
 
   return modal(h, render, {
-    title: "Change your name",
+    title: "Your name",
+    context: workspaceName(model),
+    description: "What people in this workspace call you. Others keep their own.",
+    width: "compact",
     body: [
       field(
         h,
         {
           id: "own-name",
-          label: "Your name",
+          label: "Name",
           type: "text",
           value: changing.name,
-          hint: "How others in this workspace see you.",
           isAutofocus: false,
           isDisabled: changing.isSending,
           attributes: [...render.initialFocus, h.OnMount(SelectOnFocus()), h.Autocomplete("off"), h.Spellcheck(false)],
@@ -852,6 +855,7 @@ const changingNameModal = (
       )
     ],
     cancelLabel: "Cancel",
+    isCancelDisabled: changing.isSending,
     footer: [
       submit(h, changing.isSending ? "Saving…" : "Save name", {
         isDisabled: changing.isSending || !isNameChanged(changing.name, ownName(model))
@@ -878,10 +882,10 @@ const dialogModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Set
 
 /**
  * Whether the dialog opens with a line that describes it: it does to confirm revoking an invitation or removing a
- * member.
+ * member, and to change the person's own name.
  */
 const hasDescription = (model: Model): boolean =>
-  Option.exists(model.entering, Entering.isAnyOf(["Revoking", "Removing"]))
+  Option.exists(model.entering, Entering.isAnyOf(["Revoking", "Removing", "ChangingName"]))
 
 /** What the dialog is given besides the model: the time now, which the invitations' ends are told against. */
 export type DialogInputs = Readonly<{ now: DateTime.Utc }>

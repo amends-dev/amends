@@ -151,5 +151,8 @@ export type OutMessage = typeof OutMessage.Type
 
 export const WorkspacesDefinition = Block.makeDefinition("Workspaces", { Model, Message, OutMessage })
 
+/** Whether the form for creating a workspace has a name to send: the workspace's, ignoring the space around it. */
+export const hasWorkspaceName = (name: string): boolean => name.trim() !== ""
+
 /** The ID of the row that opens `workspaceId`, which focus moves to once the person has joined it. */
 export const workspaceRowId = (workspaceId: WorkspaceId.WorkspaceId): string => `workspace-${workspaceId}`

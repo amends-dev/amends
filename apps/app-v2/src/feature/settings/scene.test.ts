@@ -178,7 +178,7 @@ describe("the Workspace page of the settings", () => {
   })
 
   it("changes the person's own name in a compact dialog the account menu opens, which starts from the name they have", () => {
-    const nameDialog = role("dialog", { name: "Change your name" })
+    const nameDialog = role("dialog", { name: "Your name" })
 
     scene(
       { update, view: withDialog(withAccount(view)) },
@@ -188,24 +188,29 @@ describe("the Workspace page of the settings", () => {
       expectNoOutMessage(),
       ...dialogOpened(),
       Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
+      expect(nameDialog).toHaveAccessibleDescription("What people in this workspace call you. Others keep their own."),
       inside(
         nameDialog,
-        expect(role("textbox", { name: "Your name" })).toHaveValue("Alice"),
-        expect(text("How others in this workspace see you.")).toExist(),
-        expect(role("button", { name: "Cancel" })).toExist(),
+        expect(selector("form")).toHaveClass("w-[min(35rem,calc(100%-2rem))]"),
+        expect(role("heading", { name: "Your name", level: 2 })).toExist(),
+        expect(text("Studio")).toExist(),
+        expect(role("textbox", { name: "Name" })).toHaveValue("Alice"),
+        expect(text("How others in this workspace see you.")).toBeAbsent(),
+        expect(role("button", { name: "Cancel" })).toBeEnabled(),
         // The name they have is no name to save, and neither is a blank one.
         expect(role("button", { name: "Save name" })).toBeDisabled(),
-        type(role("textbox", { name: "Your name" }), "   "),
+        type(role("textbox", { name: "Name" }), "   "),
         expect(role("button", { name: "Save name" })).toBeDisabled(),
-        type(role("textbox", { name: "Your name" }), "Alice M."),
+        type(role("textbox", { name: "Name" }), "Alice M."),
         expect(role("button", { name: "Save name" })).toBeEnabled(),
         click(role("button", { name: "Save name" }))
       ),
       Command.expectExact(RenameSelf({ ...asMember, name: "Alice M." })),
       inside(
         nameDialog,
-        expect(role("textbox", { name: "Your name" })).toBeDisabled(),
-        expect(role("button", { name: "Saving…" })).toBeDisabled()
+        expect(role("textbox", { name: "Name" })).toBeDisabled(),
+        expect(role("button", { name: "Saving…" })).toBeDisabled(),
+        expect(role("button", { name: "Cancel" })).toBeDisabled()
       ),
       Command.resolve(RenameSelf, Message.WroteAction({ written: Written.RenameSelf() })),
       expectOutMessage(OutMessage.RenamedSelf()),
@@ -216,7 +221,7 @@ describe("the Workspace page of the settings", () => {
   })
 
   it("says why the name could not be saved, and keeps the dialog open to try again", () => {
-    const nameDialog = role("dialog", { name: "Change your name" })
+    const nameDialog = role("dialog", { name: "Your name" })
 
     scene(
       { update, view: withDialog(withAccount(view)) },
@@ -224,17 +229,14 @@ describe("the Workspace page of the settings", () => {
       ...chooseFromMenu(AccountMenu, "Account: Alice", "Change your name…"),
       ...dialogOpened(),
       Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
-      inside(
-        nameDialog,
-        type(role("textbox", { name: "Your name" }), "A"),
-        click(role("button", { name: "Save name" }))
-      ),
+      inside(nameDialog, type(role("textbox", { name: "Name" }), "A"), click(role("button", { name: "Save name" }))),
       Command.resolve(RenameSelf, Message.FailedWriteAction({ written: Written.RenameSelf(), reason: "Invalid" })),
       inside(
         nameDialog,
         expect(text("Use 1 to 80 characters, with no invisible ones.")).toExist(),
-        expect(role("textbox", { name: "Your name" })).toHaveValue("A"),
-        type(role("textbox", { name: "Your name" }), "Al"),
+        expect(role("textbox", { name: "Name" })).toHaveValue("A"),
+        expect(role("button", { name: "Cancel" })).toBeEnabled(),
+        type(role("textbox", { name: "Name" }), "Al"),
         expect(text("Use 1 to 80 characters, with no invisible ones.")).toBeAbsent(),
         click(role("button", { name: "Save name" }))
       ),
@@ -242,7 +244,8 @@ describe("the Workspace page of the settings", () => {
       inside(
         nameDialog,
         expect(text("Your name could not be saved. Try again when the host is available.")).toExist(),
-        expect(role("button", { name: "Save name" })).toBeEnabled()
+        expect(role("button", { name: "Save name" })).toBeEnabled(),
+        expect(role("button", { name: "Cancel" })).toBeEnabled()
       )
     )
   })
