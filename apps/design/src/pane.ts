@@ -8,7 +8,7 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { hint, iconButton } from "./control.ts"
 import { form } from "./form.ts"
 import { type IconName, icon } from "./icon.ts"
-import { mark } from "./mark.ts"
+import { type MarkContent, type MarkStatus, mark } from "./mark.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
 
@@ -27,6 +27,12 @@ const closeSlot = "flex flex-none items-center max-tablet:hidden"
 const titleBlock = "flex min-w-0 flex-1 items-center gap-3"
 
 const titleText = "flex min-w-0 items-baseline gap-2"
+
+const titleTextStacked = `${titleText} max-tablet:flex-col max-tablet:items-start max-tablet:gap-0`
+
+const titlePhoneContext = "hidden min-w-0 truncate text-control leading-4.5 text-ink-secondary max-tablet:block"
+
+const hiddenStatus = "sr-only"
 
 const titleMain = "m-0 min-w-0 truncate text-title font-medium text-ink"
 
@@ -70,6 +76,10 @@ const sectionColumn = "flex flex-col gap-3"
 
 const sectionHeading = "flex flex-wrap items-baseline gap-x-2"
 
+const stitchedSectionHeading = "flex min-h-8 items-center gap-3"
+
+const sectionStitch = "h-0 min-w-6 flex-1 border-t border-dashed border-stitch"
+
 const sectionTitle = "m-0 text-item font-medium text-ink"
 
 export type PaneVariant = "main" | "side"
@@ -78,10 +88,14 @@ export type PaneHeader = Readonly<{
   title: string
   /** A drawing before the title. */
   icon?: IconName
-  /** A letter on a small square before the title, for a person or an agent, in place of an `icon`. */
-  mark?: string
+  /** A small square of letters before the title, for a person or an agent, in place of an `icon`. */
+  mark?: MarkContent
+  /** How what the `mark` stands for stands, as the patch on it. */
+  status?: MarkStatus | undefined
   /** A quieter word after the title, such as where it is. */
   context?: string
+  /** A quieter line under the title on phones only, such as the workspace's name, which they have no room for beside it. */
+  phoneContext?: string
   /** A control before the title that brings its own spacing, such as `paneBack`. */
   leading?: Html
   /** Controls at the right, such as `iconButton`s, a `button`, and `paneClose`. */
@@ -113,7 +127,7 @@ const renderTitleLeading = <Message, Requirements>(
     return h.span([h.Class(titleIcon[variant])], [icon(h, header.icon, { size: variant === "main" ? "md" : "sm" })])
   }
 
-  return header.mark === undefined ? h.empty : mark(h, { text: header.mark })
+  return header.mark === undefined ? h.empty : mark(h, { ...header.mark, status: header.status })
 }
 
 const renderTitle = <Message, Requirements>(
@@ -129,8 +143,15 @@ const renderTitle = <Message, Requirements>(
     [
       renderTitleLeading(h, variant, header),
       h.div(
-        [h.Class(titleText)],
-        [heading, header.context === undefined ? h.empty : h.span([h.Class(titleContext)], [header.context])]
+        [h.Class(header.phoneContext === undefined ? titleText : titleTextStacked)],
+        [
+          heading,
+          header.mark === undefined || header.status === undefined
+            ? h.empty
+            : h.span([h.Class(hiddenStatus)], [header.status.label]),
+          header.context === undefined ? h.empty : h.span([h.Class(titleContext)], [header.context]),
+          header.phoneContext === undefined ? h.empty : h.span([h.Class(titlePhoneContext)], [header.phoneContext])
+        ]
       )
     ]
   )
@@ -254,31 +275,48 @@ export const paneColumn = <Message, Requirements>(
 /**
  * A section of a pane's column, a `section` named by `title`: the title as an `h3`, with the `trailing`
  * pieces after it on the same line, such as `sending` or a `badge`, then the `children` in a column, 12px
- * apart.
+ * apart. With `hasStitch` the heading is a line of its own, 32px tall, with a dashed rule running from the
+ * title to the pane's edge, as the sections of a page about one item are set apart.
  */
 export const paneSection = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ title: string; trailing?: ReadonlyArray<Html>; children: ReadonlyArray<Html> }>
+  config: Readonly<{
+    title: string
+    trailing?: ReadonlyArray<Html>
+    hasStitch?: boolean
+    children: ReadonlyArray<Html>
+  }>
 ): Html =>
   h.section(
     [h.AriaLabel(config.title), h.Class(sectionColumn)],
     [
-      h.div([h.Class(sectionHeading)], [h.h3([h.Class(sectionTitle)], [config.title]), ...(config.trailing ?? [])]),
+      config.hasStitch === true
+        ? h.div(
+            [h.Class(stitchedSectionHeading)],
+            [
+              h.h3([h.Class(sectionTitle)], [config.title]),
+              ...(config.trailing ?? []),
+              h.span([h.AriaHidden(true), h.Class(sectionStitch)])
+            ]
+          )
+        : h.div([h.Class(sectionHeading)], [h.h3([h.Class(sectionTitle)], [config.title]), ...(config.trailing ?? [])]),
       ...config.children
     ]
   )
 
 /**
  * A section of a pane's column that is one form, named and titled alike: a `paneSection` of the `title` holding a
- * `pane` form of that name, which sends `onSubmit` and holds the `children`, its fields and buttons.
+ * `pane` form of that name, which sends `onSubmit` and holds the `children`, its fields and buttons. It takes the
+ * section's `hasStitch`.
  */
 export const paneForm = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ title: string; onSubmit: Message }>,
+  config: Readonly<{ title: string; onSubmit: Message; hasStitch?: boolean }>,
   children: ReadonlyArray<Html>
 ): Html =>
   paneSection(h, {
     title: config.title,
+    ...(config.hasStitch === undefined ? {} : { hasStitch: config.hasStitch }),
     children: [form(h, { onSubmit: config.onSubmit, label: config.title, variant: "pane" }, children)]
   })
 

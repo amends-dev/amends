@@ -25,6 +25,7 @@ import {
   answerKeys,
   button,
   buttonRow,
+  type Choice,
   choiceSelect,
   column,
   field,
@@ -33,6 +34,7 @@ import {
   iconButton,
   iconSubmit,
   notice,
+  noticeBox,
   sending,
   submit as submitButton,
   textarea,
@@ -337,6 +339,31 @@ describe("field", () => {
       expect(label("Email")).toHaveAccessibleDescription("Enter a complete address.")
     )
   })
+
+  it("shows its value and takes none while it is disabled", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          field(
+            h,
+            {
+              id: "email",
+              label: "Email",
+              type: "email",
+              value: model.email,
+              isDisabled: true,
+              onInput: (value) => Message.TypedEmail({ value })
+            },
+            Option.none()
+          )
+        ])
+      },
+      given(modifyFields(initial, { email: () => "ada@example.com" })),
+      expect(label("Email")).toBeDisabled(),
+      expect(label("Email")).toHaveValue("ada@example.com")
+    )
+  })
 })
 
 describe("answerKeys", () => {
@@ -441,6 +468,54 @@ describe("textarea", () => {
       expect(label("Notes")).toHaveAttr("rows", "6")
     )
   })
+
+  it("shows a hint under the box that describes it, and the refusal describes it first when there is one", () => {
+    const hinted = (error: Option.Option<string>) => (model: Model, h: HtmlBuilder<Message>) =>
+      textarea(h, {
+        id: "notes",
+        label: "Notes",
+        value: model.notes,
+        hint: "What to remember.",
+        error,
+        onInput: (value) => Message.TypedNotes({ value })
+      })
+    scene(
+      { update, view: viewOf((model, h) => [hinted(Option.none())(model, h)]) },
+      given(initial),
+      expect(text("What to remember.")).toExist(),
+      expect(label("Notes")).toHaveAccessibleDescription("What to remember."),
+      expect(label("Notes")).not.toHaveAttr("aria-invalid"),
+      expect(role("alert")).toBeAbsent()
+    )
+    scene(
+      { update, view: viewOf((model, h) => [hinted(Option.some("That is too long."))(model, h)]) },
+      given(initial),
+      expect(role("alert")).toHaveText("That is too long."),
+      expect(text("What to remember.")).toExist(),
+      expect(label("Notes")).toHaveAccessibleDescription("That is too long."),
+      expect(label("Notes")).toHaveAttr("aria-invalid", "true")
+    )
+  })
+
+  it("shows its value and takes none while it is disabled", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          textarea(h, {
+            id: "notes",
+            label: "Notes",
+            value: model.notes,
+            isDisabled: true,
+            onInput: (value) => Message.TypedNotes({ value })
+          })
+        ])
+      },
+      given(modifyFields(initial, { notes: () => "Remember the milk" })),
+      expect(label("Notes")).toBeDisabled(),
+      expect(label("Notes")).toHaveValue("Remember the milk")
+    )
+  })
 })
 
 describe("toggle", () => {
@@ -525,6 +600,86 @@ describe("choiceSelect", () => {
       expect(label("Plan of Ada")).toHaveValue("team")
     )
   })
+
+  it("reads a choice's description after its label, and lists a choice that can't be chosen as disabled", () => {
+    const harnesses: ReadonlyArray<Choice<string>> = [
+      ["", "Auto", { description: "amends chooses a harness as the agent works" }],
+      ["opencode", "opencode", { description: "opencode · Works only in a sandbox" }],
+      ["vertex", "Vertex", { description: "Its integration isn't installed on this host.", isDisabled: true }],
+      ["plain", "Plain"]
+    ]
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          choiceSelect(h, {
+            id: "harness",
+            label: "Harness",
+            choices: harnesses,
+            value: model.plan,
+            onChange: (plan) => Message.ChangedPlan({ plan })
+          })
+        ])
+      },
+      given(modifyFields(initial, { plan: () => "" })),
+      expect(role("option", { name: "Auto · amends chooses a harness as the agent works" })).toExist(),
+      expect(role("option", { name: "opencode · opencode · Works only in a sandbox" })).toBeEnabled(),
+      expect(role("option", { name: "Vertex · Its integration isn't installed on this host." })).toBeDisabled(),
+      expect(role("option", { name: "Plain" })).toBeEnabled(),
+      change(label("Harness"), "opencode"),
+      expect(label("Harness")).toHaveValue("opencode")
+    )
+  })
+
+  it("shows a hint under the select that describes it, and why its value was refused first when there is one", () => {
+    const hinted = (error: Option.Option<string>) => (model: Model, h: HtmlBuilder<Message>) =>
+      choiceSelect(h, {
+        id: "plan",
+        label: "Plan",
+        choices: plans,
+        value: model.plan,
+        hint: "What you pay for.",
+        error,
+        onChange: (plan) => Message.ChangedPlan({ plan })
+      })
+    scene(
+      { update, view: viewOf((model, h) => [hinted(Option.none())(model, h)]) },
+      given(initial),
+      expect(text("What you pay for.")).toExist(),
+      expect(label("Plan")).toHaveAccessibleDescription("What you pay for."),
+      expect(label("Plan")).not.toHaveAttr("aria-invalid"),
+      expect(role("alert")).toBeAbsent()
+    )
+    scene(
+      { update, view: viewOf((model, h) => [hinted(Option.some("Choose a plan you can pay for."))(model, h)]) },
+      given(initial),
+      expect(role("alert")).toHaveText("Choose a plan you can pay for."),
+      expect(text("What you pay for.")).toExist(),
+      expect(label("Plan")).toHaveAccessibleDescription("Choose a plan you can pay for."),
+      expect(label("Plan")).toHaveAttr("aria-invalid", "true")
+    )
+  })
+
+  it("shows its choice and takes no other while it is disabled", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          choiceSelect(h, {
+            id: "plan",
+            label: "Plan",
+            choices: plans,
+            value: model.plan,
+            isDisabled: true,
+            onChange: (plan) => Message.ChangedPlan({ plan })
+          })
+        ])
+      },
+      given(initial),
+      expect(label("Plan")).toBeDisabled(),
+      expect(label("Plan")).toHaveValue("free")
+    )
+  })
 })
 
 describe("fieldGrid", () => {
@@ -579,6 +734,52 @@ describe("notice", () => {
       { update, view: viewOf((_, h) => [notice(h, Option.none()), notice(h, Option.none(), { tone: "success" })]) },
       given(initial),
       expect(role("alert")).toBeAbsent()
+    )
+  })
+})
+
+describe("noticeBox", () => {
+  it("is a note named by its title, with a line for each reason under it, and not an alert", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          noticeBox(h, {
+            title: "This agent can't run as it is set up",
+            lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
+          })
+        ])
+      },
+      given(initial),
+      expect(role("note", { name: "This agent can't run as it is set up" })).toExist(),
+      expect(
+        within(
+          role("note", { name: "This agent can't run as it is set up" }),
+          text("This agent can't run as it is set up")
+        )
+      ).toExist(),
+      expect(role("listitem", { name: "Its model connection was removed." })).toExist(),
+      expect(role("listitem", { name: "Its harness works only in a sandbox, and it has none." })).toExist(),
+      expect(role("alert")).toBeAbsent()
+    )
+  })
+
+  it("is boxed in the tone's colors with the tone's shape, caution unless it is danger", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          noticeBox(h, { title: "Needs setup", lines: [] }),
+          noticeBox(h, { title: "Unavailable", lines: [], tone: "danger" })
+        ])
+      },
+      given(initial),
+      expect(role("note", { name: "Needs setup" })).toHaveClass("bg-caution-surface"),
+      expect(role("note", { name: "Needs setup" })).toHaveClass("border-caution-border"),
+      expect(within(role("note", { name: "Needs setup" }), selector("span.bg-caution-mark"))).toExist(),
+      expect(role("note", { name: "Unavailable" })).toHaveClass("bg-danger-surface"),
+      expect(within(role("note", { name: "Unavailable" }), selector("span.bg-danger-mark"))).toExist(),
+      expect(within(role("note", { name: "Unavailable" }), selector("ul"))).toBeAbsent()
     )
   })
 })

@@ -1,8 +1,8 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row
  * they lie in, labelled fields and boxes and the grid they lie in, a labelled switch, a choice from a
- * list, a line of hint, why an entry was refused, that an action is on its way, and the column that
- * holds a few of these together. Each renders with the caller's builder and messages, and carries the
+ * list, a line of hint, why an entry was refused, a boxed note for a page as a whole, that an action is on
+ * its way, and the column that holds a few of these together. Each renders with the caller's builder and messages, and carries the
  * look.
  */
 
@@ -14,6 +14,7 @@ import * as Textarea from "@foldkit/ui/textarea"
 import * as Option from "effect/Option"
 import type { Attribute, ChildAttribute, Html, HtmlBuilder, KeyboardModifiers } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
+import { statusMark } from "./mark.ts"
 
 const buttonBase =
   "inline-flex flex-none cursor-pointer items-center justify-center gap-2 whitespace-nowrap focus-ring aria-disabled:cursor-default"
@@ -93,6 +94,25 @@ const noticeTones = {
   success: "text-success-text"
 }
 
+const noticeBoxLooks = {
+  caution: "border-caution-border bg-caution-surface",
+  danger: "border-danger-border bg-danger-surface"
+}
+
+const noticeBoxTitles = { caution: "text-caution-text", danger: "text-danger-text" }
+
+const noticeBoxMarks = { caution: "attention", danger: "blocked" } as const
+
+const noticeBoxBase = "flex items-start gap-3 border px-4 py-3"
+
+const noticeBoxMark = "mt-1.5 flex-none"
+
+const noticeBoxColumn = "flex min-w-0 flex-1 flex-col gap-1"
+
+const noticeBoxTitle = "m-0 text-control font-medium"
+
+const noticeBoxLines = "m-0 flex list-none flex-col gap-1 p-0 text-control text-ink-secondary"
+
 const sendingMark = "text-meta text-ink-muted"
 
 const hintText = "text-hint text-ink-muted"
@@ -138,12 +158,23 @@ export type ControlAttributes<Message, Requirements = never> = ReadonlyArray<
   Attribute<Message, Requirements> | ChildAttribute
 >
 
+/**
+ * What a choice says besides its label: a `description`, which a native select can show only after the label, and
+ * whether it can be chosen, for one that is listed to say that it can't be.
+ */
+export type ChoiceDetail = Readonly<{ description?: string; isDisabled?: boolean }>
+
+/** A choice of a select: its value, how the person reads it, and what else it says. */
+export type Choice<Value extends string> = readonly [Value, string] | readonly [Value, string, ChoiceDetail]
+
 export type ChoiceSelectOptions = Readonly<{
   /** The label names the select for assistive technology and is not shown, for a select in a row of its own. */
   isLabelHidden?: boolean
 }>
 
 export type NoticeTone = keyof typeof noticeTones
+
+export type NoticeBoxTone = keyof typeof noticeBoxLooks
 
 export type NoticeOptions = Readonly<{
   /** `danger` (the default) says what went wrong. */
@@ -306,6 +337,37 @@ export const notice = <Message, Requirements>(
       h.p([h.Role("alert"), h.Class(joinClasses(noticeBase, noticeTones[options.tone ?? "danger"]))], [text])
   })
 
+/**
+ * A note boxed in its tone, `caution` (the default) or `danger`, for a page or a form as a whole and not for one
+ * field: the tone's shape, the `title` that says what is wrong in medium weight, and under it a quiet line for each
+ * of `lines`, why. It is a `note` named by its title, not an alert, since it is there when the page opens.
+ */
+export const noticeBox = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ title: string; lines: ReadonlyArray<string>; tone?: NoticeBoxTone }>
+): Html => {
+  const tone = config.tone ?? "caution"
+
+  return h.div(
+    [h.Role("note"), h.AriaLabel(config.title), h.Class(`${noticeBoxBase} ${noticeBoxLooks[tone]}`)],
+    [
+      h.span([h.Class(noticeBoxMark)], [statusMark(h, { kind: noticeBoxMarks[tone], label: config.title })]),
+      h.div(
+        [h.Class(noticeBoxColumn)],
+        [
+          h.p([h.Class(`${noticeBoxTitle} ${noticeBoxTitles[tone]}`)], [config.title]),
+          config.lines.length === 0
+            ? h.empty
+            : h.ul(
+                [h.Class(noticeBoxLines)],
+                config.lines.map((line) => h.li([], [line]))
+              )
+        ]
+      )
+    ]
+  )
+}
+
 /** A line of quiet text, such as what to know about the control above or below it. */
 export const hint = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Class(hintText)], [text])
@@ -333,7 +395,8 @@ const describeField = <Message, Requirements>(
  * to know about the input, 8px under it. With `isLabelHidden` the label does not show above the input and still
  * names it, for a field in a section that already names it. The `attributes` go onto the input, such as a
  * dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off, and the keys the caller
- * answers, `answerKeys`, for a field above a list its keys walk.
+ * answers, `answerKeys`, for a field above a list its keys walk. A field that `isDisabled` shows its value and
+ * takes none, for a page the person may read and not change.
  */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -346,6 +409,7 @@ export const field = <Message, Requirements>(
     placeholder?: string
     hint?: string
     isAutofocus?: boolean
+    isDisabled?: boolean
     isLabelHidden?: boolean
     attributes?: ControlAttributes<Message, Requirements>
   }>,
@@ -357,6 +421,7 @@ export const field = <Message, Requirements>(
       type: config.type,
       value: config.value,
       onInput: config.onInput,
+      isDisabled: config.isDisabled ?? false,
       isInvalid: Option.isSome(error),
       hasDescription: Option.isSome(error) || config.hint !== undefined,
       isAutofocus: config.isAutofocus ?? true,
@@ -381,7 +446,10 @@ export const field = <Message, Requirements>(
     h
   )
 
-/** A labelled box for longer text, `rows` lines tall, three unless given. The `attributes` go onto the box. */
+/**
+ * A labelled box for longer text, `rows` lines tall, three unless given, with the `hint` under it and why its
+ * value was refused, `error`, as a field has them. The `attributes` go onto the box.
+ */
 export const textarea = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
@@ -390,26 +458,36 @@ export const textarea = <Message, Requirements>(
     value: string
     onInput: (value: string) => Message
     rows?: number
+    hint?: string
+    error?: Option.Option<string>
+    isDisabled?: boolean
     attributes?: PublishedAttributes
   }>
-) =>
-  Textarea.view(
+) => {
+  const error = config.error ?? Option.none()
+
+  return Textarea.view(
     {
       id: config.id,
       value: config.value,
       rows: config.rows ?? 3,
       onInput: config.onInput,
+      isDisabled: config.isDisabled ?? false,
+      isInvalid: Option.isSome(error),
+      hasDescription: Option.isSome(error) || config.hint !== undefined,
       toView: (attributes) =>
         h.div(
           [h.Class(fieldColumn)],
           [
             h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
-            h.textarea([...attributes.textarea, ...(config.attributes ?? []), h.Class(textareaBox)])
+            h.textarea([...attributes.textarea, ...(config.attributes ?? []), h.Class(textareaBox)]),
+            ...describeField(h, attributes.description, config.hint, error)
           ]
         )
     },
     h
   )
+}
 
 /** A labelled switch, on or off, with its label after it. */
 export const toggle = <Message, Requirements>(
@@ -433,27 +511,46 @@ export const toggle = <Message, Requirements>(
     h
   )
 
+const detailOf = <Value extends string>(choice: Choice<Value>): ChoiceDetail | undefined =>
+  choice.length === 3 ? choice[2] : undefined
+
+/** How a choice reads in the list: its label, and its description after it. */
+const choiceText = <Value extends string>(choice: Choice<Value>): string => {
+  const description = detailOf(choice)?.description
+  return description === undefined ? choice[1] : `${choice[1]} · ${description}`
+}
+
 /**
- * A choice of one of `choices`, each a value and how the person reads it. With `isLabelHidden` the label does not
- * show above the select, and still names it. The `attributes` go onto the select.
+ * A choice of one of `choices`, each a value and how the person reads it, with a third part, a `ChoiceDetail`, for
+ * a description after the label and for a choice that can't be chosen. With `isLabelHidden` the label does not
+ * show above the select, and still names it. The `hint` is under it and `error` is why its value was refused, as a
+ * field has them. The `attributes` go onto the select.
  */
-export const choiceSelect = <Choice extends string, Message, Requirements>(
+export const choiceSelect = <Value extends string, Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
     id: string
     label: string
-    choices: ReadonlyArray<readonly [Choice, string]>
-    value: Choice
-    onChange: (value: Choice) => Message
+    choices: ReadonlyArray<Choice<Value>>
+    value: Value
+    onChange: (value: Value) => Message
+    hint?: string
+    error?: Option.Option<string>
+    isDisabled?: boolean
     attributes?: PublishedAttributes
   }>,
   options: ChoiceSelectOptions = {}
-) =>
-  Select.view(
+) => {
+  const error = config.error ?? Option.none()
+
+  return Select.view(
     {
       id: config.id,
       value: config.value,
       onChange: (value) => config.onChange(config.choices.find(([choice]) => choice === value)?.[0] ?? config.value),
+      isDisabled: config.isDisabled ?? false,
+      isInvalid: Option.isSome(error),
+      hasDescription: Option.isSome(error) || config.hint !== undefined,
       toView: (attributes) =>
         h.div(
           [h.Class(fieldColumn)],
@@ -467,12 +564,19 @@ export const choiceSelect = <Choice extends string, Message, Requirements>(
               [
                 h.select(
                   [...attributes.select, ...(config.attributes ?? []), h.Class(selectBox)],
-                  config.choices.map(([choice, label]) => h.option([h.Value(choice)], [label]))
+                  config.choices.map((choice) =>
+                    h.option(
+                      [h.Value(choice[0]), ...(detailOf(choice)?.isDisabled === true ? [h.Disabled(true)] : [])],
+                      [choiceText(choice)]
+                    )
+                  )
                 )
               ]
-            )
+            ),
+            ...describeField(h, attributes.description, config.hint, error)
           ]
         )
     },
     h
   )
+}

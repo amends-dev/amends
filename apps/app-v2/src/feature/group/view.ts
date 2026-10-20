@@ -48,7 +48,7 @@ const markOf = (model: Model) =>
   Option.match(model.group, {
     onNone: () => ({ icon: "mark-channel" as const }),
     onSome: ({ group }) =>
-      group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: nameOf(model).slice(0, 1) }
+      group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: { text: nameOf(model).slice(0, 1) } }
   })
 
 /** Follow, as a bell that is not pressed: following the group is one press away. */

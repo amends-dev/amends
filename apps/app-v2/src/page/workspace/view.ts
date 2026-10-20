@@ -192,7 +192,7 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       return pane(h, {
         variant: "main",
         label: name,
-        header: { title: name, mark: name.slice(0, 1), subtitle: "Pick a group, or open your inbox." },
+        header: { title: name, mark: { text: name.slice(0, 1) }, subtitle: "Pick a group, or open your inbox." },
         body: []
       })
     },

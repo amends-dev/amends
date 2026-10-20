@@ -20,10 +20,12 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
 buttons by variant, disabled, large, and wide, with the link in a sentence, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
-placeholder, filled, invalid, and with a hint under it; a hint; a textarea; a grid of selects, side
+placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
+disabled; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
-field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
-tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
+field with its label hidden, in a section that names it; the toggle on and off; a select, and with
+descriptions and a choice that can't be chosen and a hint, refused, and disabled; the notice
+tones, a boxed note in each tone, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, and a section of two rows with a button
 named for their workspaces, with a footnote after them, and a table of three groups' rows
@@ -48,7 +50,7 @@ groups, each in a frame wider than the measure; the composer empty, filled, and 
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
-as a plain row under its group and the second with its notices; the shell three more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, and Connections, with a section for each capability; and the icons by size, as the shell
+as a plain row under its group and the second with its notices; the shell three more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, and Connections, with a section for each capability; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
@@ -163,8 +165,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   what says whether it is disabled, so it takes no `isDisabled`.
 - `field(h, config, error)` is a label over a 42px bordered input with the error, an
   `Option<string>`, below it as a `notice` that describes the input. The `config` is
-  `{ id, label, type, value, onInput, placeholder?, hint?, isAutofocus?, isLabelHidden?, attributes? }`.
-  A field with an error is `aria-invalid` with a danger border. The `placeholder` shows an example
+  `{ id, label, type, value, onInput, placeholder?, hint?, isAutofocus?, isDisabled?, isLabelHidden?, attributes? }`.
+  A field with an error is `aria-invalid` with a danger border. A field that `isDisabled` shows its value
+  and takes none, for a page the person may read and may not change. The `placeholder` shows an example
   of what to enter while it is empty. The `hint` is a line of what to know about the input, in the
   look of `hint`, 8px under it as the label is above it; it describes the input while there is no
   error. It takes focus as it shows unless `isAutofocus` is `false`. With `isLabelHidden` the label
@@ -181,8 +184,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   composer's list of members is answered the same way.
 - `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the
   control next to it.
-- `textarea(h, { id, label, value, onInput, rows?, attributes? })` is the input's look over `rows`
-  lines, three unless given, with the `attributes` on the box as a field has them.
+- `textarea(h, { id, label, value, onInput, rows?, hint?, error?, isDisabled?, attributes? })` is the input's
+  look over `rows` lines, three unless given, with the `hint` under it, `error` (an `Option<string>`) as the
+  alert that describes it first, and the `attributes` on the box, as a field has them.
 - `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
   `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
   that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
@@ -204,13 +208,20 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   onto new rows when they do not fit, such as a task's Status, Priority, and Assignee.
 - `toggle(h, { id, label, isOn, onToggle })` is a switch with its label after it. The switch is
   named by its label. On touch the switch and its label are each a 44px target.
-- `choiceSelect(h, { id, label, choices, value, onChange, attributes? }, options?)` is a select over
-  `choices`, each a value and how the person reads it, in the input's look, with the `attributes` on
-  the select as a field has them. With `options.isLabelHidden` the label is not shown above the
-  select and still names it, for a select in a row that says what it is for, such as a member's role
-  beside their name.
+- `choiceSelect(h, { id, label, choices, value, onChange, hint?, error?, isDisabled?, attributes? }, options?)`
+  is a select over `choices`, each a value and how the person reads it, in the input's look, with the
+  `hint` under it, `error` as the alert that describes it first, and the `attributes` on the select, as a
+  field has them. A choice may have a third part, `{ description?, isDisabled? }`: a native select shows
+  only text, so the description reads after the label as "Auto · amends chooses a harness as the agent
+  works", and a choice that `isDisabled` is listed and can't be chosen, for the one an agent names that is
+  gone. With `options.isLabelHidden` the label is not shown above the select and still names it, for a
+  select in a row that says what it is for, such as a member's role beside their name.
 - `notice(h, message, options?)` renders an `Option<string>` as an alert in a tone, `"danger"` by
   default, `"caution"`, or `"success"`, and nothing when there is none.
+- `noticeBox(h, { title, lines, tone? })` is a note boxed in its tone, `"caution"` (the default) or
+  `"danger"`, for a page or a form as a whole and not for a field: the tone's status shape, the `title` in
+  medium weight, and a quiet line under it for each of `lines`, why. It is a `note` named by its title and
+  not an alert, since it is there when the page opens, such as the reasons an agent can't run.
 - `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
 
 ### `@amends-dev/design/icon`
@@ -499,11 +510,16 @@ The third and fourth layout patterns share one structure.
   scrolls, and a `footer` that stays in place. The `"main"` variant is the page's `main` landmark,
   its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
   `h2` at body size, in medium weight. A `label` names the main landmark too.
-- The `header` is `{ title, icon?, mark?, context?, leading?, actions?, tabs?, subtitle? }`, 96px
-  tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
+- The `header` is `{ title, icon?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
+  96px tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
   row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
-  spacing, such as `paneBack`, then the title with an `icon` or a `mark` letter before it and
-  `context` after it in `ink-secondary`, and `actions` at the right. The main pane's row starts 40px
+  spacing, such as `paneBack`, then the title with an `icon` or a `mark` before it and
+  `context` after it in `ink-secondary`, and `actions` at the right. The `mark` is a `mark`'s letters and
+  tone, `{ text, tone? }`, the 24px square for a person or an agent that a page about one shows in place of
+  an icon, and its `status` is the patch on it, as a sidebar row's is, which an `sr-only` word after the
+  title says too. The `phoneContext` is a quiet line under the title below 48rem only, such as the
+  workspace's name, which a phone's row has no room for beside the title; from 48rem it is not shown, and a
+  title with one stacks over it there. The main pane's row starts 40px
   further in below 64rem, for the shell's menu button over it; its tabs and subtitle keep the pane's
   gutter, and the side pane's row is not moved. The line under the header is drawn inside it, so the
   current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`.
@@ -525,13 +541,16 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
   table: the group's threads, the groups to browse, the inbox's rows, and the tasks' table, whose
   three cells would be squeezed inside the measure until their titles truncate. The side panes keep
   the measure.
-- `paneSection(h, { title, trailing?, children })` is a section of that column, a `section` named by
+- `paneSection(h, { title, trailing?, hasStitch?, children })` is a section of that column, a `section` named by
   its title: the title as an `h3` at item size in medium weight, with the `trailing` pieces after it on
-  the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart.
-- `paneForm(h, { title, onSubmit }, children)` is a section of that column that is one form, named
+  the same line, such as `sending` or a `badge`, then the `children` in a column 12px apart. With
+  `hasStitch` the heading is a line of its own, 32px tall, with a dashed `stitch` rule running from the
+  title to the pane's edge, hidden from assistive technology, as the sections of a page about one item
+  are set apart.
+- `paneForm(h, { title, onSubmit, hasStitch? }, children)` is a section of that column that is one form, named
   and titled alike: a `paneSection` of the `title` holding a `pane` `form` of the same name that
   sends `onSubmit`, with the `children`, its fields and buttons, in the form's column. The section
-  is a region and the form a landmark, both found by the `title`.
+  is a region and the form a landmark, both found by the `title`. It takes the section's `hasStitch`.
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
   header's `actions`. It shows from 48rem; below that the side pane is full screen and has `paneBack`.
 - `paneBack(h, onClick)` is the side pane's Back button, an `iconButton` named Back, for the header's
@@ -717,7 +736,7 @@ The groups Block's form for a new team does all four.
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
-`aria-invalid`, and description, a switch by its label, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, also when its label is
+`aria-invalid`, and description, a switch by its label, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
 landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, and a footnote by its text; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
@@ -726,7 +745,7 @@ sends what it is given; a sidebar item by its name, which has the status's word 
 `aria-current` and its count, the row under it as a button or as a plain row, the logo's mark at the end of a row at
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
-section by `role("region")` and its `h3`, its trailing pieces and children; a pane's empty state by
+section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title; a pane's empty state by
 its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, its action, and its icon as `aria-hidden`; a detail list's labels
 and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,

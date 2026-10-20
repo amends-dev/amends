@@ -160,7 +160,7 @@ describe("pane", () => {
         view: paneView((model, h) =>
           pane(h, {
             variant: "main",
-            header: { title: "Yumi", mark: "Y", subtitle: "Reads the repository.", tabs: tabs(model, h) },
+            header: { title: "Yumi", mark: { text: "Y" }, subtitle: "Reads the repository.", tabs: tabs(model, h) },
             body: []
           })
         )
@@ -175,7 +175,7 @@ describe("pane", () => {
         view: paneView((_, h) =>
           pane(h, {
             variant: "main",
-            header: { title: "Yumi", mark: "Y", subtitle: "Reads the repository." },
+            header: { title: "Yumi", mark: { text: "Y" }, subtitle: "Reads the repository." },
             body: []
           })
         )
@@ -204,6 +204,73 @@ describe("pane", () => {
       given(initial),
       click(role("button", { name: "Open navigation" })),
       expect(role("status")).toHaveText("Tab threads, closed 0, settings 1")
+    )
+  })
+
+  it("puts the mark of what it is about before the title, in its tone, with its status as the patch and for assistive technology", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "main",
+            header: {
+              title: "Yumi",
+              mark: { text: "Y", tone: "lilac" },
+              status: { kind: "attention", label: "Needs setup", detail: "Its model connection was removed." }
+            },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("main"), text("Y"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(within(role("main"), text("Y"))).toHaveClass("size-6"),
+      expect(within(role("main"), text("Y"))).toHaveAttr("title", "Needs setup: Its model connection was removed."),
+      expect(within(role("main"), text("Y"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("main"), role("heading", { name: "Yumi", level: 1 }))).toExist(),
+      expect(within(role("main"), text("Needs setup"))).toHaveClass("sr-only")
+    )
+  })
+
+  it("shows a mark without a status as the letters alone, and says no status for it", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) => pane(h, { variant: "main", header: { title: "Yumi", mark: { text: "Y" } }, body: [] }))
+      },
+      given(initial),
+      expect(within(role("main"), text("Y"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("main"), text("Y"))).not.toHaveAttr("title"),
+      expect(within(role("main"), selector(".sr-only"))).toBeAbsent()
+    )
+  })
+
+  it("shows a line under the title on phones only, stacking the title over it, and none unless it is given", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "main",
+            header: { title: "Yumi", phoneContext: "Mercier & Co", context: "Agent" },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("main"), text("Mercier & Co"))).toHaveClass("max-tablet:block"),
+      expect(within(role("main"), text("Mercier & Co"))).toHaveClass("hidden"),
+      expect(within(role("main"), text("Agent"))).not.toHaveClass("hidden"),
+      expect(within(role("main"), selector("div.items-baseline"))).toHaveClass("max-tablet:flex-col")
+    )
+    scene(
+      {
+        update,
+        view: paneView((_, h) => pane(h, { variant: "main", header: { title: "Yumi", context: "Agent" }, body: [] }))
+      },
+      given(initial),
+      expect(within(role("main"), selector("div.items-baseline"))).not.toHaveClass("max-tablet:flex-col")
     )
   })
 })
@@ -419,6 +486,33 @@ describe("paneSection", () => {
       expect(within(role("region", { name: "Turns" }), text("Triage"))).toBeAbsent()
     )
   })
+
+  it("sets its title apart by a dashed rule to the pane's edge when it has a stitch, which assistive technology does not read", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          paneColumn(h, [
+            paneSection(h, {
+              title: "Details",
+              hasStitch: true,
+              trailing: [sending(h, true)],
+              children: [h.p([], ["Idle"])]
+            }),
+            paneSection(h, { title: "Turns", children: [h.p([], ["Scout"])] })
+          ])
+        )
+      },
+      given(initial),
+      expect(within(role("region", { name: "Details" }), role("heading", { name: "Details", level: 3 }))).toExist(),
+      expect(within(role("region", { name: "Details" }), text(" · Sending…"))).toExist(),
+      expect(within(role("region", { name: "Details" }), selector("span.border-dashed"))).toHaveAttr(
+        "aria-hidden",
+        "true"
+      ),
+      expect(within(role("region", { name: "Turns" }), selector(".border-dashed"))).toBeAbsent()
+    )
+  })
 })
 
 describe("paneForm", () => {
@@ -482,6 +576,24 @@ describe("paneForm", () => {
       given(initial),
       expect(role("form")).toExist(),
       expect(within(role("region", { name: "Turns" }), role("form"))).toBeAbsent()
+    )
+  })
+
+  it("takes the stitch of its section, and has none unless it is given", () => {
+    scene(
+      {
+        update,
+        view: formView((_, h) =>
+          paneColumn(h, [
+            paneForm(h, { title: "Setup", onSubmit: Message.SubmittedName(), hasStitch: true }, [h.p([], ["Fields"])]),
+            paneForm(h, { title: "Rename", onSubmit: Message.SubmittedName() }, [h.p([], ["Name"])])
+          ])
+        )
+      },
+      given(initial),
+      expect(within(role("region", { name: "Setup" }), selector(".border-dashed"))).toExist(),
+      expect(within(role("region", { name: "Setup" }), role("form", { name: "Setup" }))).toExist(),
+      expect(within(role("region", { name: "Rename" }), selector(".border-dashed"))).toBeAbsent()
     )
   })
 })

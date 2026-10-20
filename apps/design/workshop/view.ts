@@ -6,6 +6,7 @@ import { composer } from "../src/composer.ts"
 import {
   button,
   buttonRow,
+  type Choice,
   choiceSelect,
   column,
   field,
@@ -13,6 +14,7 @@ import {
   hint,
   iconButton,
   notice,
+  noticeBox,
   sending,
   submit,
   textarea,
@@ -172,6 +174,13 @@ const taskPriorityChoices: ReadonlyArray<readonly [TaskPriority, string]> = [
   ["none", "No priority"],
   ["low", "Low"],
   ["high", "High"]
+]
+
+const harnessChoices: ReadonlyArray<Choice<string>> = [
+  ["", "Auto", { description: "amends chooses a harness as the agent works" }],
+  ["amends", "Amends harness", { description: "amends · Works on this host" }],
+  ["opencode", "opencode", { description: "opencode · Works only in a sandbox" }],
+  ["vertex", "Vertex", { description: "Its integration isn't installed on this host.", isDisabled: true }]
 ]
 
 const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
@@ -412,6 +421,55 @@ const fieldGroup = (
       ],
       sampleStack
     ),
+    sample(
+      h,
+      "Textarea with a hint, refused, and disabled",
+      [
+        textarea(h, {
+          id: "instructions",
+          label: "Instructions",
+          value: model.notes,
+          rows: 6,
+          hint: "What the agent works by: its role, how it answers, and what to avoid.",
+          onInput: (value) => Message.TypedNotes({ value })
+        }),
+        textarea(h, {
+          id: "refused-instructions",
+          label: "Instructions",
+          value: model.notes,
+          error: Option.some("The instructions are too long, or hold what can't be stored."),
+          onInput: (value) => Message.TypedNotes({ value })
+        }),
+        textarea(h, {
+          id: "disabled-instructions",
+          label: "Instructions",
+          value: "Read the repository, and file what you find as tasks.",
+          isDisabled: true,
+          onInput: (value) => Message.TypedNotes({ value })
+        })
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Disabled field",
+      [
+        field(
+          h,
+          {
+            id: "disabled-name",
+            label: "Agent name",
+            type: "text",
+            value: "Yumi",
+            isDisabled: true,
+            isAutofocus: false,
+            onInput: (value) => Message.TypedFullName({ value })
+          },
+          Option.none()
+        )
+      ],
+      sampleStack
+    ),
     sample(h, "In a grid, side by side", [taskFields(h, model, "grid")], "flex max-w-xl flex-col"),
     sample(h, "In a grid, wrapping in a narrow column", [taskFields(h, model, "narrow")], sidePaneColumn),
     sample(
@@ -498,6 +556,51 @@ const selectGroup = (h: ApplicationViewBuilder, plan: Plan): Html =>
         })
       ],
       sampleStack
+    ),
+    sample(
+      h,
+      "With descriptions, a choice that can't be chosen, and a hint",
+      [
+        choiceSelect(h, {
+          id: "harness",
+          label: "Harness",
+          choices: harnessChoices,
+          value: "",
+          hint: "No connection gives a harness yet. On Auto, the agent waits for one.",
+          onChange: () => Message.ClickedButton()
+        })
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Refused",
+      [
+        choiceSelect(h, {
+          id: "sandbox",
+          label: "Sandbox",
+          choices: harnessChoices,
+          value: "opencode",
+          error: Option.some("Opencode works only in a sandbox. Choose one."),
+          onChange: () => Message.ClickedButton()
+        })
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Disabled",
+      [
+        choiceSelect(h, {
+          id: "disabled-plan",
+          label: "Plan",
+          choices: planChoices,
+          value: "team",
+          isDisabled: true,
+          onChange: () => Message.ClickedButton()
+        })
+      ],
+      sampleStack
     )
   ])
 
@@ -510,6 +613,18 @@ const noticeGroup = (h: ApplicationViewBuilder): Html =>
         notice(h, Option.some("That code is not right."), { tone: "danger" }),
         notice(h, Option.some("Setup is not finished."), { tone: "caution" }),
         notice(h, Option.some("Saved."), { tone: "success" })
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Boxed note: caution with a line for each reason, and danger",
+      [
+        noticeBox(h, {
+          title: "This agent can't run as it is set up",
+          lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
+        }),
+        noticeBox(h, { title: "Its integration isn't installed on this host", lines: [], tone: "danger" })
       ],
       sampleStack
     ),
@@ -2011,20 +2126,59 @@ const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
 const agentPane = (h: ApplicationViewBuilder): Html =>
   pane(h, {
     variant: "main",
-    header: {
-      title: "Yumi",
-      mark: "Y",
-      context: "Agent",
-      subtitle: "Reads the repository and files what it finds as tasks.",
-      actions: [button(h, "New task", Message.ClickedButton(), { variant: "primary" })]
-    },
+    label: "Yumi",
+    header: { title: "Yumi", mark: { text: "Y", tone: "lilac" }, status: needsSetup, phoneContext: "Mercier & Co" },
     body: [
       paneColumn(h, [
-        labelledLines(h, [
-          ["Model", "A model the workspace's connections provide."],
-          ["Tools", "Search the repository, read files, and file tasks."]
+        noticeBox(h, {
+          title: "This agent can't run as it is set up",
+          lines: ["Its model connection was removed.", "Its harness works only in a sandbox, and it has none."]
+        }),
+        form(h, { onSubmit: Message.ClickedButton(), label: "Name", variant: "pane" }, [
+          field(
+            h,
+            {
+              id: "agent-name",
+              label: "Agent name",
+              type: "text",
+              value: "Yumi",
+              onInput: () => Message.ClickedButton(),
+              isAutofocus: false
+            },
+            Option.none()
+          ),
+          buttonRow(h, [submit(h, "Save name", { variant: "secondary", isDisabled: true })])
         ]),
-        hint(h, "One column of sections, with nothing beside it.")
+        paneForm(h, { title: "Setup", onSubmit: Message.ClickedButton(), hasStitch: true }, [
+          textarea(h, {
+            id: "agent-instructions",
+            label: "Instructions",
+            value: "Read the repository, and file what you find as tasks.",
+            rows: 6,
+            hint: "What the agent works by: its role, how it answers, and what to avoid.",
+            onInput: () => Message.ClickedButton()
+          }),
+          buttonRow(h, [submit(h, "Save setup", { isDisabled: true })])
+        ]),
+        paneSection(h, {
+          title: "Details",
+          hasStitch: true,
+          children: [
+            detailList(h, [
+              { label: "Role", value: "Changed in Settings › Members, as any member's is." },
+              { label: "Current activity", value: "Idle" },
+              { label: "Created by", value: "Alex Morgan · 6 Oct 2026" }
+            ])
+          ]
+        }),
+        paneSection(h, {
+          title: "Removal",
+          hasStitch: true,
+          children: [
+            hint(h, "Removing this agent ends its membership. Its messages stay in their threads."),
+            buttonRow(h, [button(h, "Remove agent", Message.ClickedButton())])
+          ]
+        })
       ])
     ]
   })
@@ -2384,7 +2538,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "Without the side pane: a page about one item, a section with no items, and notices",
+      "Without the side pane: an agent's page, with its mark and status in the header and sections set apart by a stitch, and notices",
       [
         h.div(
           [h.Class(shellFrame)],
