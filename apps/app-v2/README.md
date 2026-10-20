@@ -11,7 +11,8 @@ notifications under the days they came, all of them or only those waiting, each 
 is about, what they did, where it comes from, and how long ago, to open its thread beside the inbox,
 which marks it seen, or to mark all of them seen at once; the tasks they can see across their groups, those waiting in triage and every
 open one, as a table to narrow by assignee, by status, and by search, each to open in its group; and a
-search for anything in the workspace, groups, threads, and people, from the sidebar or from the keyboard;
+a Jump to for the workspace's pages, groups, people, agents, and threads, from the rail, the sidebar, or the
+keyboard;
 the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, each with a
 page of its own, to add, check, rename, set up, replace the key of, and remove; its agents, each with how ready it is and what it runs on, and a
@@ -96,7 +97,7 @@ A turn's state is the design's
 check, a warning, or a dash once it ended. The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination (`page/workspace/home` renders Home's sidebar, main pane, side pane, and dialogs from its children's views), `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations and the modals they open, `feature/groups` the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
-a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
+a team or a conversation is started, `feature/search` the palette where the person jumps to anything, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
 its content in its own `pane`. The panes that read or are filled in, the settings, the connections,
 the channels, and the side panes, keep the `paneColumn`'s measure; the panes that list, the agents, the group's
 threads and tasks, the groups to browse, the inbox, and the tasks' Triage and Tasks, pass it `isWide`,
@@ -122,7 +123,7 @@ was written. The form that edits a message shows its text as written, mentions t
 message is its words without that syntax, a mention as "@" and the member's current name (`messageWords` and
 `threadWords`, by the design's `messageTextWords`, which `richTextWords` gives the markdown's words): a title taken
 from a thread's opening (`titleOf`), in the pane's header and under the group in the sidebar, and what a search for a
-thread's words matches (`threadContains`, and the store's `findMatches`), so that `**` and a link's address are
+thread's words matches (`threadContains`, and the store's `listJumpTargets`), so that `**` and a link's address are
 never found. Every write of a message's text, a thread's opening, a reply, an edit, and a conversation's
 first message, says whom the message addresses by the mentions in its text (core's
 `ThreadMessage.mentionedIn`, each member once).
@@ -481,14 +482,15 @@ below it counted at each level above.
   workspace, each in the stage it is in once it is sent too, so that the dialog keeps its size, a new conversation,
   inviting someone, revoking an invitation, handing the workspace over, removing a member, changing one's own name,
   removing an agent, replacing a connection's key, and removing a connection. Form, 40rem wide and as tall as its
-  content, is adding an agent and configuring a connection. The tests say each size by the panel's classes
-  (`test/panelSize.ts`).
+  content, is adding an agent and configuring a connection. Wide, 45rem by 54rem, is for a long form with fields side by side, which
+  `apps/ui` gives to none of its dialogs, so none of this app's is one. The palette, 40rem by 30rem and set 12vh below the top of the window, is the
+  Jump to. The tests say each size by the panel's classes (`test/panelSize.ts`).
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
   to, general first and then by name, and their conversations, ordered the same way by the other members' names,
   to pick one from (`byGeneralThenName`: by name as the person reads it, in any case and whatever the accents, as
   `foldAccents` folds them, then by ID; the browse page's two tabs share this order, since they read the same
-  groups, and so does nothing else, since the channels' choice of group and the search list groups as the replica
-  holds them); the public teams they may join are not in the sidebar, only on the browse page's Discover tab; and
+  groups, and so does the Jump to's Groups section, with `orderTargets`, so that its first five are the ones the person
+  most likely wants, but not the channels' choice of group, which lists groups as the replica holds them); the public teams they may join are not in the sidebar, only on the browse page's Discover tab; and
   where they start a team, or a conversation with another member, in a modal
   over the page: a dialog the Block binds from `@foldkit/ui/dialog` and renders with the design's
   `modal`, a team as Create group and a conversation by the member and the first message, with the
@@ -559,24 +561,31 @@ below it counted at each level above.
   at every width. Its parent can ask for a conversation with a member (`requestConversationWith`,
   `RequestedConversationWith`): the Block selects the conversation the person already has with just
   that member, and, when there is none, opens the dialog for a conversation with the member chosen.
-- `feature/search`: finding anything in the workspace, groups, threads, and people, in a modal named
-  Find anything, which the Block binds from `@foldkit/ui/dialog` and renders with the design's
-  `modal`, wide, over a search field of type search whose label is hidden and which takes the focus as
-  the dialog opens, with its parent asking it to open (`requestOpen`) on an empty field. What is typed
-  is searched for with the store's `search` once it holds more than spaces, a search for each
-  keystroke, and an answer for a query that is no longer the one typed is dropped. The rows of the
-  last answer stay while the next is on its way, so the list does not flicker. They are listed under
-  Groups, Threads, and People, each only when it has something: a group by `#` for a team or the other
-  members' initials for a conversation, and its name; a thread by the words it opened with and a badge
-  of its group; a person by their initials and name. Nothing typed says "Type to search."; nothing
-  found, `Nothing found for "zzz".`, with the query trimmed; a search that failed, why. The first row is
-  active; the arrow keys walk the rows, around the list, and keep the active one in view
-  (`ScrollToResult`), Enter opens the active one, and a click opens the one clicked. The active row
-  is marked with `aria-current` and named as the field's `aria-activedescendant`. A key with
-  Shift, Control, Alt, or Meta held is left to the browser, as are the keys it does not answer. The
-  Block reports what was opened, a group (`OpenedGroup`), a thread in its group (`OpenedThread`), or a
-  person (`OpenedPerson`), and closes its dialog, which, however it closes, forgets what was typed and
-  found. It does not act on a person itself: its parent decides what opening a person is.
+- `feature/search`: jumping anywhere in the workspace, as `apps/ui`'s Jump to does, in a palette that the Block binds
+  from `@foldkit/ui/dialog` and renders with the design's `palette`: a modal of the palette size, 40rem by 30rem near
+  the top of the window, which fills the screen below 48rem. It has no title, and is named Jump to, as is its field,
+  whose placeholder says "Jump to a group, person, or page…" and which takes the focus as the dialog opens, with its
+  parent asking it to open (`requestOpen`) on an empty field. A Close button closes it. Where the person can jump to
+  is read from the store while the dialog is open (the subscription `ReadJumpTargets`, which follows the store's
+  `jumpTargets` and reads nothing while the dialog is shut); what is typed ranks it in the page, with no request of
+  its own (`sectionsOf`). The sections keep `apps/ui`'s order: Go to, with Inbox, Agents, Connections, and Settings;
+  Groups; People, each with "Direct message" beside the name; and Agents. After them comes Threads, which `apps/ui`
+  has no section for: it has the same look, a thread's words with the name of its group beside them where a person has
+  "Direct message". Before anything is typed each section lists its first five, and while typing its best eight, a
+  section with nothing in it left out. A name matches what is typed whatever the case and the accents, a leading `#` or
+  `@` ignored: best when it starts with it, then when a word in it does, then when it has it anywhere, and, among those
+  as good, in the order the items came in; a thread with a title is also found by the words of its opening. A page and a
+  team are marked by a drawing, a thread by the message drawing, and a conversation, a person, and an agent, on the
+  lilac tone, by initials. Nothing that matches says `Nothing matches "zzz".`, with what was typed trimmed; a read that
+  failed, why; and a read not answered yet lists the pages alone. Under the list is a row of hints, "↑ ↓ to move",
+  "↵ to open", and "esc to close", hidden from assistive technology and below 64rem. The first item is active; the arrow
+  keys walk the items of every section as one list, around it, and keep the active one in view (`ScrollToItem`), Enter
+  opens the active one, and a click opens the one clicked. The active item is marked `aria-selected` and named as the
+  field's `aria-activedescendant`. A key with Shift, Control, Alt, or Meta held is left to the browser, as are the keys it
+  does not answer. The Block reports what was opened, a page (`OpenedDestination`), a group (`OpenedGroup`), a thread in
+  its group (`OpenedThread`), a person (`OpenedPerson`), or an agent (`OpenedAgent`), and closes its dialog, which,
+  however it closes, forgets what was typed and which item was active. It acts on none itself: its parent decides what
+  opening each is.
 - `feature/inbox`: the person's notifications, newest first, on two tabs: Unread, those still waiting,
   counted whether any wait or none, and All, every notification the store gives, waiting or seen, Unread at first.
   Each tab's notifications sit under a divider for each day they came on by the person's own clock, named
@@ -1053,10 +1062,12 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   inviting someone, reading the invitations, revoking one, handing the workspace over, or removing a member, and the
   search, which the page binds as `search` (`SearchBinding`). All are in the document after the drawer and the side
   pane's dialog, so the one opened last is over the rest. `ClickedSearch` and `RequestedSearch`, which the root
-  sends, ask the search to open. The search reports what was opened and the page asks Home to open it, as Home's
-  own lists do: a group (`requestOpenGroup`), a thread in its group (`requestOpenThread`), as a task's is, and a
-  person as a conversation with them (`requestConversationWith`), which Home's groups select or start. A group or a
-  thread opened shows Home and closes the navigation drawer and the side pane's dialog, as any navigation does. So does
+  sends, ask the search to open. The search reports what was opened and the page opens it: a page as the rail goes to it (`goToDestination`: Inbox is
+  Home, which opens on its inbox, and Settings is the Workspace page, as the account menu goes to it), and, in Home,
+  as Home's own lists do, a group (`requestOpenGroup`), a thread in its group (`requestOpenThread`), as a task's is,
+  and a person as a conversation with them (`requestConversationWith`), which Home's groups select or start; an agent
+  opens on its page, as a row of the agents' sidebar does. Whatever is opened closes the navigation drawer and the
+  side pane's dialog, as any navigation does. So does
   the thread of a turn picked on an agent's page, which the agents Block reports as `OpenedThread` and the page asks
   Home to open the same way. The
   workspace's name in the sidebar and
@@ -1310,17 +1321,18 @@ after a chip is removed (`focusMembersInput`).
   members with `list`, since they show which are unfinished. `workspacePlace` is the place of the
   records the workspace holds itself, which a Block lists the other kinds at, such as groups, roles,
   assignments, connections, and channels.
-- `search(query)` is an Effect and not a stream, since a search runs when it is asked: it reads the
-  groups, the members, the threads, and their messages once, as the person's unfinished actions leave
-  them, and `findMatches` decides what has the query in it. It reads every message, since the replica
-  keeps no index of a thread's opening. It gives `SearchResults`: the groups whose names, as the
-  person reads them (a conversation by the other members), contain it; the threads whose title, or whose opening message's words, without its markdown's syntax and a mention as the member's current name, contain it,
-  each with the name of its group and the words the person reads it by, its title or its opening's;
-  and the active members, other than the person, whose names contain it. Each kind is at most eight
-  (`maxSearchResults`), in the order of the records, and the query is matched whatever its case or
-  accents (`foldAccents` in `seen.ts`, which the composer's list of members compares names with too).
-  An empty query, or one of spaces, finds nothing. A thread whose group the replica lacks is left
-  out, since it could not be opened, and so is one whose only words are a deleted message's.
+- `jumpTargets` is a stream of where the person can jump to, which `listJumpTargets` decides from the groups, the
+  members, the threads, and their messages, as the person's unfinished actions leave them, so it follows what the
+  person writes and what the server sends. It reads every message, since the replica keeps no index of a thread's
+  opening. It gives `JumpTargets`: the groups, each with the name the person reads it by (a conversation by the other
+  members), other than a conversation of two whose other member is an active person, who is among the people; the
+  threads that have a title or an opening with words, without its markdown's syntax and a mention as the member's
+  current name, each with the name of its group, the words the person reads it by, its title or its opening's, and
+  the opening's words; the active members other than the person; and the active members that are agents, each with
+  its agent ID. A thread whose group the replica lacks is left out, since it could not be opened, and so is one whose
+  only words are a deleted message's. The store lists them in the order of the records and applies no limit, and does
+  not match: the search ranks them (`foldAccents` in `seen.ts`, which the composer's list of members compares names
+  with too, folds what is typed and the names to compare).
 - The host's sync server is the event log's remote, through `SyncClient`. The store registers the
   browser's sync key over HTTP, then connects, in the background and again until both succeed, so
   a store opens, reads, and takes actions offline. Each time its connection drops, the store builds
@@ -1384,13 +1396,14 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   join told from the conversations, a public team joined once and reported as it is named when the join is written,
   why a join could not be kept and joining again, the groups read again each time the person asks after they could
   not be, and selecting the conversation with a member asked for, or opening the dialog with the member chosen when there is none, a team
-  with that member in it not being that conversation; the search opening on an empty field, searching
-  for what is typed only once it holds more than spaces, keeping the rows shown while the next search
-  is on its way, dropping an answer for an earlier query, saying why a search failed and searching again
-  as the person types on, listing groups, threads, and people in that order, moving the active result
-  and scrolling it into view, and opening the active result or one clicked, reporting a group, a thread,
-  or a person, closing the dialog and forgetting the search, and opening none while there is nothing
-  found or the rows shown are for an earlier query; the inbox
+  with that member in it not being that conversation; the search opening on an empty field and
+  reading where the person can jump to only while it is open, listing the pages and then the groups, people, agents, and
+  threads, at most five of each before anything is typed and eight while typing, ranking a name by its start, then
+  the start of a word, then anywhere, whatever the case and accents and with a leading `#` or `@` ignored, finding
+  a thread by the words of its opening too, moving the active item and scrolling it into view, around the list, and
+  opening the active item or one clicked, reporting a page, a group, a thread, a person, or an agent, closing the dialog
+  and forgetting the query, saying why a read failed, and opening none while there is nothing
+  found; the inbox
   saying why the person is told, who wrote what and what they did, where it comes from, and what it
   says, grouping the notifications by the day they came on, listing every one or those waiting, and the
   one opened in its place, newest first, as its tab chooses, the newest page of them and a page more each
@@ -1719,13 +1732,18 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   to `Desktop`, staying there at `Phone`, and back as it widens to `Split`, and the open inbox's
   notifications growing older as the subscription reports each minute.
   The search's scenes show it
-  open on a field named Find anything that takes the focus, searching for what is typed, the sections
-  that have something in them, the first result active and the field's active descendant following the
-  arrow keys round the list, Enter and a click opening a result and closing the dialog, the keys with a
-  modifier and those it does not answer left to the browser, nothing found, a search on its way, and a
-  failed search. The workspace's scenes show the search in the sidebar's header with its shortcut hidden from
+  open as a palette, a dialog named Jump to with no title and a Close button, over a field of that name that takes
+  the focus, in the palette size, listing the pages, the groups, the people, the agents, and the threads each under its
+  title, with the note beside a person and a thread and the mark before each, at most five of each before anything is
+  typed and eight while typing, ranking a name by its start, a word's start, and anywhere, ignoring case, accents, and a
+  leading `#` or `@`, finding a thread by its opening's words, saying what nothing matches, the row of hints hidden
+  from assistive technology, why a read failed, the first item active and the field's active descendant following the
+  arrow keys round the list, Enter and a click opening an item of each kind and closing the dialog, and the keys with a
+  modifier and those it does not answer left to the browser. The workspace's scenes show the search in the sidebar's
+  header with its shortcut hidden from
   assistive technology and written ⌘K on an Apple platform and Ctrl K on another, opening in a dialog from
-  it and, at `Phone`, from the drawer over the drawer, and a group found opening and closing the search.
+  it and, at `Phone`, from the drawer over the drawer, a group found opening and closing the search, and a page
+  chosen with Enter opening as the rail does.
   The root's show the key that opens the search opening it in an open workspace and doing nothing before
   one is open, and the shortcut it gives the workspace by the platform. The workspaces page's scenes
   show each row with its members and "Owner" only for a workspace the person owns, on a button with an ID of
@@ -1790,21 +1808,20 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
   and its move shows at once; and the settings' reads, as the settings Block reads them together,
   give the owner the workspace with its members, roles, assignments, and invitations, and the grant to rename it; and the members, the contacts, and the people together: a contact a channel heard
-  from reaches them, and a member renamed here shows at once, then as the host has it; and a search
-  finds a team, a thread, and a conversation the person started, and the member they are with,
-  before the server has them and after, whatever the case or accents of the query, and not the
-  person themselves. `Store.deriveParticipationChanges` is tested apart: a follow and each way a
+  from reaches them, and a member renamed here shows at once, then as the host has it; and the places to jump to
+  are a team, a thread, and the member a conversation the person started is with, and not the conversation
+  itself or the person themselves, before the server has them and after. `Store.deriveParticipationChanges` is tested apart: a follow and each way a
   participation ended in the order of the thread, when each was made, and nothing for other activity, details that do
   not read, or a participation that is not a member's, and so is `Store.viewTurns`: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
   with no messages, and the later of two messages, and so is `Store.viewTasks`: each task with its
   thread, the place of its group, and the summary of its messages, a conversation's group placed by the other
   member, a thread still being started, and no task whose thread or group the replica lacks, and so
-  is `Store.findMatches`: nothing for an empty
-  query or one of spaces, a group by the name the person reads and a conversation by the other member,
-  a thread by its title or its opening's words and shown by its title, a mention in an opening as
-  the member's current name and the syntax of its markdown not found, no thread by a deleted opening or without its group, the active members
-  but the person by name, whatever the case or accents, and at most eight of each in the order given,
+  is `Store.listJumpTargets`: the groups by
+  the name the person reads, a conversation of two with an active person left to the people and one with several, or
+  with someone who is gone, kept, a thread by its title or its opening's words and shown by its title, a mention in an
+  opening as the member's current name and the syntax of its markdown not read, no thread without words or without its
+  group, the active members but the person, the active agents, and every one in the order of the records,
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   full date and time of a moment, the start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up

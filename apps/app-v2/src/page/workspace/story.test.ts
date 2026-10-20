@@ -59,7 +59,7 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
-import { Result } from "../../feature/search/definition.ts"
+import { Item as SearchItem } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { AccountBinding } from "../../feature/settings/composition.ts"
 import { AccountEntry, AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
@@ -1432,7 +1432,7 @@ describe("a workspace", () => {
       message(Message.ClickedSearch()),
       dialogShown,
       message(
-        fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Group({ group: design, name: "Design" }) }))
+        fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Group({ group: design, name: "Design" }) }))
       ),
       Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
       dialogClosed,
@@ -1453,7 +1453,7 @@ describe("a workspace", () => {
       message(Message.ClickedSearch()),
       dialogShown,
       message(
-        fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Group({ group: design, name: "Design" }) }))
+        fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Group({ group: design, name: "Design" }) }))
       ),
       Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
       Command.resolve(Dialog.test.CloseDialog({ id: "workspace-menu" }), DialogBlock.Message.CompletedCloseDialog()),
@@ -1474,8 +1474,13 @@ describe("a workspace", () => {
         dialogShown,
         message(
           fromSearch(
-            SearchBlock.Message.ClickedResult({
-              result: Result.Thread({ thread, groupName: "General", words: "Plans for the week" })
+            SearchBlock.Message.ClickedItem({
+              item: SearchItem.Thread({
+                thread,
+                groupName: "General",
+                words: "Plans for the week",
+                openingWords: Option.none()
+              })
             })
           )
         ),
@@ -1527,7 +1532,7 @@ describe("a workspace", () => {
   })
 
   it("opens the conversation the search found with a person, or asks the groups to start one in their dialog", () => {
-    const person = message(fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Person({ member: bob }) })))
+    const person = message(fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Person({ member: bob }) })))
     const withConversation = modifyFields(opened, {
       home: (home) =>
         modifyFields(home, {
@@ -1591,6 +1596,64 @@ describe("a workspace", () => {
         expect(model.home.groups.starting).toEqual(
           Option.some({ _tag: "Conversation", memberId: Option.some(bob.id), text: "" })
         )
+      })
+    )
+  })
+
+  it("opens the page the search found as the rail goes to it, from any page, closing the dialogs it was over", () => {
+    for (const [destination, from, isOpen] of [
+      ["Inbox", withAgentPage, Open.isAnyOf(["Home"])],
+      ["Agents", opened, Open.isAnyOf(["Agents"])],
+      ["Connections", opened, Open.isAnyOf(["Connections"])],
+      ["Settings", opened, Open.isAnyOf(["Settings"])]
+    ] as const) {
+      story(
+        update,
+        given(from),
+        message(Message.ClickedMenu()),
+        dialogShown,
+        message(Message.ClickedSearch()),
+        dialogShown,
+        message(fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Destination({ destination }) }))),
+        Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
+        Command.resolve(Dialog.test.CloseDialog({ id: "workspace-menu" }), DialogBlock.Message.CompletedCloseDialog()),
+        model((model) => {
+          expect(isOpen(model.open)).toBe(true)
+          expect(model.menu.isOpen).toBe(false)
+          expect(model.search.dialog.isOpen).toBe(false)
+        })
+      )
+    }
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedSearch()),
+      dialogShown,
+      message(
+        fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Destination({ destination: "Settings" }) }))
+      ),
+      dialogClosed,
+      model((model) => {
+        expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
+      })
+    )
+  })
+
+  it("opens the page of the agent the search found, closing the dialogs it was over", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedMenu()),
+      dialogShown,
+      message(Message.ClickedSearch()),
+      dialogShown,
+      message(fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Agent({ agentId, member: scout }) }))),
+      Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(Dialog.test.CloseDialog({ id: "workspace-menu" }), DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.open).toEqual(Open.Agent({ agentId }))
+        expect(model.menu.isOpen).toBe(false)
+        expect(model.search.dialog.isOpen).toBe(false)
       })
     )
   })

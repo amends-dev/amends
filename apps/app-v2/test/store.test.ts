@@ -5,7 +5,7 @@ import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 // Bun's own fetch and WebSocket reach the in-process server; fake-indexeddb is the browser's storage.
 import { ChannelIntake, DeliveryJobs } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
-import { Group, GroupId, GroupPermissions } from "@amends-dev/core/group"
+import { Group, GroupPermissions } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { MemoryDatabase } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
@@ -62,6 +62,8 @@ import {
   opening,
   reply,
   saying,
+  scout,
+  scoutAgent,
   task,
   thread
 } from "./fixtures.ts"
@@ -654,7 +656,7 @@ describe("Store", () => {
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
-  it.live("a search finds the groups, threads, and people called what it asks, as the person sees them", () =>
+  it.live("the places to jump to are the groups, threads, and people the person sees, once written and once held", () =>
     Effect.gen(function* () {
       const services = yield* host
       const gateway = Context.get(services, Gateway.Gateway)
@@ -664,7 +666,7 @@ describe("Store", () => {
       const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
       yield* firstWhere(store.groups, (views) => membersIn(views, Group.GeneralId) === 2)
 
-      // What the person has written and the server does not hold yet is found.
+      // What the person has written and the server does not hold yet is among them.
       yield* store.write("TeamCreated", { name: "Design crew", memberIds: [workspace.ownerMemberId, bob.id] })
       yield* store.write("ThreadStarted", {
         groupId: Group.GeneralId,
@@ -673,30 +675,29 @@ describe("Store", () => {
       })
       yield* store.write("DirectThreadStarted", { memberIds: [bob.id], text: "Got a minute?", mentions: [] })
 
-      /** What a search for `query` finds, by the groups' names, the threads' words and group names, and the people's names. */
-      const found = (query: string) =>
-        Effect.map(store.search(query), ({ groups, threads, people }) => ({
-          groups: groups.map(({ name }) => name),
-          threads: threads.map(({ words, groupName }) => [words, groupName]),
-          people: people.map(({ name }) => name)
-        }))
-      const cafe = [["Café plans for the offsite", "general"]]
-      const nothing = { groups: [], threads: [], people: [] }
+      /** The groups' names, the threads' words and the names of their groups, and the people's and agents' names. */
+      const readable = ({ groups, threads, people, agents }: Store.JumpTargets) => ({
+        groups: groups.map(({ name }) => name).toSorted(),
+        threads: threads.map(({ words, groupName }) => `${words} in ${groupName}`).toSorted(),
+        people: people.map(({ name }) => name),
+        agents: agents.map(({ member }) => member.name)
+      })
+      // A conversation with one person is among the people, the person is not, and the thread of the conversation is
+      // named for the person.
+      const expected = {
+        groups: ["Design crew", "general"],
+        threads: ["Café plans for the offsite in general", "Got a minute? in Bob"],
+        people: ["Bob"],
+        agents: []
+      }
+      const isWhole = ({ threads }: Store.JumpTargets) => threads.length === 2
 
-      expect(yield* found("DESIGN")).toEqual({ groups: ["Design crew"], threads: [], people: [] })
-      expect(yield* found("gene")).toEqual({ groups: ["general"], threads: [], people: [] })
-      expect(yield* found("cafe")).toEqual({ groups: [], threads: cafe, people: [] })
-      // A conversation is named for the other member, who is found among the people too, and the person is not.
-      expect(yield* found("bob")).toEqual({ groups: ["Bob"], threads: [], people: ["Bob"] })
-      expect(yield* found("alice")).toEqual(nothing)
-      expect(yield* found("")).toEqual(nothing)
+      expect(readable(yield* firstWhere(store.jumpTargets, isWhole))).toEqual(expected)
 
-      // Once the server has them, the same are found.
+      // Once the server has them, the same are.
       yield* firstWhere(store.groups, (views) => views.length === 3 && views.every(({ group }) => !group.pending))
       yield* firstWhere(store.threads(Group.GeneralId), ([started]) => started?.thread.pending === false)
-      expect(yield* found("DESIGN")).toEqual({ groups: ["Design crew"], threads: [], people: [] })
-      expect(yield* found("cafe")).toEqual({ groups: [], threads: cafe, people: [] })
-      expect(yield* found("bob")).toEqual({ groups: ["Bob"], threads: [], people: ["Bob"] })
+      expect(readable(yield* firstWhere(store.jumpTargets, isWhole))).toEqual(expected)
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
@@ -1327,98 +1328,97 @@ describe("Store.viewTasks", () => {
   })
 })
 
-describe("Store.findMatches", () => {
+describe("Store.listJumpTargets", () => {
   const person = membership.member
   const zoe = { ...bob, id: MemberId.MemberId.make("member-4"), name: "Zoë" }
-  const searched: Store.Searched = {
+  const source: Store.JumpSource = {
     memberId: person.id,
     groups: [general, design, conversationWithBob],
-    members: [person, bob, zoe],
+    members: [person, bob, zoe, scout],
     threads: [thread],
     messages: [reply, opening]
   }
-  const groupNames = (query: string, among: Store.Searched = searched) =>
-    Store.findMatches(query, among).groups.map(({ name }) => name)
+  const groupNames = (among: Store.JumpSource = source) => Store.listJumpTargets(among).groups.map(({ name }) => name)
 
-  it("finds nothing for an empty query, or one of spaces", () => {
-    for (const query of ["", "   "])
-      expect(Store.findMatches(query, searched)).toEqual({ groups: [], threads: [], people: [] })
+  it("lists the groups by the names the person reads, other than a conversation with one other person", () => {
+    expect(groupNames()).toEqual(["General", "Design"])
+    expect(Store.listJumpTargets(source).groups.map(({ group }) => group.id)).toEqual([general.id, design.id])
   })
 
-  it("finds a group by the name the person reads, a conversation by the other member, in any case", () => {
-    expect(groupNames("DES")).toEqual(["Design"])
-    expect(groupNames("  e ")).toEqual(["General", "Design"])
-    expect(groupNames("bo")).toEqual(["Bob"])
-    expect(groupNames("alice")).toEqual([])
+  it("keeps a conversation with several people, or with one who is gone, among the groups", () => {
+    const withZoe = Schema.decodeSync(Group.Group)({
+      id: "alice-bob-and-zoe",
+      workspaceId: "workspace-1",
+      kind: "Direct",
+      memberIds: ["member-1", "member-2", "member-4"],
+      createdBy: "member-1",
+      createdAt: "2026-10-18T12:00:00Z"
+    })
+    const goneBob = { ...bob, status: "removed" as const }
+
+    expect(groupNames({ ...source, groups: [withZoe] })).toEqual(["Bob, Zoë"])
+    expect(groupNames({ ...source, groups: [conversationWithBob], members: [person, goneBob] })).toEqual(["Bob"])
   })
 
-  it("finds a thread by its title, or by the words of its opening message, and shows its title first", () => {
+  it("lists a thread with its group's name and the words it is read by: its title, else its opening's", () => {
     const titled = { ...thread, title: "Weekly sync" as typeof thread.title }
-    const among = { ...searched, threads: [titled] }
 
-    expect(Store.findMatches("week", searched).threads).toEqual([
-      { thread, groupName: "General", words: "Plans for the week" }
+    expect(Store.listJumpTargets(source).threads).toEqual([
+      { thread, groupName: "General", words: "Plans for the week", openingWords: Option.some("Plans for the week") }
     ])
-    expect(Store.findMatches("SYNC", among).threads).toEqual([
-      { thread: titled, groupName: "General", words: "Weekly sync" }
+    expect(Store.listJumpTargets({ ...source, threads: [titled] }).threads).toEqual([
+      { thread: titled, groupName: "General", words: "Weekly sync", openingWords: Option.some("Plans for the week") }
     ])
-    expect(Store.findMatches("plans", among).threads).toEqual([
-      { thread: titled, groupName: "General", words: "Weekly sync" }
+  })
+
+  it("lists a titled thread whose opening has no words, and leaves out an untitled one", () => {
+    const titled = { ...thread, title: "Weekly sync" as typeof thread.title }
+
+    expect(Store.listJumpTargets({ ...source, threads: [titled], messages: [deleted(opening)] }).threads).toEqual([
+      { thread: titled, groupName: "General", words: "Weekly sync", openingWords: Option.none() }
     ])
-    expect(Store.findMatches("sounds good", searched).threads).toEqual([])
+    expect(Store.listJumpTargets({ ...source, messages: [deleted(opening)] }).threads).toEqual([])
+    expect(Store.listJumpTargets({ ...source, messages: [] }).threads).toEqual([])
   })
 
   it("reads a mention in an opening as the member's current name", () => {
     const mentioning = saying(opening, `Hey ${ThreadMessage.mentionText(bob.id, "Bobby")}, look`)
 
-    expect(Store.findMatches("@bob", { ...searched, messages: [mentioning] }).threads).toMatchObject([
+    expect(Store.listJumpTargets({ ...source, messages: [mentioning] }).threads).toMatchObject([
       { words: "Hey @Bob, look" }
     ])
-    expect(Store.findMatches("bobby", { ...searched, messages: [mentioning] }).threads).toEqual([])
   })
 
   it("reads an opening's words without the syntax of its markdown", () => {
     const formatted = saying(opening, "**Ship** the [retry fix](https://example.com) `now`")
-    const among = { ...searched, messages: [formatted] }
 
-    expect(Store.findMatches("ship the retry fix now", among).threads).toMatchObject([
+    expect(Store.listJumpTargets({ ...source, messages: [formatted] }).threads).toMatchObject([
       { words: "Ship the retry fix now" }
     ])
-    expect(Store.findMatches("**", among).threads).toEqual([])
-    expect(Store.findMatches("example.com", among).threads).toEqual([])
   })
 
-  it("does not find a thread by a deleted opening, nor one whose group the replica lacks", () => {
-    expect(Store.findMatches("deleted", { ...searched, messages: [deleted(opening)] }).threads).toEqual([])
-    expect(Store.findMatches("week", { ...searched, groups: [design] }).threads).toEqual([])
+  it("leaves out a thread whose group the replica lacks", () => {
+    expect(Store.listJumpTargets({ ...source, groups: [design] }).threads).toEqual([])
   })
 
-  it("finds the active members other than the person by name, whatever the case or accents", () => {
-    const people = (query: string, among: Store.Searched = searched) =>
-      Store.findMatches(query, among).people.map(({ name }) => name)
+  it("lists the active people other than the person, and the active agents apart from them", () => {
+    const names = (among: Store.JumpSource = source) => Store.listJumpTargets(among).people.map(({ name }) => name)
 
-    expect(people("ZOE")).toEqual(["Zoë"])
-    expect(people("zoë")).toEqual(["Zoë"])
-    expect(people("o")).toEqual(["Bob", "Zoë"])
-    expect(people("alice")).toEqual([])
-    expect(people("bob", { ...searched, members: [person, { ...bob, status: "removed" }] })).toEqual([])
+    expect(names()).toEqual(["Bob", "Zoë"])
+    expect(names({ ...source, members: [person, { ...bob, status: "removed" }] })).toEqual([])
+    expect(Store.listJumpTargets(source).agents).toEqual([{ agentId: scoutAgent.id, member: scout }])
+    expect(Store.listJumpTargets({ ...source, members: [person, { ...scout, status: "removed" }] }).agents).toEqual([])
   })
 
-  it("gives at most eight of each, in the order given", () => {
+  it("lists every one in the order of the records, for the search to rank, however many there are", () => {
     const crowd = Array.from({ length: 10 }, (_, index) => ({
       ...bob,
       id: MemberId.MemberId.make(`member-${index + 10}`),
       name: `Sam ${index}`
     }))
-    const teams = crowd.map((_, index) => ({
-      ...design,
-      id: GroupId.GroupId.make(`team-${index}`),
-      name: `Sam's team ${index}`
-    }))
 
-    const found = Store.findMatches("sam", { ...searched, members: [person, ...crowd], groups: teams })
-
-    expect(found.people.map(({ name }) => name)).toEqual(crowd.slice(0, 8).map(({ name }) => name))
-    expect(found.groups.map(({ name }) => name)).toEqual(teams.slice(0, 8).map(({ name }) => name))
+    expect(Store.listJumpTargets({ ...source, members: [person, ...crowd] }).people.map(({ name }) => name)).toEqual(
+      crowd.map(({ name }) => name)
+    )
   })
 })

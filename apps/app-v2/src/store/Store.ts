@@ -12,7 +12,7 @@ import { type Grant, GrantResolver } from "@amends-dev/core/authorization"
 import type { Contact } from "@amends-dev/core/channel"
 import type { CoreError } from "@amends-dev/core/error"
 import type { Group, GroupId } from "@amends-dev/core/group"
-import type { Identity } from "@amends-dev/core/identity"
+import { Identity } from "@amends-dev/core/identity"
 import type { Presence } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
@@ -62,7 +62,7 @@ import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Api from "../api.ts"
-import { foldAccents, groupName, messageWords, placeName } from "../seen.ts"
+import { groupName, isAgent, messageWords, placeName } from "../seen.ts"
 import * as Drafts from "./Drafts.ts"
 import * as Pending from "./Pending.ts"
 import * as Replica from "./Replica.ts"
@@ -243,46 +243,49 @@ const countMembers = (
   }))
 }
 
-/** The most groups, threads, and people a search gives each. */
-export const maxSearchResults = 8
-
-/** A group a search found, with its name as the person reads it. */
-export interface GroupMatch {
+/** A group the person can jump to, with its name as they read it. */
+export interface NamedGroup {
   readonly group: Group.Group
   readonly name: string
 }
 
 /**
- * A thread a search found, with the name of its group and the words the person reads it by: its title, or its
- * opening's.
+ * A thread the person can jump to, with the name of its group, the words they read it by, which are its title or, when
+ * it has none, its opening's, and the words of its opening, which they may know it by as well.
  */
-export interface ThreadMatch {
+export interface WordedThread {
   readonly thread: Thread.Thread
   readonly groupName: string
   readonly words: string
+  readonly openingWords: Option.Option<string>
+}
+
+/** An agent the person can jump to: the identity it works as, and the member it is, which has its name. */
+export interface NamedAgent {
+  readonly agentId: Identity.AgentId
+  readonly member: Member.Member
 }
 
 /**
- * What a search found in the workspace: the groups by their names, the threads by their titles and their
- * openings' words, and the active members, other than the person, by their names, each at most
- * `maxSearchResults`, in the order of the records.
+ * Where the person can jump to in the workspace, besides its pages: the groups, other than a conversation with one
+ * other person, whom the people stand for, in the order of the records; the threads, with the words of their openings;
+ * the active people other than the person; and the active agents.
  */
-export interface SearchResults {
-  readonly groups: ReadonlyArray<GroupMatch>
-  readonly threads: ReadonlyArray<ThreadMatch>
+export interface JumpTargets {
+  readonly groups: ReadonlyArray<NamedGroup>
+  readonly threads: ReadonlyArray<WordedThread>
   readonly people: ReadonlyArray<Member.Member>
+  readonly agents: ReadonlyArray<NamedAgent>
 }
 
-/** What a search reads of the replica, as the person's unfinished actions leave it. */
-export interface Searched {
+/** What the jump targets are read from in the replica, as the person's unfinished actions leave it. */
+export interface JumpSource {
   readonly memberId: MemberId.MemberId
   readonly groups: ReadonlyArray<Group.Group>
   readonly members: ReadonlyArray<Member.Member>
   readonly threads: ReadonlyArray<Thread.Thread>
   readonly messages: ReadonlyArray<ThreadMessage.ThreadMessage>
 }
-
-const noMatches: SearchResults = { groups: [], threads: [], people: [] }
 
 /** The first message published in each thread among `messages`. */
 const openingsOf = (
@@ -304,37 +307,38 @@ const wordsOfText = (message: ThreadMessage.ThreadMessage | undefined, members: 
     : undefined
 
 /**
- * What in `searched` has `query` in it, whatever its case or accents, and nothing for a query of spaces: the
- * groups whose names the person reads, the threads whose titles or whose openings' words, a mention as the
- * member's current name, and the active members, other than the person, whose names. A thread whose group
- * the replica lacks is left out, since it could not be opened.
+ * Where in `source` the person can jump to: the groups by the names the person reads, other than a conversation with
+ * one other person, who is among the people; the threads by their titles or their openings' words, a mention as the
+ * member's current name, leaving out one whose group the replica lacks, since it could not be opened, and one with
+ * neither; the active people other than the person; and the active agents.
  */
-export const findMatches = (
-  query: string,
-  { memberId, groups, members, threads, messages }: Searched
-): SearchResults => {
-  const wanted = foldAccents(query.trim())
-  if (wanted === "") return noMatches
-
-  const contains = (text: string | null | undefined) => text != null && foldAccents(text).includes(wanted)
+export const listJumpTargets = ({ memberId, groups, members, threads, messages }: JumpSource): JumpTargets => {
   const openings = openingsOf(messages)
-  const named = groups.map((group): GroupMatch => ({ group, name: groupName(group, members, memberId) }))
+  const named = groups.map((group): NamedGroup => ({ group, name: groupName(group, members, memberId) }))
+  const people = members.filter((member) => member.id !== memberId && member.status === "active" && !isAgent(member))
+  const isOnePersonsConversation = ({ group }: NamedGroup) =>
+    group.kind === "Direct" &&
+    group.memberIds.length === 2 &&
+    group.memberIds.some((id) => people.some((person) => person.id === id))
 
   return {
-    groups: named.filter(({ name }) => contains(name)).slice(0, maxSearchResults),
-    threads: threads
-      .flatMap((thread): ReadonlyArray<ThreadMatch> => {
-        const openingWords = wordsOfText(openings.get(thread.id), members)
-        const group = named.find((match) => match.group.id === thread.groupId)
-        const words = thread.title ?? openingWords
-        return group === undefined || words === undefined || !(contains(thread.title) || contains(openingWords))
-          ? []
-          : [{ thread, groupName: group.name, words }]
-      })
-      .slice(0, maxSearchResults),
-    people: members
-      .filter((member) => member.id !== memberId && member.status === "active" && contains(member.name))
-      .slice(0, maxSearchResults)
+    groups: named.filter((target) => !isOnePersonsConversation(target)),
+    threads: threads.flatMap((thread): ReadonlyArray<WordedThread> => {
+      const openingWords = Option.fromUndefinedOr(wordsOfText(openings.get(thread.id), members))
+      const group = named.find((target) => target.group.id === thread.groupId)
+      const words = thread.title ?? Option.getOrUndefined(openingWords)
+
+      return group === undefined || words === undefined ? [] : [{ thread, groupName: group.name, words, openingWords }]
+    }),
+    people,
+    agents: members.flatMap((member): ReadonlyArray<NamedAgent> =>
+      member.status === "active"
+        ? Identity.MemberReference.match(member.identity, {
+            Human: () => [],
+            Agent: ({ id }) => [{ agentId: id, member }]
+          })
+        : []
+    )
   }
 }
 
@@ -549,8 +553,8 @@ export class Store extends Context.Service<
     readonly grants: Stream.Stream<ReadonlyArray<Grant.Grant>, QueryError>
     /** The person's notifications as their inbox shows them, and again after each change. */
     readonly inbox: Stream.Stream<ReadonlyArray<InboxEntry>, QueryError>
-    /** What matches `query` in the workspace as the person sees it now, nothing for an empty one. */
-    readonly search: (query: string) => Effect.Effect<SearchResults, QueryError>
+    /** Where the person can jump to in the workspace as they see it, and again after each change. */
+    readonly jumpTargets: Stream.Stream<JumpTargets, QueryError>
     /** The person's actions the server has not completed, and again after each change to them. */
     readonly actions: Stream.Stream<ReadonlyArray<ActionView>, QueryError>
     /** Who has the workspace open and where they type, while the host can be reached; no one while it can't. */
@@ -562,10 +566,6 @@ export class Store extends Context.Service<
     readonly saveDraft: Drafts.Drafts["Service"]["save"]
   }
 >()("@amends-dev/app-v2/store/Store") {}
-
-/** The first value `stream` gives, for a read made once; a read of the replica always gives one. */
-const readOnce = <A, E>(stream: Stream.Stream<A, E>): Effect.Effect<A, E> =>
-  Effect.flatMap(Stream.runHead(stream), (head) => Effect.orDie(Effect.fromOption(head)))
 
 /** The prefix of every database the person's stores keep on the host at `apiUrl`. */
 const databasePrefix = (apiUrl: string, humanId: Identity.HumanId) => `amends/${apiUrl}/${humanId}/`
@@ -881,20 +881,22 @@ export const layer = (options: Options) =>
                 }
               })
             ),
-            search: (query) =>
-              readOnce(
-                Stream.zipLatestAll(list("Group", workspacePlace), members, every("Thread"), every("ThreadMessage"))
-              ).pipe(
-                Effect.map(([groups, members, threads, messages]) =>
-                  findMatches(query, {
-                    memberId: options.memberId,
-                    groups: groups.map(({ record }) => record.value),
-                    members,
-                    threads: threads.map(({ record }) => record.value),
-                    messages: messages.map(({ record }) => record.value)
-                  })
-                )
-              ),
+            jumpTargets: Stream.zipLatestAll(
+              list("Group", workspacePlace),
+              members,
+              every("Thread"),
+              every("ThreadMessage")
+            ).pipe(
+              Stream.map(([groups, members, threads, messages]) =>
+                listJumpTargets({
+                  memberId: options.memberId,
+                  groups: groups.map(({ record }) => record.value),
+                  members,
+                  threads: threads.map(({ record }) => record.value),
+                  messages: messages.map(({ record }) => record.value)
+                })
+              )
+            ),
             actions: untilFailed(
               Stream.mapEffect(replica.actions, (actions) =>
                 Effect.forEach(actions, ({ key, tag, payload, rejection }) =>

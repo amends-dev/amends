@@ -1,72 +1,58 @@
+import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { ScrollToResult, Search } from "./command.ts"
+import { ScrollToItem } from "./command.ts"
 import { clearQuery, DialogBinding, SearchComposition } from "./composition.ts"
-import {
-  activeResult,
-  isSearchable,
-  Message,
-  OutMessage,
-  Result,
-  resultId,
-  SearchStatus,
-  shownResults
-} from "./definition.ts"
+import { activeItem, Item, itemId, Message, orderTargets, OutMessage, SearchStatus, shownItems } from "./definition.ts"
 
 export const update = SearchComposition.makeUpdate((model, message) => {
-  /** Close the dialog and report the group, the thread, or the person `result` opens. */
-  const choose = (result: Result) =>
+  /** Close the dialog and report the page, the group, the thread, the person, or the agent `item` opens. */
+  const choose = (item: Item) =>
     Update.withOutMessage(
       Update.combine(model, [DialogBinding.requestClose()]),
-      Result.match(result, {
+      Item.match(item, {
+        Destination: ({ destination }) => OutMessage.OpenedDestination({ destination }),
         Group: ({ group }) => OutMessage.OpenedGroup({ groupId: group.id }),
-        Thread: ({ thread }) => OutMessage.OpenedThread({ groupId: thread.groupId, threadId: thread.id }),
-        Person: ({ member }) => OutMessage.OpenedPerson({ memberId: member.id })
+        Person: ({ member }) => OutMessage.OpenedPerson({ memberId: member.id }),
+        Agent: ({ agentId }) => OutMessage.OpenedAgent({ agentId }),
+        Thread: ({ thread }) => OutMessage.OpenedThread({ groupId: thread.groupId, threadId: thread.id })
       })
     )
 
   return Message.match(message, {
     RequestedOpen: () => Update.combine(model, [clearQuery, DialogBinding.requestOpen()]),
-    TypedQuery: ({ query }) => {
-      const typed = modifyFields(model, { query: () => query, activeIndex: () => 0 })
-      if (!isSearchable(query)) return { model: modifyFields(typed, { status: () => SearchStatus.Idle() }) }
+    // The item reached stays reached while the places change under it, unless the list is now too short to hold it.
+    ReceivedTargets: ({ targets }) => {
+      const received = modifyFields(model, { status: () => SearchStatus.Read({ targets: orderTargets(targets) }) })
 
       return {
-        // The rows found before stay until the search for this query answers, so the list does not blink.
-        model: modifyFields(typed, {
-          status: (status) => (SearchStatus.isAnyOf(["Found"])(status) ? status : SearchStatus.Searching({ query }))
-        }),
-        commands: [Search({ workspaceId: model.workspaceId, memberId: model.memberId, query })]
+        model: modifyFields(received, {
+          activeIndex: (activeIndex) => (activeIndex < shownItems(received).length ? activeIndex : 0)
+        })
       }
     },
-    // An answer for a query that is not the one typed now is late, and dropped.
-    CompletedSearch: ({ query, results }) =>
-      query === model.query
-        ? { model: modifyFields(model, { status: () => SearchStatus.Found({ query, results }), activeIndex: () => 0 }) }
-        : { model },
-    FailedSearch: ({ query, error }) =>
-      query === model.query
-        ? { model: modifyFields(model, { status: () => SearchStatus.Failed({ error }), activeIndex: () => 0 }) }
-        : { model },
-    // The view counts the results it shows, so it says which one is active.
+    FailedRead: ({ error }) => ({
+      model: modifyFields(model, { status: () => SearchStatus.Failed({ error }), activeIndex: () => 0 })
+    }),
+    TypedQuery: ({ query }) => ({ model: modifyFields(model, { query: () => query, activeIndex: () => 0 }) }),
+    // The view counts the items it shows, so it says which one is active.
     MovedActive: ({ to }) => {
       const moved = modifyFields(model, { activeIndex: () => to })
+
       return {
         model: moved,
         commands: Option.toArray(
-          Option.map(Option.fromUndefinedOr(shownResults(moved)[to]), (result) =>
-            ScrollToResult({ id: resultId(result) })
-          )
+          Option.map(Array.get(shownItems(moved), to), (item) => ScrollToItem({ id: itemId(item) }))
         )
       }
     },
-    CompletedScrollToResult: () => ({ model }),
+    CompletedScrollToItem: () => ({ model }),
     ChoseActive: () =>
-      Option.match(activeResult(model), {
+      Option.match(activeItem(model), {
         onNone: () => ({ model }),
         onSome: choose
       }),
-    ClickedResult: ({ result }) => choose(result)
+    ClickedItem: ({ item }) => choose(item)
   })
 })

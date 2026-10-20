@@ -1,16 +1,25 @@
-import { answerKeys, field, hint, notice } from "@amends-dev/design/control"
-import { badge, entry, entryList } from "@amends-dev/design/details"
-import { modal } from "@amends-dev/design/modal"
-import { paneSection } from "@amends-dev/design/pane"
+import { answerKeys } from "@amends-dev/design/control"
+import type { IconName } from "@amends-dev/design/icon"
+import { palette, type PaletteItem, type PaletteLeading } from "@amends-dev/design/palette"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { groupMark, initials } from "../../seen.ts"
+import { initials } from "../../seen.ts"
 import { DialogBinding, SearchComposition, type SearchViewBuilder } from "./composition.ts"
-import { Message, type Model, Result, resultId, SearchStatus, resultsOf, shownResults } from "./definition.ts"
+import {
+  activeItem,
+  type Destination,
+  Item,
+  itemId,
+  Message,
+  type Model,
+  SearchStatus,
+  sectionsShown,
+  shownItems
+} from "./definition.ts"
 
-/** What the arrow keys and Enter do in the field: move the active result around the list, or open it. */
+/** What the arrow keys and Enter do in the field: move the active item around the list, or open it. */
 const answerKey = (key: string, count: number, activeIndex: number): Option.Option<Message> =>
   count === 0
     ? Option.none()
@@ -21,91 +30,92 @@ const answerKey = (key: string, count: number, activeIndex: number): Option.Opti
         Match.orElse(() => Option.none())
       )
 
+/** The drawing of each page, as the rail and the sidebar draw it. */
+const destinationIcons: Readonly<Record<Destination, IconName>> = {
+  Inbox: "mark-mail",
+  Agents: "mark-agents",
+  Connections: "mark-connections",
+  Settings: "mark-settings"
+}
+
 /**
- * A result as a row that opens it: a team by `#` and a conversation or a person by letters, a thread by its
- * words with the name of its group after them.
+ * What stands before an item: a drawing for a page, a team (`#`), and a thread, and the initials of a conversation's
+ * other members, of a person, or of an agent, on the agent's tone.
  */
-const resultEntry = (result: Result, isActive: boolean, h: SearchViewBuilder): Html => {
-  const row = { key: resultId(result), onClick: Message.ClickedResult({ result }), isActive }
-
-  return Result.match(result, {
-    Group: ({ group, name }) => entry(h, { ...row, mark: groupMark(group, name), title: name }),
-    Thread: ({ words, groupName }) => entry(h, { ...row, title: words, trailing: [badge(h, { label: groupName })] }),
-    Person: ({ member }) => entry(h, { ...row, mark: initials(member.name), title: member.name })
+const leadingOf = (item: Item): PaletteLeading =>
+  Item.match<PaletteLeading>(item, {
+    Destination: ({ destination }) => ({ icon: destinationIcons[destination] }),
+    Group: ({ group, name }) => (group.kind === "Team" ? { icon: "mark-channel" } : { text: initials(name) }),
+    Person: ({ member }) => ({ text: initials(member.name) }),
+    Agent: ({ member }) => ({ text: initials(member.name), tone: "lilac" }),
+    Thread: () => ({ icon: "message" })
   })
-}
 
-/** The results of one kind, in a section titled `title`, each marked active when it is the one at `activeIndex`. */
-const resultSection = (
-  title: string,
-  results: ReadonlyArray<Result>,
-  isKind: (result: Result) => boolean,
-  activeIndex: number,
-  h: SearchViewBuilder
-): ReadonlyArray<Html> => {
-  const entries = results.flatMap((result, index) =>
-    isKind(result) ? [resultEntry(result, index === activeIndex, h)] : []
-  )
+/** A quiet note after an item's name: that a person opens a conversation, and which group a thread is in. */
+const detailOf = (item: Item): string | undefined =>
+  Item.match(item, {
+    Destination: () => undefined,
+    Group: () => undefined,
+    Person: () => "Direct message",
+    Agent: () => undefined,
+    Thread: ({ groupName }) => groupName
+  })
 
-  return entries.length === 0
-    ? []
-    : [
-        paneSection(h, {
-          title,
-          children: [entryList(h, { label: `Matching ${title.toLowerCase()}`, children: entries })]
-        })
-      ]
-}
+/** What an item is called, which is what is typed to find it. */
+const labelOf = (item: Item): string =>
+  Item.match(item, {
+    Destination: ({ destination }) => destination,
+    Group: ({ name }) => name,
+    Person: ({ member }) => member.name,
+    Agent: ({ member }) => member.name,
+    Thread: ({ words }) => words
+  })
 
-/** What the dialog says under the field: how to start, nothing while the search is on its way, what was found, or why it failed. */
-const bodyUnderField = (model: Model, h: SearchViewBuilder): ReadonlyArray<Html> =>
+/** An item as a line of the palette that opens it, filled while it is the one at `activeIndex`. */
+const paletteItem = (item: Item, isActive: boolean): PaletteItem<Message> => ({
+  id: itemId(item),
+  label: labelOf(item),
+  detail: detailOf(item),
+  leading: leadingOf(item),
+  isActive,
+  onClick: Message.ClickedItem({ item })
+})
+
+/** What the palette says when it has nothing to list: why the read failed, or that nothing matches what is typed. */
+const emptyTextOf = (model: Model): string =>
   SearchStatus.match(model.status, {
-    Idle: () => [hint(h, "Type to search.")],
-    Searching: () => [],
-    Found: ({ query, results }) => {
-      const found = resultsOf(results)
-
-      return found.length === 0
-        ? [hint(h, `Nothing found for "${query.trim()}".`)]
-        : [
-            ...resultSection("Groups", found, Result.isAnyOf(["Group"]), model.activeIndex, h),
-            ...resultSection("Threads", found, Result.isAnyOf(["Thread"]), model.activeIndex, h),
-            ...resultSection("People", found, Result.isAnyOf(["Person"]), model.activeIndex, h)
-          ]
-    },
-    Failed: ({ error }) => [notice(h, Option.some(error))]
+    Reading: () => `Nothing matches "${model.query.trim()}".`,
+    Read: () => `Nothing matches "${model.query.trim()}".`,
+    Failed: ({ error }) => error
   })
 
-/** The modal: the field, which takes the focus as it opens and walks the results with the arrow keys, over the results. */
-const searchModal = (render: RenderInfo, model: Model, h: SearchViewBuilder): Html => {
-  const shown = shownResults(model)
-  const active = Option.fromUndefinedOr(shown[model.activeIndex])
+/** The palette: the field, which takes the focus as it opens and walks the items with the arrow keys, over the items. */
+const searchPalette = (render: RenderInfo, model: Model, h: SearchViewBuilder): Html => {
+  const active = activeItem(model)
+  const count = shownItems(model).length
+  const activeId = Option.map(active, itemId)
 
-  return modal(h, render, {
-    title: "Find anything",
-    size: "wide",
-    body: [
-      field(
-        h,
-        {
-          id: "search-query",
-          label: "Find anything",
-          type: "search",
-          value: model.query,
-          onInput: (query) => Message.TypedQuery({ query }),
-          placeholder: "Groups, threads, people…",
-          isAutofocus: false,
-          isLabelHidden: true,
-          attributes: [
-            ...render.initialFocus,
-            answerKeys(h, (key) => answerKey(key, shown.length, model.activeIndex)),
-            ...Option.toArray(Option.map(active, (result) => h.AriaActiveDescendant(resultId(result))))
-          ]
-        },
-        Option.none()
-      ),
-      ...bodyUnderField(model, h)
-    ]
+  return palette(h, render, {
+    label: "Jump to",
+    id: "jump-to",
+    placeholder: "Jump to a group, person, or page…",
+    query: model.query,
+    onInput: (query) => Message.TypedQuery({ query }),
+    attributes: [
+      ...render.initialFocus,
+      answerKeys(h, (key) => answerKey(key, count, model.activeIndex)),
+      ...Option.toArray(Option.map(activeId, (id) => h.AriaActiveDescendant(id)))
+    ],
+    sections: sectionsShown(model).map(({ title, items }) => ({
+      title,
+      items: items.map((item) =>
+        paletteItem(
+          item,
+          Option.exists(activeId, (id) => id === itemId(item))
+        )
+      )
+    })),
+    emptyText: emptyTextOf(model)
   })
 }
 
@@ -115,7 +125,7 @@ export const view = SearchComposition.makeView((model, h) =>
     DialogBinding.embedView({
       slotId: "dialog",
       model: model.dialog,
-      viewInputs: { toView: (render) => searchModal(render, model, h) }
+      viewInputs: { toView: (render) => searchPalette(render, model, h) }
     })
   )
 )

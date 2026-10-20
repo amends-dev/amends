@@ -407,7 +407,7 @@ describe("the app", () => {
       given(choosing),
       Subscription.emit(subscriptions.openSearch, Message.PressedSearchKey()),
       Command.expectNone(),
-      expect(role("dialog", { name: "Find anything" })).toBeAbsent()
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent()
     )
     scene(
       { update, view, subscriptions },
@@ -415,8 +415,8 @@ describe("the app", () => {
       Subscription.emit(subscriptions.openSearch, Message.PressedSearchKey()),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "Find anything" })).toExist(),
-      expect(label("Find anything")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
+      expect(role("dialog", { name: "Jump to" })).toExist(),
+      expect(label("Jump to")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
     )
   })
 })

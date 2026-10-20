@@ -4,6 +4,7 @@ import type { Identity } from "@amends-dev/core/identity"
 import type { MemberId } from "@amends-dev/core/workspace"
 import { isAsideInDialog } from "@amends-dev/design/shell"
 import { DialogBlock } from "@foldkit/ui/dialog"
+import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type { Block } from "foldkit"
@@ -16,6 +17,7 @@ import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { connectionsToast } from "../../feature/connections/wording.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
+import type { Destination } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
 import { LoadIntegrations } from "./command.ts"
@@ -112,15 +114,29 @@ const foldHomeOutMessage = HomeBlock.OutMessage.match({
 const openGroupInHome = (groupId: GroupId.GroupId) =>
   Update.combine([HomeBinding.requestOpenGroup({ groupId }), goToHome()])
 
+/** The page of `destination` a search opened: the one the rail goes to, or, for Settings, the account menu's. */
+const goToDestination = (destination: Destination) =>
+  Match.value(destination).pipe(
+    Match.when("Inbox", () => goTo(showHome)),
+    Match.when("Agents", () => goTo(showAgents)),
+    Match.when("Connections", () => goTo(showConnections)),
+    Match.when("Settings", () => goTo(showSettings("Workspace"))),
+    Match.exhaustive
+  )
+
 /**
- * What the search found opens in Home as it would from the sidebar and the tasks, and shows Home. A person is opened as
- * a conversation, which Home's groups find or start.
+ * What the search opened is shown as the rail, the sidebar, and the tasks show it: a page as the rail goes to it, with
+ * the navigation drawer shut, Inbox being Home, which opens on it, and Settings the Workspace page the account menu goes
+ * to; a group or a thread in Home, as picking it in the sidebar does; an agent on its page. A person is opened as a
+ * conversation, which Home's groups find or start.
  */
 const foldSearchOutMessage = SearchBlock.OutMessage.match({
+  OpenedDestination: ({ destination }) => goToDestination(destination),
   OpenedGroup: ({ groupId }) => openGroupInHome(groupId),
   OpenedThread: ({ groupId, threadId }) =>
     Update.combine([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
-  OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId })
+  OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId }),
+  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId))
 })
 
 /**

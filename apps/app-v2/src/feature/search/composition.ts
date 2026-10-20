@@ -1,15 +1,14 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import type { Block } from "foldkit"
-import { SearchStatus, SearchDefinition } from "./definition.ts"
+import { SearchDefinition } from "./definition.ts"
 
-/** Forget what was typed and found, and which result was active. */
+/** Forget what was typed, and which item was active. What was read of the places stays, to show as the search opens. */
 export const clearQuery = SearchDefinition.stepFields(() => ({
   query: () => "",
-  status: () => SearchStatus.Idle(),
   activeIndex: () => 0
 }))
 
-/** The dialog closing, by the person or by a result opened, ends the search. */
+/** The dialog closing, by the person or by an item opened, ends the search. */
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
   Opened: () => SearchDefinition.stepNoop(),
   Closed: () => clearQuery,

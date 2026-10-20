@@ -20,6 +20,7 @@ import {
   first,
   given,
   inside,
+  keydown,
   label,
   nth,
   role,
@@ -91,7 +92,6 @@ import { CreateTeam, JoinGroup } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
-import { Search } from "../../feature/search/command.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { RenameSelf, SelectOnFocus } from "../../feature/settings/command.ts"
 import { AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
@@ -758,11 +758,11 @@ describe("a workspace", () => {
       { update, view: sceneView },
       given(opened),
       expect(railButton("Search")).not.toHaveAttr("aria-current"),
-      expect(role("dialog", { name: "Find anything" })).toBeAbsent(),
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
       click(railButton("Search")),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "Find anything" })).toExist(),
+      expect(role("dialog", { name: "Jump to" })).toExist(),
       expect(railButton("Search")).not.toHaveAttr("aria-current"),
       expect(railButton("Home")).toHaveAttr("aria-current", "true")
     )
@@ -1975,12 +1975,12 @@ describe("a workspace", () => {
       given(opened),
       expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Find anything…" }))).toExist(),
       expect(within(role("button", { name: "Find anything…" }), text("⌘K"))).toHaveAttr("aria-hidden", "true"),
-      expect(role("dialog", { name: "Find anything" })).toBeAbsent(),
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
       click(role("button", { name: "Find anything…" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      expect(role("dialog", { name: "Find anything" })).toExist(),
-      expect(label("Find anything")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
+      expect(role("dialog", { name: "Jump to" })).toExist(),
+      expect(label("Jump to")).toHaveAttr("data-foldkit-dialog-initial-focus", "")
     )
   })
 
@@ -2003,25 +2003,41 @@ describe("a workspace", () => {
 
   it("opens the group the search found from its row, closing the search", () => {
     scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(opened),
+      click(role("button", { name: "Find anything…" })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      Subscription.emit(
+        workspaceSubscriptions["search/targets"],
+        SearchBlock.Message.ReceivedTargets({
+          targets: { groups: [{ group: design, name: "Design" }], threads: [], people: [], agents: [] }
+        })
+      ),
+      type(label("Jump to"), "des"),
+      click(within(role("dialog", { name: "Jump to" }), role("option", { name: "Design" }))),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist()
+    )
+  })
+
+  it("opens the page the search found with Enter, as the rail goes to it", () => {
+    scene(
       { update, view: sceneView },
       given(opened),
       click(role("button", { name: "Find anything…" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      type(label("Find anything"), "des"),
-      Command.resolve(
-        Search,
-        SearchBlock.Message.CompletedSearch({
-          query: "des",
-          results: { groups: [{ group: design, name: "Design" }], threads: [], people: [] }
-        })
-      ),
-      click(within(role("dialog", { name: "Find anything" }), role("button", { name: /^Design/ }))),
+      type(label("Jump to"), "conn"),
+      keydown(label("Jump to"), "Enter"),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),
-      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
-      expect(role("dialog", { name: "Find anything" })).toBeAbsent(),
-      expect(role("main", { name: "A group" })).toExist()
+      expect(role("dialog", { name: "Jump to" })).toBeAbsent(),
+      expect(railButton("Connections")).toHaveAttr("aria-current", "true"),
+      expect(railButton("Home")).not.toHaveAttr("aria-current")
     )
   })
 
@@ -2037,7 +2053,7 @@ describe("a workspace", () => {
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(role("dialog", { name: "Navigation" })).toExist(),
-      expect(role("dialog", { name: "Find anything" })).toExist()
+      expect(role("dialog", { name: "Jump to" })).toExist()
     )
   })
 })

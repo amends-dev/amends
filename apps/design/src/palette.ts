@@ -58,7 +58,7 @@ export type PaletteItem<Message> = Readonly<{
   id: string
   label: string
   /** A quiet note after the label, such as "Direct message". */
-  detail?: string
+  detail?: string | undefined
   leading: PaletteLeading
   /** Whether it is the item the arrow keys have reached, which Enter opens. */
   isActive: boolean
