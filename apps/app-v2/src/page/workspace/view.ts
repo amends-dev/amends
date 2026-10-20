@@ -196,7 +196,7 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
           slotId: "home",
           model: model.home,
           view: homeView,
-          viewInputs: { now, workspaceName: nameOf(model) }
+          viewInputs: { now }
         })
       ),
     Connections: () =>

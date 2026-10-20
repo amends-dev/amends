@@ -10,7 +10,6 @@ import {
   openThreadInGroup,
   showAside,
   showInbox,
-  showNothing,
   showTasks,
   showTriage,
   switchTo
@@ -41,7 +40,7 @@ export const update = HomeComposition.makeUpdate((model, message) =>
     ClickedInbox: () => Update.withOutMessage(Update.combine(model, [switchTo(showInbox)]), OutMessage.Navigated()),
     ClickedTriage: () => Update.withOutMessage(Update.combine(model, [switchTo(showTriage)]), OutMessage.Navigated()),
     ClickedTasks: () => Update.withOutMessage(Update.combine(model, [switchTo(showTasks)]), OutMessage.Navigated()),
-    RequestedReset: () => Update.combine(model, [switchTo(showNothing)]),
+    RequestedReset: () => Update.combine(model, [switchTo(showInbox)]),
     RequestedOpenGroup: ({ groupId }) =>
       Update.combine(model, [
         GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),

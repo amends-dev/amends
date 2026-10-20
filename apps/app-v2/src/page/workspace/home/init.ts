@@ -4,12 +4,12 @@ import { HomeComposition } from "./composition.ts"
 import { Open } from "./definition.ts"
 
 /**
- * Home of the workspace `workspaceId`, as the member `memberId`, in a window of the width `viewport`, showing nothing
- * yet, its inbox, tasks, and groups before they are read.
+ * Home of the workspace `workspaceId`, as the member `memberId`, in a window of the width `viewport`, showing the
+ * inbox, which with its tasks and groups is not read yet.
  */
 export const init = HomeComposition.makeInit(
   (workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, viewport: Viewport) => ({
     childInitContext: { workspaceId, memberId },
-    model: { workspaceId, memberId, viewport, open: Open.Nothing() }
+    model: { workspaceId, memberId, viewport, open: Open.Inbox() }
   })
 )

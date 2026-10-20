@@ -22,11 +22,6 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
     })
   )
 
-/** Show nothing yet in the main pane. */
-export const showNothing = HomeDefinition.step((model: Model) => ({
-  model: modifyFields(model, { open: () => Open.Nothing() })
-}))
-
 /** Show the inbox in the main pane. */
 export const showInbox = HomeDefinition.step((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Inbox() })
@@ -51,7 +46,7 @@ export const showGroups = HomeDefinition.step((model: Model) => ({
  * Switch to a list of Home, as the sidebar does: close the side pane's dialog and the thread beside the inbox, leave
  * no group marked in the sidebar, and `show` the list.
  */
-export const switchTo = (show: typeof showNothing) =>
+export const switchTo = (show: typeof showInbox) =>
   Update.combine([
     hideAside,
     InboxBinding.requestCloseThread(),

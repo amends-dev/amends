@@ -287,9 +287,6 @@ const withNotification = atHome(opened, (home) =>
   })
 )
 
-/** The same, with the inbox shown. */
-const withInbox = atHome(withNotification, (home) => modifyFields(home, { open: () => HomeOpen.Inbox() }))
-
 /** The write that marks the notification seen acknowledged, and the thread's reply draft read, as its thread opens. */
 const notificationThreadOpened = [
   Command.resolve(MarkNotificationSeen, InboxBlock.Message.WroteAction()),
@@ -440,6 +437,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView, subscriptions: workspaceSubscriptions },
       given(opened),
+      click(sidebarButton("Tasks")),
       expect(role("main", { name: "Inbox" })).toBeAbsent(),
       Subscription.emit(
         workspaceSubscriptions["home/inbox/inbox"],
@@ -629,21 +627,24 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens on the workspace's own main pane, with Home current and the sidebar named by the workspace", () => {
+  it("opens on the inbox in the main pane, with Home current and the sidebar named by the workspace", () => {
     scene(
       { update, view: sceneView },
       given(opened),
-      expect(role("main", { name: "Studio" })).toExist(),
-      expect(within(role("main", { name: "Studio" }), role("heading", { name: "Studio", level: 1 }))).toExist(),
-      expect(within(role("main", { name: "Studio" }), text("Pick a group, or open your inbox."))).toExist(),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      expect(within(role("main", { name: "Inbox" }), role("tab", { name: "All" }))).toHaveAttr("aria-selected", "true"),
+      expect(role("main", { name: "Studio" })).toBeAbsent(),
+      expect(text("Pick a group, or open your inbox.")).toBeAbsent(),
       expect(role("navigation", { name: "Studio" })).toExist(),
+      expect(sidebarButton("Inbox")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Tasks")).not.toHaveAttr("aria-current"),
       expect(role("complementary")).toBeAbsent(),
       expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
       expect(role("button", { name: "Connections" })).not.toHaveAttr("aria-current")
     )
   })
 
-  it("names the workspace as the settings hold it, so the sidebar and the main pane follow a rename", () => {
+  it("names the workspace as the settings hold it, so the sidebar and the panes that name it follow a rename", () => {
     const renamed = modifyFields(opened, {
       settings: (settings) =>
         modifyFields(settings, {
@@ -655,9 +656,10 @@ describe("a workspace", () => {
       given(renamed),
       expect(role("navigation", { name: "Atelier" })).toExist(),
       expect(within(role("navigation", { name: "Atelier" }), text("Atelier"))).toExist(),
-      expect(within(role("main", { name: "Atelier" }), role("heading", { name: "Atelier", level: 1 }))).toExist(),
       expect(role("navigation", { name: "Studio" })).toBeAbsent(),
-      expect(role("main", { name: "Studio" })).toBeAbsent()
+      click(role("button", { name: "Connections" })),
+      expect(within(role("main", { name: "Connections" }), text("Atelier"))).toExist(),
+      expect(within(role("main", { name: "Connections" }), text("Studio"))).toBeAbsent()
     )
   })
 
@@ -1302,16 +1304,20 @@ describe("a workspace", () => {
     )
   })
 
-  it("goes home from a destination, to the workspace's own pane with nothing marked in the sidebar", () => {
+  it("goes home from a destination, to the inbox, whatever Home showed when the person left", () => {
     scene(
       { update, view: sceneView },
       given(opened),
+      click(sidebarButton("Tasks")),
+      expect(role("main", { name: "Tasks" })).toExist(),
       click(role("button", { name: "Connections" })),
       expect(role("main", { name: "Connections" })).toExist(),
       click(role("button", { name: "Home" })),
       expect(role("main", { name: "Connections" })).toBeAbsent(),
-      expect(role("main", { name: "Studio" })).toExist(),
-      expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-current")
+      expect(role("main", { name: "Tasks" })).toBeAbsent(),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      expect(sidebarButton("Inbox")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Tasks")).not.toHaveAttr("aria-current")
     )
   })
 
@@ -1414,13 +1420,15 @@ describe("a workspace", () => {
   it("draws the logo as the rail's brand, a button that goes Home, and the workspaces one click away from the sidebar's header", () => {
     scene(
       { update, view: sceneView },
-      given(withInbox),
+      given(withNotification),
       expect(role("button", { name: "Amends home" })).toExist(),
       expect(within(role("button", { name: "Amends home" }), selector("svg"))).toHaveAttr("viewBox", "0 0 64 64"),
       expect(within(role("button", { name: "Amends home" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
       expect(role("main", { name: "Inbox" })).toExist(),
-      click(role("button", { name: "Amends home" })),
+      click(sidebarButton("Tasks")),
       expect(role("main", { name: "Inbox" })).toBeAbsent(),
+      click(role("button", { name: "Amends home" })),
+      expect(role("main", { name: "Inbox" })).toExist(),
       expect(railButton("Home")).toHaveAttr("aria-current", "true"),
       expect(within(role("navigation", { name: "Studio" }), role("button", { name: "All workspaces" }))).toExist(),
       click(role("button", { name: "All workspaces" })),
@@ -1553,7 +1561,12 @@ describe("a workspace", () => {
 
     scene(
       { update, view: sceneView, subscriptions: workspaceSubscriptions },
-      given(withSettings),
+      // The inbox Home opens on is read, so that its line saying it is loading is not the status the toast is looked for in.
+      given(
+        atHome(withSettings, (home) =>
+          modifyFields(home, { inbox: (inbox) => modifyFields(inbox, { isLoaded: () => true }) })
+        )
+      ),
       expect(nameDialog).toBeAbsent(),
       ...openMenu(AccountMenu, "Account: Alice"),
       ...chooseMenuItem(AccountMenu, "Change your name…"),
@@ -1665,7 +1678,7 @@ describe("a workspace", () => {
 
     scene(
       { update, view: sceneView },
-      given(inWindow(withInbox, "Desktop")),
+      given(inWindow(withNotification, "Desktop")),
       expect(role("dialog", { name: "Thread" })).toBeAbsent(),
       click(role("button", { name: "Bob replied" })),
       ...notificationThreadOpened,
@@ -1691,7 +1704,7 @@ describe("a workspace", () => {
   it("closes a notification's thread when the side pane's dialog closes from its scrim", () => {
     scene(
       { update, view: sceneView },
-      given(inWindow(withInbox, "Desktop")),
+      given(inWindow(withNotification, "Desktop")),
       click(role("button", { name: "Bob replied" })),
       ...notificationThreadOpened,
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),

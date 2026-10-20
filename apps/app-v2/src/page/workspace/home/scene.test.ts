@@ -60,7 +60,7 @@ const homeSubscriptions = HomeBlock.subscriptions
 const sidebarButton = (name: string | RegExp) =>
   within(role("navigation", { name: "Studio" }), role("button", { name }))
 
-const mainView = withViewInputs(view, { now, workspaceName: "Studio" })()
+const mainView = withViewInputs(view, { now })()
 
 const sideView = withViewInputs(threadView, { now })()
 
@@ -217,9 +217,6 @@ const withNotification = modifyFields(opened, {
     })
 })
 
-/** The same, with the inbox shown. */
-const withInbox = modifyFields(withNotification, { open: () => Open.Inbox() })
-
 /** The write that marks the notification seen acknowledged, and the thread's reply draft read, as its thread opens. */
 const notificationThreadOpened = [
   Command.resolve(MarkNotificationSeen, InboxBlock.Message.WroteAction()),
@@ -257,11 +254,16 @@ const withTasks = modifyFields(opened, {
 })
 
 describe("home", () => {
-  it("shows how many notifications wait beside the inbox, which it shows on request", () => {
+  it("shows how many notifications wait beside the inbox, which it shows first and again on request", () => {
     scene(
       { update, view: sceneView },
       given(withNotification),
       expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1"),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Triage" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current"),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      click(role("button", { name: "Tasks" })),
       expect(role("main", { name: "Inbox" })).toBeAbsent(),
       click(role("button", { name: "Inbox" })),
       expect(role("main", { name: "Inbox" })).toExist(),
@@ -278,7 +280,6 @@ describe("home", () => {
       { update, view: sceneView },
       given(opened),
       expect(role("button", { name: "Inbox" })).not.toHaveAttr("aria-description"),
-      click(role("button", { name: "Inbox" })),
       expect(within(role("main", { name: "Inbox" }), text("Loading your inbox…"))).toExist()
     )
   })
@@ -522,7 +523,7 @@ describe("home", () => {
 
     scene(
       { update, view: sceneView },
-      given(withInbox),
+      given(withNotification),
       expect(role("complementary")).toBeAbsent(),
       expect(within(inbox, selector('[aria-current="true"]'))).toBeAbsent(),
       click(role("button", { name: "Bob replied" })),
@@ -545,7 +546,7 @@ describe("home", () => {
 
     scene(
       { update, view: sceneView },
-      given(withInbox),
+      given(withNotification),
       click(role("button", { name: "Bob replied" })),
       ...notificationThreadOpened,
       click(within(role("complementary", { name: "Thread" }), role("button", { name: "Close" }))),
@@ -559,7 +560,7 @@ describe("home", () => {
   it("leaves no thread beside the inbox when the person leaves it and comes back", () => {
     scene(
       { update, view: sceneView },
-      given(withInbox),
+      given(withNotification),
       click(role("button", { name: "Bob replied" })),
       ...notificationThreadOpened,
       expect(role("complementary", { name: "Thread" })).toExist(),

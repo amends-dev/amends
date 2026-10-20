@@ -235,7 +235,7 @@ const fromHome = (message: typeof HomeBlock.Message.Type) =>
     slotId: "home",
     model: opened.home,
     view: homeView,
-    viewInputs: { now, workspaceName: "Studio" }
+    viewInputs: { now }
   }).toParentMessage(message)
 
 /** What the groups report, as Home and then the workspace receive it. */
@@ -418,7 +418,7 @@ describe("a workspace", () => {
       given(opened),
       model((model) => {
         expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
-        expect(HomeOpen.isAnyOf(["Nothing"])(model.home.open)).toBe(true)
+        expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
       }),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
@@ -471,7 +471,7 @@ describe("a workspace", () => {
     )
   })
 
-  it("goes home from the group open or a destination, to nothing open in Home and no group marked", () => {
+  it("goes home from the group open or a destination, to the inbox in Home and no group marked", () => {
     story(
       update,
       given(opened),
@@ -480,14 +480,14 @@ describe("a workspace", () => {
       message(Message.ClickedHome()),
       model((model) => {
         expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
-        expect(HomeOpen.isAnyOf(["Nothing"])(model.home.open)).toBe(true)
+        expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
         expect(model.home.groups.selected).toEqual(Option.none())
       }),
       message(Message.ClickedConnections()),
       message(Message.ClickedHome()),
       model((model) => {
         expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
-        expect(HomeOpen.isAnyOf(["Nothing"])(model.home.open)).toBe(true)
+        expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
       })
     )
   })
@@ -1525,7 +1525,7 @@ describe("a workspace", () => {
       ),
       model((model) => {
         expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
-        expect(HomeOpen.isAnyOf(["Nothing"])(model.home.open)).toBe(true)
+        expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
         expect(model.home.groups.dialog.isOpen).toBe(true)
         expect(model.home.groups.starting).toEqual(
           Option.some({ _tag: "Conversation", memberId: Option.some(bob.id), text: "" })

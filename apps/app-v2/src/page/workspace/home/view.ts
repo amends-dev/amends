@@ -1,4 +1,3 @@
-import { pane } from "@amends-dev/design/pane"
 import { sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
@@ -19,26 +18,12 @@ import {
 } from "./composition.ts"
 import { Message, Open, openThreadTitle } from "./definition.ts"
 
-/** The time now, which the inbox, the tasks, and the group open are given, and the name of the workspace. */
-export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
+/** The time now, which the inbox, the tasks, and the group open are given. */
+export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
-/**
- * The main pane: what the person opened, or, while they have opened nothing, the way to pick something. The inbox,
- * the tasks, and the open group are given the time now.
- */
-export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
+/** The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the time now. */
+export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   Open.match(model.open, {
-    Nothing: () =>
-      pane(h, {
-        variant: "main",
-        label: workspaceName,
-        header: {
-          title: workspaceName,
-          mark: { text: workspaceName.slice(0, 1) },
-          subtitle: "Pick a group, or open your inbox."
-        },
-        body: []
-      }),
     Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),
     Triage: () =>
       h.block(TasksBinding.embedView({ slotId: "triage", model: model.tasks, view: triageView, viewInputs: { now } })),

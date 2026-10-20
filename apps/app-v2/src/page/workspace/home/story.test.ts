@@ -156,12 +156,19 @@ const threadBesideInboxOpened = [
 ] as const
 
 describe("home", () => {
+  it("opens on the inbox, with no thread open, no group marked, and the side pane's dialog closed", () => {
+    expect(Open.isAnyOf(["Inbox"])(opened.open)).toBe(true)
+    expect(isThreadOpen(opened)).toBe(false)
+    expect(opened.groups.selected).toEqual(Option.none())
+    expect(opened.aside.isOpen).toBe(false)
+  })
+
   it("opens the group picked, and reports that the person moved", () => {
     story(
       update,
       given(opened),
       model((model) => {
-        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
       }),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       expectOutMessage(OutMessage.Navigated()),
@@ -193,7 +200,7 @@ describe("home", () => {
     }
   })
 
-  it("shows nothing when its parent resets it, leaving no group marked, and reports nothing", () => {
+  it("shows the inbox when its parent resets it, leaving no group marked, and reports nothing", () => {
     story(
       update,
       given(opened),
@@ -202,10 +209,33 @@ describe("home", () => {
       message(Message.RequestedReset()),
       expectNoOutMessage(),
       model((model) => {
-        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
         expect(model.groups.selected).toEqual(Option.none())
       })
     )
+  })
+
+  it("shows the inbox again when its parent resets it from the tasks, the triage, or the groups to browse", () => {
+    for (const navigation of [
+      Message.ClickedTriage(),
+      Message.ClickedTasks(),
+      fromGroups(GroupsBlock.Message.ClickedBrowse())
+    ]) {
+      story(
+        update,
+        given(opened),
+        message(navigation),
+        model((model) => {
+          expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(false)
+        }),
+        message(Message.RequestedReset()),
+        expectNoOutMessage(),
+        model((model) => {
+          expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
+          expect(model.groups.selected).toEqual(Option.none())
+        })
+      )
+    }
   })
 
   it("shows the groups to browse in place of the open group, leaving no group marked, and opens one picked there", () => {
@@ -450,7 +480,6 @@ describe("home", () => {
 
   it("closes the thread beside the inbox with every navigation that leaves the inbox, so returning shows none", () => {
     for (const navigation of [
-      Message.RequestedReset(),
       Message.ClickedTriage(),
       Message.ClickedTasks(),
       fromGroups(GroupsBlock.Message.ClickedBrowse())
@@ -486,6 +515,22 @@ describe("home", () => {
       }),
       message(Message.ClickedInbox()),
       model((model) => {
+        expect(model.inbox.selected).toEqual(Option.none())
+        expect(isThreadOpen(model)).toBe(false)
+      })
+    )
+  })
+
+  it("closes the thread beside the inbox when its parent resets it, and goes on showing the inbox", () => {
+    story(
+      update,
+      given(opened),
+      ...notificationOpened,
+      ...threadBesideInboxOpened,
+      message(Message.RequestedReset()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
         expect(model.inbox.selected).toEqual(Option.none())
         expect(isThreadOpen(model)).toBe(false)
       })
@@ -726,7 +771,7 @@ describe("home", () => {
         DialogBlock.Message.SucceededShowDialog()
       ),
       model((model) => {
-        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
         expect(model.groups.dialog.isOpen).toBe(true)
         expect(model.groups.starting).toEqual(
           Option.some({ _tag: "Conversation", memberId: Option.some(bob.id), text: "" })

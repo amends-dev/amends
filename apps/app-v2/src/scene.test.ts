@@ -139,7 +139,6 @@ const withInbox = inWorkspaceChanged((workspace) =>
   modifyFields(workspace, {
     home: (home) =>
       modifyFields(home, {
-        open: () => HomeOpen.Inbox(),
         inbox: (inbox) =>
           modifyFields(inbox, {
             isLoaded: () => true,
@@ -246,7 +245,8 @@ describe("the app", () => {
       expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toBeAbsent(),
       expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))).toBeAbsent(),
       expect(within(role("navigation", { name: "Destinations" }), role("button", { name: accountButton }))).toExist(),
-      expect(role("main", { name: "Studio" })).toExist(),
+      expect(role("main", { name: "Inbox" })).toExist(),
+      expect(role("main", { name: "Studio" })).toBeAbsent(),
       expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
       expect(role("heading", { name: "Sign in to amends" })).toBeAbsent()
     )

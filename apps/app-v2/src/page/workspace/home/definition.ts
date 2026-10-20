@@ -5,7 +5,8 @@
  * threads or beside the inbox, which stays, and the Block lays the pane out by the window's width, which its parent
  * informs it of: below 80rem the pane is in a dialog of its own, which follows the thread opening and closing. It
  * reports when the person moved within Home from its sidebar or its lists, and its parent asks it to open a group, a
- * thread in its group, or a conversation with a member, and to show nothing, as leaving Home does.
+ * thread in its group, or a conversation with a member, and to show the inbox again, as leaving Home does. Home opens
+ * on the inbox.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -25,11 +26,10 @@ import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { titleOf } from "../../../feature/thread/definition.ts"
 
 /**
- * What Home's main pane shows: nothing yet, the inbox, the tasks in triage, every open task, the groups to browse, or
- * the group open, with the thread open in it.
+ * What Home's main pane shows: the inbox, the tasks in triage, every open task, the groups to browse, or the group
+ * open, with the thread open in it.
  */
 export const Open = defineTaggedUnion({
-  Nothing: {},
   Inbox: {},
   Triage: {},
   Tasks: {},
