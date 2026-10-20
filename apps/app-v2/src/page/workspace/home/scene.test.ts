@@ -86,6 +86,7 @@ const withThread = modifyFields(opened, {
   groups: (groups) =>
     modifyFields(groups, {
       groups: () => [{ group: general, pending: false, members: 1 }],
+      memberships: () => [aliceInGeneral],
       selected: () => Option.some(general.id)
     }),
   open: () =>
@@ -256,7 +257,7 @@ describe("home", () => {
     scene(
       { update, view: sceneView },
       given(withNotification),
-      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1"),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1 unread"),
       expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page"),
       expect(role("button", { name: "Triage" })).not.toHaveAttr("aria-current"),
       expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current"),
@@ -302,7 +303,7 @@ describe("home", () => {
     scene(
       { update, view: sceneView },
       given(withTasks),
-      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "1"),
+      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "1 to triage"),
       expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-description"),
       expect(triaged).toBeAbsent(),
       expect(open).toBeAbsent(),
@@ -354,11 +355,18 @@ describe("home", () => {
       { update, view: sceneView },
       given(
         modifyFields(opened, {
-          groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false, members: 1 }] })
+          groups: (groups) =>
+            modifyFields(groups, {
+              groups: () => [{ group: general, pending: false, members: 1 }],
+              memberships: () => [aliceInGeneral]
+            })
         })
       ),
       expect(within(role("navigation", { name: "Studio" }), role("heading", { name: "Groups", level: 2 }))).toExist(),
-      expect(within(role("navigation", { name: "Studio" }), text("No messages yet"))).toExist(),
+      expect(
+        within(role("navigation", { name: "Studio" }), role("heading", { name: "Direct messages", level: 2 }))
+      ).toExist(),
+      expect(within(role("navigation", { name: "Studio" }), text("No messages yet"))).toBeAbsent(),
       expect(role("button", { name: "General" })).not.toHaveAttr("aria-current"),
       click(role("button", { name: "General" })),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
@@ -376,7 +384,7 @@ describe("home", () => {
       given(
         modifyFields(opened, { groups: (groups) => modifyFields(groups, { grants: () => grantsOf([aliceOwns]) }) })
       ),
-      click(within(role("navigation", { name: "Studio" }), role("button", { name: "New team" }))),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Create group" }))),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
       expect(role("dialog", { name: "New team" })).toExist(),
@@ -587,6 +595,29 @@ describe("home", () => {
         "aria-current"
       ),
       expect(text("Composer paste crash")).toBeAbsent()
+    )
+  })
+
+  it("opens the groups to browse on Discover from Browse groups, and on Your groups from the title", () => {
+    scene(
+      { update, view: sceneView },
+      given(withBrowsableGroup),
+      click(sidebarButton("Browse groups")),
+      expect(within(role("main", { name: "Groups" }), role("tab", { name: "Discover" }))).toHaveAttr(
+        "aria-selected",
+        "true"
+      ),
+      click(sidebarButton("Inbox")),
+      click(sidebarButton("Groups")),
+      expect(within(role("main", { name: "Groups" }), role("tab", { name: "Your groups" }))).toHaveAttr(
+        "aria-selected",
+        "true"
+      ),
+      click(sidebarButton("Browse groups")),
+      expect(within(role("main", { name: "Groups" }), role("tab", { name: "Discover" }))).toHaveAttr(
+        "aria-selected",
+        "true"
+      )
     )
   })
 

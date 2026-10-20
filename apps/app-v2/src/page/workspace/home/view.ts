@@ -55,14 +55,14 @@ export const sidebarView = HomeComposition.makeView((model, h) => {
         sidebarItem(h, {
           icon: "mark-mail",
           label: "Inbox",
-          ...(waiting > 0 ? { count: waiting } : {}),
+          ...(waiting > 0 ? { count: waiting, countName: "unread" } : {}),
           isCurrent: Open.isAnyOf(["Inbox"])(model.open),
           onClick: Message.ClickedInbox()
         }),
         sidebarItem(h, {
           icon: "mark-triage",
           label: "Triage",
-          ...(inTriage > 0 ? { count: inTriage } : {}),
+          ...(inTriage > 0 ? { count: inTriage, countName: "to triage" } : {}),
           isCurrent: Open.isAnyOf(["Triage"])(model.open),
           onClick: Message.ClickedTriage()
         }),

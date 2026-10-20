@@ -3,14 +3,14 @@ import { ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Effect, Layer, Option } from "effect"
+import { Array, Effect, Layer, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
-import { conversationWithBob, general } from "../../../test/fixtures.ts"
+import { bob, conversationWithBob, design, general } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
-import { conversationWith, Message, OutMessage, Starting } from "./definition.ts"
+import { byGeneralThenName, conversationWith, Message, OutMessage, Starting } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -150,18 +150,89 @@ describe("the groups", () => {
     )
   })
 
-  it("ask its parent to browse each time the person asks, without changing what it holds", () => {
+  it("ask its parent to browse each time the person asks, on the teams to join for Browse groups", () => {
     story(
       update,
       given(listed),
       message(Message.ClickedBrowse()),
       expectOutMessage(OutMessage.RequestedBrowse()),
+      model((model) => {
+        expect(model).toEqual(modifyFields(listed, { browse: () => ({ tab: "Discover", query: "" }) }))
+      }),
       message(Message.ClickedBrowse()),
       expectOutMessage(OutMessage.RequestedBrowse()),
       model((model) => {
-        expect(model).toEqual(listed)
+        expect(model.browse).toEqual({ tab: "Discover", query: "" })
       })
     )
+  })
+
+  it("ask its parent to browse from the Groups title, on the groups the person belongs to, keeping the search", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ChoseBrowseTab({ tab: "Discover" })),
+      message(Message.TypedBrowseQuery({ query: "ann" })),
+      message(Message.ClickedGroupsTitle()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      model((model) => {
+        expect(model.browse).toEqual({ tab: "Yours", query: "ann" })
+      })
+    )
+  })
+
+  it("know the groups are read once they are received, and no sooner", () => {
+    story(
+      update,
+      given(listed),
+      model((model) => {
+        expect(model.isLoaded).toBe(false)
+      }),
+      message(Message.ReceivedGroups({ groups: [], members: [], memberships: [], grants: [] })),
+      model((model) => {
+        expect(model.isLoaded).toBe(true)
+        expect(model.groups).toEqual([])
+      })
+    )
+  })
+
+  it("order the teams general first and then by name in any case and whatever the accents, then by ID", () => {
+    const named = (id: string, name: string) => ({
+      group: { ...design, id: GroupId.GroupId.make(id), name },
+      pending: false,
+      members: 1
+    })
+    const items = [
+      named("b", "beta"),
+      named("a2", "Álvaro"),
+      named("a1", "alvaro"),
+      named("z", "Zed"),
+      named("general", "x")
+    ]
+
+    expect(Array.sort(items, byGeneralThenName(listed)).map(({ group }) => group.id)).toEqual([
+      "general",
+      "a1",
+      "a2",
+      "b",
+      "z"
+    ])
+  })
+
+  it("order a conversation among the teams by the names of the other members", () => {
+    const withMembers = modifyFields(listed, { members: () => [bob] })
+    const conversation = { group: conversationWithBob, pending: false, members: 2 }
+    const team = (name: string) => ({
+      group: { ...design, id: GroupId.GroupId.make(name), name },
+      pending: false,
+      members: 1
+    })
+
+    expect(
+      Array.sort([team("Zed"), conversation, team("Alpha"), team("Carol")], byGeneralThenName(withMembers)).map(
+        ({ group }) => group.id
+      )
+    ).toEqual(["Alpha", conversationWithBob.id, "Carol", "Zed"])
   })
 
   it("drop what the person was starting when the dialog closes, and report the group picked once", () => {

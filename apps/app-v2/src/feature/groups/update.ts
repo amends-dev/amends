@@ -5,7 +5,15 @@ import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { DialogBinding, GroupsComposition } from "./composition.ts"
-import { conversationWith, GroupsDefinition, Message, type Model, OutMessage, Starting } from "./definition.ts"
+import {
+  type BrowseTab,
+  conversationWith,
+  GroupsDefinition,
+  Message,
+  type Model,
+  OutMessage,
+  Starting
+} from "./definition.ts"
 
 /** The model with what the person is starting as `change` makes it, while they start something. */
 const atStarting = (model: Model, change: (starting: Starting) => Starting) =>
@@ -51,6 +59,12 @@ const pickGroup = (model: Model, groupId: GroupId.GroupId) =>
         outMessage: OutMessage.SelectedGroup({ groupId })
       }
 
+/** Ask to browse the groups, on the tab `tab`. */
+const browseOn = (model: Model, tab: BrowseTab) => ({
+  model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) }),
+  outMessage: OutMessage.RequestedBrowse()
+})
+
 /** Write the team `name`, public when `isPublic`, to the person's store. */
 const writeTeam = (name: string, isPublic: boolean) =>
   GroupsDefinition.step((model: Model) => ({
@@ -67,14 +81,20 @@ const writeConversation = (withMemberId: MemberId.MemberId, text: string) =>
 
 export const update = GroupsComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ReceivedGroups: ({ groups }) => ({ model: modifyFields(model, { groups: () => groups }) }),
-    ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
-    ReceivedMemberships: ({ memberships }) => ({ model: modifyFields(model, { memberships: () => memberships }) }),
-    ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
+    ReceivedGroups: ({ groups, members, memberships, grants }) => ({
+      model: modifyFields(model, {
+        isLoaded: () => true,
+        groups: () => groups,
+        members: () => members,
+        memberships: () => memberships,
+        grants: () => grants
+      })
+    }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedGroup: ({ groupId }) => pickGroup(model, groupId),
     InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
-    ClickedBrowse: () => ({ model, outMessage: OutMessage.RequestedBrowse() }),
+    ClickedGroupsTitle: () => browseOn(model, "Yours"),
+    ClickedBrowse: () => browseOn(model, "Discover"),
     ChoseBrowseTab: ({ tab }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) })
     }),

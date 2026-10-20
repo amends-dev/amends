@@ -124,21 +124,39 @@ const mayCreateTeam = (model: Model): boolean =>
   may(model.grants, GroupPermissions.Create, workspaceTarget(model.workspaceId))
 
 /**
- * The sidebar's sections of the groups: the teams the person belongs to, their conversations, and the public
- * teams they may join. The Groups title opens the browse page and is current while it shows. The buttons that start
+ * The Groups section's rows: a row for each team the person belongs to, and, when they belong to none, "No groups yet"
+ * once the groups are read, and nothing before.
+ */
+const teamRows = (
+  teams: ReadonlyArray<GroupItem>,
+  model: Model,
+  openThread: Option.Option<string>,
+  h: GroupsViewBuilder
+): ReadonlyArray<Html> => {
+  if (teams.length > 0) {
+    return teams.map((item) => groupRow(item, model, openThread, h))
+  }
+
+  return model.isLoaded ? [sidebarEmpty(h, "No groups yet")] : []
+}
+
+/**
+ * The sidebar's sections of the groups, in the order `yours` gives them: the teams the person belongs to, with Browse
+ * groups and, where they may start a team, Create group beside the title, and their conversations, with New message,
+ * which is there whoever else is in the workspace. The Groups title opens the browse page on the teams the person
+ * belongs to and is current while it shows; Browse groups opens it on the teams they may join. The buttons that start
  * a team or a conversation open the dialog `dialogView` renders.
  */
 export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread, isBrowsing }, h) => {
   const own = yours(model)
   const teams = own.filter(({ group }) => group.kind === "Team")
   const conversations = own.filter(({ group }) => group.kind !== "Team")
-  const joinable = discoverable(model)
 
   return sidebarSections(h, [
     notice(h, model.notice),
     sidebarSection(h, {
       label: "Groups",
-      onTitleClick: Message.ClickedBrowse(),
+      onTitleClick: Message.ClickedGroupsTitle(),
       isTitleCurrent: isBrowsing,
       actions: [
         iconButton(
@@ -150,40 +168,25 @@ export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { 
           ? [
               iconButton(
                 h,
-                { icon: "mark-new", label: "New team", onClick: Message.ClickedNewTeam() },
+                { icon: "mark-new", label: "Create group", onClick: Message.ClickedNewTeam() },
                 { size: "compact" }
               )
             ]
           : [])
       ],
-      children:
-        teams.length === 0
-          ? [sidebarEmpty(h, "No groups yet")]
-          : teams.map((item) => groupRow(item, model, openThread, h))
+      children: teamRows(teams, model, openThread, h)
     }),
     sidebarSection(h, {
       label: "Direct messages",
-      actions:
-        others(model).length === 0
-          ? []
-          : [
-              iconButton(
-                h,
-                { icon: "mark-new", label: "New conversation", onClick: Message.ClickedNewConversation() },
-                { size: "compact" }
-              )
-            ],
-      children:
-        conversations.length === 0
-          ? [sidebarEmpty(h, "No messages yet")]
-          : conversations.map((item) => groupRow(item, model, openThread, h))
-    }),
-    joinable.length === 0
-      ? h.empty
-      : sidebarSection(h, {
-          label: "Other teams",
-          children: joinable.map((item) => groupRow(item, model, openThread, h))
-        })
+      actions: [
+        iconButton(
+          h,
+          { icon: "mark-new", label: "New message", onClick: Message.ClickedNewConversation() },
+          { size: "compact" }
+        )
+      ],
+      children: conversations.map((item) => groupRow(item, model, openThread, h))
+    })
   ])
 })
 

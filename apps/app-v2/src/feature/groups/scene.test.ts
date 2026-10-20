@@ -1,5 +1,5 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
-import { Group, GroupPermissions } from "@amends-dev/core/group"
+import { Group, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option, Schema } from "effect"
@@ -14,9 +14,11 @@ import {
   expectOutMessage,
   given,
   label,
+  nth,
   role,
   scene,
   selector,
+  Subscription,
   text,
   type,
   withViewInputs,
@@ -24,9 +26,11 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership } from "../../../test/fixtures.ts"
+import { GroupsBlock } from "./block.ts"
 import { CreateTeam, StartConversation } from "./command.ts"
 import { Message, OutMessage, Starting } from "./definition.ts"
 import { init } from "./init.ts"
+import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { browseView, dialogView, view } from "./view.ts"
 
@@ -62,6 +66,29 @@ const announcements = Schema.decodeSync(Group.Group)({
   createdAt: "2026-10-18T12:00:00Z"
 })
 
+/** A private team named `name`, which the person made. */
+const privateTeam = (id: string, name: string) =>
+  Schema.decodeSync(Group.Group)({
+    id,
+    workspaceId: "workspace-1",
+    kind: "Team",
+    visibility: "Private",
+    name,
+    createdBy: "member-1",
+    createdAt: "2026-10-18T12:00:00Z"
+  })
+
+/** The person's admission to the team `groupId`. */
+const admittedTo = (groupId: string) =>
+  Schema.decodeSync(GroupMembership.GroupMembership)({
+    id: `membership-${groupId}`,
+    workspaceId: "workspace-1",
+    groupId,
+    memberId: "member-1",
+    admittedAt: "2026-10-18T12:00:00Z",
+    status: "active"
+  })
+
 /** The conversation between the person and Bob. */
 const withBob = Schema.decodeSync(Group.Group)({
   id: "direct-1",
@@ -74,6 +101,7 @@ const withBob = Schema.decodeSync(Group.Group)({
 
 /** The groups read, as a member who may create teams sees them. */
 const listed = modifyFields(init(workspace.id, member.id).model, {
+  isLoaded: () => true,
   groups: () => [
     { group: general, pending: false, members: 2 },
     { group: design, pending: false, members: 1 },
@@ -90,15 +118,41 @@ const withConversation = modifyFields(listed, {
 })
 
 describe("the groups", () => {
-  it("list the person's teams apart from the teams they may join", () => {
+  it("list the person's teams, and not the teams they may join, which only the browse page's Discover tab has", () => {
     scene(
       { update, view: sceneView() },
       given(listed),
       expect(role("heading", { name: "Groups", level: 2 })).toExist(),
       expect(role("button", { name: "Design" })).toExist(),
-      expect(role("heading", { name: "Other teams", level: 2 })).toExist(),
-      expect(role("button", { name: "Announcements" })).toExist(),
+      expect(role("button", { name: "General" })).toExist(),
+      expect(role("heading", { name: "Other teams" })).toBeAbsent(),
+      expect(text("Other teams")).toBeAbsent(),
+      expect(role("button", { name: "Announcements" })).toBeAbsent(),
       expect(role("dialog", { name: "New team" })).toBeAbsent()
+    )
+  })
+
+  it("list the teams with general first and then by name, in any case and whatever the accents", () => {
+    const teams = [
+      privateTeam("zebra", "Zebra"),
+      privateTeam("emile", "Émile"),
+      privateTeam("general", "general"),
+      privateTeam("emma", "emma"),
+      privateTeam("alpha", "alpha")
+    ]
+    const belonging = modifyFields(init(workspace.id, member.id).model, {
+      groups: () => teams.map((group) => ({ group, pending: false, members: 1 })),
+      memberships: () => teams.map(({ id }) => admittedTo(id))
+    })
+
+    scene(
+      { update, view: sceneView() },
+      given(belonging),
+      expect(nth(all.selector("li button"), 0)).toHaveAttr("aria-label", "general"),
+      expect(nth(all.selector("li button"), 1)).toHaveAttr("aria-label", "alpha"),
+      expect(nth(all.selector("li button"), 2)).toHaveAttr("aria-label", "Émile"),
+      expect(nth(all.selector("li button"), 3)).toHaveAttr("aria-label", "emma"),
+      expect(nth(all.selector("li button"), 4)).toHaveAttr("aria-label", "Zebra")
     )
   })
 
@@ -135,7 +189,7 @@ describe("the groups", () => {
     scene(
       { update, view: withDialog },
       given(listed),
-      click(role("button", { name: "New team" })),
+      click(role("button", { name: "Create group" })),
       ...dialogOpened(),
       expect(role("dialog", { name: "New team" })).toExist(),
       expect(within(role("dialog", { name: "New team" }), label("Team name"))).toExist(),
@@ -149,7 +203,7 @@ describe("the groups", () => {
       Command.resolve(CreateTeam, Message.WroteAction()),
       ...dialogClosed(),
       expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      expect(role("button", { name: "New team" })).toExist()
+      expect(role("button", { name: "Create group" })).toExist()
     )
   })
 
@@ -157,7 +211,7 @@ describe("the groups", () => {
     scene(
       { update, view: withDialog },
       given(listed),
-      click(role("button", { name: "New team" })),
+      click(role("button", { name: "Create group" })),
       ...dialogOpened(),
       expect(role("switch", { name: "Anyone in the workspace can join" })).toHaveAttr("aria-checked", "false"),
       click(role("switch", { name: "Anyone in the workspace can join" })),
@@ -175,14 +229,14 @@ describe("the groups", () => {
     scene(
       { update, view: withDialog },
       given(listed),
-      click(role("button", { name: "New team" })),
+      click(role("button", { name: "Create group" })),
       ...dialogOpened(),
       type(label("Team name"), "Research"),
       click(role("button", { name: "Cancel" })),
       Command.expectExact(Dialog.test.CloseDialog),
       ...dialogClosed(),
       expect(role("dialog", { name: "New team" })).toBeAbsent(),
-      click(role("button", { name: "New team" })),
+      click(role("button", { name: "Create group" })),
       ...dialogOpened(),
       expect(label("Team name")).toHaveValue("")
     )
@@ -192,7 +246,7 @@ describe("the groups", () => {
     scene(
       { update, view: withDialog },
       given(listed),
-      click(role("button", { name: "New conversation" })),
+      click(role("button", { name: "New message" })),
       ...dialogOpened(),
       expect(role("dialog", { name: "New conversation" })).toExist(),
       click(within(role("dialog", { name: "New conversation" }), role("button", { name: "Close" }))),
@@ -205,22 +259,66 @@ describe("the groups", () => {
     scene(
       { update, view: withDialog },
       given(modifyFields(listed, { grants: () => [] })),
-      expect(role("button", { name: "New team" })).toBeAbsent(),
-      expect(role("button", { name: "New conversation" })).toExist(),
-      click(role("button", { name: "New conversation" })),
+      expect(role("button", { name: "Create group" })).toBeAbsent(),
+      expect(role("button", { name: "New message" })).toExist(),
+      click(role("button", { name: "New message" })),
       ...dialogOpened(),
       expect(text("Choose a member")).toExist()
     )
   })
 
-  it("say so when there are no teams or conversations, and list no teams to join when none can be", () => {
+  it("say No groups yet once the groups are read and the person belongs to none, and no line for conversations", () => {
     scene(
       { update, view: sceneView() },
-      given(modifyFields(listed, { groups: () => [], members: () => [] })),
-      expect(text("No groups yet")).toExist(),
-      expect(text("No messages yet")).toExist(),
-      expect(role("heading", { name: "Other teams" })).toBeAbsent(),
-      expect(role("button", { name: "New conversation" })).toBeAbsent()
+      given(modifyFields(listed, { groups: () => [], memberships: () => [] })),
+      expect(within(role("list"), text("No groups yet"))).toExist(),
+      expect(text("No messages yet")).toBeAbsent(),
+      expect(text("No conversations yet")).toBeAbsent(),
+      expect(role("heading", { name: "Direct messages", level: 2 })).toExist()
+    )
+  })
+
+  it("say nothing of the groups before they are read, not that the person has none, and then list them", () => {
+    scene(
+      { update, view: sceneView(), subscriptions: GroupsBlock.subscriptions },
+      given(init(workspace.id, member.id).model),
+      expect(text("No groups yet")).toBeAbsent(),
+      expect(role("heading", { name: "Groups", level: 2 })).toExist(),
+      expect(role("button", { name: "Browse groups" })).toExist(),
+      Subscription.emit(
+        subscriptions.groups,
+        Message.ReceivedGroups({
+          groups: [{ group: general, pending: false, members: 1 }],
+          members: [bob],
+          memberships: [aliceInGeneral],
+          grants: []
+        })
+      ),
+      expect(role("button", { name: "General" })).toExist(),
+      expect(text("No groups yet")).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView(), subscriptions: GroupsBlock.subscriptions },
+      given(init(workspace.id, member.id).model),
+      Subscription.emit(
+        subscriptions.groups,
+        Message.ReceivedGroups({ groups: [], members: [], memberships: [], grants: [] })
+      ),
+      expect(text("No groups yet")).toExist()
+    )
+  })
+
+  it("offer New message to everyone, whoever else is in the workspace, and open a dialog with no one to choose", () => {
+    scene(
+      { update, view: withDialog },
+      given(modifyFields(listed, { grants: () => [], members: () => [] })),
+      expect(role("button", { name: "New message" })).toExist(),
+      click(role("button", { name: "New message" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "New conversation" })).toExist(),
+      expect(label("With")).toHaveValue(""),
+      expectAll(all.role("option")).toHaveCount(1),
+      expect(text("Choose a member")).toExist()
     )
   })
 
@@ -238,7 +336,7 @@ describe("the groups", () => {
     scene(
       { update, view: withDialog },
       given(listed),
-      click(role("button", { name: "New conversation" })),
+      click(role("button", { name: "New message" })),
       ...dialogOpened(),
       expect(role("dialog", { name: "New conversation" })).toExist(),
       expect(label("With")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
@@ -318,24 +416,48 @@ describe("the groups", () => {
 const browsingWithDialog: ReturnType<typeof sceneView> = (model, h) =>
   h.div([], [browseView(model, h), dialogView(model, h)])
 
+/** The sidebar and the browse page, as the shell puts them side by side, for a button of one to show on the other. */
+const sidebarBesideBrowsePage: ReturnType<typeof sceneView> = (model, h) =>
+  h.div([], [sceneView()(model, h), browseView(model, h)])
+
 describe("the sidebar's way to browse", () => {
-  it("is a button in the groups' header, for everyone, that asks to browse", () => {
+  it("is a button in the groups' header, for everyone, that asks to browse, on the teams to join", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: sidebarBesideBrowsePage },
       given(modifyFields(listed, { grants: () => [] })),
       expect(role("button", { name: "Browse groups" })).toExist(),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "true"),
       click(role("button", { name: "Browse groups" })),
-      expectOutMessage(OutMessage.RequestedBrowse())
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "false")
     )
   })
 
-  it("is also the Groups title, a button that asks to browse", () => {
+  it("opens Discover each time, not the tab the person last had open", () => {
     scene(
-      { update, view: sceneView() },
+      { update, view: sidebarBesideBrowsePage },
       given(listed),
+      click(role("tab", { name: "Your groups" })),
+      click(role("button", { name: "Browse groups" })),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
+      click(role("tab", { name: "Your groups" })),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "true"),
+      click(role("button", { name: "Browse groups" })),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true")
+    )
+  })
+
+  it("is also the Groups title, a button that asks to browse, on the groups the person belongs to", () => {
+    scene(
+      { update, view: sidebarBesideBrowsePage },
+      given(modifyFields(listed, { browse: (browse) => modifyFields(browse, { tab: () => "Discover" }) })),
       expect(role("button", { name: "Groups" })).not.toHaveAttr("aria-current"),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
       click(role("button", { name: "Groups" })),
-      expectOutMessage(OutMessage.RequestedBrowse())
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "true")
     )
   })
 

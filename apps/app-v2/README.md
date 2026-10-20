@@ -397,8 +397,12 @@ below it counted at each level above.
   action at the end for the connection's form; and Invite people at the start and Done at the end for the
   invitations' history.
 - `feature/groups`: the groups the person can see, as the sidebar's sections: the teams they belong
-  to by name, their conversations by the other members in them, then the public teams they may join,
-  to pick one from; and where they start a team, or a conversation with another member, in a modal
+  to, general first and then by name, and their conversations, ordered the same way by the other members' names,
+  to pick one from (`byGeneralThenName`: by name as the person reads it, in any case and whatever the accents, as
+  `foldAccents` folds them, then by ID; the browse page's two tabs share this order, since they read the same
+  groups, and so does nothing else, since the channels' choice of group and the search list groups as the replica
+  holds them); the public teams they may join are not in the sidebar, only on the browse page's Discover tab; and
+  where they start a team, or a conversation with another member, in a modal
   over the page: a dialog the Block binds from `@foldkit/ui/dialog` and renders with the design's
   `modal`, a team by its name and whether anyone in the workspace can join, with the name field taking
   the focus as the dialog opens, and a conversation by the member and the first message, with the
@@ -406,9 +410,19 @@ below it counted at each level above.
   dialog, which drops what was being started. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
-  parent, which it shows under the group. The Groups section's header has a button, Browse groups,
-  which reports `RequestedBrowse`, shown to everyone, and so does the title, Groups, which is a
-  button too and is current while the page it opens shows (the view input `isBrowsing`). `browseView` is the page it asks for, a main
+  parent, which it shows under the group. The groups are read by one subscription, `ReadGroups`, which zips the
+  groups, the members, the person's admissions, and what they may do into one `ReceivedGroups`, so that `isLoaded` is
+  true once all of them have been read: "No groups yet" is under the Groups title only then, and nothing is before,
+  as `feature/agents` and `feature/connections` wait for theirs. The Groups section's header has two buttons: Browse
+  groups, shown to everyone, which reports `RequestedBrowse` with the browse page on its Discover tab, and Create
+  group, where the person may start a team, in place of the "+" that was called New team. The title, Groups, is a
+  button too: it reports `RequestedBrowse` with the page on Your groups, as `apps/ui`'s `#groups` link does, and is
+  current while the page it opens shows (the view input `isBrowsing`). The Direct messages section lists
+  the conversations and has no line of its own for none, and its New message button is shown always, as `apps/ui`'s
+  is, whoever else is in the workspace: with nobody else its dialog, "New conversation", has a member choice with
+  only "Choose a member" to pick and a first message to write, and Start sends nothing until a member is chosen. A
+  row's count would be read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
+  `countName`); the sidebar's group rows show no count, so there is none to name. `browseView` is the page it asks for, a main
   pane titled Groups with two tabs, Your groups, the teams the person belongs to and their
   conversations, as the sidebar lists them, and Discover, the public teams they may join and do not
   belong to, each counted, Your groups at first, and Create group, the same as the sidebar's "+" for
@@ -982,8 +996,8 @@ below it counted at each level above.
   pane (`AsideBinding`, id `home-aside`). Its main pane (`view`, given the time now) shows the
   inbox, which it opens on, the tasks in triage, every open task, the groups to browse, or the open group (`Open`:
   `Inbox`, `Triage`, `Tasks`, `Groups`, `Group`); it has no state of showing nothing. Its sidebar (`sidebarView`) is an
-  "Inbox" item with how many notifications wait, a "Triage" item with how many tasks wait in triage
-  (`triageCount`), a "Tasks" item, and the groups' sections; picking a group opens it and marks it in the list, and
+  "Inbox" item with how many notifications wait, read aloud as "5 unread", a "Triage" item with how many tasks wait in
+  triage (`triageCount`), read aloud as "5 to triage", a "Tasks" item, and the groups' sections; picking a group opens it and marks it in the list, and
   resetting Home, as showing any other destination does, leaves no group marked and shows the inbox. The tasks Block is the same child
   under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened there is opened in
   its group with the thread already open, and the group marked, which a notification's is not: its thread opens
@@ -1220,7 +1234,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   report, or closed as its parent asks, without one; the groups starting a
   team or a conversation in a dialog it opens on a blank form and closes when the form is submitted
   or the dialog closes, dropping what was being started, and reporting the group picked once, asking
-  to browse each time, and keeping the browse page's tab and search, and selecting the conversation
+  to browse each time, Browse groups on Discover and the title on Your groups, keeping the browse page's search,
+  the groups read once they are received, and their order, general first and then by name in any case and
+  whatever the accents, a conversation among the teams by the others' names, and selecting the conversation
   with a member asked for, or opening the dialog with the member chosen when there is none, a team
   with that member in it not being that conversation; the search opening on an empty field, searching
   for what is typed only once it holds more than spaces, keeping the rows shown while the next search
@@ -1386,13 +1402,15 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   someone who manages them; and its side pane for the thread open in it, titled by the thread
   under the group it is in, with the composer to reply in its footer, closed by its Close button or its Back, which send the
   same message; the groups listed in the
-  sidebar's sections apart from the teams to join, a conversation by its other member, one still on
+  sidebar's sections, the teams to join not among them, in order, "No groups yet" only once the groups are read,
+  no line for conversations, New message always and its dialog with no one to choose when nobody else is in the
+  workspace, a conversation by its other member, one still on
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, and a new team taken in a dialog named for it, with the name
   field holding the focus, made public by its switch, and closed by Cancel, by its Close button, or
   once written, only from someone who may create one, a conversation started with the member chosen in
   a dialog of its own, both in a view apart from the sidebar's, with the sidebar's buttons that open
   them and the same team taken from the workspace's sidebar, the dialog for a conversation taking the
-  focus on its member choice, or on the first message when the member is chosen, and the groups to browse: the button in the sidebar's header asking for them, the tabs counted and chosen, each
+  focus on its member choice, or on the first message when the member is chosen, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted and chosen, each
   group's mark, visibility, and members, a team and a conversation told apart, the search narrowing
   either tab in any case and with spaces ignored, nothing matching, nothing to discover, no groups yet, a
   team on its way, a group opened from its row, and Create group only for someone who may create
@@ -1511,8 +1529,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   name and settings, key, adding, and removal confirmed the same way, the dialog of the connections opened from
   the sidebar and from the list, a connection added, shown by its page after it is checked, and the
   connections listing the integrations
-  again after the host could not be reached. Home's scenes show the sidebar counting what waits beside "Inbox" and "Triage", its groups in their sections, and the Groups title opening
-  the groups to browse and marked while they show, then the inbox, the tasks in triage, and every open task in a main pane named for it,
+  again after the host could not be reached. Home's scenes show the sidebar counting what waits beside "Inbox" and "Triage", each count read aloud with what it counts, its groups in their sections, Browse groups opening
+  the groups to browse on Discover and the Groups title on Your groups, marked while they show, then the inbox, the tasks in triage, and every open task in a main pane named for it,
   the inbox saying nothing waits or that it is being read, the group's threads as messages in the main pane with the composer to start
   one, the thread picked opened in the side pane beside the main pane with no dialog, with its messages and the composer to reply, marked in
   the list and under the group in the sidebar, and closed by its button, a notification's thread opened the same way beside the inbox, which stays with

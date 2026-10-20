@@ -443,7 +443,7 @@ describe("a workspace", () => {
         workspaceSubscriptions["home/inbox/inbox"],
         InboxBlock.Message.ReceivedInbox({ items: withNotification.home.inbox.items })
       ),
-      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1"),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "1 unread"),
       expect(role("main", { name: "Inbox" })).toBeAbsent()
     )
   })
@@ -457,7 +457,7 @@ describe("a workspace", () => {
         workspaceSubscriptions["home/tasks/tasks"],
         TasksBlock.Message.ReceivedTasks({ items: withTasks.home.tasks.items })
       ),
-      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "1"),
+      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "1 to triage"),
       expect(role("main", { name: "Triage" })).toBeAbsent()
     )
   })
@@ -1443,7 +1443,11 @@ describe("a workspace", () => {
       given(
         atHome(onPhone, (home) =>
           modifyFields(home, {
-            groups: (groups) => modifyFields(groups, { groups: () => [{ group: general, pending: false, members: 1 }] })
+            groups: (groups) =>
+              modifyFields(groups, {
+                groups: () => [{ group: general, pending: false, members: 1 }],
+                memberships: () => [aliceInGeneral]
+              })
           })
         )
       ),
@@ -1769,10 +1773,11 @@ describe("a workspace", () => {
       expect(role("main", { name: "Groups" })).toExist(),
       expect(role("main", { name: "Studio" })).toBeAbsent(),
       expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
-      expect(within(role("main", { name: "Groups" }), role("tab", { name: "Your groups" }))).toHaveAttr(
+      expect(within(role("main", { name: "Groups" }), role("tab", { name: "Discover" }))).toHaveAttr(
         "aria-selected",
         "true"
       ),
+      click(within(role("main", { name: "Groups" }), role("tab", { name: "Your groups" }))),
       expect(within(role("main", { name: "Groups" }), role("button", { name: "General" }))).toHaveAttr(
         "aria-description",
         "Public · 3 members"
