@@ -13,7 +13,7 @@ import {
   session,
   unnamedInvitation
 } from "../../../test/fixtures.ts"
-import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
+import { AcceptInvitation, CreateWorkspace, ExpireConfirmation, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import {
   Entering,
@@ -168,7 +168,7 @@ describe("creating a workspace", () => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
         expect(model.workspaces).toEqual(loaded([membership, acme], []))
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
       }),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
     )
@@ -463,11 +463,14 @@ const listedWithNorthstar = Message.SucceededLoadWorkspaces({
   invitations: [atlasInvitation]
 })
 
-/** The commands that listing gives the page, resolved: the dialog closed, focus on the row, and the toast's time up. */
+/**
+ * The commands that listing gives the page, resolved: the dialog closed, focus on the row, and the confirmation's time
+ * up.
+ */
 const joinedNorthstarShown = [
   Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
   Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
-  Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 }))
+  Command.resolve(ExpireConfirmation, Message.ExpiredConfirmation({ confirmationId: 1 }))
 ] as const
 
 describe("joining a workspace", () => {
@@ -522,7 +525,7 @@ describe("joining a workspace", () => {
           Option.some(Entering.Joined({ invitation: northstarInvitation, reloadFailed: false }))
         )
         expect(model.dialog.isOpen).toBe(true)
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
       }),
       expectNoOutMessage(),
       Command.resolve(LoadWorkspaces, listedWithNorthstar),
@@ -536,82 +539,82 @@ describe("joining a workspace", () => {
     )
   })
 
-  it("says it joined the workspace with a toast, which goes after a while, and moves focus to the workspace's row", () => {
+  it("says it joined the workspace with a confirmation, which goes after a while, and moves focus to the workspace's row", () => {
     story(
       update,
       given(joinedNorthstar),
       message(listedWithNorthstar),
       Command.expectHas(
         Dialog.test.CloseDialog,
-        ExpireToast({ toastId: 1 }),
+        ExpireConfirmation({ confirmationId: 1 }),
         FocusWorkspaceRow({ workspaceId: northstar.workspace.id })
       ),
       model((model) => {
-        expect(model.toasts).toEqual([{ id: 1, text: "Joined Northstar Studio" }])
-        expect(model.nextToastId).toBe(2)
+        expect(model.confirmations).toEqual([{ id: 1, text: "Joined Northstar Studio" }])
+        expect(model.nextConfirmationId).toBe(2)
       }),
       Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       model((model) => {
-        expect(model.toasts).toHaveLength(1)
+        expect(model.confirmations).toHaveLength(1)
       }),
-      Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 })),
+      Command.resolve(ExpireConfirmation, Message.ExpiredConfirmation({ confirmationId: 1 })),
       model((model) => {
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
       })
     )
   })
 
-  it("shows a toast after another, each with an ID of its own, which goes when its time is up", () => {
+  it("shows a confirmation after another, each with an ID of its own, which goes when its time is up", () => {
     story(
       update,
       given(
         modifyFields(joinedNorthstar, {
-          toasts: () => [{ id: 1, text: "Joined Atlas Labs" }],
-          nextToastId: () => 2
+          confirmations: () => [{ id: 1, text: "Joined Atlas Labs" }],
+          nextConfirmationId: () => 2
         })
       ),
       message(listedWithNorthstar),
-      Command.expectHas(ExpireToast({ toastId: 2 })),
+      Command.expectHas(ExpireConfirmation({ confirmationId: 2 })),
       model((model) => {
-        expect(model.toasts).toEqual([
+        expect(model.confirmations).toEqual([
           { id: 1, text: "Joined Atlas Labs" },
           { id: 2, text: "Joined Northstar Studio" }
         ])
       }),
-      Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 2 })),
+      Command.resolve(ExpireConfirmation, Message.ExpiredConfirmation({ confirmationId: 2 })),
       Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       model((model) => {
-        expect(model.toasts).toEqual([{ id: 1, text: "Joined Atlas Labs" }])
+        expect(model.confirmations).toEqual([{ id: 1, text: "Joined Atlas Labs" }])
       }),
-      message(Message.ExpiredToast({ toastId: 1 })),
+      message(Message.ExpiredConfirmation({ confirmationId: 1 })),
       model((model) => {
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
       })
     )
   })
 
-  it("lets the person dismiss a toast before its time, and a toast gone is not gone again when its time is up", () => {
-    const withToast = modifyFields(listed, {
-      toasts: () => [
+  it("keeps each confirmation until its own time is up, and one gone is not gone again when another's is", () => {
+    const withConfirmations = modifyFields(listed, {
+      confirmations: () => [
         { id: 3, text: "Joined Northstar Studio" },
         { id: 4, text: "Joined Atlas Labs" }
       ],
-      nextToastId: () => 5
+      nextConfirmationId: () => 5
     })
 
     story(
       update,
-      given(withToast),
-      message(Message.DismissedToast({ toastId: 3 })),
+      given(withConfirmations),
+      message(Message.ExpiredConfirmation({ confirmationId: 3 })),
       model((model) => {
-        expect(model.toasts).toEqual([{ id: 4, text: "Joined Atlas Labs" }])
-        expect(model.nextToastId).toBe(5)
+        expect(model.confirmations).toEqual([{ id: 4, text: "Joined Atlas Labs" }])
+        expect(model.nextConfirmationId).toBe(5)
       }),
-      message(Message.ExpiredToast({ toastId: 3 })),
+      message(Message.ExpiredConfirmation({ confirmationId: 3 })),
       model((model) => {
-        expect(model.toasts).toEqual([{ id: 4, text: "Joined Atlas Labs" }])
+        expect(model.confirmations).toEqual([{ id: 4, text: "Joined Atlas Labs" }])
       })
     )
   })
@@ -719,7 +722,7 @@ describe("joining a workspace", () => {
     )
   })
 
-  it("shows the list alone, with no toast, when the invitation was accepted after the person closed the form", () => {
+  it("shows the list alone, with no confirmation, when the invitation was accepted after the person closed the form", () => {
     story(
       update,
       given(invited),
@@ -732,12 +735,12 @@ describe("joining a workspace", () => {
       Command.expectNone(),
       model((model) => {
         expect(model.workspaces).toEqual(loaded([membership, northstar], [atlasInvitation]))
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
       })
     )
   })
 
-  it("shows the list alone, with no toast, when the person closes the dialog while it is read again", () => {
+  it("shows the list alone, with no confirmation, when the person closes the dialog while it is read again", () => {
     story(
       update,
       given(joinedNorthstar),
@@ -751,12 +754,12 @@ describe("joining a workspace", () => {
       expectNoOutMessage(),
       Command.expectNone(),
       model((model) => {
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
       })
     )
   })
 
-  it("closes the dialog without a toast when the list does not have the workspace joined", () => {
+  it("closes the dialog without a confirmation when the list does not have the workspace joined", () => {
     story(
       update,
       given(invited),
@@ -772,7 +775,7 @@ describe("joining a workspace", () => {
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.toasts).toEqual([])
+        expect(model.confirmations).toEqual([])
         expect(model.workspaces).toEqual(loaded([membership], [atlasInvitation]))
       })
     )
@@ -804,13 +807,13 @@ describe("joining a workspace", () => {
       Command.expectHas(Dialog.test.CloseDialog),
       model((model) => {
         expect(model.entering).toEqual(Option.none())
-        expect(model.toasts).toEqual([{ id: 1, text: "Joined Northstar Studio" }])
+        expect(model.confirmations).toEqual([{ id: 1, text: "Joined Northstar Studio" }])
       }),
       ...joinedNorthstarShown
     )
   })
 
-  it("names the toast for the workspace the listing has, even when the host had no name for the invitation's", () => {
+  it("names the confirmation for the workspace the listing has, even when the host had no name for the invitation's", () => {
     story(
       update,
       given(
@@ -838,11 +841,11 @@ describe("joining a workspace", () => {
         })
       ),
       model((model) => {
-        expect(model.toasts).toEqual([{ id: 1, text: "Joined Mercier & Co" }])
+        expect(model.confirmations).toEqual([{ id: 1, text: "Joined Mercier & Co" }])
       }),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
-      Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 }))
+      Command.resolve(ExpireConfirmation, Message.ExpiredConfirmation({ confirmationId: 1 }))
     )
   })
 })

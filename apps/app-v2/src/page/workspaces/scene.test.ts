@@ -37,7 +37,7 @@ import { calendarDate } from "../../seen.ts"
 import {
   AcceptInvitation,
   CreateWorkspace,
-  ExpireToast,
+  ExpireConfirmation,
   FocusWorkspaceRow,
   LoadWorkspaces,
   SelectOnFocus
@@ -153,12 +153,15 @@ const listedWithNorthstar = Message.SucceededLoadWorkspaces({
   invitations: [atlasInvitation]
 })
 
-/** What the page does once the listing says the person joined Northstar Studio, acknowledged: the dialog closed, focus moved to the row, and the toast gone when its time is up. */
+/**
+ * What the page does once the listing says the person joined Northstar Studio, acknowledged: the dialog closed, focus
+ * moved to the row, and the confirmation gone when its time is up.
+ */
 const joinedNorthstarShown = () =>
   [
     ...dialogClosed(),
     Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
-    Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 }))
+    Command.resolve(ExpireConfirmation, Message.ExpiredConfirmation({ confirmationId: 1 }))
   ] as const
 
 const refusedName = "Use 1 to 80 characters, with no invisible ones."
@@ -657,7 +660,7 @@ describe("joining a workspace", () => {
     )
   })
 
-  it("joins under the name the person types, then closes the dialog and says so with a toast", () => {
+  it("joins under the name the person types, then closes the dialog and says so with a confirmation", () => {
     scene(
       { update, view: sceneView },
       given(invited),
@@ -681,7 +684,8 @@ describe("joining a workspace", () => {
       expect(text("3 workspaces · 1 pending invitation")).toBeAbsent(),
       expect(text("2 workspaces · 1 pending invitation")).toExist(),
       expect(within(role("status"), text("Joined Northstar Studio"))).toExist(),
-      expect(within(role("status"), role("button", { name: "Dismiss" }))).toExist(),
+      expect(within(role("status"), role("button"))).toBeAbsent(),
+      expect(role("button", { name: "Dismiss" })).toBeAbsent(),
       expect(role("button", { name: "Northstar Studio" })).toHaveAttr("id", "workspace-workspace-4"),
       expect(role("button", { name: "Northstar Studio" })).toHaveAttr("aria-description", "3 members"),
       ...joinedNorthstarShown(),
@@ -690,22 +694,29 @@ describe("joining a workspace", () => {
     )
   })
 
-  it("lets the person dismiss a toast before its time is up", () => {
+  it("shows a confirmation as a status with a check, centered at the bottom, with no way to dismiss it", () => {
     scene(
       { update, view: sceneView },
-      given(modifyFields(listed, { toasts: () => [{ id: 1, text: "Joined Northstar Studio" }], nextToastId: () => 2 })),
+      given(
+        modifyFields(listed, {
+          confirmations: () => [{ id: 1, text: "Joined Northstar Studio" }],
+          nextConfirmationId: () => 2
+        })
+      ),
+      expect(within(role("list", { name: "Notifications" }), role("status"))).toExist(),
       expect(within(role("status"), text("Joined Northstar Studio"))).toExist(),
-      click(within(role("status"), role("button", { name: "Dismiss" }))),
-      expect(role("status")).toBeAbsent(),
+      expect(within(role("status"), selector('svg[aria-hidden="true"]'))).toExist(),
+      expect(role("button", { name: "Dismiss" })).toBeAbsent(),
+      expect(role("list", { name: "Notifications" })).toHaveClass("bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"),
       expect(role("button", { name: "Studio" })).toExist()
     )
   })
 
-  it("shows a live region for toasts from the first, with none in it", () => {
+  it("shows a live region for confirmations from the first, with none in it", () => {
     scene(
       { update, view: sceneView },
       given(listed),
-      expect(selector('[aria-live="polite"]')).toExist(),
+      expect(role("list", { name: "Notifications" })).toHaveAttr("aria-live", "polite"),
       expect(role("status")).toBeAbsent()
     )
   })

@@ -1,7 +1,8 @@
 /**
  * The workspaces the person belongs to and the invitations waiting for them, as the host lists them, to open a
  * workspace or accept an invitation, and the modal where they create a workspace or join one. It reports the one
- * they pick or create, and that the host no longer knows their session. Joining one tells the person with a toast.
+ * they pick or create, and that the host no longer knows their session. Joining one tells the person with a
+ * confirmation.
  */
 
 import { Request } from "@amends-dev/core/request"
@@ -69,7 +70,7 @@ export const noJoinErrors = JoinErrors.make({ name: Option.none(), form: Option.
  *
  * Joining has its form, over the invitation it answers, and the request on its way, which needs no key since the
  * host returns the same member when the invitation is accepted again. Once the person is in the workspace they have
- * `Joined` it: the listing is read again, and may fail. When it is read the dialog closes and a toast says so,
+ * `Joined` it: the listing is read again, and may fail. When it is read the dialog closes and a confirmation says so,
  * since the workspace is not opened.
  */
 export const Entering = defineTaggedUnion({
@@ -92,19 +93,19 @@ export const Entering = defineTaggedUnion({
 export type Entering = typeof Entering.Type
 
 /** A confirmation that shows over the page's corner until the person dismisses it or its time is up. */
-export const Toast = Schema.Struct({ id: Schema.Finite, text: Schema.String })
-export type Toast = typeof Toast.Type
+export const Confirmation = Schema.Struct({ id: Schema.Finite, text: Schema.String })
+export type Confirmation = typeof Confirmation.Type
 
 /**
  * The listing, what the person is doing in the dialog and the dialog it is in, nothing while the dialog is closed,
- * the name a person joining is offered to go by, and the toasts showing, with the ID the next one takes.
+ * the name a person joining is offered to go by, and the confirmations showing, with the ID the next one takes.
  */
 export const Model = Schema.Struct({
   workspaces: Workspaces,
   entering: Schema.Option(Entering),
   suggestedName: Schema.String,
-  toasts: Schema.Array(Toast),
-  nextToastId: Schema.Finite,
+  confirmations: Schema.Array(Confirmation),
+  nextConfirmationId: Schema.Finite,
   dialog: DialogBlock.Model
 })
 export type Model = typeof Model.Type
@@ -136,8 +137,7 @@ export const Message = defineMessageUnion({
   SucceededJoin: {},
   FailedJoin: { error: JoinErrors },
   RejectedSession: {},
-  DismissedToast: { toastId: Schema.Finite },
-  ExpiredToast: { toastId: Schema.Finite },
+  ExpiredConfirmation: { confirmationId: Schema.Finite },
   CompletedFocusWorkspaceRow: {},
   CompletedSelectOnFocus: {}
 })

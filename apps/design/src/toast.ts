@@ -44,22 +44,20 @@ export const toastStack = <Message, Requirements>(
 ): Html => h.div([h.AriaLive("polite"), h.Class(stackColumn)], children)
 
 /**
- * A raised card with its `text`, the `detail` quieter under it when there is one, and at the right the quiet
- * `action` button that sends its `onClick`, such as Dismiss. The card is an alert, for what went wrong, since the
- * person has to read it and a refusal does not go by itself, or with `role` `status` a status, for a confirmation,
- * which a `confirmation` is now the look of.
+ * A raised card, an alert, for what went wrong, with its `text`, the `detail` quieter under it when there is one,
+ * and at the right the quiet `action` button that sends its `onClick`, such as Dismiss, since the person has to
+ * read it and a refusal does not go by itself.
  */
 export const toast = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
     text: string
     detail?: string
-    role?: "alert" | "status"
     action: Readonly<{ label: string; onClick: Message }>
   }>
 ): Html =>
   h.div(
-    [h.Role(config.role ?? "alert"), h.Class(toastCard)],
+    [h.Role("alert"), h.Class(toastCard)],
     [
       h.div(
         [h.Class(toastBody)],

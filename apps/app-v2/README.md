@@ -774,11 +774,20 @@ below it counted at each level above.
   the connections feature's `connectionsGiving`; the person then asks again, and the Block asks the
   page, by its out message `RequestedIntegrations`. A form about a channel that is gone closes.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
-  refused, until they dismiss it, shown as toasts over the shell's corner; and what the page confirms to the
-  person that they did, which a Block reports and the page hands it with `confirm`, such as "Name saved",
-  shown in the same stack as a status toast with a Dismiss that goes by itself after five seconds
-  (`ExpireConfirmation`), each under an ID of its own (`nextConfirmationId`) so that the time of one the person
-  dismissed cannot take another's.
+  refused, until they dismiss it, shown as the design's `toast`s in its `toastStack` over the shell's bottom end
+  corner, with Dismiss; and what the page confirms to the person that they did, which a Block reports and the page
+  hands it with `confirm`, such as "Name saved", shown as the design's `confirmation`s in its `confirmationStack`,
+  centered at the bottom of the window, 24px above its edge and any home indicator, each with a check before its
+  words, no Dismiss, and at most one thing it offers to do next. A confirmation goes by itself after five seconds
+  (`ExpireConfirmation`, which waits with `Effect.sleep`, so a test moves the clock), each under an ID of its own
+  (`nextConfirmationId`) so that the time of one that has gone cannot take another's. What it offers is an `Offer`,
+  a value of the Block's own type and not a message of its parent's, which a Block cannot hold: `confirm({ text,
+offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, and the person taking it removes the
+  confirmation and reports `TookOffer({ offer })`, which the workspace page carries out, as it carries out the
+  search's `OpenedGroup`, by opening the group in Home (`HomeBinding.requestOpenGroup`) and showing Home. The two
+  stacks are separate and fixed, so a refusal keeps its corner and its Dismiss beside the confirmations; on a window
+  so narrow that they meet, the confirmation lies over the refusal until it goes. The view is the two stacks in one
+  element, which the shell places in the open dialog or last in its frame.
 - `page/signIn`, `page/workspaces`, `page/workspace`'s listing of the integrations, and `feature/agents`' listing of a
   connection's models are commands that call the host and end in a message whatever happens to the call: the client
   reports a status its contract does not list as a defect, which a failure handler misses, so each handles the whole
@@ -876,22 +885,23 @@ below it counted at each level above.
     "This invitation can't be accepted as it is." (`Invalid`), and, for a host that was unavailable, unsure, or
     not reached, "We couldn't accept the invitation. Try again when the host is available." A failure returns to
     the form with its reason, to send again. Once the person is in the workspace the listing is read again, and
-    once it is the dialog closes, a toast says "Joined {workspace}" (the name the listing has), and focus moves to
+    once it is the dialog closes, a confirmation says "Joined {workspace}" (the name the listing has), and focus moves to
     that workspace's row in Your workspaces, since the invitation's button has gone; the workspace is not opened.
     If the listing cannot be read, the dialog stays and says "Joined, but we couldn't load your workspaces. Try
     again." with Close and a primary Try again, which reads the listing again and sends nothing.
-  - The toast is the design's `toast` with `role: "status"` and a Dismiss, in its `toastStack`, which the page
-    renders at the end, since the centered screen has no shell. The model keeps `toasts`, each with an ID taken
-    from `nextToastId`, so that the time of a toast the person dismissed cannot take another's. Showing one
-    starts `ExpireToast`, a command that waits five seconds (`Effect.sleep`, so a test moves the clock) and
-    reports `ExpiredToast`, which takes the toast away as `DismissedToast` does; `FocusWorkspaceRow` moves focus
+  - The confirmation is the design's `confirmation` in its `confirmationStack`, as the workspace page's are,
+    which the page renders at the end, since the centered screen has no shell: a check before its words, centered at
+    the bottom, and no Dismiss, so only its time takes it away. The model keeps `confirmations`, each with an ID
+    taken from `nextConfirmationId`, so that the time of one that has gone cannot take another's. Showing one
+    starts `ExpireConfirmation`, a command that waits five seconds (`Effect.sleep`, so a test moves the clock) and
+    reports `ExpiredConfirmation`, which takes the confirmation away; `FocusWorkspaceRow` moves focus
     to the row with `Dom.focus`, completing when the row is not there.
   - A request the host answers with `Authentication.Unauthorized` (told with `Schema.is`), because it does not
     know the session, ends in `RejectedSession`, whichever request it was, and the page reports `EndedSession`;
     the root signs the person out. Any other failure is worded for the person, as each request does.
   - Closing the dialog ends what was being done, except while a request is on its way: it opens again, so that a
     workspace is not created, nor an invitation accepted, unseen. Closing it while the listing is read again
-    leaves the listing to show the result alone, without a toast.
+    leaves the listing to show the result alone, without a confirmation.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
   rail has the logo, a button named "Amends home" that goes Home, over "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings" and the person's account. Each
   destination is marked while it is open; Home is open while the page shows it (`Open.Home`), whatever Home shows, and
@@ -953,7 +963,7 @@ below it counted at each level above.
   person sees the sidebar of the destination they picked and picks from it, which closes the drawer.
   The member's side pane is in the shell's card beside the main pane only from 80rem
   (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
-  the toasts come inside whichever dialog is open, where they can be read and dismissed. The page
+  the toasts and confirmations come inside whichever dialog is open, where they can be read and acted on. The page
   binds another `DialogBlock` for it as `aside` (`AsideBinding`, id `workspace-aside`) and lends the
   shell the pane's view with the dialog's, and whether the dialog is open; Home binds its own for its thread. The design's
   `isAsideInDialog(viewport)` decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
@@ -1307,7 +1317,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and closing the member open, what is on its way kept as it is, the dialog closing while a request is on its way
   opening again, what the person did told to the page by name, and what an owner, an administrator, and a member
   may do to the members and the invitations; the actions confirming what the page says the person did, each under an ID of its own, going when
-  its own time is up or the person dismisses it, apart from what the server refused; Home opening the group picked and reporting that the person moved, as it does for an item of its sidebar, the groups to browse,
+  its own time is up, which `ExpireConfirmation` waits five seconds for over `TestClock`, or when the person takes the
+  one thing it offers, which is reported once and only while the confirmation is there, apart from what the server
+  refused; Home opening the group picked and reporting that the person moved, as it does for an item of its sidebar, the groups to browse,
   and a task's thread, showing the inbox, the tasks in triage, every open task, or the groups to browse in place of the open group with no group
   marked, showing nothing when its parent resets it, which reports nothing, keeping what the tasks were narrowed to between Triage
   and Tasks, opening a task's thread in its group, and a notification's beside the inbox, which stays, naming the thread open in the group open
@@ -1341,11 +1353,11 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   the dialog again, end on a close at any other point, and show the list alone when the workspace is not in
   it or the dialog was closed; for joining they open the form over the invitation clicked, with the name
   suggested, and none for one the listing does not hold, send the name with the invitation's IDs and read the
-  list again once the person is in, then close the dialog, show a toast naming the workspace the listing has,
-  and focus its row, without opening it, start the toast's time and take the toast away when the time is up
-  or the person dismisses it, with an ID of its own that a later toast does not take, return to the form with
+  list again once the person is in, then close the dialog, show a confirmation naming the workspace the listing has,
+  and focus its row, without opening it, start the confirmation's time and take it away when the time is up,
+  with an ID of its own that a later confirmation does not take, return to the form with
   why a request failed and send it again as it was, clear the refusal as the name is typed, ignore a close
-  while the request is on its way, close without a toast when the dialog was closed or the list does not have
+  while the request is on its way, close without a confirmation when the dialog was closed or the list does not have
   the workspace, keep the dialog on the join when the list could not be read and read it again, sending
   nothing, on request, and end as creating does; for the listing they keep the list when reading it again
   fails and say the host was not reached when the first read does, and report the session ended when any
@@ -1353,7 +1365,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   handlers run over `test/host.ts`, a stub `HttpClient` that gives a canned status and body, to show the path, key, and names
   they send and each refusal as the person reads it, and that a session the host does not know (status 401,
   `Authentication.Unauthorized`) ends each of them in `RejectedSession`; `FocusWorkspaceRow` runs over a button
-  in the document, which it focuses, and `ExpireToast` over `TestClock`, which it waits five seconds on. The connections'
+  in the document, which it focuses, and `ExpireConfirmation`, in the workspaces' commands and the actions', over `TestClock`, which it waits five seconds on. The connections'
   `CheckConnection`, `AddConnection`, and `ReplaceConnectionKey` run over the same stub host, to show the path they call,
   the request key `AddConnection` sends, new or the earlier attempt's, and the reason each of the host's refusals, and
   a host that answers what the contract does not say or cannot be reached, is read as; `RenameConnection`,
@@ -1524,7 +1536,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   the scrim, which also closes the thread, a notification's thread opened the same way beside the inbox,
   and what the server refused as toasts, over the shell and
   inside the side pane's dialog while it is open, and what the person did to an agent confirmed in a
-  toast that goes by itself, the dialog of the agents opened from the sidebar over the destination that shows,
+  confirmation that goes by itself, and Open on one taking the person to the group in Home from any destination, the dialog of the agents opened from the sidebar over the destination that shows,
   an agent added, shown by its page with its row current, and one removed, shown by the list, a connection's
   name and settings, key, adding, and removal confirmed the same way, the dialog of the connections opened from
   the sidebar and from the list, a connection added, shown by its page after it is checked, and the
@@ -1567,8 +1579,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   be refreshed, with Close and a way to try again; the dialog from an invitation's button, "Join {workspace}" or
   "Join this workspace", described by its line, with its field filled in with the name suggested, taking the
   focus and watching it to select the text, the sending state, each refusal at the field and under it, and
-  joining closing the dialog and showing the toast with its Dismiss, the workspace's row focused and the
-  toast gone when its time is up, or the dialog saying the person joined and the list could not be loaded,
+  joining closing the dialog and showing the confirmation, a status with a check and no Dismiss, the workspace's row
+  focused and the confirmation gone when its time is up, or the dialog saying the person joined and the list could not be loaded,
   with Close and a primary Try again that reads it again. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
   and `Dialog.test.CloseDialog` from `@foldkit/ui`, resolves the field's `SelectOnFocus` mount and expects it

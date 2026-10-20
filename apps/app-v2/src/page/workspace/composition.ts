@@ -1,4 +1,5 @@
 import type { Connection as ConnectionContract } from "@amends-dev/connection"
+import type { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { MemberId } from "@amends-dev/core/workspace"
 import { isAsideInDialog } from "@amends-dev/design/shell"
@@ -9,6 +10,7 @@ import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { ActionsBlock } from "../../feature/actions/block.ts"
+import { Offer } from "../../feature/actions/definition.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
@@ -99,12 +101,16 @@ const foldHomeOutMessage = HomeBlock.OutMessage.match({
   Navigated: () => goToHome()
 })
 
+/** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */
+const openGroupInHome = (groupId: GroupId.GroupId) =>
+  Update.combine([HomeBinding.requestOpenGroup({ groupId }), goToHome()])
+
 /**
  * What the search found opens in Home as it would from the sidebar and the tasks, and shows Home. A person is opened as
  * a conversation, which Home's groups find or start.
  */
 const foldSearchOutMessage = SearchBlock.OutMessage.match({
-  OpenedGroup: ({ groupId }) => Update.combine([HomeBinding.requestOpenGroup({ groupId }), goToHome()]),
+  OpenedGroup: ({ groupId }) => openGroupInHome(groupId),
   OpenedThread: ({ groupId, threadId }) =>
     Update.combine([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
   OpenedPerson: ({ memberId }) => HomeBinding.requestConversationWith({ memberId })
@@ -215,9 +221,15 @@ export const showAside = WorkspaceDefinition.step((model: Model) =>
 /** Close the side pane's dialog; closing one that is closed does nothing. */
 export const hideAside = AsideBinding.requestClose()
 
+/** Taking what a confirmation offers does it: Open, on a group, opens it in Home, as the search does. */
+const foldActionsOutMessage = ActionsBlock.OutMessage.match({
+  TookOffer: ({ offer }) => Offer.match(offer, { OpenGroup: ({ groupId }) => openGroupInHome(groupId) })
+})
+
 export const ActionsBinding = WorkspaceDefinition.bindChild(ActionsBlock, {
   field: "actions",
-  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] }
+  init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
+  outMessage: { fold: foldActionsOutMessage }
 })
 
 export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {

@@ -3,7 +3,7 @@ import { button, buttonRow, column, field, hint, notice, submit } from "@amends-
 import { footnote, row, rowWithButton, section } from "@amends-dev/design/directory"
 import { modal } from "@amends-dev/design/modal"
 import { paneEmpty } from "@amends-dev/design/pane"
-import { toast, toastStack } from "@amends-dev/design/toast"
+import { confirmation, confirmationStack } from "@amends-dev/design/toast"
 import type * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
@@ -354,23 +354,11 @@ const enteringModal = (render: RenderInfo, model: Model, h: WorkspacesViewBuilde
 /** Whether the dialog has a line that describes it: the forms and the workspace created do, and a join does not. */
 const isDescribed = (model: Model): boolean => !Option.exists(model.entering, Entering.isAnyOf(["Joined"]))
 
-/** What the person did that is confirmed, each with a way to dismiss it, in a live region that is there before the first. */
-const toasts = (model: Model, h: WorkspacesViewBuilder): Html =>
-  toastStack(
+/** What the person did that is confirmed, which goes by itself, in a live region that is there before the first. */
+const confirmations = (model: Model, h: WorkspacesViewBuilder): Html =>
+  confirmationStack(
     h,
-    model.toasts.map(({ id, text }) =>
-      h.keyed("div")(
-        `${id}`,
-        [],
-        [
-          toast(h, {
-            text,
-            role: "status",
-            action: { label: "Dismiss", onClick: Message.DismissedToast({ toastId: id }) }
-          })
-        ]
-      )
-    )
+    model.confirmations.map(({ id, text }) => confirmation(h, { key: `${id}`, text }))
   )
 
 /** The time now, which when each invitation closes is read from. */
@@ -386,6 +374,6 @@ export const view = WorkspacesComposition.makeView.withInputs<ViewInputs>((model
         viewInputs: { hasDescription: isDescribed(model), toView: (render) => enteringModal(render, model, h) }
       })
     ),
-    toasts(model, h)
+    confirmations(model, h)
   ])
 )

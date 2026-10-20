@@ -927,12 +927,11 @@ centered at its bottom, for something the person did.
   open dialog, as the shell places it, or in a centered screen, which has no shell. A frame that shows it apart from a window, as the workshop's
   do, contains it with `contain: layout`. It is an `aria-live="polite"` region, there before the
   first toast so each is announced as it arrives. `children` are `toast`s, or a `notice`.
-- `toast(h, { text, detail?, role?, action: { label, onClick } })` is a `role="alert"` card for a refusal, `raised` with
+- `toast(h, { text, detail?, action: { label, onClick } })` is a `role="alert"` card for a refusal, `raised` with
   a border and `shadow-toast`: the `text` at body size, the `detail` under it at hint size in
   `ink-secondary`, clamped to three lines, such as the words an action carried, and at the right the
   `action` as a quiet `button`, such as Dismiss. The person has to read a refusal, so it stays until the app takes
-  it away, when the person dismisses it; the card has no timer of its own. A `role` of `status` is what a confirmation
-  was before `confirmation`, kept only until the app's confirmations are `confirmation`s.
+  it away, when the person dismisses it; the card has no timer of its own.
 - `confirmationStack(h, children)` is the list of confirmations centered at the bottom of the window, as `apps/ui`'s
   toast region is: `fixed` from edge to edge, 24px above the bottom edge and above any home indicator
   (`bottom: calc(1.5rem + env(safe-area-inset-bottom))`, which the app's `viewport-fit=cover` gives a value), at the

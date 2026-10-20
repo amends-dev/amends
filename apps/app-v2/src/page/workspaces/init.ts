@@ -14,15 +14,15 @@ export const suggestNameFromEmail = (email: string): string => {
 
 /**
  * The listing as it starts, under way, for the person whose address is `email`, with nothing being done in the dialog
- * and the dialog closed, and no toast showing.
+ * and the dialog closed, and no confirmation showing.
  */
 export const init = WorkspacesComposition.makeInit((email: string) => ({
   model: {
     workspaces: Workspaces.Loading(),
     entering: Option.none(),
     suggestedName: suggestNameFromEmail(email),
-    toasts: [],
-    nextToastId: 1
+    confirmations: [],
+    nextConfirmationId: 1
   },
   commands: [LoadWorkspaces()]
 }))

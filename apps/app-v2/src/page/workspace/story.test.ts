@@ -654,14 +654,14 @@ describe("a workspace", () => {
       message(fromAgents(AgentsBlock.Message.WroteAction({ written: AgentWritten.Rename({ agentId }) }))),
       Command.expectExact(ExpireConfirmation({ id: 1 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Name saved" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Name saved", offer: Option.none() }])
         expect(model.open).toEqual(Open.Agent({ agentId }))
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
       message(fromAgents(AgentsBlock.Message.WroteAction({ written: AgentWritten.Configure({ agentId }) }))),
       Command.expectExact(ExpireConfirmation({ id: 2 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Setup saved" }])
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Setup saved", offer: Option.none() }])
         expect(model.open).toEqual(Open.Agent({ agentId }))
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 })),
@@ -694,7 +694,7 @@ describe("a workspace", () => {
       ),
       model((model) => {
         expect(model.open).toEqual(Open.Agent({ agentId: reviewerAgent.id }))
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Reviewer created" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Reviewer created", offer: Option.none() }])
         expect(model.agents.adding).toEqual(Option.none())
       }),
       dialogClosed,
@@ -711,7 +711,7 @@ describe("a workspace", () => {
       Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
       model((model) => {
         expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Scout removed" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Scout removed", offer: Option.none() }])
         expect(model.agents.removing).toEqual(Option.none())
       }),
       dialogClosed,
@@ -728,7 +728,7 @@ describe("a workspace", () => {
       ),
       Command.expectExact(ExpireConfirmation({ id: 1 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Name saved" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Name saved", offer: Option.none() }])
         expect(model.open).toEqual(Open.Connection({ connectionId }))
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
@@ -739,7 +739,7 @@ describe("a workspace", () => {
       ),
       Command.expectExact(ExpireConfirmation({ id: 2 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Settings saved" }])
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Settings saved", offer: Option.none() }])
         expect(model.open).toEqual(Open.Connection({ connectionId }))
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 }))
@@ -750,7 +750,7 @@ describe("a workspace", () => {
       message(fromConnections(ConnectionsBlock.Message.ReplacedConnectionKey({ connectionId }))),
       Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "API key replaced" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "API key replaced", offer: Option.none() }])
         expect(model.open).toEqual(Open.Connection({ connectionId }))
         expect(model.connections.replacing).toEqual(Option.none())
       }),
@@ -777,7 +777,7 @@ describe("a workspace", () => {
       ),
       model((model) => {
         expect(model.open).toEqual(Open.Connection({ connectionId: createdConnection.id }))
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "MCP server created" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "MCP server created", offer: Option.none() }])
         expect(model.connections.adding).toEqual(Option.none())
       }),
       dialogClosed,
@@ -802,7 +802,7 @@ describe("a workspace", () => {
       Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
       model((model) => {
         expect(Open.isAnyOf(["Connections"])(model.open)).toBe(true)
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Search tools removed" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Search tools removed", offer: Option.none() }])
         expect(model.connections.removing).toEqual(Option.none())
       }),
       dialogClosed,
@@ -1154,14 +1154,14 @@ describe("a workspace", () => {
       message(fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.Rename() }))),
       Command.expectExact(ExpireConfirmation({ id: 1 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Workspace renamed" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Workspace renamed", offer: Option.none() }])
         expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
       message(fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.RenameSelf() }))),
       Command.expectExact(ExpireConfirmation({ id: 2 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Name saved" }])
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Name saved", offer: Option.none() }])
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 })),
       message(
@@ -1169,7 +1169,7 @@ describe("a workspace", () => {
       ),
       Command.expectExact(ExpireConfirmation({ id: 3 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 3, text: "Role saved for Bob" }])
+        expect(model.actions.confirmations).toEqual([{ id: 3, text: "Role saved for Bob", offer: Option.none() }])
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 3 })),
       message(
@@ -1177,13 +1177,13 @@ describe("a workspace", () => {
       ),
       Command.expectExact(ExpireConfirmation({ id: 4 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 4, text: "Bob is now the owner" }])
+        expect(model.actions.confirmations).toEqual([{ id: 4, text: "Bob is now the owner", offer: Option.none() }])
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 4 })),
       message(fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.Invite() }))),
       Command.expectExact(ExpireConfirmation({ id: 5 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 5, text: "Invitation created" }])
+        expect(model.actions.confirmations).toEqual([{ id: 5, text: "Invitation created", offer: Option.none() }])
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 5 })),
       message(
@@ -1195,7 +1195,7 @@ describe("a workspace", () => {
       ),
       Command.expectExact(ExpireConfirmation({ id: 6 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 6, text: "Invitation revoked" }])
+        expect(model.actions.confirmations).toEqual([{ id: 6, text: "Invitation revoked", offer: Option.none() }])
         expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Members")
       }),
       Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 6 }))
@@ -1214,7 +1214,7 @@ describe("a workspace", () => {
       ),
       Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
       model((model) => {
-        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Bob was removed" }])
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Bob was removed", offer: Option.none() }])
         expect(openMemberId(model)).toEqual(Option.none())
         expect(model.aside.isOpen).toBe(false)
         expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)

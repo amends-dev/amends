@@ -1,6 +1,6 @@
 /**
  * The page's commands: the workspace requests, over HTTP, each ending in a message, failures worded for the person;
- * and what it does in the window, which is moving focus to a row and letting a toast go after a while. And the
+ * and what it does in the window, which is moving focus to a row and letting a confirmation go after a while. And the
  * mount that selects a field's text when the field takes focus.
  */
 
@@ -187,12 +187,13 @@ export const FocusWorkspaceRow = WorkspacesDefinition.command("FocusWorkspaceRow
   }
 })
 
-/** Wait five seconds, then report that the toast `toastId` has had its time. */
-export const ExpireToast = WorkspacesDefinition.command("ExpireToast", {
-  args: { toastId: Schema.Finite },
-  messages: [Message.ExpiredToast],
+/** Wait five seconds, then report that the confirmation `confirmationId` has had its time. */
+export const ExpireConfirmation = WorkspacesDefinition.command("ExpireConfirmation", {
+  args: { confirmationId: Schema.Finite },
+  messages: [Message.ExpiredConfirmation],
   handler: function* () {
-    return ({ toastId }) => Effect.sleep("5 seconds").pipe(Effect.as(Message.ExpiredToast({ toastId })))
+    return ({ confirmationId }) =>
+      Effect.sleep("5 seconds").pipe(Effect.as(Message.ExpiredConfirmation({ confirmationId })))
   }
 })
 
@@ -209,6 +210,6 @@ export const EffectsLayer = Layer.mergeAll(
   CreateWorkspace.layer,
   AcceptInvitation.layer,
   FocusWorkspaceRow.layer,
-  ExpireToast.layer,
+  ExpireConfirmation.layer,
   SelectOnFocus.layer
 )

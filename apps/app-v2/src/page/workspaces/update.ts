@@ -3,7 +3,7 @@ import type * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
+import { AcceptInvitation, CreateWorkspace, ExpireConfirmation, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
 import { DialogBinding, leaveEntering, WorkspacesComposition } from "./composition.ts"
 import {
   Entering,
@@ -118,21 +118,27 @@ const reload = WorkspacesDefinition.step((model: Model) => ({
 }))
 
 /**
- * Tell the person they joined `workspace` with a toast that goes by itself after a while, and move focus to its
+ * Tell the person they joined `workspace` with a confirmation that goes by itself after a while, and move focus to its
  * row, since the invitation's button they pressed has gone.
  */
 const announceJoined = (workspace: Workspace.Workspace) =>
   WorkspacesDefinition.step((model: Model) => ({
     model: modifyFields(model, {
-      toasts: (toasts) => [...toasts, { id: model.nextToastId, text: `Joined ${workspace.name}` }],
-      nextToastId: (nextToastId) => nextToastId + 1
+      confirmations: (confirmations) => [
+        ...confirmations,
+        { id: model.nextConfirmationId, text: `Joined ${workspace.name}` }
+      ],
+      nextConfirmationId: (nextConfirmationId) => nextConfirmationId + 1
     }),
-    commands: [ExpireToast({ toastId: model.nextToastId }), FocusWorkspaceRow({ workspaceId: workspace.id })]
+    commands: [
+      ExpireConfirmation({ confirmationId: model.nextConfirmationId }),
+      FocusWorkspaceRow({ workspaceId: workspace.id })
+    ]
   }))
 
-/** The model without the toast `toastId`, which the person dismissed or whose time was up. */
-const withoutToast = (model: Model, toastId: number) =>
-  modifyFields(model, { toasts: (toasts) => toasts.filter(({ id }) => id !== toastId) })
+/** The model without the confirmation `confirmationId`, which the person dismissed or whose time was up. */
+const withoutConfirmation = (model: Model, confirmationId: number) =>
+  modifyFields(model, { confirmations: (confirmations) => confirmations.filter(({ id }) => id !== confirmationId) })
 
 export const update = WorkspacesComposition.makeUpdate((model, message) =>
   Message.match(message, {
@@ -260,8 +266,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
         })
       }),
     RejectedSession: () => ({ model, outMessage: OutMessage.EndedSession() }),
-    DismissedToast: ({ toastId }) => ({ model: withoutToast(model, toastId) }),
-    ExpiredToast: ({ toastId }) => ({ model: withoutToast(model, toastId) }),
+    ExpiredConfirmation: ({ confirmationId }) => ({ model: withoutConfirmation(model, confirmationId) }),
     CompletedFocusWorkspaceRow: () => ({ model }),
     CompletedSelectOnFocus: () => ({ model })
   })

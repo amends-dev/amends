@@ -64,6 +64,7 @@ import {
 import { acknowledgeMenuClosed, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { Dismiss, ExpireConfirmation } from "../../feature/actions/command.ts"
+import { Offer } from "../../feature/actions/definition.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RemoveAgent, RenameAgent } from "../../feature/agents/command.ts"
 import { Written as AgentWritten } from "../../feature/agents/definition.ts"
@@ -898,6 +899,32 @@ describe("a workspace", () => {
       expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
       click(role("button", { name: "Show all agents" })),
       expect(role("main", { name: "Agents" })).toExist()
+    )
+  })
+
+  it("takes what a confirmation offers: Open opens the group in Home, from any destination, and the confirmation goes", () => {
+    const offering = (model: typeof opened) =>
+      modifyFields(model, {
+        actions: (actions) =>
+          modifyFields(actions, {
+            confirmations: () => [
+              { id: 1, text: "Joined #General", offer: Option.some(Offer.OpenGroup({ groupId: general.id })) }
+            ],
+            nextConfirmationId: () => 2
+          })
+      })
+
+    scene(
+      { update, view: sceneView },
+      given(offering(modifyFields(withBrowsableGroup, { open: () => Open.Agents() }))),
+      expect(role("main", { name: "Agents" })).toExist(),
+      expect(within(role("list", { name: "Notifications" }), text("Joined #General"))).toExist(),
+      click(within(role("list", { name: "Notifications" }), role("button", { name: "Open" }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("main", { name: "Agents" })).toBeAbsent(),
+      expect(role("main", { name: "A group" })).toExist(),
+      expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page"),
+      expect(text("Joined #General")).toBeAbsent()
     )
   })
 

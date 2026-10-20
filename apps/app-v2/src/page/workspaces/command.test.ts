@@ -8,7 +8,7 @@ import * as Story from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import { atlasInvitation, northstar, northstarInvitation, session } from "../../../test/fixtures.ts"
 import { type Answer, hostAnswering } from "../../../test/host.ts"
-import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
+import { AcceptInvitation, CreateWorkspace, ExpireConfirmation, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
 import {
   Entering,
   FormErrors,
@@ -455,16 +455,18 @@ describe("FocusWorkspaceRow", () => {
   )
 })
 
-describe("ExpireToast", () => {
-  it.effect("reports that the toast had its time once five seconds have passed, and not before", () =>
+describe("ExpireConfirmation", () => {
+  it.effect("reports that the confirmation had its time once five seconds have passed, and not before", () =>
     Effect.gen(function* () {
-      const expiry = yield* Effect.forkChild(ExpireToast({ toastId: 7 }).effect.pipe(Effect.provide(ExpireToast.layer)))
+      const expiry = yield* Effect.forkChild(
+        ExpireConfirmation({ confirmationId: 7 }).effect.pipe(Effect.provide(ExpireConfirmation.layer))
+      )
 
       yield* TestClock.adjust("4 seconds")
       expect(expiry.pollUnsafe()).toBeUndefined()
 
       yield* TestClock.adjust("1 second")
-      expect(yield* Fiber.join(expiry)).toEqual(Message.ExpiredToast({ toastId: 7 }))
+      expect(yield* Fiber.join(expiry)).toEqual(Message.ExpiredConfirmation({ confirmationId: 7 }))
     })
   )
 })
