@@ -206,6 +206,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
             entering: () => Option.some(Entering.FillingJoin({ invitation, name, errors: error }))
           })
         })
-      })
+      }),
+    RejectedSession: () => ({ model, outMessage: OutMessage.EndedSession() })
   })
 )

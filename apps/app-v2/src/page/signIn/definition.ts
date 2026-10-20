@@ -10,9 +10,12 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
 
-/** Where signing in has got to. */
+/**
+ * Where signing in has got to. The email step may carry a `notice` over the form, such as that a session ended,
+ * which goes when the person sends the address.
+ */
 export const SignInForm = defineTaggedUnion({
-  EnteringEmail: { email: Schema.String, error: Schema.Option(Schema.String) },
+  EnteringEmail: { email: Schema.String, error: Schema.Option(Schema.String), notice: Schema.Option(Schema.String) },
   SendingCode: { email: Schema.String },
   EnteringCode: { email: Schema.String, code: Schema.String, error: Schema.Option(Schema.String) },
   CheckingCode: { email: Schema.String, code: Schema.String }

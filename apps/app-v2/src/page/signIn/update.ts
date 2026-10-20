@@ -12,7 +12,7 @@ export const update = SignInComposition.makeUpdate((model, message) => {
       at(
         SignInForm.matchOrElse(
           form,
-          { EnteringEmail: ({ error }) => SignInForm.EnteringEmail({ email, error }) },
+          { EnteringEmail: ({ error, notice }) => SignInForm.EnteringEmail({ email, error, notice }) },
           () => undefined
         )
       ),
@@ -39,7 +39,10 @@ export const update = SignInComposition.makeUpdate((model, message) => {
       at(
         SignInForm.matchOrElse(
           form,
-          { SendingCode: ({ email }) => SignInForm.EnteringEmail({ email, error: Option.some(error) }) },
+          {
+            SendingCode: ({ email }) =>
+              SignInForm.EnteringEmail({ email, error: Option.some(error), notice: Option.none() })
+          },
           () => undefined
         )
       ),
@@ -47,7 +50,10 @@ export const update = SignInComposition.makeUpdate((model, message) => {
       at(
         SignInForm.matchOrElse(
           form,
-          { EnteringCode: ({ email }) => SignInForm.EnteringEmail({ email, error: Option.none() }) },
+          {
+            EnteringCode: ({ email }) =>
+              SignInForm.EnteringEmail({ email, error: Option.none(), notice: Option.none() })
+          },
           () => undefined
         )
       ),
@@ -86,7 +92,7 @@ export const update = SignInComposition.makeUpdate((model, message) => {
         form,
         {
           CheckingCode: ({ email }) => ({
-            model: { form: SignInForm.EnteringEmail({ email, error: Option.none() }) },
+            model: { form: SignInForm.EnteringEmail({ email, error: Option.none(), notice: Option.none() }) },
             outMessage: OutMessage.SignedIn({ session })
           })
         },

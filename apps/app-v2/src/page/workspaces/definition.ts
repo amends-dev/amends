@@ -1,7 +1,7 @@
 /**
  * The workspaces the person belongs to and the invitations waiting for them, as the host lists them, to open a
  * workspace or accept an invitation, and the modal where they create a workspace or join one. It reports the one
- * they pick, create, or join.
+ * they pick, create, or join, and that the host no longer knows their session.
  */
 
 import { Request } from "@amends-dev/core/request"
@@ -109,12 +109,14 @@ export const Message = defineMessageUnion({
   SucceededCreate: { workspace: Workspace.Workspace },
   FailedCreate: { key: Schema.Option(Request.Key), error: FormErrors },
   SucceededJoin: { member: Member.Member },
-  FailedJoin: { error: JoinErrors }
+  FailedJoin: { error: JoinErrors },
+  RejectedSession: {}
 })
 export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
-  OpenedWorkspace: { membership: WorkspaceDirectory.Membership }
+  OpenedWorkspace: { membership: WorkspaceDirectory.Membership },
+  EndedSession: {}
 })
 export type OutMessage = typeof OutMessage.Type
 

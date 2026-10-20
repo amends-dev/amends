@@ -750,6 +750,58 @@ describe("joining a workspace", () => {
   })
 })
 
+describe("a session the host no longer knows", () => {
+  it("is reported as ended when the host rejects it for the listing", () => {
+    story(
+      update,
+      given(showing(Workspaces.Failed({ error: "The host could not be reached." }))),
+      message(Message.ClickedTryAgain()),
+      Command.expectExact(LoadWorkspaces()),
+      expectNoOutMessage(),
+      Command.resolve(LoadWorkspaces, Message.RejectedSession()),
+      expectOutMessage(OutMessage.EndedSession())
+    )
+  })
+
+  it("is reported as ended when the host rejects it for the listing read again after a workspace was created", () => {
+    story(
+      update,
+      given(listed),
+      ...filled,
+      message(Message.SubmittedCreate()),
+      Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
+      Command.resolve(LoadWorkspaces, Message.RejectedSession()),
+      expectOutMessage(OutMessage.EndedSession())
+    )
+  })
+
+  it("is reported as ended when the host rejects it for creating a workspace", () => {
+    story(
+      update,
+      given(listed),
+      ...filled,
+      message(Message.SubmittedCreate()),
+      Command.expectExact(CreateWorkspace({ name: "Acme", memberName: "Alex", key: Option.none() })),
+      expectNoOutMessage(),
+      Command.resolve(CreateWorkspace, Message.RejectedSession()),
+      expectOutMessage(OutMessage.EndedSession())
+    )
+  })
+
+  it("is reported as ended when the host rejects it for accepting an invitation", () => {
+    story(
+      update,
+      given(invited),
+      ...joinFilled,
+      message(Message.SubmittedJoin()),
+      Command.expectExact(acceptNorthstar),
+      expectNoOutMessage(),
+      Command.resolve(AcceptInvitation, Message.RejectedSession()),
+      expectOutMessage(OutMessage.EndedSession())
+    )
+  })
+})
+
 describe("the listing", () => {
   it("is read again when the person asks after it could not be read", () => {
     story(

@@ -43,16 +43,24 @@ export const SignInBinding = ApplicationDefinition.bindChild(SignInBlock, {
   outMessage: { fold: foldSignInOutMessage }
 })
 
+/** Go to the sign-in form with the address kept and `notice` over it, if any, and forget the session, the person's stores, and their sync identity. */
+const signOutWithNotice = (notice: string | undefined) =>
+  ApplicationDefinition.step((model: Model) =>
+    SignInBinding.init({
+      args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => ""), notice],
+      toParentModel: (signIn) => modifyFields(model, { page: () => Page.SignedOut({ signIn }) }),
+      commands: [SignOut()]
+    })
+  )
+
 /** Signing out leaves the address in the form, and forgets the session, the person's stores, and their sync identity. */
-export const signOut = ApplicationDefinition.step((model: Model) =>
-  SignInBinding.init({
-    args: [Page.matchOrElse(model.page, { SignedIn: ({ account }) => account.email }, () => "")],
-    toParentModel: (signIn) => modifyFields(model, { page: () => Page.SignedOut({ signIn }) }),
-    commands: [SignOut()]
-  })
-)
+export const signOut = signOutWithNotice(undefined)
+
+/** A session the host no longer knows ends as signing out does, and says so over the form. */
+export const endSession = signOutWithNotice("Your session has ended. Sign in again.")
 
 const foldWorkspacesOutMessage = WorkspacesBlock.OutMessage.match({
+  EndedSession: () => endSession,
   OpenedWorkspace: ({ membership }) =>
     ApplicationDefinition.step((model: Model) =>
       WorkspaceBinding.init({

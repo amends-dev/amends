@@ -12,6 +12,7 @@ import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { CheckCode, SendCode } from "./page/signIn/command.ts"
+import { SignInForm } from "./page/signIn/definition.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { LoadIntegrations } from "./page/workspace/command.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
@@ -134,6 +135,25 @@ describe("the app", () => {
             _tag: "EnteringEmail",
             email: "alice@example.com"
           }
+        )
+      })
+    )
+  })
+
+  it("signs out when the host no longer knows the session, to the sign-in form with the address and why", () => {
+    story(
+      update,
+      given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
+      message(fromWorkspaces(WorkspacesBlock.Message.RejectedSession())),
+      Command.expectExact(SignOut()),
+      Command.resolve(SignOut, Message.CompletedSignOut()),
+      model((model) => {
+        expect(Page.matchOrElse(model.page, { SignedOut: ({ signIn }) => signIn.form }, () => undefined)).toEqual(
+          SignInForm.EnteringEmail({
+            email: "alice@example.com",
+            error: Option.none(),
+            notice: Option.some("Your session has ended. Sign in again.")
+          })
         )
       })
     )

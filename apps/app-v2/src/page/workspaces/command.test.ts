@@ -1,14 +1,15 @@
 import { Request } from "@amends-dev/core/request"
 import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
+import { WorkspaceDirectory } from "@amends-dev/gateway"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
-import { apiUrl, northstar, session } from "../../../test/fixtures.ts"
+import { apiUrl, atlasInvitation, northstar, session } from "../../../test/fixtures.ts"
 import * as Session from "../../session.ts"
-import { AcceptInvitation, CreateWorkspace } from "./command.ts"
+import { AcceptInvitation, CreateWorkspace, LoadWorkspaces } from "./command.ts"
 import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors } from "./definition.ts"
 
 const created = { id: "workspace-3", name: "Acme", createdBy: "alice", ownerMemberId: "member-20" }
@@ -32,7 +33,7 @@ const hostAnswering = (answer: Answer) => {
       sent.push({
         path: new URL(request.url).pathname,
         key: request.headers["idempotency-key"],
-        payload: JSON.parse(text)
+        payload: text === "" ? undefined : JSON.parse(text)
       })
       if (answer === "unreachable") {
         return yield* new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request }) })
@@ -63,6 +64,20 @@ const hostAnswering = (answer: Answer) => {
   return { sent, layer }
 }
 
+/** What the host answers to a request whose session it does not know. */
+const unauthorized: Answer = {
+  status: 401,
+  body: { _tag: "Authentication.Unauthorized", message: "The bearer token is not recognized" }
+}
+
+const load = (answer: Answer) => {
+  const { sent, layer } = hostAnswering(answer)
+  return LoadWorkspaces().effect.pipe(
+    Effect.provide(LoadWorkspaces.layer.pipe(Layer.provideMerge(layer))),
+    Effect.map((message) => ({ message, sent }))
+  )
+}
+
 const create = (
   answer: Answer,
   names: Readonly<{ name: string; memberName: string }>,
@@ -86,7 +101,61 @@ const refusedForm = (text: string) => FormErrors.make({ ...noFormErrors, form: O
 
 const refusedName = "Use 1 to 80 characters, with no invisible ones."
 
+describe("LoadWorkspaces", () => {
+  it.effect("asks for the person's workspaces, and reports them and their invitations", () =>
+    Effect.gen(function* () {
+      const listing = yield* Schema.encodeEffect(WorkspaceDirectory.Listing)({
+        memberships: [northstar],
+        invitations: [atlasInvitation]
+      })
+      const { message, sent } = yield* load({ status: 200, body: listing })
+
+      expect(sent.map(({ path }) => path)).toEqual(["/me/workspaces"])
+      expect(message).toEqual(
+        Message.SucceededLoadWorkspaces({ memberships: [northstar], invitations: [atlasInvitation] })
+      )
+    })
+  )
+
+  it.effect("says the session is rejected when the host does not know it", () =>
+    Effect.gen(function* () {
+      const { message, sent } = yield* load(unauthorized)
+
+      expect(sent).toHaveLength(1)
+      expect(message).toEqual(Message.RejectedSession())
+    })
+  )
+
+  for (const [description, answer] of [
+    [
+      "the host is not ready",
+      {
+        status: 503,
+        body: { _tag: "CoreError.Unavailable", reason: { _tag: "CredentialsUnavailable", description: "No keys" } }
+      }
+    ],
+    ["the host cannot be reached", "unreachable"]
+  ] as const satisfies ReadonlyArray<readonly [string, Answer]>) {
+    it.effect(`says the listing failed when ${description}, which is no reason to sign in again`, () =>
+      Effect.gen(function* () {
+        const { message } = yield* load(answer)
+
+        expect(message).toEqual(Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." }))
+      })
+    )
+  }
+})
+
 describe("CreateWorkspace", () => {
+  it.effect("says the session is rejected when the host does not know it, whichever key it sent", () =>
+    Effect.gen(function* () {
+      const { message, sent } = yield* create(unauthorized, names, Option.some(key))
+
+      expect(sent).toHaveLength(1)
+      expect(message).toEqual(Message.RejectedSession())
+    })
+  )
+
   it.effect("sends the names, ignoring the space around them, with a new key, and reports the workspace", () =>
     Effect.gen(function* () {
       const { message, sent } = yield* create(
@@ -213,6 +282,15 @@ const joined = Schema.encodeSync(Member.Member)(northstar.member)
 const refusedJoin = (text: string) => JoinErrors.make({ ...noJoinErrors, form: Option.some(text) })
 
 describe("AcceptInvitation", () => {
+  it.effect("says the session is rejected when the host does not know it", () =>
+    Effect.gen(function* () {
+      const { message, sent } = yield* accept(unauthorized, "Alex")
+
+      expect(sent).toHaveLength(1)
+      expect(message).toEqual(Message.RejectedSession())
+    })
+  )
+
   it.effect("sends the name, ignoring the space around it, to the invitation, and reports the member", () =>
     Effect.gen(function* () {
       const { message, sent } = yield* accept({ status: 200, body: joined }, "  Alex ")

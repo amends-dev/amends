@@ -3,6 +3,7 @@
 import { Request } from "@amends-dev/core/request"
 import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
+import * as Authentication from "@amends-dev/http/Authentication"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -11,9 +12,17 @@ import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
 import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, WorkspacesDefinition } from "./definition.ts"
 
+/**
+ * What a request ends in when the host answered `failure`: that the host does not know the session, when the
+ * failure is that, since nothing the person does here will succeed until they sign in again, and otherwise what
+ * `otherwise` makes of it.
+ */
+const rejectedSessionOr = <Otherwise>(failure: unknown, otherwise: () => Otherwise) =>
+  Schema.is(Authentication.Unauthorized)(failure) ? Message.RejectedSession() : otherwise()
+
 /** List the workspaces the person belongs to and the invitations waiting for them. */
 export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
-  messages: [Message.SucceededLoadWorkspaces, Message.FailedLoadWorkspaces],
+  messages: [Message.SucceededLoadWorkspaces, Message.FailedLoadWorkspaces, Message.RejectedSession],
   handler: function* () {
     return () =>
       Effect.gen(function* () {
@@ -21,7 +30,13 @@ export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
         const listing = yield* client.me.workspaces()
         return Message.SucceededLoadWorkspaces({ memberships: listing.memberships, invitations: listing.invitations })
       }).pipe(
-        Effect.orElseSucceed(() => Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." }))
+        Effect.catch((failure) =>
+          Effect.succeed(
+            rejectedSessionOr(failure, () =>
+              Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." })
+            )
+          )
+        )
       )
   }
 })
@@ -71,7 +86,7 @@ const newRequestKey = Effect.gen(function* () {
  */
 export const CreateWorkspace = WorkspacesDefinition.command("CreateWorkspace", {
   args: { name: Schema.String, memberName: Schema.String, key: Schema.Option(Request.Key) },
-  messages: [Message.SucceededCreate, Message.FailedCreate],
+  messages: [Message.SucceededCreate, Message.FailedCreate, Message.RejectedSession],
   handler: function* () {
     return ({ name, memberName, key }) =>
       Effect.gen(function* () {
@@ -88,7 +103,9 @@ export const CreateWorkspace = WorkspacesDefinition.command("CreateWorkspace", {
             client.workspaces.create({ payload: input, headers: { "idempotency-key": requestKey } })
           ),
           Effect.mapError((failure) =>
-            Message.FailedCreate({ key: Option.some(requestKey), error: wordFailure(failure) })
+            rejectedSessionOr(failure, () =>
+              Message.FailedCreate({ key: Option.some(requestKey), error: wordFailure(failure) })
+            )
           )
         )
         return Message.SucceededCreate({ workspace })
@@ -120,7 +137,7 @@ const wordJoinFailure = (failure: unknown): JoinErrors =>
  */
 export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation", {
   args: { workspaceId: WorkspaceId.WorkspaceId, invitationId: Invitation.InvitationId, name: Schema.String },
-  messages: [Message.SucceededJoin, Message.FailedJoin],
+  messages: [Message.SucceededJoin, Message.FailedJoin, Message.RejectedSession],
   handler: function* () {
     return ({ workspaceId, invitationId, name }) =>
       Effect.gen(function* () {
@@ -133,7 +150,9 @@ export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation",
           Effect.flatMap((client) =>
             client.workspaces.acceptInvitation({ params: { workspaceId, invitationId }, payload: { name: memberName } })
           ),
-          Effect.mapError((failure) => Message.FailedJoin({ error: wordJoinFailure(failure) }))
+          Effect.mapError((failure) =>
+            rejectedSessionOr(failure, () => Message.FailedJoin({ error: wordJoinFailure(failure) }))
+          )
         )
         return Message.SucceededJoin({ member })
       }).pipe(Effect.catch(Effect.succeed))

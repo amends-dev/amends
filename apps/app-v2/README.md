@@ -464,7 +464,9 @@ the pages that compose them; the root composes the pages.
   refused, until they dismiss it, shown as toasts over the shell's corner.
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
   which the person can change the email or ask for a new code to the same address; it keeps the
-  session a right code gives, and reports it.
+  session a right code gives, and reports it. It starts with an address, if the root has one to give,
+  and a notice, such as that the session ended, which shows over the email field in the caution tone,
+  stays as the address is typed, and goes when the address is sent.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
   members it has, "Owner" when they own it, and the name they go by in it, such as "4 members · Owner · as
   Alex"; it reports the one picked. The line under the heading counts what the listing holds, "2 workspaces ·
@@ -499,6 +501,9 @@ the pages that compose them; the root composes the pages.
     was not accepted."), or about the form for an invitation addressed to another account, one no longer open
     (revoked or expired), a workspace that no longer exists, and a host that was unavailable, unsure, or not
     reached, the last three as "try again". A failure returns to the form with its reason, to send again.
+  - A request the host answers with `Authentication.Unauthorized` (told with `Schema.is`), because it does not
+    know the session, ends in `RejectedSession`, whichever request it was, and the page reports `EndedSession`;
+    the root signs the person out. Any other failure is worded for the person, as each request does.
   - Closing the dialog ends what was being done, except while a request is on its way: it opens again, so that a
     workspace is not created, nor an invitation accepted, unseen. Once the workspace exists or the person is
     in it, the dialog is the workspace's name over "Opening {name}…"; if the listing cannot be read, it says the
@@ -591,7 +596,10 @@ the pages that compose them; the root composes the pages.
   out, from the workspace list or from the open workspace's sidebar, which asks the root, is one step
   in `composition.ts`, and its command, `command.ts`, forgets the session, the person's stores, and
   their sync identity first, so it works offline, then removes the browser's sync key and ends the
-  session as far as the host can be reached. The width is the design's `Viewport` (`Phone`, `Tablet`,
+  session as far as the host can be reached. A session the host no longer knows, which the workspace
+  list reports as `EndedSession` (as when the host was started over another database), signs out the same
+  way and lands on the sign-in form with the account's address filled in and "Your session has ended.
+  Sign in again." over it (`endSession`). The width is the design's `Viewport` (`Phone`, `Tablet`,
   `Desktop`, or `Split`), which a view that changes with it cannot leave to CSS. It starts from the
   flags, `flags.ts`, which read the session kept from the last visit and ask `window.matchMedia` the
   design's `viewportQueries`: the runtime processes no Message until the first render has painted, so
@@ -825,7 +833,8 @@ browser's storage. Each Block's tests sit beside it:
   open; the thread closing as its dialog closes by itself, below `Split`; the thread beside the inbox
   closing with every navigation that leaves the inbox, so that coming back shows none; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
-  from the list or from the open workspace, and following the window's width, for the workspace it
+  from the list or from the open workspace, signing out to the sign-in form with the address and a notice when the
+  host no longer knows the session, and following the window's width, for the workspace it
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
   one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
   `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
@@ -839,9 +848,12 @@ browser's storage. Each Block's tests sit beside it:
   name with the invitation's IDs and read the list again once the person is in to report the workspace
   opened, as a workspace the host has no name for, return to the form with why a request failed and send
   it again as it was, clear the refusal as the name is typed, ignore a close while the request is on its
-  way, and end as creating does; the `CreateWorkspace` and `AcceptInvitation` handlers run over a stub
+  way, and end as creating does, and report the session ended when any request is rejected as
+  unauthorized; the `LoadWorkspaces`, `CreateWorkspace`, and `AcceptInvitation` handlers run over a stub
   `HttpClient` that gives a canned status and body, to show the path, key, and names they send and each
-  refusal as the person reads it.
+  refusal as the person reads it, and that a session the host does not know (status 401,
+  `Authentication.Unauthorized`) ends each of them in `RejectedSession`. The sign-in Block's stories and
+  scenes show the notice it starts with, kept as the address is typed and gone once it is sent.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message

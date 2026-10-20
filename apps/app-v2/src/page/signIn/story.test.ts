@@ -26,6 +26,51 @@ describe("signing in", () => {
     )
   })
 
+  it("starts with the notice it is given over the email step, keeps it as the address is typed, and drops it when the address is sent", () => {
+    const notice = "Your session has ended. Sign in again."
+
+    story(
+      update,
+      given(init(email, notice).model),
+      model((model) => {
+        expect(model.form).toEqual(
+          SignInForm.EnteringEmail({ email, error: Option.none(), notice: Option.some(notice) })
+        )
+      }),
+      message(Message.TypedEmail({ email: "alex@mercier.example.com" })),
+      model((model) => {
+        expect(model.form).toEqual(
+          SignInForm.EnteringEmail({
+            email: "alex@mercier.example.com",
+            error: Option.none(),
+            notice: Option.some(notice)
+          })
+        )
+      }),
+      message(Message.SubmittedEmail()),
+      Command.expectExact(SendCode({ email: "alex@mercier.example.com" })),
+      model((model) => {
+        expect(model.form).toEqual(SignInForm.SendingCode({ email: "alex@mercier.example.com" }))
+      }),
+      Command.resolve(SendCode, Message.FailedSendCode({ error: "The code could not be sent. Try again." })),
+      model((model) => {
+        expect(model.form).toEqual(
+          SignInForm.EnteringEmail({
+            email: "alex@mercier.example.com",
+            error: Option.some("The code could not be sent. Try again."),
+            notice: Option.none()
+          })
+        )
+      })
+    )
+  })
+
+  it("starts with no notice unless it is given one", () => {
+    expect(init(email).model.form).toEqual(
+      SignInForm.EnteringEmail({ email, error: Option.none(), notice: Option.none() })
+    )
+  })
+
   it("goes back to the email step with the address kept when the person changes it", () => {
     story(
       update,
@@ -33,7 +78,7 @@ describe("signing in", () => {
       message(Message.ClickedChangeEmail()),
       Command.expectNone(),
       model((model) => {
-        expect(model.form).toEqual(SignInForm.EnteringEmail({ email, error: Option.none() }))
+        expect(model.form).toEqual(SignInForm.EnteringEmail({ email, error: Option.none(), notice: Option.none() }))
       })
     )
   })
@@ -63,7 +108,11 @@ describe("signing in", () => {
       Command.resolve(SendCode, Message.FailedSendCode({ error: "The code could not be sent. Try again." })),
       model((model) => {
         expect(model.form).toEqual(
-          SignInForm.EnteringEmail({ email, error: Option.some("The code could not be sent. Try again.") })
+          SignInForm.EnteringEmail({
+            email,
+            error: Option.some("The code could not be sent. Try again."),
+            notice: Option.none()
+          })
         )
       })
     )

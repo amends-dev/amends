@@ -1,16 +1,17 @@
 import { copy, heading, screenContent } from "@amends-dev/design/centered"
-import { button, field, hint, submit } from "@amends-dev/design/control"
+import { button, field, hint, notice, submit } from "@amends-dev/design/control"
 import { form, inline, valueWithAction } from "@amends-dev/design/form"
 import { SignInComposition } from "./composition.ts"
 import { Message, SignInForm } from "./definition.ts"
 
 export const view = SignInComposition.makeView((model, h) =>
   SignInForm.match(model.form, {
-    EnteringEmail: ({ email, error }) =>
+    EnteringEmail: ({ email, error, notice: aboveForm }) =>
       screenContent(h, [
         heading(h, "Sign in to amends"),
         copy(h, "Use your email to get a one-time code."),
         form(h, { onSubmit: Message.SubmittedEmail(), label: "Sign in" }, [
+          notice(h, aboveForm, { tone: "caution" }),
           field(
             h,
             {

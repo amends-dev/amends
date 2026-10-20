@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { Command, click, expect, given, label, role, scene, text, type } from "foldkit/scene"
+import { Command, click, expect, given, label, role, scene, text, type, within } from "foldkit/scene"
 import { CheckCode, SendCode } from "./command.ts"
 import { Message, SignInForm } from "./definition.ts"
 import { init } from "./init.ts"
@@ -31,11 +31,40 @@ describe("the sign-in page", () => {
   it("says why an email was refused beside the field", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringEmail({ email: "alex", error: Option.some("Enter an email address.") }) }),
+      given({
+        form: SignInForm.EnteringEmail({
+          email: "alex",
+          error: Option.some("Enter an email address."),
+          notice: Option.none()
+        })
+      }),
       expect(role("alert")).toHaveText("Enter an email address."),
       expect(label("Email")).toHaveAttr("aria-invalid", "true"),
       expect(label("Email")).toHaveValue("alex")
     )
+  })
+
+  it("says over the form what it was given to say, keeps it while the address is typed, and drops it once the address is sent", () => {
+    scene(
+      { update, view },
+      given(init(email, "Your session has ended. Sign in again.").model),
+      expect(role("alert")).toHaveText("Your session has ended. Sign in again."),
+      expect(within(role("form", { name: "Sign in" }), role("alert"))).toExist(),
+      expect(label("Email")).toHaveValue(email),
+      type(label("Email"), "alex@mercier.example.com"),
+      expect(role("alert")).toHaveText("Your session has ended. Sign in again."),
+      click(role("button", { name: "Continue" })),
+      Command.expectExact(SendCode({ email: "alex@mercier.example.com" })),
+      expect(role("alert")).toBeAbsent(),
+      Command.resolve(SendCode, Message.SucceededSendCode()),
+      click(role("button", { name: "Change email" })),
+      expect(role("heading", { name: "Sign in to amends" })).toExist(),
+      expect(role("alert")).toBeAbsent()
+    )
+  })
+
+  it("says nothing over the form when it was given nothing to say", () => {
+    scene({ update, view }, given(init(email).model), expect(role("alert")).toBeAbsent())
   })
 
   it("asks for the code that was sent, and checks it", () => {
