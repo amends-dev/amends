@@ -5,7 +5,6 @@
  * workspace the person is.
  */
 
-import { viewportOf, viewportQueries } from "@amends-dev/design/viewport"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
@@ -14,23 +13,13 @@ import * as Dom from "foldkit/dom"
 import { ApplicationDefinition } from "./definition.ts"
 import { Message } from "./message.ts"
 import { openedWorkspaceId } from "./model.ts"
-
-const watchQuery = (query: string) => Dom.streamFromMediaQuery({ query, mapMatches: (isMatching) => isMatching })
+import { viewportChanges } from "./viewport.ts"
 
 export const subscriptions = ApplicationDefinition.subscriptions((entry) => ({
   viewport: entry("WatchViewport", {
     messages: [Message.ChangedViewport],
     handler: function* () {
-      return () =>
-        Stream.zipLatestAll(
-          watchQuery(viewportQueries.tablet),
-          watchQuery(viewportQueries.desktop),
-          watchQuery(viewportQueries.split)
-        ).pipe(
-          Stream.map(([isTablet, isDesktop, isSplit]) => viewportOf({ isTablet, isDesktop, isSplit })),
-          Stream.changes,
-          Stream.map((viewport) => Message.ChangedViewport({ viewport }))
-        )
+      return () => Stream.map(viewportChanges, (viewport) => Message.ChangedViewport({ viewport }))
     }
   }),
   tick: entry("Tick", {

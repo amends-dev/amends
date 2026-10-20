@@ -146,6 +146,26 @@ write reads the text. The textarea that edits a message shows its mentions the s
 the composer does, and writes them as links when saved, but suggests no one; it is not the composer. When the person removes a mention whole from the textarea of an edit, the
 caret moves to its end, since that form sets no selection.
 
+The composer's toolbar named "Formatting" writes markdown, because the box holds the markdown a message is rendered
+from: Bold, Italic, Strikethrough, Link, Numbered list, Bulleted list, Quote, Code, and Code block (`src/feature/composer/format.ts`).
+A button reads the selection through a command, which runs before the render commits, and the answer is formatted by a
+pure function of the text, its mentions, and the selection: an inline format wraps the selected words in its markers,
+leaving the spaces at the ends outside, or takes the markers off when they are just outside the selection or its first
+and last characters, and with nothing selected writes the markers twice with the caret between them; a list or a quote
+puts its marker on each line the selection touches, numbering a list in order, leaves the empty lines of several alone,
+replaces the marker of the other list, and takes the markers off when every line has them; the code block puts fences
+on lines of their own, or takes them off. A second command selects the text after the render commits, on what was
+formatted, or at the caret where the person goes on writing, since setting a box's value moves its caret to its end. The
+keys are `apps/ui`'s, Control or Command with B, I, Shift+X, Shift+U, Shift+7, Shift+8, Shift+9, Shift+C, and
+Alt+Shift+C, which the buttons name as `aria-keyshortcuts`. A view does not know which of Control and Command is the platform's,
+so either asks. The buttons are not pressed: nothing gives the formats that apply at
+the caret, since the selection is read only when asked, so a button would show what it did not know. A link writes
+`[text](url)`, "link" for no selection, with the address selected for the person to type in its place, and has no form
+that asks for the address as `apps/ui` does. The button "Formatting", beside Send, shows and hides the toolbar, and
+is pressed while it is shown; the toolbar starts hidden in a window as narrow as a phone's (`isFormattingShown`), which
+each composer follows through its own subscription `WatchViewport`, until the person chooses, and then keeps
+their choice. The keys work while the toolbar is hidden.
+
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
 turns its timeline embeds are the design's `turnRow`s, each its agent's mark and name with a `turnStatus` for how it
@@ -236,7 +256,12 @@ below it counted at each level above.
   (`ReadSelection`, which no render has changed yet) and writes "@" there in place of what is selected, after a space
   unless the text before it is empty or ends in one, opens the list for it, and puts the caret after it. A command
   that sets the box's value moves the caret to its end, so the Block sets the selection after the render commits
-  (`Render.afterCommit`, in `SelectText`), and no timer is used.
+  (`Render.afterCommit`, in `SelectText`), and no timer is used. The toolbar of formatting is the design's `formatting`,
+  one button for each format with the keys that ask for it, and the button "Formatting" beside Send shows and hides it
+  (`ClickedFormattingToggle`; `isFormattingShown`, from the person's choice and the window's width, which the Block's
+  subscription `WatchViewport` keeps current); a button reads the selection (`ChoseFormat`, `ReadSelection`) and the
+  answer is formatted by `applyFormat` in `format.ts`, which says how each format writes its markdown, and the Block
+  keeps the draft and selects what was formatted (`SelectText`).
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
   part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
   composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
@@ -1370,8 +1395,9 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   (`ShowAppearance`, `KeepAppearance`; a browser that refuses to keep it loses it only for the next visit). The runtime
   paints once before it runs a command, so `index.html` shows a kept Light or Dark itself, before the page first paints,
   and `init` shows it again. The
-  subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries,
-  drops a width that did not change, and sends `ChangedViewport`, whose update sets the width and
+  subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries
+  (`viewportChanges`, in `viewport.ts`, which each composer follows as well), drops a width that did not change, and
+  sends `ChangedViewport`, whose update sets the width and
   informs the open workspace of it, and a workspace opened later starts from the width the root has
   then. What the clock decides, such as which day a time falls on and how long ago it was, needs the
   time now, which enters the same way: the flags read it with `DateTime.now`, and the subscription
@@ -1582,7 +1608,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a draft read as names, moving the mentions with the text before them and dropping one that is edited or that letters
   are written against, removing one whole as Backspace just after it does and putting the caret where it was, and
   starting a mention at the caret with its button, reading the selection and writing the "@", in place of what is
-  selected, after a space or not; a thread's message loaded for editing with its mentions as names, saved as the
+  selected, after a space or not, and formatting: each format's markdown, taken off again, for a caret and for
+  a selection, for several lines and for a mention among them, a link with its address selected, the keys that ask
+  for each and the ones left to the browser, the toolbar shown at first, hidden by its button and on a phone until the
+  person chooses; a thread's message loaded for editing with its mentions as names, saved as the
   links, and as plain text once the name is edited, and `mentions.ts`: a markdown text read as text and spans and
   written back, whatever is escaped in a name, a range replaced, and an edit found by comparing the text before and
   after it, and a mention picked; a group

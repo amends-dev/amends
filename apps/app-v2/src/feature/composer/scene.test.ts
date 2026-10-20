@@ -4,6 +4,7 @@ import { describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import {
   Command,
+  Subscription,
   all,
   click,
   expect,
@@ -17,6 +18,7 @@ import {
   label,
   role,
   scene,
+  selector,
   text,
   type,
   withViewInputs,
@@ -25,8 +27,9 @@ import {
 import { bob, membership } from "../../../test/fixtures.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
-import { boxId, Message, OutMessage, Reading } from "./definition.ts"
+import { boxId, type Format, Message, OutMessage, Reading } from "./definition.ts"
 import { init } from "./init.ts"
+import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
@@ -464,6 +467,206 @@ describe("a composer sending", () => {
       expectOutMessage(OutMessage.SubmittedText({ text: "Hi [@Alan Turing](member:member-3) " })),
       Command.expectExact(draft("")),
       Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+    )
+  })
+})
+
+const formattingToolbar = role("toolbar", { name: "Formatting" })
+
+const formatReading = (format: Format) => Reading.cases.Format.make({ format })
+
+/** A format chosen reads the selection, and it is formatted as it was read. */
+const chosen = (format: Format, selection: { from: number; to: number }) => [
+  Command.expectExact(ReadSelection({ id: boxId(place), reading: formatReading(format) })),
+  Command.resolve(
+    ReadSelection,
+    Message.ReceivedSelection({ reading: formatReading(format), selection: Option.some(selection) })
+  )
+]
+
+describe("a composer formatting its text", () => {
+  it("has a toolbar named Formatting over the box, a button for each format, and a switch for it beside Send", () => {
+    scene(
+      { update, view: sceneView, subscriptions },
+      given(empty),
+      expect(formattingToolbar).toHaveId("reply-thread-1-formatting"),
+      ...[
+        "Bold",
+        "Italic",
+        "Strikethrough",
+        "Link",
+        "Numbered list",
+        "Bulleted list",
+        "Quote",
+        "Code",
+        "Code block"
+      ].map((name) => expect(within(formattingToolbar, role("button", { name }))).toExist()),
+      expectAll(all.role("button")).toHaveCount(12),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-controls", "reply-thread-1-formatting")
+    )
+  })
+
+  it("names the keys that do what a button does, and leaves the buttons unpressed, since nothing says what applies at the caret", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      expect(role("button", { name: "Bold" })).toHaveAttr("aria-keyshortcuts", "Control+B Meta+B"),
+      expect(role("button", { name: "Italic" })).toHaveAttr("aria-keyshortcuts", "Control+I Meta+I"),
+      expect(role("button", { name: "Code block" })).toHaveAttr(
+        "aria-keyshortcuts",
+        "Control+Alt+Shift+C Meta+Alt+Shift+C"
+      ),
+      expect(role("button", { name: "Bold" })).not.toHaveAttr("aria-pressed"),
+      expect(role("button", { name: "Quote" })).not.toHaveAttr("aria-pressed")
+    )
+  })
+
+  it("reads the selection when a button is clicked, writes the markdown there, and keeps it as the draft", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("Say hello now"),
+      click(role("button", { name: "Bold" })),
+      ...chosen("Bold", { from: 4, to: 9 }),
+      Command.expectExact(draft("Say **hello** now"), SelectText({ id: boxId(place), from: 6, to: 11 })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("Say **hello** now")
+    )
+  })
+
+  it("formats the lines of the selection for the list, quote, and code block buttons", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("one\ntwo"),
+      click(role("button", { name: "Numbered list" })),
+      ...chosen("NumberedList", { from: 0, to: 7 }),
+      Command.expectExact(draft("1. one\n2. two"), SelectText({ id: boxId(place), from: 0, to: 13 })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("1. one\n2. two"),
+      click(role("button", { name: "Numbered list" })),
+      ...chosen("NumberedList", { from: 0, to: 13 }),
+      Command.expectExact(draft("one\ntwo"), SelectText({ id: boxId(place), from: 0, to: 7 })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("one\ntwo"),
+      click(role("button", { name: "Code block" })),
+      ...chosen("CodeBlock", { from: 0, to: 7 }),
+      Command.expectExact(draft("```\none\ntwo\n```"), SelectText({ id: boxId(place), from: 4, to: 11 })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("```\none\ntwo\n```")
+    )
+  })
+
+  it("writes a link as [text](url) with the address selected for the person to type", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("see docs"),
+      click(role("button", { name: "Link" })),
+      ...chosen("Link", { from: 4, to: 8 }),
+      Command.expectExact(draft("see [docs](url)"), SelectText({ id: boxId(place), from: 11, to: 14 })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("see [docs](url)")
+    )
+  })
+
+  it("formats with the keys the buttons name: Control or Command with the letter, and Shift or Alt where they have it", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("hello"),
+      keydown(typingReply, "b", { ctrlKey: true }),
+      expectHandled(),
+      ...chosen("Bold", { from: 0, to: 5 }),
+      Command.expectExact(draft("**hello**"), SelectText({ id: boxId(place), from: 2, to: 7 })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      keydown(typingReply, "i", { metaKey: true }),
+      expectHandled(),
+      ...chosen("Italic", { from: 2, to: 7 }),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      keydown(typingReply, "x", { ctrlKey: true, shiftKey: true }),
+      ...chosen("Strikethrough", { from: 3, to: 8 }),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      keydown(typingReply, "c", { metaKey: true, shiftKey: true, altKey: true }),
+      ...chosen("CodeBlock", { from: 0, to: 0 }),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText())
+    )
+  })
+
+  it("leaves the other keys with Control, Command, Shift, or Alt to the browser", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("hello"),
+      keydown(typingReply, "b", { shiftKey: true }),
+      expectIgnored(),
+      keydown(typingReply, "b", { altKey: true }),
+      expectIgnored(),
+      keydown(typingReply, "z", { ctrlKey: true }),
+      expectIgnored(),
+      keydown(typingReply, "x", { metaKey: true }),
+      expectIgnored(),
+      keydown(typingReply, "b"),
+      expectIgnored(),
+      Command.expectNone(),
+      expect(typingReply).toHaveValue("hello")
+    )
+  })
+
+  it("hides the toolbar with the switch and shows it again, the switch pressed while it is shown", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      expect(selector("#reply-thread-1-formatting")).not.toHaveAttr("hidden"),
+      click(role("button", { name: "Formatting" })),
+      expect(selector("#reply-thread-1-formatting")).toHaveAttr("hidden"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "false"),
+      click(role("button", { name: "Formatting" })),
+      expect(selector("#reply-thread-1-formatting")).not.toHaveAttr("hidden"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "true")
+    )
+  })
+
+  it("hides the toolbar at first on a phone, shows it for a wider window, and keeps what the person chose", () => {
+    scene(
+      { update, view: sceneView, subscriptions },
+      given(empty),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Phone" })),
+      expect(selector("#reply-thread-1-formatting")).toHaveAttr("hidden"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "false"),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Tablet" })),
+      expect(selector("#reply-thread-1-formatting")).not.toHaveAttr("hidden"),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Phone" })),
+      click(role("button", { name: "Formatting" })),
+      expect(selector("#reply-thread-1-formatting")).not.toHaveAttr("hidden"),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Desktop" })),
+      Subscription.emit(subscriptions.viewport, Message.ChangedViewport({ viewport: "Phone" })),
+      expect(selector("#reply-thread-1-formatting")).not.toHaveAttr("hidden")
+    )
+  })
+
+  it("keeps the shortcut working while the toolbar is hidden", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("hello"),
+      click(role("button", { name: "Formatting" })),
+      keydown(typingReply, "b", { ctrlKey: true }),
+      expectHandled(),
+      ...chosen("Bold", { from: 0, to: 5 }),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("**hello**")
     )
   })
 })

@@ -5,6 +5,7 @@ import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
 import { ComposerComposition } from "./composition.ts"
 import {
   boxId,
+  isFormattingShown,
   Message,
   type Model,
   OutMessage,
@@ -14,21 +15,25 @@ import {
   type Selection,
   writtenOf
 } from "./definition.ts"
+import { applyFormat } from "./format.ts"
 
 /** Keep `written` as the draft of `model`'s place, as the markdown it says. */
 const saveDraft = ({ workspaceId, memberId, place }: Model, written: Written) =>
   SaveDraft({ workspaceId, memberId, place, text: writeMarkdown(written) })
 
+/** The selection of nothing at `at`, where the person goes on typing. */
+const caretAt = (at: number): Selection => ({ from: at, to: at })
+
 /**
  * The box holds `written`: it is kept as the draft and reported to whatever holds the composer, with the mention being
- * typed, if there is one. Given a `caret`, it is put there once the box shows the text, where the person goes on
- * typing, since setting the value of a box moves its caret to its end.
+ * typed, if there is one. Given a `selection`, it is made once the box shows the text, where the person goes on typing
+ * or what they go on to format, since setting the value of a box moves its caret to its end.
  */
 const changeWritten = (
   model: Model,
   written: Written,
   picking: Option.Option<Picking>,
-  caret: Option.Option<number>
+  selection: Option.Option<Selection>
 ) => ({
   model: modifyFields(model, {
     text: () => Option.some(written.text),
@@ -37,7 +42,7 @@ const changeWritten = (
   }),
   commands: [
     saveDraft(model, written),
-    ...Option.toArray(Option.map(caret, (at) => SelectText({ id: boxId(model.place), from: at, to: at })))
+    ...Option.toArray(Option.map(selection, ({ from, to }) => SelectText({ id: boxId(model.place), from, to })))
   ],
   outMessage: OutMessage.ChangedText({ text: writeMarkdown(written) })
 })
@@ -62,7 +67,7 @@ const startMention = (model: Model, written: Written, { from, to }: Selection) =
     model,
     replaceRange(written, from, to, typed),
     Option.some(Picking.make({ from: caret - 1, query: "", activeIndex: 0, isDismissed: false })),
-    Option.some(caret)
+    Option.some(caretAt(caret))
   )
 }
 
@@ -86,7 +91,7 @@ export const update = ComposerComposition.makeUpdate((model, message) =>
         model,
         edit.written,
         pickingAfterTyping(edit.written, edit.caret, model.picking),
-        edit.written.text === text ? Option.none() : Option.some(edit.caret)
+        edit.written.text === text ? Option.none() : Option.some(caretAt(edit.caret))
       )
     },
     // The letters typed after the "@" become the member's name, and the list closes.
@@ -96,7 +101,7 @@ export const update = ComposerComposition.makeUpdate((model, message) =>
         onSome: ({ from, query }) => {
           const edit = pickMention(writtenOf(model), { from, to: from + 1 + query.length }, { memberId, name })
 
-          return changeWritten(model, edit.written, Option.none(), Option.some(edit.caret))
+          return changeWritten(model, edit.written, Option.none(), Option.some(caretAt(edit.caret)))
         }
       }),
     // The view counts the suggestions, so it says which one is active.
@@ -110,15 +115,30 @@ export const update = ComposerComposition.makeUpdate((model, message) =>
         picking: Option.map((picking) => Picking.make({ ...picking, isDismissed: true }))
       })
     }),
+    // The selection is what the format is for, and it is read as it stands.
+    ChoseFormat: ({ format }) => ({
+      model,
+      commands: [ReadSelection({ id: boxId(model.place), reading: Reading.cases.Format.make({ format }) })]
+    }),
     ClickedMention: () => ({
       model,
       commands: [ReadSelection({ id: boxId(model.place), reading: Reading.cases.Mention.make({}) })]
     }),
+    ClickedFormattingToggle: () => ({
+      model: modifyFields(model, { formattingChoice: () => Option.some(!isFormattingShown(model)) })
+    }),
+    ChangedViewport: ({ viewport }) => ({ model: modifyFields(model, { viewport: () => viewport }) }),
     ReceivedSelection: ({ reading, selection }) => {
       const written = writtenOf(model)
+      const selected = withinText(written.text, selection)
 
       return Reading.match(reading, {
-        Mention: () => startMention(model, written, withinText(written.text, selection))
+        Mention: () => startMention(model, written, selected),
+        Format: ({ format }) => {
+          const formatted = applyFormat(written, format, selected)
+
+          return changeWritten(model, formatted.written, Option.none(), Option.some(formatted.selection))
+        }
       })
     },
     SubmittedText: () => {

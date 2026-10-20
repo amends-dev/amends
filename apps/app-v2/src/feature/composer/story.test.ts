@@ -5,7 +5,16 @@ import { Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import * as Drafts from "../../store/Drafts.ts"
 import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
-import { boxId, mentionQueryAt, Message, OutMessage, Reading, suggestMembers } from "./definition.ts"
+import {
+  boxId,
+  type Format,
+  isFormattingShown,
+  mentionQueryAt,
+  Message,
+  OutMessage,
+  Reading,
+  suggestMembers
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -20,6 +29,10 @@ const draft = (text: string) => SaveDraft({ workspaceId, memberId, place, text }
 const selecting = (at: number) => SelectText({ id: boxId(place), from: at, to: at })
 
 const mentionReading = Reading.cases.Mention.make({})
+
+const selectingRange = (from: number, to: number) => SelectText({ id: boxId(place), from, to })
+
+const formatReading = (format: Format) => Reading.cases.Format.make({ format })
 
 describe("a composer", () => {
   it("fills in the draft as it is read, unless the person began writing, keeps what they write, and sends it once", () => {
@@ -415,5 +428,177 @@ describe("a composer mentioning a member", () => {
     expect(names("")).toHaveLength(8)
     expect(names("zz")).toEqual([])
     expect(suggestMembers(members, MemberId.MemberId.make("member-2"), "al")[0]?.name).toBe("Alice Chen")
+  })
+})
+
+describe("a composer formatting its text", () => {
+  it("reads the selection when a format is chosen, then writes the markdown and selects what the person goes on with", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("Say hello now"),
+      message(Message.ChoseFormat({ format: "Bold" })),
+      Command.expectExact(ReadSelection({ id: boxId(place), reading: formatReading("Bold") })),
+      Command.resolve(
+        ReadSelection,
+        Message.ReceivedSelection({ reading: formatReading("Bold"), selection: Option.some({ from: 4, to: 9 }) })
+      ),
+      Command.expectExact(draft("Say **hello** now"), selectingRange(6, 11)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      model((model) => {
+        expect(model.text).toEqual(Option.some("Say **hello** now"))
+      })
+    )
+  })
+
+  it("reports the text it wrote as changed, and sends it as it stands", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("Say hello now"),
+      message(
+        Message.ReceivedSelection({ reading: formatReading("Italic"), selection: Option.some({ from: 4, to: 9 }) })
+      ),
+      expectOutMessage(OutMessage.ChangedText({ text: "Say *hello* now" })),
+      Command.expectExact(draft("Say *hello* now"), selectingRange(5, 10)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      message(Message.SubmittedText()),
+      expectOutMessage(OutMessage.SubmittedText({ text: "Say *hello* now" })),
+      Command.expectExact(draft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+    )
+  })
+
+  it("writes a link as the text of one with its address selected, to be typed in its place", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("see docs now"),
+      message(
+        Message.ReceivedSelection({ reading: formatReading("Link"), selection: Option.some({ from: 4, to: 8 }) })
+      ),
+      Command.expectExact(draft("see [docs](url) now"), selectingRange(11, 14)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText())
+    )
+  })
+
+  it("formats the end of the text when the box could not be read, and a selection past the text is kept within it", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("Say hi"),
+      message(Message.ReceivedSelection({ reading: formatReading("Bold"), selection: Option.none() })),
+      Command.expectExact(draft("Say hi****"), selecting(8)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      message(
+        Message.ReceivedSelection({ reading: formatReading("Code"), selection: Option.some({ from: 40, to: 50 }) })
+      ),
+      Command.expectExact(draft("Say hi****``"), selecting(11)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText())
+    )
+  })
+
+  it("keeps a picked mention through a format, drafts it as a link, and moves its span with the markers", () => {
+    story(
+      update,
+      given(composer),
+      message(Message.ReceivedDraft({ text: "Hi [@Alice](member:member-2) there" })),
+      message(
+        Message.ReceivedSelection({ reading: formatReading("Bold"), selection: Option.some({ from: 10, to: 15 }) })
+      ),
+      Command.expectExact(draft("Hi [@Alice](member:member-2) **there**"), selectingRange(12, 17)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      model((model) => {
+        expect(model.text).toEqual(Option.some("Hi @Alice **there**"))
+        expect(model.mentions).toEqual([{ memberId: aliceId, from: 3, to: 9 }])
+      }),
+      message(
+        Message.ReceivedSelection({ reading: formatReading("Bold"), selection: Option.some({ from: 3, to: 9 }) })
+      ),
+      Command.expectExact(draft("Hi **[@Alice](member:member-2)** **there**"), selectingRange(5, 11)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      model((model) => {
+        expect(model.mentions).toEqual([{ memberId: aliceId, from: 5, to: 11 }])
+      })
+    )
+  })
+
+  it("closes the list of people the format was chosen over", () => {
+    story(
+      update,
+      given(composer),
+      ...typed("Hi @al"),
+      message(
+        Message.ReceivedSelection({ reading: formatReading("Quote"), selection: Option.some({ from: 6, to: 6 }) })
+      ),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      model((model) => {
+        expect(model.text).toEqual(Option.some("> Hi @al"))
+        expect(model.picking).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("shows the toolbar at first, and a button shows it and hides it again", () => {
+    story(
+      update,
+      given(composer),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(true)
+      }),
+      message(Message.ClickedFormattingToggle()),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(false)
+      }),
+      message(Message.ClickedFormattingToggle()),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(true)
+      })
+    )
+  })
+
+  it("hides the toolbar at first on a phone, until the person shows it, whatever the width becomes", () => {
+    story(
+      update,
+      given(composer),
+      message(Message.ChangedViewport({ viewport: "Phone" })),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(false)
+      }),
+      message(Message.ChangedViewport({ viewport: "Tablet" })),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(true)
+      }),
+      message(Message.ChangedViewport({ viewport: "Phone" })),
+      message(Message.ClickedFormattingToggle()),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(true)
+      }),
+      message(Message.ChangedViewport({ viewport: "Desktop" })),
+      message(Message.ChangedViewport({ viewport: "Phone" })),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(true)
+      })
+    )
+  })
+
+  it("keeps the person's choice to hide the toolbar on a wide window", () => {
+    story(
+      update,
+      given(composer),
+      message(Message.ClickedFormattingToggle()),
+      message(Message.ChangedViewport({ viewport: "Split" })),
+      model((model) => {
+        expect(isFormattingShown(model)).toBe(false)
+      })
+    )
   })
 })

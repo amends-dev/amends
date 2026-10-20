@@ -3,10 +3,12 @@
  * kept as a draft in their browser until they send it. It reports what it sends, and that its text
  * changed, to whatever holds it. While the person types a mention, `@` and some letters of a name, it
  * lists the people they may mean, and shows the one they pick as their name in the text. A button
- * starts a mention at the caret.
+ * starts a mention at the caret. A toolbar formats the selection as markdown, which a button shows and
+ * hides, and which starts hidden on a phone.
  */
 
 import { type Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import { Viewport } from "@amends-dev/design/viewport"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
@@ -31,13 +33,28 @@ export type Picking = typeof Picking.Type
 export const Selection = Schema.Struct({ from: Schema.Int, to: Schema.Int })
 export type Selection = typeof Selection.Type
 
-/** What the selection is read for: to start a mention where it is. */
-export const Reading = Schema.TaggedUnion({ Mention: {} })
+/** The ways the selection can be formatted, as the toolbar offers them. */
+export const Format = Schema.Literals([
+  "Bold",
+  "Italic",
+  "Strikethrough",
+  "Link",
+  "NumberedList",
+  "BulletedList",
+  "Quote",
+  "Code",
+  "CodeBlock"
+])
+export type Format = typeof Format.Type
+
+/** What the selection is read for: to start a mention where it is, or to format it. */
+export const Reading = Schema.TaggedUnion({ Mention: {}, Format: { format: Format } })
 export type Reading = typeof Reading.Type
 
 /**
- * Whose composer, at which place, the text it shows once its draft is read, the members picked in that text, and the
- * mention being typed.
+ * Whose composer, at which place, the text it shows once its draft is read, the members picked in that text, the
+ * mention being typed, whether the person chose to show or hide the formatting, and the window's width, which decides
+ * it until they do.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -45,7 +62,9 @@ export const Model = Schema.Struct({
   place: Drafts.Place,
   text: Schema.Option(Schema.String),
   mentions: Schema.Array(PickedMention),
-  picking: Schema.Option(Picking)
+  picking: Schema.Option(Picking),
+  formattingChoice: Schema.Option(Schema.Boolean),
+  viewport: Viewport
 })
 export type Model = typeof Model.Type
 
@@ -55,7 +74,10 @@ export const Message = defineMessageUnion({
   PickedMention: { memberId: MemberId.MemberId, name: Schema.String },
   MovedSuggestion: { to: Schema.Int },
   DismissedSuggestions: {},
+  ChoseFormat: { format: Format },
   ClickedMention: {},
+  ClickedFormattingToggle: {},
+  ChangedViewport: { viewport: Viewport },
   ReceivedSelection: { reading: Reading, selection: Schema.Option(Selection) },
   SubmittedText: {},
   CompletedSaveDraft: {},
@@ -78,6 +100,13 @@ export const boxId = (place: Drafts.Place): string =>
     Thread: ({ groupId }) => `thread-${groupId}`,
     Conversation: ({ memberIds }) => `conversation-${memberIds.join("-")}`
   })
+
+/**
+ * Whether the toolbar of formatting is shown: as the person chose, and until they do, unless the window is as narrow
+ * as a phone's, where it starts hidden to leave room for the text.
+ */
+export const isFormattingShown = (model: Model): boolean =>
+  Option.getOrElse(model.formattingChoice, () => model.viewport !== "Phone")
 
 /** What the box shows and the members picked in it. */
 export const writtenOf = (model: Model): Written => ({
