@@ -226,8 +226,9 @@ below it counted at each level above.
   say the person types, at once, then at most as often as typing lasts, by core's
   `Presence.typingRepeats`, and sending says they stopped. It has two views. `view`, its canonical
   one, is the body of a side pane, which takes the time now as its view input, and, optionally, the
-  id of a message to highlight (`highlightedMessageId`), which it draws as the current row, so the
-  person sees what a notification was about, and the group gives none. For a thread that tracks no
+  id of a message to highlight (`highlightedMessageId`), which it draws as the current row and scrolls to the middle
+  of the pane when the row is drawn (the `RevealHighlightedMessage` mount, on the row alone), so the person sees what a
+  notification was about, and the group gives none. For a thread that tracks no
   task it is a section named Thread: Rename, the form to rename it while the person does, the task
   (making it one, where they may), then its timeline as a list under a `divider` for each day it happened on by the
   person's own clock (`groupByDay`, named as `dayLabel` names it): the opening first, how many replies follow it,
@@ -263,12 +264,17 @@ below it counted at each level above.
   `apps/ui` draws it: an outlined bell named "Follow thread", or, while the person follows, a filled
   one named "Following thread" and pressed, which stops following, and disabled, as it was, while a change
   is on its way. `replyView` is the reply composer, named and shown as "Reply in thread", for the pane's footer, which
-  suggests the workspace's members the thread has read. `sidePane` puts the three into the design's
+  suggests the workspace's members the thread has read. A thread that tracks no task keeps its messages at their end, as
+  `conversationScroll.ts` does (below): its list has the id `thread-messages-` and the thread's, the `ScrollMessagesToEnd`
+  Command scrolls it to its end as the thread opens, unless a message is highlighted, which the person came for, and,
+  from then on, when a message or a note is added while the person was near its end. `sidePane` puts the three into the design's
   side `pane` for the group and the inbox alike: the pane is named Thread, or Task for a thread that
   tracks one; the header has the thread's title, or its first message's words, before a message icon
   or the task's status drawing, a subtitle (the group's, or the inbox's own), Back, named for where
   it goes back to, such as "Back to Design", "Back to Tasks", or "Back to Inbox", before the title on
-  a phone, and the bell and Close thread, or Close task, after it. The thread tells whether it is shown as the group
+  a phone, and the bell and Close thread, or Close task, after it. The pane's body is anchored to the bottom for a
+  thread that tracks no task, so that a short conversation rests against the composer, and to the top for a task,
+  whose activity reads from the top, as `apps/ui`'s timeline has it. The thread tells whether it is shown as the group
   tells it for itself (`availabilityOf`): it is `Loading` until the store has answered its first read
   (`isLoaded`), `Available` once the answer held the thread (`hasThread`, which the store's `thread` read gives from
   the replica's thread), `Unavailable` once it answered without it, as it does for a thread in a group the person no
@@ -354,7 +360,7 @@ below it counted at each level above.
   title as written or its opening's markdown as the message shows it, with each mention a chip (`threadText`, by the
   group's members), with "Sending…" while it is being started. An opening by the same author as the thread before it
   within the day, less than five minutes after it, stacks under it without its mark and name, with the short time of
-  day ("10:02", `shortTimeOf`) in the mark's place while the pointer or the keyboard is on it (`isStackedUnderPrevious`,
+  day ("10:02", `shortTimeOf`) in the mark's place while the pointer or the keyboard is on it (`openingStacksUnder`,
   from `seen.ts`'s `isStackedUnder`: as `apps/ui`'s `stacked` has it, neither has replies, since a thread's replies
   end a stack and start their own, and an opening not read yet stacks under none and has none stack under it). Under
   the text, the task the thread tracks as a chip, the status drawn and the thread's words beside it, named "Plans for
@@ -369,7 +375,12 @@ below it counted at each level above.
   working", "Atlas queued", or "Scout stopping" (`ThreadItem.working`, read from the thread's turns that are queued,
   running, or being stopped: `agentsAtWork` and `workingLabel` in `agentActivity.ts`), and who types in it besides the
   person, "Ada is typing…" (`typingNames` and `typingLine`, from the `present` the group's Block reads and gives
-  `view`); the thread open is the current row. Until the store has answered (`isLoaded`) the tab says "Loading the
+  `view`); the thread open is the current row. The list has the id `group-threads-` and the group's (`threadsListId`) and
+  rests against the composer while the pane shows a conversation (`showsConversation`: the Threads tab, read, with any
+  thread), which the group's pane anchors to the bottom. The `ScrollThreadsToEnd` Command scrolls it to its end the first time
+  threads are read and whenever the person chooses the Threads tab, and, when a thread is added, only if the person was
+  near its end before it (`onlyIfNearEnd`), so that scrolling up leaves them where they are; a read that adds none, and
+  the Tasks tab, scroll nothing. Until the store has answered (`isLoaded`) the tab says "Loading the
   conversation…", and once it has, a group with no thread welcomes the person, "Welcome to #General" for a team and
   "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
   caret blinking. A team's welcome says who belongs to it first, "You, Alex Morgan, and Sara are members." as
@@ -421,7 +432,8 @@ below it counted at each level above.
   hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. It
-  has two views. `view`, its canonical one, is the group's main pane, titled by its name, with the drawing of a
+  has two views. `view`, its canonical one, is the group's main pane, anchored to the bottom while it lists threads, as
+  the threads Block's `showsConversation` says, and to the top otherwise, titled by its name, with the drawing of a
   channel before it for a team and of a message for a conversation, as `apps/ui` marks them, and the workspace's name
   under it on a phone (`workspaceName`, a view input from the page), under the
   tabs of the threads Block, Threads and Tasks, named for the group, which a team the person has not joined does not have,
@@ -1239,6 +1251,15 @@ the host's integrations, which the workspace page does once for the connections,
 channels, adding a connection, replacing its key, checking it, and listing the models a connection
 offers an agent.
 
+`conversationScroll.ts`, where a conversation sits in the pane that scrolls it, as `apps/ui`'s `useStickToBottom` keeps
+it, is the threads Block's and the thread Block's. A conversation is a message list with an `id` in a pane body that
+says it is anchored to the bottom (`data-anchor="bottom"`, from the design's `pane`); a list in any other body, such as a
+task's activity, is left where it is. `scrollToEnd` scrolls it to its end once the render in progress has committed, as
+a conversation opens, and with `unlessCurrent` keeps the view while a message is the current one. `followEnd` measures the
+pane body at once, before the render commits, since a Command runs before it does, and scrolls to the end after it only
+if the person was near the end, less than 80px of it (`nearEnd`, `isNearEnd`) below the view. `revealMessage` scrolls a
+message to the middle of the pane. Typing and the agents at work are not followed as the end moves, as in `apps/ui`, which
+follows only as its entries are counted; a note of who types may sit just below the view until the person scrolls.
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
 feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's, as is
 `agentActivity.ts`, what an agent is doing, read from its turns. A turn that is queued, running, or being
@@ -1382,6 +1403,13 @@ it leaves its sending state with the general failure. `appearance.test.ts` runs 
 key `keepAppearance` keeps, to show the two agree. `crash.test.ts` renders the crash view: the heading and its words, the
 state art, the brand alone in the header, and Reload as a link to the page's own address:
 
+- `conversationScroll.test.ts` gives a pane body the extent a browser would measure, with happy-dom's `scrollHeight`
+  and `clientHeight` stubbed, and reads back the `scrollTop` the effects set: near the end is less than 80px, a list
+  scrolls to the end when the render has committed unless a message is current and it is told to keep the view, a list
+  in a body not anchored to the bottom is left alone, the person is measured before the render grows the pane and
+  scrolled to the end it made only if they were near, and a message is revealed in the middle. They run live, since the
+  effects wait for an animation frame. happy-dom lays nothing out, so a real scroll, the browser clamping `scrollTop`
+  to the end, a short list resting against the composer, and `scrollIntoView` moving a real pane are not observed here.
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
   is written and stopped once it is sent, and why a write could not be kept; a task made and changed
@@ -1389,8 +1417,12 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   only when nothing else keeps them from it, a stop or retry the browser could not keep said until the person tries
   again, and what the server refused read from the store's actions, and a turn's log followed from viewing it until
   the turn ends or the person hides it, passing over another turn's, and followed again after it
-  could not be; a thread started from the composer, a task started on the Tasks tab, the tab chosen, and the status, the
-  assignee, and the order chosen from their menus, which change only the Block's own model, the thread picked, and the
+  could not be; a thread's messages scrolled to their end as the thread opens and again when it comes back, and
+  followed as a message or a note is added, and left alone when a read adds none or typing changes; a thread started from
+  the composer, a task started on the Tasks tab, the tab chosen, and the status, the
+  assignee, and the order chosen from their menus, which change only the Block's own model, a group's threads scrolled to
+  their end as they are first read, as the Threads tab is chosen, and, while the person is near it, as one is added, and
+  left alone on the Tasks tab, the thread picked, and the
   tasks of a group's threads kept to a status, an assignee, and a search and ordered latest active, newest, or
   oldest first, and counted while open; a composer filling in its
   draft only while nothing was written, keeping what is written, and sending it once, listing members for

@@ -24,7 +24,7 @@ import {
   visibilityHint
 } from "../../seen.ts"
 import { followView, replyView, sidePane } from "../thread/view.ts"
-import { selfName } from "../threads/definition.ts"
+import { selfName, showsConversation } from "../threads/definition.ts"
 import {
   cantLoadConversation,
   composerView,
@@ -506,6 +506,7 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
           ]
         }
       : {}),
+    anchor: isReadable && availability !== "Failed" && showsConversation(model.threads) ? "bottom" : "top",
     body: [
       paneColumn(h, columnOf(model, availability, isReadable, threadsInputs, h), { isWide: true }),
       h.block(

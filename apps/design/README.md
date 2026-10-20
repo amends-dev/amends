@@ -744,7 +744,8 @@ The third and fourth layout patterns share one structure.
   the header, unless the `anchor` is `"bottom"`: a conversation takes that, so that where it is shorter than the
   body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is taller the body
   scrolls as any other does, because the element's top margin is automatic (`mt-auto`), which is no space once there is
-  none to spare. The body is then a column whose children keep their own height.
+  none to spare. The body is then a column whose children keep their own height, and says `data-anchor="bottom"`, so
+  that a program that keeps a conversation at its end finds the body that scrolls it from a message list in it.
 - The `header` is `{ title, icon?, taskStatus?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
   96px tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
   row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
@@ -1338,7 +1339,7 @@ Escape, a click on the backdrop, and the button pressed again, which each close 
 placement as the anchor its Mount is given, a header with a line under it, a heading over a group, the line between groups,
 and a plain button holding its content; a pane's toolbar by its search found by its label, its menus and its actions at the
 end, kept out of the body that scrolls, which starts flush under it, and a pane without one with its usual padding; a pane
-whose body is anchored to the bottom by the classes that rest its first element there; the quiet
+whose body is anchored to the bottom by the classes that rest its first element there, and says so in `data-anchor`; the quiet
 search by its hidden label, its placeholder and its magnifier, hidden from assistive technology; the theme's two dark
 blocks, which give the same values, by `theme.test.ts`; a sidebar item by its name, which has the status's word after the label, with
 `aria-current` and its count, read as "5 unread" when the row names what it counts, the row under it as a button or as a plain row, the working logo at the end of a row at

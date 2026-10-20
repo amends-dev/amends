@@ -931,6 +931,15 @@ describe("pane with its body anchored to the bottom", () => {
     )
   })
 
+  it("says it is anchored to the bottom, so that a program that keeps a conversation at its end finds it", () => {
+    scene(
+      { update, view: paneView(conversationPane("bottom")) },
+      given(initial),
+      expect(scrollingBody).toHaveAttr("data-anchor", "bottom"),
+      expect(within(selector('[data-anchor="bottom"]'), role("list", { name: "Threads" }))).toExist()
+    )
+  })
+
   it("rests its body's first element against the header unless it is anchored to the bottom", () => {
     for (const anchor of [undefined, "top"] as const) {
       scene(
@@ -938,7 +947,8 @@ describe("pane with its body anchored to the bottom", () => {
         given(initial),
         expect(scrollingBody).toHaveClass("overflow-y-auto"),
         expect(scrollingBody).not.toHaveClass("flex-col"),
-        expect(scrollingBody).not.toHaveClass("[&>:first-child]:mt-auto")
+        expect(scrollingBody).not.toHaveClass("[&>:first-child]:mt-auto"),
+        expect(scrollingBody).not.toHaveAttr("data-anchor")
       )
     }
   })

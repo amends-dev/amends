@@ -51,7 +51,8 @@ import {
   byDay,
   isFiltered,
   isReadFailed,
-  isStackedUnderPrevious,
+  openingStacksUnder,
+  threadsListId,
   Message,
   type Model,
   membersLine,
@@ -126,7 +127,7 @@ const threadNotes = (
 /**
  * A thread as a message, as `apps/ui`'s timeline draws one: its opening's author, "A thread" until the opening is
  * read, in their tone, with the time of day the thread was created, the title or the opening, stacked under the thread
- * before it without a mark and a name when `isStackedUnderPrevious` says so, the task it tracks as a chip, and under
+ * before it without a mark and a name when `openingStacksUnder` says so, the task it tracks as a chip, and under
  * them the button that opens it: how many replies it has and who wrote them, with a dot while any is unread, or "Reply
  * in thread" where it has none, and at its end the agents at work in it and who types in it. A hovered thread also
  * offers the reply as an action. Each of them opens the thread.
@@ -184,7 +185,7 @@ const threadRow = (
     ]
   } as const
 
-  return isStackedUnderPrevious(item, previous)
+  return openingStacksUnder(item, previous)
     ? message(h, { ...common, isStacked: true, shortTime: shortTimeOf(item.thread.createdAt) })
     : message(h, common)
 }
@@ -228,6 +229,7 @@ const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): H
         ? welcome(inputs, h)
         : messageList(h, {
             label: "Threads",
+            id: threadsListId(model.groupId),
             children: byDay(model.threads, inputs.now).flatMap((day) => [
               divider(h, day.label),
               ...day.items.map((item, index) => threadRow(item, day.items[index - 1], model, inputs, h))

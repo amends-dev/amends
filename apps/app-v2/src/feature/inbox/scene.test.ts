@@ -5,6 +5,7 @@ import { describe, it } from "@effect/vitest"
 import { DateTime, Option, Struct } from "effect"
 import {
   Command,
+  Mount,
   Subscription,
   all,
   click,
@@ -40,6 +41,8 @@ import {
 } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { ReadDraft } from "../composer/command.ts"
+import { ThreadBlock } from "../thread/block.ts"
+import { RevealHighlightedMessage } from "../thread/command.ts"
 import { init as initThread } from "../thread/init.ts"
 import { InboxBlock } from "./block.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
@@ -117,6 +120,9 @@ const many = (count: number) =>
 
 /** The inbox with the notification's thread open beside it. */
 const openedThread = modifyFields(opened, { selected: () => selectedOf(notification.id) })
+
+/** The thread's highlighted message revealed, as it is whenever a thread opens at a message. */
+const revealed = Mount.resolve(RevealHighlightedMessage, ThreadBlock.Message.CompletedRevealHighlightedMessage())
 
 /** The thread's reply draft read, as it is whenever a thread opens. */
 const draftRead = Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
@@ -561,6 +567,7 @@ describe("the inbox", () => {
     scene(
       { update, view: withSidePane },
       given(modifyFields(opened, { items: () => [bobsReply, other], selected: () => selectedOf(notification.id) })),
+      revealed,
       expect(role("button", { name: "Mark all seen" })).toExist(),
       click(role("button", { name: "Mark all seen" })),
       Command.expectExact(
@@ -688,6 +695,7 @@ describe("the inbox's side pane", () => {
     scene(
       { update, view: sceneThreadView },
       given(openedThread),
+      revealed,
       expect(pane).toExist(),
       expect(within(pane, role("heading", { name: "Composer paste crash", level: 2 }))).toExist(),
       expect(within(pane, text("Reply · #General"))).toExist(),
@@ -699,11 +707,13 @@ describe("the inbox's side pane", () => {
     scene(
       { update, view: sceneThreadView },
       given(modifyFields(openedThread, { items: () => [{ ...bobsReply, message: Option.some(mention) }] })),
+      revealed,
       expect(within(pane, text("Mention · #General"))).toExist()
     )
     scene(
       { update, view: sceneThreadView },
       given(modifyFields(openedThread, { items: () => [{ ...bobsReply, message: Option.some(opening) }] })),
+      revealed,
       expect(within(pane, text("New thread · #General"))).toExist()
     )
   })
@@ -717,12 +727,14 @@ describe("the inbox's side pane", () => {
           selected: Option.map((selected) => ({ ...selected, groupId: conversationWithBob.id }))
         })
       ),
+      revealed,
       expect(within(pane, text("Reply · Bob"))).toExist(),
       expect(within(pane, text("Reply · #General"))).toBeAbsent()
     )
     scene(
       { update, view: sceneThreadView },
       given(modifyFields(openedThread, { groups: () => [] })),
+      revealed,
       expect(within(pane, text("Reply"))).toExist(),
       expect(within(pane, text(/Reply ·/))).toBeAbsent()
     )
@@ -732,6 +744,7 @@ describe("the inbox's side pane", () => {
     scene(
       { update, view: sceneThreadView },
       given(modifyFields(openedThread, { items: () => [{ ...bobsReply, message: Option.none() }] })),
+      revealed,
       expect(within(pane, text("Thread in #General"))).toExist()
     )
   })
@@ -752,6 +765,7 @@ describe("the inbox's side pane", () => {
           }))
         })
       ),
+      revealed,
       expect(pane).toBeAbsent(),
       expect(within(role("complementary", { name: "Task" }), text("Reply · #General"))).toExist(),
       expect(within(role("complementary", { name: "Task" }), role("button", { name: "Close task" }))).toExist(),
@@ -763,6 +777,7 @@ describe("the inbox's side pane", () => {
     scene(
       { update, view: sceneThreadView },
       given(openedThread),
+      revealed,
       expect(within(pane, role("button", { name: "Follow thread" }))).toExist()
     )
   })
@@ -771,6 +786,7 @@ describe("the inbox's side pane", () => {
     scene(
       { update, view: sceneThreadView },
       given(openedThread),
+      revealed,
       expect(within(pane, role("list", { name: "Messages" }))).toExist(),
       expect(within(pane, text("Plans for the week"))).toExist(),
       expect(within(pane, text("Sounds good"))).toExist(),
@@ -793,10 +809,39 @@ describe("the inbox's side pane", () => {
     )
   })
 
+  it("rests the thread's messages against the composer, anchored to the bottom, and a task's activity at the top", () => {
+    scene(
+      { update, view: sceneThreadView },
+      given(openedThread),
+      revealed,
+      expect(within(pane, selector('[data-anchor="bottom"]'))).toExist(),
+      expect(within(selector('[data-anchor="bottom"]'), role("list", { name: "Messages" }))).toExist()
+    )
+    scene(
+      { update, view: sceneThreadView },
+      given(
+        modifyFields(openedThread, {
+          selected: Option.map((selected) => ({
+            ...selected,
+            model: modifyFields(selected.model, {
+              task: (taskModel) =>
+                modifyFields(taskModel, {
+                  task: () => Option.some({ task: { ...task, threadId: thread.id }, pending: false })
+                })
+            })
+          }))
+        })
+      ),
+      revealed,
+      expect(selector('[data-anchor="bottom"]')).toBeAbsent()
+    )
+  })
+
   it("holds the composer to reply in its footer", () => {
     scene(
       { update, view: sceneThreadView },
       given(openedThread),
+      revealed,
       expect(within(pane, role("form", { name: "Reply in thread" }))).toExist(),
       expect(label("Reply in thread")).toHaveAttr("placeholder", "Reply in thread")
     )
@@ -807,10 +852,12 @@ describe("the inbox's side pane", () => {
       scene(
         { update, view: sidePane },
         given(openedThread),
+        revealed,
         expect(within(pane, role("button", { name }))).toExist(),
         click(within(pane, role("button", { name }))),
         expectOutMessage(OutMessage.ClosedThread()),
-        expect(role("complementary")).toBeAbsent()
+        expect(role("complementary")).toBeAbsent(),
+        Mount.expectEnded(RevealHighlightedMessage)
       )
     }
   })

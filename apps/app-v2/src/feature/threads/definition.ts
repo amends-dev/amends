@@ -100,6 +100,7 @@ export const Message = defineMessageUnion({
   TypedTaskQuery: { query: Schema.String },
   ClickedNewTask: {},
   CompletedFocusComposer: {},
+  CompletedScrollThreadsToEnd: {},
   ClickedThread: { threadId: ThreadId.ThreadId },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
@@ -134,10 +135,20 @@ const stackableOf = (item: ThreadItem): Option.Option<Stackable> =>
  * Whether the opening of `item` stacks under the opening of `previous`, the thread just before it within a day, as the
  * timeline stacks messages: see `isStackedUnder`. An opening not yet read stacks under none and none stacks under it.
  */
-export const isStackedUnderPrevious = (item: ThreadItem, previous: ThreadItem | undefined): boolean =>
+export const openingStacksUnder = (item: ThreadItem, previous: ThreadItem | undefined): boolean =>
   Option.exists(stackableOf(item), (stackable) =>
     isStackedUnder(stackable, Option.getOrUndefined(Option.flatMap(Option.fromUndefinedOr(previous), stackableOf)))
   )
+
+/** The `id` of the list of the threads of `groupId`, which the scroll that keeps it at its end finds it by. */
+export const threadsListId = (groupId: GroupId.GroupId): string => `group-threads-${groupId}`
+
+/**
+ * Whether the pane shows the group's threads as a conversation, which rests against its end: the Threads tab, once
+ * the threads are read, while there are any.
+ */
+export const showsConversation = (model: Model): boolean =>
+  model.tab === "Threads" && model.isLoaded && model.threads.length > 0
 
 const memberNamesList = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 

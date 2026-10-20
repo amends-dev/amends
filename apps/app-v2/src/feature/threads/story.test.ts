@@ -20,16 +20,18 @@ import {
 } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
-import { StartThread } from "./command.ts"
+import { ScrollThreadsToEnd, StartThread } from "./command.ts"
 import { AssigneeBinding, ComposerBinding, SortBinding, StatusBinding } from "./composition.ts"
 import {
   isFiltered,
   isReadFailed,
-  isStackedUnderPrevious,
+  openingStacksUnder,
+  threadsListId,
   Message,
   membersLine,
   openTaskCount,
   OutMessage,
+  showsConversation,
   type TaskSort,
   TaskSortMenu,
   taskSortChoices,
@@ -148,6 +150,7 @@ describe("a group's threads", () => {
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       Command.resolve(StartThread, Message.WroteAction()),
       message(Message.ChoseTab({ tab: "Threads" })),
+      Command.resolve(ScrollThreadsToEnd, Message.CompletedScrollThreadsToEnd()),
       message(fromComposer(ComposerBlock.Message.TypedText({ text: "Plans for the week" }))),
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       message(fromComposer(ComposerBlock.Message.SubmittedText())),
@@ -183,6 +186,7 @@ describe("a group's threads", () => {
         expect(model.taskSort).toBe("Oldest")
       }),
       message(Message.ChoseTab({ tab: "Threads" })),
+      Command.resolve(ScrollThreadsToEnd, Message.CompletedScrollThreadsToEnd()),
       model((model) => {
         expect(model.tab).toBe("Threads")
         expect(model.taskFilter).toEqual(narrowed)
@@ -274,6 +278,7 @@ describe("a group's threads", () => {
           ]
         })
       ),
+      Command.resolve(ScrollThreadsToEnd, Message.CompletedScrollThreadsToEnd()),
       message(Message.ClickedThread({ threadId: ThreadId.ThreadId.make("thread-1") })),
       expectOutMessage(OutMessage.SelectedThread({ threadId: ThreadId.ThreadId.make("thread-1") }))
     )
@@ -452,22 +457,112 @@ describe("the threads that stack under the one before", () => {
   })
 
   it("is true for an opening by the same author within five minutes after the one before it", () => {
-    expect(isStackedUnderPrevious(opened("thread-2", 4), opened("thread-1", 0))).toBe(true)
+    expect(openingStacksUnder(opened("thread-2", 4), opened("thread-1", 0))).toBe(true)
   })
 
   it("is false five minutes after it, for another author, for the first of a day, and when either has replies", () => {
-    expect(isStackedUnderPrevious(opened("thread-2", 5), opened("thread-1", 0))).toBe(false)
-    expect(isStackedUnderPrevious(opened("thread-2", 1, bobAuthor), opened("thread-1", 0))).toBe(false)
-    expect(isStackedUnderPrevious(opened("thread-2", 1), undefined)).toBe(false)
-    expect(isStackedUnderPrevious(opened("thread-2", 1, aliceAuthor, 2), opened("thread-1", 0))).toBe(false)
-    expect(isStackedUnderPrevious(opened("thread-2", 1), opened("thread-1", 0, aliceAuthor, 2))).toBe(false)
+    expect(openingStacksUnder(opened("thread-2", 5), opened("thread-1", 0))).toBe(false)
+    expect(openingStacksUnder(opened("thread-2", 1, bobAuthor), opened("thread-1", 0))).toBe(false)
+    expect(openingStacksUnder(opened("thread-2", 1), undefined)).toBe(false)
+    expect(openingStacksUnder(opened("thread-2", 1, aliceAuthor, 2), opened("thread-1", 0))).toBe(false)
+    expect(openingStacksUnder(opened("thread-2", 1), opened("thread-1", 0, aliceAuthor, 2))).toBe(false)
   })
 
   it("is false while either opening is not read, which leaves its author unknown", () => {
     const unknown = { ...opened("thread-2", 1), opening: Option.none() }
 
-    expect(isStackedUnderPrevious(unknown, opened("thread-1", 0))).toBe(false)
-    expect(isStackedUnderPrevious(opened("thread-1", 2), unknown)).toBe(false)
+    expect(openingStacksUnder(unknown, opened("thread-1", 0))).toBe(false)
+    expect(openingStacksUnder(opened("thread-1", 2), unknown)).toBe(false)
+  })
+})
+
+describe("a group's threads at the end of their pane", () => {
+  const started = (id: string) => ({
+    thread: { ...thread, id: ThreadId.ThreadId.make(id) },
+    opening: Option.none(),
+    task: Option.none(),
+    replies: 0,
+    repliers: [],
+    working: [],
+    lastActiveAt: thread.createdAt,
+    pending: false,
+    unread: 0
+  })
+  const received = (...ids: ReadonlyArray<string>) => message(Message.ReceivedThreads({ threads: ids.map(started) }))
+  const scrolls = (onlyIfNearEnd: boolean) => [
+    Command.expectExact(ScrollThreadsToEnd({ groupId, onlyIfNearEnd })),
+    Command.resolve(ScrollThreadsToEnd, Message.CompletedScrollThreadsToEnd())
+  ]
+
+  it("open scrolled to their end once they are read, and follow it as one is added, while the person is near it", () => {
+    story(
+      update,
+      given(listing),
+      received("thread-1", "thread-2"),
+      ...scrolls(false),
+      received("thread-1", "thread-2", "thread-3"),
+      ...scrolls(true),
+      received("thread-1", "thread-2", "thread-3", "thread-4"),
+      ...scrolls(true)
+    )
+  })
+
+  it("stay where they are when what is read adds none, as a read of the same threads again does", () => {
+    story(
+      update,
+      given(listing),
+      received("thread-1", "thread-2"),
+      ...scrolls(false),
+      received("thread-1", "thread-2"),
+      Command.expectNone(),
+      message(Message.ClickedThread({ threadId: ThreadId.ThreadId.make("thread-1") })),
+      Command.expectNone()
+    )
+  })
+
+  it("have nothing to scroll while none were said, and follow the first ones once they come", () => {
+    story(
+      update,
+      given(listing),
+      received(),
+      Command.expectNone(),
+      received("thread-1", "thread-2", "thread-3"),
+      ...scrolls(true)
+    )
+  })
+
+  it("are left alone on the Tasks tab, and open scrolled to their end again when the person comes back to them", () => {
+    story(
+      update,
+      given(listing),
+      received("thread-1"),
+      ...scrolls(false),
+      message(Message.ChoseTab({ tab: "Tasks" })),
+      Command.expectNone(),
+      received("thread-1", "thread-2"),
+      Command.expectNone(),
+      message(Message.ChoseTab({ tab: "Tasks" })),
+      Command.expectNone(),
+      message(Message.ChoseTab({ tab: "Threads" })),
+      ...scrolls(false),
+      message(Message.ChoseTab({ tab: "Threads" })),
+      Command.expectNone()
+    )
+  })
+
+  it("are conversations once they are read and any was said, on the Threads tab only", () => {
+    const read = (...ids: ReadonlyArray<string>) =>
+      modifyFields(listing, { isLoaded: () => true, threads: () => ids.map(started) })
+
+    expect(showsConversation(listing)).toBe(false)
+    expect(showsConversation(read())).toBe(false)
+    expect(showsConversation(read("thread-1"))).toBe(true)
+    expect(showsConversation(modifyFields(read("thread-1"), { tab: () => "Tasks" as const }))).toBe(false)
+    expect(showsConversation(modifyFields(listing, { threads: () => [started("thread-1")] }))).toBe(false)
+  })
+
+  it("are listed under an id of the group's, which the scroll finds them by", () => {
+    expect(threadsListId(groupId)).toBe("group-threads-general")
   })
 })
 

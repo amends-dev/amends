@@ -1,7 +1,13 @@
-import { ThreadId, ThreadMessage, ThreadParticipationId } from "@amends-dev/core/thread"
+import {
+  ThreadActivity,
+  ThreadId,
+  ThreadMessage,
+  ThreadMessageId,
+  ThreadParticipationId
+} from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Option, Schema } from "effect"
+import { DateTime, Effect, Layer, Option, Schema } from "effect"
 import { Command, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import { saying } from "../../../test/fixtures.ts"
@@ -16,6 +22,7 @@ import {
   MarkThreadRead,
   PostReply,
   RenameThread,
+  ScrollMessagesToEnd,
   TellTyping,
   UnfollowThread
 } from "./command.ts"
@@ -70,8 +77,8 @@ const received = (latest: number, readThrough: number, active = true) =>
     })
   )
 
-/** The store answering that it holds the thread, or that it does not. */
-const answered = (hasThread: boolean) =>
+/** The store answering that it holds the thread, which opens at its end, or that it does not. */
+const answered = (hasThread: boolean) => [
   message(
     Message.ReceivedThread({
       hasThread,
@@ -82,7 +89,14 @@ const answered = (hasThread: boolean) =>
       latest: 0,
       readThrough: 0
     })
-  )
+  ),
+  ...(hasThread
+    ? [
+        Command.expectExact(ScrollMessagesToEnd({ threadId, onlyIfNearEnd: false })),
+        Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd())
+      ]
+    : [])
+]
 
 const unreadable = "This browser could not read that. Try again."
 
@@ -95,7 +109,7 @@ describe("a thread being read", () => {
         expect(availabilityOf(model)).toBe("Loading")
         expect(model.isLoaded).toBe(false)
       }),
-      answered(true),
+      ...answered(true),
       model((model) => {
         expect(availabilityOf(model)).toBe("Available")
         expect(model.isLoaded).toBe(true)
@@ -104,7 +118,7 @@ describe("a thread being read", () => {
     story(
       update,
       given(opened),
-      answered(false),
+      ...answered(false),
       model((model) => {
         expect(availabilityOf(model)).toBe("Unavailable")
         expect(model.isLoaded).toBe(true)
@@ -116,12 +130,12 @@ describe("a thread being read", () => {
     story(
       update,
       given(opened),
-      answered(true),
-      answered(false),
+      ...answered(true),
+      ...answered(false),
       model((model) => {
         expect(availabilityOf(model)).toBe("Unavailable")
       }),
-      answered(true),
+      ...answered(true),
       model((model) => {
         expect(availabilityOf(model)).toBe("Available")
       })
@@ -148,7 +162,7 @@ describe("a thread being read", () => {
       model((model) => {
         expect(model.reads).toBe(2)
       }),
-      answered(true),
+      ...answered(true),
       model((model) => {
         expect(availabilityOf(model)).toBe("Available")
       })
@@ -159,7 +173,7 @@ describe("a thread being read", () => {
     story(
       update,
       given(opened),
-      answered(true),
+      ...answered(true),
       message(Message.FailedRead({ error: unreadable })),
       model((model) => {
         expect(availabilityOf(model)).toBe("Available")
@@ -172,11 +186,99 @@ describe("a thread being read", () => {
     story(
       update,
       given(opened),
-      answered(false),
+      ...answered(false),
       message(Message.FailedRead({ error: unreadable })),
       model((model) => {
         expect(availabilityOf(model)).toBe("Unavailable")
       })
+    )
+  })
+})
+
+describe("a thread's messages", () => {
+  const written = (id: string, minute: number) => ({
+    message: {
+      ...opening,
+      id: ThreadMessageId.ThreadMessageId.make(id),
+      publishedAt: DateTime.makeUnsafe(`2026-10-18T12:0${minute}:00Z`)
+    },
+    pending: false
+  })
+  const readWith = (
+    messages: ReadonlyArray<ReturnType<typeof written>>,
+    changes: ReadonlyArray<Model["changes"][number]> = []
+  ) =>
+    message(
+      Message.ReceivedThread({
+        hasThread: true,
+        title: Option.none(),
+        messages,
+        following: Option.none(),
+        changes,
+        latest: 0,
+        readThrough: 0
+      })
+    )
+  const scrolls = (onlyIfNearEnd: boolean) => [
+    Command.expectExact(ScrollMessagesToEnd({ threadId, onlyIfNearEnd })),
+    Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd())
+  ]
+
+  it("open scrolled to their end, and follow it as a message is added, while the person is near it", () => {
+    story(
+      update,
+      given(opened),
+      readWith([written("message-1", 0)]),
+      ...scrolls(false),
+      readWith([written("message-1", 0), written("message-2", 1)]),
+      ...scrolls(true),
+      readWith([written("message-1", 0), written("message-2", 1), written("message-3", 2)]),
+      ...scrolls(true)
+    )
+  })
+
+  it("follow a note of who followed the thread, as one more entry", () => {
+    const followed = {
+      id: ThreadActivity.ThreadActivityId.make("activity-1"),
+      at: DateTime.makeUnsafe("2026-10-18T12:03:00Z"),
+      change: "followed",
+      memberId
+    } as const
+
+    story(
+      update,
+      given(opened),
+      readWith([written("message-1", 0)]),
+      ...scrolls(false),
+      readWith([written("message-1", 0)], [followed]),
+      ...scrolls(true)
+    )
+  })
+
+  it("stay where they are when what is read adds nothing, as a read of the same messages again does", () => {
+    story(
+      update,
+      given(opened),
+      readWith([written("message-1", 0)]),
+      ...scrolls(false),
+      readWith([written("message-1", 0)]),
+      Command.expectNone(),
+      message(
+        Message.ReceivedPresence({ present: [{ memberId: MemberId.MemberId.make("member-2"), typingIn: threadId }] })
+      ),
+      Command.expectNone()
+    )
+  })
+
+  it("open scrolled to their end again when the thread comes back after it was gone", () => {
+    story(
+      update,
+      given(opened),
+      readWith([written("message-1", 0)]),
+      ...scrolls(false),
+      ...answered(false),
+      readWith([written("message-1", 0)]),
+      ...scrolls(false)
     )
   })
 })
@@ -201,8 +303,12 @@ describe("a thread", () => {
       update,
       given(opened),
       received(4, 2),
-      Command.expectExact(MarkThreadRead({ ...inThread, throughSequence: 4 })),
+      Command.expectExact(
+        MarkThreadRead({ ...inThread, throughSequence: 4 }),
+        ScrollMessagesToEnd({ threadId, onlyIfNearEnd: false })
+      ),
       Command.resolve(MarkThreadRead, Message.WroteAction()),
+      Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
       // Nothing newer than what it asked for: it does not ask again.
       received(4, 2),
       Command.expectNone(),

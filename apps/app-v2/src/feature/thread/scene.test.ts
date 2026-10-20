@@ -10,6 +10,7 @@ import { describe, it } from "@effect/vitest"
 import { DateTime, Option, Schema } from "effect"
 import {
   Command,
+  Mount,
   Subscription,
   all,
   click,
@@ -41,6 +42,8 @@ import {
   FollowThread,
   PostReply,
   RenameThread,
+  RevealHighlightedMessage,
+  ScrollMessagesToEnd,
   TellTyping,
   UnfollowThread
 } from "./command.ts"
@@ -113,6 +116,31 @@ const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.T
       readThrough: 0
     })
   ),
+  Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
+  Subscription.emit(subscriptions.thread, Message.ReceivedPeople({ members: [alice, bob], contacts: [] }))
+]
+
+/**
+ * The thread read with `messages`, written by alice and bob, whose names are read, when one of them is highlighted, which
+ * the thread reveals once it is drawn.
+ */
+const readHighlighted = (
+  ...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.ThreadMessage; pending: boolean }>>
+) => [
+  Subscription.emit(
+    subscriptions.thread,
+    Message.ReceivedThread({
+      hasThread: true,
+      title: Option.none(),
+      messages,
+      following: Option.none(),
+      changes: [],
+      latest: 0,
+      readThrough: 0
+    })
+  ),
+  Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
+  Mount.resolve(RevealHighlightedMessage, Message.CompletedRevealHighlightedMessage()),
   Subscription.emit(subscriptions.thread, Message.ReceivedPeople({ members: [alice, bob], contacts: [] }))
 ]
 
@@ -146,6 +174,7 @@ const readWithChanges = (
       readThrough: 0
     })
   ),
+  Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
   Subscription.emit(subscriptions.thread, Message.ReceivedPeople({ members: [alice, bob], contacts: [] }))
 ]
 
@@ -171,7 +200,7 @@ const trackingTask = modifyFields(read, {
 })
 
 /** The thread read when the store answered `hasThread`. */
-const answered = (hasThread: boolean) =>
+const answered = (hasThread: boolean) => [
   Subscription.emit(
     subscriptions.thread,
     Message.ReceivedThread({
@@ -183,7 +212,9 @@ const answered = (hasThread: boolean) =>
       latest: 0,
       readThrough: 0
     })
-  )
+  ),
+  ...(hasThread ? [Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd())] : [])
+]
 
 describe("a thread being read", () => {
   it("says that it is loading until the store answers, and then shows its timeline", () => {
@@ -194,7 +225,7 @@ describe("a thread being read", () => {
       expect(role("list", { name: "Messages" })).toBeAbsent(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toBeAbsent(),
-      answered(true),
+      ...answered(true),
       expect(text("Loading the thread…")).toBeAbsent(),
       expect(role("list", { name: "Messages" })).toExist()
     )
@@ -204,7 +235,7 @@ describe("a thread being read", () => {
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
-      answered(false),
+      ...answered(false),
       expect(
         within(role("region", { name: "Thread" }), role("heading", { name: "This thread isn't available", level: 2 }))
       ).toExist(),
@@ -213,7 +244,7 @@ describe("a thread being read", () => {
       expect(role("list", { name: "Messages" })).toBeAbsent(),
       expect(role("button", { name: "Rename" })).toBeAbsent(),
       expect(role("button", { name: "Try again" })).toBeAbsent(),
-      answered(true),
+      ...answered(true),
       expect(role("heading", { name: "This thread isn't available" })).toBeAbsent(),
       expect(role("list", { name: "Messages" })).toExist()
     )
@@ -232,7 +263,7 @@ describe("a thread being read", () => {
       click(role("button", { name: "Try again" })),
       expect(role("heading", { name: "Can't load this thread" })).toBeAbsent(),
       expect(text("Loading the thread…")).toExist(),
-      answered(true),
+      ...answered(true),
       expect(role("list", { name: "Messages" })).toExist()
     )
   })
@@ -241,7 +272,7 @@ describe("a thread being read", () => {
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
-      answered(true),
+      ...answered(true),
       Subscription.emit(subscriptions.thread, Message.FailedRead({ error: "This browser could not read that." })),
       expect(role("list", { name: "Messages" })).toExist(),
       expect(text("This browser could not read that.")).toExist(),
@@ -448,6 +479,7 @@ describe("a thread", () => {
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
       readFollowing(Option.none()),
+      Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
       expect(role("button", { name: "Follow thread" })).toHaveAttr("aria-pressed", "false"),
       click(role("button", { name: "Follow thread" })),
       Command.expectExact(FollowThread({ workspaceId, memberId, threadId })),
@@ -787,12 +819,63 @@ describe("a thread", () => {
     )
   })
 
-  it("draws no message current unless one is highlighted", () => {
+  it("draws no message current unless one is highlighted, and mounts nothing to reveal one", () => {
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
       ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
-      expect(selector("[aria-current]")).toBeAbsent()
+      expect(selector("[aria-current]")).toBeAbsent(),
+      Mount.expectNone()
+    )
+  })
+
+  it("reveals the highlighted message once it is drawn, by a mount on its row alone", () => {
+    const highlighted = (messageId: ThreadMessageId.ThreadMessageId) =>
+      withViewInputs(view, { now, highlightedMessageId: Option.some(messageId) })()
+
+    scene(
+      { update, view: highlighted(reply.id), subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      Subscription.emit(
+        subscriptions.thread,
+        Message.ReceivedThread({
+          hasThread: true,
+          title: Option.none(),
+          messages: [
+            { message: opening, pending: false },
+            { message: reply, pending: false }
+          ],
+          following: Option.none(),
+          changes: [],
+          latest: 0,
+          readThrough: 0
+        })
+      ),
+      Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
+      Mount.expectExact(RevealHighlightedMessage),
+      Mount.resolve(RevealHighlightedMessage, Message.CompletedRevealHighlightedMessage())
+    )
+  })
+
+  it("reveals the highlighted description of a task, which is its opening, once it is drawn", () => {
+    scene(
+      {
+        update,
+        view: withViewInputs(view, { now, highlightedMessageId: Option.some(opening.id) })(),
+        subscriptions: ThreadBlock.subscriptions
+      },
+      given(trackingTask),
+      ...readHighlighted({ message: opening, pending: false }, { message: reply, pending: false }),
+      expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist()
+    )
+  })
+
+  it("lists its messages under an id of the thread's, which the scroll that keeps them at their end finds them by", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }),
+      expect(role("list", { name: "Messages" })).toHaveAttr("id", "thread-messages-thread-1")
     )
   })
 
@@ -803,7 +886,7 @@ describe("a thread", () => {
     scene(
       { update, view: highlighted(reply.id), subscriptions: ThreadBlock.subscriptions },
       given(opened),
-      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      ...readHighlighted({ message: opening, pending: false }, { message: reply, pending: false }),
       expect(selector('[aria-current="true"]')).toExist(),
       expect(within(selector('[aria-current="true"]'), text("Sounds good"))).toExist(),
       expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toBeAbsent()
@@ -811,7 +894,7 @@ describe("a thread", () => {
     scene(
       { update, view: highlighted(opening.id), subscriptions: ThreadBlock.subscriptions },
       given(opened),
-      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      ...readHighlighted({ message: opening, pending: false }, { message: reply, pending: false }),
       expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist(),
       expect(within(selector('[aria-current="true"]'), text("Sounds good"))).toBeAbsent()
     )

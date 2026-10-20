@@ -36,6 +36,7 @@ import {
   whenLabel
 } from "../../seen.ts"
 import { replyActionView, replyLogView } from "../turns/view.ts"
+import { RevealHighlightedMessage } from "./command.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import {
   type Availability,
@@ -43,6 +44,7 @@ import {
   Message,
   type MessageItem,
   type Model,
+  messagesListId,
   noteOf,
   titleOf,
   typingIn
@@ -164,6 +166,7 @@ const messageView = (
     () => false
   )
   const author = authorName(item.message.author, model.members, model.contacts)
+  const isCurrent = Option.contains(highlightedMessageId, item.message.id)
   const { body, actions } = editControls(item, model, h)
   const turnActions = Option.match(turnPostingReply(model, item.message.id), {
     onNone: () => [],
@@ -188,7 +191,8 @@ const messageView = (
     note: item.pending ? "Sending…" : undefined,
     text: messageText(item.message, model.members),
     isEdited: edited,
-    isCurrent: Option.contains(highlightedMessageId, item.message.id),
+    isCurrent,
+    attributes: isCurrent ? [h.OnMount(RevealHighlightedMessage())] : [],
     body,
     actions: [...actions, ...turnActions]
   })
@@ -269,6 +273,7 @@ const messagesView = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): H
 
   return messageList(h, {
     label: "Messages",
+    id: messagesListId(model.threadId),
     children: days.flatMap(({ label, items }, dayIndex) => [
       divider(h, label),
       ...items.flatMap((entry, index) => [
@@ -301,6 +306,7 @@ const descriptionView = (
   }
 
   const { body, actions } = editControls(opening, model, h)
+  const isCurrent = Option.contains(highlightedMessageId, opening.message.id)
 
   return property(h, {
     caption: "Description",
@@ -309,7 +315,8 @@ const descriptionView = (
         text: messageText(opening.message, model.members),
         body,
         actions,
-        isCurrent: Option.contains(highlightedMessageId, opening.message.id)
+        isCurrent,
+        attributes: isCurrent ? [h.OnMount(RevealHighlightedMessage())] : []
       }),
       opening.pending ? hint(h, "Sending…") : h.empty
     ]
@@ -476,6 +483,7 @@ export const sidePane = <Message, Requirements>(
         paneClose(h, config.onClose, `Close ${about.toLowerCase()}`)
       ]
     },
+    anchor: Option.isNone(tracked) && availability === "Available" ? "bottom" : "top",
     body: [config.body],
     ...(availability === "Unavailable" ? {} : { footer: [config.reply] })
   })

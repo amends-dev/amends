@@ -5,10 +5,11 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Dom from "foldkit/dom"
+import { followEnd, scrollToEnd } from "../../conversationScroll.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import * as Stores from "../../store/Stores.ts"
 import { boxId } from "../composer/definition.ts"
-import { Message, ThreadsDefinition } from "./definition.ts"
+import { threadsListId, Message, ThreadsDefinition } from "./definition.ts"
 
 /** Why `error` kept the action from being written, as the person reads it. */
 const failed = (error: string) => Message.FailedWriteAction({ error })
@@ -23,6 +24,23 @@ export const FocusComposer = ThreadsDefinition.command("FocusComposer", {
         Effect.ignore,
         Effect.as(Message.CompletedFocusComposer())
       )
+  }
+})
+
+/**
+ * Scroll the threads of `groupId` to their end once they are drawn, so that they open there; or, with `onlyIfNearEnd`,
+ * only if the person was near their end, so that what is added stays in view while they are there and leaves them
+ * where they scrolled to when they are not.
+ */
+export const ScrollThreadsToEnd = ThreadsDefinition.command("ScrollThreadsToEnd", {
+  args: { groupId: GroupId.GroupId, onlyIfNearEnd: Schema.Boolean },
+  messages: [Message.CompletedScrollThreadsToEnd],
+  handler: function* () {
+    return ({ groupId, onlyIfNearEnd }) =>
+      (onlyIfNearEnd
+        ? followEnd(threadsListId(groupId))
+        : scrollToEnd(threadsListId(groupId), { unlessCurrent: false })
+      ).pipe(Effect.as(Message.CompletedScrollThreadsToEnd()))
   }
 })
 

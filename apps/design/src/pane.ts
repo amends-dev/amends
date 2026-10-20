@@ -216,7 +216,8 @@ const renderHeader = <Message, Requirements>(
  *
  * The body's first element rests against its start unless the `anchor` is `bottom`, which a conversation takes: where
  * it is shorter than the body it rests against the footer's composer, as `apps/ui`'s timeline does, and where it is
- * taller the body scrolls as it does for any other.
+ * taller the body scrolls as it does for any other. An anchored body says so as `data-anchor="bottom"`, which is how a
+ * program that keeps a conversation at its end finds the body that scrolls it.
  */
 export const pane = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -235,7 +236,9 @@ export const pane = <Message, Requirements>(
   const children = [
     renderHeader(h, config.variant, config.header),
     config.toolbar === undefined ? h.empty : h.div([h.Class(toolbarBand)], config.toolbar),
-    h.div([h.Class(config.anchor === "bottom" ? `${scroll} ${bodyAtEnd}` : scroll)], config.body),
+    config.anchor === "bottom"
+      ? h.div([h.DataAttribute("anchor", "bottom"), h.Class(`${scroll} ${bodyAtEnd}`)], config.body)
+      : h.div([h.Class(scroll)], config.body),
     config.footer === undefined ? h.empty : h.div([h.Class(footerBar)], config.footer)
   ]
 

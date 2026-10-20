@@ -4,7 +4,7 @@ import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
-import { PostReply, TellTyping } from "./command.ts"
+import { PostReply, RevealHighlightedMessage, TellTyping } from "./command.ts"
 import { type Model, ThreadDefinition } from "./definition.ts"
 
 /**
@@ -53,6 +53,7 @@ export const TurnsBinding = ThreadDefinition.bindChild(TurnsBlock, {
 })
 
 export const ThreadComposition = ThreadDefinition.makeComposition({
-  bindings: [ReplyBinding, TaskBinding, TurnsBinding]
+  bindings: [ReplyBinding, TaskBinding, TurnsBinding],
+  mounts: [RevealHighlightedMessage]
 })
 export type ThreadViewBuilder = Block.ViewBuilderFor<typeof ThreadComposition>

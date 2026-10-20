@@ -126,12 +126,17 @@ export const Message = defineMessageUnion({
   ClickedFollow: {},
   ClickedUnfollow: {},
   ToldTyping: {},
+  CompletedScrollMessagesToEnd: {},
+  CompletedRevealHighlightedMessage: {},
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
 })
 export type Message = typeof Message.Type
 
 export const ThreadDefinition = Block.makeDefinition("Thread", { Model, Message, ChildInitContext })
+
+/** The `id` of the list of the messages of `threadId`, which the scroll that keeps it at its end finds it by. */
+export const messagesListId = (threadId: ThreadId.ThreadId): string => `thread-messages-${threadId}`
 
 /**
  * Whether the person's replica has the thread, so that it is shown: `Loading` until the store has answered, `Failed`

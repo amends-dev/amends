@@ -1,6 +1,14 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
-import { DeleteMessage, EditMessage, FollowThread, MarkThreadRead, RenameThread, UnfollowThread } from "./command.ts"
+import {
+  DeleteMessage,
+  EditMessage,
+  FollowThread,
+  MarkThreadRead,
+  RenameThread,
+  ScrollMessagesToEnd,
+  UnfollowThread
+} from "./command.ts"
 import { ThreadComposition } from "./composition.ts"
 import { Message, type Model, textOf } from "./definition.ts"
 
@@ -12,6 +20,10 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
     ReceivedThread: ({ hasThread, title, messages, following, changes, latest, readThrough }) => {
       // Reading it open marks it read through its latest activity, once for each.
       const marking = latest > Math.max(readThrough, model.readRequested)
+      // It opens at its end, and stays there while the person is near it as a message or a note is added.
+      const opens = !model.hasThread && hasThread
+      const grew = messages.length + changes.length > model.messages.length + model.changes.length
+      const scrolling = opens || grew ? [ScrollMessagesToEnd({ threadId: model.threadId, onlyIfNearEnd: !opens })] : []
       return {
         model: modifyFields(model, {
           isLoaded: () => true,
@@ -24,7 +36,7 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
           readThrough: () => readThrough,
           readRequested: (requested) => (marking ? latest : requested)
         }),
-        commands: marking ? [MarkThreadRead({ ...inThread(model), throughSequence: latest })] : []
+        commands: [...(marking ? [MarkThreadRead({ ...inThread(model), throughSequence: latest })] : []), ...scrolling]
       }
     },
     ReceivedPeople: ({ members, contacts }) => ({
@@ -92,6 +104,8 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
         })
       }),
     ToldTyping: () => ({ model: modifyFields(model, { typingTold: () => false }) }),
+    CompletedScrollMessagesToEnd: () => ({ model }),
+    CompletedRevealHighlightedMessage: () => ({ model }),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
     FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
   })

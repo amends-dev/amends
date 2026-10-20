@@ -52,6 +52,8 @@ import {
 } from "../../../test/fixtures.ts"
 import { pickerClosed, pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { panelIs } from "../../../test/panelSize.ts"
+import { ThreadsBlock } from "../threads/block.ts"
+import { ScrollThreadsToEnd } from "../threads/command.ts"
 import {
   AdmitMembers,
   FocusAdmitMembers,
@@ -297,6 +299,7 @@ describe("a group's main pane", () => {
       expect(label("New task in #Design")).toHaveAttr("placeholder", "New task in #Design"),
       expect(within(role("main", { name: "Design" }), role("button", { name: "Send" }))).toExist(),
       click(role("tab", { name: "Threads" })),
+      Command.resolve(ScrollThreadsToEnd, ThreadsBlock.Message.CompletedScrollThreadsToEnd()),
       expect(role("list", { name: "Threads" })).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(label("Message #Design")).toHaveAttr("placeholder", "Message #Design")
@@ -489,6 +492,57 @@ describe("a group's main pane", () => {
         "true"
       ),
       expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist()
+    )
+  })
+
+  it("rests the group's threads against the composer, anchored to the bottom, while they are listed on the Threads tab", () => {
+    const listed = modifyFields(opened, {
+      threads: (threads) =>
+        modifyFields(threads, {
+          isLoaded: () => true,
+          threads: () => [
+            {
+              thread: { ...thread, groupId: design.id },
+              opening: Option.some(opening),
+              task: Option.none(),
+              replies: 0,
+              repliers: [],
+              working: [],
+              lastActiveAt: opening.publishedAt,
+              pending: false,
+              unread: 0
+            }
+          ]
+        })
+    })
+
+    scene(
+      { update, view },
+      given(listed),
+      expect(within(role("main", { name: "Design" }), selector('[data-anchor="bottom"]'))).toExist(),
+      expect(within(selector('[data-anchor="bottom"]'), role("list", { name: "Threads" }))).toExist(),
+      expect(role("list", { name: "Threads" })).toHaveAttr("id", "group-threads-design"),
+      click(role("tab", { name: "Tasks" })),
+      expect(selector('[data-anchor="bottom"]')).toBeAbsent()
+    )
+  })
+
+  it("does not anchor the pane to the bottom while the threads are read, or none was said, or they could not be read", () => {
+    const welcoming = modifyFields(opened, { threads: (threads) => modifyFields(threads, { isLoaded: () => true }) })
+
+    scene({ update, view }, given(opened), expect(selector('[data-anchor="bottom"]')).toBeAbsent())
+    scene(
+      { update, view },
+      given(welcoming),
+      expect(role("heading", { name: "Welcome to #Design" })).toExist(),
+      expect(selector('[data-anchor="bottom"]')).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, { isLoaded: () => false, group: () => Option.none(), notice: () => Option.some("No") })
+      ),
+      expect(selector('[data-anchor="bottom"]')).toBeAbsent()
     )
   })
 

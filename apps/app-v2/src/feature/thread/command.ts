@@ -11,8 +11,9 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
+import { followEnd, revealMessage, scrollToEnd } from "../../conversationScroll.ts"
 import * as Stores from "../../store/Stores.ts"
-import { Message, ThreadDefinition } from "./definition.ts"
+import { Message, messagesListId, ThreadDefinition } from "./definition.ts"
 
 const posted = [Message.WroteAction, Message.FailedWriteAction]
 
@@ -152,6 +153,34 @@ export const TellTyping = ThreadDefinition.command("TellTyping", {
   }
 })
 
+/**
+ * Scroll the messages of `threadId` to their end once they are drawn, so that the thread opens there, unless a message
+ * is the current one, which a notification came for; or, with `onlyIfNearEnd`, only if the person was near their end,
+ * so that what is added stays in view while they are there and leaves them where they scrolled to when they are not.
+ */
+export const ScrollMessagesToEnd = ThreadDefinition.command("ScrollMessagesToEnd", {
+  args: { threadId: ThreadId.ThreadId, onlyIfNearEnd: Schema.Boolean },
+  messages: [Message.CompletedScrollMessagesToEnd],
+  handler: function* () {
+    return ({ threadId, onlyIfNearEnd }) =>
+      (onlyIfNearEnd
+        ? followEnd(messagesListId(threadId))
+        : scrollToEnd(messagesListId(threadId), { unlessCurrent: true })
+      ).pipe(Effect.as(Message.CompletedScrollMessagesToEnd()))
+  }
+})
+
+/**
+ * Scroll the message it is mounted on to the middle of the pane when it is drawn, so that the person sees what a
+ * notification came for.
+ */
+export const RevealHighlightedMessage = ThreadDefinition.mount("RevealHighlightedMessage", {
+  messages: [Message.CompletedRevealHighlightedMessage],
+  handler: function* () {
+    return ({ element }) => Effect.as(revealMessage(element), Message.CompletedRevealHighlightedMessage())
+  }
+})
+
 export const EffectsLayer = Layer.mergeAll(
   PostReply.layer,
   RenameThread.layer,
@@ -160,5 +189,7 @@ export const EffectsLayer = Layer.mergeAll(
   FollowThread.layer,
   UnfollowThread.layer,
   MarkThreadRead.layer,
-  TellTyping.layer
+  TellTyping.layer,
+  ScrollMessagesToEnd.layer,
+  RevealHighlightedMessage.layer
 )

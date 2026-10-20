@@ -29,7 +29,7 @@ import * as Drafts from "../../store/Drafts.ts"
 import { AssigneeMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
-import { FocusComposer, StartThread } from "./command.ts"
+import { FocusComposer, ScrollThreadsToEnd, StartThread } from "./command.ts"
 import { Message, OutMessage, TaskSortMenu } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -597,6 +597,7 @@ describe("a group's threads", () => {
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       Command.resolve(StartThread, Message.WroteAction()),
       click(role("tab", { name: "Threads" })),
+      Command.resolve(ScrollThreadsToEnd, Message.CompletedScrollThreadsToEnd()),
       expect(label("Message #General")).toHaveAttr("placeholder", "Message #General")
     )
   })
@@ -658,6 +659,8 @@ describe("a group's tabs", () => {
       expect(role("list", { name: "Tasks" })).toExist(),
       expect(role("list", { name: "Threads" })).toBeAbsent(),
       click(role("tab", { name: "Threads" })),
+      Command.expectExact(ScrollThreadsToEnd({ groupId, onlyIfNearEnd: false })),
+      Command.resolve(ScrollThreadsToEnd, Message.CompletedScrollThreadsToEnd()),
       expect(role("list", { name: "Threads" })).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent()
     )

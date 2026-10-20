@@ -1,5 +1,5 @@
 import * as Layer from "effect/Layer"
-import { FocusComposer, StartThread } from "./command.ts"
+import { FocusComposer, ScrollThreadsToEnd, StartThread } from "./command.ts"
 import { ThreadsComposition } from "./composition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
@@ -11,7 +11,7 @@ const ThreadsBlockValue = ThreadsComposition.assembleBlock({
   update,
   view,
   subscriptions,
-  EffectsLayer: Layer.mergeAll(StartThread.layer, FocusComposer.layer, subscriptions.layer)
+  EffectsLayer: Layer.mergeAll(StartThread.layer, FocusComposer.layer, ScrollThreadsToEnd.layer, subscriptions.layer)
 })
 type ThreadsBlockType = typeof ThreadsBlockValue
 export interface ThreadsBlock extends ThreadsBlockType {}
