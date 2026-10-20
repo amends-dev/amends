@@ -6,7 +6,6 @@ import { DateTime, Option } from "effect"
 import {
   Command,
   all,
-  change,
   click,
   expect,
   expectAll,
@@ -24,12 +23,14 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { art, bob, membership, now, opening, saying, task, thread } from "../../../test/fixtures.ts"
+import { chooseFromMenu, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
 import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
+import { AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { FocusComposer, StartThread } from "./command.ts"
-import { Message, OutMessage } from "./definition.ts"
+import { Message, OutMessage, TaskSortMenu } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { composerView, tabsView, toolbarView, view } from "./view.ts"
@@ -507,18 +508,113 @@ describe("a group's tasks", () => {
     )
   })
 
+  it("has a search, a menu of status and one of assignee that narrow them, and at the end a menu of order and New task", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(alices, shipping)),
+      expect(label("Search tasks")).toHaveAttr("placeholder", "Search tasks…"),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("Status: Any status"),
+      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Assignee: Anyone"),
+      expect(nth(all.role("button"), 2)).toHaveAccessibleName("Sort: Latest activity"),
+      expect(nth(all.role("button"), 3)).toHaveAccessibleName("New task"),
+      expect(within(role("button", { name: "Status: Any status" }), text("Status"))).toExist(),
+      expect(within(role("button", { name: "Assignee: Anyone" }), text("Assignee"))).toExist(),
+      expect(within(role("button", { name: "Sort: Latest activity" }), text("Latest activity"))).toExist(),
+      expect(role("combobox")).toBeAbsent()
+    )
+  })
+
   it("narrows to the tasks in the status the person chooses, and back to all of them", () => {
     scene(
       { update, view: tasksTab },
       given(tasking(alices, shipping)),
-      expect(label("Status")).toHaveValue("All"),
-      change(label("Status"), "doing"),
-      expect(label("Status")).toHaveValue("doing"),
+      ...openMenu(StatusFilterMenu, "Status: Any status"),
+      expect(role("menuitem", { name: "Any status (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Triage" })).toExist(),
+      expect(role("menuitem", { name: "To do" })).toExist(),
+      expect(role("menuitem", { name: "Doing" })).toExist(),
+      expect(role("menuitem", { name: "Held" })).toExist(),
+      expect(role("menuitem", { name: "Done" })).toExist(),
+      expect(role("menuitem", { name: "Dismissed" })).toExist(),
+      ...chooseMenuItem(StatusFilterMenu, "Doing"),
+      expect(role("button", { name: "Status: Doing" })).toExist(),
       expectAll(all.role("listitem")).toHaveCount(1),
       expect(role("button", { name: "Ship the release" })).toExist(),
       expect(role("button", { name: "Plans for the week" })).toBeAbsent(),
       expect(text("1 task")).toExist(),
-      change(label("Status"), "All"),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Doing", "Any status"),
+      expect(role("button", { name: "Status: Any status" })).toExist(),
+      expectAll(all.role("listitem")).toHaveCount(2)
+    )
+  })
+
+  it("narrows to the tasks assigned as the person chooses: anyone, themselves, or no one", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(alices, shipping)),
+      ...openMenu(AssigneeFilterMenu, "Assignee: Anyone"),
+      expect(role("menuitem", { name: "Anyone (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Me" })).toExist(),
+      expect(role("menuitem", { name: "No one" })).toExist(),
+      ...chooseMenuItem(AssigneeFilterMenu, "Me"),
+      expect(role("button", { name: "Assignee: Me" })).toExist(),
+      expectAll(all.role("listitem")).toHaveCount(1),
+      expect(role("button", { name: "Ship the release" })).toExist(),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Me", "No one"),
+      expect(role("button", { name: "Assignee: No one" })).toExist(),
+      expectAll(all.role("listitem")).toHaveCount(1),
+      expect(role("button", { name: "Plans for the week" })).toExist(),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: No one", "Anyone"),
+      expectAll(all.role("listitem")).toHaveCount(2)
+    )
+  })
+
+  it("orders them as the person chooses: latest activity, newest started, or oldest started", () => {
+    const startedAt = (minutesAgo: number) => DateTime.subtract(now, { minutes: minutesAgo })
+    const oldest = { ...alices, thread: { ...alices.thread, createdAt: startedAt(300) } }
+    const middle = { ...shipping, thread: { ...shipping.thread, createdAt: startedAt(200) } }
+    const newest = {
+      ...shipping,
+      thread: {
+        ...shipping.thread,
+        id: ThreadId.ThreadId.make("thread-5"),
+        title: "Review the logo",
+        createdAt: startedAt(100)
+      },
+      lastActiveAt: startedAt(50)
+    }
+    const inOrder = (...titles: ReadonlyArray<string>) =>
+      titles.map((title, index) => expect(within(taskRow(index), role("button", { name: title }))).toExist())
+
+    scene(
+      { update, view: tasksTab },
+      given(tasking(oldest, middle, newest)),
+      ...inOrder("Ship the release", "Plans for the week", "Review the logo"),
+      ...openMenu(TaskSortMenu, "Sort: Latest activity"),
+      expect(role("menuitem", { name: "Latest activity (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Newest" })).toExist(),
+      expect(role("menuitem", { name: "Oldest" })).toExist(),
+      ...chooseMenuItem(TaskSortMenu, "Newest"),
+      expect(role("button", { name: "Sort: Newest" })).toExist(),
+      ...inOrder("Review the logo", "Ship the release", "Plans for the week"),
+      ...chooseFromMenu(TaskSortMenu, "Sort: Newest", "Oldest"),
+      expect(role("button", { name: "Sort: Oldest" })).toExist(),
+      ...inOrder("Plans for the week", "Ship the release", "Review the logo"),
+      ...chooseFromMenu(TaskSortMenu, "Sort: Oldest", "Latest activity"),
+      ...inOrder("Ship the release", "Plans for the week", "Review the logo")
+    )
+  })
+
+  it("leaves what is narrowed and how it is ordered as it was when a menu is closed without a choice", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(alices, shipping)),
+      ...openMenu(StatusFilterMenu, "Status: Any status"),
+      ...closeMenu(StatusFilterMenu, "Status: Any status"),
+      ...openMenu(TaskSortMenu, "Sort: Latest activity"),
+      ...closeMenu(TaskSortMenu, "Sort: Latest activity"),
+      expect(role("button", { name: "Status: Any status" })).toExist(),
+      expect(role("button", { name: "Sort: Latest activity" })).toExist(),
       expectAll(all.role("listitem")).toHaveCount(2)
     )
   })
@@ -541,16 +637,21 @@ describe("a group's tasks", () => {
     )
   })
 
-  it("narrows by the status and the search together", () => {
+  it("narrows by the status, the assignee, and the search together", () => {
     scene(
       { update, view: tasksTab },
       given(tasking(alices, shipping)),
-      change(label("Status"), "triage"),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Triage"),
       type(label("Search tasks"), "ship"),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist(),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       type(label("Search tasks"), "plans"),
+      expect(role("button", { name: "Plans for the week" })).toExist(),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Anyone", "Me"),
+      expect(role("list", { name: "Tasks" })).toBeAbsent(),
+      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Me", "No one"),
       expect(role("button", { name: "Plans for the week" })).toExist()
     )
   })
@@ -568,18 +669,23 @@ describe("a group's tasks", () => {
     scene({ update, view: tasksTab }, given(tasking()), expect(role("heading", { name: "No tasks yet" })).toExist())
   })
 
-  it("says that none match when a search or a status leaves none, and not that there are none yet", () => {
+  it("says that none match when a search, a status, or an assignee leaves none, and not that there are none yet", () => {
     scene(
       { update, view: tasksTab },
       given(tasking(alices, shipping)),
       type(label("Search tasks"), "zzz"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       expect(art("nothing-here")).toExist(),
-      expect(text("Try a different search or status.")).toExist(),
+      expect(text("Try different filters.")).toExist(),
       expect(role("heading", { name: "No tasks yet" })).toBeAbsent(),
       type(label("Search tasks"), "  "),
       expectAll(all.role("listitem")).toHaveCount(2),
-      change(label("Status"), "done"),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Done"),
+      expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Done", "Any status"),
+      expectAll(all.role("listitem")).toHaveCount(2),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Anyone", "Me"),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Triage"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist()
     )
   })

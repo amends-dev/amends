@@ -1,18 +1,35 @@
 import { Task } from "@amends-dev/core/task"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
-import { button, choiceSelect, column, loadingLine, notice, searchField } from "@amends-dev/design/control"
+import { button, column, loadingLine, notice, searchField } from "@amends-dev/design/control"
 import { summary } from "@amends-dev/design/directory"
+import { choiceMenu } from "@amends-dev/design/menu"
 import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
 import { paneEmpty, paneTabs, paneToolbar, paneToolbarStack } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { authorName, initials, pluralize, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
-import { statusChoices } from "../../taskFilter.ts"
+import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { taskColumns, taskRows } from "../../taskTable.ts"
-import { ComposerBinding, ThreadsComposition, type ThreadsViewBuilder } from "./composition.ts"
-import { byDay, Message, type Model, openTaskCount, type ThreadItem, tasksOf } from "./definition.ts"
+import {
+  AssigneeBinding,
+  ComposerBinding,
+  SortBinding,
+  StatusBinding,
+  ThreadsComposition,
+  type ThreadsViewBuilder
+} from "./composition.ts"
+import {
+  byDay,
+  isFiltered,
+  Message,
+  type Model,
+  openTaskCount,
+  taskSortChoices,
+  type ThreadItem,
+  tasksOf
+} from "./definition.ts"
 
 /**
  * Who could have written the openings, what the group is called and whether it is a team, which of its threads is
@@ -125,12 +142,10 @@ const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): H
  * nothing matches what the person narrowed it to.
  */
 const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Html => {
-  const { status, query } = model.taskFilter
   const shown = tasksOf(model, inputs.members)
-  const none =
-    query.trim() === "" && status === "All"
-      ? ({ art: "fill", title: "No tasks yet", copy: "Start one from the composer below." } as const)
-      : ({ art: "nothing-here", title: "No tasks match", copy: "Try a different search or status." } as const)
+  const none = isFiltered(model)
+    ? ({ art: "nothing-here", title: "No tasks match", copy: "Try different filters." } as const)
+    : ({ art: "fill", title: "No tasks yet", copy: "Start one from the composer below." } as const)
 
   return column(h, [
     notice(h, model.notice),
@@ -154,9 +169,9 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
 }
 
 /**
- * The toolbar of the Tasks tab, for the pane that holds the tab: a search and the choice of status that narrow the
- * tasks, and at its end New task, which moves the focus to the composer; under it, how many tasks the tab lists and the
- * labels of its columns.
+ * The toolbar of the Tasks tab, for the pane that holds the tab: a search and the menus of status and assignee that
+ * narrow the tasks, and at its end the menu of the order they are listed in and New task, which moves the focus to the
+ * composer; under it, how many tasks the tab lists and the labels of its columns.
  */
 export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
   const shown = tasksOf(model, inputs.members)
@@ -171,19 +186,30 @@ export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((m
           value: model.taskFilter.query,
           onInput: (query) => Message.TypedTaskQuery({ query })
         }),
-        choiceSelect(
-          h,
-          {
-            id: "task-status",
-            label: "Status",
-            choices: taskStatusChoices,
-            value: model.taskFilter.status,
-            onChange: (status) => Message.ChoseTaskStatus({ status })
-          },
-          { isLabelHidden: true }
-        )
+        statusFilterMenu(h, {
+          choices: taskStatusChoices,
+          value: model.taskFilter.status,
+          embed: (viewInputs) =>
+            h.block(StatusBinding.embedView({ slotId: "group-tasks-status", model: model.statusMenu, viewInputs }))
+        }),
+        assigneeFilterMenu(h, {
+          value: model.taskFilter.assignee,
+          embed: (viewInputs) =>
+            h.block(
+              AssigneeBinding.embedView({ slotId: "group-tasks-assignee", model: model.assigneeMenu, viewInputs })
+            )
+        })
       ],
-      end: [button(h, "New task", Message.ClickedNewTask(), { icon: "mark-new" })]
+      end: [
+        choiceMenu(h, {
+          choices: taskSortChoices,
+          value: model.taskSort,
+          name: `Sort: ${taskSortChoices.find(([value]) => value === model.taskSort)?.[1]}`,
+          embed: (viewInputs) =>
+            h.block(SortBinding.embedView({ slotId: "group-tasks-sort", model: model.sortMenu, viewInputs }))
+        }),
+        button(h, "New task", Message.ClickedNewTask(), { icon: "mark-new" })
+      ]
     }),
     summary(h, { copy: "Threads that track a task.", count: pluralize(shown.length, "task", "tasks") }),
     ...(shown.length === 0 ? [] : [taskColumns(h, { hasGroupColumn: false })])

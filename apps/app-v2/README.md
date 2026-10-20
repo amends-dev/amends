@@ -237,12 +237,19 @@ the pages that compose them; the root composes the pages.
   conversation…", and once it has, a group with no thread welcomes the person, "Welcome to #General" for a team and
   "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
   caret blinking. On the Tasks tab it is the threads that track a
-  task as a table, latest active first by `lastActiveAt`: under a toolbar, the threads Block's `toolbarView`, which the
-  group's pane draws over the rows while the tab is open, of a search field, whose label is hidden and
-  whose placeholder says "Search tasks…", beside a select of the status, All statuses or one by its name
-  (`statusLabel`), whose label is hidden too, and, at its end, New task, which moves the focus to the composer in the
-  footer (`ClickedNewTask`, the command `FocusComposer`), a line says "Threads that track a task." with how many
-  tasks the search and the status leave at its end, "12 tasks", over the labels of the columns, Task,
+  task as a table, in the order the person chose, latest active first by `lastActiveAt` at first: under a toolbar, the
+  threads Block's `toolbarView`, which the group's pane draws over the rows while the tab is open, as `apps/ui`'s
+  `GroupTasks` has it, of a search field, whose label is hidden and whose placeholder says "Search tasks…", beside a
+  menu of the status (`StatusFilterMenu`), Any status or one by its name (`statusLabel`), named "Status: Any status",
+  and a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Me, or No one, named "Assignee: Anyone",
+  both the ones `taskFilter.ts` gives the workspace's Triage and Tasks, whose buttons say Status and Assignee while
+  they narrow to nothing, and, at its end, a menu of the order (`TaskSortMenu`), Latest activity, Newest, or Oldest,
+  named "Sort: Latest activity", the last two by when the thread was created, and New task, which moves the focus to the composer in the
+  footer (`ClickedNewTask`, the command `FocusComposer`). Each menu is a Foldkit `Menu` Block the Block binds
+  (`StatusBinding`, `AssigneeBinding`, `SortBinding`, with the ids `group-tasks-status`, `group-tasks-assignee`, and
+  `group-tasks-sort`), and choosing from it changes only the Block's own model (`taskFilter`, `taskSort`), so the Block
+  has no message for the choice. A line says "Threads that track a task." with how many
+  tasks the search, the status, and the assignee leave at its end, "12 tasks", over the labels of the columns, Task,
   Status, and Activity, and a row for each task: the initials of its assignee, or a dash for no one, the
   thread's title or its opening's words (`threadWords`), "Started by Alice · 3 replies" under it, with
   "Sending…" while the thread is being started, a badge of the status, a success for done and a caution
@@ -272,7 +279,7 @@ the pages that compose them; the root composes the pages.
   which is filled, named Unfollow, and pressed while the person follows the group, or Join, where
   they apply; and a gear that opens the settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
   tab's content, threads or tasks, with the composer to start one in the footer, which a team the person has not joined does
-  not have. The Tasks tab's status stays a select, and it has no menu of the assignee or sort, as `apps/ui`'s has. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
+  not have. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
   beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
   name, and Save changes, which is disabled while the draft is the name the team has, for someone
@@ -912,8 +919,9 @@ offers an agent.
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
 feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
 `taskTable.ts`, tasks as the design's `directory` rows under the labels of its columns, with the badge
-of each status and the choices of a status to narrow them to, is the threads feature's Tasks tab's and
-the tasks feature's, which adds a column for the group.
+of each status, is the threads feature's Tasks tab's and the tasks feature's, which adds a column for the group.
+`taskFilter.ts`, what a list of tasks is narrowed to besides the letters typed, the status and the assignee, each
+chosen from a menu, is theirs too.
 `memberChoice.ts`, the choice of a workspace member over the design's select, is the groups'
 conversation form's, the group's admit form's, and the task's assignee, each saying what its empty
 choice is.
@@ -1034,9 +1042,10 @@ key `keepAppearance` keeps, to show the two agree:
   from what was seen, unless nothing changes; a thread's turns stopped while they are active and run
   again only when nothing else keeps them from it, and a turn's log followed from showing it until
   the turn ends or the person hides it, passing over another turn's, and followed again after it
-  could not be; a thread started from the composer, a task started on the Tasks tab, the tab and the task
-  filter chosen, the thread picked, and the tasks of a group's threads kept to a status and a search and
-  ordered, and counted while open; a composer filling in its
+  could not be; a thread started from the composer, a task started on the Tasks tab, the tab chosen, and the status, the
+  assignee, and the order chosen from their menus, which change only the Block's own model, the thread picked, and the
+  tasks of a group's threads kept to a status, an assignee, and a search and ordered latest active, newest, or
+  oldest first, and counted while open; a composer filling in its
   draft only while nothing was written, keeping what is written, and sending it once, listing members for
   a mention typed at the end of the text and for no other, keeping the list closed for the letters it
   was dismissed for, opening none for a draft read, and writing the member picked as a link; a group
@@ -1181,7 +1190,8 @@ key `keepAppearance` keeps, to show the two agree:
   times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
   from the composer, whose box is named for the group; a group's tabs, Tasks counted while any task is
   open and chosen to show the tasks as rows by their assignee, title, who started them, replies, status,
-  and age, latest active first, narrowed by status and by search, saying there are none yet or that none
+  and age, latest active first, narrowed by search and by the status and assignee menus, ordered by the sort menu,
+  with the menus in the toolbar's order and New task at its end, saying there are none yet or that none
   match, opening a thread by its row, and a task started from the composer, named for the task; a composer listing the members whose names
   contain the letters after the "@" that ends the text, and not the person, saying which is active and
   what the textarea completes from, picking by a click, by Enter, and by Tab, moving around the list

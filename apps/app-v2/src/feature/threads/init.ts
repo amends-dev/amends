@@ -14,7 +14,8 @@ export const init = ThreadsComposition.makeInit(
       threads: [],
       isLoaded: false,
       tab: "Threads",
-      taskFilter: { status: "All", query: "" },
+      taskFilter: { status: "All", assignee: "Anyone", query: "" },
+      taskSort: "Latest",
       notice: Option.none()
     }
   })

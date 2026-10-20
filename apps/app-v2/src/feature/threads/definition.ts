@@ -1,8 +1,8 @@
 /**
  * A group's threads, as the person lists them on a tab each: all of them, oldest first under the days they
  * were created, each with its opening message, who replied to it, the task it tracks, and how much of it is
- * new; and the ones that track a task, latest active first, as a table the person narrows by status and by what
- * they search for. A composer starts a thread, or on the Tasks tab a thread that tracks a task, which the Tasks tab's
+ * new; and the ones that track a task, as a table the person narrows by status, by assignee, and by what they
+ * search for, and sorts by latest activity or by when the thread was started. A composer starts a thread, or on the Tasks tab a thread that tracks a task, which the Tasks tab's
  * New task moves the focus to. It reports the thread the person picks.
  */
 
@@ -10,6 +10,7 @@ import { GroupId } from "@amends-dev/core/group"
 import { Task } from "@amends-dev/core/task"
 import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { type Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import * as Menu from "@foldkit/ui/menu"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -18,7 +19,13 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { type Day, groupByDay, isOpen, threadContains } from "../../seen.ts"
-import { TaskStatusFilter } from "../../taskFilter.ts"
+import {
+  AssigneeFilter,
+  AssigneeFilterMenu,
+  isAssignedAs,
+  StatusFilterMenu,
+  TaskStatusFilter
+} from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**
@@ -41,9 +48,23 @@ export type ThreadItem = typeof ThreadItem.Type
 export const ThreadsTab = Schema.Literals(["Threads", "Tasks"])
 export type ThreadsTab = typeof ThreadsTab.Type
 
+/** How the Tasks tab orders its tasks: by latest activity, or by when their threads were started, newest or oldest first. */
+export const TaskSort = Schema.Literals(["Latest", "Newest", "Oldest"])
+export type TaskSort = typeof TaskSort.Type
+
+/** The menu that chooses how the Tasks tab orders its tasks. */
+export const TaskSortMenu = Menu.create<TaskSort>()
+
+/** The orders of the Tasks tab, as the person reads them. */
+export const taskSortChoices: ReadonlyArray<readonly [TaskSort, string]> = [
+  ["Latest", "Latest activity"],
+  ["Newest", "Newest"],
+  ["Oldest", "Oldest"]
+]
+
 /**
- * The group's threads as they were read, whether they were yet, the tab shown, what the Tasks tab is narrowed to, the
- * composer, and why the last read or write failed.
+ * The group's threads as they were read, whether they were yet, the tab shown, what the Tasks tab is narrowed to, how
+ * it is ordered, and the menus those are chosen in, the composer, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -52,7 +73,11 @@ export const Model = Schema.Struct({
   threads: Schema.Array(ThreadItem),
   isLoaded: Schema.Boolean,
   tab: ThreadsTab,
-  taskFilter: Schema.Struct({ status: TaskStatusFilter, query: Schema.String }),
+  taskFilter: Schema.Struct({ status: TaskStatusFilter, assignee: AssigneeFilter, query: Schema.String }),
+  taskSort: TaskSort,
+  statusMenu: StatusFilterMenu.Model,
+  assigneeMenu: AssigneeFilterMenu.Model,
+  sortMenu: TaskSortMenu.Model,
   composer: ComposerBlock.Model,
   notice: Schema.Option(Schema.String)
 })
@@ -69,7 +94,6 @@ export const Message = defineMessageUnion({
   ReceivedThreads: { threads: Schema.Array(ThreadItem) },
   FailedRead: { error: Schema.String },
   ChoseTab: { tab: ThreadsTab },
-  ChoseTaskStatus: { status: TaskStatusFilter },
   TypedTaskQuery: { query: Schema.String },
   ClickedNewTask: {},
   CompletedFocusComposer: {},
@@ -98,22 +122,32 @@ export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): Read
 /** A thread of the group and the task it tracks. */
 export type TrackingThread = Readonly<{ item: ThreadItem; task: Task.Task }>
 
-const byLastActive = Order.mapInput(Order.flip(DateTime.Order), ({ item }: TrackingThread) => item.lastActiveAt)
+const taskOrder: Readonly<Record<TaskSort, Order.Order<TrackingThread>>> = {
+  Latest: Order.mapInput(Order.flip(DateTime.Order), ({ item }) => item.lastActiveAt),
+  Newest: Order.flip(Order.mapInput(byCreated, ({ item }) => item)),
+  Oldest: Order.mapInput(byCreated, ({ item }) => item)
+}
 
 /**
- * The threads that track a task, latest active first, kept to the status the filter chose, every one for All, and
- * to those whose title or opening contains what the filter searches for, in any case and whatever the accents,
- * all of them for no letters.
+ * The threads that track a task, kept to the status the filter chose, every one for All, to those assigned as it
+ * chose, and to those whose title or opening contains what it searches for, in any case and whatever the accents,
+ * all of them for no letters, in the order the person chose.
  */
 export const tasksOf = (model: Model, members: ReadonlyArray<Member.Member>): ReadonlyArray<TrackingThread> => {
-  const { status, query } = model.taskFilter
+  const { status, assignee, query } = model.taskFilter
   const tracked = model.threads.flatMap((item) => Option.toArray(Option.map(item.task, (task) => ({ item, task }))))
 
-  return Array.sort(tracked, byLastActive).filter(
+  return Array.sort(tracked, taskOrder[model.taskSort]).filter(
     ({ item, task }) =>
-      (status === "All" || task.status === status) && threadContains(item.thread, item.opening, members, query)
+      (status === "All" || task.status === status) &&
+      isAssignedAs(assignee, task.assignee, model.memberId) &&
+      threadContains(item.thread, item.opening, members, query)
   )
 }
+
+/** Whether the person narrowed the tasks: they searched for letters, or chose an assignee or a status. */
+export const isFiltered = ({ taskFilter }: Model): boolean =>
+  taskFilter.query.trim() !== "" || taskFilter.assignee !== "Anyone" || taskFilter.status !== "All"
 
 /** How many of `items` track a task that is neither done nor dismissed. */
 export const openTaskCount = (items: ReadonlyArray<ThreadItem>): number =>

@@ -11,9 +11,6 @@ export const update = ThreadsComposition.makeUpdate((model, message) =>
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
-    ChoseTaskStatus: ({ status }) => ({
-      model: modifyFields(model, { taskFilter: (filter) => modifyFields(filter, { status: () => status }) })
-    }),
     TypedTaskQuery: ({ query }) => ({
       model: modifyFields(model, { taskFilter: (filter) => modifyFields(filter, { query: () => query }) })
     }),

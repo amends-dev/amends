@@ -4,16 +4,33 @@ import { Thread, ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Schema } from "effect"
-import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import { bob, now, opening, saying } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
 import * as Drafts from "../../store/Drafts.ts"
+import {
+  type AssigneeFilter,
+  AssigneeFilterMenu,
+  assigneeChoices,
+  StatusFilterMenu,
+  statusChoices,
+  type TaskStatusFilter
+} from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { StartThread } from "./command.ts"
-import { ComposerBinding } from "./composition.ts"
-import { Message, openTaskCount, OutMessage, tasksOf } from "./definition.ts"
+import { AssigneeBinding, ComposerBinding, SortBinding, StatusBinding } from "./composition.ts"
+import {
+  isFiltered,
+  Message,
+  openTaskCount,
+  OutMessage,
+  type TaskSort,
+  TaskSortMenu,
+  taskSortChoices,
+  tasksOf
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -39,6 +56,45 @@ const fromComposer = (message: typeof ComposerBlock.Message.Type) =>
     model: listing.composer,
     viewInputs: { label: "Start a thread", submitLabel: "Start", placeholder: "Message General", members: [] }
   }).toParentMessage(message)
+
+/** The status menu reporting that the person chose `status`, as the threads receive it. */
+const choseStatus = (status: TaskStatusFilter) =>
+  StatusBinding.embedView({
+    slotId: "group-tasks-status",
+    model: listing.statusMenu,
+    viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+  }).toParentMessage(
+    StatusFilterMenu.Message.SelectedItem({
+      index: statusChoices(Task.Status.literals).findIndex(([value]) => value === status),
+      item: status
+    })
+  )
+
+/** The assignee menu reporting that the person chose `assignee`, as the threads receive it. */
+const choseAssignee = (assignee: AssigneeFilter) =>
+  AssigneeBinding.embedView({
+    slotId: "group-tasks-assignee",
+    model: listing.assigneeMenu,
+    viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+  }).toParentMessage(
+    AssigneeFilterMenu.Message.SelectedItem({
+      index: assigneeChoices.findIndex(([value]) => value === assignee),
+      item: assignee
+    })
+  )
+
+/** The sort menu reporting that the person chose `sort`, as the threads receive it. */
+const choseSort = (sort: TaskSort) =>
+  SortBinding.embedView({
+    slotId: "group-tasks-sort",
+    model: listing.sortMenu,
+    viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+  }).toParentMessage(
+    TaskSortMenu.Message.SelectedItem({
+      index: taskSortChoices.findIndex(([value]) => value === sort),
+      item: sort
+    })
+  )
 
 describe("a group's threads", () => {
   it("starts a thread with what the person wrote, and says why it could not be kept", () => {
@@ -91,32 +147,69 @@ describe("a group's threads", () => {
     )
   })
 
-  it("starts on the Threads tab, with every status and no search on the Tasks tab", () => {
+  it("starts on the Threads tab, with every status, any assignee, and no search on the Tasks tab, latest active first", () => {
     expect(listing.tab).toBe("Threads")
-    expect(listing.taskFilter).toEqual({ status: "All", query: "" })
+    expect(listing.taskFilter).toEqual({ status: "All", assignee: "Anyone", query: "" })
+    expect(listing.taskSort).toBe("Latest")
   })
 
   it("shows the tab the person chooses, and keeps what the Tasks tab was narrowed to while they are on the other", () => {
+    const narrowed = { status: "doing", assignee: "Me", query: "ship" }
+
     story(
       update,
       given(listing),
       message(Message.ChoseTab({ tab: "Tasks" })),
-      message(Message.ChoseTaskStatus({ status: "doing" })),
+      message(choseStatus("doing")),
+      message(choseAssignee("Me")),
+      message(choseSort("Oldest")),
       message(Message.TypedTaskQuery({ query: "ship" })),
       model((model) => {
         expect(model.tab).toBe("Tasks")
-        expect(model.taskFilter).toEqual({ status: "doing", query: "ship" })
+        expect(model.taskFilter).toEqual(narrowed)
+        expect(model.taskSort).toBe("Oldest")
       }),
       message(Message.ChoseTab({ tab: "Threads" })),
       model((model) => {
         expect(model.tab).toBe("Threads")
-        expect(model.taskFilter).toEqual({ status: "doing", query: "ship" })
+        expect(model.taskFilter).toEqual(narrowed)
+        expect(model.taskSort).toBe("Oldest")
       }),
-      message(Message.ChoseTaskStatus({ status: "All" })),
+      message(choseStatus("All")),
+      message(choseAssignee("Anyone")),
+      message(choseSort("Latest")),
       message(Message.TypedTaskQuery({ query: "" })),
       model((model) => {
-        expect(model.taskFilter).toEqual({ status: "All", query: "" })
+        expect(model.taskFilter).toEqual({ status: "All", assignee: "Anyone", query: "" })
+        expect(model.taskSort).toBe("Latest")
       })
+    )
+  })
+
+  it("changes only what each menu chooses, and starts nothing and reports nothing by it", () => {
+    story(
+      update,
+      given(listing),
+      message(choseStatus("held")),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.taskFilter).toEqual({ status: "held", assignee: "Anyone", query: "" })
+        expect(model.taskSort).toBe("Latest")
+      }),
+      message(choseAssignee("NoOne")),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.taskFilter).toEqual({ status: "held", assignee: "NoOne", query: "" })
+        expect(model.taskSort).toBe("Latest")
+      }),
+      message(choseSort("Newest")),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.taskFilter).toEqual({ status: "held", assignee: "NoOne", query: "" })
+        expect(model.taskSort).toBe("Newest")
+        expect(model.tab).toBe("Threads")
+      }),
+      expectNoOutMessage()
     )
   })
 
@@ -174,10 +267,25 @@ describe("a group's threads", () => {
 })
 
 describe("the tasks of a group's threads", () => {
-  const item = (id: string, title: string | null, task: Task.Status | null, minutesAgo: number, words?: string) => {
+  const item = (
+    id: string,
+    title: string | null,
+    task: Task.Status | null,
+    minutesAgo: number,
+    words?: string,
+    details: { assignee?: MemberId.MemberId; startedMinutesAgo?: number } = {}
+  ) => {
     const threadId = ThreadId.ThreadId.make(id)
     return {
-      thread: { ...thread, id: threadId, title },
+      thread: {
+        ...thread,
+        id: threadId,
+        title,
+        createdAt:
+          details.startedMinutesAgo === undefined
+            ? thread.createdAt
+            : DateTime.subtract(now, { minutes: details.startedMinutesAgo })
+      },
       opening: words === undefined ? Option.none() : Option.some(saying(opening, words)),
       task:
         task === null
@@ -189,7 +297,7 @@ describe("the tasks of a group's threads", () => {
                 groupId: "general",
                 status: task,
                 priority: "none",
-                assignee: null,
+                assignee: details.assignee ?? null,
                 createdBy: { _tag: "Member", memberId: "member-1" },
                 createdAt: "2026-10-18T12:01:00Z"
               })
@@ -202,7 +310,7 @@ describe("the tasks of a group's threads", () => {
     }
   }
   const retro = item("thread-1", "Retro", "todo", 30)
-  const release = item("thread-2", "Ship the release", "doing", 10, "Ready to ship?")
+  const release = item("thread-2", "Ship the release", "doing", 10, "Ready to ship?", { assignee: bob.id })
   const café = item("thread-3", null, "done", 20, `Menu for ${ThreadMessage.mentionText(bob.id, "Robert")}'s café`)
   const chat = item("thread-4", "Chat", null, 5)
   const read = (...threads: typeof listing.threads) => modifyFields(listing, { threads: () => threads })
@@ -222,7 +330,7 @@ describe("the tasks of a group's threads", () => {
 
   it("are kept to the status the filter chose, and every status for All", () => {
     const filtered = (status: typeof listing.taskFilter.status) =>
-      modifyFields(read(retro, release, café), { taskFilter: () => ({ status, query: "" }) })
+      modifyFields(read(retro, release, café), { taskFilter: () => ({ status, assignee: "Anyone", query: "" }) })
 
     expect(titles(filtered("All"))).toEqual(["Ship the release", null, "Retro"])
     expect(titles(filtered("doing"))).toEqual(["Ship the release"])
@@ -230,9 +338,58 @@ describe("the tasks of a group's threads", () => {
     expect(titles(filtered("held"))).toEqual([])
   })
 
+  it("are kept to those assigned as the filter chose: anyone, the member's own, or no one", () => {
+    const mine = item("thread-5", "Mine", "todo", 40, undefined, { assignee: memberId })
+    const assigned = (assignee: AssigneeFilter) =>
+      modifyFields(read(retro, release, mine), { taskFilter: () => ({ status: "All", assignee, query: "" }) })
+
+    expect(titles(assigned("Anyone"))).toEqual(["Ship the release", "Retro", "Mine"])
+    expect(titles(assigned("Me"))).toEqual(["Mine"])
+    expect(titles(assigned("NoOne"))).toEqual(["Retro"])
+  })
+
+  it("are kept to those the status, the assignee, and the search all keep", () => {
+    const mine = item("thread-5", "Mine to ship", "doing", 40, undefined, { assignee: memberId })
+    const narrowed = (taskFilter: typeof listing.taskFilter) =>
+      titles(modifyFields(read(retro, release, mine), { taskFilter: () => taskFilter }))
+
+    expect(narrowed({ status: "doing", assignee: "Anyone", query: "ship" })).toEqual([
+      "Ship the release",
+      "Mine to ship"
+    ])
+    expect(narrowed({ status: "doing", assignee: "Me", query: "ship" })).toEqual(["Mine to ship"])
+    expect(narrowed({ status: "todo", assignee: "Me", query: "ship" })).toEqual([])
+    expect(narrowed({ status: "doing", assignee: "Me", query: "retro" })).toEqual([])
+  })
+
+  it("are ordered as the person chose: by latest activity, or by when their threads were started, newest or oldest first", () => {
+    const oldest = item("thread-1", "Oldest", "todo", 10, undefined, { startedMinutesAgo: 300 })
+    const middle = item("thread-2", "Middle", "todo", 5, undefined, { startedMinutesAgo: 200 })
+    const newest = item("thread-3", "Newest", "todo", 50, undefined, { startedMinutesAgo: 100 })
+    const sorted = (taskSort: TaskSort, ...threads: typeof listing.threads) =>
+      titles(modifyFields(read(...threads), { taskSort: () => taskSort }))
+
+    expect(sorted("Latest", newest, oldest, middle)).toEqual(["Middle", "Oldest", "Newest"])
+    expect(sorted("Newest", oldest, middle, newest)).toEqual(["Newest", "Middle", "Oldest"])
+    expect(sorted("Oldest", newest, middle, oldest)).toEqual(["Oldest", "Middle", "Newest"])
+  })
+
+  it("count as narrowed when a status or an assignee is chosen or letters are searched for, and not by spaces", () => {
+    const narrowedTo = (taskFilter: Partial<typeof listing.taskFilter>) =>
+      isFiltered(modifyFields(listing, { taskFilter: (filter) => ({ ...filter, ...taskFilter }) }))
+
+    expect(isFiltered(listing)).toBe(false)
+    expect(narrowedTo({ status: "done" })).toBe(true)
+    expect(narrowedTo({ assignee: "NoOne" })).toBe(true)
+    expect(narrowedTo({ query: "ship" })).toBe(true)
+    expect(narrowedTo({ query: "   " })).toBe(false)
+  })
+
   it("are kept to those whose title or opening has the search, whatever its case and accents, and its spaces", () => {
     const searched = (query: string) =>
-      modifyFields(read(retro, release, café), { taskFilter: () => ({ status: "All", query }) })
+      modifyFields(read(retro, release, café), {
+        taskFilter: () => ({ status: "All", assignee: "Anyone", query })
+      })
 
     expect(titles(searched("RETRO"))).toEqual(["Retro"])
     expect(titles(searched("  ship "))).toEqual(["Ship the release"])
