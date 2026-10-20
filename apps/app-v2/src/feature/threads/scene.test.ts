@@ -45,11 +45,15 @@ const inputs = {
   members: [member, bob],
   groupName: "General",
   isTeam: true,
+  memberNames: ["You", "Bob"],
   openThreadId: Option.none<ThreadId.ThreadId>(),
   now
 }
 
 const sceneView = withViewInputs(view, inputs)()
+
+/** The tabs of the group General. */
+const tabs = withViewInputs(tabsView, { groupName: "General" })()
 
 /** A thread titled Retro that is being started, whose opening is not read yet. */
 const retro = { ...thread, id: ThreadId.ThreadId.make("thread-2"), title: "Retro" }
@@ -151,11 +155,11 @@ const tasking = (...threads: typeof empty.threads) =>
   modifyFields(empty, { threads: () => threads, tab: () => "Tasks" as const })
 
 /** The tabs over the threads, as a group's header holds them, and the tab shown. */
-const withTabs: typeof sceneView = (model, h) => h.div([], [tabsView(model, h), sceneView(model, h)])
+const withTabs: typeof sceneView = (model, h) => h.div([], [tabs(model, h), sceneView(model, h)])
 
 /** The tabs over the composer. */
 const withTabsAndComposer: typeof sceneView = (model, h) =>
-  h.div([], [tabsView(model, h), withViewInputs(composerView, inputs)()(model, h)])
+  h.div([], [tabs(model, h), withViewInputs(composerView, inputs)()(model, h)])
 
 /** The Tasks tab under its toolbar, as a group's pane holds them. */
 const tasksTab: typeof sceneView = (model, h) =>
@@ -318,11 +322,12 @@ describe("a group's threads", () => {
     scene({ update, view: sceneView }, given(listed), expect(selector('[aria-current="true"]')).toBeAbsent())
   })
 
-  it("welcomes the person to a team that has no threads yet, with its caret blinking and how to start one", () => {
+  it("welcomes the person to a team that has no threads yet, with who belongs to it, its caret blinking, and how to start one", () => {
     scene(
       { update, view: sceneView },
       given(empty),
       expect(role("heading", { name: "Welcome to #General", level: 2 })).toExist(),
+      expect(text("You and Bob are members.")).toExist(),
       expect(text("Send the first message to start the conversation.")).toExist(),
       expect(selector("svg path.art-caret")).toExist(),
       expect(role("list", { name: "Threads" })).toBeAbsent(),
@@ -330,12 +335,48 @@ describe("a group's threads", () => {
     )
   })
 
-  it("welcomes the person to a conversation by who it is with", () => {
+  it("says who belongs to a team in the welcome as a list: all of them, two, or one alone", () => {
+    const welcomeTo = (memberNames: ReadonlyArray<string>) => withViewInputs(view, { ...inputs, memberNames })()
+
+    scene(
+      { update, view: welcomeTo(["You", "Alex Morgan", "Sara"]) },
+      given(empty),
+      expect(text("You, Alex Morgan, and Sara are members.")).toExist()
+    )
+    scene(
+      { update, view: welcomeTo(["You", "Sara"]) },
+      given(empty),
+      expect(text("You and Sara are members.")).toExist()
+    )
+    scene({ update, view: welcomeTo(["You"]) }, given(empty), expect(text("You is a member.")).toExist())
+  })
+
+  it("says the members before how to start, as two paragraphs", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      expectAll(all.selector("p:not([role])")).toHaveCount(2),
+      expect(nth(all.selector("p:not([role])"), 0)).toHaveText("You and Bob are members."),
+      expect(nth(all.selector("p:not([role])"), 1)).toHaveText("Send the first message to start the conversation.")
+    )
+  })
+
+  it("welcomes the person to a conversation by who it is with, and does not list its members", () => {
     scene(
       { update, view: withViewInputs(view, { ...inputs, groupName: "Bob", isTeam: false })() },
       given(empty),
       expect(role("heading", { name: "Your conversation with Bob", level: 2 })).toExist(),
+      expect(text("You and Bob are members.")).toBeAbsent(),
       expect(text("Send the first message to start the conversation.")).toExist()
+    )
+  })
+
+  it("names no members in a team's welcome while it has none to name", () => {
+    scene(
+      { update, view: withViewInputs(view, { ...inputs, memberNames: [] })() },
+      given(empty),
+      expect(text("Send the first message to start the conversation.")).toExist(),
+      expectAll(all.selector("p:not([role])")).toHaveCount(1)
     )
   })
 
@@ -349,11 +390,44 @@ describe("a group's threads", () => {
     )
   })
 
-  it("says why they could not be read", () => {
+  it("says why a write failed, over the threads it lists", () => {
     scene(
       { update, view: sceneView },
       given(modifyFields(empty, { notice: () => Option.some("This browser could not read that. Try again.") })),
-      expect(role("alert")).toHaveText("This browser could not read that. Try again.")
+      expect(role("alert")).toHaveText("This browser could not read that. Try again."),
+      expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent()
+    )
+  })
+
+  it("says it can't load the conversation when the first read failed, with the way to read it again", () => {
+    const failed = modifyFields(unread, { notice: () => Option.some("This browser could not read that. Try again.") })
+
+    scene(
+      { update, view: sceneView },
+      given(failed),
+      expect(role("heading", { name: "Can't load this conversation", level: 2 })).toExist(),
+      expect(text("Try again once the host is reachable.")).toExist(),
+      expect(selector("svg g.art-swinging")).toExist(),
+      expect(role("status")).toBeAbsent(),
+      expect(role("alert")).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading the conversation…")
+    )
+  })
+
+  it("says it can't load the conversation on the Tasks tab as well", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(unread, {
+          tab: () => "Tasks" as const,
+          notice: () => Option.some("This browser could not read that.")
+        })
+      ),
+      expect(role("heading", { name: "Can't load this conversation", level: 2 })).toExist(),
+      expect(role("button", { name: "Try again" })).toExist(),
+      expect(text("No tasks yet")).toBeAbsent()
     )
   })
 
@@ -421,9 +495,9 @@ describe("a group's threads", () => {
 describe("a group's tabs", () => {
   it("are Threads and Tasks, named for the group, the first one selected", () => {
     scene(
-      { update, view: tabsView },
+      { update, view: tabs },
       given(empty),
-      expect(role("tablist", { name: "Group" })).toExist(),
+      expect(role("tablist", { name: "General" })).toExist(),
       expect(role("tab", { name: "Threads" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "false")
     )
@@ -431,17 +505,17 @@ describe("a group's tabs", () => {
 
   it("count the tasks that are not done or dismissed on the Tasks tab, and no count while there are none", () => {
     scene(
-      { update, view: tabsView },
+      { update, view: tabs },
       given(listing(alices, shipping, inStatus({ ...alices, thread: retro }, "done"), starting)),
       expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-description", "2")
     )
     scene(
-      { update, view: tabsView },
+      { update, view: tabs },
       given(listing(inStatus(alices, "done"), inStatus(shipping, "dismissed"), starting)),
       expect(role("tab", { name: "Tasks" })).not.toHaveAttr("aria-description")
     )
     scene(
-      { update, view: tabsView },
+      { update, view: tabs },
       given(empty),
       expect(role("tab", { name: "Tasks" })).not.toHaveAttr("aria-description")
     )

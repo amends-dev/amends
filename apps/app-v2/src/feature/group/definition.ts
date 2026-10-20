@@ -41,16 +41,18 @@ export const SettingsTab = Schema.Literals(["General", "Members"])
 export type SettingsTab = typeof SettingsTab.Type
 
 /**
- * The group, while the replica holds it, its admissions, the person's follow of it, the workspace's
- * members, what the person may do, who is present, the name being given the team, the member
+ * The group, while the replica holds it, whether it was read yet, its admissions, the person's follow of it, the
+ * workspace's members, what the person may do, who is present, the name being given the team, the member
  * chosen to admit, the group's threads, the thread open among them, the settings' dialog and the
- * section of it shown, and why the last read or write failed.
+ * section of it shown, how many times the person asked to read the group again, and why the last read or write
+ * failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   groupId: GroupId.GroupId,
   group: Schema.Option(GroupItem),
+  isLoaded: Schema.Boolean,
   memberships: Schema.Array(MembershipItem),
   follow: Schema.Option(FollowItem),
   members: Schema.Array(Member.Member),
@@ -62,6 +64,7 @@ export const Model = Schema.Struct({
   thread: Schema.Option(OpenThread),
   dialog: DialogBlock.Model,
   settingsTab: SettingsTab,
+  reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -83,6 +86,7 @@ export const Message = defineMessageUnion({
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },
   ReceivedPresence: { present: Schema.Array(Presence.Present) },
   FailedRead: { error: Schema.String },
+  ClickedTryAgain: {},
   ClickedSettings: {},
   ClickedMembers: {},
   ChoseSettingsTab: { tab: SettingsTab },
@@ -109,6 +113,25 @@ export const OutMessage = defineMessageUnion({
 export type OutMessage = typeof OutMessage.Type
 
 export const GroupDefinition = Block.makeDefinition("Group", { Model, Message, OutMessage, ChildInitContext })
+
+/**
+ * Whether the person's replica has the group, so that it is shown: `Loading` until the store has answered, `Failed` when
+ * it could not be read, and, once it answered without the group, `Unavailable`, as it is for a group the person never
+ * had or lost the right to read.
+ */
+export type Availability = "Available" | "Loading" | "Failed" | "Unavailable"
+
+export const availabilityOf = (model: Model): Availability => {
+  if (Option.isSome(model.group)) {
+    return "Available"
+  }
+
+  if (model.isLoaded) {
+    return "Unavailable"
+  }
+
+  return Option.isSome(model.notice) ? "Failed" : "Loading"
+}
 
 /** The admissions in force. */
 export const admitted = (model: Model): ReadonlyArray<MembershipItem> =>

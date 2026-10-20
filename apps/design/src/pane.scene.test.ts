@@ -10,6 +10,7 @@ import {
   expectAll,
   given,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -465,6 +466,26 @@ describe("paneEmpty", () => {
       expect(role("heading", { name: "Can't reach your workspace host", level: 1 })).toExist(),
       expect(role("heading", { level: 2 })).toBeAbsent(),
       expect(text("You're still signed in. Try again once the host is running.")).toExist()
+    )
+  })
+
+  it("says each line of its copy as a paragraph of its own, in order", () => {
+    scene(
+      {
+        update,
+        view: paneView((_: Model, h: HtmlBuilder<Message>) =>
+          paneEmpty(h, {
+            art: "caret",
+            title: "Welcome to #general",
+            copy: ["You, Alex Morgan, and Sara are members.", "Send the first message to start the conversation."]
+          })
+        )
+      },
+      given(initial),
+      expect(role("heading", { name: "Welcome to #general", level: 2 })).toExist(),
+      expectAll(all.selector("p:not([role])")).toHaveCount(2),
+      expect(nth(all.selector("p:not([role])"), 0)).toHaveText("You, Alex Morgan, and Sara are members."),
+      expect(nth(all.selector("p:not([role])"), 1)).toHaveText("Send the first message to start the conversation.")
     )
   })
 

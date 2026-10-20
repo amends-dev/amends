@@ -235,7 +235,7 @@ const fromHome = (message: typeof HomeBlock.Message.Type) =>
     slotId: "home",
     model: opened.home,
     view: homeView,
-    viewInputs: { now }
+    viewInputs: { now, workspaceName: "Studio" }
   }).toParentMessage(message)
 
 /** What the groups report, as Home and then the workspace receive it. */
@@ -316,7 +316,7 @@ const fromGroup = (message: typeof GroupBlock.Message.Type) =>
       key: groupId,
       slotId: "group",
       model: openGroupModel,
-      viewInputs: { now }
+      viewInputs: { now, workspaceName: "Studio" }
     }).toParentMessage(message)
   )
 
@@ -326,7 +326,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: { members: [], groupName: "General", isTeam: true, openThreadId: Option.none(), now }
+      viewInputs: { members: [], groupName: "General", isTeam: true, memberNames: [], openThreadId: Option.none(), now }
     }).toParentMessage(message)
   )
 

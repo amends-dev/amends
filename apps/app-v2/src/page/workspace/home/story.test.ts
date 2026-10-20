@@ -71,9 +71,12 @@ const openGroupModel = initGroup(workspaceId, memberId, groupId, Option.none()).
 
 /** What the open group reports, as Home receives it. */
 const fromGroup = (message: typeof GroupBlock.Message.Type) =>
-  GroupBinding.embedView({ key: groupId, slotId: "group", model: openGroupModel, viewInputs: { now } }).toParentMessage(
-    message
-  )
+  GroupBinding.embedView({
+    key: groupId,
+    slotId: "group",
+    model: openGroupModel,
+    viewInputs: { now, workspaceName: "Studio" }
+  }).toParentMessage(message)
 
 /** What the open group's threads report, as Home receives it. */
 const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
@@ -81,7 +84,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
     ThreadsBinding.embedView({
       slotId: "threads",
       model: openGroupModel.threads,
-      viewInputs: { members: [], groupName: "General", isTeam: true, openThreadId: Option.none(), now }
+      viewInputs: { members: [], groupName: "General", isTeam: true, memberNames: [], openThreadId: Option.none(), now }
     }).toParentMessage(message)
   )
 

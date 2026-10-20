@@ -187,7 +187,10 @@ const sidebarView = (model: Model, { isApplePlatform }: ViewInputs, h: Workspace
   })
 }
 
-/** The main pane: the destination the person opened. Home and the settings' members page are given the time now. */
+/**
+ * The main pane: the destination the person opened. Home and the settings' members page are given the time now, and
+ * Home the workspace's name.
+ */
 const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Html =>
   Open.match(model.open, {
     Home: () =>
@@ -196,7 +199,7 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
           slotId: "home",
           model: model.home,
           view: homeView,
-          viewInputs: { now }
+          viewInputs: { now, workspaceName: nameOf(model) }
         })
       ),
     Connections: () =>

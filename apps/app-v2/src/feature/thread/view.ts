@@ -10,7 +10,6 @@ import {
   hint,
   iconButton,
   notice,
-  sending,
   submit,
   textarea
 } from "@amends-dev/design/control"
@@ -56,32 +55,26 @@ const renamingView = (model: Model, h: ThreadViewBuilder): Html =>
   })
 
 /**
- * The person's part in the thread as a bell in the pane's header, filled and pressed while they follow it, as `apps/ui`
- * has it, or that a change to that is on its way.
+ * The person's part in the thread as a bell in the pane's header, as `apps/ui` has it: named Follow thread, or Following
+ * thread, filled and pressed, while they follow it, which stops following, and unavailable while a change to that is on
+ * its way.
  */
-export const followView = ThreadComposition.makeView((model, h) =>
-  Option.match(model.following, {
-    onNone: () =>
-      iconButton(h, { icon: "bell", label: "Follow thread", onClick: Message.ClickedFollow() }, { isPressed: false }),
-    onSome: ({ active, pending }) => {
-      if (pending) {
-        return sending(h, true)
-      }
+export const followView = ThreadComposition.makeView((model, h) => {
+  const isFollowing = Option.exists(model.following, ({ active }) => active)
+  const isPending = Option.exists(model.following, ({ pending }) => pending)
 
-      return active
-        ? iconButton(
-            h,
-            { icon: "bell-filled", label: "Following thread", onClick: Message.ClickedUnfollow() },
-            { isPressed: true }
-          )
-        : iconButton(
-            h,
-            { icon: "bell", label: "Follow thread", onClick: Message.ClickedFollow() },
-            { isPressed: false }
-          )
-    }
-  })
-)
+  return isFollowing
+    ? iconButton(
+        h,
+        { icon: "bell-filled", label: "Following thread", onClick: Message.ClickedUnfollow() },
+        { isPressed: true, isDisabled: isPending }
+      )
+    : iconButton(
+        h,
+        { icon: "bell", label: "Follow thread", onClick: Message.ClickedFollow() },
+        { isPressed: false, isDisabled: isPending }
+      )
+})
 
 /** Renaming the thread, until the person starts. */
 const renameAction = (model: Model, h: ThreadViewBuilder): Html =>

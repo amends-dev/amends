@@ -12,7 +12,7 @@ import { ReadDraft } from "../composer/command.ts"
 import { ThreadsBlock } from "../threads/block.ts"
 import { AdmitMember, FollowGroup, JoinGroup, LeaveGroup, RemoveMember, RenameGroup, UnfollowGroup } from "./command.ts"
 import { DialogBinding, ThreadsBinding } from "./composition.ts"
-import { Message, OutMessage } from "./definition.ts"
+import { availabilityOf, Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -82,7 +82,7 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
   ThreadsBinding.embedView({
     slotId: "threads",
     model: opened.threads,
-    viewInputs: { members: [], groupName: "Design", isTeam: true, openThreadId: Option.none(), now }
+    viewInputs: { members: [], groupName: "Design", isTeam: true, memberNames: [], openThreadId: Option.none(), now }
   }).toParentMessage(message)
 
 describe("a group", () => {
@@ -352,6 +352,89 @@ describe("a group", () => {
       expectNoOutMessage(),
       model((model) => {
         expect(model.thread).toEqual(Option.none())
+      })
+    )
+  })
+})
+
+describe("a group being read", () => {
+  it("is loading until the store answers, available once it holds the group, and unavailable once it answers without one", () => {
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Loading")
+        expect(model.isLoaded).toBe(false)
+      }),
+      received,
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+        expect(model.isLoaded).toBe(true)
+      })
+    )
+    story(
+      update,
+      given(opened),
+      message(Message.ReceivedGroup({ group: Option.none(), memberships: [], follow: Option.none() })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Unavailable")
+        expect(model.isLoaded).toBe(true)
+      })
+    )
+  })
+
+  it("is unavailable again when a group it held is no longer there, and available when it comes back", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      message(Message.ReceivedGroup({ group: Option.none(), memberships: [], follow: Option.none() })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Unavailable")
+      }),
+      received,
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+      })
+    )
+  })
+
+  it("has failed when the read did, until the person asks to try again, which reads it again", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.FailedRead({ error: "This browser could not read that. Try again." })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Failed")
+        expect(model.reads).toBe(0)
+      }),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Loading")
+        expect(model.notice).toEqual(Option.none())
+        expect(model.reads).toBe(1)
+      }),
+      message(Message.FailedRead({ error: "This browser could not read that. Try again." })),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.reads).toBe(2)
+      }),
+      received,
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+      })
+    )
+  })
+
+  it("is available, with the reason, when a later read fails after the group was held", () => {
+    story(
+      update,
+      given(opened),
+      received,
+      message(Message.FailedRead({ error: "This browser could not read that. Try again." })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+        expect(model.notice).toEqual(Option.some("This browser could not read that. Try again."))
       })
     )
   })

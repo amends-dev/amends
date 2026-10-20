@@ -24,7 +24,9 @@ import { StartThread } from "./command.ts"
 import { AssigneeBinding, ComposerBinding, SortBinding, StatusBinding } from "./composition.ts"
 import {
   isFiltered,
+  isReadFailed,
   Message,
+  membersLine,
   openTaskCount,
   OutMessage,
   type TaskSort,
@@ -418,5 +420,54 @@ describe("the tasks of a group's threads", () => {
     expect(openTaskCount(states("triage", "todo", "doing", "held"))).toBe(4)
     expect(openTaskCount(states("done", "dismissed", null))).toBe(0)
     expect(openTaskCount(states("done", "doing", null, "dismissed", "triage"))).toBe(2)
+  })
+})
+
+describe("a group's threads being read", () => {
+  it("have failed to load when the first read failed, until the person asks to try again, which reads them again", () => {
+    story(
+      update,
+      given(listing),
+      model((model) => {
+        expect(isReadFailed(model)).toBe(false)
+      }),
+      message(Message.FailedRead({ error: "This browser could not read that. Try again." })),
+      model((model) => {
+        expect(isReadFailed(model)).toBe(true)
+        expect(model.reads).toBe(0)
+      }),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(isReadFailed(model)).toBe(false)
+        expect(model.notice).toEqual(Option.none())
+        expect(model.reads).toBe(1)
+      }),
+      message(Message.ReceivedThreads({ threads: [] })),
+      model((model) => {
+        expect(model.isLoaded).toBe(true)
+        expect(isReadFailed(model)).toBe(false)
+      })
+    )
+  })
+
+  it("have not failed to load when a read fails after they were read", () => {
+    story(
+      update,
+      given(listing),
+      message(Message.ReceivedThreads({ threads: [] })),
+      message(Message.FailedRead({ error: "This browser could not read that. Try again." })),
+      model((model) => {
+        expect(isReadFailed(model)).toBe(false)
+        expect(model.notice).toEqual(Option.some("This browser could not read that. Try again."))
+      })
+    )
+  })
+})
+
+describe("who belongs to a team, as its welcome says it", () => {
+  it("lists them with the commas and the and of the English list, and is a member for one", () => {
+    expect(membersLine(["You", "Alex Morgan", "Sara"])).toBe("You, Alex Morgan, and Sara are members.")
+    expect(membersLine(["You", "Sara"])).toBe("You and Sara are members.")
+    expect(membersLine(["You"])).toBe("You is a member.")
   })
 })

@@ -48,12 +48,20 @@ const writeLeaving = (membershipId: GroupMembership.GroupMembershipId) =>
 export const update = GroupComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ReceivedGroup: ({ group, memberships, follow }) => ({
-      model: modifyFields(model, { group: () => group, memberships: () => memberships, follow: () => follow })
+      model: modifyFields(model, {
+        group: () => group,
+        isLoaded: () => true,
+        memberships: () => memberships,
+        follow: () => follow
+      })
     }),
     ReceivedMembers: ({ members }) => ({ model: modifyFields(model, { members: () => members }) }),
     ReceivedGrants: ({ grants }) => ({ model: modifyFields(model, { grants: () => grants }) }),
     ReceivedPresence: ({ present }) => ({ model: modifyFields(model, { present: () => present }) }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
     ClickedSettings: () =>
       Update.combine(model, [showSettingsTab("General"), startRenaming, DialogBinding.requestOpen()]),
     ClickedMembers: () =>

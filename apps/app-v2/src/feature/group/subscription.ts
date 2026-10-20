@@ -1,11 +1,13 @@
 /**
  * The group, its admissions, and the person's follow of it, the workspace's members, what the
- * person may do, and who is present, read from their store as they change.
+ * person may do, and who is present, read from their store as they change, and the group again each time the person
+ * asks to try again.
  */
 
 import { GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { GroupDefinition, Message } from "./definition.ts"
@@ -13,10 +15,15 @@ import { GroupDefinition, Message } from "./definition.ts"
 export const subscriptions = GroupDefinition.subscriptions((entry) => ({
   group: entry(
     "ReadGroup",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, groupId: GroupId.GroupId },
+    {
+      workspaceId: WorkspaceId.WorkspaceId,
+      memberId: MemberId.MemberId,
+      groupId: GroupId.GroupId,
+      reads: Schema.Int
+    },
     {
       messages: [Message.ReceivedGroup, Message.ReceivedMembers, Message.ReceivedGrants, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId, groupId }) => ({ workspaceId, memberId, groupId }),
+      modelToDependencies: ({ workspaceId, memberId, groupId, reads }) => ({ workspaceId, memberId, groupId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId, groupId }) =>

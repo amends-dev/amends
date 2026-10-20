@@ -10,6 +10,9 @@ export const update = ThreadsComposition.makeUpdate((model, message) =>
       model: modifyFields(model, { threads: () => threads, isLoaded: () => true })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
     ChoseTab: ({ tab }) => ({ model: modifyFields(model, { tab: () => tab }) }),
     TypedTaskQuery: ({ query }) => ({
       model: modifyFields(model, { taskFilter: (filter) => modifyFields(filter, { query: () => query }) })

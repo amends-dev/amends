@@ -61,7 +61,6 @@ import {
   type MarkSize,
   type MarkStatus,
   mark,
-  markCluster,
   markStack,
   statusMark,
   statusTooltip,
@@ -1626,16 +1625,7 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
           onClick: Message.ClickedButton()
         })
       ]
-    ),
-    sample(h, "Cluster of two, three, and seven", [
-      markCluster(h, { marks: ["AM", "Y"], label: "2 members", onClick: Message.ClickedButton() }),
-      markCluster(h, { marks: ["AM", "Y", "S"], label: "3 members", onClick: Message.ClickedButton() }),
-      markCluster(h, {
-        marks: ["AM", "Y", "S", "OK", "AJ", "KL", "RT"],
-        label: "7 members",
-        onClick: Message.ClickedButton()
-      })
-    ])
+    )
   ])
 
 const tooltipRow = "flex items-center gap-6 pt-4"
@@ -2084,6 +2074,30 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
               label: "Inbox",
               header: { title: "Inbox", icon: "mark-mail", actions: [button(h, "Mark all seen", press)] },
               body: [paneEmpty(h, { art: "rest", title: "You're all caught up", copy: "Nothing new." })]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A title and two lines of copy, each a paragraph of its own",
+      [
+        h.div(
+          [h.Class(emptyPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "general",
+              header: { title: "general", icon: "mark-channel" },
+              body: [
+                paneEmpty(h, {
+                  art: "caret",
+                  title: "Welcome to #general",
+                  copy: ["You, Alex Morgan, and Sara are members.", "Send the first message to start the conversation."]
+                })
+              ]
             })
           ]
         )

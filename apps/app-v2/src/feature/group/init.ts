@@ -21,6 +21,7 @@ export const init = GroupComposition.makeInit(
       memberId,
       groupId,
       group: Option.none(),
+      isLoaded: false,
       memberships: [],
       follow: Option.none(),
       members: [],
@@ -30,6 +31,7 @@ export const init = GroupComposition.makeInit(
       admitting: Option.none(),
       thread: Option.none(),
       settingsTab: "General",
+      reads: 0,
       notice: Option.none()
     },
     steps: Option.toArray(Option.map(threadId, openThread))

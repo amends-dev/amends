@@ -235,8 +235,8 @@ below it counted at each level above.
   `Thread.origin`, no thread the app starts has one, and the link would have to ask the page to open
   another thread from inside a side pane. It shows no title, which the pane's header has. `followView` is the bell for that header, as
   `apps/ui` draws it: an outlined bell named "Follow thread", or, while the person follows, a filled
-  one named "Following thread" and pressed, which stops following, and " · Sending…" in its place
-  while a change is on its way. `replyView` is the reply composer, named and shown as "Reply in thread", for the pane's footer, which
+  one named "Following thread" and pressed, which stops following, and disabled, as it was, while a change
+  is on its way. `replyView` is the reply composer, named and shown as "Reply in thread", for the pane's footer, which
   suggests the workspace's members the thread has read. `sidePane` puts the three into the design's
   side `pane` for the group and the inbox alike: the pane is named Thread, or Task for a thread that
   tracks one; the header has the thread's title, or its first message's words, before a message icon
@@ -279,10 +279,10 @@ below it counted at each level above.
   who wrote them, when it was last active, its task, whether it is still being started, and how much is new, and a composer to
   start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
   three views, and its tab, Threads or Tasks, Threads at first, says what `view` and `composerView` show.
-  `tabsView` is the tabs, a `paneTabs` named Group: Threads, and Tasks, counted by the tasks that are
-  neither done nor dismissed while there are any, for the group's header, which takes nothing from its
-  parent. The other two take the group's members, its name and whether it is a team, the thread open in
-  it, and the time now from their parent. `view`, its canonical one, shows the tab chosen. On the Threads
+  `tabsView` is the tabs, a `paneTabs` named for the group, as `apps/ui` names them: Threads, and Tasks, counted by the
+  tasks that are neither done nor dismissed while there are any, for the group's header, which takes the group's
+  name from its parent. The other two take the group's members, its name and whether it is a team, who belongs to
+  a team as its welcome names them, the thread open in it, and the time now from their parent. `view`, its canonical one, shows the tab chosen. On the Threads
   tab it lists the
   threads as messages, oldest first by when each thread was created (core's `Thread.createdAt`, the
   moment its opening was published), whatever order the store gives them, under a `divider` for each
@@ -297,7 +297,14 @@ below it counted at each level above.
   task stands; the thread open is the current row. Until the store has answered (`isLoaded`) the tab says "Loading the
   conversation…", and once it has, a group with no thread welcomes the person, "Welcome to #General" for a team and
   "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
-  caret blinking. On the Tasks tab it is the threads that track a
+  caret blinking. A team's welcome says who belongs to it first, "You, Alex Morgan, and Sara are members." as
+  `apps/ui` words it, with `Intl.ListFormat` (`membersLine`): the person as "You" and first, then the others by name in
+  the order of the admissions, and "You is a member." for a team of one, which `apps/ui` reads the same way; a
+  conversation's welcome lists no one. When the first read failed (`isReadFailed`: not loaded, and why in `notice`),
+  either tab says "Can't load this conversation" with "Try again once the host is reachable." and a Try again
+  (`cantLoadConversation`) in place of the loading line, which `ClickedTryAgain` replaces again while it reads: it clears
+  the reason and raises `reads`, the dependency that restarts the subscription. A read that fails after the threads were
+  read leaves them and says why above them. On the Tasks tab it is the threads that track a
   task as a table, in the order the person chose, latest active first by `lastActiveAt` at first: under a toolbar, the
   threads Block's `toolbarView`, which the group's pane draws over the rows while the tab is open, as `apps/ui`'s
   `GroupTasks` has it, of a search field, whose label is hidden and whose placeholder says "Search tasks…", beside a
@@ -339,15 +346,27 @@ below it counted at each level above.
   hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit and remove them. It
-  has two views. `view`, its canonical one, is the group's main pane, titled by its name, under the
-  tabs of the threads Block, Threads and Tasks, which a team the person has not joined does not have,
-  with, as the header's buttons, its members as a cluster of their marks named for how many there are
+  has two views. `view`, its canonical one, is the group's main pane, titled by its name, with the drawing of a
+  channel before it for a team and of a message for a conversation, as `apps/ui` marks them, and the workspace's name
+  under it on a phone (`workspaceName`, a view input from the page), under the
+  tabs of the threads Block, Threads and Tasks, named for the group, which a team the person has not joined does not have,
+  with, as the header's buttons, its members as a stack of their first three marks, overlapping, at 22px in their
+  tones (`memberMark`, an agent's lilac), named for how many there are
   ("7 members", for a team its admitted ones and for a conversation both people), which opens the
-  settings on the Members tab, or on General for a conversation, which has none; Follow as a bell,
-  which is filled, named Unfollow, and pressed while the person follows the group, or Join, where
+  settings on the Members tab, or on General for a conversation, which has none, and which a phone does not show, as
+  `apps/ui`'s header does not; Follow as a bell named Follow, or Following and filled and pressed while the person
+  follows the group, which stops following, and disabled as it was while a change is on its way, or Join, where
   they apply; and a gear that opens the settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
   tab's content, threads or tasks, with the composer to start one in the footer, which a team the person has not joined does
-  not have. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
+  not have. The group is one of four, by what the store has answered (`availabilityOf`): `Loading` until its first
+  answer (`isLoaded`, set by the first `ReceivedGroup`), in which its threads list as they would for a member;
+  `Available` once the replica holds it; `Unavailable` once the store has answered without it, as for a group the
+  person never had or has lost the right to read, which the replica then lacks, and which differs from loading by that
+  answer alone; and `Failed` when the read did, with no answer (`FailedRead`, and `notice`). An unavailable group
+  keeps its title, "A group", and says "This group isn't available" with "You may no longer be a member of it." in the
+  place of its threads, with no tabs, no composer, and no actions. A group that failed to load says "Can't load this
+  conversation" with "Try again once the host is reachable." and a Try again, which clears the reason and raises
+  `reads`, the dependency of the subscription that reads it, and keeps the tabs and the composer. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
   beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
   name, and Save changes, which is disabled while the draft is the name the team has, for someone
@@ -1341,16 +1360,22 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   open and chosen to show the tasks as rows by their assignee, title, who started them, replies, status,
   and age, latest active first, narrowed by search and by the status and assignee menus, ordered by the sort menu,
   with the menus in the toolbar's order and New task at its end, saying there are none yet or that none
-  match, opening a thread by its row, and a task started from the composer, named for the task; a composer listing the members whose names
-  contain the letters after the "@" that ends the text, and not the person, saying which is active and
+  match, opening a thread by its row, and a task started from the composer, named for the task; a composer, named and worded for the place it writes to, sending on Enter and not on Shift+Enter, nor while
+  suggestions are open, which Enter picks from, and with a Send that waits for words, listing, up to eight, the members
+  with a word of their names starting with the letters after the "@" that ends the text, accents and case aside, and not
+  the person, each with its mark in its tone, saying which is active and
   what the textarea completes from, picking by a click, by Enter, and by Tab, moving around the list
   with the arrows, and closing on Escape until other letters are typed; a task changed by someone who may, read as
   rows by someone who may not, and made by someone who may create tasks; a thread's turns by their
   agents' names and initials and the badges of how they stand, stopped and run again by someone who
   may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends
   or it could not be followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
-  a conversation's other member, with its tabs, its members as a cluster that opens them in the settings,
-  the person's part in it as a bell pressed while they follow, and the gear to its settings, and
+  a conversation's other member, with the drawing of a channel or of a message before it, the workspace's name
+  under it on a phone, its tabs named for it, its members as a stack of three marks named for how many there are, which
+  opens them in the settings, the person's part in it as a bell named Following and pressed while they follow, and
+  disabled while a change is on its way, and the gear to its settings, a team's welcome naming its members as a list in
+  three forms, a group it is not available to and one that could not be read, saying so, the second with a Try again that
+  reads it again, and
   joining in place of the threads and the tabs of a team they do not belong to,
   with the composer to start a thread in its footer; its settings in a dialog named for them, in a
   team's name beside the title, with General and Members as tabs, the name a field for someone who

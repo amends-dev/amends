@@ -1,6 +1,13 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
-import { Group, GroupFollow, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group"
+import {
+  Group,
+  GroupFollow,
+  GroupMembership,
+  GroupMembershipPermissions,
+  GroupPermissions
+} from "@amends-dev/core/group"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
+import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
@@ -38,6 +45,7 @@ import {
   opening,
   reply,
   saying,
+  scout,
   task,
   thread
 } from "../../../test/fixtures.ts"
@@ -49,7 +57,7 @@ import * as GroupView from "./view.ts"
 
 const { workspace, member } = membership
 
-const view = withViewInputs(GroupView.view, { now })()
+const view = withViewInputs(GroupView.view, { now, workspaceName: "Studio" })()
 const threadView = withViewInputs(GroupView.threadView, { now })()
 const threadId = ThreadId.ThreadId.make("thread-1")
 
@@ -181,6 +189,39 @@ const openedConversation = modifyFields(init(workspace.id, member.id, withBob.id
   members: () => [member, bob]
 })
 
+/** The drawings of a channel and of a message, which mark a team and a conversation in the title. */
+const channelDrawing = "M8 4L7 20M17 4L16 20M4 9L20 9M4 16L20 16"
+const messageDrawing =
+  "M5 5L19 5A2 2 0 0 1 21 7L21 15A2 2 0 0 1 19 17L10.83 17A2 2 0 0 0 9.41 17.59L7.13 19.87A.66 .66 0 0 1 6 19.4L6 18.2A1.2 1.2 0 0 0 4.8 17L4.2 17A1.2 1.2 0 0 1 3 15.8L3 7A2 2 0 0 1 5 5ZM7 9L17 9M7 13L13 13"
+
+/** The team with four members admitted, an agent among them, whose marks the header stacks three of. */
+const dana = Schema.decodeSync(Member.Member)({
+  id: "member-4",
+  workspaceId: "workspace-1",
+  identity: { _tag: "Human", id: "dana" },
+  name: "Dana Park",
+  status: "active"
+})
+
+const admittedToDesign = (id: string, memberId: string) =>
+  Schema.decodeSync(GroupMembership.GroupMembership)({
+    id,
+    workspaceId: "workspace-1",
+    groupId: "design",
+    memberId,
+    admittedAt: "2026-10-18T12:00:00Z",
+    status: "active"
+  })
+
+const openedWithFourMembers = modifyFields(opened, {
+  memberships: (memberships) => [
+    ...memberships,
+    { membership: admittedToDesign("membership-4", scout.id), pending: false },
+    { membership: admittedToDesign("membership-5", dana.id), pending: false }
+  ],
+  members: (members) => [...members, scout, dana]
+})
+
 describe("a group's main pane", () => {
   it("is the main landmark titled by the group's name, with the person's part in it and the button to its settings", () => {
     scene(
@@ -202,7 +243,7 @@ describe("a group's main pane", () => {
     scene(
       { update, view },
       given(opened),
-      expect(within(role("main"), role("tablist", { name: "Group" }))).toExist(),
+      expect(within(role("main"), role("tablist", { name: "Design" }))).toExist(),
       expect(role("tab", { name: "Threads" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "false"),
       expect(role("tab", { name: "Tasks" })).not.toHaveAttr("aria-description"),
@@ -243,7 +284,7 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("shows who is in the team as a cluster of their marks before the person's part in it, named for how many", () => {
+  it("shows who is in the team as a stack of their marks before the person's part in it, named for how many", () => {
     scene(
       { update, view },
       given(opened),
@@ -256,6 +297,37 @@ describe("a group's main pane", () => {
     )
   })
 
+  it("stacks the first three of the team's members at 22px in their tones, an agent's lilac, and counts them all", () => {
+    scene(
+      { update, view },
+      given(openedWithFourMembers),
+      expect(within(role("main"), role("button", { name: "4 members" }))).toExist(),
+      expect(within(role("button", { name: "4 members" }), text("A"))).toHaveClass("size-5.5"),
+      expect(within(role("button", { name: "4 members" }), text("A"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("button", { name: "4 members" }), text("B"))).toHaveClass("size-5.5"),
+      expect(within(role("button", { name: "4 members" }), text("S"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(within(role("button", { name: "4 members" }), text("DP"))).toBeAbsent(),
+      expect(text(/\+\d/)).toBeAbsent()
+    )
+  })
+
+  it("opens the members when the stack is pressed, on the Members section of a team and the General section of a conversation", () => {
+    scene(
+      { update, view },
+      given(opened),
+      click(role("button", { name: "2 members" })),
+      ...dialogOpened(),
+      expect(role("tab", { name: "Members" })).toHaveAttr("aria-selected", "true")
+    )
+    scene(
+      { update, view },
+      given(openedConversation),
+      click(role("button", { name: "2 members" })),
+      ...dialogOpened(),
+      expect(role("tab", { name: "Members" })).toBeAbsent()
+    )
+  })
+
   it("shows who is in a conversation the same way, and nothing of the members before the group is read", () => {
     scene({ update, view }, given(openedConversation), expect(role("button", { name: "2 members" })).toExist())
     scene(
@@ -265,12 +337,12 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("shows the person's follow as a bell, not pressed until they follow, and sends the other way when it is clicked", () => {
+  it("shows the person's follow as a bell named Follow, not pressed until they follow, and sends the other way when it is clicked", () => {
     scene(
       { update, view },
       given(opened),
       expect(role("button", { name: "Follow" })).toHaveAttr("aria-pressed", "false"),
-      expect(role("button", { name: "Unfollow" })).toBeAbsent(),
+      expect(role("button", { name: "Following" })).toBeAbsent(),
       click(role("button", { name: "Follow" })),
       Command.expectExact(FollowGroup(inDesign)),
       Command.resolve(FollowGroup, Message.WroteAction())
@@ -278,9 +350,9 @@ describe("a group's main pane", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: false }) })),
-      expect(role("button", { name: "Unfollow" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Following" })).toHaveAttr("aria-pressed", "true"),
       expect(role("button", { name: "Follow" })).toBeAbsent(),
-      click(role("button", { name: "Unfollow" })),
+      click(role("button", { name: "Following" })),
       Command.expectExact(UnfollowGroup(inDesign)),
       Command.resolve(UnfollowGroup, Message.WroteAction())
     )
@@ -303,13 +375,48 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("marks a change to the person's follow that is on its way, and offers no button for it", () => {
+  it("keeps the bell, disabled, while a change to the person's follow is on its way, pressed as it was", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { follow: () => Option.some({ follow: followOfDesign, pending: true }) })),
-      expect(text(" · Sending…")).toExist(),
-      expect(role("button", { name: "Unfollow" })).toBeAbsent(),
-      expect(role("button", { name: "Follow" })).toBeAbsent()
+      expect(role("button", { name: "Following" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Following" })).toBeDisabled(),
+      expect(text(" · Sending…")).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(
+        modifyFields(opened, {
+          follow: () => Option.some({ follow: { ...followOfDesign, status: "ended" as const }, pending: true })
+        })
+      ),
+      expect(role("button", { name: "Follow" })).toHaveAttr("aria-pressed", "false"),
+      expect(role("button", { name: "Follow" })).toBeDisabled()
+    )
+    scene({ update, view }, given(opened), expect(role("button", { name: "Follow" })).toBeEnabled())
+  })
+
+  it("is titled with the drawing of a channel for a team and of a message for a conversation, not a letter", () => {
+    scene(
+      { update, view },
+      given(opened),
+      expect(within(role("main"), selector(`svg path[d="${channelDrawing}"]`))).toExist(),
+      expect(within(role("main"), selector(`svg path[d="${messageDrawing}"]`))).toBeAbsent()
+    )
+    scene(
+      { update, view },
+      given(openedConversation),
+      expect(within(role("main"), selector(`svg path[d="${messageDrawing}"]`))).toExist(),
+      expect(within(role("main"), selector(`svg path[d="${channelDrawing}"]`))).toBeAbsent()
+    )
+  })
+
+  it("names the workspace under the title for a phone, which the title's room does not show from 48rem", () => {
+    scene(
+      { update, view },
+      given(opened),
+      expect(within(role("main"), text("Studio"))).toExist(),
+      expect(within(role("main"), text("Studio"))).toHaveClass("max-tablet:block")
     )
   })
 
@@ -394,12 +501,11 @@ describe("a group's main pane", () => {
     )
   })
 
-  it("is titled by the other member of a conversation, marked by their first letter, with no members", () => {
+  it("is titled by the other member of a conversation, with no members to leave or rename", () => {
     scene(
       { update, view },
       given(openedConversation),
       expect(role("heading", { name: "Bob", level: 1 })).toExist(),
-      expect(within(role("main", { name: "Bob" }), text("B"))).toExist(),
       expect(role("heading", { name: "Members" })).toBeAbsent(),
       expect(role("button", { name: "Leave" })).toBeAbsent(),
       expect(label("Message Bob")).toHaveAttr("placeholder", "Message Bob")
@@ -922,5 +1028,94 @@ describe("a group's side pane", () => {
 
   it("renders nothing while no thread is open", () => {
     scene({ update, view: sidePane }, given(opened), expect(role("complementary")).toBeAbsent())
+  })
+})
+
+/** The threads of a team read, and none in it. */
+const withThreadsRead = (model: Model) =>
+  modifyFields(model, { threads: (threads) => modifyFields(threads, { isLoaded: () => true }) })
+
+describe("a group's welcome", () => {
+  it("says who belongs to a team, the person as You and first, before how to start the conversation", () => {
+    scene(
+      { update, view },
+      given(withThreadsRead(opened)),
+      expect(role("heading", { name: "Welcome to #Design", level: 2 })).toExist(),
+      expect(text("You and Bob are members.")).toExist(),
+      expect(text("Send the first message to start the conversation.")).toExist()
+    )
+    scene(
+      { update, view },
+      given(withThreadsRead(openedWithFourMembers)),
+      expect(text("You, Bob, Scout, and Dana Park are members.")).toExist()
+    )
+  })
+
+  it("says a team of one has one member, and lists no members for a conversation", () => {
+    scene({ update, view }, given(withThreadsRead(openedGeneral)), expect(text("You is a member.")).toExist())
+    scene(
+      { update, view },
+      given(withThreadsRead(openedConversation)),
+      expect(role("heading", { name: "Your conversation with Bob", level: 2 })).toExist(),
+      expect(text(/are members|is a member/)).toBeAbsent(),
+      expect(text("Send the first message to start the conversation.")).toExist()
+    )
+  })
+})
+
+/** A group the store answered for without it, as it does for one the person never had or can no longer read. */
+const unavailable = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
+  isLoaded: () => true,
+  members: () => [member, bob]
+})
+
+/** A group whose read failed before it was read. */
+const failedToLoad = modifyFields(init(workspace.id, member.id, design.id, Option.none()).model, {
+  notice: () => Option.some("This browser could not read that. Try again.")
+})
+
+describe("a group the person cannot read", () => {
+  it("says it isn't available and that they may no longer be a member, with no tabs, composer, or way to try again", () => {
+    scene(
+      { update, view },
+      given(unavailable),
+      expect(role("heading", { name: "A group", level: 1 })).toExist(),
+      expect(role("heading", { name: "This group isn't available", level: 2 })).toExist(),
+      expect(text("You may no longer be a member of it.")).toExist(),
+      expect(selector("svg g.art-pulling")).toExist(),
+      expect(role("tablist")).toBeAbsent(),
+      expect(role("textbox")).toBeAbsent(),
+      expect(role("button", { name: "Send" })).toBeAbsent(),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      expect(role("status")).toBeAbsent(),
+      expect(role("button", { name: "Group settings" })).toBeAbsent()
+    )
+  })
+
+  it("does not say so while the store has not answered, but loads as it did, with its composer", () => {
+    scene(
+      { update, view },
+      given(init(workspace.id, member.id, design.id, Option.none()).model),
+      expect(role("heading", { name: "This group isn't available" })).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading the conversation…"),
+      expect(role("textbox")).toExist(),
+      expect(role("tablist")).toExist()
+    )
+  })
+
+  it("says it can't load the conversation when the read failed, keeping the composer, and reads again on Try again", () => {
+    scene(
+      { update, view },
+      given(failedToLoad),
+      expect(role("heading", { name: "Can't load this conversation", level: 2 })).toExist(),
+      expect(text("Try again once the host is reachable.")).toExist(),
+      expect(selector("svg g.art-swinging")).toExist(),
+      expect(role("heading", { name: "This group isn't available" })).toBeAbsent(),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("textbox")).toExist(),
+      click(role("button", { name: "Try again" })),
+      expect(role("heading", { name: "Can't load this conversation" })).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading the conversation…")
+    )
   })
 })

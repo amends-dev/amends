@@ -60,7 +60,7 @@ const homeSubscriptions = HomeBlock.subscriptions
 const sidebarButton = (name: string | RegExp) =>
   within(role("navigation", { name: "Studio" }), role("button", { name }))
 
-const mainView = withViewInputs(view, { now })()
+const mainView = withViewInputs(view, { now, workspaceName: "Studio" })()
 
 const sideView = withViewInputs(threadView, { now })()
 

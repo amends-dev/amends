@@ -61,7 +61,8 @@ export const taskSortChoices: ReadonlyArray<readonly [TaskSort, string]> = [
 
 /**
  * The group's threads as they were read, whether they were yet, the tab shown, what the Tasks tab is narrowed to, how
- * it is ordered, and the menus those are chosen in, the composer, and why the last read or write failed.
+ * it is ordered, and the menus those are chosen in, the composer, how many times the person asked to read the
+ * threads again, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -76,6 +77,7 @@ export const Model = Schema.Struct({
   assigneeMenu: AssigneeMenu.Model,
   sortMenu: TaskSortMenu.Model,
   composer: ComposerBlock.Model,
+  reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -90,6 +92,7 @@ export const ChildInitContext = Schema.Struct({
 export const Message = defineMessageUnion({
   ReceivedThreads: { threads: Schema.Array(ThreadItem) },
   FailedRead: { error: Schema.String },
+  ClickedTryAgain: {},
   ChoseTab: { tab: ThreadsTab },
   TypedTaskQuery: { query: Schema.String },
   ClickedNewTask: {},
@@ -115,6 +118,18 @@ const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thr
  */
 export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<Day<ThreadItem>> =>
   groupByDay(Array.sort(items, byCreated), ({ thread }) => thread.createdAt, now)
+
+const memberNamesList = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
+
+/**
+ * Who belongs to a team as its welcome says it, from `names`: "You, Alex Morgan, and Sara are members.", "You and Sara
+ * are members.", and "You is a member." for one.
+ */
+export const membersLine = (names: ReadonlyArray<string>): string =>
+  `${memberNamesList.format(names)} ${names.length === 1 ? "is a member" : "are members"}.`
+
+/** Whether the threads could not be read, which is why none are shown: nothing was read, and why. */
+export const isReadFailed = (model: Model): boolean => !model.isLoaded && Option.isSome(model.notice)
 
 /** A thread of the group and the task it tracks. */
 export type TrackingThread = Readonly<{ item: ThreadItem; task: Task.Task }>

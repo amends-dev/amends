@@ -4,6 +4,7 @@
  */
 
 import * as Button from "@foldkit/ui/button"
+import * as Predicate from "effect/Predicate"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { hint, iconButton } from "./control.ts"
 import { form } from "./form.ts"
@@ -295,11 +296,19 @@ export const paneTabs = <Message, Requirements>(
     )
   )
 
+const copyLines = (copy: string | ReadonlyArray<string> | undefined): ReadonlyArray<string> => {
+  if (copy === undefined) {
+    return []
+  }
+
+  return Predicate.isString(copy) ? [copy] : copy
+}
+
 /**
  * What a pane's body says when it has nothing to list, or a centered screen when it has nothing to show: 64px
  * under the header, centered, the `art` that draws the state, then the `title` as an `h2`, under the pane's `h1`,
- * and the `copy` under it, a line of what to do or why, in quiet text, and the `action` under that, such as a
- * `button` that does it, 12px below. The text is centered and 20rem wide at most. The `art` is one of the
+ * and the `copy` under it, a line of what to do or why, in quiet text, or several lines, each its own paragraph, and
+ * the `action` under that, such as a `button` that does it, 12px below. The text is centered and 20rem wide at most. The `art` is one of the
  * `stateArt` kinds, or `working`, the logo at 3.5rem in its working motion, for what is waited on: the column is
  * then a live region, a `status`, so that what it says is announced. A screen whose message is all it has, such as
  * one that says the host cannot be reached, makes the title its `h1` with `level` 1; under a heading, as a list
@@ -307,7 +316,13 @@ export const paneTabs = <Message, Requirements>(
  */
 export const paneEmpty = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ art: StateArtKind | "working"; title: string; copy?: string; action?: Html; level?: 1 | 2 }>
+  config: Readonly<{
+    art: StateArtKind | "working"
+    title: string
+    copy?: string | ReadonlyArray<string>
+    action?: Html
+    level?: 1 | 2
+  }>
 ): Html =>
   h.div(
     [...(config.art === "working" ? [h.Role("status")] : []), h.Class(emptyColumn)],
@@ -317,7 +332,7 @@ export const paneEmpty = <Message, Requirements>(
         [config.art === "working" ? logo(h, { size: "3.5rem", motion: "working" }) : stateArt(h, config.art)]
       ),
       config.level === 1 ? h.h1([h.Class(emptyTitle)], [config.title]) : h.h2([h.Class(emptyTitle)], [config.title]),
-      config.copy === undefined ? h.empty : hint(h, config.copy),
+      ...copyLines(config.copy).map((line) => hint(h, line)),
       config.action === undefined ? h.empty : h.div([h.Class(emptyAction)], [config.action])
     ]
   )

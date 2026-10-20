@@ -17,6 +17,7 @@ export const init = ThreadsComposition.makeInit(
       tab: "Threads",
       taskFilter: { status: "All", assignee: AssigneeFilter.Anyone(), query: "" },
       taskSort: "Latest",
+      reads: 0,
       notice: Option.none()
     }
   })

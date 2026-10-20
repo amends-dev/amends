@@ -9,7 +9,7 @@ import { paneEmpty, paneTabs, paneToolbar, paneToolbarStack } from "@amends-dev/
 import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
-import type { Html } from "foldkit/html"
+import type { Html, HtmlBuilder } from "foldkit/html"
 import { authorName, initials, pluralize, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
@@ -24,8 +24,10 @@ import {
 import {
   byDay,
   isFiltered,
+  isReadFailed,
   Message,
   type Model,
+  membersLine,
   openTaskCount,
   taskSortChoices,
   type ThreadItem,
@@ -33,26 +35,34 @@ import {
 } from "./definition.ts"
 
 /**
- * Who could have written the openings, what the group is called and whether it is a team, which of its threads is
- * open, and the time now, which the days the threads were created on and when each was are read from.
+ * Who could have written the openings, what the group is called and whether it is a team, who belongs to a team as its
+ * welcome names them, which of its threads is open, and the time now, which the days the threads were created on and
+ * when each was are read from.
  */
 export type ViewInputs = Readonly<{
   members: ReadonlyArray<Member.Member>
   groupName: string
   isTeam: boolean
+  memberNames: ReadonlyArray<string>
   openThreadId: Option.Option<ThreadId.ThreadId>
   now: DateTime.Utc
 }>
 
+/** The group's name, which names its tabs. */
+export type TabsInputs = Readonly<{ groupName: string }>
+
 /** The statuses the Tasks tab narrows to: any, then each as the person reads it. */
 const taskStatusChoices = statusChoices(Task.Status.literals)
 
-/** The tabs under the group's title: its threads, and those that track a task, counted while any is open. */
-export const tabsView = ThreadsComposition.makeView((model, h) => {
+/**
+ * The tabs under the group's title, named for the group: its threads, and those that track a task, counted while any
+ * is open.
+ */
+export const tabsView = ThreadsComposition.makeView.withInputs<TabsInputs>((model, { groupName }, h) => {
   const open = openTaskCount(model.threads)
 
   return paneTabs(h, {
-    label: "Group",
+    label: groupName,
     tabs: [
       { label: "Threads", isCurrent: model.tab === "Threads", onClick: Message.ChoseTab({ tab: "Threads" }) },
       {
@@ -110,12 +120,30 @@ const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs,
   })
 }
 
-/** What the group says when nothing was said in it yet: it welcomes the person to a team, or to a conversation. */
+/**
+ * What the group says when nothing was said in it yet: it welcomes the person to a team and says who belongs to it, or
+ * to a conversation.
+ */
 const welcome = (inputs: ViewInputs, h: ThreadsViewBuilder): Html =>
   paneEmpty(h, {
     art: "caret",
     title: inputs.isTeam ? `Welcome to #${inputs.groupName}` : `Your conversation with ${inputs.groupName}`,
-    copy: "Send the first message to start the conversation."
+    copy: [
+      ...(inputs.isTeam && inputs.memberNames.length > 0 ? [membersLine(inputs.memberNames)] : []),
+      "Send the first message to start the conversation."
+    ]
+  })
+
+/** What a group's conversation says when it could not be read, with the way to read it again. */
+export const cantLoadConversation = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  onTryAgain: Message
+): Html =>
+  paneEmpty(h, {
+    art: "came-apart",
+    title: "Can't load this conversation",
+    copy: "Try again once the host is reachable.",
+    action: button(h, "Try again", onTryAgain)
   })
 
 /**
@@ -218,10 +246,17 @@ export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((m
   ])
 })
 
-/** What the tab shows: the group's threads, or the tasks they track. */
-export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
-  model.tab === "Threads" ? threadsView(model, inputs, h) : tasksView(model, inputs, h)
-)
+/**
+ * What the tab shows: the group's threads, or the tasks they track; or, in place of both, that the conversation could
+ * not be read.
+ */
+export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+  if (isReadFailed(model)) {
+    return cantLoadConversation(h, Message.ClickedTryAgain())
+  }
+
+  return model.tab === "Threads" ? threadsView(model, inputs, h) : tasksView(model, inputs, h)
+})
 
 /**
  * The composer to start a thread in the group, for a pane's footer, named by what it shows while it is empty: "Message

@@ -244,8 +244,14 @@ describe("a thread", () => {
       expect(role("button", { name: "Follow thread" })).toHaveAttr("aria-pressed", "false"),
       readFollowing(Option.some({ participationId, active: true, pending: true })),
       expect(role("button", { name: "Follow thread" })).toBeAbsent(),
-      expect(role("button", { name: "Following thread" })).toBeAbsent(),
-      expect(text(" · Sending…")).toExist()
+      expect(role("button", { name: "Following thread" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Following thread" })).toBeDisabled(),
+      expect(text(" · Sending…")).toBeAbsent(),
+      readFollowing(Option.some({ participationId, active: false, pending: true })),
+      expect(role("button", { name: "Follow thread" })).toHaveAttr("aria-pressed", "false"),
+      expect(role("button", { name: "Follow thread" })).toBeDisabled(),
+      readFollowing(Option.some({ participationId, active: false, pending: false })),
+      expect(role("button", { name: "Follow thread" })).toBeEnabled()
     )
   })
 

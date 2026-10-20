@@ -72,20 +72,12 @@ const statusTones: Readonly<Record<keyof typeof statusShapes, TooltipTone | unde
   blocked: "danger"
 }
 
-const clusterLook =
-  "inline-flex flex-none cursor-pointer items-center gap-0.5 border border-outline bg-transparent p-0.5 focus-ring hover:bg-hover max-desktop:min-h-11"
-
-const clusterRest = "px-1 text-meta text-ink-secondary tabular-nums"
-
 const stackLook =
   "inline-grid h-8 flex-none cursor-pointer place-items-center border-0 bg-transparent px-1 focus-ring hover:bg-subtle max-desktop:me-2 max-desktop:h-11 max-tablet:hidden"
 
 const stackMarks = "inline-flex items-center [&>*+*]:-ms-1.25"
 
 const hiddenLabel = "sr-only"
-
-/** How many marks a cluster shows before it counts the rest. */
-const clusterShown = 3
 
 export type MarkSize = keyof typeof markSizes
 
@@ -272,33 +264,6 @@ export const taskStatus = <Message, Requirements>(
     ]
   )
 }
-
-/**
- * A button of the first three `marks`, as `xs` marks side by side in a bordered box, and "+4" after them for
- * four more, that sends `onClick`. It is named by `label`, which says how many people it stands for, since the
- * marks and the count are hidden from assistive technology.
- */
-export const markCluster = <Message, Requirements>(
-  h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ marks: ReadonlyArray<string>; label: string; onClick: Message }>
-): Html =>
-  Button.view(
-    {
-      onClick: config.onClick,
-      toView: (attributes) =>
-        h.button(
-          [...attributes.button, h.Class(clusterLook)],
-          [
-            ...config.marks.slice(0, clusterShown).map((text) => mark(h, { text, size: "xs" })),
-            config.marks.length > clusterShown
-              ? h.span([h.AriaHidden(true), h.Class(clusterRest)], [`+${config.marks.length - clusterShown}`])
-              : h.empty,
-            h.span([h.Class(hiddenLabel)], [config.label])
-          ]
-        )
-    },
-    h
-  )
 
 /**
  * A button of a few `marks` at 22px in their tones, each overlapping the one before it by 5px, as `@amends-dev/ui`'s
