@@ -109,6 +109,8 @@ export type ButtonOptions = Readonly<{
   size?: "large"
   /** Fill the container's width. */
   wide?: boolean
+  /** Drawn at `sm` before the label, 8px from it, and hidden from assistive technology, which reads the label. */
+  icon?: IconName
   isDisabled?: boolean
 }>
 
@@ -176,7 +178,10 @@ export const buttonWith = <Message, Requirements>(
     options.wide === true && buttonWide
   )
 
-  return h.button([...attributes, h.Class(className)], [label])
+  return h.button(
+    [...attributes, h.Class(className)],
+    options.icon === undefined ? [label] : [icon(h, options.icon, { size: "sm" }), label]
+  )
 }
 
 const renderButton = <Message, Requirements>(

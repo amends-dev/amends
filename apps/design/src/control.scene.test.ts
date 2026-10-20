@@ -159,6 +159,36 @@ describe("button", () => {
     )
   })
 
+  it("draws an icon before its label, which names the button, and hides the icon", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          button(h, "Create workspace", Message.ClickedSave(), { icon: "mark-new" }),
+          button(h, "Save", Message.ClickedSave()),
+          h.form(
+            [h.AriaLabel("Sign in"), h.OnSubmit(Message.SubmittedForm())],
+            [submitButton(h, "Send a code", { icon: "mark-send" })]
+          )
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Create workspace" })).toHaveText("Create workspace"),
+      expect(within(role("button", { name: "Create workspace" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Create workspace" }), selector("svg"))).toHaveAttr("width", "1rem"),
+      expect(within(role("button", { name: "Create workspace" }), selector("path"))).toHaveAttr(
+        "d",
+        "M12 4L12 20M4 12L20 12"
+      ),
+      expect(within(role("button", { name: "Save" }), selector("svg"))).toBeAbsent(),
+      expect(within(role("button", { name: "Send a code" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      click(role("button", { name: "Create workspace" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0"),
+      submit(role("form", { name: "Sign in" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 1")
+    )
+  })
+
   it("says it is disabled, and cannot be clicked", () => {
     scene(
       {

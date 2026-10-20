@@ -19,7 +19,7 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
 placeholder, filled, invalid, and with a hint under it; a hint; a textarea; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
 field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
@@ -28,7 +28,7 @@ action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows, and a row with cells and no action, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
-sign-in's two steps and as the workspace picker, each with its pieces in `screenContent` as the app's
+sign-in's two steps and as the workspace picker, whose heading has a Create workspace action on its line, each with its pieces in `screenContent` as the app's
 pages return them; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
@@ -145,8 +145,11 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   at the size of the line around it with no padding or border, for a link in a sentence such as
   Change email). `options.size` is `"large"` for the 44px, item-size button of a centered screen; a
   link ignores it. `options.wide` fills the container, and `options.isDisabled` marks it
-  `aria-disabled` and sends nothing. A button is 36px tall, a quiet one 32px, and every one but a
-  link 44px on touch.
+  `aria-disabled` and sends nothing. `options.icon` draws an icon before the label, at `sm`, 8px from
+  it, in the label's color; the label still names the button, and the icon is hidden from assistive
+  technology. The actions that create something use `mark-new`, which the reference's buttons use,
+  not `plus`, which is smaller and lighter and has no mark's weight. A button is 36px tall, a quiet
+  one 32px, and every one but a link 44px on touch.
 - `submit(h, label, options?)` is a button of `type="submit"`, primary unless `options.variant`
   says otherwise.
 - `buttonWith(h, attributes, label, options?)` is the look of `button` over `attributes` that already
@@ -237,7 +240,11 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
   and `"directory"` starts an 800px column near the top. An ancestor that sets
   `--amends-screen-height` shows the card at that height instead of the viewport's, as the
   workshop does to show both widths on one page.
-- `heading(h, text)` is the screen's `h1`, at display size, with 12px below it for what follows.
+- `heading(h, text, options?)` is the screen's `h1`, at display size, with 12px below it for what
+  follows. An `options.action`, such as a `button` that creates what the screen lists, shares the
+  title's line: the title takes the line's width and the action lies at its end, in line with the
+  middle of the title and 16px from it, and the 12px below belong to the line. A title wraps within
+  the room the action leaves it.
 - `copy(h, text)` is a line of secondary text under the heading.
 - `screenContent(h, children)` is the pieces of a screen's body as one node, for a view that must return
   one, such as a page. It is `display: contents`, so they lie in the card's column as if it were not
@@ -646,8 +653,8 @@ The groups Block's form for a new team does all four.
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
 `aria-invalid`, and description, a switch by its label, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, also when its label is
-hidden, a setting row's label, copy, and action, the centered screen's
-landmarks, a form by its label, with the pane variant of a form the same; a row by its title; an
+hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
+landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
 destination by `role("button", { name })` with `aria-current`; a sidebar item by its name with
 `aria-current` and its count, the row under it as a button or as a plain row, and the sections of

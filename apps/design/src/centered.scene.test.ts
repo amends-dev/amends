@@ -7,14 +7,15 @@ import { modifyFields } from "foldkit/struct"
 import { centered, copy, heading, screenContent } from "./centered.ts"
 import { button } from "./control.ts"
 
-const Message = defineMessageUnion({ ClickedSignOut: {} })
+const Message = defineMessageUnion({ ClickedSignOut: {}, ClickedCreate: {} })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ signOuts: number }>
+type Model = Readonly<{ signOuts: number; creations: number }>
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
-    ClickedSignOut: () => ({ model: modifyFields(model, { signOuts: (signOuts) => signOuts + 1 }) })
+    ClickedSignOut: () => ({ model: modifyFields(model, { signOuts: (signOuts) => signOuts + 1 }) }),
+    ClickedCreate: () => ({ model: modifyFields(model, { creations: (creations) => creations + 1 }) })
   })
 
 const screen = (width: "form" | "directory") => (model: Model, h: HtmlBuilder<Message>) =>
@@ -25,12 +26,14 @@ const screen = (width: "form" | "directory") => (model: Model, h: HtmlBuilder<Me
     children: [heading(h, "Sign in"), copy(h, "Enter the code sent to ada@example.com"), h.p([], [`${model.signOuts}`])]
   })
 
+const initial: Model = { signOuts: 0, creations: 0 }
+
 describe("centered", () => {
   for (const width of ["form", "directory"] as const) {
     it(`holds the title, the copy, and the children in its ${width} column, and the actions in its header`, () => {
       scene(
         { update, view: screen(width) },
-        given({ signOuts: 0 }),
+        given(initial),
         expect(role("heading", { name: "Sign in", level: 1 })).toExist(),
         expect(text("Enter the code sent to ada@example.com")).toExist(),
         expect(within(role("main"), role("heading", { name: "Sign in" }))).toExist(),
@@ -40,6 +43,52 @@ describe("centered", () => {
       )
     })
   }
+})
+
+describe("heading", () => {
+  const titled = (action: "none" | "create") => (model: Model, h: HtmlBuilder<Message>) =>
+    centered(h, {
+      brand: "amends",
+      width: "directory",
+      children: [
+        screenContent(h, [
+          heading(
+            h,
+            "Choose a workspace",
+            action === "none"
+              ? {}
+              : { action: button(h, "Create workspace", Message.ClickedCreate(), { icon: "mark-new" }) }
+          ),
+          copy(h, "2 workspaces"),
+          h.p([], [`${model.creations}`])
+        ])
+      ]
+    })
+
+  it("is the title alone, without a line of its own, when it has no action", () => {
+    scene(
+      { update, view: titled("none") },
+      given(initial),
+      expect(within(role("main"), role("heading", { name: "Choose a workspace", level: 1 }))).toExist(),
+      expect(selector("div.items-center.gap-4")).toBeAbsent(),
+      expect(role("button", { name: "Create workspace" })).toBeAbsent()
+    )
+  })
+
+  it("shares its line with an action, which sends its message", () => {
+    scene(
+      { update, view: titled("create") },
+      given(initial),
+      expect(role("heading", { name: "Choose a workspace", level: 1 })).toExist(),
+      expect(
+        within(selector("div.items-center.gap-4"), role("heading", { name: "Choose a workspace", level: 1 }))
+      ).toExist(),
+      expect(within(selector("div.items-center.gap-4"), role("button", { name: "Create workspace" }))).toExist(),
+      expect(within(selector("div.items-center.gap-4"), text("2 workspaces"))).toBeAbsent(),
+      click(role("button", { name: "Create workspace" })),
+      expect(within(role("main"), text("1"))).toExist()
+    )
+  })
 })
 
 describe("screenContent", () => {
@@ -54,7 +103,7 @@ describe("screenContent", () => {
             children: [screenContent(h, [heading(h, "Sign in"), copy(h, "Enter the code sent to ada@example.com")])]
           })
       },
-      given({ signOuts: 0 }),
+      given(initial),
       expect(within(role("main"), selector(".contents"))).toExist(),
       expect(within(selector(".contents"), role("heading", { name: "Sign in", level: 1 }))).toExist(),
       expect(within(selector(".contents"), text("Enter the code sent to ada@example.com"))).toExist()

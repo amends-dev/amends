@@ -23,7 +23,13 @@ const screenBodyWidths = {
   directory: "max-w-212 pt-20 pb-16 max-tablet:pt-6"
 }
 
-const headingText = "mb-3 text-display font-medium text-ink"
+const headingFace = "text-display font-medium text-ink"
+
+const headingText = `mb-3 ${headingFace}`
+
+const headingLine = "mb-3 flex items-center gap-4"
+
+const headingBesideAction = `min-w-0 flex-1 ${headingFace}`
 
 const copyText = "text-item text-ink-secondary"
 
@@ -63,9 +69,23 @@ export const centered = <Message, Requirements>(
     ]
   )
 
-/** The screen's title, with the space below it that what follows needs. */
-export const heading = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
-  h.h1([h.Class(headingText)], [text])
+export type HeadingOptions = Readonly<{
+  /** A control at the end of the title's line, such as a button that creates what the screen lists. */
+  action?: Html
+}>
+
+/**
+ * The screen's title, with the space below it that what follows needs. An `action` shares the title's line, at its
+ * end, 16px from the title and in line with the middle of it; the space below is that of the line.
+ */
+export const heading = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  text: string,
+  options: HeadingOptions = {}
+): Html =>
+  options.action === undefined
+    ? h.h1([h.Class(headingText)], [text])
+    : h.div([h.Class(headingLine)], [h.h1([h.Class(headingBesideAction)], [text]), options.action])
 
 /** A line of secondary text under the screen's title. */
 export const copy = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>

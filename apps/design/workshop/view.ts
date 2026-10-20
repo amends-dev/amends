@@ -160,7 +160,7 @@ const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
 
 const workspaces: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
   { name: "Mercier & Co", meta: "12 members · as Alex" },
-  { name: "Fieldwork", meta: "4 members · as Alex" }
+  { name: "Fieldwork", meta: "4 members · Owner · as Alex" }
 ]
 
 const groupRows: ReadonlyArray<Readonly<{ name: string; visibility: string; members: number }>> = [
@@ -210,6 +210,12 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
       sampleStack
     ),
     sample(h, "Submit", [h.form([h.OnSubmit(press)], [submit(h, "Send a code")])]),
+    sample(h, "Icon before the label", [
+      button(h, "Create workspace", press, { icon: "mark-new" }),
+      button(h, "New task", press, { variant: "primary", icon: "mark-new" }),
+      button(h, "Create workspace", press, { icon: "mark-new", isDisabled: true }),
+      button(h, "Create workspace", press, { icon: "mark-new", size: "large" })
+    ]),
     sample(h, "Link", [
       h.p([], ["Wrong address? ", button(h, "Change email", press, { variant: "link" })]),
       button(h, "Disabled link", press, { variant: "link", isDisabled: true })
@@ -607,7 +613,9 @@ const directoryScreen = (h: ApplicationViewBuilder): Html =>
     width: "directory",
     children: [
       screenContent(h, [
-        heading(h, "Choose a workspace"),
+        heading(h, "Choose a workspace", {
+          action: button(h, "Create workspace", Message.ClickedButton(), { icon: "mark-new" })
+        }),
         copy(h, `${workspaces.length} workspaces`),
         section(h, { label: "Your workspaces", count: workspaces.length }),
         workspaceList(h)
