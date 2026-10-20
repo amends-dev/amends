@@ -1,6 +1,6 @@
 import { type Group, GroupPermissions } from "@amends-dev/core/group"
 import type { Task } from "@amends-dev/core/task"
-import type { Member } from "@amends-dev/core/workspace"
+import type { Member, MemberId } from "@amends-dev/core/workspace"
 import {
   announcement,
   button,
@@ -64,10 +64,15 @@ import {
 export type OpenThread = Readonly<{ title: string; taskStatus: Option.Option<Task.Status> }>
 
 /**
- * The thread open in the group open, and whether the browse page is the destination open, which marks the Groups title
- * current.
+ * The thread open in the group open, whether the browse page is the destination open, which marks the Groups title
+ * current, and the member the conversation not started is with, when one is open and it is with one alone, which marks
+ * their row current.
  */
-export type ViewInputs = Readonly<{ openThread: Option.Option<OpenThread>; isBrowsing: boolean }>
+export type ViewInputs = Readonly<{
+  openThread: Option.Option<OpenThread>
+  isBrowsing: boolean
+  unsentWith: Option.Option<MemberId.MemberId>
+}>
 
 /**
  * The thread open as the row under its group draws it: the drawing of the status of the task it tracks, which the
@@ -151,9 +156,15 @@ const groupRow = (
 
 /**
  * A member the person has no conversation with yet as a row of the sidebar, by their mark in their tone and their name;
- * an agent says how it stands and what it is doing, as in a conversation with it. The row starts the conversation.
+ * an agent says how it stands and what it is doing, as in a conversation with it. The row opens the conversation, and
+ * is current while the conversation with them that is not started is what the main pane shows.
  */
-const teammateRow = (member: Member.Member, model: Model, h: GroupsViewBuilder): Html =>
+const teammateRow = (
+  member: Member.Member,
+  model: Model,
+  unsentWith: Option.Option<MemberId.MemberId>,
+  h: GroupsViewBuilder
+): Html =>
   sidebarItem(h, {
     mark: memberMark(member),
     ...Option.match(findAgentOfMember(model, member.id), {
@@ -161,7 +172,7 @@ const teammateRow = (member: Member.Member, model: Model, h: GroupsViewBuilder):
       onSome: (item) => standingOfAgent(item, model)
     }),
     label: member.name,
-    isCurrent: false,
+    isCurrent: Option.contains(unsentWith, member.id),
     onClick: Message.ClickedTeammate({ memberId: member.id })
   })
 
@@ -298,51 +309,53 @@ const teamRows = (
  * person belongs to and is current while it shows; Browse groups opens it on the teams they may join. The buttons that
  * start a team or a conversation open the dialog `dialogView` renders.
  */
-export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread, isBrowsing }, h) => {
-  const own = yours(model)
-  const teams = own.filter(({ group }) => group.kind === "Team")
-  const conversations = own.filter(({ group }) => group.kind !== "Team")
+export const view = GroupsComposition.makeView.withInputs<ViewInputs>(
+  (model, { openThread, isBrowsing, unsentWith }, h) => {
+    const own = yours(model)
+    const teams = own.filter(({ group }) => group.kind === "Team")
+    const conversations = own.filter(({ group }) => group.kind !== "Team")
 
-  return sidebarSections(h, [
-    notice(h, model.notice),
-    sidebarSection(h, {
-      label: "Groups",
-      onTitleClick: Message.ClickedGroupsTitle(),
-      isTitleCurrent: isBrowsing,
-      actions: [
-        iconButton(
-          h,
-          { icon: "mark-search", label: "Browse groups", onClick: Message.ClickedBrowse() },
-          { size: "compact" }
-        ),
-        ...(mayCreateTeam(model)
-          ? [
-              iconButton(
-                h,
-                { icon: "mark-new", label: "Create group", onClick: Message.ClickedNewTeam() },
-                { size: "compact" }
-              )
-            ]
-          : [])
-      ],
-      children: teamRows(teams, model, openThread, h)
-    }),
-    sidebarSection(h, {
-      label: "Direct messages",
-      actions: [
-        iconButton(
-          h,
-          { icon: "mark-new", label: "New message", onClick: Message.ClickedNewConversation() },
-          { size: "compact" }
-        )
-      ],
-      children: [
-        ...conversations.map((item) => groupRow(item, model, openThread, h)),
-        ...teammates(model).map((member) => teammateRow(member, model, h))
-      ]
-    })
-  ])
-})
+    return sidebarSections(h, [
+      notice(h, model.notice),
+      sidebarSection(h, {
+        label: "Groups",
+        onTitleClick: Message.ClickedGroupsTitle(),
+        isTitleCurrent: isBrowsing,
+        actions: [
+          iconButton(
+            h,
+            { icon: "mark-search", label: "Browse groups", onClick: Message.ClickedBrowse() },
+            { size: "compact" }
+          ),
+          ...(mayCreateTeam(model)
+            ? [
+                iconButton(
+                  h,
+                  { icon: "mark-new", label: "Create group", onClick: Message.ClickedNewTeam() },
+                  { size: "compact" }
+                )
+              ]
+            : [])
+        ],
+        children: teamRows(teams, model, openThread, h)
+      }),
+      sidebarSection(h, {
+        label: "Direct messages",
+        actions: [
+          iconButton(
+            h,
+            { icon: "mark-new", label: "New message", onClick: Message.ClickedNewConversation() },
+            { size: "compact" }
+          )
+        ],
+        children: [
+          ...conversations.map((item) => groupRow(item, model, openThread, h)),
+          ...teammates(model).map((member) => teammateRow(member, model, unsentWith, h))
+        ]
+      })
+    ])
+  }
+)
 
 /**
  * The dialog for what the person is starting, a team or a conversation, which the page lends the shell: it

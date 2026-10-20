@@ -192,9 +192,12 @@ const threadRow = (
 
 /**
  * What the group says when nothing was said in it yet: it welcomes the person to a team and says who belongs to it, or
- * to a conversation.
+ * to a conversation. A conversation not started says the same.
  */
-const welcome = (inputs: ViewInputs, h: ThreadsViewBuilder): Html =>
+export const welcome = <Message, Requirements>(
+  inputs: Pick<ViewInputs, "groupName" | "isTeam" | "memberNames">,
+  h: HtmlBuilder<Message, Requirements>
+): Html =>
   paneEmpty(h, {
     art: "caret",
     title: inputs.isTeam ? `Welcome to #${inputs.groupName}` : `Your conversation with ${inputs.groupName}`,

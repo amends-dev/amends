@@ -847,35 +847,31 @@ describe("the groups", () => {
     )
   })
 
-  it("ask for a conversation with the member already chosen, in its dialog, when there is none with them alone", () => {
+  it("report the member asked for, to open a conversation with them as it will be, when there is none with them alone", () => {
     story(
       update,
       given(listed),
       message(Message.RequestedConversationWith({ memberId: bobId })),
-      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
-      expectNoOutMessage(),
-      model((model) => {
-        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberIds: [bobId] })))
-        expect(model.dialog.isOpen).toBe(true)
-        expect(model.selected).toEqual(Option.none())
-      }),
-      message(Message.SubmittedConversation()),
-      Command.expectExact(Dialog.test.CloseDialog),
       expectOutMessage(OutMessage.SelectedPeople({ memberIds: [bobId] })),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+      Command.expectNone(),
+      model((model) => {
+        expect(model.starting).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+        expect(model.selected).toEqual(Option.none())
+      })
     )
   })
 
-  it("ask for a conversation with a teammate the sidebar lists as asking for one with them does, in its dialog", () => {
+  it("report a teammate the sidebar lists the same way, with no dialog to ask first", () => {
     story(
       update,
       given(listed),
       message(Message.ClickedTeammate({ memberId: bobId })),
-      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
-      expectNoOutMessage(),
+      expectOutMessage(OutMessage.SelectedPeople({ memberIds: [bobId] })),
+      Command.expectNone(),
       model((model) => {
-        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberIds: [bobId] })))
-        expect(model.dialog.isOpen).toBe(true)
+        expect(model.starting).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
         expect(model.selected).toEqual(Option.none())
       })
     )
@@ -1062,7 +1058,7 @@ describe("the groups", () => {
     const withBobAndCarol = {
       ...conversationWithBob,
       id: GroupId.GroupId.make("bob-and-carol"),
-      memberIds: [carolId, memberId, bobId]
+      memberIds: [memberId, bobId, carolId]
     }
     const among = modifyFields(listed, {
       groups: () => [

@@ -2058,3 +2058,35 @@ describe("a workspace", () => {
     )
   })
 })
+
+describe("a conversation the person has not started, in the workspace", () => {
+  /** The groups read, with Bob a member the person has no conversation with. */
+  const withTeammate = atHome(opened, (home) =>
+    modifyFields(home, {
+      groups: (groups) =>
+        modifyFields(groups, {
+          isLoaded: () => true,
+          groups: () => [{ group: general, pending: false, members: 2 }],
+          members: () => [member, bob],
+          memberships: () => [aliceInGeneral]
+        })
+    })
+  )
+
+  it("opens from a teammate's row in the main pane, as it will be, beside the sidebar, and leaves it for the inbox", () => {
+    scene(
+      { update, view: sceneView },
+      given(withTeammate),
+      click(sidebarButton("Bob")),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("main", { name: "Bob" })).toExist(),
+      expect(role("heading", { name: "Your conversation with Bob", level: 2 })).toExist(),
+      expect(label("Message Bob")).toExist(),
+      expect(sidebarButton("Bob")).toHaveAttr("aria-current", "page"),
+      expect(role("dialog", { name: "New message" })).toBeAbsent(),
+      click(sidebarButton("Inbox")),
+      expect(role("main", { name: "Bob" })).toBeAbsent(),
+      expect(sidebarButton("Bob")).not.toHaveAttr("aria-current")
+    )
+  })
+})

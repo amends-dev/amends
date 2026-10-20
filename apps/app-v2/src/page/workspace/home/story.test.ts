@@ -1,4 +1,4 @@
-import { GroupId } from "@amends-dev/core/group"
+import { Group, GroupId } from "@amends-dev/core/group"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -14,6 +14,7 @@ import {
   now,
   opening,
   reply,
+  scout,
   task,
   thread
 } from "../../../../test/fixtures.ts"
@@ -23,15 +24,18 @@ import { GroupBlock } from "../../../feature/group/block.ts"
 import { ThreadsBinding } from "../../../feature/group/composition.ts"
 import { init as initGroup } from "../../../feature/group/init.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
+import { Starting } from "../../../feature/groups/definition.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../../feature/inbox/command.ts"
 import { waitingCount } from "../../../feature/inbox/definition.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
 import { triageCount } from "../../../feature/tasks/definition.ts"
 import { ThreadsBlock } from "../../../feature/threads/block.ts"
+import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
+import { init as initUnsent } from "../../../feature/unsentConversation/init.ts"
 import * as Drafts from "../../../store/Drafts.ts"
-import { AsideBinding, GroupBinding, GroupsBinding, InboxBinding, TasksBinding } from "./composition.ts"
-import { isThreadOpen, Message, Open, OutMessage, openThreadTitle } from "./definition.ts"
+import { AsideBinding, GroupBinding, GroupsBinding, InboxBinding, TasksBinding, UnsentBinding } from "./composition.ts"
+import { isThreadOpen, Message, Open, OutMessage, openThreadTitle, unsentMemberId } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -49,7 +53,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
   GroupsBinding.embedView({
     slotId: "groups",
     model: opened.groups,
-    viewInputs: { openThread: Option.none(), isBrowsing: false }
+    viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
   }).toParentMessage(message)
 
 /** What the inbox reports, as Home receives it. */
@@ -775,7 +779,7 @@ describe("home", () => {
     }
   })
 
-  it("opens the conversation its parent asks for with a person, or asks the groups to start one in their dialog", () => {
+  describe("a conversation the person has not started", () => {
     const withConversation = modifyFields(opened, {
       groups: (groups) =>
         modifyFields(groups, {
@@ -786,32 +790,182 @@ describe("home", () => {
         })
     })
 
-    story(
-      update,
-      given(withConversation),
+    /** The conversation with Bob not started, as the model Home opens it with. */
+    const unsentWithBob = initUnsent(workspaceId, memberId, [bob.id], []).model
+
+    /** What the conversation with Bob not started reports, as Home receives it. */
+    const fromUnsent = (message: typeof UnsentConversationBlock.Message.Type) =>
+      UnsentBinding.embedView({
+        key: Group.directKey([bob.id]),
+        slotId: "unsent",
+        model: unsentWithBob,
+        viewInputs: { workspaceName: "Studio" }
+      }).toParentMessage(message)
+
+    /** The draft of the first message to Bob read, as the conversation not started opens. */
+    const unsentDraftRead = Command.resolve(
+      ReadDraft({ workspaceId, memberId, place: Drafts.Place.cases.Conversation.make({ memberIds: [bob.id] }) }),
+      ComposerBlock.Message.ReceivedDraft({ text: "" })
+    )
+
+    /** The person asked for a conversation with Bob, whom they have none with. */
+    const askedForBob = [
       message(Message.RequestedConversationWith({ memberId: bob.id })),
       expectOutMessage(OutMessage.Navigated()),
-      draftRead,
-      model((model) => {
-        expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(conversationWithBob.id)
-        expect(model.groups.selected).toEqual(Option.some(conversationWithBob.id))
-        expect(model.groups.dialog.isOpen).toBe(false)
+      unsentDraftRead
+    ] as const
+
+    it("opens the conversation its parent asks for with a person, when the groups have one", () => {
+      story(
+        update,
+        given(withConversation),
+        message(Message.RequestedConversationWith({ memberId: bob.id })),
+        expectOutMessage(OutMessage.Navigated()),
+        draftRead,
+        model((model) => {
+          expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(conversationWithBob.id)
+          expect(model.groups.selected).toEqual(Option.some(conversationWithBob.id))
+          expect(model.groups.dialog.isOpen).toBe(false)
+        })
+      )
+    })
+
+    it("opens in the main pane, with no dialog and nothing written, when the person has none with the person asked for", () => {
+      story(
+        update,
+        given(modifyFields(opened, { groups: (groups) => modifyFields(groups, { members: () => [bob] }) })),
+        ...askedForBob,
+        model((model) => {
+          expect(Open.isAnyOf(["Unsent"])(model.open)).toBe(true)
+          expect(Open.isAnyOf(["Unsent"])(model.open) && model.open.model.members).toEqual([bob])
+          expect(unsentMemberId(model)).toEqual(Option.some(bob.id))
+          expect(model.groups.selected).toEqual(Option.none())
+          expect(model.groups.dialog.isOpen).toBe(false)
+          expect(model.groups.starting).toEqual(Option.none())
+        })
+      )
+    })
+
+    it("lists its people as a direct group does, and has no sole person with several", () => {
+      const carolId = MemberId.MemberId.make("member-9")
+      const choosingTwo = modifyFields(opened, {
+        groups: (groups) =>
+          modifyFields(groups, {
+            starting: () => Option.some(Starting.Conversation({ memberIds: [carolId, bob.id] })),
+            dialog: (dialog) => modifyFields(dialog, { isOpen: () => true })
+          })
       })
-    )
-    story(
-      update,
-      given(opened),
-      message(Message.RequestedConversationWith({ memberId: bob.id })),
-      expectNoOutMessage(),
-      Command.resolve(
-        Dialog.test.ShowDialog({ id: "groups-starting", focusSelector: "[data-foldkit-dialog-initial-focus]" }),
-        DialogBlock.Message.SucceededShowDialog()
-      ),
-      model((model) => {
-        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
-        expect(model.groups.dialog.isOpen).toBe(true)
-        expect(model.groups.starting).toEqual(Option.some({ _tag: "Conversation", memberIds: [bob.id] }))
-      })
-    )
+
+      story(
+        update,
+        given(choosingTwo),
+        message(fromGroups(GroupsBlock.Message.SubmittedConversation())),
+        expectOutMessage(OutMessage.Navigated()),
+        Command.resolve(Dialog.test.CloseDialog({ id: "groups-starting" }), DialogBlock.Message.CompletedCloseDialog()),
+        Command.resolve(
+          ReadDraft({
+            workspaceId,
+            memberId,
+            place: Drafts.Place.cases.Conversation.make({ memberIds: [bob.id, carolId] })
+          }),
+          ComposerBlock.Message.ReceivedDraft({ text: "" })
+        ),
+        model((model) => {
+          expect(Open.isAnyOf(["Unsent"])(model.open) && model.open.model.memberIds).toEqual([bob.id, carolId])
+          expect(unsentMemberId(model)).toEqual(Option.none())
+          expect(model.groups.dialog.isOpen).toBe(false)
+        })
+      )
+    })
+
+    it("closes the thread and the side pane's dialog, and marks no group in the sidebar, as it opens", () => {
+      story(
+        update,
+        given(atDesktop),
+        ...threadPicked,
+        message(Message.RequestedConversationWith({ memberId: bob.id })),
+        expectOutMessage(OutMessage.Navigated()),
+        dialogClosed,
+        unsentDraftRead,
+        model((model) => {
+          expect(Open.isAnyOf(["Unsent"])(model.open)).toBe(true)
+          expect(isThreadOpen(model)).toBe(false)
+          expect(model.groups.selected).toEqual(Option.none())
+          expect(model.aside.isOpen).toBe(false)
+        })
+      )
+    })
+
+    it("opens the conversation in its place once the store lists one with exactly those people, and marks it", () => {
+      story(
+        update,
+        given(opened),
+        ...askedForBob,
+        message(fromUnsent(UnsentConversationBlock.Message.ReceivedConversation({ groupId: Option.none() }))),
+        expectNoOutMessage(),
+        model((model) => {
+          expect(Open.isAnyOf(["Unsent"])(model.open)).toBe(true)
+        }),
+        message(
+          fromUnsent(
+            UnsentConversationBlock.Message.ReceivedConversation({ groupId: Option.some(conversationWithBob.id) })
+          )
+        ),
+        draftRead,
+        expectNoOutMessage(),
+        model((model) => {
+          expect(Open.isAnyOf(["Group"])(model.open) && model.open.groupId).toBe(conversationWithBob.id)
+          expect(Open.isAnyOf(["Unsent"])(model.open)).toBe(false)
+          expect(model.groups.selected).toEqual(Option.some(conversationWithBob.id))
+          expect(unsentMemberId(model)).toEqual(Option.none())
+        })
+      )
+    })
+
+    it("leaves nothing behind when the person goes elsewhere, and ignores what the conversation says after", () => {
+      story(
+        update,
+        given(opened),
+        ...askedForBob,
+        message(Message.ClickedTasks()),
+        expectOutMessage(OutMessage.Navigated()),
+        model((model) => {
+          expect(Open.isAnyOf(["Tasks"])(model.open)).toBe(true)
+          expect(unsentMemberId(model)).toEqual(Option.none())
+          expect(model.groups.selected).toEqual(Option.none())
+        }),
+        message(
+          fromUnsent(
+            UnsentConversationBlock.Message.ReceivedConversation({ groupId: Option.some(conversationWithBob.id) })
+          )
+        ),
+        expectNoOutMessage(),
+        model((model) => {
+          expect(Open.isAnyOf(["Tasks"])(model.open)).toBe(true)
+        })
+      )
+    })
+
+    it("opens another in its place, a fresh one, when the person asks for a conversation with someone else", () => {
+      const scoutDraftRead = Command.resolve(
+        ReadDraft({
+          workspaceId,
+          memberId,
+          place: Drafts.Place.cases.Conversation.make({ memberIds: [scout.id] })
+        }),
+        ComposerBlock.Message.ReceivedDraft({ text: "" })
+      )
+
+      story(
+        update,
+        given(opened),
+        ...askedForBob,
+        message(Message.RequestedConversationWith({ memberId: scout.id })),
+        scoutDraftRead,
+        model((model) => {
+          expect(unsentMemberId(model)).toEqual(Option.some(scout.id))
+        })
+      )
+    })
   })
 })

@@ -1,12 +1,11 @@
 import { isAsideInDialog } from "@amends-dev/design/shell"
 import type { Viewport } from "@amends-dev/design/viewport"
-import * as Option from "effect/Option"
 import * as Update from "foldkit/update"
 import {
   GroupsBinding,
   HomeComposition,
   hideAside,
-  openGroupAlone,
+  markAndOpenGroup,
   openThreadInGroup,
   showAside,
   showInbox,
@@ -41,11 +40,7 @@ export const update = HomeComposition.makeUpdate((model, message) =>
     ClickedTriage: () => Update.withOutMessage(Update.combine(model, [switchTo(showTriage)]), OutMessage.Navigated()),
     ClickedTasks: () => Update.withOutMessage(Update.combine(model, [switchTo(showTasks)]), OutMessage.Navigated()),
     RequestedReset: () => Update.combine(model, [switchTo(showInbox)]),
-    RequestedOpenGroup: ({ groupId }) =>
-      Update.combine(model, [
-        GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }),
-        openGroupAlone(groupId)
-      ]),
+    RequestedOpenGroup: ({ groupId }) => Update.combine(model, [markAndOpenGroup(groupId)]),
     RequestedOpenThread: ({ groupId, threadId }) => Update.combine(model, [openThreadInGroup(groupId, threadId)]),
     // NOTE: The operation's own result, not one passed through Update.combine, which keeps no OutMessage and would lose
     // the Navigated that the groups' policy forwards when a conversation is selected.

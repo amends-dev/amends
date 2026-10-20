@@ -1,8 +1,10 @@
-import { GroupId } from "@amends-dev/core/group"
+import { Group, GroupId } from "@amends-dev/core/group"
 import type { ThreadId } from "@amends-dev/core/thread"
+import type { MemberId } from "@amends-dev/core/workspace"
 import { isAsideInDialog } from "@amends-dev/design/shell"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
@@ -10,6 +12,7 @@ import { GroupBlock } from "../../../feature/group/block.ts"
 import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { TasksBlock } from "../../../feature/tasks/block.ts"
+import { UnsentConversationBlock } from "../../../feature/unsentConversation/block.ts"
 import { HomeDefinition, type Model, Open, OutMessage } from "./definition.ts"
 
 /** Open the group `groupId` in the main pane, with the thread `threadId` open in it, if there is one. */
@@ -21,6 +24,22 @@ const openGroup = (groupId: GroupId.GroupId, threadId: Option.Option<ThreadId.Th
       toParentModel: (group) => modifyFields(model, { open: () => Open.Group({ groupId, model: group }) })
     })
   )
+
+/**
+ * Open the conversation with the members `memberIds` in the main pane before it is started. It lists its people as a
+ * direct group does, so that it is named as the conversation will be, and is given the members the groups have read,
+ * so that it is named from its first view.
+ */
+const openUnsentConversation = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
+  HomeDefinition.step((model: Model) => {
+    const people = Group.directMembers(memberIds)
+
+    return UnsentBinding.init({
+      key: Group.directKey(people),
+      args: [model.workspaceId, model.memberId, people, model.groups.members],
+      toParentModel: (unsent) => modifyFields(model, { open: () => Open.Unsent({ model: unsent }) })
+    })
+  })
 
 /** Show the inbox in the main pane. */
 export const showInbox = HomeDefinition.step((model: Model) => ({
@@ -59,6 +78,22 @@ export const openGroupAlone = (groupId: GroupId.GroupId) =>
   Update.combine([hideAside, InboxBinding.requestCloseThread(), openGroup(groupId, Option.none())])
 
 /**
+ * Open the conversation with the members `memberIds` before it is started, as picking a group opens it: close the side
+ * pane's dialog and the thread beside the inbox, and leave no group marked in the sidebar, since there is none.
+ */
+export const openUnsentConversationAlone = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
+  Update.combine([
+    hideAside,
+    InboxBinding.requestCloseThread(),
+    GroupsBinding.informOpenGroup({ groupId: Option.none() }),
+    openUnsentConversation(memberIds)
+  ])
+
+/** Mark the group `groupId` in the sidebar and open it without a thread, as asking Home to open it does. */
+export const markAndOpenGroup = (groupId: GroupId.GroupId) =>
+  Update.combine([GroupsBinding.informOpenGroup({ groupId: Option.some(groupId) }), openGroupAlone(groupId)])
+
+/**
  * Open the group `groupId` with the thread `threadId` open in it, mark the group open in the list, close the thread
  * beside the inbox, and open the side pane's dialog where the pane is one.
  */
@@ -71,20 +106,21 @@ export const openThreadInGroup = (groupId: GroupId.GroupId, threadId: ThreadId.T
   ])
 
 /**
- * Picking a group opens it without a thread, and asking to browse shows the groups. Joining a group changes nothing in
- * Home. A group the person created opens, as picking it does.
+ * Picking a group opens it without a thread, picking people the person has no conversation with opens the one they
+ * would start, and asking to browse shows the groups. Joining a group changes nothing in Home. A group the person
+ * created opens, as picking it does.
  */
 const foldGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: ({ groupId }) => openGroupAlone(groupId),
-  SelectedPeople: () => HomeDefinition.stepNoop(),
+  SelectedPeople: ({ memberIds }) => openUnsentConversationAlone(memberIds),
   RequestedBrowse: () => switchTo(showGroups),
   JoinedGroup: () => HomeDefinition.stepNoop(),
   CreatedGroup: ({ groupId }) => openGroupAlone(groupId)
 })
 
 /**
- * Picking a group and asking to browse are the person moving within Home, which Home reports, and joining a group and
- * creating one are reported as they are, for the page to confirm.
+ * Picking a group or people to talk with and asking to browse are the person moving within Home, which Home reports,
+ * and joining a group and creating one are reported as they are, for the page to confirm.
  */
 const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
   SelectedGroup: () => OutMessage.Navigated(),
@@ -159,6 +195,15 @@ const closeThread = HomeDefinition.step((model: Model) =>
   )
 )
 
+/**
+ * The conversation the person has not started being listed, whether their own first message started it or it was
+ * made elsewhere, opens it as any group opens, and marks it in the sidebar.
+ */
+const foldUnsentOutMessage = (_key: string, outMessage: typeof UnsentConversationBlock.OutMessage.Type) =>
+  UnsentConversationBlock.OutMessage.match(outMessage, {
+    FoundConversation: ({ groupId }) => markAndOpenGroup(groupId)
+  })
+
 export const GroupsBinding = HomeDefinition.bindChild(GroupsBlock, {
   field: "groups",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
@@ -212,7 +257,26 @@ export const GroupBinding = HomeDefinition.bindChild(GroupBlock, {
   outMessage: { forward: forwardGroupOutMessage, fold: foldGroupOutMessage }
 })
 
+/**
+ * The conversation not started, a keyed occurrence by its people, so opening another makes a fresh one and a late
+ * result cannot land in the wrong one.
+ */
+export const UnsentBinding = HomeDefinition.bindChild(UnsentConversationBlock, {
+  readAll: (model) => (Open.isAnyOf(["Unsent"])(model.open) ? [model.open] : []),
+  key: (open) => Group.directKey(open.model.memberIds),
+  keySchema: Schema.String,
+  read: (open) => open.model,
+  writeAt: (model, key, nextUnsent) =>
+    modifyFields(model, {
+      open: (open) =>
+        Open.isAnyOf(["Unsent"])(open) && Group.directKey(open.model.memberIds) === key
+          ? Open.Unsent({ model: nextUnsent })
+          : open
+    }),
+  outMessage: { fold: foldUnsentOutMessage }
+})
+
 export const HomeComposition = HomeDefinition.makeComposition({
-  bindings: [AsideBinding, GroupsBinding, InboxBinding, TasksBinding, GroupBinding]
+  bindings: [AsideBinding, GroupsBinding, InboxBinding, TasksBinding, GroupBinding, UnsentBinding]
 })
 export type HomeViewBuilder = Block.ViewBuilderFor<typeof HomeComposition>

@@ -59,7 +59,7 @@ const openThreadRow = selector('[aria-current="page"]:not(button)')
 /** When the latest activity of a group the person has not read was. */
 const later = DateTime.makeUnsafe("2026-10-18T12:05:00Z")
 
-const sceneView = withViewInputs(view, { openThread: Option.none(), isBrowsing: false })
+const sceneView = withViewInputs(view, { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() })
 
 /** The sidebar's groups and the dialog for starting a team or a conversation, which the shell keeps beside them. */
 const withDialog: ReturnType<typeof sceneView> = (model, h) => h.div([], [sceneView()(model, h), dialogView(model, h)])
@@ -998,22 +998,30 @@ describe("the groups", () => {
     )
   })
 
-  it("start a conversation with a teammate the sidebar lists, in the dialog with them chosen", () => {
+  it("open a conversation with a teammate the sidebar lists as it will be, with no dialog to ask first", () => {
     scene(
       { update, view: withDialog },
       given(withConversations),
       click(role("button", { name: "Carol" })),
-      ...dialogOpened(),
-      pickerReady,
-      expect(messageDialog).toExist(),
-      expect(role("button", { name: "Remove Carol" })).toExist(),
-      expect(startConversationButton).not.toHaveAttr("aria-disabled"),
-      expect(toField).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
-      click(startConversationButton),
-      pickerEnded(),
-      Command.expectExact(Dialog.test.CloseDialog),
+      Command.expectNone(),
       expectOutMessage(OutMessage.SelectedPeople({ memberIds: [carol.id] })),
-      ...dialogClosed()
+      expect(messageDialog).toBeAbsent(),
+      expect(role("button", { name: "Carol" })).toExist()
+    )
+  })
+
+  it("mark the teammate whose conversation is open, not started, current, and no other row", () => {
+    scene(
+      { update, view: sceneView({ openThread: Option.none(), isBrowsing: false, unsentWith: Option.some(carol.id) }) },
+      given(withConversations),
+      expect(role("button", { name: "Carol" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Bob" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Bob, Carol" })).not.toHaveAttr("aria-current")
+    )
+    scene(
+      { update, view: sceneView() },
+      given(withConversations),
+      expect(role("button", { name: "Carol" })).not.toHaveAttr("aria-current")
     )
   })
 

@@ -252,7 +252,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
     GroupsBinding.embedView({
       slotId: "groups",
       model: opened.home.groups,
-      viewInputs: { openThread: Option.none(), isBrowsing: false }
+      viewInputs: { openThread: Option.none(), isBrowsing: false, unsentWith: Option.none() }
     }).toParentMessage(message)
   )
 
@@ -1579,7 +1579,7 @@ describe("a workspace", () => {
     }
   })
 
-  it("opens the conversation the search found with a person, or asks the groups to start one in their dialog", () => {
+  it("opens the conversation the search found with a person, or the one they would start, in Home's main pane", () => {
     const person = message(fromSearch(SearchBlock.Message.ClickedItem({ item: SearchItem.Person({ member: bob }) })))
     const withConversation = modifyFields(opened, {
       home: (home) =>
@@ -1634,14 +1634,18 @@ describe("a workspace", () => {
       person,
       Command.resolve(Dialog.test.CloseDialog({ id: "search" }), DialogBlock.Message.CompletedCloseDialog()),
       Command.resolve(
-        Dialog.test.ShowDialog({ id: "groups-starting", focusSelector: "[data-foldkit-dialog-initial-focus]" }),
-        DialogBlock.Message.SucceededShowDialog()
+        ReadDraft({
+          workspaceId: membership.workspace.id,
+          memberId: membership.member.id,
+          place: Drafts.Place.cases.Conversation.make({ memberIds: [bob.id] })
+        }),
+        ComposerBlock.Message.ReceivedDraft({ text: "" })
       ),
       model((model) => {
         expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
-        expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
-        expect(model.home.groups.dialog.isOpen).toBe(true)
-        expect(model.home.groups.starting).toEqual(Option.some({ _tag: "Conversation", memberIds: [bob.id] }))
+        expect(HomeOpen.isAnyOf(["Unsent"])(model.home.open)).toBe(true)
+        expect(model.home.groups.dialog.isOpen).toBe(false)
+        expect(model.home.groups.starting).toEqual(Option.none())
       })
     )
   })

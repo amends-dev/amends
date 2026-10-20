@@ -54,7 +54,8 @@ export const ComposerDefinition = Block.makeDefinition("Composer", { Model, Mess
 export const boxId = (place: Drafts.Place): string =>
   Drafts.Place.match(place, {
     Reply: ({ threadId }) => `reply-${threadId}`,
-    Thread: ({ groupId }) => `thread-${groupId}`
+    Thread: ({ groupId }) => `thread-${groupId}`,
+    Conversation: ({ memberIds }) => `conversation-${memberIds.join("-")}`
   })
 
 const mentionAtEnd = /(^|\s)@([^\s@]*)$/u

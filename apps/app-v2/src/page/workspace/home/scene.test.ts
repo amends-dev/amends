@@ -7,8 +7,10 @@ import {
   Command,
   Mount,
   Subscription,
+  all,
   click,
   expect,
+  expectAll,
   expectOutMessage,
   given,
   inside,
@@ -51,6 +53,7 @@ import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../../feature/inbox/command.ts"
 import { init as initThread } from "../../../feature/thread/init.ts"
 import { LogState } from "../../../feature/turns/definition.ts"
+import { init as initUnsent } from "../../../feature/unsentConversation/init.ts"
 import { timeOf } from "../../../seen.ts"
 import { HomeBlock } from "./block.ts"
 import { Open, OutMessage } from "./definition.ts"
@@ -808,6 +811,99 @@ describe("Home, while the person follows the log of a turn that failed", () => {
       click(role("button", { name: "Agent settings" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
       expect(role("complementary", { name: "Turn log" })).toExist()
+    )
+  })
+})
+
+describe("Home, with a conversation the person has not started", () => {
+  /** The groups read: general, and Bob and Scout as the members the person has no conversation with. */
+  const withTeammates = modifyFields(opened, {
+    groups: (groups) =>
+      modifyFields(groups, {
+        isLoaded: () => true,
+        groups: () => [{ group: general, pending: false, members: 1 }],
+        members: () => [member, bob, scout],
+        memberships: () => [aliceInGeneral]
+      })
+  })
+
+  /** The same with the conversation with Bob not started open in the main pane. */
+  const unsentWithBob = modifyFields(withTeammates, {
+    open: () => Open.Unsent({ model: initUnsent(workspace.id, member.id, [bob.id], [member, bob, scout]).model })
+  })
+
+  const unsentDraftRead = Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" }))
+
+  it("opens a teammate's row as the conversation with them, in the main pane, with the row current and no dialog", () => {
+    scene(
+      { update, view: sceneView },
+      given(withTeammates),
+      expect(sidebarButton("Bob")).not.toHaveAttr("aria-current"),
+      click(sidebarButton("Bob")),
+      expectOutMessage(OutMessage.Navigated()),
+      unsentDraftRead,
+      expect(role("main", { name: "Bob" })).toExist(),
+      expect(role("heading", { name: "Your conversation with Bob", level: 2 })).toExist(),
+      expect(label("Message Bob")).toExist(),
+      expect(sidebarButton("Bob")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Scout")).not.toHaveAttr("aria-current"),
+      expect(sidebarButton("General")).not.toHaveAttr("aria-current"),
+      expect(role("dialog", { name: "New message" })).toBeAbsent()
+    )
+  })
+
+  it("lists no conversation for it in the sidebar: the teammate's row is the one marked, and no row is added", () => {
+    scene(
+      { update, view: sceneView },
+      given(unsentWithBob),
+      expectAll(all.role("button", { name: "Bob" })).toHaveCount(1),
+      expect(sidebarButton("Bob")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Scout")).toExist()
+    )
+  })
+
+  it("starts nothing while it is only open, and leaves nothing behind when the person goes to the inbox", () => {
+    scene(
+      { update, view: sceneView },
+      given(unsentWithBob),
+      expect(role("main", { name: "Bob" })).toExist(),
+      Command.expectNone(),
+      click(sidebarButton("Inbox")),
+      expectOutMessage(OutMessage.Navigated()),
+      expect(role("main", { name: "Bob" })).toBeAbsent(),
+      expect(label("Message Bob")).toBeAbsent(),
+      expect(sidebarButton("Bob")).not.toHaveAttr("aria-current"),
+      expect(sidebarButton("Inbox")).toHaveAttr("aria-current", "page")
+    )
+  })
+
+  it("is replaced by the group the sidebar opens, marking it", () => {
+    scene(
+      { update, view: sceneView },
+      given(unsentWithBob),
+      click(sidebarButton("General")),
+      expectOutMessage(OutMessage.Navigated()),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      expect(role("main", { name: "Bob" })).toBeAbsent(),
+      expect(sidebarButton("General")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Bob")).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("is named by every person it is with, and marks none of their rows", () => {
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(withTeammates, {
+          open: () =>
+            Open.Unsent({ model: initUnsent(workspace.id, member.id, [bob.id, scout.id], [member, bob, scout]).model })
+        })
+      ),
+      expect(role("main", { name: "Bob, Scout" })).toExist(),
+      expect(role("heading", { name: "Your conversation with Bob, Scout", level: 2 })).toExist(),
+      expect(label("Message Bob, Scout")).toExist(),
+      expect(sidebarButton("Bob")).not.toHaveAttr("aria-current"),
+      expect(sidebarButton("Scout")).not.toHaveAttr("aria-current")
     )
   })
 })

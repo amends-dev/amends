@@ -203,8 +203,8 @@ room for the app to grow: TypeScript stops checking one expression at 5,000,000 
 (TS2589), and the workspace page's `makeUpdate` is the first to reach it, with every Block bound
 below it counted at each level above.
 
-- `feature/composer`: what the person writes at a place, a reply in a thread or a new thread in a
-  group, kept as a draft in their browser until they send it. It reports what it sends, and that
+- `feature/composer`: what the person writes at a place, a reply in a thread, a new thread in a
+  group, or the first message of a conversation not yet started, kept as a draft in their browser until they send it. It reports what it sends, and that
   its text changed. Its view takes what the box shows while it is empty, which also names it ("Message #general",
   "Message Bob", "Reply in thread"), and the workspace's members, and is the design's `composer`: its button is named
   Send and is unavailable while the draft is empty or only spaces, and Enter sends it. Sending clears the box at once and the
@@ -601,7 +601,8 @@ below it counted at each level above.
   button is Open conversation then, and otherwise Start conversation, disabled until someone is chosen. Open
   conversation closes the dialog and picks that conversation as a click on its row does, which does nothing more when
   it is the one open already. Start conversation closes the dialog and reports the people (`SelectedPeople`), since no
-  conversation exists to pick; nothing is written by the dialog. A group still on its way shows "Sending…" at the end
+  conversation exists to pick, and Home opens the conversation as it will be (`feature/unsentConversation`); nothing
+  is written by the dialog. A group still on its way shows "Sending…" at the end
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the thread open in that group, from its parent, as its title and the
   status of the task it tracks (`OpenThread`), which it shows under the group as a plain row, the drawing of that
@@ -652,9 +653,11 @@ below it counted at each level above.
   the workspace's other active members the person has no conversation with alone yet (`teammates`), by name as they
   read it, each on their mark in their tone, and an agent among them with its patch and its logo as in a
   conversation; they have no count and no dot, since there is no group yet. A teammate's row sends `ClickedTeammate`,
-  which does what `RequestedConversationWith` does for the parent: it opens the conversation of the two when one has
-  appeared since the row was drawn, and otherwise opens the New message dialog with the member chosen, and Start
-  conversation reports them as it does for a member chosen in the dialog. A
+  which does what `RequestedConversationWith` does for the parent: it selects the conversation of the two when one has
+  appeared since the row was drawn, and otherwise reports the member as the people chosen (`SelectedPeople`), as Start
+  conversation does, with no dialog between: Home opens the conversation as it will be. The row of the member whose
+  conversation is open and not started is marked current (`unsentWith`, which the parent gives the view), and no row
+  is added to the list for the conversation. A
   row's count is read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
   `countName`). `browseView` is the page it asks for, a main pane titled Groups with two tabs, each counted once the groups are
   read: Your groups, the teams the person belongs to, and Discover, the public teams they do not, Your groups at
@@ -683,7 +686,24 @@ below it counted at each level above.
   document. The page lends it to the shell's `dialogs`, so the sidebar's "+" and Create group open it
   at every width. Its parent can ask for a conversation with a member (`requestConversationWith`,
   `RequestedConversationWith`): the Block selects the conversation the person already has with just
-  that member, and, when there is none, opens the New message dialog with the member chosen.
+  that member, and, when there is none, reports the member as the people chosen (`SelectedPeople`), as a teammate's
+  row does.
+- `feature/unsentConversation`: a conversation the person has not started, as it will be once they send its first
+  message, in Home's main pane. It is with the other people it is given, in the order a direct group lists them
+  (`Group.directMembers`), and names them as the conversation will be named, by the workspace's members that it reads
+  (`ReadPeople`, which follows the store) and by their IDs until they are read. Its view is the design's main `pane`
+  titled by the people, with the message icon and the workspace's name under the title on a phone, the welcome a
+  conversation with nothing said in it has, "Your conversation with Bob" (the thread view's `welcome`), and the
+  composer in the footer named "Message Bob" or "Message Bob, Carol" while it is empty, as `apps/ui`'s is. The
+  composer is the composer Block at `Drafts.Place.Conversation`, so the draft is kept for the people and read as the
+  conversation opens; its text is the only thing it holds, and nothing is written before the first send. The first
+  send is the Block's one command, `StartConversation`, which writes `DirectThreadStarted` with
+  `Thread.StartDirectInput` (the people, the text, and the mentions in it), as the store writes a conversation's first
+  thread, once for a send; a write the store could not keep says why over the welcome (`notice`). The Block reports
+  `FoundConversation` as soon as the store lists a conversation of the person with exactly these people
+  (`conversationAmong`, in any order of the people), listed or still on its way: it is the one the person's own message
+  starts, and equally one made on another device in the meantime, and the parent opens it in place of this one. It
+  keeps no state of having been sent.
 - `feature/search`: jumping anywhere in the workspace, as `apps/ui`'s Jump to does, in a palette that the Block binds
   from `@foldkit/ui/dialog` and renders with the design's `palette`: a modal of the palette size, 40rem by 30rem near
   the top of the window, which fills the screen below 48rem. It has no title, and is named Jump to, as is its field,
@@ -1190,7 +1210,8 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   sends, ask the search to open. The search reports what was opened and the page opens it: a page as the rail goes to it (`goToDestination`: Inbox is
   Home, which opens on its inbox, and Settings is the Workspace page, as the account menu goes to it), and, in Home,
   as Home's own lists do, a group (`requestOpenGroup`), a thread in its group (`requestOpenThread`), as a task's is,
-  and a person as a conversation with them (`requestConversationWith`), which Home's groups select or start; an agent
+  and a person as a conversation with them (`requestConversationWith`), which Home's groups select, or open before it is
+  started; an agent
   opens on its page, as a row of the agents' sidebar does. Whatever is opened closes the navigation drawer and the
   side pane's dialog, as any navigation does. So does
   the thread of a turn picked on an agent's page, which the agents Block reports as `OpenedThread` and the page asks
@@ -1255,8 +1276,17 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   its main pane, and its side pane. It binds the groups (`GroupsBinding`), the inbox (`InboxBinding`), the tasks
   (`TasksBinding`), the open group, a keyed occurrence (`GroupBinding`), and a `DialogBlock` for the thread's side
   pane (`AsideBinding`, id `home-aside`). Its main pane (`view`, given the time now) shows the
-  inbox, which it opens on, the tasks in triage, every open task, the groups to browse, or the open group (`Open`:
-  `Inbox`, `Triage`, `Tasks`, `Groups`, `Group`); it has no state of showing nothing. Its sidebar (`sidebarView`) is an
+  inbox, which it opens on, the tasks in triage, every open task, the groups to browse, the open group, or a
+  conversation the person has not started (`Open`: `Inbox`, `Triage`, `Tasks`, `Groups`, `Group`, `Unsent`); it has no
+  state of showing nothing. The conversation not started is `feature/unsentConversation`'s Block, a keyed occurrence
+  (`UnsentBinding`) keyed by its people as a direct group is (`Group.directKey`), so that opening another is a fresh
+  one and a late result cannot land in the wrong one. When the groups report `SelectedPeople`, Home opens it
+  (`openUnsentConversationAlone`) as picking a group opens one: it closes the side pane's dialog and the thread beside
+  the inbox and marks no group in the sidebar, since there is none, and gives it the members the groups have read, so
+  that it is named from its first view. It is not in the sidebar's list, which lists conversations: the row of the one
+  person it is with is marked (`unsentMemberId`). Leaving it, by any navigation, leaves nothing behind, since it is part
+  of `Open` and nothing was written. When it reports `FoundConversation`, Home opens the group and marks it
+  (`markAndOpenGroup`, which `requestOpenGroup` does too). Its sidebar (`sidebarView`) is an
   "Inbox" item with how many notifications wait, read aloud as "5 unread", a "Triage" item with how many tasks wait in
   triage (`triageCount`), read aloud as "5 to triage", a "Tasks" item, and the groups' sections, which are given the
   thread open, as its title (`openThreadTitle`) and the status of the task it tracks (`openThreadTaskStatus`), in the
@@ -1271,7 +1301,8 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   the time now) is the thread open in the open group, or the log of one of its turns in its place while the person
   follows it, or beside the open inbox (`inbox-thread`, the inbox's
   `threadView`), only while one is, and `asideDialogView`, given the `toView` the shell passes the page, is the
-  dialog around it; `dialogView` is the groups' dialogs, for starting a team or a conversation. The page lends the
+  dialog around it; `dialogView` is the groups' dialogs, for starting a team or choosing the people of a conversation.
+  The page lends the
   shell each of them. The thread's side pane is beside the main pane only from 80rem (`Split`); at every other width
   it is in the dialog, which Home opens (`showAside`, which does nothing at `Split`) as the open group or the inbox
   reports `OpenedThread`, and as a task's thread opens its group, and closes (`hideAside`) as the group or the inbox
@@ -1292,8 +1323,8 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   asks it for the rest: to reset
   (`requestReset`), which closes the thread, leaves no group marked, shows the inbox, and closes the dialog, as leaving
   Home does; to open a group without a thread (`requestOpenGroup`) or a thread in its group (`requestOpenThread`);
-  and to select or start the conversation with a member (`requestConversationWith`), which reports `Navigated` only
-  when the groups select a conversation.
+  and to open the conversation with a member (`requestConversationWith`), the one the person has or, when there is
+  none, the one they would start, which reports `Navigated` either way.
 
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
@@ -1482,9 +1513,9 @@ after a chip is removed (`focusMembersInput`).
   the remote anew: eventlog's remote asks for changes from the position it first asked from for as
   long as it lives, which after a drop the server answers with a reset, and a reset leaves out how
   the actions committed before it ended.
-- `store/Drafts.ts` is the person's drafts in the store, a reply in a thread or a new thread in a
-  group, in an IndexedDB database of their own beside the replica, which no server or other
-  device sees; saves keep the order they were asked in.
+- `store/Drafts.ts` is the person's drafts in the store, a reply in a thread, a new thread in a
+  group, or the first message of a conversation not yet started, by its people, in an IndexedDB database of their
+  own beside the replica, which no server or other device sees; saves keep the order they were asked in.
 - `store/SyncKey.ts` is the eventlog identity the browser syncs a person's stores with on a host,
   made the first time and kept in the browser's storage. `Store.forgetPerson` deletes a person's
   stores and that identity, as signing out does.
@@ -1553,7 +1584,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   whatever the accents, a conversation among the teams by the others' names, the teams the person belongs to and the public teams they may
   join told from the conversations, a public team joined once and reported as it is named when the join is written,
   why a join could not be kept and joining again, the groups read again each time the person asks after they could
-  not be, and selecting the conversation with a member asked for, or opening the dialog with the member chosen when there is none, a team
+  not be, and selecting the conversation with a member asked for, or reporting the member as the people chosen when there is none, a team
   with that member in it not being that conversation; the search opening on an empty field and
   reading where the person can jump to only while it is open, listing the pages and then the groups, people, agents, and
   threads, at most five of each before anything is typed and eight while typing, ranking a name by its start, then
@@ -1630,15 +1661,16 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and a task's thread, showing the inbox, the tasks in triage, every open task, or the groups to browse in place of the open group with no group
   marked, showing nothing when its parent resets it, which reports nothing, keeping what the tasks were narrowed to between Triage
   and Tasks, opening a task's thread in its group, and a notification's beside the inbox, which stays, naming the thread open in the group open
-  or beside the inbox, opening the group, the thread in its group, or the conversation its parent asks for, or the groups' dialog when there is no
-  conversation, and taking the window's width; the thread opening the side pane's dialog where the pane is one, from a notification, from a
+  or beside the inbox, opening the group, the thread in its group, or the conversation its parent asks for, or, when there is none, the
+  conversation as it will be, in the main pane with the members read, its thread and side pane closed and no group marked, a teammate's row current
+  and no row added, replaced by the group once the store lists the conversation and by any other destination with nothing left behind, and taking the window's width; the thread opening the side pane's dialog where the pane is one, from a notification, from a
   task, from a thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing with the thread, when Home
   is reset or the groups are browsed, and as the window widens to `Split`, which leaves the thread open; the thread closing as its dialog
   closes by itself, below `Split`; the thread beside the inbox closing with every navigation that leaves the inbox, so that coming back shows
   none; a workspace listing the integrations once as it opens, informing its connections, agents, and channels of them or of why they could not be
   listed, and listing them again when one asks, going home from a group or a destination, to the inbox in Home, showing the connections, the agents,
   the settings, or the channels in place of Home with its group unmarked and its thread closed, and an agent's page from a row of its sidebar or the
-  list, showing Home with the group a person's conversation or a search result opens, handing the settings and the channels what the person does in
+  list, showing Home with the group a person's conversation or a search result opens, or with the conversation not started when the search result is a person the member has none with, handing the settings and the channels what the person does in
   them, opening the navigation drawer, closing it as its dialog asks and by every navigation to an item of a sidebar, and not by a destination picked
   on the rail, which shows it, showing the connections, the agents, and the settings for what their sidebars ask, reporting to the root each entry of
   the account menu it acts on, asking the settings for their name dialog, and no one, when the person chooses to change their name, showing the
@@ -1744,8 +1776,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   with several people by the first letters of two names and all of them as its label, an agent's with its patch and
   why in a tooltip, "Scout, Needs setup", and with the logo moving and where it is at work, "Scout, Working in
   #General", wherever it is, its count and its dot, the members with no conversation yet after the conversations, by
-  name and each in their tone, with an agent among them carrying the same, a click on one opening the New message
-  dialog with them chosen and then reporting them, or opening the conversation if it has appeared, a conversation still on
+  name and each in their tone, with an agent among them carrying the same, a click on one reporting them as the people chosen, with no dialog,
+  or selecting the conversation if it has appeared, a conversation still on
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, drawn by the status of
   the task it tracks in each of the six, with the word for it, in ink once the task is done, and by the message icon
   when it tracks none, under a conversation as under a team, what waits for the
@@ -1771,7 +1803,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   them and the same team taken from the workspace's sidebar, the dialog for a conversation titled New message with
   its description, taking the focus on its To field with the placeholder Add someone…, several people chosen as chips
   and one taken off, Start conversation disabled until someone is chosen and Open conversation with the line that
-  says the person has one when the people chosen are exactly a conversation's others, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted
+  says the person has one when the people chosen are exactly a conversation's others, Start conversation reporting the
+  people chosen and writing nothing, a teammate's row drawn current while its
+  conversation is the one open and not started, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted
   once the groups are read and chosen, each team's channel drawing, visibility, and members, no conversation among them,
   the teams in the sidebar's order, the search narrowing either tab in any case and with spaces ignored, its
   placeholder and the line over the list following the tab, nothing matching, every public team joined, no groups
@@ -1779,7 +1813,12 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   Try again reading them again, a team on its way, a group opened from its row on either tab, a team joined from
   its Join button, which is disabled while the join is written, reports it, and then leaves Discover for Your groups,
   a join that could not be kept saying why over the list and offered again, and Create group only for someone who
-  may create one, opening the dialog with no sidebar on the page; the inbox's notifications under the day they came, by their
+  may create one, opening the dialog with no sidebar on the page; the conversation not started, titled by every person it
+  is with, named by their IDs until the members are read and by their names after, with the welcome of a conversation
+  with nothing said in it and a composer named Message and their names, writing nothing until the first send, then
+  `StartDirectInput` with the people, the text, and its mentions, once, and nothing for a message of spaces, saying why
+  a write was not kept, and reporting the conversation only once the store lists one with exactly these people, in any
+  order, listed or on its way, and not a team, another's, or one with more people; the inbox's notifications under the day they came, by their
   author and what they did, the place they come from, how long ago, and what they say, as the preview of its markdown
   with a mention in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
@@ -2015,6 +2054,6 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and `feature/groups/conversation.ts`: whom a conversation is with, which conversation is with exactly some members,
   and its mark, one member's in their tone, or the first letters of two names, or the letters of an ID before the
   members are read. `Drafts`'
-  tests keep a draft for each place, the last one written, through being closed and opened again.
+  tests keep a draft for each place, including a conversation's by its people, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

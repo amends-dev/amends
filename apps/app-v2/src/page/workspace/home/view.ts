@@ -1,3 +1,4 @@
+import { Group } from "@amends-dev/core/group"
 import { sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
@@ -15,9 +16,10 @@ import {
   GroupsBinding,
   HomeComposition,
   InboxBinding,
-  TasksBinding
+  TasksBinding,
+  UnsentBinding
 } from "./composition.ts"
-import { Message, Open, openThreadTaskStatus, openThreadTitle } from "./definition.ts"
+import { Message, Open, openThreadTaskStatus, openThreadTitle, unsentMemberId } from "./definition.ts"
 
 /**
  * The time now, which the inbox, the tasks, and the group open are given, and the workspace's name, which the inbox and
@@ -27,7 +29,8 @@ export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
 
 /**
  * The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the
- * time now, and the inbox and the group the workspace's name too, and the group the width of the window Home holds.
+ * time now, and the inbox, the group, and the conversation not started the workspace's name too, and the group the
+ * width of the window Home holds.
  */
 export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
   Open.match(model.open, {
@@ -45,6 +48,15 @@ export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { no
           slotId: "group",
           model: open,
           viewInputs: { now, workspaceName, viewport: model.viewport }
+        })
+      ),
+    Unsent: ({ model: unsent }) =>
+      h.block(
+        UnsentBinding.embedView({
+          key: Group.directKey(unsent.memberIds),
+          slotId: "unsent",
+          model: unsent,
+          viewInputs: { workspaceName }
         })
       )
   })
@@ -89,7 +101,8 @@ export const sidebarView = HomeComposition.makeView((model, h) => {
             title,
             taskStatus: openThreadTaskStatus(model)
           })),
-          isBrowsing: Open.isAnyOf(["Groups"])(model.open)
+          isBrowsing: Open.isAnyOf(["Groups"])(model.open),
+          unsentWith: unsentMemberId(model)
         }
       })
     )

@@ -41,11 +41,10 @@ const openTeamForm = GroupsDefinition.stepFields(() => ({
     )
 }))
 
-/** Ask for a new conversation with `memberIds` chosen, none when there are none. */
-const openConversationForm = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
-  GroupsDefinition.stepFields(() => ({
-    starting: () => Option.some(Starting.Conversation({ memberIds }))
-  }))
+/** Ask for a new conversation, with no one chosen. */
+const openConversationForm = GroupsDefinition.stepFields(() => ({
+  starting: () => Option.some(Starting.Conversation({ memberIds: [] }))
+}))
 
 /**
  * Ask to mark the group open as read, as of its latest activity, while it has activity the person has not read, unless
@@ -171,18 +170,13 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     })
 
   /**
-   * Open the conversation of the person and `memberId` when there is one, and otherwise ask for a new one with them
-   * chosen.
+   * Open the conversation of the person and `memberId` when there is one, and otherwise report the member for the
+   * parent to open the conversation with them as it will be, with no dialog to ask first.
    */
   const talkWith = (memberId: MemberId.MemberId) =>
     Option.match(conversationWith(model, [memberId]), {
       onSome: ({ id: groupId }) => pickGroup(model, groupId),
-      onNone: () =>
-        Update.combine(model, [
-          openConversationForm([memberId]),
-          MembersBinding.requestClose(),
-          DialogBinding.requestOpen()
-        ])
+      onNone: () => ({ model, outMessage: OutMessage.SelectedPeople({ memberIds: [memberId] }) })
     })
 
   return Message.match(message, {
@@ -254,7 +248,7 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     }),
     CompletedFocusStartingMembers: () => ({ model }),
     ClickedNewConversation: () =>
-      Update.combine(model, [openConversationForm([]), MembersBinding.requestClose(), DialogBinding.requestOpen()]),
+      Update.combine(model, [openConversationForm, MembersBinding.requestClose(), DialogBinding.requestOpen()]),
     ClickedTeammate: ({ memberId }) => talkWith(memberId),
     RequestedConversationWith: ({ memberId }) => talkWith(memberId),
     SubmittedConversation: () =>

@@ -235,6 +235,10 @@ export const connectionNameIn = (
   connectionId: string
 ): string => connections.find(({ id }) => id === connectionId)?.name ?? "Removed connection"
 
+/** The members `memberIds` by their names among `members`, as a conversation with them is named. */
+export const namesOf = (members: ReadonlyArray<Member.Member>, memberIds: ReadonlyArray<MemberId.MemberId>): string =>
+  memberIds.map((id) => memberName(members, id)).join(", ")
+
 /** A group's name: a team's own, or a conversation's other members than `self`, by their names. */
 export const groupName = (
   group: Group.Group,
@@ -243,10 +247,10 @@ export const groupName = (
 ): string =>
   group.kind === "Team"
     ? group.name
-    : group.memberIds
-        .filter((id) => id !== self)
-        .map((id) => memberName(members, id))
-        .join(", ")
+    : namesOf(
+        members,
+        group.memberIds.filter((id) => id !== self)
+      )
 
 /** What marks `group`, named `name`, in a list: a team's `#`, or a conversation's other members' initials. */
 export const groupMark = (group: Group.Group, name: string): string => (group.kind === "Team" ? "#" : initials(name))
