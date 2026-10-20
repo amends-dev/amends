@@ -111,14 +111,17 @@ const foldSearchOutMessage = SearchBlock.OutMessage.match({
 })
 
 /**
- * Asking to browse the agents shows the list as any destination is gone to, and picking one opens its page. Asking
- * again for the integrations lists them again. What the person did to an agent is confirmed to them in a toast:
+ * Asking to browse the agents shows the list as any destination is gone to, and picking one opens its page. Picking
+ * a turn an agent has under way opens its thread in Home, in its group, as picking a thread the search found does.
+ * Asking again for the integrations lists them again. What the person did to an agent is confirmed to them in a toast:
  * saving its name or its setup, adding one, which opens its page, and removing one, which shows the list.
  */
 const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
   RequestedIntegrations: () => loadIntegrationsAgain,
   RequestedBrowse: () => goTo(showAgents),
   OpenedAgent: ({ agentId }) => goTo(showAgent(agentId)),
+  OpenedThread: ({ groupId, threadId }) =>
+    Update.combine([HomeBinding.requestOpenThread({ groupId, threadId }), goToHome()]),
   SavedName: () => ActionsBinding.confirm({ text: "Name saved" }),
   SavedSetup: () => ActionsBinding.confirm({ text: "Setup saved" }),
   CreatedAgent: ({ agentId, name }) =>

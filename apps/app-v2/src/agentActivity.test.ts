@@ -1,4 +1,5 @@
 import { Identity } from "@amends-dev/core/identity"
+import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Option } from "effect"
@@ -58,10 +59,28 @@ describe("an agent's turns under way", () => {
     const strangers = { ...scoutsTurn("turn-9", "running"), agentId: otherAgentId }
 
     expect(underWay([strangers, scoutsTurn("turn-1", "running", design.id)])).toEqual([
-      { turnId: "turn-1", state: "working", place: Option.some("#Design") }
+      { turnId: "turn-1", groupId: design.id, threadId: "thread-1", state: "working", place: Option.some("#Design") }
     ])
     expect(underWay([scoutsTurn("turn-1", "queued", conversationWithBob.id)])).toEqual([
-      { turnId: "turn-1", state: "queued", place: Option.some("Bob") }
+      {
+        turnId: "turn-1",
+        groupId: conversationWithBob.id,
+        threadId: "thread-1",
+        state: "queued",
+        place: Option.some("Bob")
+      }
+    ])
+  })
+
+  it("carry the group and the thread each turn works in, which opens it", () => {
+    const inAnotherThread = {
+      ...scoutsTurn("turn-1", "running", design.id),
+      threadId: ThreadId.ThreadId.make("thread-2")
+    }
+
+    expect(underWay([inAnotherThread, scoutsTurn("turn-2", "queued", general.id)])).toMatchObject([
+      { turnId: "turn-1", groupId: design.id, threadId: "thread-2" },
+      { turnId: "turn-2", groupId: general.id, threadId: "thread-1" }
     ])
   })
 
@@ -158,11 +177,7 @@ describe("the words for what an agent is doing", () => {
   })
 
   it("say a turn's state in its place", () => {
-    expect(
-      turnLabel({ turnId: scoutsTurn("turn-1", "queued").id, state: "queued", place: Option.some("#design") })
-    ).toBe("Queued in #design")
-    expect(turnLabel({ turnId: scoutsTurn("turn-1", "queued").id, state: "working", place: Option.none() })).toBe(
-      "Working"
-    )
+    expect(turnLabel({ state: "queued", place: Option.some("#design") })).toBe("Queued in #design")
+    expect(turnLabel({ state: "working", place: Option.none() })).toBe("Working")
   })
 })

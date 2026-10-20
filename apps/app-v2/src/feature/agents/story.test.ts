@@ -2,6 +2,7 @@ import { Agent } from "@amends-dev/core/agent"
 import { type Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
+import { ThreadId } from "@amends-dev/core/thread"
 import { Member, type MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -1689,6 +1690,22 @@ describe("what the agents are doing", () => {
 
     expect(turnsOfAgent(working, { ...scoutItem!, pending: true })).toEqual([])
     expect(activityOfAgent(working, { ...scoutItem!, pending: true })).toEqual(Option.none())
+  })
+
+  it("reports the thread of the turn the person picks, with its group, and changes nothing else", () => {
+    const working = { ...opened, turns: underWay, groups: [general, design] }
+    const threadId = ThreadId.ThreadId.make("thread-2")
+
+    story(
+      update,
+      given(working),
+      message(Message.ClickedTurn({ groupId: design.id, threadId })),
+      expectOutMessage(OutMessage.OpenedThread({ groupId: design.id, threadId })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model).toEqual(working)
+      })
+    )
   })
 
   it("is read again, with the agents, when the person tries again", () => {

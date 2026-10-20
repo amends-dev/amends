@@ -3,6 +3,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization"
 import type { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
+import { ThreadId } from "@amends-dev/core/thread"
 import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -1545,5 +1546,59 @@ describe("what an agent is doing, on its page", () => {
       expect(within(activity, text("Queued"))).toExist(),
       expect(within(activity, text("#General"))).toBeAbsent()
     )
+  })
+
+  describe("opening a turn's thread", () => {
+    const workingId = role("button", { name: "Working in #General: open its log" })
+    const queued = role("button", { name: "Queued in #Design: open its log" })
+
+    /** Scout's queued turn in design works in a thread of its own, `thread-2`. */
+    const inTwoThreads = modifyFields(atWork, {
+      turns: (turns) =>
+        turns.map((turn) => (turn.id === "turn-2" ? { ...turn, threadId: ThreadId.ThreadId.make("thread-2") } : turn))
+    })
+
+    it("makes each line one button, named as apps/ui names its link to the turn's log", () => {
+      scene(
+        { update, view: pageOf("agent-1") },
+        given(inTwoThreads),
+        expect(within(activity, workingId)).toExist(),
+        expect(within(activity, queued)).toExist(),
+        expect(within(workingId, text("Working"))).toExist(),
+        expect(within(workingId, text("#General"))).toHaveClass("font-medium"),
+        expect(within(workingId, selector("svg.logo-working"))).toHaveAttr("aria-hidden", "true"),
+        expect(within(queued, selector("svg.logo-thread"))).toExist()
+      )
+    })
+
+    it("reports the thread of the turn the person picks, with its group", () => {
+      scene(
+        { update, view: pageOf("agent-1") },
+        given(inTwoThreads),
+        click(queued),
+        expectOutMessage(OutMessage.OpenedThread({ groupId: design.id, threadId: ThreadId.ThreadId.make("thread-2") })),
+        click(workingId),
+        expectOutMessage(OutMessage.OpenedThread({ groupId: general.id, threadId: ThreadId.ThreadId.make("thread-1") }))
+      )
+    })
+
+    it("names a turn whose group is not read by its state, and still opens its thread", () => {
+      scene(
+        { update, view: pageOf("agent-2") },
+        given(modifyFields(atWork, { groups: () => [] })),
+        expect(role("button", { name: "Queued: open its log" })).toExist(),
+        click(role("button", { name: "Queued: open its log" })),
+        expectOutMessage(OutMessage.OpenedThread({ groupId: general.id, threadId: ThreadId.ThreadId.make("thread-1") }))
+      )
+    })
+
+    it("has no button while the agent is idle", () => {
+      scene(
+        { update, view: pageOf("agent-2") },
+        given(modifyFields(atWork, { turns: () => [] })),
+        expect(text("Idle")).toExist(),
+        expect(role("button", { name: "Queued in #General: open its log" })).toBeAbsent()
+      )
+    })
   })
 })

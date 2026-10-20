@@ -430,6 +430,7 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
     TypedBrowseQuery: ({ query }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })
     }),
+    ClickedTurn: ({ groupId, threadId }) => ({ model, outMessage: OutMessage.OpenedThread({ groupId, threadId }) }),
     // Opening an agent's page needs the models of its connection to show its model and its efforts.
     ClickedAgent: ({ agentId }) => {
       const outMessage = OutMessage.OpenedAgent({ agentId })

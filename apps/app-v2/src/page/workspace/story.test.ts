@@ -1464,6 +1464,35 @@ describe("a workspace", () => {
     }
   })
 
+  it("opens the thread of a turn an agent has under way in its group, in Home, as the search does", () => {
+    for (const viewport of ["Desktop", "Split"] as const) {
+      story(
+        update,
+        given(
+          modifyFields(init(workspaceId, memberId, "Studio", viewport).model, {
+            open: () => Open.Agent({ agentId }),
+            agents: readAgents
+          })
+        ),
+        message(fromAgents(AgentsBlock.Message.ClickedTurn({ groupId, threadId: thread.id }))),
+        ...draftsRead,
+        ...(viewport === "Split" ? [] : [dialogShown]),
+        model((model) => {
+          expect(Open.isAnyOf(["Home"])(model.open)).toBe(true)
+          expect(
+            HomeOpen.isAnyOf(["Group"])(model.home.open) && [
+              model.home.open.groupId,
+              Option.map(model.home.open.model.thread, (open) => open.threadId)
+            ]
+          ).toEqual([groupId, Option.some(thread.id)])
+          expect(model.home.groups.selected).toEqual(Option.some(groupId))
+          expect(model.home.aside.isOpen).toBe(viewport !== "Split")
+          expect(model.menu.isOpen).toBe(false)
+        })
+      )
+    }
+  })
+
   it("opens the conversation the search found with a person, or asks the groups to start one in their dialog", () => {
     const person = message(fromSearch(SearchBlock.Message.ClickedResult({ result: Result.Person({ member: bob }) })))
     const withConversation = modifyFields(opened, {

@@ -4,9 +4,10 @@
  * way is idle. The agents list, the sidebar, and an agent's page show it.
  */
 
-import type { Group } from "@amends-dev/core/group"
+import type { Group, GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { ReplicaRecord } from "@amends-dev/core/replica"
+import type { ThreadId } from "@amends-dev/core/thread"
 import type { Turn, TurnId } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { LogoMotion } from "@amends-dev/design/logo"
@@ -48,8 +49,17 @@ export const motionOfState: Readonly<Record<ActivityState, LogoMotion>> = {
   stopping: "tug"
 }
 
-/** A turn under way: which, in what state, and where, by the group's name once the store holds the group. */
-export type TurnUnderWay = Readonly<{ turnId: TurnId.TurnId; state: ActivityState; place: Option.Option<string> }>
+/**
+ * A turn under way: which, in what state, and where: the thread it works in and its group, and the group's place once
+ * the store holds the group.
+ */
+export type TurnUnderWay = Readonly<{
+  turnId: TurnId.TurnId
+  groupId: GroupId.GroupId
+  threadId: ThreadId.ThreadId
+  state: ActivityState
+  place: Option.Option<string>
+}>
 
 /** What an agent is doing: its most pressing state, and each place it is at work, once. */
 export type AgentActivity = Readonly<{ state: ActivityState; places: ReadonlyArray<string> }>
@@ -84,6 +94,8 @@ export const turnsUnderWay = (
     .toSorted(byPressing)
     .map(({ turn, state }) => ({
       turnId: turn.id,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
       state,
       place: Option.map(Option.fromUndefinedOr(groups.find(({ id }) => id === turn.groupId)), (group) =>
         placeName(group, members, self)
@@ -112,5 +124,5 @@ export const activityLabel = ({ state, places }: AgentActivity): string =>
   places.length === 0 ? stateWord[state] : `${stateWord[state]} in ${placesLine(places)}`
 
 /** What a turn under way is doing in words, as the agent's page lists it: "Queued in #design". */
-export const turnLabel = ({ state, place }: TurnUnderWay): string =>
+export const turnLabel = ({ state, place }: Pick<TurnUnderWay, "state" | "place">): string =>
   Option.match(place, { onNone: () => stateWord[state], onSome: (place) => `${stateWord[state]} in ${place}` })

@@ -9,16 +9,18 @@
  * list or the agent's page for, and confirms. An agent's role is its membership's, in the settings. The workspace page
  * lists the host's integrations once and informs the Block of them, which say what each connection gives, and a model
  * connection lists its models over HTTP as a setup chooses it. What an agent is doing is read from the turns the store
- * holds (see `agentActivity.ts`).
+ * holds (see `agentActivity.ts`), and the person picks one of an agent's turns on its page to open its thread, which
+ * the page does in Home.
  */
 
 import { Connection as ConnectionContract, type Integration } from "@amends-dev/connection"
 import { Agent, AgentPermissions } from "@amends-dev/core/agent"
 import { BuiltinRoles, Grant, Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
-import { Group } from "@amends-dev/core/group"
+import { Group, GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
+import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, MemberPermissions, WorkspaceId } from "@amends-dev/core/workspace"
 import type { Choice } from "@amends-dev/design/control"
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -190,6 +192,7 @@ export const Message = defineMessageUnion({
   ChoseBrowseTab: { tab: BrowseTab },
   TypedBrowseQuery: { query: Schema.String },
   ClickedAgent: { agentId: Identity.AgentId },
+  ClickedTurn: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId },
   ClickedAdd: {},
   TypedAddingName: { name: Schema.String },
   ChoseRole: { roleId: Role.RoleId },
@@ -215,13 +218,15 @@ export type Message = typeof Message.Type
 
 /**
  * What the Block asks of the workspace page: to list the integrations again, once the host could not be reached;
- * to show the agents, which the sidebar's title and Browse ask; to open the agent picked; and to confirm to the
- * person what they did, with the page of the agent that was added opening and the list showing once one is removed.
+ * to show the agents, which the sidebar's title and Browse ask; to open the agent picked; to open the thread a turn
+ * of an agent works in, in its group; and to confirm to the person what they did, with the page of the agent that was
+ * added opening and the list showing once one is removed.
  */
 export const OutMessage = defineMessageUnion({
   RequestedIntegrations: {},
   RequestedBrowse: {},
   OpenedAgent: { agentId: Identity.AgentId },
+  OpenedThread: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId },
   SavedName: {},
   SavedSetup: {},
   CreatedAgent: { agentId: Identity.AgentId, name: Schema.String },

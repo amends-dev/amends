@@ -651,7 +651,9 @@ below it counted at each level above.
   tab says every agent can run, and a search with no match says so and clears from "Clear search".
   The Block reports `RequestedBrowse` when the person browses from the sidebar, and `OpenedAgent`
   with the agent picked, from the sidebar or the list, asking once for the models of the agent's
-  connection to show its model and its efforts; the page opens the agent's page for it. That page, `agentView`, with the view inputs `agentId` and
+  connection to show its model and its efforts; the page opens the agent's page for it. It reports
+  `OpenedThread` with the thread and the group of a turn the person picks on an agent's page, which the page opens in
+  Home. That page, `agentView`, with the view inputs `agentId` and
   `workspaceName`, is a pane titled by the agent's name on a 24px lilac mark with the patch of how it
   stands, and, on a phone, the workspace's name under the title. One `paneColumn` holds, in order: where the
   agent can't run, a boxed note, "This agent can't run as it is set up", with a line for each reason; a Name
@@ -660,8 +662,12 @@ below it counted at each level above.
   until the setup changes, and "Discard changes" beside it while it has; and Details: the role, which is
   changed in Settings › Members, as any member's is, the current activity, "Idle" or a line for each turn
   under way, the most pressing first, the logo moving as it does, the state, and the place, such as
-  "Working #general", and who created the agent, with the day. (`apps/ui` makes each line a link that opens
-  the turn's log beside its thread; here a line is not a link, since the Block has no way to open a thread.) A person who may not configure the agent reads the
+  "Working #general", and who created the agent, with the day. As in `apps/ui`, each line is one button named as
+  `apps/ui` names its link, "Working in #general: open its log" (or "Working: open its log" while the group is not
+  read), the design's `activityList` with an `action`; it reports `OpenedThread` with the group and the thread the turn
+  works in (`ClickedTurn`, from `TurnUnderWay`), which the page opens in Home, where the thread's side pane lists its
+  turns and each turn's Show log. `apps/ui` opens the turn's own log beside its thread; the thread Block has no way to open
+  one turn's log, so the person shows it from the pane, and the button opens the thread. A person who may not configure the agent reads the
   same fields disabled, with no buttons; an agent the workspace does not list says "This agent isn't here" and
   offers "Show all agents", and nothing shows before the agents are read. The Block keeps what the person
   changed on each agent's page (`edits`: a name and a whole setup, each saved apart, from the name the agent
@@ -847,7 +853,9 @@ below it counted at each level above.
   sends, ask the search to open. The search reports what was opened and the page asks Home to open it, as Home's
   own lists do: a group (`requestOpenGroup`), a thread in its group (`requestOpenThread`), as a task's is, and a
   person as a conversation with them (`requestConversationWith`), which Home's groups select or start. A group or a
-  thread opened shows Home and closes the navigation drawer and the side pane's dialog, as any navigation does. The
+  thread opened shows Home and closes the navigation drawer and the side pane's dialog, as any navigation does. So does
+  the thread of a turn picked on an agent's page, which the agents Block reports as `OpenedThread` and the page asks
+  Home to open the same way. The
   workspace's name in the sidebar and
   in the panes that name it is the settings' once they hold the workspace, so it follows a rename, and the one
   the workspace was opened with until then. The page's view takes the account's email, the Appearance the person chose, the time now, and whether the page runs on an Apple
@@ -999,8 +1007,8 @@ feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is t
 `agentActivity.ts`, what an agent is doing, read from its turns. A turn that is queued, running, or being
 stopped is under way, as Queued, Working, or Stopping, and a turn that finished is not (`activityStateOf`);
 `turnsUnderWay` lists an agent's, the most pressing first (working, then stopping, then queued) and the oldest
-first within a state, each in the place its group is named by, as the person reads it (`placeName`), or in none
-while the store lacks the group; `activityOf` takes the most pressing state and each place once, and none for an agent
+first within a state, each with its group and thread, which open it, and the place its group is named by, as the
+person reads it (`placeName`), or none while the store lacks the group; `activityOf` takes the most pressing state and each place once, and none for an agent
 with no turn, which is idle. `placesLine`, `activityLabel`, and `turnLabel` say them in words, "#general + 1 more" and
 "Working in #general", and `motionOfState` says how the logo moves for each: threaded, lit, or tugged. The Block
 reads the turns under way and the groups through its `ReadActivity` subscription, apart from the agents.
@@ -1360,7 +1368,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   agent, the agents by name with a patch on those that need setup, the one whose page is open marked
   current in place of the title, the one picked reported, and "No agents yet" once the agents are read; an
   agent's page: its name on a lilac mark with the workspace under it on a phone, its name and its setup as
-  they are with nothing yet to save, its details, the note of why it can't run, a line for each reason,
+  they are with nothing yet to save, its details, a button for each turn under way, named as `apps/ui` names its link, that reports the thread of the turn with its group, and that the workspace page opens in Home, beside the group's threads, the note of why it can't run, a line for each reason,
   its name renamed from the name it has and saved once, with the failure under the name, and a blank name
   or the name it has not saved, its setup set up again as a whole and saved once, discarded, with a part
   that can't be saved marked beside its field and nothing sent, and the failure under the setup, read
@@ -1530,7 +1538,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
-  the state of a turn in each status, the turns under way of an agent, ordered, and named by place, its activity
+  the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity
   from them, idle or by the most pressing state and each place once, and the words for them. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
 

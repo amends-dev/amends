@@ -58,7 +58,8 @@ import {
   support,
   task,
   testApi,
-  thread
+  thread,
+  turnOf
 } from "../../../test/fixtures.ts"
 import { acknowledgeMenuClosed, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
@@ -91,6 +92,7 @@ import { SettingsBlock } from "../../feature/settings/block.ts"
 import { RenameSelf, SelectOnFocus } from "../../feature/settings/command.ts"
 import { AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
+import * as Drafts from "../../store/Drafts.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { LoadIntegrations } from "./command.ts"
 import { Message, Open, OutMessage } from "./definition.ts"
@@ -893,6 +895,45 @@ describe("a workspace", () => {
       expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
       click(role("button", { name: "Show all agents" })),
       expect(role("main", { name: "Agents" })).toExist()
+    )
+  })
+
+  it("opens the thread of a turn an agent has under way from its page, in its group in Home, beside the threads", () => {
+    const atWork = modifyFields(withAgent, {
+      open: () => Open.Agent({ agentId: scoutAgent.id }),
+      agents: (agents) =>
+        modifyFields(agents, {
+          groups: () => [general],
+          turns: () => [{ ...turnOf("turn-1", "running"), groupId: general.id }]
+        })
+    })
+
+    scene(
+      { update, view: sceneView },
+      given(inWindow(atWork, "Desktop")),
+      inside(role("main", { name: "Scout" }), click(role("button", { name: "Working in #General: open its log" }))),
+      Command.resolve(
+        ReadDraft({
+          workspaceId: workspace.id,
+          memberId: member.id,
+          place: Drafts.Place.cases.Thread.make({ groupId: general.id })
+        }),
+        ComposerBlock.Message.ReceivedDraft({ text: "" })
+      ),
+      Command.resolve(
+        ReadDraft({
+          workspaceId: workspace.id,
+          memberId: member.id,
+          place: Drafts.Place.cases.Reply.make({ threadId: thread.id })
+        }),
+        ComposerBlock.Message.ReceivedDraft({ text: "" })
+      ),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("main", { name: "Scout" })).toBeAbsent(),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(railButton("Home")).toHaveAttr("aria-current", "true"),
+      expect(railButton("Agents")).not.toHaveAttr("aria-current")
     )
   })
 

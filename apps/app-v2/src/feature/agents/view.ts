@@ -30,6 +30,7 @@ import {
   motionOfState,
   placesLine,
   stateWord,
+  turnLabel,
   type TurnUnderWay
 } from "../../agentActivity.ts"
 import { calendarDate, memberName } from "../../seen.ts"
@@ -466,12 +467,20 @@ const setupForm = (
   ])
 }
 
-/** A turn under way as a line of the agent's page: the logo as the turn goes, its state, and the place it is in. */
+/**
+ * A turn under way as a line of the agent's page: the logo as the turn goes, its state, and the place it is in, as one
+ * button that opens the turn's thread, named as `apps/ui` names its link to the turn's log: "Working in #general: open
+ * its log".
+ */
 const turnLine = (turn: TurnUnderWay) => ({
   key: turn.turnId,
   state: stateWord[turn.state],
   motion: motionOfState[turn.state],
-  place: Option.getOrUndefined(turn.place)
+  place: Option.getOrUndefined(turn.place),
+  action: {
+    name: `${turnLabel(turn)}: open its log`,
+    onClick: Message.ClickedTurn({ groupId: turn.groupId, threadId: turn.threadId })
+  }
 })
 
 /** What the agent is doing now, a line for each turn under way, the most pressing first, or Idle when it has none. */
