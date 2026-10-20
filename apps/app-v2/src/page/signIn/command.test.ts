@@ -4,13 +4,11 @@ import { Effect, Layer, Option, Schema } from "effect"
 import { given, message, model, story } from "foldkit/story"
 import { session } from "../../../test/fixtures.ts"
 import { type Answer, hostAnswering } from "../../../test/host.ts"
-import { CheckCode, SendCode } from "./command.ts"
+import { CheckCode, FocusCode, SendCode } from "./command.ts"
 import { Message, SignInForm } from "./definition.ts"
 import { update } from "./update.ts"
 
 const email = "alex@mercier.example"
-
-const unreachable = "The host could not be reached. Try again."
 
 const sendCode = (answer: Answer, address: string) => {
   const { sent, layer } = hostAnswering(answer)
@@ -35,6 +33,13 @@ const unlisted = [
   ["makes the client's call die", "dies"]
 ] as const satisfies ReadonlyArray<readonly [string, Answer]>
 
+/** Why the host rejected a code, which reaches the app in the error the contract lists for it, and how it is told. */
+const rejections = [
+  ["mismatch", "Mismatch"],
+  ["expired", "Expired"],
+  ["unknown", "Unknown"]
+] as const satisfies ReadonlyArray<readonly [SignIn.Rejected["reason"], string]>
+
 describe("SendCode", () => {
   it.effect("asks the host to send a code to the address, and reports that it did", () =>
     Effect.gen(function* () {
@@ -52,19 +57,17 @@ describe("SendCode", () => {
       const { outcome, sent } = yield* sendCode({ status: 202, body: null }, "alex")
 
       expect(sent).toEqual([])
-      expect(outcome).toEqual(Message.FailedSendCode({ error: "Enter an email address." }))
+      expect(outcome).toEqual(Message.FailedSendCode({ error: "InvalidEmail" }))
     })
   )
 
-  it.effect("says why the host refused, when it answered that it is limited or unavailable", () =>
+  it.effect("says the host is limited when it answered so, and that the request failed when it was unavailable", () =>
     Effect.gen(function* () {
       const limited = yield* sendCode({ status: 429, body: { _tag: "SignIn.Limited" } }, email)
       const unavailable = yield* sendCode({ status: 503, body: { _tag: "SignIn.Unavailable" } }, email)
 
-      expect(limited.outcome).toEqual(
-        Message.FailedSendCode({ error: "Too many codes were sent lately. Try again later." })
-      )
-      expect(unavailable.outcome).toEqual(Message.FailedSendCode({ error: "The code could not be sent. Try again." }))
+      expect(limited.outcome).toEqual(Message.FailedSendCode({ error: "RateLimited" }))
+      expect(unavailable.outcome).toEqual(Message.FailedSendCode({ error: "RequestFailed" }))
     })
   )
 
@@ -73,14 +76,14 @@ describe("SendCode", () => {
       Effect.gen(function* () {
         const { outcome } = yield* sendCode(answer, email)
 
-        expect(outcome).toEqual(Message.FailedSendCode({ error: unreachable }))
+        expect(outcome).toEqual(Message.FailedSendCode({ error: "RequestFailed" }))
         story(
           update,
           given({ form: SignInForm.SendingCode({ email }) }),
           message(outcome),
           model((after) => {
             expect(after.form).toEqual(
-              SignInForm.EnteringEmail({ email, error: Option.some(unreachable), notice: Option.none() })
+              SignInForm.EnteringEmail({ email, error: Option.some("RequestFailed"), notice: Option.none() })
             )
           })
         )
@@ -107,38 +110,73 @@ describe("CheckCode", () => {
       const { outcome, sent } = yield* checkCode({ status: 200, body: null }, "04")
 
       expect(sent).toEqual([])
-      expect(outcome).toEqual(Message.FailedSignIn({ error: "Enter the six digits of the code." }))
+      expect(outcome).toEqual(Message.FailedSignIn({ error: "InvalidCode" }))
     })
   )
 
-  it.effect("says the code is wrong or expired, when the host rejected it", () =>
-    Effect.gen(function* () {
-      const { outcome } = yield* checkCode(
-        { status: 403, body: { _tag: "SignIn.Rejected", reason: "mismatch" } },
-        "041234"
-      )
+  for (const [reason, error] of rejections) {
+    it.effect(
+      `says the code is ${reason === "unknown" ? "no longer available" : reason}, as the host rejected it`,
+      () =>
+        Effect.gen(function* () {
+          const { outcome } = yield* checkCode({ status: 403, body: { _tag: "SignIn.Rejected", reason } }, "041234")
 
-      expect(outcome).toEqual(Message.FailedSignIn({ error: "That code is wrong or has expired." }))
-    })
-  )
+          expect(outcome).toEqual(Message.FailedSignIn({ error }))
+        })
+    )
+  }
 
   for (const [description, answer] of unlisted) {
     it.effect(`ends in a failure, and the form leaves checking, when the host ${description}`, () =>
       Effect.gen(function* () {
         const { outcome } = yield* checkCode(answer, "041234")
 
-        expect(outcome).toEqual(Message.FailedSignIn({ error: unreachable }))
+        expect(outcome).toEqual(Message.FailedSignIn({ error: "VerifyFailed" }))
         story(
           update,
           given({ form: SignInForm.CheckingCode({ email, code: "041234" }) }),
           message(outcome),
           model((after) => {
             expect(after.form).toEqual(
-              SignInForm.EnteringCode({ email, code: "041234", error: Option.some(unreachable) })
+              SignInForm.EnteringCode({
+                email,
+                code: "041234",
+                error: Option.some("VerifyFailed"),
+                isResent: false
+              })
             )
           })
         )
       })
     )
   }
+})
+
+describe("FocusCode", () => {
+  it.effect("moves focus to the code's input, and completes all the same when it is not there", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const input = yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            const element = document.createElement("input")
+            element.id = "code"
+            document.body.append(element)
+            return element
+          }),
+          (element) => Effect.sync(() => element.remove())
+        )
+
+        const focused = yield* FocusCode().effect.pipe(Effect.provide(FocusCode.layer))
+
+        expect(document.activeElement).toBe(input)
+        expect(focused).toEqual(Message.CompletedFocusCode())
+
+        input.remove()
+
+        const missing = yield* FocusCode().effect.pipe(Effect.provide(FocusCode.layer))
+
+        expect(missing).toEqual(Message.CompletedFocusCode())
+      })
+    )
+  )
 })

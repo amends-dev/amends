@@ -16,16 +16,26 @@ import {
   type,
   within
 } from "foldkit/scene"
-import { CheckCode, SendCode } from "./command.ts"
-import { Message, SignInForm } from "./definition.ts"
+import { CheckCode, FocusCode, SendCode } from "./command.ts"
+import { type CodeError, type EmailError, Message, SignInForm } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
 const email = "alex@mercier.example"
 
+/** The code step, as it is once the code was sent, with `code` typed and `error` said. */
+const enteringCode = (code: string, error: Option.Option<CodeError> = Option.none(), isResent = false) => ({
+  form: SignInForm.EnteringCode({ email, code, error, isResent })
+})
+
+/** The email step with `error` said. */
+const enteringEmail = (error: EmailError) => ({
+  form: SignInForm.EnteringEmail({ email: "alex", error: Option.some(error), notice: Option.none() })
+})
+
 describe("the sign-in page", () => {
-  it("asks for an email and sends a code to it", () => {
+  it("asks for an email and sends a code to it, with the form where it was and Continue disabled until the code is sent", () => {
     scene(
       { update, view },
       given(init("").model),
@@ -33,29 +43,56 @@ describe("the sign-in page", () => {
       expect(text("Use your email to get a one-time code.")).toExist(),
       expect(label("Email")).toHaveAttr("placeholder", "you@example.com"),
       expect(text("Your workspaces appear after you sign in.")).toExist(),
+      expect(role("button", { name: "Continue" })).not.toBeDisabled(),
       type(label("Email"), email),
       click(role("button", { name: "Continue" })),
       Command.expectExact(SendCode({ email })),
-      expect(text(`Sending a code to ${email}…`)).toExist(),
-      expect(role("button", { name: "Continue" })).toBeAbsent(),
+      expect(role("heading", { name: "Sign in to amends", level: 1 })).toExist(),
+      expect(label("Email")).toHaveValue(email),
+      expect(role("button", { name: "Continue" })).toBeDisabled(),
+      expect(text(`Sending a code to ${email}…`)).toBeAbsent(),
       Command.resolve(SendCode, Message.SucceededSendCode()),
       expect(role("heading", { name: "Enter your code" })).toExist()
     )
   })
 
-  it("says why an email was refused beside the field", () => {
+  it("says that an address is not one beside the field, which it outlines", () => {
     scene(
       { update, view },
-      given({
-        form: SignInForm.EnteringEmail({
-          email: "alex",
-          error: Option.some("Enter an email address."),
-          notice: Option.none()
-        })
-      }),
-      expect(role("alert")).toHaveText("Enter an email address."),
+      given(enteringEmail("InvalidEmail")),
+      expect(role("alert")).toHaveText("Enter a valid email address."),
       expect(label("Email")).toHaveAttr("aria-invalid", "true"),
-      expect(label("Email")).toHaveValue("alex")
+      expect(label("Email")).toHaveValue("alex"),
+      expect(role("button", { name: "Continue" })).not.toBeDisabled()
+    )
+  })
+
+  it("says that too many codes were requested, or that the request failed, over the button and not at the field", () => {
+    scene(
+      { update, view },
+      given(enteringEmail("RateLimited")),
+      expect(role("alert")).toHaveText("Too many codes were requested lately. Try again later."),
+      expect(label("Email")).not.toHaveAttr("aria-invalid")
+    )
+    scene(
+      { update, view },
+      given(enteringEmail("RequestFailed")),
+      expect(role("alert")).toHaveText("We couldn't request a code. Try again."),
+      expect(label("Email")).not.toHaveAttr("aria-invalid")
+    )
+  })
+
+  it("takes the form back from the request that failed, with the address kept and why", () => {
+    scene(
+      { update, view },
+      given(init(email).model),
+      click(role("button", { name: "Continue" })),
+      Command.expectExact(SendCode({ email })),
+      expect(role("button", { name: "Continue" })).toBeDisabled(),
+      Command.resolve(SendCode, Message.FailedSendCode({ error: "RequestFailed" })),
+      expect(role("alert")).toHaveText("We couldn't request a code. Try again."),
+      expect(label("Email")).toHaveValue(email),
+      expect(role("button", { name: "Continue" })).not.toBeDisabled()
     )
   })
 
@@ -82,10 +119,10 @@ describe("the sign-in page", () => {
     scene({ update, view }, given(init(email).model), expect(role("alert")).toBeAbsent())
   })
 
-  it("asks for the code that was sent as six cells over one input, and checks it as the sixth digit is typed", () => {
+  it("asks for the code that was sent as six cells over one input, and checks it as the sixth digit is typed, with the form where it was", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringCode({ email, code: "", error: Option.none() }) }),
+      given(enteringCode("")),
       expect(role("heading", { name: "Enter your code", level: 1 })).toExist(),
       expect(text("Enter the six-digit code for")).toExist(),
       expect(text(email)).toExist(),
@@ -95,19 +132,25 @@ describe("the sign-in page", () => {
       expectAll(all.selector('span[aria-hidden="true"]')).toHaveCount(6),
       type(label("Verification code"), "042816"),
       Command.expectExact(CheckCode({ email, code: "042816" })),
-      expect(text("Checking the code…")).toExist(),
-      expect(role("button", { name: "Verify code" })).toBeAbsent(),
-      Command.resolve(CheckCode, Message.FailedSignIn({ error: "That code is wrong or has expired." })),
-      expect(role("alert")).toHaveText("That code is wrong or has expired."),
+      expect(role("heading", { name: "Enter your code", level: 1 })).toExist(),
       expect(label("Verification code")).toHaveValue("042816"),
-      expect(selector("[data-invalid]")).toExist()
+      expect(role("button", { name: "Verify code" })).toBeDisabled(),
+      expect(role("button", { name: "Send again" })).toBeDisabled(),
+      expect(role("button", { name: "Change email" })).toBeDisabled(),
+      expect(text("Checking the code…")).toBeAbsent(),
+      Command.resolve(CheckCode, Message.FailedSignIn({ error: "Mismatch" })),
+      expect(role("alert")).toHaveText("That code doesn't match. Check it and try again."),
+      expect(label("Verification code")).toHaveValue("042816"),
+      expect(selector("[data-invalid]")).toExist(),
+      expect(role("button", { name: "Verify code" })).not.toBeDisabled(),
+      expect(role("button", { name: "Send again" })).not.toBeDisabled()
     )
   })
 
   it("keeps the digits typed, and checks nothing until the sixth is in", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringCode({ email, code: "", error: Option.none() }) }),
+      given(enteringCode("")),
       type(label("Verification code"), "04 28-x"),
       Command.expectNone(),
       expect(label("Verification code")).toHaveValue("0428"),
@@ -117,65 +160,146 @@ describe("the sign-in page", () => {
     )
   })
 
-  it("checks the code from the button too, for a code typed in pieces", () => {
+  it("disables Verify code until all six digits are in, and checks the code from it then", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringCode({ email, code: "0428", error: Option.none() }) }),
+      given(enteringCode("")),
+      expect(role("button", { name: "Verify code" })).toBeDisabled(),
+      type(label("Verification code"), "0428"),
+      expect(role("button", { name: "Verify code" })).toBeDisabled()
+    )
+    scene(
+      { update, view },
+      given(enteringCode("042816")),
+      expect(role("button", { name: "Verify code" })).not.toBeDisabled(),
       click(role("button", { name: "Verify code" })),
-      Command.expectExact(CheckCode({ email, code: "0428" })),
-      expect(text("Checking the code…")).toExist(),
-      Command.resolve(CheckCode, Message.FailedSignIn({ error: "Enter the six digits of the code." })),
-      expect(role("alert")).toHaveText("Enter the six digits of the code.")
+      Command.expectExact(CheckCode({ email, code: "042816" })),
+      expect(role("button", { name: "Verify code" })).toBeDisabled(),
+      Command.resolve(CheckCode, Message.FailedSignIn({ error: "Expired" })),
+      expect(role("button", { name: "Verify code" })).not.toBeDisabled()
     )
   })
 
   it("checks a code pasted whole at once, whatever separates its digits", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringCode({ email, code: "", error: Option.none() }) }),
+      given(enteringCode("")),
       type(label("Verification code"), "042 816"),
       Command.expectExact(CheckCode({ email, code: "042816" })),
-      Command.resolve(CheckCode, Message.FailedSignIn({ error: "That code is wrong or has expired." })),
+      Command.resolve(CheckCode, Message.FailedSignIn({ error: "Mismatch" })),
       expect(label("Verification code")).toHaveValue("042816")
     )
   })
 
-  it("says why a code was refused beside the field", () => {
-    scene(
-      { update, view },
-      given({
-        form: SignInForm.EnteringCode({
-          email,
-          code: "000000",
-          error: Option.some("That code is wrong or has expired.")
-        })
-      }),
-      expect(role("alert")).toHaveText("That code is wrong or has expired."),
-      expect(label("Verification code")).toHaveAttr("aria-invalid", "true")
-    )
-  })
+  const codeErrors = [
+    ["InvalidCode", "Enter all six digits."],
+    ["Mismatch", "That code doesn't match. Check it and try again."],
+    ["Expired", "This code has expired. Request a new one."],
+    ["Unknown", "This code is no longer available. Request a new one."]
+  ] as const satisfies ReadonlyArray<readonly [CodeError, string]>
+
+  for (const [error, words] of codeErrors) {
+    it(`says ${error === "InvalidCode" ? "that the code is short" : `why the code is refused, ${error}`} beside the field, which it outlines`, () => {
+      scene(
+        { update, view },
+        given(enteringCode("000000", Option.some(error))),
+        expect(role("alert")).toHaveText(words),
+        expect(label("Verification code")).toHaveAttr("aria-invalid", "true"),
+        expect(selector("[data-invalid]")).toExist()
+      )
+    })
+  }
+
+  const requestErrors = [
+    ["VerifyFailed", "We couldn't verify your code. Try again."],
+    ["ResendLimited", "Too many codes were requested lately. Use the last one, or try later."],
+    ["ResendFailed", "We couldn't request a new code. Try again."]
+  ] as const satisfies ReadonlyArray<readonly [CodeError, string]>
+
+  for (const [error, words] of requestErrors) {
+    it(`says that a request failed, ${error}, over the button, and leaves the code valid`, () => {
+      scene(
+        { update, view },
+        given(enteringCode("000000", Option.some(error))),
+        expect(role("alert")).toHaveText(words),
+        expect(label("Verification code")).not.toHaveAttr("aria-invalid"),
+        expect(selector("[data-invalid]")).toBeAbsent()
+      )
+    })
+  }
 
   it("returns to the email step with the address kept when the person changes it", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringCode({ email, code: "04", error: Option.none() }) }),
+      given(enteringCode("04")),
       click(role("button", { name: "Change email" })),
       expect(role("heading", { name: "Sign in to amends" })).toExist(),
       expect(label("Email")).toHaveValue(email)
     )
   })
 
-  it("sends another code to the same address when the person asks again", () => {
+  it("sends another code to the same address when the person asks again, with the form where it was and Send again disabled", () => {
     scene(
       { update, view },
-      given({ form: SignInForm.EnteringCode({ email, code: "04", error: Option.none() }) }),
+      given(enteringCode("04")),
       expect(text("Need a new code?")).toExist(),
+      expect(role("button", { name: "Send again" })).not.toBeDisabled(),
       click(role("button", { name: "Send again" })),
       Command.expectExact(SendCode({ email })),
-      expect(text(`Sending a code to ${email}…`)).toExist(),
-      Command.resolve(SendCode, Message.SucceededSendCode()),
       expect(role("heading", { name: "Enter your code" })).toExist(),
-      expect(label("Verification code")).toHaveValue("")
+      expect(label("Verification code")).toHaveValue("04"),
+      expect(role("button", { name: "Send again" })).toBeDisabled(),
+      expect(role("button", { name: "Verify code" })).toBeDisabled(),
+      expect(text(`Sending a code to ${email}…`)).toBeAbsent(),
+      expect(role("status")).toHaveText(""),
+      Command.resolve(SendCode, Message.FailedSendCode({ error: "RequestFailed" }))
+    )
+  })
+
+  it("says that a new code was sent once it is, moves focus to the code, and clears what was typed", () => {
+    scene(
+      { update, view },
+      given(enteringCode("042816")),
+      click(role("button", { name: "Send again" })),
+      Command.resolve(SendCode, Message.SucceededSendCode()),
+      Command.expectExact(FocusCode()),
+      expect(role("status")).toHaveText("We sent a new code. Use the latest one."),
+      expect(label("Verification code")).toHaveValue(""),
+      expect(role("button", { name: "Send again" })).not.toBeDisabled(),
+      expect(role("button", { name: "Verify code" })).toBeDisabled(),
+      Command.resolve(FocusCode, Message.CompletedFocusCode())
+    )
+  })
+
+  it("has the place for what a new code says on the page before it says anything, and not after the person checks a code", () => {
+    scene(
+      { update, view },
+      given(enteringCode("04")),
+      expect(role("status")).toHaveText(""),
+      click(role("button", { name: "Send again" })),
+      Command.resolve(SendCode, Message.SucceededSendCode()),
+      Command.resolve(FocusCode, Message.CompletedFocusCode()),
+      expect(role("status")).toHaveText("We sent a new code. Use the latest one."),
+      type(label("Verification code"), "042816"),
+      Command.expectExact(CheckCode({ email, code: "042816" })),
+      Command.resolve(CheckCode, Message.FailedSignIn({ error: "Mismatch" })),
+      expect(role("status")).toHaveText("")
+    )
+  })
+
+  it("says why a new code could not be sent over the button, with the code that was typed kept", () => {
+    scene(
+      { update, view },
+      given(enteringCode("04")),
+      click(role("button", { name: "Send again" })),
+      Command.resolve(SendCode, Message.FailedSendCode({ error: "RateLimited" })),
+      expect(role("alert")).toHaveText("Too many codes were requested lately. Use the last one, or try later."),
+      expect(label("Verification code")).toHaveValue("04"),
+      expect(label("Verification code")).not.toHaveAttr("aria-invalid"),
+      expect(role("button", { name: "Send again" })).not.toBeDisabled(),
+      click(role("button", { name: "Send again" })),
+      Command.resolve(SendCode, Message.FailedSendCode({ error: "RequestFailed" })),
+      expect(role("alert")).toHaveText("We couldn't request a new code. Try again.")
     )
   })
 })

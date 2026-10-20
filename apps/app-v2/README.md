@@ -737,14 +737,35 @@ below it counted at each level above.
 - `page/signIn`, `page/workspaces`, `page/workspace`'s listing of the integrations, and `feature/agents`' listing of a
   connection's models are commands that call the host and end in a message whatever happens to the call: the client
   reports a status its contract does not list as a defect, which a failure handler misses, so each handles the whole
-  cause and words it as it words a host that cannot be reached, and a form never stays on "Sending…" or "Checking…".
+  cause and words it as it words a host that cannot be reached, and a form never stays waiting for an answer.
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
   which the person can change the email or ask for a new code to the same address; it keeps the
   session a right code gives, and reports it. It starts with an address, which the root gives when it
   has one, and a notice, such as that the session ended, which shows over the email field in the caution tone,
-  stays as the address is typed, and goes when the address is sent. The code is the design's `codeInput`, six cells
+  stays as the address is typed, and goes when the address is sent. While a code is asked for or checked the form
+  stays on the screen, as `apps/ui`'s does, and only the button that sent it is disabled: Continue while the code is
+  asked for (`SendingCode`), Verify code while it is checked (`CheckingCode`) and until all six digits are in
+  (`codeLength`), and Send again and Change email while either a new code is asked for (`ResendingCode`) or the code
+  is checked. Typing the address changes nothing while its code is asked for, nor does typing the code while it is
+  checked; a code typed while a new code is asked for is kept until the new one empties the field, and is not checked.
+  The code is the design's `codeInput`, six cells
   over one native input with the hint "Use your most recent code.", which keeps digits only and checks the code
   as soon as the sixth is in (`CompletedCode`), as "Verify code" does (`SubmittedCode`), both through the one check.
+  A request that does not end in a session or a sent code ends in an error the page words (`wording.ts`), in
+  `apps/ui`'s words, at the field it outlines when the entry itself is wrong, and as an alert over the button when
+  the request is: for the address, `InvalidEmail` at the field ("Enter a valid email address."), and `RateLimited`
+  ("Too many codes were requested lately. Try again later.") and `RequestFailed` ("We couldn't request a code. Try
+  again.") over the button; for the code, `InvalidCode` ("Enter all six digits."), `Mismatch` ("That code doesn't
+  match. Check it and try again."), `Expired` ("This code has expired. Request a new one."), and `Unknown` ("This code
+  is no longer available. Request a new one.") at the field, and `VerifyFailed` ("We couldn't verify your code. Try
+  again.") and, for a new code that was not sent, `ResendLimited` ("Too many codes were requested lately. Use the last
+  one, or try later.") and `ResendFailed` ("We couldn't request a new code. Try again.") over the button. The host's
+  `SignIn.Rejected` carries why it rejected a code (`mismatch`, `expired`, `unknown`) in the error the HTTP contract
+  lists for it, so the client the app uses gives it to `CheckCode`, which tells the three apart; `SignIn.Limited` is
+  `RateLimited`, and `SignIn.Unavailable`, a host that cannot be reached, and any other cause are `RequestFailed`, or
+  `VerifyFailed` when a code was being checked. Once a new code is sent (`isResent`) the design's `announcement`, a
+  live region that is on the page before it says anything, says "We sent a new code. Use the latest one." until the
+  person checks a code, the field is empty, and focus moves back to it (`FocusCode`).
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
   members it has and "Owner" when they own it, such as "4 members · Owner"; it reports the one picked. It
   takes the account's email as its init argument, not a view input, since `update` needs it: the model keeps
@@ -1286,7 +1307,12 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   `ConfigureConnection`, and `RemoveConnection` run over `test/recordingStores.ts`, and `FocusField` over a field in the
   document.
   The sign-in Block's stories and scenes show the notice it starts with, kept as the address is typed and
-  gone once it is sent.
+  gone once it is sent; the form staying where it is, with Continue, Verify code, Send again, and Change email
+  disabled while a code is asked for or checked, and Verify code until all six digits are in; each way an address
+  or a code is refused, said at the field or over the button as `apps/ui` says it; a new code sent again, its
+  announcement, the field emptied, and focus moved to it; and a new code that could not be sent, with the code kept.
+  Its commands tell a host that rejected a code by why it did, over the stub host, and `FocusCode` runs over a field
+  in the document.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
