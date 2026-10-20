@@ -61,6 +61,19 @@ export const northstarInvitation = invitationOfAlice(
   "Northstar Studio"
 )
 
+/** Alice's membership of Northstar Studio, as accepting her invitation to it makes her a member as Alex. */
+export const northstar = Schema.decodeSync(WorkspaceDirectory.Membership)({
+  workspace: { id: "workspace-4", name: "Northstar Studio", createdBy: "bob", ownerMemberId: "member-9" },
+  member: {
+    id: "member-30",
+    workspaceId: "workspace-4",
+    identity: { _tag: "Human", id: "alice" },
+    name: "Alex",
+    status: "active"
+  },
+  people: 3
+})
+
 /** Alice's invitation to Atlas Labs, which closes three days after `now`. */
 export const atlasInvitation = invitationOfAlice("invitation-5", "workspace-5", "2026-10-21T12:30:00Z", "Atlas Labs")
 

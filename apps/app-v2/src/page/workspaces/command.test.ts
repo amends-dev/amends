@@ -1,23 +1,24 @@
 import { Request } from "@amends-dev/core/request"
-import { Workspace } from "@amends-dev/core/workspace"
+import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
-import { apiUrl, session } from "../../../test/fixtures.ts"
+import { apiUrl, northstar, session } from "../../../test/fixtures.ts"
 import * as Session from "../../session.ts"
-import { CreateWorkspace } from "./command.ts"
-import { FormErrors, Message, noFormErrors } from "./definition.ts"
+import { AcceptInvitation, CreateWorkspace } from "./command.ts"
+import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors } from "./definition.ts"
 
 const created = { id: "workspace-3", name: "Acme", createdBy: "alice", ownerMemberId: "member-20" }
 
 /** What the host answers: a status and a JSON body, or that it could not be reached. */
 type Answer = Readonly<{ status: number; body: unknown }> | "unreachable"
 
-/** What the app sent to create a workspace. */
+/** What the app sent to the host: where, with which request key, and what. */
 interface Sent {
+  readonly path: string
   readonly key: string | undefined
   readonly payload: unknown
 }
@@ -28,7 +29,11 @@ const hostAnswering = (answer: Answer) => {
   const client = HttpClient.make((request) =>
     Effect.gen(function* () {
       const text = request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : ""
-      sent.push({ key: request.headers["idempotency-key"], payload: JSON.parse(text) })
+      sent.push({
+        path: new URL(request.url).pathname,
+        key: request.headers["idempotency-key"],
+        payload: JSON.parse(text)
+      })
       if (answer === "unreachable") {
         return yield* new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request }) })
       }
@@ -184,6 +189,109 @@ describe("CreateWorkspace", () => {
             error: refusedForm("The workspace could not be created. Try again.")
           })
         )
+      })
+    )
+  }
+})
+
+const accept = (answer: Answer, name: string) => {
+  const { sent, layer } = hostAnswering(answer)
+  return AcceptInvitation({
+    workspaceId: WorkspaceId.WorkspaceId.make("workspace-4"),
+    invitationId: Invitation.InvitationId.make("invitation-4"),
+    name
+  }).effect.pipe(
+    Effect.provide(AcceptInvitation.layer.pipe(Layer.provideMerge(layer))),
+    Effect.map((message) => ({ message, sent }))
+  )
+}
+
+/** The member the host made of the person, as it answers. */
+const joined = Schema.encodeSync(Member.Member)(northstar.member)
+
+/** The refusal of the form for joining as a whole. */
+const refusedJoin = (text: string) => JoinErrors.make({ ...noJoinErrors, form: Option.some(text) })
+
+describe("AcceptInvitation", () => {
+  it.effect("sends the name, ignoring the space around it, to the invitation, and reports the member", () =>
+    Effect.gen(function* () {
+      const { message, sent } = yield* accept({ status: 200, body: joined }, "  Alex ")
+
+      expect(sent).toEqual([
+        { path: "/workspaces/workspace-4/invitations/invitation-4/accept", key: undefined, payload: { name: "Alex" } }
+      ])
+      expect(message).toEqual(Message.SucceededJoin({ member: northstar.member }))
+    })
+  )
+
+  for (const name of ["   ", "Al\u0000ex"]) {
+    it.effect(`says at the name that ${JSON.stringify(name)} is refused without asking the host`, () =>
+      Effect.gen(function* () {
+        const { message, sent } = yield* accept({ status: 200, body: joined }, name)
+
+        expect(sent).toEqual([])
+        expect(message).toEqual(
+          Message.FailedJoin({ error: JoinErrors.make({ ...noJoinErrors, name: Option.some(refusedName) }) })
+        )
+      })
+    )
+  }
+
+  for (const [description, answer, wording] of [
+    [
+      "is not addressed to this account",
+      { status: 403, body: { _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } } },
+      refusedJoin("This invitation isn't addressed to this account.")
+    ],
+    [
+      "is no longer open",
+      {
+        status: 409,
+        body: {
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "InvitationClosed", invitationId: "invitation-4", reason: "revoked" }
+        }
+      },
+      refusedJoin("This invitation is no longer open.")
+    ],
+    [
+      "is to a workspace that is not there",
+      { status: 404, body: { _tag: "CoreError.NotFound", resource: "Workspace", id: "workspace-4" } },
+      refusedJoin("This workspace no longer exists.")
+    ],
+    [
+      "has a name the host did not accept",
+      {
+        status: 422,
+        body: { _tag: "CoreError.Invalid", reason: { _tag: "Malformed", description: "Expected a name" } }
+      },
+      JoinErrors.make({ ...noJoinErrors, name: Option.some("That name was not accepted.") })
+    ],
+    [
+      "cannot be accepted because the host is not ready",
+      {
+        status: 503,
+        body: { _tag: "CoreError.Unavailable", reason: { _tag: "CredentialsUnavailable", description: "No keys" } }
+      },
+      refusedJoin("The invitation could not be accepted. Try again.")
+    ],
+    [
+      "cannot be accepted because the outcome is not known",
+      { status: 500, body: { _tag: "CoreError.Uncertain", commitId: "commit-1" } },
+      refusedJoin("The invitation could not be accepted. Try again.")
+    ],
+    [
+      "cannot be accepted because the host cannot be reached",
+      "unreachable",
+      refusedJoin("The invitation could not be accepted. Try again.")
+    ]
+  ] as const satisfies ReadonlyArray<readonly [string, Answer, JoinErrors]>) {
+    it.effect(`says so when the invitation ${description}`, () =>
+      Effect.gen(function* () {
+        const { message, sent } = yield* accept(answer, "Alex")
+
+        expect(sent).toHaveLength(1)
+        expect(message).toEqual(Message.FailedJoin({ error: wording }))
       })
     )
   }

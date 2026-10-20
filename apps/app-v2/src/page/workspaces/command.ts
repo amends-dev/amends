@@ -1,7 +1,7 @@
 /** The workspace requests, over HTTP, each ending in a message, failures worded for the person. */
 
 import { Request } from "@amends-dev/core/request"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
@@ -9,7 +9,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
-import { FormErrors, Message, noFormErrors, WorkspacesDefinition } from "./definition.ts"
+import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, WorkspacesDefinition } from "./definition.ts"
 
 /** List the workspaces the person belongs to and the invitations waiting for them. */
 export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
@@ -96,4 +96,48 @@ export const CreateWorkspace = WorkspacesDefinition.command("CreateWorkspace", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(LoadWorkspaces.layer, CreateWorkspace.layer)
+/** What the person reads of why `failure` kept the invitation from being accepted, at the name or about the form. */
+const wordJoinFailure = (failure: unknown): JoinErrors =>
+  Schema.is(ApiErrors.Invalid)(failure)
+    ? JoinErrors.make({ ...noJoinErrors, name: Option.some("That name was not accepted.") })
+    : JoinErrors.make({
+        ...noJoinErrors,
+        form: Option.some(
+          Schema.is(ApiErrors.Denied)(failure)
+            ? "This invitation isn't addressed to this account."
+            : Schema.is(ApiErrors.Conflict)(failure)
+              ? "This invitation is no longer open."
+              : Schema.is(ApiErrors.NotFound)(failure)
+                ? "This workspace no longer exists."
+                : "The invitation could not be accepted. Try again."
+        )
+      })
+
+/**
+ * Accept the invitation `invitationId` to the workspace `workspaceId`, going by `name` there, ignoring the space
+ * around it, and report the member the host made of the person. Accepting again returns the same member, so a
+ * request that ended unsure may be sent again as it was, and carries no key.
+ */
+export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation", {
+  args: { workspaceId: WorkspaceId.WorkspaceId, invitationId: Invitation.InvitationId, name: Schema.String },
+  messages: [Message.SucceededJoin, Message.FailedJoin],
+  handler: function* () {
+    return ({ workspaceId, invitationId, name }) =>
+      Effect.gen(function* () {
+        const memberName = yield* Schema.decodeEffect(Member.NewName)(name.trim()).pipe(
+          Effect.mapError(() =>
+            Message.FailedJoin({ error: JoinErrors.make({ ...noJoinErrors, name: Option.some(refusedName) }) })
+          )
+        )
+        const member = yield* Api.signedIn.pipe(
+          Effect.flatMap((client) =>
+            client.workspaces.acceptInvitation({ params: { workspaceId, invitationId }, payload: { name: memberName } })
+          ),
+          Effect.mapError((failure) => Message.FailedJoin({ error: wordJoinFailure(failure) }))
+        )
+        return Message.SucceededJoin({ member })
+      }).pipe(Effect.catch(Effect.succeed))
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(LoadWorkspaces.layer, CreateWorkspace.layer, AcceptInvitation.layer)

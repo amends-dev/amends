@@ -21,9 +21,16 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { atlasInvitation, membership, northstarInvitation, now, unnamedInvitation } from "../../../test/fixtures.ts"
-import { CreateWorkspace, LoadWorkspaces } from "./command.ts"
-import { FormErrors, Message, noFormErrors, OutMessage, Workspaces } from "./definition.ts"
+import {
+  atlasInvitation,
+  membership,
+  northstar,
+  northstarInvitation,
+  now,
+  unnamedInvitation
+} from "../../../test/fixtures.ts"
+import { AcceptInvitation, CreateWorkspace, LoadWorkspaces } from "./command.ts"
+import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, OutMessage, Workspaces } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -81,6 +88,29 @@ const createDialog = role("dialog", { name: "Create workspace" })
 
 /** The dialog's own button, since the heading's has the same name. */
 const inDialog = (name: string) => within(createDialog, role("button", { name }))
+
+/** The dialog once the workspace Acme was created, named for it. */
+const acmeDialog = role("dialog", { name: "Acme" })
+
+const joinDialog = role("dialog", { name: "Join Northstar Studio" })
+
+const inJoinDialog = (name: string) => within(joinDialog, role("button", { name }))
+
+/** The request to accept the invitation to Northstar Studio, going by `name` there. */
+const acceptNorthstarAs = (name: string) =>
+  AcceptInvitation({
+    workspaceId: northstarInvitation.details.workspaceId,
+    invitationId: northstarInvitation.details.id,
+    name
+  })
+
+const invited = showing(
+  Workspaces.Loaded({ memberships: [membership], invitations: [northstarInvitation, atlasInvitation] })
+)
+
+/** An invitation's button clicked, and the form it opens shown. */
+const joinOpened = () =>
+  [click(role("button", { name: "Accept invite to Northstar Studio" })), ...dialogOpened()] as const
 
 const refusedName = "Use 1 to 80 characters, with no invisible ones."
 
@@ -289,6 +319,8 @@ describe("creating a workspace", () => {
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
       Command.expectExact(LoadWorkspaces()),
       expect(text("Opening Acme…")).toExist(),
+      expect(within(acmeDialog, role("heading", { name: "Acme", level: 2 }))).toExist(),
+      expect(createDialog).toBeAbsent(),
       expect(label("Workspace name")).toBeAbsent(),
       Command.resolve(
         LoadWorkspaces,
@@ -400,20 +432,165 @@ describe("creating a workspace", () => {
         LoadWorkspaces,
         Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." })
       ),
-      expect(within(createDialog, role("alert"))).toHaveText(
-        "Acme was created, but your workspaces could not be reloaded."
+      expect(within(acmeDialog, role("alert"))).toHaveText(
+        "You're in Acme, but your workspaces could not be reloaded."
       ),
-      expect(inDialog("Try again")).toExist(),
-      expect(inDialog("Create workspace")).toBeAbsent(),
-      click(inDialog("Try again")),
+      expect(within(acmeDialog, role("button", { name: "Try again" }))).toExist(),
+      expect(within(acmeDialog, role("button", { name: "Create workspace" }))).toBeAbsent(),
+      click(within(acmeDialog, role("button", { name: "Try again" }))),
       Command.expectExact(LoadWorkspaces()),
       expect(text("Opening Acme…")).toExist(),
-      expect(within(createDialog, role("alert"))).toBeAbsent(),
+      expect(within(acmeDialog, role("alert"))).toBeAbsent(),
       Command.resolve(
         LoadWorkspaces,
         Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
       ),
       expectOutMessage(OutMessage.OpenedWorkspace({ membership: acme })),
+      ...dialogClosed()
+    )
+  })
+})
+
+describe("joining a workspace", () => {
+  it("opens a form from an invitation's button, and joins with the name typed, then opens the workspace", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      expect(joinDialog).toExist(),
+      expect(within(joinDialog, role("heading", { name: "Join Northstar Studio", level: 2 }))).toExist(),
+      expect(joinDialog).toHaveAccessibleDescription("Choose what people there will call you."),
+      expect(label("Your name")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      expect(label("Your name")).toHaveValue(""),
+      expect(text("What people there will call you.")).toExist(),
+      type(label("Your name"), "Alex"),
+      click(inJoinDialog("Join workspace")),
+      Command.expectExact(acceptNorthstarAs("Alex")),
+      expect(label("Your name")).toHaveValue("Alex"),
+      expect(inJoinDialog("Join workspace")).toHaveAttr("aria-disabled", "true"),
+      expect(text("Joining…")).toExist(),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
+      Command.expectExact(LoadWorkspaces()),
+      expect(text("Opening Northstar Studio…")).toExist(),
+      expect(label("Your name")).toBeAbsent(),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
+      ),
+      expectOutMessage(OutMessage.OpenedWorkspace({ membership: northstar })),
+      ...dialogClosed(),
+      expect(joinDialog).toBeAbsent()
+    )
+  })
+
+  it("names the dialog Join workspace when the invitation's workspace has no name", () => {
+    scene(
+      { update, view: sceneView },
+      given(showing(Workspaces.Loaded({ memberships: [], invitations: [unnamedInvitation] }))),
+      click(role("button", { name: "Accept invite to Workspace invitation" })),
+      ...dialogOpened(),
+      expect(within(role("dialog", { name: "Join workspace" }), role("heading", { level: 2 }))).toHaveText(
+        "Join workspace"
+      )
+    )
+  })
+
+  it("starts a fresh form for each invitation, with nothing in it", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      type(label("Your name"), "Alex"),
+      click(inJoinDialog("Cancel")),
+      Command.expectExact(Dialog.test.CloseDialog),
+      ...dialogClosed(),
+      expect(joinDialog).toBeAbsent(),
+      click(role("button", { name: "Accept invite to Atlas Labs" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "Join Atlas Labs" })).toExist(),
+      expect(label("Your name")).toHaveValue("")
+    )
+  })
+
+  it("closes with the Close button", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      click(inJoinDialog("Close")),
+      ...dialogClosed(),
+      expect(joinDialog).toBeAbsent(),
+      expect(role("button", { name: "Accept invite to Northstar Studio" })).toExist()
+    )
+  })
+
+  it("says at the field why the name was refused, and clears what it said as the person types", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      click(inJoinDialog("Join workspace")),
+      Command.expectExact(acceptNorthstarAs("")),
+      Command.resolve(
+        AcceptInvitation,
+        Message.FailedJoin({ error: JoinErrors.make({ ...noJoinErrors, name: Option.some(refusedName) }) })
+      ),
+      expectAll(all.role("alert")).toHaveCount(1),
+      expect(label("Your name")).toHaveAttr("aria-invalid", "true"),
+      expect(label("Your name")).toHaveAccessibleDescription(refusedName),
+      expect(inJoinDialog("Join workspace")).not.toHaveAttr("aria-disabled"),
+      expect(text("Joining…")).toBeAbsent(),
+      type(label("Your name"), "Alex"),
+      expect(role("alert")).toBeAbsent(),
+      expect(label("Your name")).not.toHaveAttr("aria-invalid")
+    )
+  })
+
+  it("says why the invitation could not be accepted under the field, and clears it as the person types", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      type(label("Your name"), "Alex"),
+      click(inJoinDialog("Join workspace")),
+      Command.resolve(
+        AcceptInvitation,
+        Message.FailedJoin({
+          error: JoinErrors.make({ ...noJoinErrors, form: Option.some("This invitation is no longer open.") })
+        })
+      ),
+      expect(role("alert")).toHaveText("This invitation is no longer open."),
+      expect(label("Your name")).not.toHaveAttr("aria-invalid"),
+      expect(label("Your name")).toHaveValue("Alex"),
+      expect(inJoinDialog("Join workspace")).not.toHaveAttr("aria-disabled"),
+      type(label("Your name"), "Alexandra"),
+      expect(role("alert")).toBeAbsent()
+    )
+  })
+
+  it("says the person is in the workspace and the list could not be read, with a way to try again", () => {
+    scene(
+      { update, view: sceneView },
+      given(invited),
+      ...joinOpened(),
+      type(label("Your name"), "Alex"),
+      click(inJoinDialog("Join workspace")),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." })
+      ),
+      expect(within(role("dialog", { name: "Northstar Studio" }), role("alert"))).toHaveText(
+        "You're in Northstar Studio, but your workspaces could not be reloaded."
+      ),
+      click(within(role("dialog", { name: "Northstar Studio" }), role("button", { name: "Try again" }))),
+      Command.expectExact(LoadWorkspaces()),
+      expect(text("Opening Northstar Studio…")).toExist(),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
+      ),
+      expectOutMessage(OutMessage.OpenedWorkspace({ membership: northstar })),
       ...dialogClosed()
     )
   })
