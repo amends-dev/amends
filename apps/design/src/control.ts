@@ -170,6 +170,11 @@ export type ButtonOptions = Readonly<{
   hasChevron?: boolean
   isDisabled?: boolean
   /**
+   * For a button that shows or hides what is under it, such as a turn's log: whether it is shown now, which the button
+   * says as `aria-expanded` and draws `subtle`.
+   */
+  isExpanded?: boolean
+  /**
    * What assistive technology calls the button when its label alone does not tell it from the buttons around it, such
    * as "Revoke invitation for casey@mercier.example" for "Revoke". It begins with the label.
    */
@@ -240,8 +245,8 @@ export const answerKeys = <Message, Requirements>(
   onKeyDown: (key: string) => Option.Option<Message>
 ) => h.OnKeyDownPreventDefault((key, modifiers) => (hasModifier(modifiers) ? Option.none() : onKeyDown(key)))
 
-/** What a button's look is made of, which `isDisabled` and `name` are not: they are for its behavior. */
-export type ButtonLook = Omit<ButtonOptions, "isDisabled" | "name">
+/** What a button's look is made of, which `isDisabled`, `isExpanded`, and `name` are not: they are for its behavior. */
+export type ButtonLook = Omit<ButtonOptions, "isDisabled" | "isExpanded" | "name">
 
 /**
  * The classes of a button in the `look` given, for a control that is a button element of its own, such as a
@@ -294,7 +299,11 @@ const renderButton = <Message, Requirements>(
       toView: (attributes) =>
         buttonWith(
           h,
-          options.name === undefined ? attributes.button : [...attributes.button, h.AriaLabel(options.name)],
+          [
+            ...attributes.button,
+            ...(options.name === undefined ? [] : [h.AriaLabel(options.name)]),
+            ...(options.isExpanded === undefined ? [] : [h.AriaExpanded(options.isExpanded)])
+          ],
           label,
           { variant: defaultVariant, ...options }
         )

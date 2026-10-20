@@ -192,6 +192,42 @@ describe("button", () => {
     )
   })
 
+  it("says whether what it shows is shown, as aria-expanded, only when it is given", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          button(h, "View log", Message.ClickedSave(), { variant: "quiet", isExpanded: false }),
+          button(h, "Hide log", Message.ClickedSave(), { variant: "quiet", isExpanded: true }),
+          button(h, "Save", Message.ClickedSave())
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "View log" })).toHaveAttr("aria-expanded", "false"),
+      expect(role("button", { name: "Hide log" })).toHaveAttr("aria-expanded", "true"),
+      expect(role("button", { name: "Save" })).not.toHaveAttr("aria-expanded"),
+      expect(role("button", { name: "Hide log" })).toHaveClass("aria-expanded:bg-subtle")
+    )
+  })
+
+  it("is found by its name and unavailable while it is disabled, as a Stop that is stopping is", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          button(h, "Stop", Message.ClickedSave(), { name: "Stopping", isDisabled: true }),
+          button(h, "Stop", Message.ClickedRemove(), { name: "Stop Atlas" })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Stopping" })).toHaveAttr("aria-disabled", "true"),
+      expect(role("button", { name: "Stopping" })).toBeDisabled(),
+      expect(role("status")).toHaveText("Saved 0, removed 0, submitted 0"),
+      click(role("button", { name: "Stop Atlas" })),
+      expect(role("status")).toHaveText("Saved 0, removed 1, submitted 0")
+    )
+  })
+
   it("is a link inside a sentence, found by its name, and clicking sends its message", () => {
     scene(
       {

@@ -3,9 +3,10 @@ import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
+import { log, turnStatus } from "./details.ts"
 import type { MarkContent } from "./mark.ts"
 import {
   description,
@@ -14,8 +15,11 @@ import {
   message,
   messageList,
   type MessageText,
+  note,
   notification,
-  replyLine
+  replyLine,
+  turnLog,
+  turnRow
 } from "./message.ts"
 
 const Message = defineMessageUnion({
@@ -893,6 +897,190 @@ describe("description", () => {
       given(initial),
       expect(text("The form that changes it")).toExist(),
       expect(text("Ask about the limit.")).toBeAbsent()
+    )
+  })
+})
+
+describe("note", () => {
+  const notes = (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Activity",
+      children: [
+        message(h, { key: "message-1", mark: "S", author: "Sara", text: "I can reproduce it." }),
+        note(h, {
+          key: "followed",
+          text: "Sara followed this thread",
+          time: "10:02 AM",
+          dateTime: "2026-10-20T10:02:00.000Z",
+          title: "Tuesday, October 20, 2026 at 10:02 AM"
+        }),
+        note(h, { key: "stopped", text: "You stopped following", time: "10:30 AM" })
+      ]
+    })
+
+  it("is a quiet line of who took part, an item of the list among its messages", () => {
+    scene(
+      { update, view: viewOf(notes) },
+      given(initial),
+      expect(within(role("list", { name: "Activity" }), text("Sara followed this thread"))).toExist(),
+      expect(text("Sara followed this thread")).toHaveClass("text-ink-secondary"),
+      expect(text("Sara followed this thread")).toHaveClass("text-control"),
+      expect(text("Sara followed this thread")).toHaveClass("gap-2.5"),
+      expect(text("I can reproduce it.")).toExist()
+    )
+  })
+
+  it("has its time after the words, at meta size in muted ink", () => {
+    scene(
+      { update, view: viewOf(notes) },
+      given(initial),
+      expect(text("10:02 AM")).toHaveClass("text-meta"),
+      expect(text("10:02 AM")).toHaveClass("text-ink-muted"),
+      expect(text("10:30 AM")).toExist()
+    )
+  })
+
+  it("shows its time as a time element, whether or not it is given the moment it was", () => {
+    scene(
+      { update, view: viewOf(notes) },
+      given(initial),
+      expectAll(all.selector("time")).toHaveCount(2),
+      expect(within(selector("time"), text("10:02 AM"))).toExist()
+    )
+  })
+
+  it("draws nothing before its words, which sets it apart from an event", () => {
+    scene(
+      { update, view: viewOf(notes) },
+      given(initial),
+      expect(within(selector("li.text-ink-secondary"), selector("svg"))).toBeAbsent()
+    )
+  })
+})
+
+describe("turnRow", () => {
+  const turn = (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Thread",
+      children: [
+        turnRow(h, {
+          key: "turn-1",
+          label: "Atlas's turn",
+          mark: "A",
+          name: "Atlas",
+          status: turnStatus(h, "failed"),
+          actions: [
+            button(h, "View log", Message.OpenedThread({ key: "log" }), { variant: "quiet" }),
+            button(h, "Retry", Message.ClickedEdit({ key: "turn-1" }))
+          ],
+          detail: "The model provider is unavailable.",
+          problem: "Couldn't start another attempt. Try again.",
+          children: [log(h, { label: "Log", items: ["Read 3 messages"] })]
+        })
+      ]
+    })
+
+  const bare = (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Thread",
+      children: [
+        turnRow(h, {
+          key: "turn-2",
+          label: "Atlas's turn",
+          mark: "A",
+          name: "Atlas",
+          status: turnStatus(h, "queued"),
+          actions: []
+        })
+      ]
+    })
+
+  it("is an item of the list, a group named for the agent's turn", () => {
+    scene(
+      { update, view: viewOf(turn) },
+      given(initial),
+      expect(within(role("list", { name: "Thread" }), role("group", { name: "Atlas's turn" }))).toExist()
+    )
+  })
+
+  it("has the agent's mark at 24px in its tone, its name in the agent's color, and its state after the name", () => {
+    scene(
+      { update, view: viewOf(turn) },
+      given(initial),
+      expect(text("A")).toHaveClass("size-6"),
+      expect(text("A")).toHaveClass("bg-avatar-lilac-bg"),
+      expect(text("Atlas")).toHaveClass("text-agent"),
+      expect(text("Atlas")).toHaveClass("font-medium"),
+      expect(text("Atlas")).toHaveClass("text-item"),
+      expect(within(role("group", { name: "Atlas's turn" }), role("status"))).toHaveText("Failed")
+    )
+  })
+
+  it("lays its mark, who it is, and its actions out in three columns, the actions under the name on a narrow row", () => {
+    scene(
+      { update, view: viewOf(turn) },
+      given(initial),
+      expect(role("group", { name: "Atlas's turn" })).toHaveClass("grid-cols-[1.5rem_minmax(0,1fr)_auto]"),
+      expect(role("group", { name: "Atlas's turn" })).toHaveClass("@max-[22.5rem]:grid-cols-[1.5rem_minmax(0,1fr)]"),
+      expect(selector("li")).toHaveClass("@container"),
+      expect(role("button", { name: "Retry" })).toExist(),
+      expect(role("button", { name: "View log" })).toExist()
+    )
+  })
+
+  it("says how the turn ended and why a stop or retry did not go through, under the first line", () => {
+    scene(
+      { update, view: viewOf(turn) },
+      given(initial),
+      expect(text("The model provider is unavailable.")).toHaveClass("text-ink-secondary"),
+      expect(text("The model provider is unavailable.")).toHaveClass("col-[2/-1]"),
+      expect(role("alert")).toHaveText("Couldn't start another attempt. Try again."),
+      expect(role("alert")).toHaveClass("text-caution-text")
+    )
+  })
+
+  it("holds its children, such as the log, under all that", () => {
+    scene(
+      { update, view: viewOf(turn) },
+      given(initial),
+      expect(within(role("group", { name: "Atlas's turn" }), role("list", { name: "Log" }))).toExist()
+    )
+  })
+
+  it("has no line, alert, or actions of its own when it has nothing to say or do", () => {
+    scene(
+      { update, view: viewOf(bare) },
+      given(initial),
+      expect(role("alert")).toBeAbsent(),
+      expect(role("button")).toBeAbsent(),
+      expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toBeAbsent()
+    )
+  })
+})
+
+describe("turnLog", () => {
+  const logged = (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Thread",
+      children: [
+        message(h, { key: "reply", mark: "A", author: "Atlas", text: "Deploy the API first." }),
+        turnLog(h, {
+          key: "reply-log",
+          label: "Atlas's turn log",
+          children: [log(h, { label: "Log", items: ["Read 3 messages", "Replied: Deploy the API first."] })]
+        })
+      ]
+    })
+
+  it("is an item of the list under the message that was posted, a group in line with the message's text", () => {
+    scene(
+      { update, view: viewOf(logged) },
+      given(initial),
+      expect(within(role("list", { name: "Thread" }), role("group", { name: "Atlas's turn log" }))).toExist(),
+      expect(nth(all.role("listitem"), 1)).toHaveClass("ps-11"),
+      expect(nth(all.role("listitem"), 1)).toHaveClass("pb-2.5"),
+      expect(within(role("group", { name: "Atlas's turn log" }), role("list", { name: "Log" }))).toExist(),
+      expect(text("Read 3 messages")).toExist()
     )
   })
 })

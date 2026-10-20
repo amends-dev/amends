@@ -1,7 +1,7 @@
 /**
  * What a pane says about one thing: its facts as labelled values, a few properties under a caption each, a mark of
- * how it stands, a person it is about, the places an agent is at work, the people or agents' work it lists, and the
- * log an agent wrote.
+ * how it stands, where an agent's turn stands, a person it is about, the places an agent is at work, the people or
+ * agents' work it lists, and the log an agent wrote.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -50,6 +50,16 @@ const badgeTones = {
 }
 
 const badgeWithLogo = "gap-1"
+
+const turnChipBase =
+  "inline-flex min-h-5.5 flex-none items-center gap-1.25 px-2 text-hint font-medium whitespace-nowrap"
+
+const turnChipTones = {
+  quiet: "bg-subtle text-ink-secondary [--amends-status-knockout:var(--amends-subtle)]",
+  caution: "text-caution-text inset-ring-1 inset-ring-caution-border"
+}
+
+const turnMarkIcon = "flex size-3.5 flex-none [&>svg]:size-full"
 
 const personRow = "flex min-w-0 items-center gap-3"
 
@@ -155,6 +165,48 @@ export const badge = <Message, Requirements>(
       )
     ],
     config.motion === undefined ? [config.label] : [logo(h, { size: "0.875rem", motion: config.motion }), config.label]
+  )
+
+/**
+ * Where an agent's turn stands: waiting to start, working, stopping as asked, done, failed, or stopped.
+ */
+export type TurnState = "queued" | "working" | "stopping" | "done" | "failed" | "stopped"
+
+const turnStateWords: Readonly<Record<TurnState, string>> = {
+  queued: "Queued",
+  working: "Working",
+  stopping: "Stopping…",
+  done: "Completed",
+  failed: "Failed",
+  stopped: "Stopped"
+}
+
+const turnStateMotions = { queued: "thread", working: "working", stopping: "tug" } as const satisfies Partial<
+  Record<TurnState, LogoMotion>
+>
+
+const turnStateIcons = { done: "check", failed: "alert-triangle", stopped: "minus" } as const satisfies Partial<
+  Record<TurnState, IconName>
+>
+
+const renderTurnMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, state: TurnState): Html =>
+  state === "queued" || state === "working" || state === "stopping"
+    ? activityMark(h, turnStateMotions[state])
+    : h.span([h.AriaHidden(true), h.Class(turnMarkIcon)], [icon(h, turnStateIcons[state], { size: "xs" })])
+
+/**
+ * Where an agent's turn stands, as `apps/ui`'s `TurnStatus` draws it: a quiet tile 22px tall on `subtle`, at `hint`
+ * size in medium weight, with the state's mark 0.875rem before its word, 5px from it. A turn that is under way moves
+ * the logo as the logo does, the thread drawn through while it is `queued`, the stitches lit while it is `working`, the
+ * patch tugged while it is `stopping`, "Stopping…"; one that ended is still, a check for `done`, "Completed", and a
+ * dash for `stopped`. A `failed` turn reads in the caution colors, outlined and not filled so that its text keeps its
+ * contrast, with a warning for its mark. The mark is hidden from assistive technology, and the tile is a live region
+ * (`role="status"`), so that a state that changes is announced.
+ */
+export const turnStatus = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, state: TurnState): Html =>
+  h.span(
+    [h.Role("status"), h.Class(`${turnChipBase} ${turnChipTones[state === "failed" ? "caution" : "quiet"]}`)],
+    [renderTurnMark(h, state), turnStateWords[state]]
   )
 
 /**

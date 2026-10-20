@@ -16,7 +16,8 @@ import {
   properties,
   property,
   propertyIcon,
-  propertyValue
+  propertyValue,
+  turnStatus
 } from "./details.ts"
 import { taskStatus } from "./mark.ts"
 
@@ -384,6 +385,86 @@ describe("badge", () => {
       given(initial),
       expect(text("Running")).toHaveClass("[--amends-status-knockout:var(--amends-caution-surface)]"),
       expect(text("Queued")).toHaveClass("[--amends-status-knockout:var(--amends-subtle)]")
+    )
+  })
+})
+
+describe("turnStatus", () => {
+  const states = ["queued", "working", "stopping", "done", "failed", "stopped"] as const
+
+  const statuses = (h: HtmlBuilder<Message>) =>
+    h.div(
+      [],
+      states.map((state) => h.div([h.Id(state)], [turnStatus(h, state)]))
+    )
+
+  const words = {
+    queued: "Queued",
+    working: "Working",
+    stopping: "Stopping…",
+    done: "Completed",
+    failed: "Failed",
+    stopped: "Stopped"
+  } as const
+
+  for (const state of states) {
+    it(`says ${state} as ${words[state]}, in a live region`, () => {
+      scene(
+        { update, view: viewOf(statuses) },
+        given(initial),
+        expect(within(selector(`#${state}`), role("status"))).toHaveText(words[state])
+      )
+    })
+  }
+
+  for (const [state, motion] of [
+    ["queued", "thread"],
+    ["working", "working"],
+    ["stopping", "tug"]
+  ] as const) {
+    it(`moves the logo in its ${motion} motion while the turn is ${state}, hidden from assistive technology`, () => {
+      scene(
+        { update, view: viewOf(statuses) },
+        given(initial),
+        expect(selector(`#${state} svg`)).toHaveClass(`logo-${motion}`),
+        expect(selector(`#${state} svg`)).toHaveAttr("aria-hidden", "true"),
+        expect(selector(`#${state} svg`)).toHaveAttr("width", "0.875rem")
+      )
+    })
+  }
+
+  for (const state of ["done", "failed", "stopped"] as const) {
+    it(`draws a still mark, not the logo, once the turn is ${state}`, () => {
+      scene(
+        { update, view: viewOf(statuses) },
+        given(initial),
+        expect(selector(`#${state} svg`)).toHaveAttr("aria-hidden", "true"),
+        expect(selector(`#${state} svg`)).not.toHaveClass("logo-working"),
+        expect(selector(`#${state} [aria-hidden]`)).toHaveClass("size-3.5")
+      )
+    })
+  }
+
+  it("is a quiet tile on subtle, with the logo cut out of it", () => {
+    scene(
+      { update, view: viewOf(statuses) },
+      given(initial),
+      expect(within(selector("#working"), role("status"))).toHaveClass("bg-subtle"),
+      expect(within(selector("#working"), role("status"))).toHaveClass("text-ink-secondary"),
+      expect(within(selector("#working"), role("status"))).toHaveClass("min-h-5.5"),
+      expect(within(selector("#working"), role("status"))).toHaveClass(
+        "[--amends-status-knockout:var(--amends-subtle)]"
+      )
+    )
+  })
+
+  it("reads a failure in the caution colors, outlined and not filled", () => {
+    scene(
+      { update, view: viewOf(statuses) },
+      given(initial),
+      expect(within(selector("#failed"), role("status"))).toHaveClass("text-caution-text"),
+      expect(within(selector("#failed"), role("status"))).toHaveClass("inset-ring-caution-border"),
+      expect(within(selector("#failed"), role("status"))).not.toHaveClass("bg-subtle")
     )
   })
 })

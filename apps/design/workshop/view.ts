@@ -38,7 +38,9 @@ import {
   properties,
   property,
   propertyIcon,
-  propertyValue
+  propertyValue,
+  type TurnState,
+  turnStatus
 } from "../src/details.ts"
 import {
   activityCell,
@@ -85,8 +87,11 @@ import {
   message,
   messageList,
   type MessageText,
+  note,
   notification,
-  replyLine
+  replyLine,
+  turnLog,
+  turnRow
 } from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
 import {
@@ -2213,8 +2218,151 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
         })
       ],
       conversationColumn
+    ),
+    sample(
+      h,
+      "Notes of who took part, quiet lines with their time among the messages",
+      [
+        messageList(h, {
+          label: "Thread",
+          children: [
+            divider(h, "Yesterday"),
+            message(h, { key: "alex", mark: "AM", author: "Alex", time: "4:01 PM", text: "Can we review the plan?" }),
+            note(h, { key: "followed", text: "Sara followed this thread", time: "4:02 PM" }),
+            message(h, { key: "sara", mark: "S", author: "Sara", time: "4:10 PM", text: "Yes, after lunch." }),
+            note(h, { key: "unfollowed", text: "You stopped following", time: "4:30 PM" }),
+            note(h, { key: "left", text: "Sara left the group", time: "5:12 PM" }),
+            note(h, { key: "removed", text: "Sara was removed from the group", time: "5:13 PM" }),
+            note(h, { key: "removed-self", text: "You were removed from the workspace", time: "5:14 PM" })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "An agent's turn among the messages in each state, with the actions it offers and what it says under its line",
+      [
+        messageList(h, {
+          label: "Turns",
+          children: turnRowSamples(h)
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A turn's log opened under its row, and the row of a stop that did not go through",
+      [
+        messageList(h, {
+          label: "Opened turn",
+          children: [
+            turnRow(h, {
+              key: "opened",
+              label: "Atlas's turn",
+              mark: "A",
+              name: "Atlas",
+              status: turnStatus(h, "failed"),
+              actions: [
+                button(h, "View log", press, { variant: "quiet", isExpanded: true }),
+                button(h, "Retry", press)
+              ],
+              detail: "The model provider is unavailable.",
+              children: [log(h, { label: "Log", items: logLines }), hint(h, "The turn has ended.")]
+            }),
+            turnRow(h, {
+              key: "refused",
+              label: "Yumi's turn",
+              mark: "Y",
+              name: "Yumi",
+              status: turnStatus(h, "working"),
+              actions: [
+                button(h, "View log", press, { variant: "quiet", isExpanded: false }),
+                button(h, "Stop", press, { name: "Stop Yumi" })
+              ],
+              problem: "This turn has already finished."
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A turn that replied is its reply, with View turn log among the message's actions, and its log under it",
+      [
+        messageList(h, {
+          label: "Reply",
+          children: [
+            message(h, {
+              key: "reply",
+              mark: "AT",
+              author: "Atlas",
+              time: "9:28 AM",
+              text: "Deploy the API first, verify compatibility, then release clients on Thursday.",
+              actions: [iconButton(h, { icon: "list", label: "View turn log", onClick: press }, { isPressed: true })]
+            }),
+            turnLog(h, {
+              key: "reply-log",
+              label: "Atlas's turn log",
+              children: [log(h, { label: "Log", items: logLines }), hint(h, "The turn has ended.")]
+            })
+          ]
+        })
+      ],
+      conversationColumn
+    ),
+    sample(
+      h,
+      "A turn's row in a column 20rem wide, where its actions drop under the name",
+      [
+        messageList(h, {
+          label: "Narrow turn",
+          children: [
+            turnRow(h, {
+              key: "narrow",
+              label: "Atlas's turn",
+              mark: "A",
+              name: "Atlas",
+              status: turnStatus(h, "stopped"),
+              actions: [button(h, "View log", press, { variant: "quiet" }), button(h, "Retry", press)],
+              detail: "Atlas stopped taking part in this thread."
+            })
+          ]
+        })
+      ],
+      "flex w-80 flex-col px-3"
     )
   ])
+}
+
+const turnStates: ReadonlyArray<TurnState> = ["queued", "working", "stopping", "done", "failed", "stopped"]
+
+/** An agent's turn in each state, with what it offers and says, as a thread's list holds them. */
+const turnRowSamples = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
+  const press = Message.ClickedButton()
+  const viewLog = button(h, "View log", press, { variant: "quiet", isExpanded: false })
+  const row = (key: string, name: string, state: TurnState, actions: ReadonlyArray<Html>, detail?: string) =>
+    turnRow(h, {
+      key,
+      label: `${name}'s turn`,
+      mark: name.charAt(0),
+      name,
+      status: turnStatus(h, state),
+      actions,
+      detail
+    })
+
+  return [
+    row("queued", "Atlas", "queued", [viewLog, button(h, "Stop", press, { name: "Stop Atlas" })]),
+    row("working", "Atlas", "working", [viewLog, button(h, "Stop", press, { name: "Stop Atlas" })]),
+    row("stopping", "Atlas", "stopping", [viewLog, button(h, "Stop", press, { name: "Stopping", isDisabled: true })]),
+    row("done", "Atlas", "done", [viewLog], "No reply posted."),
+    row("failed", "Atlas", "failed", [viewLog, button(h, "Retry", press)], "Anthropic needs its API key."),
+    row("departed", "Atlas", "stopped", [viewLog], "Atlas stopped taking part in this thread."),
+    row("task", "Atlas", "stopped", [viewLog], "The task no longer asks Atlas to work on it."),
+    row("requested", "Atlas", "stopped", [viewLog, button(h, "Retry", press)])
+  ]
 }
 
 /** A message that uses every form markdown has, and the mention of a member the workshop does not know. */
@@ -4060,6 +4208,12 @@ const detailsGroup = (
         badge(h, { label: "Running", tone: "caution", motion: "working" }),
         badge(h, { label: "Stopping", tone: "caution", motion: "tug" })
       ],
+      sampleRow
+    ),
+    sample(
+      h,
+      "Where a turn stands: the logo moving while it is queued (thread), working, and stopping (tug), and a still mark once it is done, failed, or stopped",
+      turnStates.map((state) => turnStatus(h, state)),
       sampleRow
     ),
     sample(

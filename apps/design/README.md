@@ -36,7 +36,7 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 and beside a refusal, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, as a compact one with a context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with an agent among them in its tone; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+Members tab has an action at the start of its footer and Done at its end, as a compact one with a context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; where a turn stands in each of its six states, the logo moving while it waits, works, and stops and a still mark once it is done, failed, or stopped; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with an agent among them in its tone; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -44,7 +44,7 @@ conversation's messages as a list with a current row whose text opens the thread
 an edited mark after the text, a deleted message, actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with markdown in the text as blocks in a plain row and as a preview in a row that opens a thread and in a notification, with a form in place of the text, and set apart by dividers, centered and at the
-start, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
+start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a turn's log opened under its row, a stop that did not go through, a turn that replied with View turn log among its message's actions and its log under it, and a turn's row in a column 20rem wide, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the shell twice, with and without its side pane, each in a
@@ -175,7 +175,8 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   it, in the label's color; the label still names the button, and the icon is hidden from assistive
   technology. `options.name` is what assistive technology calls the button when its label alone does not tell
   it from the buttons around it, such as "Revoke invitation for casey@mercier.example" for "Revoke"; it begins
-  with the label. The actions that create something use `mark-new`, which the reference's buttons use,
+  with the label. `options.isExpanded` is for a button that shows or hides what is under it, such as a turn's log:
+  whether it is shown now, which it says as `aria-expanded` and draws with the `subtle` fill of a quiet button. The actions that create something use `mark-new`, which the reference's buttons use,
   not `plus`, which is smaller and lighter and has no mark's weight. `options.hasChevron` draws a chevron after the
   label and tightens the padding, for a button that opens a menu. A button is 36px tall, a quiet
   one 32px, and every one but a link 44px on touch. A secondary button with an open menu has a stronger border and a
@@ -796,6 +797,14 @@ What a pane says about one thing.
   0.875rem before the label, moving and cut out of the badge's own surface, for what is under way: `"thread"` while
   it waits, `"working"` while it runs, `"tug"` while it stops. The logo is hidden from assistive technology, since
   the label says it.
+- `turnStatus(h, state)` is where an agent's turn stands, as `apps/ui`'s `TurnStatus` draws it: a quiet tile 22px
+  tall on `subtle`, at `hint` size in medium weight, with the state's mark at 0.875rem and its word 5px after it. A
+  `TurnState` is `"queued"`, "Queued", with the logo drawing its thread through; `"working"`, "Working", with the
+  stitches lit; `"stopping"`, "Stopping…", with the patch tugged; `"done"`, "Completed", with a check; `"failed"`,
+  "Failed", with a warning, in the caution colors, outlined and not filled so that its text keeps its contrast; and
+  `"stopped"`, "Stopped", with a dash. The logo is cut out of the tile's own surface, and the marks are hidden from
+  assistive technology, since the word says it. The tile is a live region (`role="status"`), so that a state that
+  changes is announced.
 - `entryList(h, { label, children })` is a `ul` named by `label`, a column with no list style, of
   `entry`s. It is for lists of people or agents' work, such as a thread's turns, and of people, such as
   a workspace's members and the invitations waiting.
@@ -820,7 +829,7 @@ What a pane says about one thing.
 What a conversation is made of.
 
 - `messageList(h, { label, children })` is an `ol` named by `label`, a column with no list style, of
-  `message`s, `notification`s, and `divider`s.
+  `message`s, `notification`s, `divider`s, `event`s, `note`s, `turnRow`s, and `turnLog`s.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
   then a column of the author line, the text, and the meta row. The author line is the
   `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
@@ -879,6 +888,25 @@ What a conversation is made of.
   as "Alex created this task · 10:06 AM": `control` size in `ink-secondary`, the drawing of something new (`mark-new`)
   before it at 0.875rem, 10px from the words and hidden from assistive technology, as `apps/ui`'s timeline draws its
   events.
+- `note(h, { key, text, time, dateTime?, title? })` is a quiet line of who took part in the conversation or stopped,
+  such as "Sara followed this thread" or "You stopped following", an item of the list among its messages, as
+  `apps/ui`'s timeline draws its notes: `control` size in `ink-secondary` with the `time`, already formatted, 10px after
+  it at `meta` size in `ink-muted`, in a `time` element that is given the moment it was (`dateTime`) and a longer
+  `title` for a tooltip, when the caller has them. It has 10px above and below, as a message's row does, and draws nothing before its words, which sets it apart from
+  an `event`.
+- `turnRow(h, { key, label, mark, name, status, actions, detail?, problem?, children? })` is an agent's turn where it
+  took on the work, an item of the list among its messages and notes, a `group` named `label` for assistive technology,
+  such as "Atlas's turn", as `apps/ui`'s `TurnRow` draws it: the agent's `mark` at 24px in its lilac tone, the `name` at
+  item size in medium weight in the agent's color (`text-agent`), the `status` after it (a `turnStatus`), and the
+  `actions` at the end, buttons 4px apart. The row has 10px above and below, and is a container: where it is narrower than 22.5rem the actions drop to
+  a line of their own under the name. Under the first line, in line with the name, 4px down, the `detail` says how the
+  turn ended, such as "No reply posted.", at `control` size in `ink-secondary`; the `problem` says why a stop or retry
+  did not go through, at `control` size in the caution color, as an alert; and the `children` follow, 8px apart, such
+  as the turn's `log`.
+- `turnLog(h, { key, label, children })` is the log of the turn that posted the message above it, an item of the list
+  right under that message, 44px in from the list's edge so that it lies in line with the message's text and 10px
+  below, holding a `group` named `label` whose `children` are 8px apart, such as the `log` and where following it
+  stands.
 - `description(h, { text, body?, actions?, isCurrent? })` is the text that describes the thing a pane is about, such as
   a task: `text` at item size in `ink`, a `MessageText`, markdown as the blocks of `richText`, its line breaks kept and
   a mention in it a chip, as `apps/ui`'s task pane sets it, 11px under the `property` caption above it. `body` takes the text's place, such as
