@@ -69,7 +69,7 @@ export const MembersPicker = Multi.create()
 export const VisibilityRadioGroup = RadioGroup.create<Visibility>()
 
 /** Which of the workshop's pickers a message is about: the empty one, the one with chips, and the ones in the modals. */
-export const MemberPlace = Schema.Literals(["empty", "chosen", "create", "add"])
+export const MemberPlace = Schema.Literals(["empty", "chosen", "create", "add", "list"])
 export type MemberPlace = typeof MemberPlace.Type
 
 export const Destination = Schema.Literals(["home", "agents", "connections", "settings"])
@@ -111,6 +111,7 @@ export const Model = Schema.Struct({
   confirmModal: DialogBlock.Model,
   compactModal: DialogBlock.Model,
   createModal: DialogBlock.Model,
+  addViewModal: DialogBlock.Model,
   emptyPicker: MembersPicker.Model,
   emptyMembers: Schema.Array(Schema.String),
   chosenPicker: MembersPicker.Model,
@@ -120,6 +121,8 @@ export const Model = Schema.Struct({
   addPicker: MembersPicker.Model,
   addMembers: Schema.Array(Schema.String),
   heldMembers: Schema.Array(Schema.String),
+  listMembers: Schema.Array(Schema.String),
+  listQuery: Schema.String,
   visibility: Visibility,
   visibilityGroup: VisibilityRadioGroup.Model,
   lockedVisibilityGroup: VisibilityRadioGroup.Model,
@@ -181,6 +184,10 @@ export const Message = defineMessageUnion({
   ClickedOpenConfirmModal: {},
   ClickedOpenCompactModal: {},
   ClickedOpenCreateModal: {},
+  ClickedOpenAddViewModal: {},
+  ClickedCloseAddViewModal: {},
+  TypedMemberListQuery: { value: Schema.String },
+  PickedListMember: { id: Schema.String },
   ClickedRemoveMember: { place: MemberPlace, id: Schema.String },
   ClickedAddMembers: {},
   ClickedRemoveHeldMember: { id: Schema.String },
@@ -192,6 +199,7 @@ export const Message = defineMessageUnion({
   SubmittedConfirmModal: {},
   SubmittedCompactModal: {},
   SubmittedCreateModal: {},
+  SubmittedAddViewModal: {},
   ChangedPlan: { plan: Plan },
   ChangedTaskStatus: { status: TaskStatus },
   ChangedTaskPriority: { priority: TaskPriority },

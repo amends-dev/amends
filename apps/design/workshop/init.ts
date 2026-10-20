@@ -30,6 +30,8 @@ export const init = ApplicationComposition.makeInit(() => ({
     createMembers: [],
     addMembers: [],
     heldMembers: ["alex", "yumi"],
+    listMembers: [],
+    listQuery: "",
     visibility: "Private",
     integrationQuery: "",
     plan: "team",

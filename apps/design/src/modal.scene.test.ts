@@ -127,6 +127,26 @@ describe("modal over a dialog's published groups", () => {
     )
   })
 
+  it("puts a Back button named for where it goes before the title, in place of the Close button", () => {
+    scene(
+      {
+        update,
+        view: (_model: Model, h: HtmlBuilder<Message>) =>
+          modal(h, visibleRender, {
+            title: "Add members",
+            context: "# general",
+            back: { label: "Back to members", onClick: Message.ChangedTab({ tab: "members" }) },
+            body: []
+          })
+      },
+      given(initial),
+      expect(role("heading", { name: "Add members", level: 2 })).toExist(),
+      expect(role("button", { name: "Back to members" })).toExist(),
+      expect(role("button", { name: "Close" })).toBeAbsent(),
+      click(role("button", { name: "Back to members" }))
+    )
+  })
+
   it("has a Close button, a Cancel button, and the footer's action, which submits the form", () => {
     scene(
       { update, view: settingsView(visibleRender) },

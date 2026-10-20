@@ -2,7 +2,8 @@
  * The people of a group: the field that chooses several workspace members, the line that counts the people a group
  * holds, and the list of them. The field is the look of `@foldkit/ui`'s headless multi-select combobox, so the
  * framework keeps the input, the list's arrow keys, Enter, Escape, the focus, and the labels, and this module gives
- * them the look and puts the people chosen so far in the field as chips.
+ * them the look and puts the people chosen so far in the field as chips. For a phone, where a list that opens over the
+ * form has no room, `memberPickerList` is the same field with the list always shown under it, and no combobox.
  *
  * A Block that has a members picker:
  *
@@ -300,6 +301,125 @@ export const memberPicker = <Message, Requirements>(
         ]
       ),
       config.hint === undefined ? h.empty : h.p([h.Id(`${config.id}-hint`), h.Class(hintText)], [config.hint])
+    ]
+  )
+}
+
+/**
+ * What a list of people to choose among takes: the `id` of its search input, a visible `label`, the people `chosen`
+ * so far, everyone who may be chosen, and the text typed.
+ */
+export type MemberPickerListConfig<Message> = Readonly<{
+  /** The `id` of the search input, which the label is for. */
+  id: string
+  label: string
+  /** Shown while no one is chosen. */
+  placeholder?: string
+  /** People chosen so far, shown as chips in the order given, each removable. */
+  chosen: ReadonlyArray<PickerPerson>
+  /** Everyone who may be chosen. The list shows those who are not chosen and whose name holds the text typed. */
+  candidates: ReadonlyArray<PickerPerson>
+  /** The text typed, which narrows the list. */
+  query: string
+  onQuery: (query: string) => Message
+  /** What choosing a person from the list sends. */
+  onPick: (id: string) => Message
+  /** What a chip's Remove button, and Backspace in the empty input, which removes the last, sends. */
+  onRemove: (id: string) => Message
+}>
+
+const listPanel = "mt-2 flex flex-col border border-outline bg-popover"
+
+const listScroll = "max-h-72 overflow-y-auto overscroll-contain pb-1"
+
+const listHeading = "flex justify-between gap-3 px-3 pt-2.5 pb-1.5 text-hint font-medium text-ink-secondary"
+
+const listOption =
+  "mx-2 grid min-h-12 w-[calc(100%-1rem)] cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-x-3 border-0 bg-transparent px-3 text-start hover:bg-subtle focus-ring-inset"
+
+const listFooter = "m-0 border-t border-divider px-3 pt-1.5 pb-2 text-hint text-ink-secondary"
+
+const listInput =
+  "m-0 h-7 min-w-28 flex-[1_1_7rem] border-0 bg-transparent px-1 text-body-touch text-ink outline-none placeholder:text-ink-muted"
+
+/**
+ * A field of chips and the people to choose among as a list that is always shown under it, for a phone, where a list
+ * that opens over the form has no room. It is the look of `memberPicker` without the combobox: the people chosen are
+ * chips in the field with a Remove button named for them, the input narrows the list to the names that hold what is
+ * typed, whatever its case, Backspace in the empty input removes the last chip, and the list, headed "Workspace
+ * members" and how many are available, has a button for each person, named by their name and whether they are a person
+ * or an agent, that chooses them. Under the people the line says how to use it, or that no one matches, or that
+ * everyone is in.
+ */
+export const memberPickerList = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: MemberPickerListConfig<Message>
+): Html => {
+  const taken = config.chosen.map(({ id }) => id)
+  const available = config.candidates.filter(({ id }) => !taken.includes(id))
+  const wanted = config.query.trim().toLowerCase()
+  const offered = available.filter(({ name }) => name.toLowerCase().includes(wanted))
+  const last = config.chosen.at(-1)
+
+  return h.div(
+    [h.Class(fieldColumn)],
+    [
+      h.label([h.For(config.id), h.Class(fieldLabel)], [config.label]),
+      h.div(
+        [h.Class(`${controlBase} border-outline`)],
+        [
+          config.chosen.length > 0 ? h.empty : h.span([h.Class(searchIcon)], [icon(h, "mark-search", { size: "sm" })]),
+          ...config.chosen.map((person) => chip(h, person, Option.some(removeChip(h, person, config.onRemove)))),
+          h.input([
+            h.Id(config.id),
+            h.Type("text"),
+            h.Value(config.query),
+            h.Placeholder(config.chosen.length > 0 ? "Add more…" : (config.placeholder ?? "Search workspace members…")),
+            h.Autocomplete("off"),
+            h.OnInput(config.onQuery),
+            answerKeys(h, (key) =>
+              key === "Backspace" && config.query === "" && last !== undefined
+                ? Option.some(config.onRemove(last.id))
+                : Option.none()
+            ),
+            h.Class(listInput)
+          ])
+        ]
+      ),
+      h.div(
+        [h.Class(listPanel)],
+        [
+          h.div(
+            [h.Class(listHeading)],
+            [h.span([], ["Workspace members"]), h.span([h.Class(availableCount)], [`${offered.length} available`])]
+          ),
+          offered.length === 0
+            ? h.empty
+            : h.ul(
+                [h.AriaLabel("Workspace members"), h.Class(`${listScroll} m-0 list-none p-0`)],
+                offered.map((person) =>
+                  h.keyed("li")(
+                    person.id,
+                    [],
+                    [
+                      h.button(
+                        [h.Type("button"), h.OnClick(config.onPick(person.id)), h.Class(listOption)],
+                        [
+                          mark(h, { ...person.mark, size: "account" }),
+                          h.span(
+                            [h.Class(optionText)],
+                            [h.span([h.Class(optionName)], [person.name]), h.span([h.Class(optionKind)], [person.kind])]
+                          ),
+                          h.span([h.Class(optionPlus)], [icon(h, "mark-new", { size: "sm" })])
+                        ]
+                      )
+                    ]
+                  )
+                )
+              ),
+          h.p([h.Class(listFooter)], [footerWords(offered.length, available.length)])
+        ]
+      )
     ]
   )
 }

@@ -39,30 +39,31 @@ Cancel at the start of the footer and the primary button at its end, as a form f
 name field with a placeholder, the visibility as a choice, and a members picker with the person locked, whose action
 waits for a name, as a wide one with tabs, a description, and a Close settings button whose Members tab has the picker
 beside its Add button, the count of the people held over a dashed rule, their list, an action at the start of its
-footer, and Done at its end, as a compact one with a context and a description whose Cancel and primary button are
-dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's
-edges; the members picker empty and with the person locked as You and two chosen under a hint that counts them, the
-count and list of a group's people with You and Agent beside names and a group of one, and the visibility choice, open
-to change and dimmed; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a
-button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and
-moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a
-pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu
-as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each
-opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each
-person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of
-checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the
-status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels
-of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with
-an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a
-task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in
-frames 66rem, 52rem, and 360px wide; where a turn stands in each of its six states, the logo moving while it waits,
-works, and stops and a still mark once it is done, failed, or stopped; the marks by size, 20px to 40px with the 22px
-mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac
-tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of
-its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the stack of two,
-three, and four with an agent among them in its tone; the tooltip in each tone, with a detail and with the title alone,
-over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane
-says about one thing, as a detail
+footer, and Done at its end, as a view the modal moved to, with Back before the title in place of Close, the list of
+people always shown, and a wide action, as a compact one with a context and a description whose Cancel and primary
+button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to
+the panel's edges; the members picker empty and with the person locked as You and two chosen under a hint that counts
+them, the same field with its list always shown under it for a phone, the count and list of a group's people with You
+and Agent beside names and a group of one, and the visibility choice, open to change and dimmed; the logo at five sizes,
+decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on
+the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in
+for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed
+into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status
+while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the
+assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups
+behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a
+pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end,
+then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide;
+the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the
+task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title,
+and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; where a turn stands in
+each of its six states, the logo moving while it waits, works, and stops and a still mark once it is done, failed, or
+stopped; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each
+status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its
+tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its
+six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with an agent among them in its tone; the
+tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls
+with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -1066,6 +1067,9 @@ the `dialog` element, the focus inside it, Escape, the click on the scrim, and t
     pane's do.
   - `closeLabel`, which is what assistive technology calls the Close button, "Close" unless given, such as "Close
     settings" for a modal that is a group's settings.
+  - `back`, `{ label, onClick }`, for a view the modal moved to, such as the add members view a phone's group settings
+    open. It is a Back button, an icon button of `mark-back` named `label`, such as "Back to members", before the title,
+    and it takes the place of the Close button: the view ends by going back, so there is one way out of it.
   - `body`, which scrolls, in a column 16px apart. The optional `description` is its first line, at
     hint size in `ink-secondary`, and describes the dialog to assistive technology, so the Block
     passes `hasDescription: true` to the dialog's view when it gives one.
@@ -1214,6 +1218,13 @@ keeps the input, the arrow keys through the list, Enter, Escape, the focus, and 
   - The list is placed against the field and not the input, so the field carries the id `{id}-input-wrapper` that the
     combobox places against, and the input's own wrapper another. Both are `memberPicker`'s to set, and a caller does
     not give them.
+- `memberPickerList(h, config)` is the same field for a phone, where a list that opens over the form has no room. The
+  `config` is `{ id, label, placeholder?, chosen, candidates, query, onQuery, onPick, onRemove }`. The chips, the input,
+  Backspace, and the heading with "N available" are `memberPicker`'s, and the list is always shown under the field, in a
+  bordered panel with no popover, no combobox, and no button to show or hide it. Each person who is not in `chosen` and
+  whose name holds the text typed is a button named by their name and whether they are a person or an agent, at least
+  48px tall, that sends `onPick(id)`; the line under them says the same words as the picker's. There is nothing for a
+  Block to bind: the model holds the text typed and the people chosen, and the Block's update empties the text on a pick.
 - `memberCount(h, count)` is "1 member" or "4 members" at control size in medium weight and `ink-secondary`, before a
   dashed rule that runs to the end of the line and is hidden from assistive technology.
 - `memberList(h, { label, members })` is the people a group holds as a list named `label`: a row each, at least 40px
@@ -1256,13 +1267,17 @@ and values, a value that is a button, a person's mark in its size and tone, hidd
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
-those with a modifier, left to the browser, and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; a
+those with a modifier, left to the browser, and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; the list under a
+field of chips by the label of its search, with no combobox, the people offered as buttons named by their name and kind, how many are available, the
+line for none matching and for everyone being in, a pick that becomes a chip and leaves the list, and Backspace that removes the last chip in the empty
+input and leaves them while there is text; a
 toast by `role("alert")` with its text, detail, and Dismiss, in the stack's live region, and a confirmation by `role("status")` in the list named Notifications, with its check, its text, its one action that takes it away, no Dismiss, and the classes that centre it at the bottom 24px above the edge and any home indicator; a modal by its
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the buttons of the footer in the order they sit, the leading ones and a
 Cancel told to lead at the start and the rest at the end, the control given `initialFocus` by its marker, and Close and
 Cancel by closing the dialog without sending the form, a Cancel that is disabled by `aria-disabled` and by closing
-nothing when pressed, the panel's width by its class for each of the three widths, its Close button named by `closeLabel`, and a list of rows by its label, a row each
+nothing when pressed, the panel's width by its class for each of the three widths, its Close button named by `closeLabel`,
+a Back button named by `back` before the title in place of Close, and a list of rows by its label, a row each
 with its meta as its description, the side and bottom padding it cancels, and the message a row sends; a message by
 its text button, `aria-current`, its note, its edited mark, actions, meta, and body, the words of a deleted one, its markdown as the blocks of `richText` and as the
 preview a button holds, a string as the words it is, a mention in its text by the chip that holds it and a button by the

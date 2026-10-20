@@ -78,6 +78,7 @@ import {
   memberCount,
   memberList as groupMemberList,
   memberPicker,
+  memberPickerList,
   type PickerPerson
 } from "../src/members.ts"
 import {
@@ -133,6 +134,7 @@ import { tooltip } from "../src/tooltip.ts"
 import {
   AccountBinding,
   AddPickerBinding,
+  AddViewModalBinding,
   type ApplicationViewBuilder,
   ApplicationComposition,
   AssigneeFilterBinding,
@@ -4717,6 +4719,37 @@ const membersTab = (h: ApplicationViewBuilder, model: Model): ReadonlyArray<Html
   ]
 }
 
+const memberPickerListSample = (h: ApplicationViewBuilder, model: Model, id: string): Html =>
+  memberPickerList(h, {
+    id,
+    label: "Search workspace members",
+    chosen: peopleOf(model.listMembers),
+    candidates: pickerPeople,
+    query: model.listQuery,
+    onQuery: (value) => Message.TypedMemberListQuery({ value }),
+    onPick: (id) => Message.PickedListMember({ id }),
+    onRemove: (id) => Message.ClickedRemoveMember({ place: "list", id })
+  })
+
+const addViewLabel = (count: number) =>
+  count === 0 ? "Add members" : count === 1 ? "Add 1 member" : `Add ${count} members`
+
+/** The view a phone's settings move to for adding members: Back in place of Close, the list always shown. */
+const addViewModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Add members",
+    context: "# general",
+    back: { label: "Back to members", onClick: Message.ClickedCloseAddViewModal() },
+    body: [memberPickerListSample(h, model, "workshop-add-view-search")],
+    footer: [
+      button(h, addViewLabel(model.listMembers.length), Message.SubmittedAddViewModal(), {
+        variant: "primary",
+        wide: true,
+        isDisabled: model.listMembers.length === 0
+      })
+    ]
+  })
+
 const membersColumn = "flex max-w-md flex-col gap-4"
 
 const membersGroup = (h: ApplicationViewBuilder, model: Model): Html =>
@@ -4749,6 +4782,12 @@ const membersGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           members: [{ key: "you", name: "Jamie Morgan", mark: { text: "JM" }, note: "You" }]
         })
       ],
+      membersColumn
+    ),
+    sample(
+      h,
+      "The same field with its list always shown under it, for a phone, where a list that opens over the form has no room",
+      [memberPickerListSample(h, model, "workshop-list-search")],
       membersColumn
     ),
     sample(
@@ -4787,6 +4826,20 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
             slotId: "create-modal",
             model: model.createModal,
             viewInputs: { hasDescription: true, toView: (render) => createGroupModal(h, render, model) }
+          })
+        )
+      ]
+    ),
+    sample(
+      h,
+      "A view the modal moved to, with Back before the title in place of Close, the list of people always shown, and a wide action",
+      [
+        button(h, "Open the add members view", Message.ClickedOpenAddViewModal()),
+        h.block(
+          AddViewModalBinding.embedView({
+            slotId: "add-view-modal",
+            model: model.addViewModal,
+            viewInputs: { toView: (render) => addViewModal(h, render, model) }
           })
         )
       ]

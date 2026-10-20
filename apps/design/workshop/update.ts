@@ -2,6 +2,7 @@ import * as Match from "effect/Match"
 import { modifyFields } from "foldkit/struct"
 import {
   ApplicationComposition,
+  AddViewModalBinding,
   ChooserModalBinding,
   CompactModalBinding,
   ConfirmModalBinding,
@@ -20,6 +21,7 @@ const withoutMember = (model: Model, place: MemberPlace, id: string) => {
     Match.when("chosen", () => modifyFields(model, { chosenMembers: remove })),
     Match.when("create", () => modifyFields(model, { createMembers: remove })),
     Match.when("add", () => modifyFields(model, { addMembers: remove })),
+    Match.when("list", () => modifyFields(model, { listMembers: remove })),
     Match.exhaustive
   )
 }
@@ -55,6 +57,12 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     ClickedOpenConfirmModal: () => ConfirmModalBinding.requestOpen()(model),
     ClickedOpenCompactModal: () => CompactModalBinding.requestOpen()(model),
     ClickedOpenCreateModal: () => CreateModalBinding.requestOpen()(model),
+    ClickedOpenAddViewModal: () => AddViewModalBinding.requestOpen()(model),
+    ClickedCloseAddViewModal: () => AddViewModalBinding.requestClose()(model),
+    TypedMemberListQuery: ({ value }) => ({ model: modifyFields(model, { listQuery: () => value }) }),
+    PickedListMember: ({ id }) => ({
+      model: modifyFields(model, { listMembers: (members) => [...members, id], listQuery: () => "" })
+    }),
     ClickedRemoveMember: ({ place, id }) => ({ model: withoutMember(model, place, id) }),
     ClickedAddMembers: () => ({
       model: modifyFields(model, {
@@ -73,6 +81,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     SubmittedConfirmModal: () => ConfirmModalBinding.requestClose()(model),
     SubmittedCompactModal: () => CompactModalBinding.requestClose()(model),
     SubmittedCreateModal: () => CreateModalBinding.requestClose()(model),
+    SubmittedAddViewModal: () => AddViewModalBinding.requestClose()(model),
     ChangedPlan: ({ plan }) => ({ model: modifyFields(model, { plan: () => plan }) }),
     ChangedTaskStatus: ({ status }) => ({ model: modifyFields(model, { taskStatus: () => status }) }),
     ChangedTaskPriority: ({ priority }) => ({ model: modifyFields(model, { taskPriority: () => priority }) }),

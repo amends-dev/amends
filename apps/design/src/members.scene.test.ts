@@ -16,6 +16,7 @@ import {
   focus,
   given,
   keydown,
+  label,
   role,
   scene,
   text,
@@ -23,7 +24,14 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { type GroupMember, type PickerPerson, memberCount, memberList, memberPicker } from "./members.ts"
+import {
+  type GroupMember,
+  type PickerPerson,
+  memberCount,
+  memberList,
+  memberPicker,
+  memberPickerList
+} from "./members.ts"
 
 const PickerBlock = Multi.create()
 
@@ -418,6 +426,111 @@ describe("memberList", () => {
       given<Removed>([]),
       expect(role("button", { name: "Remove Yumi" })).toHaveAttr("aria-disabled", "true"),
       expect(role("button", { name: "Remove Sara" })).not.toHaveAttr("aria-disabled")
+    )
+  })
+})
+
+const ListMessage = defineMessageUnion({
+  TypedQuery: { query: Schema.String },
+  Picked: { id: Schema.String },
+  Removed: { id: Schema.String }
+})
+type ListMessage = typeof ListMessage.Type
+
+type ListModel = Readonly<{ query: string; chosen: ReadonlyArray<string> }>
+
+const listInitial: ListModel = { query: "", chosen: [] }
+
+const listUpdate = (model: ListModel, message: ListMessage) =>
+  ListMessage.match<Update.Return<ListModel, ListMessage>>(message, {
+    TypedQuery: ({ query }) => ({ model: modifyFields(model, { query: () => query }) }),
+    Picked: ({ id }) => ({ model: modifyFields(model, { chosen: (chosen) => [...chosen, id], query: () => "" }) }),
+    Removed: ({ id }) => ({ model: modifyFields(model, { chosen: (chosen) => chosen.filter((c) => c !== id) }) })
+  })
+
+const listView = (model: ListModel, h: HtmlBuilder<ListMessage>) =>
+  memberPickerList(h, {
+    id: "add-members-search",
+    label: "Search workspace members",
+    chosen: model.chosen.flatMap((id) => people.filter((person) => person.id === id)),
+    candidates: people,
+    query: model.query,
+    onQuery: (query) => ListMessage.TypedQuery({ query }),
+    onPick: (id) => ListMessage.Picked({ id }),
+    onRemove: (id) => ListMessage.Removed({ id })
+  })
+
+describe("memberPickerList", () => {
+  const listScene = { update: listUpdate, view: listView }
+
+  it("shows the people it offers under the label of its search, with how many are available and how to use it", () => {
+    scene(
+      listScene,
+      given(listInitial),
+      expect(label("Search workspace members")).toHaveAttr("placeholder", "Search workspace members…"),
+      expect(text("Workspace members")).toExist(),
+      expect(text("3 available")).toExist(),
+      expectAll(all.role("button")).toHaveCount(3),
+      expect(role("button", { name: /Alex Morgan/ })).toExist(),
+      expect(role("button", { name: /Yumi/ })).toExist(),
+      expect(text("Agent")).toExist(),
+      expect(text("Select one or more members.")).toExist(),
+      expectAll(all.role("combobox")).toHaveCount(0)
+    )
+  })
+
+  it("narrows the list to the names that hold what is typed, whatever the case", () => {
+    scene(
+      listScene,
+      given(listInitial),
+      type(label("Search workspace members"), "CA"),
+      expect(text("1 available")).toExist(),
+      expect(role("button", { name: /Caleb/ })).toExist(),
+      expect(role("button", { name: /Alex Morgan/ })).toBeAbsent()
+    )
+  })
+
+  it("says no one matches when nothing holds what is typed, and that everyone is in when no one is left", () => {
+    scene(
+      listScene,
+      given(listInitial),
+      type(label("Search workspace members"), "zzz"),
+      expect(text("0 available")).toExist(),
+      expect(text("No workspace members match.")).toExist(),
+      expectAll(all.role("button")).toHaveCount(0)
+    )
+    scene(
+      listScene,
+      given({ query: "", chosen: ["alex", "caleb", "yumi"] }),
+      expect(text("Everyone in the workspace is here.")).toExist(),
+      expect(label("Search workspace members")).toHaveAttr("placeholder", "Add more…")
+    )
+  })
+
+  it("chooses the person pressed, as a chip with a Remove button that leaves the list", () => {
+    scene(
+      listScene,
+      given(listInitial),
+      click(role("button", { name: /Caleb/ })),
+      expect(role("button", { name: "Remove Caleb" })).toExist(),
+      expect(text("2 available")).toExist(),
+      click(role("button", { name: "Remove Caleb" })),
+      expect(role("button", { name: "Remove Caleb" })).toBeAbsent(),
+      expect(text("3 available")).toExist()
+    )
+  })
+
+  it("removes the last chip with Backspace in the empty input, and none while there is text", () => {
+    scene(
+      listScene,
+      given({ query: "", chosen: ["alex", "caleb"] }),
+      keydown(label("Search workspace members"), "Backspace"),
+      expect(role("button", { name: "Remove Caleb" })).toBeAbsent(),
+      expect(role("button", { name: "Remove Alex Morgan" })).toExist(),
+      type(label("Search workspace members"), "y"),
+      keydown(label("Search workspace members"), "Backspace"),
+      expectIgnored(),
+      expect(role("button", { name: "Remove Alex Morgan" })).toExist()
     )
   })
 })

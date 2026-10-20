@@ -53,6 +53,12 @@ export const CompactModalBinding = ApplicationDefinition.bindChild(DialogBlock, 
   outMessage: { fold: foldDialogOutMessage }
 })
 
+export const AddViewModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "addViewModal",
+  init: { contextToArgs: () => [{ id: "workshop-add-view-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
 export const CreateModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
   field: "createModal",
   init: { contextToArgs: () => [{ id: "workshop-create-modal" }] },
@@ -295,6 +301,7 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     ConfirmModalBinding,
     CompactModalBinding,
     CreateModalBinding,
+    AddViewModalBinding,
     EmptyPickerBinding,
     ChosenPickerBinding,
     CreatePickerBinding,

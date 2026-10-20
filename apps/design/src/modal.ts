@@ -18,7 +18,7 @@
 
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { buttonWith, iconButtonWith } from "./control.ts"
+import { buttonWith, iconButton, iconButtonWith } from "./control.ts"
 
 const dialogLook = "m-0 max-h-none max-w-none bg-transparent p-0 open:grid open:place-items-center"
 
@@ -43,6 +43,8 @@ const titleText = "m-0 min-w-0 truncate text-title font-medium text-ink"
 const contextText = "min-w-0 truncate text-control text-ink-secondary"
 
 const closeSlot = "flex flex-none items-center ps-4"
+
+const backSlot = "-ms-3 me-2 flex flex-none items-center"
 
 const tabsSlot = "mt-auto flex"
 
@@ -74,6 +76,11 @@ export type ModalConfig<Message> = Readonly<{
   context?: string
   /** What assistive technology calls the button in the header that closes the modal, "Close" unless given. */
   closeLabel?: string
+  /**
+   * A button before the title that goes back to what the modal showed before, named `label` for assistive technology,
+   * such as "Back to members", for a view the modal moved to. It takes the place of the Close button.
+   */
+  back?: Readonly<{ label: string; onClick: Message }>
   /** A line at the start of the body, which describes the dialog to assistive technology. */
   description?: string
   /** The `paneTabs` under the title, for a modal with sections. */
@@ -106,6 +113,12 @@ const renderHeader = <Message, Requirements>(
       h.div(
         [h.Class(titleRow)],
         [
+          config.back === undefined
+            ? h.empty
+            : h.div(
+                [h.Class(backSlot)],
+                [iconButton(h, { icon: "mark-back", label: config.back.label, onClick: config.back.onClick })]
+              ),
           h.div(
             [h.Class(titleBlock)],
             [
@@ -113,10 +126,12 @@ const renderHeader = <Message, Requirements>(
               config.context === undefined ? h.empty : h.span([h.Class(contextText)], [config.context])
             ]
           ),
-          h.div(
-            [h.Class(closeSlot)],
-            [iconButtonWith(h, render.closeButton, { icon: "mark-close", label: config.closeLabel ?? "Close" })]
-          )
+          config.back === undefined
+            ? h.div(
+                [h.Class(closeSlot)],
+                [iconButtonWith(h, render.closeButton, { icon: "mark-close", label: config.closeLabel ?? "Close" })]
+              )
+            : h.empty
         ]
       ),
       config.tabs === undefined ? h.empty : h.div([h.Class(tabsSlot)], [config.tabs])
