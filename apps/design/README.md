@@ -36,8 +36,8 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
-list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
+Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+list, properties that are read under their captions, where an agent is at work as a line for each place, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
@@ -51,7 +51,7 @@ groups, each in a frame wider than the measure; the composer empty, filled, and 
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
-as a plain row under its group and the second with its notices; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
+as a plain row under its group and the second with its notices; the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close, as do the menus, whose choices are kept. The first shell's rail has the account menu that opens, and the other shells draw its button closed, since a menu's Block owns the ids of its button and its list. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
@@ -344,8 +344,18 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `statusMark(h, kind)` is a status's shape alone, 9px, for the end of a row whose item has no mark of its own, such as
   a connection, and hidden from assistive technology. It says nothing on hover; the sidebar wraps it in
   `statusTooltip`, and the boxed note's mark is this shape with none.
-- `activityMark(h)` is the logo at 1rem in its `working` motion, which a row shows at its end while the thing it
-  stands for is at work, in the color of the text around it and hidden from assistive technology.
+- `activityMark(h, motion?)` is the logo at 0.875rem, as `@amends-dev/ui` draws a turn's mark, in the `motion` of what
+  is under way, `working` unless given: `thread` while it waits, `working` while it runs, `tug` while it stops. A row
+  shows it at its end while the thing it stands for is at work, in the color of the text around it and hidden from
+  assistive technology.
+- `taskStatus(h, shape, { size? })` is where a task stands, drawn as `apps/ui`'s `TaskStatus` draws it: a circle on a
+  16-unit grid, 0.875rem wide unless the `size` says (a pane's title has it at 1rem), with the `shape` in it, one of
+  `taskStatusShapes`. `triage` is an exclamation mark, `open` a bare circle, `progress` a circle half filled, and `done`
+  a circle filled and checked, in the color of an action's text; `apps/ui` draws those four. `paused` is a circle with
+  two bars, and `dismissed` a circle crossed out, which the app's statuses Held and Dismissed need and `apps/ui` does
+  not draw. Every shape is gray, `ink-secondary`, and `ink` once it is `done`. It is hidden from assistive technology,
+  since the word for the status is always beside it. A `pane`'s `header.taskStatus`, a `menu` choice's `taskStatus`, and
+  `propertyMenu` draw it.
 - `markCluster(h, { marks, label, onClick })` is a button named `label` that gathers the people a group
   has: a bordered box, 1px in `outline` with 2px of padding, holding the first three `marks` as `xs` marks
   2px apart, and, beyond three, "+4" for four more in `ink-secondary` at `meta` size. It is `hover` on
@@ -455,9 +465,11 @@ What a directory screen lists.
   over the `detail` at hint size in `ink-secondary`, such as an agent's harness over its sandbox. Both end in an
   ellipsis. Below 48rem, where the cells fold under the title, the detail is not shown, so the folded line reads
   as the values alone.
-- `activityCell(h, { state, place? })` is a cell of the same two lines for what is at work: the logo's mark and the
-  `state`, "Working", over the `place`, "#design". A row that is idle leaves its cell empty and the column keeps
-  its place.
+- `activityCell(h, { state, motion, place? })` is a cell of the same two lines for what is at work: the logo's mark,
+  0.875rem and moving as the `motion` says (`thread` while it waits, `working` while it runs, `tug` while it stops, as
+  `@amends-dev/ui` moves a turn's mark), and the `state`, "Working", over the `place`, "#design". Below 48rem, where
+  the cells fold under the title, the place follows the state on its line, "Working · #design", as `@amends-dev/ui`
+  puts them under an agent's name. A row that is idle leaves its cell empty and the column keeps its place.
 - `rowWithButton(h, { mark, markSize?, title, meta?, action, actionName, variant?, isDisabled?, onClick })` is a row for a thing the
   person answers and does not open, such as an invitation, so it is not a button itself: the same
   height, mark (letters or an icon, at the sizes `row` has), and title over meta as `row`, and at the end a
@@ -597,13 +609,15 @@ The frame of the first four layout patterns, which the modules below fill.
   `indicator-bar`, as a current row is. A group without a label is the list alone, as a sidebar's first is. Sections sit 22px
   apart. `children` are `sidebarItem`s or a `sidebarEmpty`; a section with none at all, as one still loading has, is its
   heading and actions alone, with no list.
-- `sidebarItem(h, { icon?, mark?, status?, label, count?, activity?, isPending?, isCurrent, onClick, children? })` is a
+- `sidebarItem(h, { icon?, mark?, status?, label, count?, activity?, activityMotion?, isPending?, isCurrent, onClick, children? })` is a
   38px row, 44px on touch, one button: an `icon`, or a `mark`, `{ text, tone? }`, on a 24px square for a
   person or an agent, then the `label` in `ink-secondary` and a `count` in a badge at the end. A `status` is how the item
   stands: the patch on its mark, cut out of the row's own fill, so that `status-knockout` is `hover`'s while the row is hovered
   and `selected`'s while it is current, or, for an item with an `icon` or no mark, the status's shape alone, 9px, at the
   row's end before the count. An `activity`, such as "Working in #design", is what an agent at work is doing: the row shows
-  the logo's mark at its end, in `ink-secondary`, and the words only name it. A row that
+  the logo's mark (`activityMark`, 0.875rem) at its end, in `ink-secondary`, moving as `activityMotion` says (`working`
+  unless given, `thread` while the turn waits, `tug` while it stops), and the words only name it. A row that
+  says it by a `status` of kind `available` has the filled square on its mark instead, with the words in its tooltip. A row that
   `isPending`, as a group still being created is, says "Sending…" at its end at `meta` size in
   `ink-muted` in place of those and the count; a pending row has no count, activity, or status shape. The button is named by
   the label and then the status's label, "Atlas, Needs setup", or, with no status, the activity's words, "Atlas, Working in
@@ -630,11 +644,12 @@ The third and fourth layout patterns share one structure.
   with no padding above, so the first row is the one under the column labels. The `"main"` variant is the page's `main` landmark,
   its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
   `h2` at body size, in medium weight. A `label` names the main landmark too.
-- The `header` is `{ title, icon?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
+- The `header` is `{ title, icon?, taskStatus?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
   96px tall, and 104px below 64rem, so the main pane's, the side pane's, and the sidebar's line up: a 60px
   row, then the `tabs` or a `subtitle`. In the row, `leading` is a control that brings its own
-  spacing, such as `paneBack`, then the title with an `icon` or a `mark` before it and
-  `context` after it in `ink-secondary`, and `actions` at the right. The `mark` is a `mark`'s letters and
+  spacing, such as `paneBack`, then the title with an `icon`, a `taskStatus`, or a `mark` before it and
+  `context` after it in `ink-secondary`, and `actions` at the right. The `taskStatus` is a task's status drawn at 1rem
+  as `apps/ui`'s task pane draws it (see `mark`), and an `icon` takes its place if both are given. The `mark` is a `mark`'s letters and
   tone, `{ text, tone? }`, the 24px square for a person or an agent that a page about one shows in place of
   an icon, and its `status` is the patch on it, as a sidebar row's is, with its tooltip below the mark, since the
   header is at the window's top, and which an `sr-only` word after the title says too. The `phoneContext` is a quiet line under the title below 48rem only, such as the
@@ -679,8 +694,12 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
   and titled alike: a `paneSection` of the `title` holding a `pane` `form` of the same name that
   sends `onSubmit`, with the `children`, its fields and buttons, in the form's column. The section
   is a region and the form a landmark, both found by the `title`. It takes the section's `hasStitch`.
-- `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
-  header's `actions`. It shows from 48rem; below that the side pane is full screen and has `paneBack`.
+- `paneStack(h, children)` is the body of a side pane that is about one thing, such as a task: its properties, its
+  description, and its activity, one under the other, 28px apart as `apps/ui`'s task pane sets them, with nothing beside
+  them and no measure, since the side pane is narrow.
+- `paneClose(h, onClick, label?)` is the side pane's close button, an `iconButton` named Close, or by `label` for what
+  it closes, such as "Close task" or "Close thread", for the header's `actions`. It shows from 48rem; below that the
+  side pane is full screen and has `paneBack`.
 - `paneBack(h, onClick, label?)` is the side pane's Back button, an `iconButton` named Back, or by `label` for where
   it goes back to, such as "Back to Members", for the header's `leading`, pulled to the pane's edge. It shows below 48rem only. Page code gives the two the same
   message, so each way out of the side pane does the same.
@@ -692,6 +711,24 @@ What a pane says about one thing.
 - `detailList(h, items)` is a definition list of `{ label, value }` items, the `value` text or any
   `Html`: two columns, each `label` at hint size in `ink-muted` at least 5rem wide before its value at
   item size in `ink`, rows 8px apart.
+- `properties(h, { label, children })` is the properties of one thing, such as a task's status, assignee, and priority, in
+  two columns of equal width 24px apart and rows 4px apart, a `group` named by `label`, as `apps/ui`'s task pane sets
+  them; a third lies under the first. Each of the `children` is a `property`.
+- `property(h, { caption, isCaptionHidden?, children })` is one of them: its `caption` at `meta` size in capitals, in
+  medium weight and `ink-secondary`, 5px above its `children`, such as a `propertyValue`, a `propertyMenu`, or a
+  `description`. The caption is read to assistive technology, unless the control under it names itself by it, as a
+  `propertyMenu` does: `isCaptionHidden` hides it there, which would otherwise say it twice.
+- `propertyValue(h, { before?, text })` is the value of a property that is read and not changed, in the look of the
+  quiet button of a `propertyMenu`: `hint` size in `ink-secondary`, 32px tall (44px on touch) and level with the words
+  of that button, 3px in as they are, with what comes `before` the `text` (a `taskStatus`, a `mark`, a `propertyIcon`)
+  8px from it.
+- `propertyIcon(h, name)` is an icon before a property's words at 15px, as `apps/ui` draws the people icon for an
+  assignee that is no one, hidden from assistive technology. A `propertyMenu` draws its `buttonIcon` with it.
+- `activityList(h, { label, lines })` is where an agent is at work, a `ul` named by `label`, a line for each of the
+  `lines`, `{ key, state, motion, place? }`, as `apps/ui`'s agent page lists the turns in progress: the logo at
+  0.875rem moving as its `motion` says, hidden from assistive technology, and the `state` after it, "Working", at
+  `hint` size in `ink-secondary`, then the `place`, "#general", in medium weight at item size, 10px on, unless the line
+  has none, as a turn has until its group is read.
 - `person(h, { mark, markSize?, name, detail? })` is one person or agent alone, not in a list: their `mark`, 40px
   unless `markSize` says otherwise, beside the `name` at item size in medium weight over the `detail` at hint
   size in `ink-secondary`, such as "Workspace owner" or "Person · Active". The mark is hidden from assistive
@@ -773,8 +810,18 @@ What a conversation is made of.
 - `divider(h, label, options?)` is an item of the list with a dashed `stitch` rule and the `label` in
   capitals at `meta` size in `ink-muted`: `options.align` is `"center"` (the default), the label between
   two rules, as a day sets apart the messages after it, or `"start"`, the label before one rule that
-  runs on, as "4 replies" sets apart the replies to the opening message. The rules are hidden from
-  assistive technology; the label is read as an item of the list.
+  runs on, as "4 replies" sets apart the replies to the opening message, and "Activity" the activity of a task. The
+  rules are hidden from assistive technology; the label is read as an item of the list.
+- `event(h, { key, text })` is an item of the list that says what happened to the thing the conversation is about, such
+  as "Alex created this task · 10:06 AM": `control` size in `ink-secondary`, the drawing of something new (`mark-new`)
+  before it at 0.875rem, 10px from the words and hidden from assistive technology, as `apps/ui`'s timeline draws its
+  events.
+- `description(h, { text, body?, actions?, isCurrent? })` is the text that describes the thing a pane is about, such as
+  a task: `text` at item size in `ink`, a string or `TextRun`s, its line breaks kept and a mention in it a chip, as
+  `apps/ui`'s task pane sets it, 11px under the `property` caption above it. `body` takes the text's place, such as
+  the form that changes it, and `actions` are quiet buttons under it, 8px down and level with its words, such as Edit
+  and Delete. `isCurrent` fills it with `selected`, draws the `indicator-bar` at its start, and makes it
+  `aria-current="true"`, reaching 12px into the pane's gutter as a message's row does.
 
 ### `@amends-dev/design/composer`
 
@@ -905,12 +952,15 @@ End, typeahead by label, Enter, Escape, a click outside, and the focus that retu
 - `menu(h, { trigger, placement?, header?, groups, embed })` builds the headless menu's view inputs and hands them to
   `embed`, which embeds the Block the page bound. The `trigger` is the button: by default a `choice`, `{ text, name? }`,
   a secondary button of the current choice's `text` with a chevron, or `{ variant: "plain", name, content }`, a button
-  with no look of its own around its `content`, such as a mark. The `name` is what assistive technology calls the button
-  when its text says too little, such as "Sort: Latest activity", and a plain button must have one. The `placement` is
+  with no look of its own around its `content`, such as a mark, or `{ variant: "quiet", text, name, before? }`, a button
+  with no border that says its `text` and a chevron after what comes `before` them, which `propertyMenu` uses. The
+  `name` is what assistive technology calls the button when its text says too little, such as "Sort: Latest
+  activity", and a plain or quiet button must have one. The `placement` is
   where the list opens from its button, `bottom-start` unless given, as `@foldkit/ui` names it: the rail's account is
   `right-end`, and a filter at the end of a toolbar `bottom-end`. The `groups` are `{ label?, choices }`, each choice
-  `{ value, label, mark?, isChecked? }`, separated by a line: a choice's `mark`, a `MarkContent`, is drawn at 22px before
-  its label, hidden from assistive technology, for a person; a group's `label` is a heading above it, a choice with an
+  `{ value, label, mark?, taskStatus?, isChecked? }`, separated by a line: a choice's `mark`, a `MarkContent`, is drawn
+  at 22px before its label, hidden from assistive technology, for a person, and its `taskStatus` (see `mark`) at 0.875rem
+  in its place, for a status; a group's `label` is a heading above it, a choice with an
   `isChecked` is one of a group of which one is current, with a check mark while it is `true`, and a choice without one
   is an action. The `header`, `{ title, detail? }`, is a title over a detail above the first group, with a line under it,
   as the account's name is over its sign-in address. A choice's `value` is what the Block reports, and each choice of a
@@ -919,6 +969,17 @@ End, typeahead by label, Enter, Escape, a click outside, and the focus that retu
   one group of `choices`, each `[value, label]` or `[value, label, mark]`, with `value` checked and its label on the
   button, or `text` when given, such as "Status" while every status is chosen. A choice with a `mark` is a person: the
   assignee filter lists Anyone and Unassigned, which have none, and then each person with theirs.
+- `propertyMenu(h, { caption, choices, value, placement?, embed })` is a property of the thing a pane is about that the
+  person changes, as `apps/ui`'s task pane has its status and assignee: the `caption` (see `property` in `details`) in
+  capitals over a quiet button, a trigger with no border at `hint` size, 32px tall (44px on touch), that shows the
+  current one of `choices` and a chevron and opens the menu. The button is pulled back by its padding so its words
+  start where the caption does, and is named "Status: Doing", the caption and the choice, with the caption over it
+  hidden from assistive technology, which would otherwise say it twice. Each choice is `{ value, label, mark?,
+taskStatus?, buttonIcon? }`: its `mark` is a person's, 22px in the list and 24px in the button, and its `taskStatus` a
+  status's drawing at 0.875rem in both; a `buttonIcon` is drawn in the button alone, at 15px, while the choice is
+  current, such as the people icon for Unassigned, which has nothing before it in the list. It is the `menu` with the
+  trigger `{ variant: "quiet", text, name, before? }`, a quiet button with a chevron after what comes `before` its
+  `text`.
 
 A Block uses it in three steps:
 
@@ -926,7 +987,7 @@ A Block uses it in three steps:
   values for `Value`, and binds it as a child, with an `id` for the menu through `init`. A Block's ids are for one place,
   so a menu is rendered once, and a place that shows two has two bindings.
 - Its binding's out message fold answers `Selected({ value })` with what the choice was for, and `Closed` with nothing.
-- Its view calls `menu` or `choiceMenu` with `embed: (viewInputs) => h.block(Binding.embedView({ slotId, model:
+- Its view calls `menu`, `choiceMenu`, or `propertyMenu` with `embed: (viewInputs) => h.block(Binding.embedView({ slotId, model:
 model.menu, viewInputs }))`.
 
 The list is drawn in the document's portal root, outside the Block that renders it, 6px from its button and 8px from the
@@ -981,7 +1042,7 @@ chip that holds it and a button by the words joined, a notification by its
 text button named by its author and activity and described by its text, its place and age,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
-and a divider by its label in the list; a composer by its form, the textarea found by the same label, the placeholder, and the
+and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, and the
 send button, and its list of members by the listbox named for it, its options with the active one selected, the
 textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
 row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; and the shell's landmarks by role and name: `navigation` for

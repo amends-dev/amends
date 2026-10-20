@@ -4,7 +4,18 @@ import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark, statusTooltip } from "./mark.ts"
+import {
+  activityMark,
+  type MarkSize,
+  type MarkStatus,
+  mark,
+  markCluster,
+  statusMark,
+  statusTooltip,
+  type TaskStatusShape,
+  taskStatus,
+  taskStatusShapes
+} from "./mark.ts"
 
 const marks = (_: null, h: HtmlBuilder<never>) =>
   h.div(
@@ -372,16 +383,110 @@ describe("statusMark", () => {
 })
 
 describe("activityMark", () => {
-  it("is the logo in its working motion, hidden from assistive technology", () => {
+  it("is the logo at 0.875rem in its working motion, hidden from assistive technology", () => {
     scene(
       { ...still, view: (_: null, h: HtmlBuilder<never>) => h.div([h.Id("work")], [activityMark(h)]) },
       given(null),
       expect(selector("#work svg")).toHaveAttr("aria-hidden", "true"),
       expect(selector("#work svg")).toHaveAttr("viewBox", "0 0 64 64"),
-      expect(selector("#work svg")).toHaveAttr("width", "1rem"),
+      expect(selector("#work svg")).toHaveAttr("width", "0.875rem"),
       expect(selector("#work svg")).toHaveClass("logo-working"),
       expect(role("img")).toBeAbsent()
     )
+  })
+
+  it("moves as the motion says: the thread drawn through while it waits, the patch tugged while it stops", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div(
+            [],
+            [h.span([h.Id("waits")], [activityMark(h, "thread")]), h.span([h.Id("stops")], [activityMark(h, "tug")])]
+          )
+      },
+      given(null),
+      expect(selector("#waits svg")).toHaveClass("logo-thread"),
+      expect(selector("#waits svg")).toHaveAttr("width", "0.875rem"),
+      expect(selector("#stops svg")).toHaveClass("logo-tug"),
+      expect(selector("#stops svg")).not.toHaveClass("logo-working")
+    )
+  })
+})
+
+describe("taskStatus", () => {
+  const drawn = (shape: TaskStatusShape, size?: string) => (_: null, h: HtmlBuilder<never>) =>
+    h.div([h.Id("status")], [taskStatus(h, shape, size === undefined ? {} : { size })])
+
+  it("is a circle on a 16-unit grid, 0.875rem wide unless given a size, hidden from assistive technology", () => {
+    scene(
+      { ...still, view: drawn("open") },
+      given(null),
+      expect(selector("#status svg")).toHaveAttr("viewBox", "0 0 16 16"),
+      expect(selector("#status svg")).toHaveAttr("width", "0.875rem"),
+      expect(selector("#status svg")).toHaveAttr("height", "0.875rem"),
+      expect(selector("#status svg")).toHaveAttr("aria-hidden", "true"),
+      expect(selector("#status circle")).toHaveAttr("r", "6.4"),
+      expect(selector("#status circle")).toHaveAttr("fill", "none"),
+      expect(role("img")).toBeAbsent()
+    )
+    scene(
+      { ...still, view: drawn("open", "1rem") },
+      given(null),
+      expect(selector("#status svg")).toHaveAttr("width", "1rem")
+    )
+  })
+
+  it("is gray, and ink once the task is done, which is the one filled circle, with a check in the color of an action's text", () => {
+    scene(
+      { ...still, view: drawn("progress") },
+      given(null),
+      expect(selector("#status svg")).toHaveClass("text-ink-secondary"),
+      expect(selector("#status svg")).not.toHaveClass("text-ink")
+    )
+    scene(
+      { ...still, view: drawn("done") },
+      given(null),
+      expect(selector("#status svg")).toHaveClass("text-ink"),
+      expect(selector("#status svg")).not.toHaveClass("text-ink-secondary"),
+      expect(selector("#status circle")).toHaveAttr("fill", "currentColor"),
+      expect(selector("#status path")).toHaveClass("stroke-on-action")
+    )
+  })
+
+  it("draws what each shape means in the circle: a bar and a point for triage, half for progress, two bars for paused, and a cross for dismissed", () => {
+    scene(
+      { ...still, view: drawn("triage") },
+      given(null),
+      expect(selector("#status circle[r='6.4']")).toExist(),
+      expect(selector("#status path")).toHaveAttr("d", "M8 4.6 V8.8"),
+      expect(selector("#status circle[r='0.8']")).toHaveAttr("fill", "currentColor")
+    )
+    scene(
+      { ...still, view: drawn("progress") },
+      given(null),
+      expect(selector("#status path")).toHaveAttr("d", "M8 3.6 A4.4 4.4 0 0 0 8 12.4 Z"),
+      expect(selector("#status path")).toHaveAttr("fill", "currentColor")
+    )
+    scene(
+      { ...still, view: drawn("paused") },
+      given(null),
+      expect(nth(all.selector("#status path"), 0)).toHaveAttr("d", "M6.5 5.8 V10.2"),
+      expect(nth(all.selector("#status path"), 1)).toHaveAttr("d", "M9.5 5.8 V10.2")
+    )
+    scene(
+      { ...still, view: drawn("dismissed") },
+      given(null),
+      expect(nth(all.selector("#status path"), 0)).toHaveAttr("d", "M6.2 6.2 L9.8 9.8"),
+      expect(nth(all.selector("#status path"), 1)).toHaveAttr("d", "M9.8 6.2 L6.2 9.8")
+    )
+    scene({ ...still, view: drawn("open") }, given(null), expect(selector("#status path")).toBeAbsent())
+  })
+
+  it("draws every shape it lists as a circle", () => {
+    for (const shape of taskStatusShapes) {
+      scene({ ...still, view: drawn(shape) }, given(null), expect(selector("#status circle[r='6.4']")).toExist())
+    }
   })
 })
 

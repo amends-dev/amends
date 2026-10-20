@@ -1,18 +1,39 @@
 /**
- * What a pane says about one thing: its facts as labelled values, a mark of how it stands, a person it is
- * about, the people or agents' work it lists, and the log an agent wrote.
+ * What a pane says about one thing: its facts as labelled values, a few properties under a caption each, a mark of
+ * how it stands, a person it is about, the places an agent is at work, the people or agents' work it lists, and the
+ * log an agent wrote.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
+import { type IconName, icon } from "./icon.ts"
 import { type LogoMotion, logo } from "./logo.ts"
-import { type MarkContent, type MarkSize, mark } from "./mark.ts"
+import { type MarkContent, type MarkSize, activityMark, mark } from "./mark.ts"
 
 const detailGrid = "m-0 grid grid-cols-[minmax(5rem,auto)_1fr] items-baseline gap-x-4 gap-y-2"
 
 const detailLabel = "m-0 text-hint text-ink-muted"
 
 const detailValue = "m-0 min-w-0 text-item wrap-break-word text-ink"
+
+const propertyGrid = "grid grid-cols-2 gap-x-6 gap-y-1"
+
+const propertyColumn = "flex min-w-0 flex-col"
+
+const propertyCaption = "mb-1.25 block text-meta font-medium uppercase text-ink-secondary"
+
+const propertyValueLook =
+  "inline-flex min-h-8 items-center gap-2 ps-0.75 text-hint text-ink-secondary max-desktop:min-h-11"
+
+const propertyIconBox = "flex size-3.75 flex-none [&>svg]:size-full"
+
+const activityColumn = "m-0 flex list-none flex-col items-start gap-1 p-0"
+
+const activityLine = "flex items-center gap-2.5 text-item text-ink"
+
+const activityState = "inline-flex items-center gap-1.25 text-hint whitespace-nowrap text-ink-secondary"
+
+const activityPlace = "font-medium"
 
 const badgeBase = "inline-flex h-5 flex-none items-center border px-1.5 text-meta font-medium whitespace-nowrap"
 
@@ -70,6 +91,52 @@ export const detailList = <Message, Requirements>(
   )
 
 /**
+ * The properties of one thing side by side, such as a task's status and its assignee, in two columns 24px apart and
+ * 4px between rows, a group named by `label`. Each of the `children` is a `property`.
+ */
+export const properties = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; children: ReadonlyArray<Html> }>
+): Html => h.div([h.Role("group"), h.AriaLabel(config.label), h.Class(propertyGrid)], config.children)
+
+/**
+ * One property: its `caption`, small and in capitals, over its `children`, 5px below, such as a `propertyValue` or a
+ * `propertyMenu`. A control that names itself by its caption, as a menu does, says the caption to assistive
+ * technology already, so the caption is hidden from it with `isCaptionHidden`.
+ */
+export const property = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ caption: string; isCaptionHidden?: boolean; children: ReadonlyArray<Html> }>
+): Html =>
+  h.div(
+    [h.Class(propertyColumn)],
+    [
+      h.span(
+        [...(config.isCaptionHidden === true ? [h.AriaHidden(true)] : []), h.Class(propertyCaption)],
+        [config.caption]
+      ),
+      ...config.children
+    ]
+  )
+
+/**
+ * A drawing before a property's words, 15px, as `apps/ui` draws the people icon for an assignee that is no one, hidden
+ * from assistive technology, since the words say what it does. A `propertyMenu` draws its `buttonIcon` with it.
+ */
+export const propertyIcon = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, name: IconName): Html =>
+  h.span([h.AriaHidden(true), h.Class(propertyIconBox)], [icon(h, name, { size: "sm" })])
+
+/**
+ * The value of a property that is read and not changed, in the look of the quiet button a `propertyMenu` is, its
+ * `text` after what comes `before` it, such as a status's drawing or a person's mark, 8px from it, and level with the
+ * text such a button would hold.
+ */
+export const propertyValue = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ before?: Html; text: string }>
+): Html => h.span([h.Class(propertyValueLook)], [config.before ?? h.empty, config.text])
+
+/**
  * A small mark of how something stands, 20px tall: `neutral` (the default) on `subtle`, and `success`,
  * `caution`, and `danger` on their own surfaces with a border. With a `motion` the logo moves before the
  * label, 0.875rem, cut out of the badge's own surface, for what is under way: `thread` while it waits, `working`
@@ -86,6 +153,38 @@ export const badge = <Message, Requirements>(
       )
     ],
     config.motion === undefined ? [config.label] : [logo(h, { size: "0.875rem", motion: config.motion }), config.label]
+  )
+
+/**
+ * One place an agent is at work: the `key` of its turn, the `state` of the turn in words, how its logo `motion` goes,
+ * and the `place`, which a turn has none of until its group is read.
+ */
+export type ActivityLine = Readonly<{ key: string; state: string; motion: LogoMotion; place?: string | undefined }>
+
+/**
+ * Where an agent is at work, named by `label`, a line for each of the `lines`: the logo moving as its `motion` says
+ * and the `state` in quiet text, then the `place` in medium weight, 10px on, unless the line has none. The logo is
+ * hidden from assistive technology, since the state says what it does.
+ */
+export const activityList = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; lines: ReadonlyArray<ActivityLine> }>
+): Html =>
+  h.ul(
+    [h.AriaLabel(config.label), h.Class(activityColumn)],
+    config.lines.map((line) =>
+      h.keyed("li")(
+        line.key,
+        [h.Class(activityLine)],
+        [
+          h.span(
+            [h.Class(activityState)],
+            [h.span([h.AriaHidden(true), h.Class("flex")], [activityMark(h, line.motion)]), line.state]
+          ),
+          line.place === undefined ? h.empty : h.span([h.Class(activityPlace)], [line.place])
+        ]
+      )
+    )
   )
 
 /**

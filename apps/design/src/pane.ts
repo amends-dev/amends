@@ -9,7 +9,7 @@ import { hint, iconButton } from "./control.ts"
 import { form } from "./form.ts"
 import { type IconName, icon } from "./icon.ts"
 import { logo } from "./logo.ts"
-import { type MarkContent, type MarkStatus, mark } from "./mark.ts"
+import { type MarkContent, type MarkStatus, type TaskStatusShape, mark, taskStatus } from "./mark.ts"
 import { type StateArtKind, stateArt } from "./stateArt.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
@@ -84,6 +84,8 @@ const measuredColumnBody = "flex max-w-170 flex-col gap-10 pt-1"
 
 const wideColumnBody = "flex flex-col gap-10 pt-1"
 
+const stackBody = "flex flex-col gap-7"
+
 const sectionColumn = "flex flex-col gap-3"
 
 const sectionHeading = "flex flex-wrap items-baseline gap-x-2"
@@ -100,6 +102,8 @@ export type PaneHeader = Readonly<{
   title: string
   /** A drawing before the title. */
   icon?: IconName
+  /** Where a task stands, drawn before the title at 1rem, in place of an `icon`. */
+  taskStatus?: TaskStatusShape
   /** A small square of letters before the title, for a person or an agent, in place of an `icon`. */
   mark?: MarkContent
   /** How what the `mark` stands for stands, as the patch on it. */
@@ -139,6 +143,10 @@ const renderTitleLeading = <Message, Requirements>(
 ): Html => {
   if (header.icon !== undefined) {
     return h.span([h.Class(titleIcon[variant])], [icon(h, header.icon, { size: variant === "main" ? "md" : "sm" })])
+  }
+
+  if (header.taskStatus !== undefined) {
+    return h.span([h.Class(titleIcon[variant])], [taskStatus(h, header.taskStatus, { size: "1rem" })])
   }
 
   return header.mark === undefined
@@ -326,6 +334,15 @@ export const paneColumn = <Message, Requirements>(
 ): Html => h.div([h.Class(options.isWide === true ? wideColumnBody : measuredColumnBody)], children)
 
 /**
+ * The body of a side pane that is about one thing, such as a task: its properties, its description, and its
+ * activity, one under the other, 28px apart, with nothing beside them. It spans the pane, which is narrow.
+ */
+export const paneStack = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  children: ReadonlyArray<Html>
+): Html => h.div([h.Class(stackBody)], children)
+
+/**
  * A section of a pane's column, a `section` named by `title`: the title as an `h3`, with the `trailing`
  * pieces after it on the same line, such as `sending` or a `badge`, then the `children` in a column, 12px
  * apart. With `hasStitch` the heading is a line of its own, 32px tall, with a dashed rule running from the
@@ -374,11 +391,14 @@ export const paneForm = <Message, Requirements>(
   })
 
 /**
- * The side panel's close button, named Close, for the header's `actions`. It shows from 48rem; below that the
- * side panel is full screen and `paneBack` is its way out.
+ * The side panel's close button, named Close unless `label` names what it closes, such as "Close task", for the
+ * header's `actions`. It shows from 48rem; below that the side panel is full screen and `paneBack` is its way out.
  */
-export const paneClose = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, onClick: Message): Html =>
-  h.span([h.Class(closeSlot)], [iconButton(h, { icon: "mark-close", label: "Close", onClick })])
+export const paneClose = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  onClick: Message,
+  label = "Close"
+): Html => h.span([h.Class(closeSlot)], [iconButton(h, { icon: "mark-close", label, onClick })])
 
 /**
  * The side panel's Back button, named Back unless `label` names where it goes back to, such as "Back to Members",

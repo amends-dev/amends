@@ -7,8 +7,11 @@ import {
   ApplicationDefinition,
   AssigneeFilterMenu,
   MemberFilterMenu,
+  TaskAssigneeMenu,
   TaskFilterMenu,
-  TaskSortMenu
+  TaskPriorityMenu,
+  TaskSortMenu,
+  TaskStatusMenu
 } from "./definition.ts"
 
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
@@ -85,6 +88,40 @@ export const TaskSortBinding = ApplicationDefinition.bindChild(TaskSortMenu, {
   }
 })
 
+/** Choosing from a menu of a task's properties changes the property the selects of the fields show too. */
+export const TaskStatusBinding = ApplicationDefinition.bindChild(TaskStatusMenu, {
+  field: "statusPropertyMenu",
+  init: { contextToArgs: () => [{ id: "workshop-status-property" }] },
+  outMessage: {
+    fold: TaskStatusMenu.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskStatus: () => value })),
+      Closed: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const TaskPriorityBinding = ApplicationDefinition.bindChild(TaskPriorityMenu, {
+  field: "priorityPropertyMenu",
+  init: { contextToArgs: () => [{ id: "workshop-priority-property" }] },
+  outMessage: {
+    fold: TaskPriorityMenu.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskPriority: () => value })),
+      Closed: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const TaskAssigneeBinding = ApplicationDefinition.bindChild(TaskAssigneeMenu, {
+  field: "assigneePropertyMenu",
+  init: { contextToArgs: () => [{ id: "workshop-assignee-property" }] },
+  outMessage: {
+    fold: TaskAssigneeMenu.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ taskAssignee: () => value })),
+      Closed: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
 /** The toolbar over the tasks and the roster have menus of their own, since a Block's ids are for one place. */
 export const ToolbarFilterBinding = ApplicationDefinition.bindChild(TaskFilterMenu, {
   field: "toolbarFilterMenu",
@@ -150,6 +187,9 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     AssigneeFilterBinding,
     TaskFilterBinding,
     TaskSortBinding,
+    TaskStatusBinding,
+    TaskPriorityBinding,
+    TaskAssigneeBinding,
     ToolbarFilterBinding,
     ToolbarSortBinding,
     MembersPaneFilterBinding,

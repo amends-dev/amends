@@ -6,7 +6,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { divider, message, messageList, notification, replyLine, type TextRun } from "./message.ts"
+import { description, divider, event, message, messageList, notification, replyLine, type TextRun } from "./message.ts"
 
 const Message = defineMessageUnion({
   OpenedThread: { key: Schema.String },
@@ -528,6 +528,108 @@ describe("divider", () => {
       { update, view: viewOf(dividers) },
       given(initial),
       expect(within(selector("li"), selector('[aria-hidden="true"]'))).toExist()
+    )
+  })
+})
+
+describe("event", () => {
+  const events = (_: Model, h: HtmlBuilder<Message>) =>
+    messageList(h, {
+      label: "Activity",
+      children: [
+        divider(h, "Activity", { align: "start" }),
+        event(h, { key: "created", text: "Alex created this task · 10:06 AM" }),
+        message(h, { key: "message-1", mark: "S", author: "Sara", text: "I can reproduce it." })
+      ]
+    })
+
+  it("is a quiet line of what happened, an item of the list among its messages", () => {
+    scene(
+      { update, view: viewOf(events) },
+      given(initial),
+      expect(within(role("list", { name: "Activity" }), text("Alex created this task · 10:06 AM"))).toHaveClass(
+        "text-ink-secondary"
+      ),
+      expect(text("Alex created this task · 10:06 AM")).toHaveClass("text-control"),
+      expect(text("Alex created this task · 10:06 AM")).toHaveClass("gap-2.5"),
+      expect(text("I can reproduce it.")).toExist()
+    )
+  })
+
+  it("draws the drawing of something new at 0.875rem before the words, hidden from assistive technology", () => {
+    scene(
+      { update, view: viewOf(events) },
+      given(initial),
+      expect(within(selector("li.text-ink-secondary"), selector("span[aria-hidden]"))).toExist(),
+      expect(within(selector("li.text-ink-secondary"), selector("svg"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+})
+
+describe("description", () => {
+  const described = (model: Model, h: HtmlBuilder<Message>) =>
+    h.div(
+      [],
+      [
+        description(h, {
+          text: [
+            { text: "Ask " },
+            { text: "@Jamie", isMention: true },
+            { text: " about the 5 MB limit.\nThen test it." }
+          ],
+          isCurrent: model.current === "thread-2",
+          actions: [button(h, "Edit", Message.ClickedEdit({ key: "opening" }), { variant: "quiet" })]
+        })
+      ]
+    )
+
+  it("shows its text in the size of an item and in ink, its line breaks kept, a mention in it a chip", () => {
+    scene(
+      { update, view: viewOf(described) },
+      given(initial),
+      expect(selector("p.whitespace-pre-wrap")).toHaveClass("text-item"),
+      expect(selector("p.whitespace-pre-wrap")).toHaveClass("text-ink"),
+      expect(selector("p.whitespace-pre-wrap")).toHaveClass("mt-2.75"),
+      expect(text("@Jamie")).toHaveClass("bg-mention")
+    )
+  })
+
+  it("is current while it says so, filled with the bar, and reaches into the gutter", () => {
+    scene(
+      { update, view: viewOf(described) },
+      given(initial),
+      expect(selector("[aria-current]")).toHaveAttr("aria-current", "true"),
+      expect(selector("[aria-current]")).toHaveClass("-mx-3"),
+      expect(selector("[aria-current]")).toHaveClass("aria-[current=true]:bg-selected"),
+      expect(selector("[aria-current]")).toHaveClass("aria-[current=true]:indicator-bar")
+    )
+    scene(
+      { update, view: viewOf(described) },
+      given({ ...initial, current: "other" }),
+      expect(selector("[aria-current]")).toBeAbsent()
+    )
+  })
+
+  it("holds quiet actions under the text, which send their messages", () => {
+    scene(
+      { update, view: viewOf(described) },
+      given(initial),
+      click(role("button", { name: "Edit" })),
+      expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 0")
+    )
+  })
+
+  it("shows its body in place of its text while one is given, as the form that changes it does", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          description(h, { text: "Ask about the limit.", body: h.p([], ["The form that changes it"]) })
+        )
+      },
+      given(initial),
+      expect(text("The form that changes it")).toExist(),
+      expect(text("Ask about the limit.")).toBeAbsent()
     )
   })
 })

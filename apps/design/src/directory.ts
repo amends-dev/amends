@@ -8,6 +8,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { buttonWith } from "./control.ts"
+import type { LogoMotion } from "./logo.ts"
 import { activityMark, type MarkContent, type MarkStatus, mark } from "./mark.ts"
 
 const sectionLine = "mt-9 mb-2 flex items-center gap-3 text-item font-medium text-ink"
@@ -94,6 +95,8 @@ const cellColumn = "flex min-w-0 flex-col gap-1"
 const cellValue = "flex min-w-0 items-center gap-1.5 text-control text-ink"
 
 const cellDetail = "block truncate text-hint text-ink-secondary max-tablet:hidden"
+
+const cellPhonePlace = "hidden truncate text-ink-secondary max-tablet:block"
 
 const renderText = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -229,17 +232,25 @@ export const cellWithDetail = <Message, Requirements>(
   )
 
 /**
- * A cell of what is at work for a `row`, in the shape of `cellWithDetail`: the logo's mark and the `state`, such
- * as "Working", over the `place` it works, such as "#design".
+ * A cell of what is at work for a `row`, in the shape of `cellWithDetail`: the logo's mark, moving as the `motion`
+ * says, and the `state`, such as "Working", over the `place` it works, such as "#design". Below 48rem, where the
+ * cells fold under the title, the place follows the state on its line: "Working · #design".
  */
 export const activityCell = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ state: string; place?: string }>
+  config: Readonly<{ state: string; motion: LogoMotion; place?: string }>
 ): Html =>
   h.span(
     [h.Class(cellColumn)],
     [
-      h.span([h.Class(cellValue)], [activityMark(h), h.span([h.Class("truncate")], [config.state])]),
+      h.span(
+        [h.Class(cellValue)],
+        [
+          activityMark(h, config.motion),
+          h.span([h.Class("truncate")], [config.state]),
+          config.place === undefined ? h.empty : h.span([h.Class(cellPhonePlace)], [`· ${config.place}`])
+        ]
+      ),
       config.place === undefined ? h.empty : h.span([h.Class(cellDetail)], [config.place])
     ]
   )

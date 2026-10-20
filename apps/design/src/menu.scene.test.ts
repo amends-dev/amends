@@ -20,7 +20,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { type ChoiceMenuChoice, choiceMenu, menu } from "./menu.ts"
+import { type ChoiceMenuChoice, choiceMenu, menu, type PropertyChoice, propertyMenu } from "./menu.ts"
 
 const Sort = Schema.Literals(["Activity", "Newest", "Oldest"])
 type Sort = typeof Sort.Type
@@ -477,6 +477,166 @@ describe("a menu of choices with a mark", () => {
       click(role("menuitem", { name: "Review helper" })),
       ...sortClosed(),
       expect(role("status")).toHaveText("Sort Oldest")
+    )
+  })
+})
+
+describe("a menu of choices with a task status", () => {
+  const statusView = Composition.makeView((model, h) =>
+    menu(h, {
+      trigger: { text: "Status" },
+      groups: [
+        {
+          choices: [
+            { value: "Activity", label: "Triage", taskStatus: "triage", isChecked: model.sort === "Activity" },
+            { value: "Newest", label: "Doing", taskStatus: "progress", isChecked: model.sort === "Newest" },
+            { value: "Oldest", label: "Anything", isChecked: model.sort === "Oldest" }
+          ]
+        }
+      ],
+      embed: (viewInputs) => h.block(SortBinding.embedView({ slotId: "sort", model: model.sortMenu, viewInputs }))
+    })
+  )
+
+  it("draws the status at 0.875rem before the label of a choice that has one, hidden from assistive technology, and nothing before one without", () => {
+    scene(
+      { update, view: statusView },
+      given(initial),
+      click(role("button", { name: "Status" })),
+      ...sortOpened(),
+      expect(within(role("menuitem", { name: "Triage (selected)" }), selector("svg"))).toHaveAttr("width", "0.875rem"),
+      expect(within(role("menuitem", { name: "Triage (selected)" }), selector("svg"))).toHaveAttr(
+        "aria-hidden",
+        "true"
+      ),
+      expect(within(role("menuitem", { name: "Triage (selected)" }), selector("svg path[d='M8 4.6 V8.8']"))).toExist(),
+      expect(within(role("menuitem", { name: "Doing" }), selector("svg path[d^='M8 3.6']"))).toExist(),
+      expect(within(role("menuitem", { name: "Anything" }), selector("svg"))).toBeAbsent()
+    )
+  })
+})
+
+describe("a property that can be changed", () => {
+  const assignees: ReadonlyArray<PropertyChoice<Sort>> = [
+    { value: "Activity", label: "Unassigned", buttonIcon: "users" },
+    { value: "Newest", label: "Alex Morgan", mark: { text: "AM" } },
+    { value: "Oldest", label: "Review helper", mark: { text: "R", tone: "lilac" } }
+  ]
+
+  const statuses: ReadonlyArray<PropertyChoice<Sort>> = [
+    { value: "Activity", label: "Triage", taskStatus: "triage" },
+    { value: "Newest", label: "In progress", taskStatus: "progress" }
+  ]
+
+  const propertyView = (choices: ReadonlyArray<PropertyChoice<Sort>>, caption: string) =>
+    Composition.makeView((model, h) =>
+      h.div(
+        [],
+        [
+          h.p([h.Role("status")], [`Sort ${model.sort}`]),
+          propertyMenu(h, {
+            caption,
+            choices,
+            value: model.sort,
+            embed: (viewInputs) => h.block(SortBinding.embedView({ slotId: "sort", model: model.sortMenu, viewInputs }))
+          })
+        ]
+      )
+    )
+
+  it("is a quiet button named by its caption and the current choice, with the caption in capitals over it, hidden from assistive technology", () => {
+    scene(
+      { update, view: propertyView(assignees, "Assignee") },
+      given(initial),
+      expect(role("button", { name: "Assignee: Unassigned" })).toHaveAttr("aria-haspopup", "menu"),
+      expect(role("button", { name: "Assignee: Unassigned" })).toHaveClass("bg-transparent"),
+      expect(role("button", { name: "Assignee: Unassigned" })).toHaveClass("border-transparent"),
+      expect(role("button", { name: "Assignee: Unassigned" })).toHaveClass("text-hint"),
+      expect(role("button", { name: "Assignee: Unassigned" })).toHaveClass("px-3"),
+      expect(text("Assignee")).toHaveClass("uppercase"),
+      expect(text("Assignee")).toHaveAttr("aria-hidden", "true"),
+      expect(role("menu")).toBeAbsent()
+    )
+  })
+
+  it("is pulled back by its padding so that its words start where the caption does", () => {
+    scene(
+      { update, view: propertyView(assignees, "Assignee") },
+      given(initial),
+      expect(role("button", { name: "Assignee: Unassigned" })).toHaveClass("-ms-2.5")
+    )
+  })
+
+  it("shows its icon in the button for the choice that has one, and none in the list", () => {
+    scene(
+      { update, view: propertyView(assignees, "Assignee") },
+      given(initial),
+      expect(within(role("button", { name: "Assignee: Unassigned" }), selector("svg path[d^='M5 7a4']"))).toExist(),
+      click(role("button", { name: "Assignee: Unassigned" })),
+      ...sortOpened(),
+      expect(
+        within(role("menuitem", { name: "Unassigned (selected)" }), selector("svg path[d^='M5 7a4']"))
+      ).toBeAbsent()
+    )
+  })
+
+  it("shows the mark of a person at 24px in the button and at 22px in the list", () => {
+    scene(
+      { update, view: propertyView(assignees, "Assignee") },
+      given({ ...initial, sort: "Newest" as const }),
+      expect(within(role("button", { name: "Assignee: Alex Morgan" }), text("AM"))).toHaveClass("size-6"),
+      click(role("button", { name: "Assignee: Alex Morgan" })),
+      ...sortOpened(),
+      expect(within(role("menuitem", { name: "Alex Morgan (selected)" }), text("AM"))).toHaveClass("size-5.5"),
+      expect(within(role("menuitem", { name: "Review helper" }), text("R"))).toHaveClass("bg-avatar-lilac-bg")
+    )
+  })
+
+  it("shows the status drawing before the words in the button and in the list, and reports the choice", () => {
+    scene(
+      { update, view: propertyView(statuses, "Status") },
+      given(initial),
+      expect(within(role("button", { name: "Status: Triage" }), selector("svg path[d='M8 4.6 V8.8']"))).toExist(),
+      click(role("button", { name: "Status: Triage" })),
+      ...sortOpened(),
+      expect(within(role("menuitem", { name: "In progress" }), selector("svg path[d^='M8 3.6']"))).toExist(),
+      click(role("menuitem", { name: "In progress" })),
+      ...sortClosed(),
+      expect(role("status")).toHaveText("Sort Newest"),
+      expect(within(role("button", { name: "Status: In progress" }), selector("svg path[d^='M8 3.6']"))).toExist(),
+      expect(
+        within(role("button", { name: "Status: In progress" }), selector("svg path[d='M8 4.6 V8.8']"))
+      ).toBeAbsent()
+    )
+  })
+
+  it("lists its choices with the current one marked, and reports the value of the one chosen", () => {
+    scene(
+      { update, view: propertyView(assignees, "Assignee") },
+      given(initial),
+      click(role("button", { name: "Assignee: Unassigned" })),
+      ...sortOpened(),
+      expectAll(all.role("menuitem")).toHaveCount(3),
+      expect(role("menuitem", { name: "Unassigned (selected)" })).toExist(),
+      click(role("menuitem", { name: "Review helper" })),
+      ...sortClosed(),
+      expect(role("status")).toHaveText("Sort Oldest"),
+      expect(role("button", { name: "Assignee: Review helper" })).toExist()
+    )
+  })
+
+  it("opens below its button, from its start", () => {
+    scene(
+      { update, view: propertyView(assignees, "Assignee") },
+      given(initial),
+      click(role("button", { name: "Assignee: Unassigned" })),
+      Mount.expectHas(
+        Menu.test.AnchorMenu({
+          buttonId: "sort-menu-button",
+          anchor: { placement: "bottom-start", gap: 6, padding: 8 }
+        })
+      ),
+      ...sortOpened()
     )
   })
 })

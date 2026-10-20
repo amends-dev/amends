@@ -29,6 +29,7 @@ import {
   paneEmpty,
   paneForm,
   paneSection,
+  paneStack,
   paneTabs,
   paneToolbar,
   paneToolbarStack
@@ -196,6 +197,67 @@ describe("pane", () => {
       expect(role("button", { name: "Back" })).toBeAbsent(),
       click(role("button", { name: "Back to Members" })),
       expect(role("note")).toHaveText("Back 1")
+    )
+  })
+
+  it("names what it closes when it is told, as Close task, which does what Close does", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "side",
+            label: "Composer paste crash",
+            header: {
+              title: "Composer paste crash",
+              taskStatus: "progress",
+              actions: [paneClose(h, Message.ClosedThread(), "Close task")]
+            },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Close" })).toBeAbsent(),
+      click(role("button", { name: "Close task" })),
+      expect(role("status")).toHaveText("Tab threads, closed 1, settings 0")
+    )
+  })
+
+  it("puts the status of a task before the title, 1rem and hidden from assistive technology, and an icon takes its place", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "side",
+            label: "Composer paste crash",
+            header: { title: "Composer paste crash", taskStatus: "progress", subtitle: "Task in #general" },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("complementary"), selector("svg"))).toHaveAttr("width", "1rem"),
+      expect(within(role("complementary"), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("complementary"), selector("svg path[d^='M8 3.6']"))).toExist(),
+      expect(within(role("complementary"), role("heading", { name: "Composer paste crash", level: 2 }))).toExist(),
+      expect(within(role("complementary"), text("Task in #general"))).toExist()
+    )
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "side",
+            label: "Composer paste crash",
+            header: { title: "Composer paste crash", icon: "message", taskStatus: "done" },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("complementary"), selector("svg circle"))).toBeAbsent()
     )
   })
 
@@ -553,6 +615,30 @@ describe("paneColumn", () => {
       expect(selector(".max-w-170")).toBeAbsent(),
       expect(within(role("main"), text("Composer paste crash"))).toExist(),
       expect(within(role("main"), text("Launch checklist"))).toExist()
+    )
+  })
+})
+
+describe("paneStack", () => {
+  it("holds what a side pane says about one thing, one under the other, 28px apart, with no measure", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "side",
+            label: "Task",
+            header: { title: "Composer paste crash" },
+            body: [paneStack(h, [h.p([], ["Properties"]), h.p([], ["Description"]), h.p([], ["Activity"])])]
+          })
+        )
+      },
+      given(initial),
+      expect(within(selector(".gap-7"), text("Properties"))).toExist(),
+      expect(within(selector(".gap-7"), text("Description"))).toExist(),
+      expect(within(selector(".gap-7"), text("Activity"))).toExist(),
+      expect(selector(".gap-7")).toHaveClass("flex-col"),
+      expect(selector(".max-w-170")).toBeAbsent()
     )
   })
 })

@@ -1,11 +1,13 @@
 /**
  * What a conversation is made of: the list of messages, each by its author with its time and, under the first
- * message of a thread, who replied to it, the notifications that tell of them, and the rule that sets a part of
- * the list apart, such as a day or the replies.
+ * message of a thread, who replied to it, the notifications that tell of them, the line that tells what happened
+ * to the thing the conversation is about, the text that describes it, and the rule that sets a part of the list
+ * apart, such as a day or the replies.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
+import { icon } from "./icon.ts"
 import { mark } from "./mark.ts"
 
 const listColumn = "m-0 flex list-none flex-col p-0"
@@ -60,6 +62,17 @@ const replyLabel = "text-meta text-ink-muted"
 
 /** How many marks a reply line shows before it counts the rest. */
 const shownMarks = 3
+
+const descriptionLook =
+  "relative -mx-3 flex flex-col px-3 aria-[current=true]:bg-selected aria-[current=true]:indicator-bar"
+
+const descriptionText = "m-0 mt-2.75 text-item wrap-break-word whitespace-pre-wrap text-ink"
+
+const descriptionActions = "mt-2 -ms-2.5 flex flex-wrap items-center gap-1"
+
+const eventLook = "m-0 flex items-center gap-2.5 text-control text-ink-secondary"
+
+const eventIcon = "flex size-3.5 flex-none [&>svg]:size-full"
 
 const dividerLine = "flex items-center gap-3 py-2.5 text-meta text-ink-muted uppercase"
 
@@ -303,5 +316,47 @@ export const divider = <Message, Requirements>(
   return h.li(
     [h.Class(dividerLine)],
     options.align === "start" ? [text, renderRule(h)] : [renderRule(h), text, renderRule(h)]
+  )
+}
+
+/**
+ * A line of what happened to the thing the conversation is about, such as "Alex created this task · 10:06 AM", an
+ * item of a `messageList` between its messages, quiet, after the drawing of something new, 0.875rem and hidden from
+ * assistive technology.
+ */
+export const event = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ key: string; text: string }>
+): Html =>
+  h.keyed("li")(
+    config.key,
+    [h.Class(eventLook)],
+    [h.span([h.AriaHidden(true), h.Class(eventIcon)], [icon(h, "mark-new", { size: "xs" })]), config.text]
+  )
+
+/**
+ * The text that describes the thing a pane is about, such as a task, in the size of an item and in `ink`, its
+ * line breaks kept, a mention in it a chip, 11px under the caption above it. `body` takes the text's place, for
+ * the form that changes it, and `actions` are quiet buttons under it, such as Edit and Delete, level with its words.
+ * While `isCurrent` it is filled with the 2px bar and `aria-current="true"`, reaching 12px into the pane's gutter, as
+ * a message's row does.
+ */
+export const description = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    text: string | ReadonlyArray<TextRun>
+    body?: Html | undefined
+    actions?: ReadonlyArray<Html>
+    isCurrent?: boolean
+  }>
+): Html => {
+  const actions = config.actions ?? []
+
+  return h.div(
+    [...(config.isCurrent === true ? [h.AriaCurrent("true")] : []), h.Class(descriptionLook)],
+    [
+      config.body ?? h.p([h.Class(descriptionText)], renderRuns(h, config.text)),
+      actions.length === 0 ? h.empty : h.div([h.Class(descriptionActions)], actions)
+    ]
   )
 }

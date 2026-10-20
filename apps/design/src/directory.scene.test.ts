@@ -770,7 +770,7 @@ describe("cells of two lines", () => {
       cells: [
         cellWithDetail(h, { value: "Claude Code", detail: "Remote development" }),
         cellWithDetail(h, { value: "Claude Sonnet 5" }),
-        activityCell(h, { state: "Working", place: "#design" })
+        activityCell(h, { state: "Working", motion: "working", place: "#design" })
       ],
       cellsText: "Claude Code · Remote development · Claude Sonnet 5 · Working · #design",
       onClick: Message.ClickedMercier()
@@ -791,13 +791,55 @@ describe("cells of two lines", () => {
     )
   })
 
-  it("keep only the value below 48rem, where the cells fold under the title", () => {
+  it("keep only the value below 48rem, where the cells fold under the title, and the place follows the state", () => {
     scene(
       { update, view: viewOf(rows) },
       given(initial),
       expect(text("Remote development")).toHaveClass("max-tablet:hidden"),
       expect(text("#design")).toHaveClass("max-tablet:hidden"),
-      expect(text("Claude Code")).not.toHaveClass("max-tablet:hidden")
+      expect(text("Claude Code")).not.toHaveClass("max-tablet:hidden"),
+      expect(text("· #design")).toHaveClass("hidden"),
+      expect(text("· #design")).toHaveClass("max-tablet:block")
+    )
+  })
+
+  it("move the logo as the state does: the thread drawn through while it waits, the patch tugged while it stops", () => {
+    const states = (h: HtmlBuilder<Message>) =>
+      ["thread", "working", "tug"].map((motion) =>
+        row(h, {
+          mark: { text: "A" },
+          title: motion,
+          cells: [activityCell(h, { state: motion, motion: motion as "thread" | "working" | "tug" })],
+          onClick: Message.ClickedMercier()
+        })
+      )
+
+    scene(
+      { update, view: viewOf(states) },
+      given(initial),
+      expect(within(role("button", { name: "thread" }), selector("svg.logo-thread"))).toExist(),
+      expect(within(role("button", { name: "working" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("button", { name: "tug" }), selector("svg.logo-tug"))).toExist(),
+      expect(within(role("button", { name: "tug" }), selector("svg"))).toHaveAttr("width", "0.875rem")
+    )
+  })
+
+  it("show no place under the state without one", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          row(h, {
+            mark: { text: "A" },
+            title: "Atlas",
+            cells: [activityCell(h, { state: "Queued", motion: "thread" })],
+            onClick: Message.ClickedMercier()
+          })
+        ])
+      },
+      given(initial),
+      expect(text("Queued")).toExist(),
+      expect(text(/·/)).toBeAbsent()
     )
   })
 })

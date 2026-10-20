@@ -26,7 +26,19 @@ import {
   textarea,
   toggle
 } from "../src/control.ts"
-import { badge, detailList, entry, entryList, log, person } from "../src/details.ts"
+import {
+  activityList,
+  badge,
+  detailList,
+  entry,
+  entryList,
+  log,
+  person,
+  properties,
+  property,
+  propertyIcon,
+  propertyValue
+} from "../src/details.ts"
 import {
   activityCell,
   cellWithDetail,
@@ -41,7 +53,7 @@ import {
 } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
-import { logo, logoMotions } from "../src/logo.ts"
+import { type LogoMotion, logo, logoMotions } from "../src/logo.ts"
 import {
   activityMark,
   type MarkSize,
@@ -49,10 +61,29 @@ import {
   mark,
   markCluster,
   statusMark,
-  statusTooltip
+  statusTooltip,
+  type TaskStatusShape,
+  taskStatus,
+  taskStatusShapes
 } from "../src/mark.ts"
-import { type ChoiceMenuChoice, choiceMenu, type MenuGroup, menu } from "../src/menu.ts"
-import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
+import {
+  type ChoiceMenuChoice,
+  choiceMenu,
+  type MenuGroup,
+  menu,
+  type PropertyChoice,
+  propertyMenu
+} from "../src/menu.ts"
+import {
+  description,
+  divider,
+  event,
+  message,
+  messageList,
+  notification,
+  replyLine,
+  type TextRun
+} from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
 import {
   pane,
@@ -62,6 +93,7 @@ import {
   paneEmpty,
   paneForm,
   paneSection,
+  paneStack,
   paneTabs,
   paneToolbar
 } from "../src/pane.ts"
@@ -90,8 +122,11 @@ import {
   MembersPaneFilterBinding,
   ModalBinding,
   RailAccountBinding,
+  TaskAssigneeBinding,
   TaskFilterBinding,
+  TaskPriorityBinding,
   TaskSortBinding,
+  TaskStatusBinding,
   ToolbarFilterBinding,
   ToolbarSortBinding,
   WideModalBinding
@@ -223,7 +258,10 @@ const planChoices: ReadonlyArray<readonly [Plan, string]> = [
 const taskStatusChoices: ReadonlyArray<readonly [TaskStatus, string]> = [
   ["triage", "Triage"],
   ["todo", "To do"],
-  ["doing", "Doing"]
+  ["doing", "Doing"],
+  ["held", "Held"],
+  ["done", "Done"],
+  ["dismissed", "Dismissed"]
 ]
 
 const taskPriorityChoices: ReadonlyArray<readonly [TaskPriority, string]> = [
@@ -987,7 +1025,7 @@ type AgentSample = Readonly<{
   sandbox: string
   model: string
   connection: string
-  activity?: Readonly<{ state: string; place: string }>
+  activity?: Readonly<{ state: string; motion: LogoMotion; place: string }>
 }>
 
 const agentSamples: ReadonlyArray<AgentSample> = [
@@ -998,7 +1036,7 @@ const agentSamples: ReadonlyArray<AgentSample> = [
     sandbox: "Remote development",
     model: "Claude Sonnet 5",
     connection: "Anthropic · Team",
-    activity: { state: "Queued", place: "#design" }
+    activity: { state: "Queued", motion: "thread", place: "#design" }
   },
   { name: "Nora", harness: "Auto", sandbox: "No sandbox", model: "Claude Haiku 4.5", connection: "Anthropic · Team" },
   {
@@ -1016,7 +1054,16 @@ const agentSamples: ReadonlyArray<AgentSample> = [
     sandbox: "Local development",
     model: "Claude Opus 5",
     connection: "Anthropic · Team",
-    activity: { state: "Working", place: "#general" }
+    activity: { state: "Working", motion: "working", place: "#general" }
+  },
+  {
+    name: "Planner",
+    status: { kind: "available", label: "Stopping in Jamie Morgan" },
+    harness: "Auto",
+    sandbox: "No sandbox",
+    model: "Claude Sonnet 5",
+    connection: "Anthropic · Team",
+    activity: { state: "Stopping", motion: "tug", place: "Jamie Morgan" }
   }
 ]
 
@@ -1496,6 +1543,21 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
       h,
       "A status mark alone, 9px, for an item with no mark of its own, in its tooltip, and the logo's mark of what is at work",
       [...markStatuses.map((status) => statusTooltip(h, status, [statusMark(h, status.kind)])), activityMark(h)],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "The logo's mark of what is at work, 0.875rem, in each motion: the thread drawn through while it waits, the stitches lit while it works, and the patch tugged while it stops",
+      [activityMark(h, "thread"), activityMark(h, "working"), activityMark(h, "tug")],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "Where a task stands, in each drawing: triage, open, progress, paused, done, and dismissed, at 0.875rem and at the 1rem of a pane's title",
+      [
+        ...taskStatusShapes.map((shape) => taskStatus(h, shape)),
+        ...taskStatusShapes.map((shape) => taskStatus(h, shape, { size: "1rem" }))
+      ],
       iconSizeRow
     ),
     sample(
@@ -2801,7 +2863,12 @@ const agentsSidebar = (h: ApplicationViewBuilder, current: string | undefined): 
         sidebarItem(h, {
           mark: { text: agent.name.slice(0, 1), tone: "lilac" },
           ...(agent.status === undefined ? {} : { status: agent.status }),
-          ...(agent.activity === undefined ? {} : { activity: `${agent.activity.state} in ${agent.activity.place}` }),
+          ...(agent.activity === undefined
+            ? {}
+            : {
+                activity: `${agent.activity.state} in ${agent.activity.place}`,
+                activityMotion: agent.activity.motion
+              }),
           label: agent.name,
           isCurrent: agent.name === current,
           onClick: press
@@ -3134,8 +3201,11 @@ const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
       title: "Composer paste crash",
       icon: "message",
       subtitle: "Thread in #general",
-      leading: paneBack(h, press),
-      actions: [paneClose(h, press)]
+      leading: paneBack(h, press, "Back to general"),
+      actions: [
+        iconButton(h, { icon: "bell", label: "Follow thread", onClick: press }, { isPressed: false }),
+        paneClose(h, press, "Close thread")
+      ]
     },
     body: [
       messageList(h, {
@@ -3186,6 +3256,144 @@ const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
         label: "Reply",
         placeholder: "Reply in thread",
         value: reply,
+        onInput: (value) => Message.TypedReply({ value }),
+        onSubmit: press,
+        submitLabel: "Reply"
+      })
+    ]
+  })
+}
+
+const taskStatusDrawings: Readonly<Record<TaskStatus, TaskStatusShape>> = {
+  triage: "triage",
+  todo: "open",
+  doing: "progress",
+  held: "paused",
+  done: "done",
+  dismissed: "dismissed"
+}
+
+const statusProperties: ReadonlyArray<PropertyChoice<TaskStatus>> = taskStatusChoices.map(([value, label]) => ({
+  value,
+  label,
+  taskStatus: taskStatusDrawings[value]
+}))
+
+const priorityProperties: ReadonlyArray<PropertyChoice<TaskPriority>> = taskPriorityChoices.map(([value, label]) => ({
+  value,
+  label
+}))
+
+const assigneeProperties: ReadonlyArray<PropertyChoice<TaskAssignee>> = [
+  { value: "", label: "Unassigned", buttonIcon: "users" },
+  { value: "alex", label: "Alex Morgan", mark: { text: "AM" } },
+  { value: "yumi", label: "Yumi", mark: { text: "Y", tone: "lilac" } }
+]
+
+/**
+ * A task in the side pane, as `apps/ui` has it: its status drawn before its title, the properties as quiet menus, the
+ * description, and the activity over the replies, all in one stack of 28px.
+ */
+const taskPane = (h: ApplicationViewBuilder, model: Model): Html => {
+  const press = Message.ClickedButton()
+
+  return pane(h, {
+    variant: "side",
+    label: "Composer paste crash",
+    header: {
+      title: "Composer paste crash",
+      taskStatus: taskStatusDrawings[model.taskStatus],
+      subtitle: "Task in #general",
+      leading: paneBack(h, press, "Back to Tasks"),
+      actions: [
+        iconButton(h, { icon: "bell", label: "Follow thread", onClick: press }, { isPressed: false }),
+        paneClose(h, press, "Close task")
+      ]
+    },
+    body: [
+      paneStack(h, [
+        properties(h, {
+          label: "Task",
+          children: [
+            propertyMenu(h, {
+              caption: "Status",
+              choices: statusProperties,
+              value: model.taskStatus,
+              embed: (viewInputs) =>
+                h.block(
+                  TaskStatusBinding.embedView({
+                    slotId: "status-property",
+                    model: model.statusPropertyMenu,
+                    viewInputs
+                  })
+                )
+            }),
+            propertyMenu(h, {
+              caption: "Assignee",
+              choices: assigneeProperties,
+              value: model.taskAssignee,
+              embed: (viewInputs) =>
+                h.block(
+                  TaskAssigneeBinding.embedView({
+                    slotId: "assignee-property",
+                    model: model.assigneePropertyMenu,
+                    viewInputs
+                  })
+                )
+            }),
+            propertyMenu(h, {
+              caption: "Priority",
+              choices: priorityProperties,
+              value: model.taskPriority,
+              embed: (viewInputs) =>
+                h.block(
+                  TaskPriorityBinding.embedView({
+                    slotId: "priority-property",
+                    model: model.priorityPropertyMenu,
+                    viewInputs
+                  })
+                )
+            })
+          ]
+        }),
+        property(h, {
+          caption: "Description",
+          children: [
+            description(h, {
+              text: "Handle clipboard images over 5 MB without crashing the composer.",
+              isCurrent: false
+            })
+          ]
+        }),
+        messageList(h, {
+          label: "Activity",
+          children: [
+            divider(h, "Activity", { align: "start" }),
+            event(h, { key: "created", text: "AJ created this task · 10:06 AM" }),
+            message(h, {
+              key: "reproduced",
+              mark: "S",
+              author: "Sara",
+              time: "10:09 AM",
+              text: "I can reproduce it. I'm checking the image size handling before the paste completes."
+            }),
+            message(h, {
+              key: "preview",
+              mark: "Y",
+              author: "Yumi",
+              time: "10:12 AM",
+              text: "The crash starts when the preview is generated. I've added the reproduction steps."
+            })
+          ]
+        })
+      ])
+    ],
+    footer: [
+      composer(h, {
+        id: "task-reply",
+        label: "Reply",
+        placeholder: "Reply in thread",
+        value: model.reply,
         onInput: (value) => Message.TypedReply({ value }),
         onSubmit: press,
         submitLabel: "Reply"
@@ -3345,6 +3553,46 @@ const detailsGroup = (
           { label: "Priority", value: "No priority" },
           { label: "Assignee", value: "No one" }
         ])
+      ],
+      sidePaneColumn
+    ),
+    sample(
+      h,
+      "Properties that are read and not changed: the captions in capitals over the values, in the look of the quiet button, 3px in",
+      [
+        properties(h, {
+          label: "Task",
+          children: [
+            property(h, {
+              caption: "Status",
+              children: [propertyValue(h, { before: taskStatus(h, "progress"), text: "In progress" })]
+            }),
+            property(h, {
+              caption: "Assignee",
+              children: [propertyValue(h, { before: mark(h, { text: "AM", size: "sm" }), text: "Alex Morgan" })]
+            }),
+            property(h, {
+              caption: "Assignee",
+              children: [propertyValue(h, { before: propertyIcon(h, "users"), text: "Unassigned" })]
+            }),
+            property(h, { caption: "Priority", children: [propertyValue(h, { text: "No priority" })] })
+          ]
+        })
+      ],
+      sidePaneColumn
+    ),
+    sample(
+      h,
+      "Where an agent is at work: the logo as its turn goes, the state in quiet text, then the place",
+      [
+        activityList(h, {
+          label: "Current activity",
+          lines: [
+            { key: "working", state: "Working", motion: "working", place: "#general" },
+            { key: "queued", state: "Queued", motion: "thread", place: "#design" },
+            { key: "stopping", state: "Stopping", motion: "tug", place: "Jamie Morgan" }
+          ]
+        })
       ],
       sidePaneColumn
     ),
@@ -3708,6 +3956,25 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
               aside: { label: "Thread", view: threadPane(h, model.reply), isOpen: false, dialog: () => h.empty }
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A task in the side pane on the Tasks tab: its status drawn before the title, Close task, the status, assignee, and priority as quiet menus under their captions, the description, and the activity over the replies",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              viewport: "Split",
+              rail: shellRail(h, model.destination),
+              sidebar: shellSidebar(h, true, false),
+              main: groupPane(h, "tasks", model.composer),
+              aside: { label: "Task", view: taskPane(h, model), isOpen: false, dialog: () => h.empty }
             })
           ]
         )

@@ -9,19 +9,23 @@
  * - creates the menu's Block once, `Menu.create<Value>()`, with `Value` the choices' values, and binds it as a
  *   child, with an `id` for the menu through `init`;
  * - folds the Block's `Selected` out message into whatever the choice was for;
- * - renders the menu with `menu` or `choiceMenu`, whose `embed` embeds the bound Block with the view inputs the
- *   design builds: `(viewInputs) => h.block(MenuBinding.embedView({ slotId, model: model.menu, viewInputs }))`.
+ * - renders the menu with `menu`, `choiceMenu`, or `propertyMenu`, whose `embed` embeds the bound Block with the view
+ *   inputs the design builds: `(viewInputs) => h.block(MenuBinding.embedView({ slotId, model: model.menu, viewInputs }))`.
  */
 
 import type { AnchorConfig, ViewInputs } from "@foldkit/ui/menu"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { buttonClass, buttonContent } from "./control.ts"
-import { icon } from "./icon.ts"
-import { type MarkContent, mark } from "./mark.ts"
+import { property, propertyIcon } from "./details.ts"
+import { type IconName, icon } from "./icon.ts"
+import { type MarkContent, type TaskStatusShape, mark, taskStatus } from "./mark.ts"
 
 const wrapperLook = "inline-flex flex-none"
 
 const plainTriggerLook = "inline-flex cursor-pointer items-center bg-transparent p-0 focus-ring"
+
+/** Pulls the quiet button back by its padding and border, less 3px, so its words start where its caption does. */
+const quietTriggerAlignment = "-ms-2.5"
 
 const panelLook =
   "z-40 max-h-96 min-w-48 overflow-y-auto border border-outline bg-popover p-1 text-ink shadow-popover outline-none"
@@ -60,13 +64,15 @@ export type MenuPlacement = NonNullable<AnchorConfig["placement"]>
 /**
  * One line of the menu, which `Selected` reports by its `value`. A choice with an `isChecked` is one of a group of
  * which one is current, and shows a check mark while it is `true`; a choice without it is an action. A choice with a
- * `mark` shows it before its label, at 22px, for a person or anything else that has one.
+ * `mark` shows it before its label, at 22px, for a person or anything else that has one, and one with a `taskStatus`
+ * shows that status's drawing there, at 0.875rem.
  */
 export type MenuChoice<Value extends string> = Readonly<{
   /** What the Block reports when it is chosen. Each choice of a menu has a value of its own. */
   value: Value
   label: string
   mark?: MarkContent
+  taskStatus?: TaskStatusShape
   isChecked?: boolean
 }>
 
@@ -78,11 +84,14 @@ export type MenuGroup<Value extends string> = Readonly<{
 
 /**
  * The button that opens the menu: `choice`, the default, shows `text` with a chevron, the current choice of a
- * filter, and `plain` wraps `content` such as a person's mark. The `name` is what assistive technology calls the
- * button when its text does not say enough, such as "Sort: Latest activity", and one that has no text must have it.
+ * filter, `quiet` shows `text` with a chevron in a button with no border, after what comes `before` it, for the value
+ * of a property, whose caption stands over it, and `plain` wraps `content` such as a person's mark. The `name` is what
+ * assistive technology calls the button when its text does not say enough, such as "Sort: Latest activity", and one
+ * that has no text, or whose caption is beside it and not in it, must have it.
  */
 export type MenuTrigger =
   | Readonly<{ variant?: "choice"; text: string; name?: string }>
+  | Readonly<{ variant: "quiet"; text: string; name: string; before?: Html }>
   | Readonly<{ variant: "plain"; name: string; content: Html }>
 
 export type MenuConfig<Value extends string> = Readonly<{
@@ -106,6 +115,7 @@ const renderItem = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>
     [h.Class(itemContent)],
     [
       choice.mark === undefined ? h.empty : mark(h, { ...choice.mark, size: "choice" }),
+      choice.taskStatus === undefined ? h.empty : taskStatus(h, choice.taskStatus),
       h.span([h.Class(itemLabel)], [choice.label]),
       ...(choice.isChecked === true
         ? [
@@ -158,6 +168,18 @@ const renderTrigger = <Value extends string, Message, Requirements>(
 ): Pick<ViewInputs<Value>, "buttonContent" | "buttonClassName"> & Readonly<{ ariaLabel?: string }> => {
   if (trigger.variant === "plain") {
     return { buttonContent: trigger.content, buttonClassName: plainTriggerLook, ariaLabel: trigger.name }
+  }
+
+  if (trigger.variant === "quiet") {
+    const quietLook = { variant: "quiet", hasChevron: true } as const
+    return {
+      buttonContent: h.span(
+        [h.Class("contents")],
+        [trigger.before ?? h.empty, ...buttonContent(h, trigger.text, quietLook)]
+      ),
+      buttonClassName: `${buttonClass(quietLook)} ${quietTriggerAlignment}`,
+      ariaLabel: trigger.name
+    }
   }
 
   const look = { hasChevron: true }
@@ -248,3 +270,77 @@ export const choiceMenu = <Value extends string, Message, Requirements>(
     ],
     embed: config.embed
   })
+
+/**
+ * A choice of `propertyMenu`: its value, how the person reads it, and what goes before it, in the list and in the
+ * button while it is current: a `mark`, 22px in the list and 24px in the button, for a person, or a `taskStatus`
+ * drawing. A `buttonIcon` is drawn in the button instead, 15px, while the choice is current, and nothing goes before
+ * it in the list, such as the people icon for no one.
+ */
+export type PropertyChoice<Value extends string> = Readonly<{
+  value: Value
+  label: string
+  mark?: MarkContent
+  taskStatus?: TaskStatusShape
+  buttonIcon?: IconName
+}>
+
+const renderPropertyBefore = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  choice: PropertyChoice<string> | undefined
+): Html => {
+  if (choice === undefined) return h.empty
+  if (choice.buttonIcon !== undefined) return propertyIcon(h, choice.buttonIcon)
+  if (choice.mark !== undefined) return mark(h, { ...choice.mark, size: "sm" })
+
+  return choice.taskStatus === undefined ? h.empty : taskStatus(h, choice.taskStatus)
+}
+
+/**
+ * A property of the thing a pane is about that the person changes, such as a task's status or assignee: its `caption`
+ * in capitals, and under it a quiet button with no border that shows the current one of `choices` after what comes
+ * before it, and a chevron, and opens a menu to choose another. The button is named "Status: Doing", the caption and
+ * the choice, and the caption over it is hidden from assistive technology, which would otherwise say it twice. The
+ * button is pulled back by its padding, so its words start where the caption does.
+ */
+export const propertyMenu = <Value extends string, Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    caption: string
+    choices: ReadonlyArray<PropertyChoice<Value>>
+    value: Value
+    placement?: MenuPlacement
+    embed: MenuConfig<Value>["embed"]
+  }>
+): Html => {
+  const current = config.choices.find(({ value }) => value === config.value)
+  const text = current?.label ?? config.value
+
+  return property(h, {
+    caption: config.caption,
+    isCaptionHidden: true,
+    children: [
+      menu(h, {
+        trigger: {
+          variant: "quiet",
+          text,
+          name: `${config.caption}: ${text}`,
+          before: renderPropertyBefore(h, current)
+        },
+        ...(config.placement === undefined ? {} : { placement: config.placement }),
+        groups: [
+          {
+            choices: config.choices.map(({ value, label, mark: choiceMark, taskStatus: choiceStatus }) => ({
+              value,
+              label,
+              ...(choiceMark === undefined ? {} : { mark: choiceMark }),
+              ...(choiceStatus === undefined ? {} : { taskStatus: choiceStatus }),
+              isChecked: value === config.value
+            }))
+          }
+        ],
+        embed: config.embed
+      })
+    ]
+  })
+}

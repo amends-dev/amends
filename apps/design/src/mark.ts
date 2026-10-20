@@ -1,13 +1,14 @@
 /**
  * The square that stands for a person, a workspace, an agent, or a connection: one or two letters, or a drawing,
  * on a ground of its tone, the patch over its corner that says how it stands, the logo's mark that says it is at
- * work, and the button that gathers a few marks to open the people they stand for.
+ * work, the circle that says where a task stands, and the button that gathers a few marks to open the people they
+ * stand for.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, type IconSize, icon } from "./icon.ts"
-import { logo } from "./logo.ts"
+import { type LogoMotion, logo } from "./logo.ts"
 import { type TooltipPlacement, type TooltipTone, tooltip } from "./tooltip.ts"
 
 const markBase = "relative grid flex-none place-items-center font-medium uppercase"
@@ -170,12 +171,102 @@ export const statusMark = <Message, Requirements>(
 ): Html => h.span([h.AriaHidden(true), h.Class("flex flex-none")], [renderStatusShape(h, kind, "size-2.25")])
 
 /**
- * The logo in its working motion, 1rem, which a row shows at its end while the thing it stands for is at work. It
- * takes the color of the text around it, is cut out of the row's own surface, and is hidden from assistive
- * technology, since the row says in words what it is doing.
+ * The logo, 0.875rem, in the `motion` of what is under way, `working` unless given: `thread` while it waits, `working`
+ * while it runs, `tug` while it stops. A row shows it at its end while the thing it stands for is at work. It takes
+ * the color of the text around it, is cut out of the row's own surface, and is hidden from assistive technology,
+ * since the row says in words what it is doing.
  */
-export const activityMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>): Html =>
-  logo(h, { size: "1rem", motion: "working" })
+export const activityMark = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  motion: LogoMotion = "working"
+): Html => logo(h, { size: "0.875rem", motion })
+
+const taskStatusBase = "flex-none"
+
+const taskStatusInks = { rest: "text-ink-secondary", done: "text-ink" }
+
+/**
+ * The drawings of a task's status, named by how each looks: `triage`, an exclamation mark, for what awaits a
+ * decision; `open`, a bare circle; `progress`, a circle half filled; `paused`, a circle with two bars; `done`, a
+ * circle filled and checked; and `dismissed`, a circle crossed out.
+ */
+export const taskStatusShapes = ["triage", "open", "progress", "paused", "done", "dismissed"] as const
+
+export type TaskStatusShape = (typeof taskStatusShapes)[number]
+
+const renderStroke = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  path: string,
+  width: string
+): Html => h.path([h.D(path), h.Stroke("currentColor"), h.StrokeWidth(width), h.StrokeLinecap("round")])
+
+const renderTaskStatusInside = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  shape: TaskStatusShape
+): ReadonlyArray<Html> => {
+  switch (shape) {
+    case "triage":
+      return [
+        renderStroke(h, "M8 4.6 V8.8", "1.3"),
+        h.circle([h.Cx("8"), h.Cy("11.1"), h.R("0.8"), h.Fill("currentColor")])
+      ]
+    case "progress":
+      return [h.path([h.D("M8 3.6 A4.4 4.4 0 0 0 8 12.4 Z"), h.Fill("currentColor")])]
+    case "paused":
+      return [renderStroke(h, "M6.5 5.8 V10.2", "1.3"), renderStroke(h, "M9.5 5.8 V10.2", "1.3")]
+    case "done":
+      return [
+        h.path([
+          h.D("M5.3 8.2 L7.2 10 L10.8 6.3"),
+          h.Class("stroke-on-action"),
+          h.Fill("none"),
+          h.StrokeWidth("1.4"),
+          h.StrokeLinecap("round"),
+          h.StrokeLinejoin("round")
+        ])
+      ]
+    case "dismissed":
+      return [renderStroke(h, "M6.2 6.2 L9.8 9.8", "1.3"), renderStroke(h, "M9.8 6.2 L6.2 9.8", "1.3")]
+    case "open":
+      return []
+  }
+}
+
+/**
+ * Where a task stands, drawn as `apps/ui` draws it: a circle on a 16-unit grid, 0.875rem wide unless the `size` says,
+ * with the `shape` in it. It is gray, and `ink` once the task is `done`, and takes the color of the text around it for
+ * nothing else. It is hidden from assistive technology, since the word for the status is always beside it.
+ */
+export const taskStatus = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  shape: TaskStatusShape,
+  options: Readonly<{ size?: string }> = {}
+): Html => {
+  const size = options.size ?? "0.875rem"
+
+  return h.svg(
+    [
+      h.Xmlns("http://www.w3.org/2000/svg"),
+      h.Width(size),
+      h.Height(size),
+      h.ViewBox("0 0 16 16"),
+      h.Fill("none"),
+      h.AriaHidden(true),
+      h.Class(`${taskStatusBase} ${shape === "done" ? taskStatusInks.done : taskStatusInks.rest}`)
+    ],
+    [
+      h.circle([
+        h.Cx("8"),
+        h.Cy("8"),
+        h.R("6.4"),
+        h.Stroke("currentColor"),
+        h.StrokeWidth("1.2"),
+        h.Fill(shape === "done" ? "currentColor" : "none")
+      ]),
+      ...renderTaskStatusInside(h, shape)
+    ]
+  )
+}
 
 /**
  * A button of the first three `marks`, as `xs` marks side by side in a bordered box, and "+4" after them for

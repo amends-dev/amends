@@ -394,6 +394,49 @@ describe("sidebarItem with a status", () => {
     )
   })
 
+  it("moves the logo at its end as the activity's motion says: working unless given", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((_, h) =>
+          sidebarSection(h, {
+            label: "Agents",
+            children: [
+              sidebarItem(h, {
+                mark: { text: "A", tone: "lilac" },
+                activity: "Working in #design",
+                label: "Atlas",
+                isCurrent: false,
+                onClick: open("Atlas")
+              }),
+              sidebarItem(h, {
+                mark: { text: "Y", tone: "lilac" },
+                activity: "Queued in #general",
+                activityMotion: "thread",
+                label: "Yumi",
+                isCurrent: false,
+                onClick: open("Yumi")
+              }),
+              sidebarItem(h, {
+                mark: { text: "P", tone: "lilac" },
+                activity: "Stopping in Jamie Morgan",
+                activityMotion: "tug",
+                label: "Planner",
+                isCurrent: false,
+                onClick: open("Planner")
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("button", { name: "Atlas, Working in #design" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("button", { name: "Yumi, Queued in #general" }), selector("svg.logo-thread"))).toExist(),
+      expect(within(role("button", { name: "Yumi, Queued in #general" }), selector("svg.logo-working"))).toBeAbsent(),
+      expect(within(role("button", { name: "Planner, Stopping in Jamie Morgan" }), selector("svg.logo-tug"))).toExist()
+    )
+  })
+
   it("puts the patch on the mark, with its word and why in a tooltip on hover, hidden from assistive technology like the mark", () => {
     scene(
       { update, view: sidebarView(agentsSidebar) },

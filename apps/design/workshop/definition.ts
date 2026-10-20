@@ -1,8 +1,9 @@
 /**
  * What the workshop remembers: the text of its fields, boxes, and composers, among them the search over its agents,
- * which switches are on, the plan chosen, a task's status, priority, and assignee, which rail destination, pane tab,
- * and thread are current, the group settings typed in the modals, which section of the wide one shows, whether each
- * modal is open, what each menu chose and whether it is open, and how often a button was pressed.
+ * which switches are on, the plan chosen, a task's status, priority, and assignee, which the selects and the menus of
+ * the task's properties change, which rail destination, pane tab, and thread are current, the group settings typed in
+ * the modals, which section of the wide one shows, whether each modal is open, what each menu chose and whether it is
+ * open, and how often a button was pressed.
  */
 
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -14,7 +15,7 @@ import { defineMessageUnion } from "foldkit/message"
 export const Plan = Schema.Literals(["free", "team", "enterprise"])
 export type Plan = typeof Plan.Type
 
-export const TaskStatus = Schema.Literals(["triage", "todo", "doing"])
+export const TaskStatus = Schema.Literals(["triage", "todo", "doing", "held", "done", "dismissed"])
 export type TaskStatus = typeof TaskStatus.Type
 
 export const TaskPriority = Schema.Literals(["none", "low", "high"])
@@ -54,6 +55,9 @@ export const MemberFilterMenu = Menu.create<MemberFilter>()
 export const AssigneeFilterMenu = Menu.create<AssigneeFilter>()
 export const TaskFilterMenu = Menu.create<TaskFilter>()
 export const TaskSortMenu = Menu.create<TaskSort>()
+export const TaskStatusMenu = Menu.create<TaskStatus>()
+export const TaskPriorityMenu = Menu.create<TaskPriority>()
+export const TaskAssigneeMenu = Menu.create<TaskAssignee>()
 export const AccountMenu = Menu.create<AccountEntry>()
 
 export const Destination = Schema.Literals(["home", "agents", "connections", "settings"])
@@ -111,6 +115,9 @@ export const Model = Schema.Struct({
   taskStatus: TaskStatus,
   taskPriority: TaskPriority,
   taskAssignee: TaskAssignee,
+  statusPropertyMenu: TaskStatusMenu.Model,
+  priorityPropertyMenu: TaskPriorityMenu.Model,
+  assigneePropertyMenu: TaskAssigneeMenu.Model,
   pressCount: Schema.Finite
 })
 export type Model = typeof Model.Type

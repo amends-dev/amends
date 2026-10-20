@@ -6,6 +6,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
+import type { LogoMotion } from "./logo.ts"
 import { activityMark, type MarkContent, type MarkStatus, mark, statusMark, statusTooltip } from "./mark.ts"
 
 const sidebarColumn = "flex w-66 flex-none flex-col overflow-hidden bg-panel"
@@ -150,6 +151,7 @@ type ItemEnd = Readonly<{
   status?: MarkStatus | undefined
   count?: number
   activity?: string
+  activityMotion?: LogoMotion | undefined
   isPending?: boolean
 }>
 
@@ -166,7 +168,9 @@ const renderItemEnd = <Message, Requirements>(
   }
 
   return [
-    config.activity === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(itemActivity)], [activityMark(h)]),
+    config.activity === undefined
+      ? h.empty
+      : h.span([h.AriaHidden(true), h.Class(itemActivity)], [activityMark(h, config.activityMotion)]),
     config.status === undefined || config.mark !== undefined
       ? h.empty
       : statusTooltip(h, config.status, [statusMark(h, config.status.kind)]),
@@ -336,8 +340,9 @@ export const sidebarSections = <Message, Requirements>(
  * a workspace, or an agent, then the `label` and a `count` at the end. A `status` is how the item stands: a patch
  * on its mark, or, for an item with an `icon` or no mark, its shape alone, 9px, at the row's end. A row has an
  * `activity`, such as "Working in #design", while what it stands for is at work, and shows the logo's mark at its
- * end, since its words say what it is doing. A row is `isPending` while what it stands for is on its way, such as
- * a group still being created, and says "Sending…" at its end in place of those and the count.
+ * end, moving as its `activityMotion` says, `working` unless given, since its words say what it is doing. A row is
+ * `isPending` while what it stands for is on its way, such as a group still being created, and says "Sending…" at its
+ * end in place of those and the count.
  *
  * The button is named by the label and then by the status's word, "Atlas, Needs setup", or by the activity's words
  * when there is no status, and described by "Sending…" or the count. The patch is cut out of the row's own
@@ -354,6 +359,7 @@ export const sidebarItem = <Message, Requirements>(
     label: string
     count?: number
     activity?: string
+    activityMotion?: LogoMotion | undefined
     isPending?: boolean
     isCurrent: boolean
     onClick: Message

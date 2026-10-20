@@ -5,7 +5,20 @@ import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button, buttonRow, hint, sending } from "./control.ts"
-import { badge, detailList, entry, entryList, log, person } from "./details.ts"
+import {
+  activityList,
+  badge,
+  detailList,
+  entry,
+  entryList,
+  log,
+  person,
+  properties,
+  property,
+  propertyIcon,
+  propertyValue
+} from "./details.ts"
+import { taskStatus } from "./mark.ts"
 
 const Message = defineMessageUnion({ ClickedStop: {}, ClickedOpen: {} })
 type Message = typeof Message.Type
@@ -47,6 +60,145 @@ describe("detailList", () => {
       expect(selector("dd")).toHaveText("Triage"),
       click(within(selector("dl"), role("button", { name: "Open thread" }))),
       expect(role("status")).toHaveText("Stopped 0, opened 1")
+    )
+  })
+})
+
+describe("properties", () => {
+  const read = (h: HtmlBuilder<Message>) =>
+    properties(h, {
+      label: "Task",
+      children: [
+        property(h, {
+          caption: "Status",
+          children: [propertyValue(h, { before: taskStatus(h, "progress"), text: "In progress" })]
+        }),
+        property(h, { caption: "Assignee", children: [propertyValue(h, { text: "Unassigned" })] })
+      ]
+    })
+
+  it("are a group named by its label, the captions in capitals over the values, in two columns 24px apart", () => {
+    scene(
+      { update, view: viewOf(read) },
+      given(initial),
+      expect(role("group", { name: "Task" })).toHaveClass("grid-cols-2"),
+      expect(role("group", { name: "Task" })).toHaveClass("gap-x-6"),
+      expect(role("group", { name: "Task" })).toHaveClass("gap-y-1"),
+      expect(text("Status")).toHaveClass("uppercase"),
+      expect(text("Status")).toHaveClass("text-meta"),
+      expect(text("Status")).toHaveClass("font-medium"),
+      expect(text("Status")).toHaveClass("mb-1.25"),
+      expect(text("Assignee")).toExist()
+    )
+  })
+
+  it("read their captions to assistive technology, unless the control under one names itself by it", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) =>
+          h.div(
+            [],
+            [
+              property(h, { caption: "Status", children: [propertyValue(h, { text: "Triage" })] }),
+              property(h, {
+                caption: "Priority",
+                isCaptionHidden: true,
+                children: [button(h, "Priority: High", Message.ClickedOpen())]
+              })
+            ]
+          )
+        )
+      },
+      given(initial),
+      expect(text("Status")).not.toHaveAttr("aria-hidden"),
+      expect(text("Priority")).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("show a value that is read in the look of the quiet button, 8px after what comes before it, in quiet text", () => {
+    scene(
+      { update, view: viewOf(read) },
+      given(initial),
+      expect(text("In progress")).toHaveClass("text-hint"),
+      expect(text("In progress")).toHaveClass("text-ink-secondary"),
+      expect(text("In progress")).toHaveClass("gap-2"),
+      expect(text("In progress")).toHaveClass("ps-0.75"),
+      expect(within(selector("span.gap-2"), selector("svg path[d^='M8 3.6']"))).toExist(),
+      expect(role("button")).toBeAbsent()
+    )
+  })
+
+  it("show a value with the icon of a property before it, hidden from assistive technology, as the words say it", () => {
+    scene(
+      { update, view: viewOf((h) => propertyValue(h, { before: propertyIcon(h, "users"), text: "Unassigned" })) },
+      given(initial),
+      expect(text("Unassigned")).toExist(),
+      expect(selector("svg path[d^='M5 7a4']")).toExist(),
+      expect(selector("svg")).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("show a value with nothing before it as its words alone", () => {
+    scene(
+      { update, view: viewOf((h) => propertyValue(h, { text: "Unassigned" })) },
+      given(initial),
+      expect(text("Unassigned")).toHaveClass("min-h-8"),
+      expect(selector("svg")).toBeAbsent()
+    )
+  })
+})
+
+describe("activityList", () => {
+  const lines = (h: HtmlBuilder<Message>) =>
+    activityList(h, {
+      label: "Current activity",
+      lines: [
+        { key: "turn-1", state: "Working", motion: "working", place: "#general" },
+        { key: "turn-2", state: "Queued", motion: "thread", place: "#design" },
+        { key: "turn-3", state: "Stopping", motion: "tug", place: "Jamie Morgan" }
+      ]
+    })
+
+  it("lists where the agent is at work, named by its label, a line for each place", () => {
+    scene(
+      { update, view: viewOf(lines) },
+      given(initial),
+      expect(selector("ul")).toHaveAttr("aria-label", "Current activity"),
+      expect(text("Working")).toExist(),
+      expect(text("#general")).toHaveClass("font-medium"),
+      expect(text("Queued")).toExist(),
+      expect(text("#design")).toExist(),
+      expect(text("Stopping")).toExist(),
+      expect(text("Jamie Morgan")).toExist()
+    )
+  })
+
+  it("says the state alone for a turn whose place is not read", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) =>
+          activityList(h, {
+            label: "Current activity",
+            lines: [{ key: "turn-1", state: "Working", motion: "working" }]
+          })
+        )
+      },
+      given(initial),
+      expect(text("Working")).toExist(),
+      expect(selector("li span.font-medium")).toBeAbsent()
+    )
+  })
+
+  it("moves the logo as the state does, 0.875rem, hidden from assistive technology", () => {
+    scene(
+      { update, view: viewOf(lines) },
+      given(initial),
+      expect(selector("svg.logo-working")).toHaveAttr("width", "0.875rem"),
+      expect(selector("svg.logo-thread")).toHaveAttr("aria-hidden", "true"),
+      expect(selector("svg.logo-tug")).toHaveAttr("aria-hidden", "true"),
+      expect(role("img")).toBeAbsent()
     )
   })
 })
