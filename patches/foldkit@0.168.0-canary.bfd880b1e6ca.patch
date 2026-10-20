@@ -1,3 +1,15 @@
+diff --git a/dist/block/definition.d.ts b/dist/block/definition.d.ts
+index 6e48c6bae47ab6d3d224441e51c96d6c0c70da60..5783786bb0944ef786c096644e0a6ac92e45fdcd 100644
+--- a/dist/block/definition.d.ts
++++ b/dist/block/definition.d.ts
+@@ -556,6 +556,7 @@ type ImplementationForValidation<Mounts extends ReadonlyArray<Mount.LayeredMount
+     subscriptions: ImplementationSubscriptions<ImplementationValue>;
+     managedResources: ImplementationManagedResources<ImplementationValue>;
+     EffectsLayer: CompleteEffectsLayer<ImplementationValue['EffectsLayer'], Children>;
++    [LocalEffectsLayerTypeId]: ImplementationValue['EffectsLayer'];
+     hostHandlers: ImplementationHostHandlers<ImplementationValue>;
+ }>;
+ type MergeLayers<Left extends Layer.Any, Right extends Layer.Any> = Layer.Layer<Layer.Success<Left | Right>, Layer.Error<Left | Right>, Layer.Services<Left | Right>>;
 diff --git a/dist/block/keyedBinding.js b/dist/block/keyedBinding.js
 index ecf10855bd6c0b2fd67878cf949d85a52ef561fa..0844c8be9012a693712b58b4b7102dff80bcfd57 100644
 --- a/dist/block/keyedBinding.js
@@ -23,3 +35,35 @@ index ecf10855bd6c0b2fd67878cf949d85a52ef561fa..0844c8be9012a693712b58b4b7102dff
              }),
          ...(config.outMessage?.forward === undefined
              ? {}
+diff --git a/dist/block/requirements.d.ts b/dist/block/requirements.d.ts
+index acf698013ae4113e369a5297b51355c769502019..09b2faa3044790ead7529942260aa759c0975b22 100644
+--- a/dist/block/requirements.d.ts
++++ b/dist/block/requirements.d.ts
+@@ -8,7 +8,7 @@ import type { ValidHandlerContracts } from '../runtime/handlerContracts.js';
+ import type { Handler as SubscriptionHandler } from '../subscription/handler.js';
+ import type * as Update from '../update/index.js';
+ import type { BlockOfBinding, HandlerRequirementsOfBinding, InspectionOfBinding, IsKeyedBinding, RequirementsOfBindings, ValidateBindingOperationNames } from './binding.js';
+-import type { LocalMountsTypeId } from './definition.js';
++import type { LocalEffectsLayerTypeId, LocalMountsTypeId } from './definition.js';
+ import type { IsConcreteOwner, Owner } from './owner.js';
+ import type { Qualify, Scoped } from './scope.js';
+ type AnyFunction = (...args: ReadonlyArray<any>) => any;
+@@ -121,6 +121,9 @@ type DeclaredHostHandlers<Block> = HandlerOfHostDefinition<HostDefinitions<Block
+ type BlockLayer<Block> = Block extends Readonly<{
+     EffectsLayer: infer LayerRecipe;
+ }> ? LayerRecipe : never;
++type LocalBlockLayer<Block> = Block extends Readonly<{
++    [LocalEffectsLayerTypeId]: infer LayerRecipe;
++}> ? LayerRecipe : BlockLayer<Block>;
+ type BlockManagedResources<Block> = Block extends Readonly<{
+     managedResources: infer ManagedResources;
+ }> ? ManagedResources : Readonly<Record<never, never>>;
+@@ -257,7 +260,7 @@ type ValidateUnexpectedLocalHostHandlers<Composition> = [
+     'Block hostHandlers must match residual handler requirements': UnexpectedLocalHostHandlers<Composition>;
+ }>;
+ type UnscopedHandlerRequirements<Requirements> = Requirements extends Scoped<any, any> ? never : HandlerRequirements<Requirements>;
+-type LocalHandlerContracts<Composition> = UnscopedHandlerRequirements<LocalOperationRequirements<Composition>> | HandlerRequirements<LayerOutputs<BlockLayer<Composition>> | LayerInputs<BlockLayer<Composition>> | DeclaredHostHandlers<Composition>>;
++type LocalHandlerContracts<Composition> = UnscopedHandlerRequirements<LocalOperationRequirements<Composition>> | HandlerRequirements<LayerOutputs<LocalBlockLayer<Composition>> | LayerInputs<LocalBlockLayer<Composition>> | DeclaredHostHandlers<Composition>>;
+ type ValidateLocalComposition<Composition> = ValidateBlockOperationNames<Composition> & ValidateOperationRegistrations<Composition> & ValidatePreciseRequirements<Composition> & ValidateHostDefinitions<Composition> & ValidateMissingLocalHostHandlers<Composition> & ValidateUnexpectedLocalHostHandlers<Composition> & ValidHandlerContracts<LocalHandlerContracts<Composition>>;
+ type HandlerContracts<Block> = HandlerRequirements<OperationRequirementsOfBlock<Block> | LayerOutputs<BlockLayer<Block>> | LayerInputs<BlockLayer<Block>> | DeclaredHostHandlers<Block>>;
+ /** Validates composition details that remain deferred until a generic Block

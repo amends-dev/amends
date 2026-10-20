@@ -28,8 +28,21 @@ whose APIs its author says will change; upgrading it is a chore of its own. The 
 canary, a keyed Binding's OutMessage fold that opens another child, as picking a thread opens it,
 leaves the parent model undefined, because the keyed fold does not resolve the child init recipe a
 `Definition.step` returns, as a direct Binding's fold does. The patch resolves it the same way;
-the fix belongs upstream in `packages/foldkit/src/block/keyedBinding.ts`, and the patch goes when
-a build carries it.
+the fix belongs upstream in `packages/foldkit/src/block/keyedBinding.ts`, and that part of the patch
+goes when a build carries it.
+
+The patch also limits the check of a Block's handler contracts to the Block's own `EffectsLayer`.
+In the canary, `assembleBlock` checks them against the complete layer, which carries every
+descendant's, so each descendant is checked again at every Block above it, and with enough Blocks
+bound under the workspace page TypeScript stops at 5,000,000 type instantiations in one expression
+(TS2589). A descendant's contracts were checked when it was assembled, and a placement prefixes the
+keys of its subtree's handlers, so those of different subtrees stay apart: a handler a Block's layer
+leaves out is still reported at that Block. The patch adds `LocalBlockLayer` to
+`dist/block/requirements.d.ts`, which reads the layer a completed Block keeps as
+`LocalEffectsLayerTypeId` and stands in for `BlockLayer` in `LocalHandlerContracts`, and that member
+to `ImplementationForValidation` in `dist/block/definition.d.ts`. The fix belongs upstream in
+`packages/foldkit/src/block/requirements.ts`, and this part of the patch goes when a build carries
+it.
 
 ## Run
 
