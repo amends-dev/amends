@@ -1,23 +1,26 @@
 /**
  * The workspace's agents, as a section of the sidebar to pick one from, each by its name with how it
  * stands; as a list page, All and those that need setup on a tab each, narrowed by a search, each
- * with its harness and sandbox, its model and connection, and, for a person who may configure it,
- * renaming it and changing how it is set up; and adding one, for a person who may, on the
- * harnesses, models, and sandboxes the workspace's connections give. It reports when the person
- * asks to browse and the agent they pick; until an agent has a page of its own the page shows the
- * list for both. An agent's role, and its removal, are its membership's, in the settings. The
- * workspace page lists the host's integrations once and informs the Block of them, which say what
- * each connection gives, and a model connection lists its models over HTTP as the form chooses it.
+ * with its harness and sandbox, its model and connection; as the page of one, where, for a person
+ * who may configure it, they rename it and set it up again, and see why it can't run; and adding
+ * one, for a person who may, on the harnesses, models, and sandboxes the workspace's connections
+ * give. It reports when the person asks to browse and the agent they pick; the workspace page shows
+ * the list and the agent's page. An agent's role, and its removal, are its membership's, in the
+ * settings. The workspace page lists the host's integrations once and informs the Block of them,
+ * which say what each connection gives, and a model connection lists its models over HTTP as a
+ * setup chooses it.
  */
 
-import { Connection as ConnectionContract } from "@amends-dev/connection"
+import { Connection as ConnectionContract, type Integration } from "@amends-dev/connection"
 import { Agent, AgentPermissions } from "@amends-dev/core/agent"
 import { Grant, Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import type { Choice } from "@amends-dev/design/control"
 import * as Option from "effect/Option"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -25,23 +28,73 @@ import { defineTaggedUnion } from "foldkit/schema"
 import * as AgentSetup from "../../agentSetup.ts"
 import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
 import { foldAccents } from "../../seen.ts"
-import { ConnectionItem, connectionsGiving, Integrations } from "../connections/definition.ts"
+import { ConnectionItem, connectionItemsGiving, findIntegration, Integrations } from "../connections/definition.ts"
 import { WorkspaceItem } from "../settings/definition.ts"
 
 /** An agent of the workspace, and whether a change to it is on its way. Its name and role are its member's. */
 export const AgentItem = Schema.Struct({ agent: ReplicaRecord.Agent, pending: Schema.Boolean })
 export type AgentItem = typeof AgentItem.Type
 
+/** What the person asks of the agents: adding one, renaming one, and setting one up again. */
+export const AgentAction = Schema.Literals(["Create", "Rename", "Configure"])
+export type AgentAction = typeof AgentAction.Type
+
 /**
- * The form open among the agents: adding one, with its name, the role it starts with, and how it
- * is set up; changing how one is set up; or renaming one. A setup the person left wanting keeps why.
+ * Why a change could not be made: what the person entered does not decode (`Invalid`), a setup has parts that
+ * can't be saved as they are, each marked beside its field (`Incomplete`), or this browser could not keep the
+ * action (`Unwritable`). What the server refuses afterwards comes back as a toast, from the actions.
  */
-export const Form = defineTaggedUnion({
-  Adding: { name: Schema.String, roleId: Role.RoleId, setup: AgentSetup.Draft, error: Schema.Option(Schema.String) },
-  Configuring: { agentId: Identity.AgentId, setup: AgentSetup.Draft, error: Schema.Option(Schema.String) },
-  Renaming: { agentId: Identity.AgentId, name: Schema.String }
+export const Reason = defineTaggedUnion({
+  Invalid: {},
+  Incomplete: { problems: Schema.Array(AgentSetup.Problem) },
+  Unwritable: {}
 })
-export type Form = typeof Form.Type
+export type Reason = typeof Reason.Type
+
+/** A change that could not be made, and why. */
+export const Failure = Schema.Struct({ action: AgentAction, reason: Reason })
+export type Failure = typeof Failure.Type
+
+/**
+ * An action of the agents that was written to the store, or could not be: which, with what the update needs to
+ * finish it.
+ */
+export const Written = defineTaggedUnion({
+  Create: { name: Schema.String },
+  Rename: { agentId: Identity.AgentId },
+  Configure: { agentId: Identity.AgentId }
+})
+export type Written = typeof Written.Type
+
+/**
+ * The form that adds an agent: the name it starts with, the role it starts with, how it is set up, and why the
+ * last attempt to add it failed.
+ */
+export const Adding = Schema.Struct({
+  name: Schema.String,
+  roleId: Role.RoleId,
+  setup: AgentSetup.Draft,
+  failure: Schema.Option(Failure)
+})
+export type Adding = typeof Adding.Type
+
+/**
+ * What the person has changed on an agent's page and not saved: the name they typed, the setup they edited, the
+ * save on its way, and why the last save failed. The page shows the agent as it is saved wherever they changed
+ * nothing.
+ */
+export const Edit = Schema.Struct({
+  agentId: Identity.AgentId,
+  name: Schema.Option(Schema.String),
+  setup: Schema.Option(AgentSetup.Draft),
+  saving: Schema.Option(AgentAction),
+  failure: Schema.Option(Failure)
+})
+export type Edit = typeof Edit.Type
+
+/** Which setup a change to one of its fields is for: the one the form that adds an agent holds, or an agent's own. */
+export const SetupTarget = defineTaggedUnion({ Adding: {}, Agent: { agentId: Identity.AgentId } })
+export type SetupTarget = typeof SetupTarget.Type
 
 /** The models a connection offers, as the host lists them: loading, loaded, or not reached, with why. */
 export const OfferedModels = defineTaggedUnion({
@@ -58,8 +111,9 @@ export type BrowseTab = typeof BrowseTab.Type
 /**
  * The workspace's agents, once they are read, and the members they are, the connections they run on and the
  * integrations that say what those give, the roles and the workspace that say which role a new
- * agent may start with, what the person may do, the list page's tab and search, the form open among
- * the agents, the models its model connection offers, and why the last read or write failed.
+ * agent may start with, what the person may do, the list page's tab and search, the form that adds
+ * an agent, what they changed on the agents' pages, the models the connections offer, and why the
+ * last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -73,8 +127,9 @@ export const Model = Schema.Struct({
   workspace: Schema.Option(WorkspaceItem),
   grants: Schema.Array(Grant.Grant),
   browse: Schema.Struct({ tab: BrowseTab, query: Schema.String }),
-  form: Schema.Option(Form),
-  offered: Schema.Option(OfferedModels),
+  adding: Schema.Option(Adding),
+  edits: Schema.Array(Edit),
+  offered: Schema.Array(OfferedModels),
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -97,29 +152,31 @@ export const Message = defineMessageUnion({
   TypedBrowseQuery: { query: Schema.String },
   ClickedAgent: { agentId: Identity.AgentId },
   ClickedAdd: {},
-  TypedName: { name: Schema.String },
+  TypedAddingName: { name: Schema.String },
   ChoseRole: { roleId: Role.RoleId },
-  TypedInstructions: { instructions: Schema.String },
-  ChoseHarness: { harness: Schema.String },
-  ChoseModelConnection: { connectionId: Schema.String },
-  ChoseModel: { modelId: Schema.String },
-  ChoseEffort: { effort: Schema.String },
-  ChoseSandbox: { sandbox: Schema.String },
-  SubmittedForm: {},
-  ClickedCancelForm: {},
-  ClickedRename: { agentId: Identity.AgentId },
-  ClickedConfigure: { agentId: Identity.AgentId },
+  SubmittedAdding: {},
+  ClickedCancelAdding: {},
+  TypedName: { agentId: Identity.AgentId, name: Schema.String },
+  SubmittedName: { agentId: Identity.AgentId },
+  SubmittedSetup: { agentId: Identity.AgentId },
+  ClickedDiscardSetup: { agentId: Identity.AgentId },
+  TypedInstructions: { target: SetupTarget, instructions: Schema.String },
+  ChoseHarness: { target: SetupTarget, harness: Schema.String },
+  ChoseModelConnection: { target: SetupTarget, connectionId: Schema.String },
+  ChoseModel: { target: SetupTarget, modelId: Schema.String },
+  ChoseEffort: { target: SetupTarget, effort: Schema.String },
+  ChoseSandbox: { target: SetupTarget, sandbox: Schema.String },
   ReceivedModels: { connectionId: ConnectionContract.ConnectionId, models: Connection.Models },
   FailedLoadModels: { connectionId: ConnectionContract.ConnectionId, error: Schema.String },
-  WroteAction: {},
-  FailedWriteAction: { error: Schema.String }
+  WroteAction: { written: Written },
+  FailedWriteAction: { written: Written, reason: Reason }
 })
 export type Message = typeof Message.Type
 
 /**
  * What the Block asks of the workspace page: to list the integrations again, once the host could not be reached;
- * to show the agents, which the sidebar's Browse and Add ask, since the form Add opens is in the list; and to open
- * the agent picked.
+ * to show the agents, which the sidebar's title and Browse and the form Add opens ask; and to open the agent
+ * picked.
  */
 export const OutMessage = defineMessageUnion({
   RequestedIntegrations: {},
@@ -139,6 +196,12 @@ export const listedAgents = (model: Pick<Model, "agents" | "members">): Readonly
   model.agents.filter(({ agent }) =>
     model.members.some(({ id, status }) => id === agent.memberId && status === "active")
   )
+
+/** The agent `agentId`, while the workspace lists it: it has the agent and its membership is still in it. */
+export const findListedAgent = (
+  model: Pick<Model, "agents" | "members">,
+  agentId: Identity.AgentId
+): Option.Option<AgentItem> => Option.fromUndefinedOr(listedAgents(model).find(({ agent }) => agent.id === agentId))
 
 /** The name of the agent `agentId`, its membership's. */
 export const findAgentName = (
@@ -163,7 +226,7 @@ export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean
 
 /** Whether the person may add an agent now: they may create agents and a connection gives models to run it on. */
 export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "connections" | "integrations">): boolean =>
-  mayCreate(model) && connectionsGiving(model, "models").length > 0
+  mayCreate(model) && connectionItemsGiving(model, "models").length > 0
 
 /** The name of the agent, its membership's, or "An agent" while the members are not read. */
 export const nameOfAgent = (model: Pick<Model, "members">, agent: AgentItem["agent"]): string =>
@@ -182,3 +245,200 @@ export const shownAgents = (model: Pick<Model, "agents" | "members" | "browse">)
     (item) => (tab === "All" || needsSetup(item)) && foldAccents(nameOfAgent(model, item.agent)).includes(wanted)
   )
 }
+
+/** What the person has changed on the page of `agentId`, if anything. */
+export const findEdit = (model: Pick<Model, "edits">, agentId: Identity.AgentId): Option.Option<Edit> =>
+  Option.fromUndefinedOr(model.edits.find((edit) => edit.agentId === agentId))
+
+/** The name in the field of the agent's page: what the person typed, or the name it has. */
+export const nameDraftOf = (model: Pick<Model, "edits" | "members">, { agent }: AgentItem): string =>
+  Option.getOrElse(
+    Option.flatMap(findEdit(model, agent.id), (edit) => edit.name),
+    () => model.members.find(({ id }) => id === agent.memberId)?.name ?? ""
+  )
+
+/** The setup in the fields of the agent's page: what the person edited, or the setup it has. */
+export const setupDraftOf = (model: Pick<Model, "edits">, { agent }: AgentItem): AgentSetup.Draft =>
+  Option.getOrElse(
+    Option.flatMap(findEdit(model, agent.id), (edit) => edit.setup),
+    () => AgentSetup.draftOf(agent)
+  )
+
+/** Whether the name the person typed on the agent's page is one to save: not blank, and not the name it has. */
+export const isNameChanged = (model: Pick<Model, "edits" | "members">, item: AgentItem): boolean => {
+  const typed = nameDraftOf(model, item).trim()
+  return typed !== "" && typed !== nameOfAgent(model, item.agent)
+}
+
+/** Whether the setup the person edited on the agent's page differs from the setup it has. */
+export const isSetupChanged = (model: Pick<Model, "edits">, item: AgentItem): boolean =>
+  !AgentSetup.isSameSetup(setupDraftOf(model, item), AgentSetup.draftOf(item.agent))
+
+/** The models `connectionId` offers, as the host last listed them for a form, while one asked. */
+export const offeredBy = (model: Pick<Model, "offered">, connectionId: string): Option.Option<OfferedModels> =>
+  Option.fromUndefinedOr(model.offered.find((offered) => offered.connectionId === connectionId))
+
+/** The models the connection of `setup` offers, once the host has listed them. */
+const listedModels = (model: Pick<Model, "offered">, setup: AgentSetup.Draft): Option.Option<Connection.Models> =>
+  Option.flatMap(offeredBy(model, setup.modelConnectionId), (offered) =>
+    OfferedModels.matchOrElse(offered, { Loaded: ({ models }) => Option.some(models) }, () => Option.none())
+  )
+
+/** The model of `setup` among those its connection lists, while it is one. */
+export const listedModelOf = (model: Pick<Model, "offered">, setup: AgentSetup.Draft) =>
+  Option.flatMapNullishOr(listedModels(model, setup), ({ listed }) =>
+    listed.find(({ id }) => id === setup.modelId.trim())
+  )
+
+/** Why the model of `setup` can't be used: its connection lists only the models it offers, and it is not one. */
+export const modelProblem = (model: Pick<Model, "offered">, setup: AgentSetup.Draft): Option.Option<string> =>
+  Option.isSome(listedModels(model, setup)) &&
+  Option.exists(listedModels(model, setup), ({ unlisted }) => !unlisted) &&
+  setup.modelId.trim() !== "" &&
+  Option.isNone(listedModelOf(model, setup))
+    ? Option.some("This connection offers only the models it lists.")
+    : Option.none()
+
+/** The connection `connectionId` among the workspace's, while it is one. */
+const connectionOf = (model: Pick<Model, "connections">, connectionId: string): Option.Option<ConnectionItem> =>
+  Option.fromUndefinedOr(model.connections.find(({ connection }) => connection.id === connectionId))
+
+/** Why `setup` can't have no sandbox: the harness it names works only in one. */
+export const sandboxProblem = (
+  model: Pick<Model, "connections" | "integrations">,
+  setup: AgentSetup.Draft
+): Option.Option<string> =>
+  setup.harness === "" || setup.sandbox !== ""
+    ? Option.none()
+    : Option.flatMap(connectionOf(model, setup.harness), ({ connection }) =>
+        Option.exists(findIntegration(model, connection.integration), ({ requiresSandbox }) => requiresSandbox)
+          ? Option.some(`${connection.name} works only in a sandbox. Choose one.`)
+          : Option.none()
+      )
+
+/** Whether the host has listed its integrations, which say what each connection gives. */
+const areIntegrationsListed = (model: Pick<Model, "integrations">): boolean =>
+  Integrations.isAnyOf(["Loaded"])(model.integrations)
+
+/** Whether a connection chosen for `capability` is one that gives it, which is unknown until the integrations are listed. */
+const isUnavailable = (
+  model: Pick<Model, "connections" | "integrations">,
+  capability: Integration.Capability,
+  connectionId: string
+): boolean =>
+  areIntegrationsListed(model) &&
+  connectionId !== "" &&
+  !connectionItemsGiving(model, capability).some(({ connection }) => connection.id === connectionId)
+
+const unavailableMessage = "This connection is no longer available to you. Choose another."
+
+/**
+ * The configuration `setup` makes, or the parts of it that can't be saved as they are, each with the field to mark
+ * it beside: a part it still wants, a connection that is gone or no longer gives what the part needs, a model its
+ * connection does not offer, and a harness that works only in a sandbox the setup does not have.
+ */
+export const checkSetup = (
+  model: Pick<Model, "connections" | "integrations" | "offered">,
+  setup: AgentSetup.Draft
+): Result.Result<Agent.Configuration, ReadonlyArray<AgentSetup.Problem>> => {
+  const configuration = AgentSetup.configurationOf(setup)
+  const unavailable = (field: AgentSetup.Field, isGone: boolean): ReadonlyArray<AgentSetup.Problem> =>
+    isGone ? [{ field, message: unavailableMessage }] : []
+  const marked = (field: AgentSetup.Field, message: Option.Option<string>): ReadonlyArray<AgentSetup.Problem> =>
+    Option.match(message, { onNone: () => [], onSome: (message) => [{ field, message }] })
+  const problems = [
+    ...unavailable("Harness", isUnavailable(model, "harnesses", setup.harness)),
+    ...unavailable("ModelConnection", isUnavailable(model, "models", setup.modelConnectionId)),
+    ...unavailable("Sandbox", isUnavailable(model, "sandboxes", setup.sandbox)),
+    ...marked("Model", modelProblem(model, setup)),
+    ...marked("Sandbox", sandboxProblem(model, setup)),
+    ...(Result.isFailure(configuration) ? [configuration.failure] : [])
+  ]
+
+  return Result.isSuccess(configuration) && problems.length === 0
+    ? Result.succeed(configuration.success)
+    : Result.fail(problems)
+}
+
+/** Why the field `field` is marked, among `problems`, if it is. */
+export const problemAt = (
+  problems: ReadonlyArray<AgentSetup.Problem>,
+  field: AgentSetup.Field
+): Option.Option<string> => Option.fromUndefinedOr(problems.find((problem) => problem.field === field)?.message)
+
+/** The problems a failure marks beside the fields of a setup. */
+export const problemsOf = (failure: Option.Option<Failure>): ReadonlyArray<AgentSetup.Problem> =>
+  Option.match(failure, {
+    onNone: () => [],
+    onSome: ({ reason }) => Reason.matchOrElse(reason, { Incomplete: ({ problems }) => problems }, () => [])
+  })
+
+const invalidMessages: Readonly<Record<AgentAction, string>> = {
+  Create: "Check the name, instructions, and model, then try again.",
+  Rename: "Use 1 to 80 characters, with no invisible ones.",
+  Configure: "Check the instructions and model, then save again."
+}
+
+const unwritableMessages: Readonly<Record<AgentAction, string>> = {
+  Create: "The agent couldn't be created. Try again when the host is available.",
+  Rename: "The name couldn't be saved. Try again when the host is available.",
+  Configure: "The setup couldn't be saved. Try again when the host is available."
+}
+
+/** What a failure says under the form that made it, for the action it belongs to. */
+export const failureMessage = ({ action, reason }: Failure): string =>
+  Reason.match(reason, {
+    Invalid: () => invalidMessages[action],
+    Incomplete: () => "This setup can't be saved as it is. Change what's marked, then try again.",
+    Unwritable: () => unwritableMessages[action]
+  })
+
+/**
+ * The connections that give `capability` as the choices of a select, each with what `describe` says of its
+ * integration, and, when `current` names one that does not give it, that connection too, listed as unavailable:
+ * a connection the agent names that was removed or whose integration is not installed stays chosen, and says so.
+ */
+export const connectionChoices = (
+  model: Pick<Model, "connections" | "integrations">,
+  capability: Integration.Capability,
+  current: string,
+  describe: (integration: Connection.IntegrationView) => string
+): ReadonlyArray<Choice<string>> => {
+  const giving = connectionItemsGiving(model, capability)
+  const choices = giving.map(({ connection }): Choice<string> => [
+    connection.id,
+    connection.name,
+    Option.match(findIntegration(model, connection.integration), {
+      onNone: () => ({}),
+      onSome: (integration) => ({ description: describe(integration) })
+    })
+  ])
+
+  return current === "" || giving.some(({ connection }) => connection.id === current)
+    ? choices
+    : [...choices, unavailableChoice(model, current)]
+}
+
+/** The connection `connectionId`, which does not give what a select asks for, as a choice that can't be chosen. */
+const unavailableChoice = (model: Pick<Model, "connections" | "integrations">, connectionId: string): Choice<string> =>
+  Option.match(connectionOf(model, connectionId), {
+    onNone: () => [
+      connectionId,
+      "Removed connection",
+      { description: "This connection was removed.", isDisabled: true }
+    ],
+    onSome: ({ connection }) => [
+      connectionId,
+      connection.name,
+      {
+        ...(areIntegrationsListed(model)
+          ? {
+              description: Option.isSome(findIntegration(model, connection.integration))
+                ? "Its integration doesn't give this."
+                : "Its integration isn't installed on this host."
+            }
+          : {}),
+        isDisabled: true
+      }
+    ]
+  })

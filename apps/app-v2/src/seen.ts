@@ -2,7 +2,7 @@
  * What the person sees of the workspace's records: what a member and a group are called, what letters
  * mark them, and where a group is as a line says it, who wrote a message and what it says, with a
  * mention in it as its member's current name, when a time was, by its time of day, its day, either as a
- * message shows it, and how long ago it was, which day each of a list's items falls on, how a thread is
+ * message shows it, and how long ago it was, the date something was made, which day each of a list's items falls on, how a thread is
  * titled, where it is, and how many replies it has, whether anyone may join a group, how two texts are
  * compared when the person searches and whether a thread's title or opening has what they search for,
  * how a task's status and priority and a turn's status read, which statuses leave a task open, and when an
@@ -105,6 +105,10 @@ export const ageLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string 
   const today = dayOf(now)
   return daysBefore(day, today) <= 0 ? `${Math.floor(elapsed / millisPerHour)}h ago` : readDay(day, today, "short")
 }
+
+/** The day `at` fell on, by the person's own clock, with its year, as a record says when it was made: "Oct 6, 2026". */
+export const calendarDate = (at: DateTime.DateTime): string =>
+  DateTime.formatLocal(at, { month: "short", day: "numeric", year: "numeric" })
 
 /**
  * How long after `now` it will be `at`, as an invitation says when it closes: "Expires in 7 days" and "Expires in

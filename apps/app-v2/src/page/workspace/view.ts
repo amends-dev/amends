@@ -6,7 +6,7 @@ import { sidebar, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } fr
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { sidebarView as agentsSidebarView } from "../../feature/agents/view.ts"
+import { agentView, sidebarView as agentsSidebarView } from "../../feature/agents/view.ts"
 import { sidebarView as connectionsSidebarView } from "../../feature/connections/view.ts"
 import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
@@ -50,7 +50,7 @@ const railItems = (model: Model) => [
   {
     icon: "mark-agents" as const,
     label: "Agents",
-    isCurrent: Open.isAnyOf(["Agents"])(model.open),
+    isCurrent: Open.isAnyOf(["Agents", "Agent"])(model.open),
     onClick: Message.ClickedAgents()
   },
   {
@@ -100,14 +100,20 @@ const homeSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html
   ]
 }
 
-/** The agents' section of the sidebar, whose title is current while the list of agents is what the main pane shows. */
+/**
+ * The agents' section of the sidebar, whose title is current while the list of agents is what the main pane shows, and
+ * whose row is current while that agent's page is.
+ */
 const agentsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => [
   h.block(
     AgentsBinding.embedView({
       slotId: "agents-sidebar",
       model: model.agents,
       view: agentsSidebarView,
-      viewInputs: { isListOpen: Open.isAnyOf(["Agents"])(model.open) }
+      viewInputs: {
+        isListOpen: Open.isAnyOf(["Agents"])(model.open),
+        openAgentId: Open.matchOrElse(model.open, { Agent: ({ agentId }) => Option.some(agentId) }, () => Option.none())
+      }
     })
   )
 ]
@@ -146,6 +152,7 @@ const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArr
     model.open,
     {
       Agents: () => agentsSections(model, h),
+      Agent: () => agentsSections(model, h),
       Connections: () => connectionsSections(model, h),
       Channels: () => connectionsSections(model, h),
       Settings: () => settingsSections(h)
@@ -204,6 +211,15 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
     Groups: () => h.block(GroupsBinding.embedView({ slotId: "browse", model: model.groups, view: browseView })),
     Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
+    Agent: ({ agentId }) =>
+      h.block(
+        AgentsBinding.embedView({
+          slotId: "agent",
+          model: model.agents,
+          view: agentView,
+          viewInputs: { agentId, workspaceName: nameOf(model) }
+        })
+      ),
     Settings: () => h.block(SettingsBinding.embedView({ slotId: "settings", model: model.settings })),
     Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
     Group: ({ groupId, model: open }) =>

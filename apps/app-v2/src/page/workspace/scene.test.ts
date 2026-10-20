@@ -1,4 +1,5 @@
 import { GrantResolver } from "@amends-dev/core/authorization"
+import { Identity } from "@amends-dev/core/identity"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -40,6 +41,7 @@ import {
   membership,
   notificationOf,
   now,
+  offered,
   opening,
   reply,
   roles,
@@ -321,6 +323,8 @@ const withChannel = modifyFields(opened, {
     })
 })
 
+const models = keylessConnection("models-1", "test-models", "Models")
+
 /** The agents as an owner reads them: scout runs on the models connection, which the host listed. */
 const withAgent = modifyFields(opened, {
   agents: (agents) =>
@@ -328,7 +332,7 @@ const withAgent = modifyFields(opened, {
       isLoaded: () => true,
       agents: () => [{ agent: scoutAgent, pending: false }],
       members: () => [member, bob, scout],
-      connections: () => [{ connection: keylessConnection("models-1", "test-models", "Models"), pending: false }],
+      connections: () => [{ connection: models, pending: false }],
       integrations: () =>
         Integrations.Loaded({ integrations: [integrationGiving("test-models", "Test models", ["models"])] }),
       roles: () => roles,
@@ -722,22 +726,60 @@ describe("a workspace", () => {
     )
   })
 
-  it("opens the form to add an agent from the agents' sidebar, and an agent's setup from its row", () => {
+  it("opens the form to add an agent from the agents' sidebar", () => {
     scene(
       { update, view: sceneView },
       given(withAgent),
       click(railButton("Agents")),
       click(sidebarButton("Add agent")),
-      expect(role("form", { name: "Add an agent" })).toExist(),
+      expect(role("form", { name: "Add an agent" })).toExist()
+    )
+  })
+
+  it("opens an agent's page from its row in the sidebar, which is then current in place of the title", () => {
+    scene(
+      { update, view: sceneView },
+      given(withAgent),
+      click(railButton("Agents")),
+      expect(sidebarButton("Scout")).not.toHaveAttr("aria-current"),
       click(sidebarButton("Scout")),
-      Command.resolve(
-        LoadModels,
-        AgentsBlock.Message.FailedLoadModels({
-          connectionId: keylessConnection("models-1", "test-models", "Models").id,
-          error: "No."
-        })
+      Command.resolve(LoadModels, AgentsBlock.Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      expect(role("main", { name: "Agents" })).toBeAbsent(),
+      inside(
+        role("main", { name: "Scout" }),
+        expect(role("heading", { name: "Scout", level: 1 })).toExist(),
+        expect(label("Agent name")).toHaveValue("Scout"),
+        expect(text(workspace.name)).toExist()
       ),
-      expect(role("form", { name: "Change the agent's setup" })).toExist()
+      expect(sidebarButton("Scout")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Agents")).not.toHaveAttr("aria-current"),
+      expect(railButton("Agents")).toHaveAttr("aria-current", "true"),
+      click(sidebarButton("Agents")),
+      expect(role("main", { name: "Scout" })).toBeAbsent(),
+      expect(role("main", { name: "Agents" })).toExist(),
+      expect(sidebarButton("Agents")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Scout")).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("opens an agent's page from its row in the list, and offers the list again when the agent is not there", () => {
+    scene(
+      { update, view: sceneView },
+      given(withAgent),
+      click(railButton("Agents")),
+      inside(role("main", { name: "Agents" }), click(role("button", { name: "Scout" }))),
+      Command.resolve(LoadModels, AgentsBlock.Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      expect(role("main", { name: "Scout" })).toExist(),
+      expect(sidebarButton("Scout")).toHaveAttr("aria-current", "page"),
+      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(withAgent, { open: () => Open.Agent({ agentId: Identity.AgentId.make("agent-9") }) })),
+      expect(role("main", { name: "Agent" })).toExist(),
+      expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
+      click(role("button", { name: "Show all agents" })),
+      expect(role("main", { name: "Agents" })).toExist()
     )
   })
 

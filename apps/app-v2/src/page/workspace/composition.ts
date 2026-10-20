@@ -1,4 +1,5 @@
 import { GroupId } from "@amends-dev/core/group"
+import type { Identity } from "@amends-dev/core/identity"
 import type { ThreadId } from "@amends-dev/core/thread"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
@@ -68,6 +69,12 @@ export const showConnections = WorkspaceDefinition.step((model: Model) => ({
 export const showAgents = WorkspaceDefinition.step((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Agents() })
 }))
+
+/** Show the page of the agent `agentId` in the main content. */
+export const showAgent = (agentId: Identity.AgentId) =>
+  WorkspaceDefinition.step((model: Model) => ({
+    model: modifyFields(model, { open: () => Open.Agent({ agentId }) })
+  }))
 
 /** Show the settings in the main content. */
 export const showSettings = WorkspaceDefinition.step((model: Model) => ({
@@ -156,13 +163,13 @@ const foldSearchOutMessage = SearchBlock.OutMessage.match({
 })
 
 /**
- * Asking to browse the agents, and picking one, show the agents as any destination is gone to, until an agent has a
- * page of its own to open. Asking again for the integrations lists them again.
+ * Asking to browse the agents shows the list as any destination is gone to, and picking one opens its page. Asking
+ * again for the integrations lists them again.
  */
 const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
   RequestedIntegrations: () => loadIntegrationsAgain,
   RequestedBrowse: () => goTo(showAgents),
-  OpenedAgent: () => goTo(showAgents)
+  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId))
 })
 
 /**

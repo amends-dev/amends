@@ -18,8 +18,9 @@ export const init = AgentsComposition.makeInit((workspaceId: WorkspaceId.Workspa
     workspace: Option.none(),
     grants: [],
     browse: { tab: "All", query: "" },
-    form: Option.none(),
-    offered: Option.none(),
+    adding: Option.none(),
+    edits: [],
+    offered: [],
     notice: Option.none()
   })
 }))

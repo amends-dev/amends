@@ -329,6 +329,7 @@ describe("a workspace", () => {
       Message.ClickedMembers(),
       fromAgents(AgentsBlock.Message.ClickedBrowse()),
       fromAgents(AgentsBlock.Message.ClickedAdd()),
+      fromAgents(AgentsBlock.Message.ClickedAgent({ agentId: scoutAgent.id })),
       fromConnections(ConnectionsBlock.Message.ClickedBrowse()),
       fromConnections(ConnectionsBlock.Message.ClickedAdd()),
       fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())
@@ -393,6 +394,27 @@ describe("a workspace", () => {
         expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
       }),
       message(fromAgents(AgentsBlock.Message.ClickedAdd())),
+      model((model) => {
+        expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("shows the page of the agent that a row of the sidebar or the list opens, and the list again from it", () => {
+    story(
+      update,
+      given(opened),
+      message(fromAgents(AgentsBlock.Message.ClickedAgent({ agentId: scoutAgent.id }))),
+      model((model) => {
+        expect(model.open).toEqual(Open.Agent({ agentId: scoutAgent.id }))
+        expect(model.groups.selected).toEqual(Option.none())
+      }),
+      message(fromAgents(AgentsBlock.Message.ClickedBrowse())),
+      model((model) => {
+        expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
+      }),
+      message(fromAgents(AgentsBlock.Message.ClickedAgent({ agentId: scoutAgent.id }))),
+      message(Message.ClickedAgents()),
       model((model) => {
         expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
       })

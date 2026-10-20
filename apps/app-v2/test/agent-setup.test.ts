@@ -52,9 +52,38 @@ describe("AgentSetup", () => {
         sandbox: { connectionId: "sandboxes-1" }
       })
     )
+  })
+
+  it("says which part of a setup it still wants, and why, to mark beside its field", () => {
+    const draft = { ...AgentSetup.empty, modelConnectionId: "models-1", modelId: "test-model" }
     expect(AgentSetup.configurationOf(AgentSetup.empty)).toEqual(
-      Result.fail("Choose the connection of the agent's model.")
+      Result.fail({ field: "ModelConnection", message: "Choose a model connection." })
     )
-    expect(AgentSetup.configurationOf({ ...draft, modelId: " " })).toEqual(Result.fail("Choose the agent's model."))
+    expect(AgentSetup.configurationOf({ ...draft, modelId: " " })).toEqual(
+      Result.fail({ field: "Model", message: "Choose a model." })
+    )
+    expect(AgentSetup.configurationOf({ ...draft, instructions: "x".repeat(20_001) })).toEqual(
+      Result.fail({ field: "Instructions", message: "The instructions are too long, or hold what can't be stored." })
+    )
+    expect(AgentSetup.configurationOf({ ...draft, modelId: "x".repeat(201) })).toEqual(
+      Result.fail({ field: "Model", message: "This model ID can't be used. Use 1 to 200 characters." })
+    )
+  })
+
+  it("sets two drafts apart only by what changes an agent, not by the space around its text", () => {
+    const draft = AgentSetup.draftOf(agent)
+    expect(
+      AgentSetup.isSameSetup(draft, { ...draft, instructions: "  Review what is asked.\n", modelId: " test-model" })
+    ).toBe(true)
+    for (const changed of [
+      { instructions: "Review it twice." },
+      { harness: "" },
+      { modelConnectionId: "models-2" },
+      { modelId: "other-model" },
+      { effort: "low" },
+      { sandbox: "sandboxes-1" }
+    ]) {
+      expect(AgentSetup.isSameSetup(draft, { ...draft, ...changed })).toBe(false)
+    }
   })
 })

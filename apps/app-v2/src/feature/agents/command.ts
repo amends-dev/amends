@@ -15,12 +15,18 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
 import * as Stores from "../../store/Stores.ts"
-import { AgentsDefinition, Message } from "./definition.ts"
+import { AgentsDefinition, Message, Reason, Written } from "./definition.ts"
 
-const written = [Message.WroteAction, Message.FailedWriteAction]
+const outcomes = [Message.WroteAction, Message.FailedWriteAction]
 
-/** Why `error` kept the action from being written, as the person reads it. */
-const failed = (error: string) => Message.FailedWriteAction({ error })
+/** What the action `done` reports when the store kept it. */
+const wrote = (done: Written) => Message.WroteAction({ written: done })
+
+/** What the action `done` reports when it can't be made as entered. */
+const refused = (done: Written) => Message.FailedWriteAction({ written: done, reason: Reason.Invalid() })
+
+/** What the action `done` reports when this browser could not keep it. */
+const unkept = (done: Written) => Message.FailedWriteAction({ written: done, reason: Reason.Unwritable() })
 
 const unreachable = "The host could not be reached. Try again."
 
@@ -30,39 +36,51 @@ const refusalOf = (error: unknown) => (Schema.is(CoreError.Rejection)(error) ? e
 /** Add an agent called `name`, starting with the role `roleId`, set up as `configuration` says. */
 export const CreateAgent = AgentsDefinition.command("CreateAgent", {
   args: { ...Stores.AsMember, name: Schema.String, roleId: Role.RoleId, configuration: Agent.Configuration },
-  messages: written,
+  messages: outcomes,
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ name, roleId, configuration, ...member }) =>
-      Stores.decoded(Agent.CreateInput, { name, roleId, ...configuration }, failed("An agent needs a name.")).pipe(
-        Effect.flatMap((input) => write(member, (store) => store.write("AgentCreated", input))),
+    const stores = yield* Stores.Stores
+    return ({ name, roleId, configuration, ...member }) => {
+      const done = Written.Create({ name })
+      return Stores.decoded(Agent.CreateInput, { name, roleId, ...configuration }, refused(done)).pipe(
+        Effect.flatMap((input) =>
+          Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) => store.write("AgentCreated", input))
+        ),
         Effect.catch(Effect.succeed)
       )
+    }
   }
 })
 
 /** Set `agentId` up as `configuration` says, in place of how it is set up. */
 export const ConfigureAgent = AgentsDefinition.command("ConfigureAgent", {
   args: { ...Stores.AsMember, agentId: Identity.AgentId, configuration: Agent.Configuration },
-  messages: written,
+  messages: outcomes,
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ agentId, configuration, ...member }) =>
-      write(member, (store) => store.write("AgentConfigured", { agentId, ...configuration }))
+    const stores = yield* Stores.Stores
+    return ({ agentId, configuration, ...member }) => {
+      const done = Written.Configure({ agentId })
+      return Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) =>
+        store.write("AgentConfigured", { agentId, ...configuration })
+      )
+    }
   }
 })
 
 /** Rename `agentId` to `name`, from the name the person saw. */
 export const RenameAgent = AgentsDefinition.command("RenameAgent", {
   args: { ...Stores.AsMember, agentId: Identity.AgentId, name: Schema.String, expectedName: Schema.String },
-  messages: written,
+  messages: outcomes,
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ agentId, name, expectedName, ...member }) =>
-      Stores.decoded(Agent.RenameInput, { agentId, name, expectedName }, failed("An agent needs a name.")).pipe(
-        Effect.flatMap((input) => write(member, (store) => store.write("AgentRenamed", input))),
+    const stores = yield* Stores.Stores
+    return ({ agentId, name, expectedName, ...member }) => {
+      const done = Written.Rename({ agentId })
+      return Stores.decoded(Agent.RenameInput, { agentId, name, expectedName }, refused(done)).pipe(
+        Effect.flatMap((input) =>
+          Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) => store.write("AgentRenamed", input))
+        ),
         Effect.catch(Effect.succeed)
       )
+    }
   }
 })
 

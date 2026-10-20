@@ -2,8 +2,8 @@
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
  * actions, their inbox, the tasks they can see, their connections, their agents, their settings, and their
  * channels, and what the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the
- * groups to browse, the connections, the agents, the settings, the channels, or a group, with its threads and
- * the thread open among them. A thread opens in the side pane, beside the group's threads or beside the
+ * groups to browse, the connections, the agents, one agent, the settings, the channels, or a group, with its
+ * threads and the thread open among them. A thread opens in the side pane, beside the group's threads or beside the
  * inbox, which stays. The rail picks a destination, and the sidebar lists that destination's items: Home's
  * inbox, tasks, and groups, the agents, the connections by what they give and the channels, or the settings. It
  * lays itself out by the
@@ -19,6 +19,7 @@
 
 import { Connection } from "@amends-dev/core/connection"
 import { GroupId } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { Viewport } from "@amends-dev/design/viewport"
 import { DialogBlock } from "@foldkit/ui/dialog"
@@ -42,7 +43,8 @@ import { titleOf } from "../../feature/thread/definition.ts"
 
 /**
  * What the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the groups to
- * browse, the connections, the agents, the settings, the channels, or the group open in the workspace.
+ * browse, the connections, the agents or one agent among them, the settings, the channels, or the group open in
+ * the workspace.
  */
 export const Open = defineTaggedUnion({
   Nothing: {},
@@ -52,6 +54,7 @@ export const Open = defineTaggedUnion({
   Groups: {},
   Connections: {},
   Agents: {},
+  Agent: { agentId: Identity.AgentId },
   Settings: {},
   Channels: {},
   Group: { groupId: GroupId.GroupId, model: GroupBlock.Model }

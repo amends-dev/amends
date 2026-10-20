@@ -40,14 +40,15 @@ import {
   scout,
   scoutAgent
 } from "../../../test/fixtures.ts"
+import { calendarDate } from "../../seen.ts"
 import { Integrations } from "../connections/definition.ts"
 import { AgentsBlock } from "./block.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
-import { Message, type Model, OutMessage } from "./definition.ts"
+import { Message, type Model, OfferedModels, OutMessage, Reason, Written } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { sidebarView, view } from "./view.ts"
+import { agentView, sidebarView, view } from "./view.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }
@@ -102,15 +103,21 @@ describe("the agents", () => {
         change(label("Role"), BuiltinRoles.AdministratorId),
         type(label("Instructions"), "Review what is asked."),
         change(label("Harness"), harness.id),
-        expect(label("Model")).toBeAbsent(),
+        expect(label("Model")).toBeDisabled(),
+        expect(text("Choose a model connection first.")).toExist(),
         change(label("Model connection"), models.id)
       ),
       Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
-      inside(role("form", { name: "Add an agent" }), expect(text("Loading the models…")).toExist()),
+      inside(
+        role("form", { name: "Add an agent" }),
+        expect(text("Loading this connection's models…")).toExist(),
+        expect(label("Model")).toBeDisabled()
+      ),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
       inside(
         role("form", { name: "Add an agent" }),
-        expect(text("Loading the models…")).toBeAbsent(),
+        expect(text("Loading this connection's models…")).toBeAbsent(),
+        expect(label("Model")).not.toBeDisabled(),
         expect(label("Effort")).toBeAbsent(),
         change(label("Model"), "test-model"),
         change(label("Effort"), "high"),
@@ -130,7 +137,7 @@ describe("the agents", () => {
           })
         })
       ),
-      Command.resolve(CreateAgent, Message.WroteAction()),
+      Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Reviewer" }) })),
       expect(role("form", { name: "Add an agent" })).toBeAbsent(),
       Subscription.emit(
         subscriptions.agents,
@@ -179,11 +186,11 @@ describe("the agents", () => {
           })
         })
       ),
-      Command.resolve(CreateAgent, Message.WroteAction())
+      Command.resolve(CreateAgent, Message.WroteAction({ written: Written.Create({ name: "Builder" }) }))
     )
   })
 
-  it("are refused, with why, until the draft names the connection and the model of the agent", () => {
+  it("are refused, with why beside the field, until the draft names the connection and the model of the agent", () => {
     scene(
       { update, view },
       given(opened),
@@ -194,21 +201,22 @@ describe("the agents", () => {
         click(role("button", { name: "Add" }))
       ),
       Command.expectNone(),
-      expect(text("Choose the connection of the agent's model.")).toExist(),
-      expect(role("alert")).toExist(),
+      expect(text("Choose a model connection.")).toExist(),
+      expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toExist(),
       inside(role("form", { name: "Add an agent" }), change(label("Model connection"), models.id)),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
-      expect(text("Choose the connection of the agent's model.")).toBeAbsent(),
+      expect(text("Choose a model connection.")).toBeAbsent(),
+      expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toBeAbsent(),
       inside(role("form", { name: "Add an agent" }), click(role("button", { name: "Add" }))),
       Command.expectNone(),
-      expect(text("Choose the agent's model.")).toExist(),
+      expect(text("Choose a model.")).toExist(),
       click(role("button", { name: "Cancel" })),
       expect(role("form", { name: "Add an agent" })).toBeAbsent(),
       expect(role("button", { name: "Add agent" })).toExist()
     )
   })
 
-  it("say why the models of a connection could not be listed", () => {
+  it("say why the models of a connection could not be listed, and take the id of a model all the same", () => {
     scene(
       { update, view },
       given(opened),
@@ -219,11 +227,13 @@ describe("the agents", () => {
         Message.FailedLoadModels({ connectionId: models.id, error: "The host could not be reached. Try again." })
       ),
       expect(text("The host could not be reached. Try again.")).toExist(),
-      expect(label("Model")).toBeAbsent()
+      expect(text("Its models couldn't be loaded. You can still enter a model's ID.")).toExist(),
+      inside(role("form", { name: "Add an agent" }), type(label("Model"), "any-model")),
+      expect(label("Model")).toHaveValue("any-model")
     )
   })
 
-  it("are renamed and set up again by an owner, from how they are now, picking one opening its setup below the list", () => {
+  it("report the agent picked from the list, and ask for the models of its connection once", () => {
     scene(
       { update, view },
       given(opened),
@@ -231,49 +241,13 @@ describe("the agents", () => {
       expectOutMessage(OutMessage.OpenedAgent({ agentId })),
       Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
       Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
-      inside(role("form", { name: "Change the agent's setup" }), click(role("button", { name: "Rename" }))),
-      inside(
-        role("form", { name: "Rename the agent" }),
-        type(label("Name"), "Scout Prime"),
-        click(role("button", { name: "Save" }))
-      ),
-      Command.expectExact(RenameAgent({ ...asMember, agentId, name: "Scout Prime", expectedName: "Scout" })),
-      Command.resolve(
-        RenameAgent,
-        Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
-      ),
-      expect(text("This browser could not keep that. Try again.")).toExist(),
       click(role("button", { name: "Scout" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId })),
-      Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
-      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
-      inside(
-        role("form", { name: "Change the agent's setup" }),
-        expect(label("Instructions")).toExist(),
-        expect(label("Model")).toExist(),
-        type(label("Instructions"), "Review it twice."),
-        change(label("Sandbox"), sandbox.id),
-        click(role("button", { name: "Save" }))
-      ),
-      Command.expectExact(
-        ConfigureAgent({
-          ...asMember,
-          agentId,
-          configuration: Schema.decodeSync(Agent.Configuration)({
-            instructions: "Review it twice.",
-            harness: { _tag: "Auto" },
-            model: { connectionId: models.id, id: "test-model" },
-            sandbox: { connectionId: sandbox.id }
-          })
-        })
-      ),
-      Command.resolve(ConfigureAgent, Message.WroteAction()),
-      expect(role("form", { name: "Change the agent's setup" })).toBeAbsent(),
-      expect(text("This browser could not keep that. Try again.")).toBeAbsent()
+      Command.expectNone()
     )
   })
 
-  it("show an ordinary member each agent with what it runs on, and no way to add or change one", () => {
+  it("show an ordinary member each agent with what it runs on, and no way to add one", () => {
     scene(
       { update, view, subscriptions: AgentsBlock.subscriptions },
       given(modifyFields(opened, { grants: () => memberGrants })),
@@ -285,12 +259,12 @@ describe("the agents", () => {
         )
       ),
       expect(role("button", { name: "Add agent" })).toBeAbsent(),
-      // Picking an agent reports it, and opens nothing a person who may not change it could use.
+      // Picking an agent reports it, since a member reads its page too.
       click(role("button", { name: "Scout" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId })),
-      Command.expectNone(),
-      expect(role("form", { name: "Change the agent's setup" })).toBeAbsent(),
-      // Once the person is given the role that manages them, the controls appear.
+      Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
+      // Once the person is given the role that manages them, the button to add one appears.
       Subscription.emit(
         subscriptions.agents,
         Message.ReceivedAgents({
@@ -302,14 +276,11 @@ describe("the agents", () => {
           grants: ownerGrants
         })
       ),
-      expect(role("button", { name: "Add agent" })).toExist(),
-      click(role("button", { name: "Scout" })),
-      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered })),
-      expect(role("form", { name: "Change the agent's setup" })).toExist()
+      expect(role("button", { name: "Add agent" })).toExist()
     )
   })
 
-  it("say an agent is on its way while its change is, with no status until the server says how ready it is, and open no form", () => {
+  it("say an agent is on its way while its change is, with no status until the server says how ready it is", () => {
     scene(
       { update, view },
       given(modifyFields(opened, { agents: () => [{ agent: incompleteAgent, pending: true }] })),
@@ -323,8 +294,8 @@ describe("the agents", () => {
       expect(role("button", { name: "Scout, Needs setup" })).toBeAbsent(),
       click(role("button", { name: "Scout" })),
       expectOutMessage(OutMessage.OpenedAgent({ agentId })),
-      Command.expectNone(),
-      expect(role("form", { name: "Change the agent's setup" })).toBeAbsent()
+      Command.expectExact(LoadModels({ workspaceId, connectionId: models.id })),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: models.id, models: offered }))
     )
   })
 
@@ -641,7 +612,7 @@ describe("the agents list", () => {
 })
 
 describe("the agents' section of the sidebar", () => {
-  const sidebar = withViewInputs(sidebarView, { isListOpen: true })
+  const sidebar = withViewInputs(sidebarView, { isListOpen: true, openAgentId: Option.none() })
 
   it("is a section named Agents with Browse and Add agent, and the title opening the list", () => {
     scene(
@@ -690,7 +661,18 @@ describe("the agents' section of the sidebar", () => {
     )
   })
 
-  it("reports the agent picked, and opens its setup form for an owner", () => {
+  it("marks the row of the agent whose page is open current, and the title not", () => {
+    scene(
+      { update, view: sidebar({ isListOpen: false, openAgentId: Option.some(Identity.AgentId.make("agent-2")) }) },
+      given(withSeveral),
+      expect(role("button", { name: "Nora" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Scout" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Review helper, Needs setup" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Agents" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("reports the agent picked, and asks for the models of its connection", () => {
     scene(
       { update, view: sidebar() },
       given(withSeveral),
@@ -728,6 +710,261 @@ describe("the agents' section of the sidebar", () => {
       given(modifyFields(withSeveral, { grants: () => memberGrants })),
       expect(role("button", { name: "Browse agents" })).toExist(),
       expect(role("button", { name: "Add agent" })).toBeAbsent()
+    )
+  })
+})
+
+describe("an agent's page", () => {
+  const workspaceName = workspace.name
+  const page = withViewInputs(agentView, { agentId, workspaceName })
+  const withModels: Model = modifyFields(opened, {
+    offered: () => [OfferedModels.Loaded({ connectionId: models.id, models: offered })]
+  })
+  const readOnly = modifyFields(withModels, { grants: () => memberGrants })
+
+  it("shows the agent by its name on a lilac mark, with the workspace under it on a phone", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      expect(role("heading", { name: "Scout", level: 1 })).toExist(),
+      expect(text("S")).toHaveClass("bg-avatar-lilac-bg"),
+      expect(text("S")).toHaveClass("size-6"),
+      expect(text(workspaceName)).toHaveClass("max-tablet:block"),
+      expect(text("Needs setup")).toBeAbsent(),
+      expect(role("note")).toBeAbsent()
+    )
+  })
+
+  it("shows an owner its name and its setup as they are, with nothing yet to save", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      expect(label("Agent name")).toHaveValue("Scout"),
+      expect(role("button", { name: "Save name" })).toBeDisabled(),
+      expect(role("heading", { name: "Setup" })).toExist(),
+      expect(label("Instructions")).toHaveValue("Review what is asked."),
+      expect(label("Harness")).toHaveValue(""),
+      expect(label("Model connection")).toHaveValue(models.id),
+      expect(label("Model")).toHaveValue("test-model"),
+      expect(label("Effort")).toHaveValue(""),
+      expect(label("Sandbox")).toHaveValue(""),
+      expect(role("button", { name: "Save setup" })).toBeDisabled(),
+      expect(role("button", { name: "Discard changes" })).toBeAbsent()
+    )
+  })
+
+  it("lists its details: how its role is changed, that it is idle, and who made it and when", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      expect(role("heading", { name: "Details" })).toExist(),
+      expect(text("Role")).toExist(),
+      expect(text("Changed in Settings › Members, as any member's is.")).toExist(),
+      expect(text("Current activity")).toExist(),
+      expect(text("Idle")).toExist(),
+      expect(text("Created by")).toExist(),
+      expect(text(`Alice · ${calendarDate(scoutAgent.createdAt)}`)).toExist()
+    )
+  })
+
+  it("says in a note, a line for each reason, why an agent can't run as it is set up", () => {
+    const stranded = Schema.decodeSync(ReplicaRecord.Agent)({
+      ...Schema.encodeSync(ReplicaRecord.Agent)(scoutAgent),
+      readiness: {
+        _tag: "Incomplete",
+        issues: [{ _tag: "Removed", part: "model" }, { _tag: "SandboxRequired" }]
+      }
+    })
+    scene(
+      { update, view: page() },
+      given(modifyFields(withModels, { agents: () => [{ agent: stranded, pending: false }] })),
+      expect(role("note", { name: "This agent can't run as it is set up" })).toExist(),
+      expect(text("Its model connection was removed.")).toExist(),
+      expect(text("Its harness works only in a sandbox, and it has none.")).toExist(),
+      expect(text("Needs setup")).toHaveClass("sr-only")
+    )
+  })
+
+  it("renames the agent from the name it has, saving on its own, and says why one can't be saved under the name", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      type(label("Agent name"), " Scout Prime "),
+      expect(role("button", { name: "Save name" })).not.toBeDisabled(),
+      expect(role("button", { name: "Save setup" })).toBeDisabled(),
+      click(role("button", { name: "Save name" })),
+      Command.expectExact(RenameAgent({ ...asMember, agentId, name: "Scout Prime", expectedName: "Scout" })),
+      expect(label("Agent name")).toBeDisabled(),
+      expect(role("button", { name: "Save name" })).toBeDisabled(),
+      Command.resolve(
+        RenameAgent,
+        Message.FailedWriteAction({ written: Written.Rename({ agentId }), reason: Reason.Invalid() })
+      ),
+      expect(text("Use 1 to 80 characters, with no invisible ones.")).toExist(),
+      expect(label("Agent name")).toHaveValue(" Scout Prime "),
+      type(label("Agent name"), "Scout Prime"),
+      expect(text("Use 1 to 80 characters, with no invisible ones.")).toBeAbsent(),
+      click(role("button", { name: "Save name" })),
+      Command.expectExact(RenameAgent({ ...asMember, agentId, name: "Scout Prime", expectedName: "Scout" })),
+      Command.resolve(RenameAgent, Message.WroteAction({ written: Written.Rename({ agentId }) })),
+      expect(role("button", { name: "Save name" })).toBeDisabled()
+    )
+  })
+
+  it("does not save a name that is blank or the name it has", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      type(label("Agent name"), "   "),
+      expect(role("button", { name: "Save name" })).toBeDisabled(),
+      type(label("Agent name"), "Scout"),
+      expect(role("button", { name: "Save name" })).toBeDisabled()
+    )
+  })
+
+  it("sets the agent up again as a whole, the instructions and the sandbox and the effort together", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      type(label("Instructions"), "Review it twice."),
+      change(label("Sandbox"), sandbox.id),
+      change(label("Effort"), "low"),
+      expect(role("button", { name: "Save setup" })).not.toBeDisabled(),
+      expect(role("button", { name: "Discard changes" })).toExist(),
+      expect(role("button", { name: "Save name" })).toBeDisabled(),
+      click(role("button", { name: "Save setup" })),
+      Command.expectExact(
+        ConfigureAgent({
+          ...asMember,
+          agentId,
+          configuration: Schema.decodeSync(Agent.Configuration)({
+            instructions: "Review it twice.",
+            harness: { _tag: "Auto" },
+            model: { connectionId: models.id, id: "test-model", effort: "low" },
+            sandbox: { connectionId: sandbox.id }
+          })
+        })
+      ),
+      expect(label("Instructions")).toBeDisabled(),
+      expect(role("button", { name: "Save setup" })).toBeDisabled(),
+      expect(role("button", { name: "Discard changes" })).toBeDisabled(),
+      Command.resolve(ConfigureAgent, Message.WroteAction({ written: Written.Configure({ agentId }) })),
+      expect(label("Instructions")).not.toBeDisabled()
+    )
+  })
+
+  it("puts the setup back as it is when the person discards what they changed", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      type(label("Instructions"), "Review it twice."),
+      change(label("Sandbox"), sandbox.id),
+      click(role("button", { name: "Discard changes" })),
+      expect(label("Instructions")).toHaveValue("Review what is asked."),
+      expect(label("Sandbox")).toHaveValue(""),
+      expect(role("button", { name: "Save setup" })).toBeDisabled(),
+      expect(role("button", { name: "Discard changes" })).toBeAbsent()
+    )
+  })
+
+  it("marks a part of the setup that can't be saved beside its field, and sends nothing until it is changed", () => {
+    scene(
+      { update, view: page() },
+      given(
+        modifyFields(withModels, {
+          connections: () => [harness, sandbox].map((connection) => ({ connection, pending: false }))
+        })
+      ),
+      type(label("Instructions"), "Review it twice."),
+      click(role("button", { name: "Save setup" })),
+      Command.expectNone(),
+      expect(text("This connection is no longer available to you. Choose another.")).toExist(),
+      expect(text("This setup can't be saved as it is. Change what's marked, then try again.")).toExist(),
+      type(label("Instructions"), "Review it thrice."),
+      expect(text("This connection is no longer available to you. Choose another.")).toBeAbsent()
+    )
+  })
+
+  it("says under the setup why it could not be saved, and keeps what the person changed", () => {
+    scene(
+      { update, view: page() },
+      given(withModels),
+      type(label("Instructions"), "Review it twice."),
+      click(role("button", { name: "Save setup" })),
+      Command.resolve(
+        ConfigureAgent,
+        Message.FailedWriteAction({ written: Written.Configure({ agentId }), reason: Reason.Unwritable() })
+      ),
+      expect(text("The setup couldn't be saved. Try again when the host is available.")).toExist(),
+      expect(label("Instructions")).toHaveValue("Review it twice."),
+      expect(role("button", { name: "Save setup" })).not.toBeDisabled()
+    )
+  })
+
+  it("shows a person who may not configure the agent its name and setup to read, with nothing to save", () => {
+    scene(
+      { update, view: page() },
+      given(readOnly),
+      expect(label("Agent name")).toHaveValue("Scout"),
+      expect(label("Agent name")).toBeDisabled(),
+      expect(label("Instructions")).toHaveValue("Review what is asked."),
+      expect(label("Instructions")).toBeDisabled(),
+      expect(label("Model connection")).toBeDisabled(),
+      expect(label("Sandbox")).toBeDisabled(),
+      expect(role("button", { name: "Save name" })).toBeAbsent(),
+      expect(role("button", { name: "Save setup" })).toBeAbsent(),
+      expect(role("heading", { name: "Details" })).toExist()
+    )
+  })
+
+  it("says an agent is on its way, and lets nothing about it be saved yet", () => {
+    scene(
+      { update, view: page() },
+      given(modifyFields(withModels, { agents: () => [{ agent: incompleteAgent, pending: true }] })),
+      expect(text("Sending…")).toExist(),
+      expect(role("note")).toBeAbsent(),
+      expect(label("Agent name")).toBeDisabled(),
+      expect(role("button", { name: "Save setup" })).toBeAbsent()
+    )
+  })
+
+  it("says an agent the workspace does not list isn't there, and offers the list", () => {
+    scene(
+      { update, view: withViewInputs(agentView, { agentId: Identity.AgentId.make("agent-9"), workspaceName })() },
+      given(withModels),
+      expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist(),
+      expect(text("It may have been removed, or you can no longer see it.")).toExist(),
+      click(role("button", { name: "Show all agents" })),
+      expectOutMessage(OutMessage.RequestedBrowse())
+    )
+  })
+
+  it("says nothing of the agent before the agents are read", () => {
+    scene(
+      { update, view: page() },
+      given(init(workspace.id, alice.id).model),
+      expect(role("heading", { name: "This agent isn't here" })).toBeAbsent(),
+      expect(label("Agent name")).toBeAbsent()
+    )
+  })
+
+  it("says the agent isn't there once it is removed from the workspace", () => {
+    scene(
+      { update, view: page(), subscriptions: AgentsBlock.subscriptions },
+      given(withModels),
+      expect(label("Agent name")).toExist(),
+      Subscription.emit(
+        subscriptions.agents,
+        Message.ReceivedAgents({
+          agents: [],
+          members: withModels.members,
+          connections: withModels.connections,
+          roles: withModels.roles,
+          workspace: withModels.workspace,
+          grants: withModels.grants
+        })
+      ),
+      expect(role("heading", { name: "This agent isn't here", level: 2 })).toExist()
     )
   })
 })

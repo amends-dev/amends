@@ -14,8 +14,8 @@ open one, as a table to narrow by assignee, by status, and by search, each to op
 search for anything in the workspace, groups, threads, and people, from the sidebar or from the keyboard;
 the workspace's settings, its name and their own, its members and their roles,
 and its invitations; the workspace's connections to the integrations the host installs, to add,
-rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, to
-add, rename, and set up again; and its channels, which bring in conversations from them, to add,
+rename, set up, check, and remove; its agents, each with how ready it is and what it runs on, and a
+page of its own, to add, rename, and set up again; and its channels, which bring in conversations from them, to add,
 send to another group, and remove. A reply or a new thread they have not sent is kept as a draft in
 their browser, through a reload and offline, until they send it. While the host can be reached, a
 thread shows who else is typing in it. What they do shows at once, marked as sending, even offline,
@@ -114,9 +114,10 @@ may, the host's integrations are listed, and a connection gives what the thing n
 that says the integrations are loading, or that no connection gives models or channels, is a
 `hint` in the body, and a failure to list them a `notice` over a quiet Try again in a `column`. Each
 connection is an entry of its name, its integration and how ready it is as `badge`s, a hint of why it can't be
-used, what its last check found, and its quiet buttons; each agent an entry of its initials and
-name, a badge of whether it can run, a hint of why not and of what it runs on, and its quiet
-buttons; each channel an entry of its name, a badge when it opens tasks, a hint of where its
+used, what its last check found, and its quiet buttons; each agent a `row` under `columns` of its lilac mark with
+the patch of how it stands, its name, its harness over its sandbox, and its model over its connection, and
+an agent's own page a `paneColumn` of a `noticeBox` for why it can't run, the `form` of its name, the `paneForm`
+of its setup under a stitch, and a `paneSection` of its `detailList`; each channel an entry of its name, a badge when it opens tasks, a hint of where its
 conversations come from and open, and its quiet buttons. The group's settings are the design's
 `modal` of `paneTabs`: the General tab is a `field` for the team's name with a `hint`, and a
 `settingRow` each for the visibility and the person's membership, with Leave or Join as its action; the
@@ -419,7 +420,7 @@ the pages that compose them; the root composes the pages.
   Agents: each agent by its membership's first letter on a lilac mark and its name, with Browse
   (`list`, "Browse agents") and, where the person may create agents and a connection gives models,
   "Add agent", and the title a button that opens the list and is current while it shows (the view
-  input `isListOpen`); an agent that needs setup has a caution triangle on its mark, with "Needs
+  input `isListOpen`), an agent's row being current instead while its page shows (`openAgentId`); an agent that needs setup has a caution triangle on its mark, with "Needs
   setup" on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
   ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
   Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
@@ -434,20 +435,40 @@ the pages that compose them; the root composes the pages.
   tab says every agent can run, and a search with no match says so and clears from "Clear search".
   The Block reports `RequestedBrowse` when the person browses from the sidebar or adds from it, since
   the form Add opens is in the list, and `OpenedAgent` with the agent picked, from the sidebar or
-  the list; the page shows the agents for both. Until an agent has a page of its own, picking one
-  opens its setup form below the list, where the person may configure it, and that form has a Rename
-  button for the other form. Where they may configure an agent,
-  they rename it, from the name they saw, and change how it is set up; where they may create agents,
-  they add one with a name, a role they may give, instructions, a harness, `Auto` or a connection
-  that gives harnesses, a model connection, a model from what that connection offers, an effort, and
-  a sandbox, none or a connection that gives sandboxes. The host's integrations, which say what each
+  the list, asking once for the models of the agent's connection to show its model and its efforts;
+  the page opens the agent's page for it. That page, `agentView`, with the view inputs `agentId` and
+  `workspaceName`, is a pane titled by the agent's name on a 24px lilac mark with the patch of how it
+  stands, and, on a phone, the workspace's name under the title. One `paneColumn` holds, in order: where the
+  agent can't run, a boxed note, "This agent can't run as it is set up", with a line for each reason; a Name
+  form, the field "Agent name" with a secondary "Save name", disabled until the name is changed to one that
+  is not blank; a Setup form, under a dashed stitch, of the setup fields with a primary "Save setup", disabled
+  until the setup changes, and "Discard changes" beside it while it has; and Details: the role, which is
+  changed in Settings › Members, as any member's is, the current activity, "Idle" until turns say what an agent
+  is at work on, and who created the agent, with the day. A person who may not configure the agent reads the
+  same fields disabled, with no buttons; an agent the workspace does not list says "This agent isn't here" and
+  offers "Show all agents", and nothing shows before the agents are read. The Block keeps what the person
+  changed on each agent's page (`edits`: a name and a whole setup, each saved apart, from the name the agent
+  has and the setup it has), and drops the edits of an agent that is gone.
+  Where they may create agents, they add one with a name, a role they may give, instructions, a harness,
+  `Auto` or a connection that gives harnesses, a model connection, a model from what that connection offers
+  or any model's ID where the connection takes one, an effort, and a sandbox, none or a connection that gives
+  sandboxes. These setup fields (`setupFields.ts`) are the same on the agent's page and in the form that adds
+  one. The host's integrations, which say what each
   connection gives, are listed by the workspace page, once, which informs the Block of them or of
   why they could not be reached; the person then asks again, and the Block asks the page, by its out
-  message `RequestedIntegrations`. Choosing a model connection lists its models over HTTP, and an
-  answer for another connection than the one chosen is passed over. Adding, renaming, and setting up again
-  are actions written to the store; `agentSetup.ts` makes the configuration of a draft, or says what
-  it still wants. A form about an agent that is gone closes. An agent's role and its removal are its
-  membership's, in the settings.
+  message `RequestedIntegrations`. Choosing a model connection lists its models over HTTP, kept for each
+  connection apart, so that an answer arriving late is the models of the connection it was asked of.
+  Adding, renaming, and setting up again are actions written to the store. A setup that can't be saved as it is
+  sends nothing: `checkSetup` marks each part beside its field, a model connection, harness, or sandbox that
+  was removed or no longer gives what the part needs, a model that its connection, which lists only its own,
+  does not offer, a harness that works only in a sandbox the setup has none of, and what `agentSetup.ts` finds
+  it still wants, a model connection, a model, instructions the store can't keep, or a model ID of 1 to 200
+  characters. A save the store could not keep, or a name or setup it refused to decode, is worded under the form
+  that made it: "Use 1 to 80 characters, with no invisible ones.", "Check the instructions and model, then save
+  again.", "Check the name, instructions, and model, then try again.", and, for the store, "The name couldn't be
+  saved. Try again when the host is available." and its likes. What the server refuses afterwards comes back as a
+  rejection, which `feature/actions` shows as a toast, and is not routed back to the form. An agent's role and
+  its removal are its membership's, in the settings.
 - `feature/channels`: the workspace's channels, each by its name with the connection that receives
   its conversations and the group they open in, whether they open as tasks, and marked as sending
   while a change to it is on its way. Where they may manage a channel, they send its conversations
@@ -560,7 +581,8 @@ the pages that compose them; the root composes the pages.
   reads ⌘K on an Apple platform and Ctrl K on any other, the key it names being Command+K or Control+K, by
   the view input `isApplePlatform`. The main pane shows one destination: nothing yet, titled by the
   workspace, the inbox, the tasks in triage, every open task, the groups to browse, the connections,
-  the agents, the settings, or the channels, which are always read, or the open group, a keyed
+  the agents, one agent's page (`Open.Agent`, with the agents Block's `agentView` in the slot `agent`), the
+  settings, or the channels, which are always read, or the open group, a keyed
   occurrence. The tasks Block, which the page binds as `tasks` (`TasksBinding`), is the same child
   under two slots, `triage` and `tasks`, with `triageView` and `tasksView`; a task's thread opened
   there is opened in its group, which a notification's is not: its thread opens beside the inbox,
@@ -832,13 +854,16 @@ browser's storage. Each Block's tests sit beside it:
   be kept; the agents keeping the integrations the page informs them of or why they could not be
   listed, asking the page to list them again, adding an agent as an action
   with the configuration its draft makes and refusing a draft with what it still wants, loading the
-  models of the model connection the form chooses over HTTP and passing over a late answer for
-  another connection, choosing the model again when the connection changes, renaming and setting up
-  an agent again from what was seen, closing a form about an agent that is gone, offering the roles
-  the person may give, being read once the store has answered, narrowing the list by tab and by name
+  models of the model connection the form chooses over HTTP and keeping those of each connection
+  apart, so that a late answer is the models of the connection it was asked of, choosing the model
+  again when the connection changes, offering the roles the person may give, being read once the store has answered, narrowing the list by tab and by name
   without regard to case or accents, counting those that need setup and not those on their way, asking the
-  page to show the agents when the person browses or adds, and reporting the agent picked, opening its setup
-  form only where the person may change it, and why a read or a write could not be kept; the channels keeping the
+  page to show the agents when the person browses or adds, and reporting the agent picked, asking once for
+  the models of its connection, keeping what the person changed on the page of an agent, a name and a setup
+  apart, from the name and the setup it has, saving each as an action only once it differs and the person may
+  configure the agent, once while it is on its way, marking what a setup can't be saved with beside its field
+  and sending nothing, dropping the edits of an agent that is gone, and why a read or a write could not be
+  kept; the channels keeping the
   integrations the page informs them of or why they could not be listed, asking the page to list
   them again, adding a channel as an action once its connection, group, and
   name are chosen and refusing one that lacks any, with why, offering only the connections that give
@@ -852,7 +877,7 @@ browser's storage. Each Block's tests sit beside it:
   and channels of them or of why they could not be listed, and listing them again when one asks,
   opening the group picked, showing
   the inbox, the tasks in triage, every open task, the groups to browse, the connections, the agents, the settings, or the channels in its
-  place with no group marked, and opening a group from the groups to browse, going home from a group or a destination, handing the settings and the channels what the
+  place with no group marked, and an agent's page from a row of its sidebar or the list, and opening a group from the groups to browse, going home from a group or a destination, handing the settings and the channels what the
   person does in them, keeping what the tasks were narrowed to between Triage and Tasks, opening a
   task's thread in its group, and a notification's beside the inbox, which stays, naming the thread
   open in the group open or beside the inbox, opening the navigation drawer, closing it as its dialog asks and by every
@@ -963,16 +988,22 @@ browser's storage. Each Block's tests sit beside it:
   opening their own, and the connection picked reported; the agents added by an
   owner with a harness, a model connection whose models load, a model, an effort, and a sandbox, or
   a model the connection does not list by its id, refused with why until the connection and the
-  model are chosen, with the reason a connection's models could not be listed, renamed and set up
-  again with a failure shown from the form that picking an agent opens, read as rows by what each runs
-  on, with the patch and the sentence for one that needs setup and none for one that is ready, by an
+  model are chosen, with the reason a connection's models could not be listed, read as rows by what each runs
+  on, picked to be reported, with the patch and the sentence for one that needs setup and none for one that is ready, by an
   ordinary member without the controls until the person is given the role that manages them, marked as
   sending with none while a change is on its way, offering to add only once the host listed its
   integrations and a connection gives models, and why they could not be read; the list's tabs with their
   counts, its search and the quiet line and Clear search for no match, its empty states, its columns,
   and nothing shown before the agents are read; the sidebar's section with its title, Browse, and Add
-  agent, the agents by name with a patch on those that need setup, the one picked reported, and "No
-  agents yet" once the agents are read; the settings' two names renamed, the
+  agent, the agents by name with a patch on those that need setup, the one whose page is open marked
+  current in place of the title, the one picked reported, and "No agents yet" once the agents are read; an
+  agent's page: its name on a lilac mark with the workspace under it on a phone, its name and its setup as
+  they are with nothing yet to save, its details, the note of why it can't run, a line for each reason,
+  its name renamed from the name it has and saved once, with the failure under the name, and a blank name
+  or the name it has not saved, its setup set up again as a whole and saved once, discarded, with a part
+  that can't be saved marked beside its field and nothing sent, and the failure under the setup, read
+  disabled and without buttons by a person who may not configure the agent, on its way, the agent that
+  is not there with a way to the list, and nothing before the agents are read; the settings' two names renamed, the
   members listed with their roles as badges, or as a select to change for the members the person may
   act on, changed, removed, and handed the workspace by the owner, the invitations listed by their
   address, role, and end, revoked, and sent, what is on its way marked in each section, a name
@@ -985,13 +1016,14 @@ browser's storage. Each Block's tests sit beside it:
   way, with why the integrations could not be listed and a way to ask again, and why they could not
   be read; and a workspace on the shell: counting what waits beside "Inbox", and the tasks that wait
   beside "Triage", whichever destination shows, then showing the inbox, the tasks in triage, every open
-  task, the connections, the agents, the settings, or the channels, which
+  task, the connections, the agents, an agent's page, the settings, or the channels, which
   it reads whichever destination shows, each in a main pane named for it, with the rail listing Home,
   Agents, and Connections, then Search, which opens the search and is never marked, and Settings below, and
   marking the destination open, Home from the inbox, the tasks, and the groups too, Connections from the
   channels, and the sidebar marking Triage or Tasks while it shows, changing with the rail: Home's
   items and the groups, with the Groups title opening the groups to browse and marked while they show;
-  the agents' section with its rows and its title marked; the connections' sections, by what they give,
+  the agents' section with its rows and its title marked, and, with an agent's page open from a row of
+  it or of the list, that row marked in place of the title; the connections' sections, by what they give,
   and Channels, marked while the channels show; and the settings' Workspace and Members, which open the
   settings; the groups to browse opened from the
   sidebar's button, from an open group and its thread, and from the drawer, which it closes, with

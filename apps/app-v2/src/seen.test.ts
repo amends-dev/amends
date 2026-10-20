@@ -16,6 +16,7 @@ import {
 } from "../test/fixtures.ts"
 import {
   ageLabel,
+  calendarDate,
   dayLabel,
   dayOf,
   expiryLabel,
@@ -409,6 +410,18 @@ describe("ageLabel", () => {
     expect(thisYear).not.toContain("2026")
     expect(lastYear).toBe(spelled(local(2025, 9, 20), { year: "numeric", month: "short", day: "numeric" }))
     expect(lastYear).toContain("2025")
+  })
+})
+
+describe("calendarDate", () => {
+  it("is the day with its month and year, by the person's own clock, whatever the hour or how far back it was", () => {
+    const dateOf = (at: DateTime.DateTime) => spelled(at, { month: "short", day: "numeric", year: "numeric" })
+
+    expect(calendarDate(local(2026, 10, 6, 0, 5))).toBe(dateOf(local(2026, 10, 6, 0, 5)))
+    expect(calendarDate(local(2026, 10, 6, 23, 59))).toBe(calendarDate(local(2026, 10, 6, 0, 5)))
+    expect(calendarDate(local(2026, 10, 6, 12, 0))).toContain("2026")
+    expect(calendarDate(local(2024, 2, 29, 12, 0))).toContain("2024")
+    expect(calendarDate(local(2026, 10, 7, 0, 5))).not.toBe(calendarDate(local(2026, 10, 6, 23, 59)))
   })
 })
 
