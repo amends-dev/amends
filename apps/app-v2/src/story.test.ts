@@ -54,7 +54,7 @@ const fromSignIn = (model: Model, message: typeof SignInBlock.Message.Type) =>
 const fromWorkspaces = (message: typeof WorkspacesBlock.Message.Type) =>
   WorkspacesBinding.embedView({
     slotId: "workspaces",
-    model: WorkspacesBlock.init().model,
+    model: WorkspacesBlock.init(session.account.email).model,
     viewInputs: { now }
   }).toParentMessage(message)
 

@@ -21,7 +21,7 @@ export const init = ApplicationComposition.makeInit((flags: Flags) =>
       }),
     onSome: (session) =>
       WorkspacesBinding.init({
-        args: [],
+        args: [session.account.email],
         toParentModel: (workspaces) => ({
           page: Page.SignedIn({ account: session.account, workspaces, workspace: Option.none() }),
           viewport: flags.viewport,

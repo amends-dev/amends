@@ -1,4 +1,8 @@
-/** The workspace requests, over HTTP, each ending in a message, failures worded for the person. */
+/**
+ * The page's commands: the workspace requests, over HTTP, each ending in a message, failures worded for the person;
+ * and what it does in the window, which is moving focus to a row and letting a toast go after a while. And the
+ * mount that selects a field's text when the field takes focus.
+ */
 
 import { Request } from "@amends-dev/core/request"
 import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
@@ -9,8 +13,17 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as Dom from "foldkit/dom"
 import * as Api from "../../api.ts"
-import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, WorkspacesDefinition } from "./definition.ts"
+import {
+  FormErrors,
+  JoinErrors,
+  Message,
+  noFormErrors,
+  noJoinErrors,
+  WorkspacesDefinition,
+  workspaceRowId
+} from "./definition.ts"
 
 /**
  * What a request ends in when the host answered `failure`: that the host does not know the session, when the
@@ -30,13 +43,7 @@ export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
         const listing = yield* client.me.workspaces()
         return Message.SucceededLoadWorkspaces({ memberships: listing.memberships, invitations: listing.invitations })
       }).pipe(
-        Effect.catch((failure) =>
-          Effect.succeed(
-            rejectedSessionOr(failure, () =>
-              Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." })
-            )
-          )
-        )
+        Effect.catch((failure) => Effect.succeed(rejectedSessionOr(failure, () => Message.FailedLoadWorkspaces())))
       )
   }
 })
@@ -53,7 +60,7 @@ const wordFailure = (failure: unknown): FormErrors =>
       ? "This identity can't create workspaces."
       : Schema.is(ApiErrors.Invalid)(failure)
         ? "Those values were not accepted. Check them and try again."
-        : "The workspace could not be created. Try again."
+        : "We couldn't confirm creation. Try again with this name to safely check the same request."
   )
 
 /** The names as the host takes them, which ignores the space around them, or where each is refused. */
@@ -113,27 +120,27 @@ export const CreateWorkspace = WorkspacesDefinition.command("CreateWorkspace", {
   }
 })
 
-/** What the person reads of why `failure` kept the invitation from being accepted, at the name or about the form. */
+/** The refusal of the form for joining as a whole, which the field did not cause. */
+const refusedJoinForm = (text: string) => JoinErrors.make({ ...noJoinErrors, form: Option.some(text) })
+
+/** What the person reads of why `failure` kept the invitation from being accepted, about the form. */
 const wordJoinFailure = (failure: unknown): JoinErrors =>
-  Schema.is(ApiErrors.Invalid)(failure)
-    ? JoinErrors.make({ ...noJoinErrors, name: Option.some("That name was not accepted.") })
-    : JoinErrors.make({
-        ...noJoinErrors,
-        form: Option.some(
-          Schema.is(ApiErrors.Denied)(failure)
-            ? "This invitation isn't addressed to this account."
-            : Schema.is(ApiErrors.Conflict)(failure)
-              ? "This invitation is no longer open."
-              : Schema.is(ApiErrors.NotFound)(failure)
-                ? "This workspace no longer exists."
-                : "The invitation could not be accepted. Try again."
-        )
-      })
+  refusedJoinForm(
+    Schema.is(ApiErrors.Changed)(failure)
+      ? "This invitation changed while you were accepting it. Try again."
+      : Schema.is(ApiErrors.Denied)(failure)
+        ? "This invitation isn't addressed to this address."
+        : Schema.is(ApiErrors.Conflict)(failure) || Schema.is(ApiErrors.NotFound)(failure)
+          ? "This invitation is no longer available."
+          : Schema.is(ApiErrors.Invalid)(failure)
+            ? "This invitation can't be accepted as it is."
+            : "We couldn't accept the invitation. Try again when the host is available."
+  )
 
 /**
  * Accept the invitation `invitationId` to the workspace `workspaceId`, going by `name` there, ignoring the space
- * around it, and report the member the host made of the person. Accepting again returns the same member, so a
- * request that ended unsure may be sent again as it was, and carries no key.
+ * around it. Accepting again returns the same member, so a request that ended unsure may be sent again as it was,
+ * and carries no key.
  */
 export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation", {
   args: { workspaceId: WorkspaceId.WorkspaceId, invitationId: Invitation.InvitationId, name: Schema.String },
@@ -146,7 +153,7 @@ export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation",
             Message.FailedJoin({ error: JoinErrors.make({ ...noJoinErrors, name: Option.some(refusedName) }) })
           )
         )
-        const member = yield* Api.signedIn.pipe(
+        yield* Api.signedIn.pipe(
           Effect.flatMap((client) =>
             client.workspaces.acceptInvitation({ params: { workspaceId, invitationId }, payload: { name: memberName } })
           ),
@@ -154,9 +161,59 @@ export const AcceptInvitation = WorkspacesDefinition.command("AcceptInvitation",
             rejectedSessionOr(failure, () => Message.FailedJoin({ error: wordJoinFailure(failure) }))
           )
         )
-        return Message.SucceededJoin({ member })
+        return Message.SucceededJoin()
       }).pipe(Effect.catch(Effect.succeed))
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(LoadWorkspaces.layer, CreateWorkspace.layer, AcceptInvitation.layer)
+/** Move focus to the row that opens `workspaceId`, such as the one for the workspace the person has just joined. */
+export const FocusWorkspaceRow = WorkspacesDefinition.command("FocusWorkspaceRow", {
+  args: { workspaceId: WorkspaceId.WorkspaceId },
+  messages: [Message.CompletedFocusWorkspaceRow],
+  handler: function* () {
+    return ({ workspaceId }) =>
+      Dom.focus(`#${CSS.escape(workspaceRowId(workspaceId))}`).pipe(
+        Effect.ignore,
+        Effect.as(Message.CompletedFocusWorkspaceRow())
+      )
+  }
+})
+
+/** Wait five seconds, then report that the toast `toastId` has had its time. */
+export const ExpireToast = WorkspacesDefinition.command("ExpireToast", {
+  args: { toastId: Schema.Finite },
+  messages: [Message.ExpiredToast],
+  handler: function* () {
+    return ({ toastId }) => Effect.sleep("5 seconds").pipe(Effect.as(Message.ExpiredToast({ toastId })))
+  }
+})
+
+/** Select the text of the field it is mounted on each time the field takes focus, so that typing replaces it. */
+export const SelectOnFocus = WorkspacesDefinition.mount("SelectOnFocus", {
+  messages: [Message.CompletedSelectOnFocus],
+  handler: function* () {
+    return ({ element }) =>
+      Effect.gen(function* () {
+        yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            const selectText = () => {
+              if (element instanceof HTMLInputElement) element.select()
+            }
+            element.addEventListener("focus", selectText)
+            return selectText
+          }),
+          (selectText) => Effect.sync(() => element.removeEventListener("focus", selectText))
+        )
+        return Message.CompletedSelectOnFocus()
+      })
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(
+  LoadWorkspaces.layer,
+  CreateWorkspace.layer,
+  AcceptInvitation.layer,
+  FocusWorkspaceRow.layer,
+  ExpireToast.layer,
+  SelectOnFocus.layer
+)

@@ -3,14 +3,15 @@ import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/wor
 import { WorkspaceDirectory } from "@amends-dev/gateway"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Option, Schema } from "effect"
+import { Effect, Fiber, Layer, Option, Schema } from "effect"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
+import { TestClock } from "effect/testing"
 import { apiUrl, atlasInvitation, northstar, session } from "../../../test/fixtures.ts"
 import * as Session from "../../session.ts"
-import { AcceptInvitation, CreateWorkspace, LoadWorkspaces } from "./command.ts"
-import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors } from "./definition.ts"
+import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
+import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, workspaceRowId } from "./definition.ts"
 
 const created = { id: "workspace-3", name: "Acme", createdBy: "alice", ownerMemberId: "member-20" }
 
@@ -140,7 +141,7 @@ describe("LoadWorkspaces", () => {
       Effect.gen(function* () {
         const { message } = yield* load(answer)
 
-        expect(message).toEqual(Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." }))
+        expect(message).toEqual(Message.FailedLoadWorkspaces())
       })
     )
   }
@@ -255,7 +256,9 @@ describe("CreateWorkspace", () => {
         expect(message).toEqual(
           Message.FailedCreate({
             key: Option.some(Request.Key.make(sent[0]?.key ?? "")),
-            error: refusedForm("The workspace could not be created. Try again.")
+            error: refusedForm(
+              "We couldn't confirm creation. Try again with this name to safely check the same request."
+            )
           })
         )
       })
@@ -291,14 +294,14 @@ describe("AcceptInvitation", () => {
     })
   )
 
-  it.effect("sends the name, ignoring the space around it, to the invitation, and reports the member", () =>
+  it.effect("sends the name, ignoring the space around it, to the invitation, and reports that the person joined", () =>
     Effect.gen(function* () {
       const { message, sent } = yield* accept({ status: 200, body: joined }, "  Alex ")
 
       expect(sent).toEqual([
         { path: "/workspaces/workspace-4/invitations/invitation-4/accept", key: undefined, payload: { name: "Alex" } }
       ])
-      expect(message).toEqual(Message.SucceededJoin({ member: northstar.member }))
+      expect(message).toEqual(Message.SucceededJoin())
     })
   )
 
@@ -319,7 +322,7 @@ describe("AcceptInvitation", () => {
     [
       "is not addressed to this account",
       { status: 403, body: { _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } } },
-      refusedJoin("This invitation isn't addressed to this account.")
+      refusedJoin("This invitation isn't addressed to this address.")
     ],
     [
       "is no longer open",
@@ -330,20 +333,20 @@ describe("AcceptInvitation", () => {
           reason: { _tag: "InvitationClosed", invitationId: "invitation-4", reason: "revoked" }
         }
       },
-      refusedJoin("This invitation is no longer open.")
+      refusedJoin("This invitation is no longer available.")
     ],
     [
       "is to a workspace that is not there",
       { status: 404, body: { _tag: "CoreError.NotFound", resource: "Workspace", id: "workspace-4" } },
-      refusedJoin("This workspace no longer exists.")
+      refusedJoin("This invitation is no longer available.")
     ],
     [
-      "has a name the host did not accept",
+      "cannot be accepted as it is",
       {
         status: 422,
         body: { _tag: "CoreError.Invalid", reason: { _tag: "Malformed", description: "Expected a name" } }
       },
-      JoinErrors.make({ ...noJoinErrors, name: Option.some("That name was not accepted.") })
+      refusedJoin("This invitation can't be accepted as it is.")
     ],
     [
       "cannot be accepted because the host is not ready",
@@ -351,17 +354,17 @@ describe("AcceptInvitation", () => {
         status: 503,
         body: { _tag: "CoreError.Unavailable", reason: { _tag: "CredentialsUnavailable", description: "No keys" } }
       },
-      refusedJoin("The invitation could not be accepted. Try again.")
+      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
     ],
     [
       "cannot be accepted because the outcome is not known",
       { status: 500, body: { _tag: "CoreError.Uncertain", commitId: "commit-1" } },
-      refusedJoin("The invitation could not be accepted. Try again.")
+      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
     ],
     [
       "cannot be accepted because the host cannot be reached",
       "unreachable",
-      refusedJoin("The invitation could not be accepted. Try again.")
+      refusedJoin("We couldn't accept the invitation. Try again when the host is available.")
     ]
   ] as const satisfies ReadonlyArray<readonly [string, Answer, JoinErrors]>) {
     it.effect(`says so when the invitation ${description}`, () =>
@@ -373,4 +376,51 @@ describe("AcceptInvitation", () => {
       })
     )
   }
+})
+
+describe("FocusWorkspaceRow", () => {
+  const workspaceId = northstar.workspace.id
+
+  it.effect("moves focus to the row of the workspace", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const row = yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            const button = document.createElement("button")
+            button.id = workspaceRowId(workspaceId)
+            document.body.append(button)
+            return button
+          }),
+          (button) => Effect.sync(() => button.remove())
+        )
+
+        const message = yield* FocusWorkspaceRow({ workspaceId }).effect.pipe(Effect.provide(FocusWorkspaceRow.layer))
+
+        expect(document.activeElement).toBe(row)
+        expect(message).toEqual(Message.CompletedFocusWorkspaceRow())
+      })
+    )
+  )
+
+  it.effect("completes all the same when the row is not there", () =>
+    Effect.gen(function* () {
+      const message = yield* FocusWorkspaceRow({ workspaceId }).effect.pipe(Effect.provide(FocusWorkspaceRow.layer))
+
+      expect(message).toEqual(Message.CompletedFocusWorkspaceRow())
+    })
+  )
+})
+
+describe("ExpireToast", () => {
+  it.effect("reports that the toast had its time once five seconds have passed, and not before", () =>
+    Effect.gen(function* () {
+      const expiry = yield* Effect.forkChild(ExpireToast({ toastId: 7 }).effect.pipe(Effect.provide(ExpireToast.layer)))
+
+      yield* TestClock.adjust("4 seconds")
+      expect(expiry.pollUnsafe()).toBeUndefined()
+
+      yield* TestClock.adjust("1 second")
+      expect(yield* Fiber.join(expiry)).toEqual(Message.ExpiredToast({ toastId: 7 }))
+    })
+  )
 })

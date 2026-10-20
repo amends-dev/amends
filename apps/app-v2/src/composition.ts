@@ -24,7 +24,7 @@ const foldSignInOutMessage = SignInBlock.OutMessage.match({
   SignedIn: ({ session }) =>
     ApplicationDefinition.step((model: Model) =>
       WorkspacesBinding.init({
-        args: [],
+        args: [session.account.email],
         toParentModel: (workspaces) =>
           modifyFields(model, {
             page: () => Page.SignedIn({ account: session.account, workspaces, workspace: Option.none() })

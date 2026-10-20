@@ -1,9 +1,9 @@
-import type { Invitation, WorkspaceId } from "@amends-dev/core/workspace"
+import type { Invitation, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import type * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { AcceptInvitation, CreateWorkspace, LoadWorkspaces } from "./command.ts"
+import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
 import { DialogBinding, leaveEntering, WorkspacesComposition } from "./composition.ts"
 import {
   Entering,
@@ -54,42 +54,120 @@ const openCreateForm = WorkspacesDefinition.stepFields(() => ({
     Option.some(Entering.FillingCreate({ name: "", memberName: "", key: Option.none(), errors: noFormErrors }))
 }))
 
-/** Answer `invitation`: no name yet, and nothing refused. */
+/** Answer `invitation`, offering the name suggested from the person's address, and with nothing refused. */
 const openJoinForm = (invitation: PendingInvitation) =>
-  WorkspacesDefinition.stepFields(() => ({
-    entering: () => Option.some(Entering.FillingJoin({ invitation, name: "", errors: noJoinErrors }))
+  WorkspacesDefinition.step((model: Model) => ({
+    model: modifyFields(model, {
+      entering: () => Option.some(Entering.FillingJoin({ invitation, name: model.suggestedName, errors: noJoinErrors }))
+    })
   }))
 
-/** What `entering` becomes when reading the listing again, to open the workspace, has failed, or starts over. */
+/** Once the workspace is created, the dialog opens it, while the person is still at the dialog. */
+const openCreated = (workspace: Workspace.Workspace) =>
+  WorkspacesDefinition.stepFields(() => ({
+    entering: Option.map(
+      Entering.matchOrElse(
+        {
+          SendingCreate: () =>
+            Entering.Opening({ workspaceId: workspace.id, workspaceName: workspace.name, reloadFailed: false })
+        },
+        (same) => same
+      )
+    )
+  }))
+
+/** Once the person is in the workspace, the dialog has joined it, while the person is still at the dialog. */
+const markJoined = WorkspacesDefinition.stepFields(() => ({
+  entering: Option.map(
+    Entering.matchOrElse(
+      { SendingJoin: ({ invitation }) => Entering.Joined({ invitation, reloadFailed: false }) },
+      (same) => same
+    )
+  )
+}))
+
+/** What `entering` becomes when reading the listing again, to open the workspace or to show a join, has failed, or starts over. */
 const reloadFailedAs = (reloadFailed: boolean) =>
   Option.map(
-    Entering.matchOrElse({ Opening: (opening) => Entering.Opening({ ...opening, reloadFailed }) }, (same) => same)
+    Entering.matchOrElse(
+      {
+        Opening: (opening) => Entering.Opening({ ...opening, reloadFailed }),
+        Joined: (joined) => Entering.Joined({ ...joined, reloadFailed })
+      },
+      (same) => same
+    )
   )
+
+/** The listing while it is read again: what it listed, with nothing failed yet, or under way when it listed nothing. */
+const listedAgain = Workspaces.matchOrElse(
+  { Loaded: (loaded) => Workspaces.Loaded({ ...loaded, reloadFailed: false }) },
+  () => Workspaces.Loading()
+)
+
+/** The listing once reading it again has failed: the list it kept, saying so, or not reached when it kept none. */
+const failedToList = Workspaces.matchOrElse(
+  { Loaded: (loaded) => Workspaces.Loaded({ ...loaded, reloadFailed: true }) },
+  () => Workspaces.Unreachable()
+)
 
 /** Read the listing again, which is under way until it ends. */
 const reload = WorkspacesDefinition.step((model: Model) => ({
-  model: modifyFields(model, { workspaces: () => Workspaces.Loading(), entering: reloadFailedAs(false) }),
+  model: modifyFields(model, { workspaces: listedAgain, entering: reloadFailedAs(false) }),
   commands: [LoadWorkspaces()]
 }))
+
+/**
+ * Tell the person they joined `workspace` with a toast that goes by itself after a while, and move focus to its
+ * row, since the invitation's button they pressed has gone.
+ */
+const announceJoined = (workspace: Workspace.Workspace) =>
+  WorkspacesDefinition.step((model: Model) => ({
+    model: modifyFields(model, {
+      toasts: (toasts) => [...toasts, { id: model.nextToastId, text: `Joined ${workspace.name}` }],
+      nextToastId: (nextToastId) => nextToastId + 1
+    }),
+    commands: [ExpireToast({ toastId: model.nextToastId }), FocusWorkspaceRow({ workspaceId: workspace.id })]
+  }))
+
+/** The model without the toast `toastId`, which the person dismissed or whose time was up. */
+const withoutToast = (model: Model, toastId: number) =>
+  modifyFields(model, { toasts: (toasts) => toasts.filter(({ id }) => id !== toastId) })
 
 export const update = WorkspacesComposition.makeUpdate((model, message) =>
   Message.match(message, {
     SucceededLoadWorkspaces: ({ memberships, invitations }) => {
-      const listed = modifyFields(model, { workspaces: () => Workspaces.Loaded({ memberships, invitations }) })
-      return Option.match(enteringAs(model, "Opening"), {
+      const listed = modifyFields(model, {
+        workspaces: () => Workspaces.Loaded({ memberships, invitations, reloadFailed: false })
+      })
+      return Option.match(model.entering, {
         onNone: () => ({ model: listed }),
-        onSome: ({ workspaceId }) =>
-          Update.withOutMessage(
-            Update.combine(listed, [leaveEntering, DialogBinding.requestClose()]),
-            Option.match(findMembership(memberships, workspaceId), {
-              onNone: () => undefined,
-              onSome: (membership) => OutMessage.OpenedWorkspace({ membership })
-            })
-          )
+        onSome: Entering.matchOrElse(
+          {
+            Opening: ({ workspaceId }) =>
+              Update.withOutMessage(
+                Update.combine(listed, [leaveEntering, DialogBinding.requestClose()]),
+                Option.match(findMembership(memberships, workspaceId), {
+                  onNone: () => undefined,
+                  onSome: (membership) => OutMessage.OpenedWorkspace({ membership })
+                })
+              ),
+            Joined: ({ invitation }) =>
+              Update.combine(listed, [
+                leaveEntering,
+                DialogBinding.requestClose(),
+                ...Option.toArray(
+                  Option.map(findMembership(memberships, invitation.details.workspaceId), ({ workspace }) =>
+                    announceJoined(workspace)
+                  )
+                )
+              ])
+          },
+          () => ({ model: listed })
+        )
       })
     },
-    FailedLoadWorkspaces: ({ error }) => ({
-      model: modifyFields(model, { workspaces: () => Workspaces.Failed({ error }), entering: reloadFailedAs(true) })
+    FailedLoadWorkspaces: () => ({
+      model: modifyFields(model, { workspaces: failedToList, entering: reloadFailedAs(true) })
     }),
     ClickedTryAgain: () => reload(model),
     ClickedWorkspace: ({ workspaceId }) =>
@@ -157,21 +235,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           ]
         })
       }),
-    SucceededCreate: ({ workspace }) => ({
-      model: Option.isSome(enteringAs(model, "SendingCreate"))
-        ? modifyFields(model, {
-            entering: () =>
-              Option.some(
-                Entering.Opening({
-                  workspaceId: workspace.id,
-                  workspaceName: Option.some(workspace.name),
-                  reloadFailed: false
-                })
-              )
-          })
-        : model,
-      commands: [LoadWorkspaces()]
-    }),
+    SucceededCreate: ({ workspace }) => Update.combine(model, [openCreated(workspace), reload]),
     FailedCreate: ({ key, error }) =>
       Option.match(enteringAs(model, "SendingCreate"), {
         onNone: () => ({ model }),
@@ -181,23 +245,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           })
         })
       }),
-    SucceededJoin: ({ member }) => ({
-      model: Option.match(enteringAs(model, "SendingJoin"), {
-        onNone: () => model,
-        onSome: ({ invitation }) =>
-          modifyFields(model, {
-            entering: () =>
-              Option.some(
-                Entering.Opening({
-                  workspaceId: member.workspaceId,
-                  workspaceName: Option.fromUndefinedOr(invitation.workspaceName),
-                  reloadFailed: false
-                })
-              )
-          })
-      }),
-      commands: [LoadWorkspaces()]
-    }),
+    SucceededJoin: () => Update.combine(model, [markJoined, reload]),
     FailedJoin: ({ error }) =>
       Option.match(enteringAs(model, "SendingJoin"), {
         onNone: () => ({ model }),
@@ -207,6 +255,10 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           })
         })
       }),
-    RejectedSession: () => ({ model, outMessage: OutMessage.EndedSession() })
+    RejectedSession: () => ({ model, outMessage: OutMessage.EndedSession() }),
+    DismissedToast: ({ toastId }) => ({ model: withoutToast(model, toastId) }),
+    ExpiredToast: ({ toastId }) => ({ model: withoutToast(model, toastId) }),
+    CompletedFocusWorkspaceRow: () => ({ model }),
+    CompletedSelectOnFocus: () => ({ model })
   })
 )

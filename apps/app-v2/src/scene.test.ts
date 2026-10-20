@@ -42,8 +42,8 @@ const signedOut: Model = {
 const choosing: Model = {
   page: Page.SignedIn({
     account: session.account,
-    workspaces: modifyFields(WorkspacesBlock.init().model, {
-      workspaces: () => Workspaces.Loaded({ memberships: [membership], invitations: [] })
+    workspaces: modifyFields(WorkspacesBlock.init(session.account.email).model, {
+      workspaces: () => Workspaces.Loaded({ memberships: [membership], invitations: [], reloadFailed: false })
     }),
     workspace: Option.none()
   }),
@@ -56,8 +56,8 @@ const choosing: Model = {
 const inWorkspace: Model = {
   page: Page.SignedIn({
     account: session.account,
-    workspaces: modifyFields(WorkspacesBlock.init().model, {
-      workspaces: () => Workspaces.Loaded({ memberships: [membership], invitations: [] })
+    workspaces: modifyFields(WorkspacesBlock.init(session.account.email).model, {
+      workspaces: () => Workspaces.Loaded({ memberships: [membership], invitations: [], reloadFailed: false })
     }),
     workspace: Option.some({
       workspaceId: membership.workspace.id,

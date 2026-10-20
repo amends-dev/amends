@@ -10,9 +10,10 @@ import {
   membership,
   northstar,
   northstarInvitation,
+  session,
   unnamedInvitation
 } from "../../../test/fixtures.ts"
-import { AcceptInvitation, CreateWorkspace, LoadWorkspaces } from "./command.ts"
+import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
 import {
   Entering,
@@ -22,6 +23,7 @@ import {
   noFormErrors,
   noJoinErrors,
   OutMessage,
+  type PendingInvitation,
   Workspaces
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -42,13 +44,21 @@ const acme = Schema.decodeSync(WorkspaceDirectory.Membership)({
 
 const key = Request.Key.make("key-1")
 
-const unreachable = "The workspace could not be created. Try again."
+const unreachable = "We couldn't confirm creation. Try again with this name to safely check the same request."
 
 const refusedForm = (text: string) => FormErrors.make({ ...noFormErrors, form: Option.some(text) })
 
-const showing = (workspaces: Workspaces) => modifyFields(init().model, { workspaces: () => workspaces })
+/** What the listing holds once it was read, with reading it again not having failed. */
+const loaded = (
+  memberships: ReadonlyArray<WorkspaceDirectory.Membership>,
+  invitations: ReadonlyArray<PendingInvitation>
+) => Workspaces.Loaded({ memberships, invitations, reloadFailed: false })
 
-const listed = showing(Workspaces.Loaded({ memberships: [membership], invitations: [] }))
+const started = init(session.account.email).model
+
+const showing = (workspaces: Workspaces) => modifyFields(started, { workspaces: () => workspaces })
+
+const listed = showing(loaded([membership], []))
 
 /** What the dialog reports, as the page receives it. */
 const fromDialog = (message: typeof DialogBlock.Message.Type) =>
@@ -70,7 +80,7 @@ const sending = inDialog(Entering.SendingCreate({ name: "Acme", memberName: "Ale
 
 /** The workspace created, and the list being read again to open it. */
 const opening = inDialog(
-  Entering.Opening({ workspaceId: acme.workspace.id, workspaceName: Option.some("Acme"), reloadFailed: false })
+  Entering.Opening({ workspaceId: acme.workspace.id, workspaceName: "Acme", reloadFailed: false })
 )
 
 /** The form the person fills in, once they asked for it and typed the names. */
@@ -117,15 +127,10 @@ describe("creating a workspace", () => {
       Command.expectExact(LoadWorkspaces()),
       model((model) => {
         expect(model.entering).toEqual(
-          Option.some(
-            Entering.Opening({
-              workspaceId: acme.workspace.id,
-              workspaceName: Option.some("Acme"),
-              reloadFailed: false
-            })
-          )
+          Option.some(Entering.Opening({ workspaceId: acme.workspace.id, workspaceName: "Acme", reloadFailed: false }))
         )
         expect(model.dialog.isOpen).toBe(true)
+        expect(model.workspaces).toEqual(loaded([membership], []))
       }),
       expectNoOutMessage(),
       Command.resolve(
@@ -137,7 +142,8 @@ describe("creating a workspace", () => {
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme], invitations: [] }))
+        expect(model.workspaces).toEqual(loaded([membership, acme], []))
+        expect(model.toasts).toEqual([])
       }),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
     )
@@ -314,7 +320,7 @@ describe("creating a workspace", () => {
       ),
       expectNoOutMessage(),
       model((model) => {
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme], invitations: [] }))
+        expect(model.workspaces).toEqual(loaded([membership, acme], []))
       })
     )
   })
@@ -333,7 +339,7 @@ describe("creating a workspace", () => {
       expectNoOutMessage(),
       Command.expectNone(),
       model((model) => {
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme], invitations: [] }))
+        expect(model.workspaces).toEqual(loaded([membership, acme], []))
       })
     )
   })
@@ -351,7 +357,7 @@ describe("creating a workspace", () => {
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership], invitations: [] }))
+        expect(model.workspaces).toEqual(loaded([membership], []))
       })
     )
   })
@@ -363,33 +369,24 @@ describe("creating a workspace", () => {
       ...filled,
       message(Message.SubmittedCreate()),
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
-      Command.resolve(
-        LoadWorkspaces,
-        Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." })
-      ),
+      Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
       expectNoOutMessage(),
       model((model) => {
         expect(model.entering).toEqual(
-          Option.some(
-            Entering.Opening({ workspaceId: acme.workspace.id, workspaceName: Option.some("Acme"), reloadFailed: true })
-          )
+          Option.some(Entering.Opening({ workspaceId: acme.workspace.id, workspaceName: "Acme", reloadFailed: true }))
         )
         expect(model.dialog.isOpen).toBe(true)
-        expect(model.workspaces).toEqual(Workspaces.Failed({ error: "The host could not be reached. Try again." }))
+        expect(model.workspaces).toEqual(
+          Workspaces.Loaded({ memberships: [membership], invitations: [], reloadFailed: true })
+        )
       }),
       message(Message.ClickedTryAgain()),
       Command.expectExact(LoadWorkspaces()),
       model((model) => {
         expect(model.entering).toEqual(
-          Option.some(
-            Entering.Opening({
-              workspaceId: acme.workspace.id,
-              workspaceName: Option.some("Acme"),
-              reloadFailed: false
-            })
-          )
+          Option.some(Entering.Opening({ workspaceId: acme.workspace.id, workspaceName: "Acme", reloadFailed: false }))
         )
-        expect(model.workspaces).toEqual(Workspaces.Loading())
+        expect(model.workspaces).toEqual(loaded([membership], []))
       }),
       Command.resolve(
         LoadWorkspaces,
@@ -403,12 +400,10 @@ describe("creating a workspace", () => {
 
 const refusedJoin = (text: string) => JoinErrors.make({ ...noJoinErrors, form: Option.some(text) })
 
-const unreachableJoin = "The invitation could not be accepted. Try again."
+const unreachableJoin = "We couldn't accept the invitation. Try again when the host is available."
 
 /** The listing as it is while two invitations wait. */
-const invited = showing(
-  Workspaces.Loaded({ memberships: [membership], invitations: [northstarInvitation, atlasInvitation] })
-)
+const invited = showing(loaded([membership], [northstarInvitation, atlasInvitation]))
 
 /** The same listing with the dialog open, over what the person is doing in it. */
 const invitedInDialog = (entering: Entering) =>
@@ -420,14 +415,8 @@ const invitedInDialog = (entering: Entering) =>
 /** A request to accept the invitation to Northstar Studio on its way. */
 const joining = invitedInDialog(Entering.SendingJoin({ invitation: northstarInvitation, name: "Alex" }))
 
-/** The person is in Northstar Studio, and the list is being read again to open it. */
-const openingNorthstar = invitedInDialog(
-  Entering.Opening({
-    workspaceId: northstar.workspace.id,
-    workspaceName: Option.some("Northstar Studio"),
-    reloadFailed: false
-  })
-)
+/** The person is in Northstar Studio, and the list is being read again. */
+const joinedNorthstar = invitedInDialog(Entering.Joined({ invitation: northstarInvitation, reloadFailed: false }))
 
 /** The form for joining, once the person asked for it from the invitation to Northstar Studio and typed their name. */
 const joinFilled = [
@@ -442,19 +431,33 @@ const acceptNorthstar = AcceptInvitation({
   name: "Alex"
 })
 
+/** The listing once the person is in Northstar Studio, which no longer has their invitation to it. */
+const listedWithNorthstar = Message.SucceededLoadWorkspaces({
+  memberships: [membership, northstar],
+  invitations: [atlasInvitation]
+})
+
+/** The commands that listing gives the page, resolved: the dialog closed, focus on the row, and the toast's time up. */
+const joinedNorthstarShown = [
+  Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+  Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
+  Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 }))
+] as const
+
 describe("joining a workspace", () => {
-  it("opens the form over the invitation, with no name and nothing refused, until the person asks", () => {
+  it("opens the form over the invitation with the name suggested from the person's address, and nothing refused", () => {
     story(
       update,
       given(invited),
       model((model) => {
         expect(model.entering).toEqual(Option.none())
+        expect(model.suggestedName).toBe("Alice")
       }),
       message(Message.ClickedAccept({ invitationId: atlasInvitation.details.id })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       model((model) => {
         expect(model.entering).toEqual(
-          Option.some(Entering.FillingJoin({ invitation: atlasInvitation, name: "", errors: noJoinErrors }))
+          Option.some(Entering.FillingJoin({ invitation: atlasInvitation, name: "Alice", errors: noJoinErrors }))
         )
         expect(model.dialog.isOpen).toBe(true)
       })
@@ -474,7 +477,7 @@ describe("joining a workspace", () => {
     )
   })
 
-  it("sends the name with the invitation's IDs, and once the person is in reads the list and reports it opened", () => {
+  it("sends the name with the invitation's IDs, and once the person is in reads the list and closes the dialog", () => {
     story(
       update,
       given(invited),
@@ -486,61 +489,104 @@ describe("joining a workspace", () => {
           Option.some(Entering.SendingJoin({ invitation: northstarInvitation, name: "Alex" }))
         )
       }),
-      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin()),
       Command.expectExact(LoadWorkspaces()),
       model((model) => {
         expect(model.entering).toEqual(
-          Option.some(
-            Entering.Opening({
-              workspaceId: northstar.workspace.id,
-              workspaceName: Option.some("Northstar Studio"),
-              reloadFailed: false
-            })
-          )
+          Option.some(Entering.Joined({ invitation: northstarInvitation, reloadFailed: false }))
         )
         expect(model.dialog.isOpen).toBe(true)
+        expect(model.toasts).toEqual([])
       }),
       expectNoOutMessage(),
-      Command.resolve(
-        LoadWorkspaces,
-        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
-      ),
-      expectOutMessage(OutMessage.OpenedWorkspace({ membership: northstar })),
-      Command.expectExact(Dialog.test.CloseDialog),
+      Command.resolve(LoadWorkspaces, listedWithNorthstar),
+      expectNoOutMessage(),
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.workspaces).toEqual(
-          Workspaces.Loaded({ memberships: [membership, northstar], invitations: [atlasInvitation] })
-        )
+        expect(model.workspaces).toEqual(loaded([membership, northstar], [atlasInvitation]))
       }),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+      ...joinedNorthstarShown
     )
   })
 
-  it("opens a workspace the host has no name for, as the workspace", () => {
+  it("says it joined the workspace with a toast, which goes after a while, and moves focus to the workspace's row", () => {
     story(
       update,
-      given(showing(Workspaces.Loaded({ memberships: [], invitations: [unnamedInvitation] }))),
-      message(Message.ClickedAccept({ invitationId: unnamedInvitation.details.id })),
-      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
-      message(Message.TypedJoinName({ name: "Alex" })),
-      message(Message.SubmittedJoin()),
-      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
+      given(joinedNorthstar),
+      message(listedWithNorthstar),
+      Command.expectHas(
+        Dialog.test.CloseDialog,
+        ExpireToast({ toastId: 1 }),
+        FocusWorkspaceRow({ workspaceId: northstar.workspace.id })
+      ),
       model((model) => {
-        expect(model.entering).toEqual(
-          Option.some(
-            Entering.Opening({
-              workspaceId: northstar.member.workspaceId,
-              workspaceName: Option.none(),
-              reloadFailed: false
-            })
-          )
-        )
+        expect(model.toasts).toEqual([{ id: 1, text: "Joined Northstar Studio" }])
+        expect(model.nextToastId).toBe(2)
       }),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [northstar], invitations: [] })),
-      expectOutMessage(OutMessage.OpenedWorkspace({ membership: northstar })),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+      Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.toasts).toHaveLength(1)
+      }),
+      Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 })),
+      model((model) => {
+        expect(model.toasts).toEqual([])
+      })
+    )
+  })
+
+  it("shows a toast after another, each with an ID of its own, which goes when its time is up", () => {
+    story(
+      update,
+      given(
+        modifyFields(joinedNorthstar, {
+          toasts: () => [{ id: 1, text: "Joined Atlas Labs" }],
+          nextToastId: () => 2
+        })
+      ),
+      message(listedWithNorthstar),
+      Command.expectHas(ExpireToast({ toastId: 2 })),
+      model((model) => {
+        expect(model.toasts).toEqual([
+          { id: 1, text: "Joined Atlas Labs" },
+          { id: 2, text: "Joined Northstar Studio" }
+        ])
+      }),
+      Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 2 })),
+      Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      model((model) => {
+        expect(model.toasts).toEqual([{ id: 1, text: "Joined Atlas Labs" }])
+      }),
+      message(Message.ExpiredToast({ toastId: 1 })),
+      model((model) => {
+        expect(model.toasts).toEqual([])
+      })
+    )
+  })
+
+  it("lets the person dismiss a toast before its time, and a toast gone is not gone again when its time is up", () => {
+    const withToast = modifyFields(listed, {
+      toasts: () => [
+        { id: 3, text: "Joined Northstar Studio" },
+        { id: 4, text: "Joined Atlas Labs" }
+      ],
+      nextToastId: () => 5
+    })
+
+    story(
+      update,
+      given(withToast),
+      message(Message.DismissedToast({ toastId: 3 })),
+      model((model) => {
+        expect(model.toasts).toEqual([{ id: 4, text: "Joined Atlas Labs" }])
+        expect(model.nextToastId).toBe(5)
+      }),
+      message(Message.ExpiredToast({ toastId: 3 })),
+      model((model) => {
+        expect(model.toasts).toEqual([{ id: 4, text: "Joined Atlas Labs" }])
+      })
     )
   })
 
@@ -565,13 +611,9 @@ describe("joining a workspace", () => {
       }),
       message(Message.SubmittedJoin()),
       Command.expectExact(acceptNorthstar),
-      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
-      Command.resolve(
-        LoadWorkspaces,
-        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
-      ),
-      expectOutMessage(OutMessage.OpenedWorkspace({ membership: northstar })),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+      Command.resolve(AcceptInvitation, Message.SucceededJoin()),
+      Command.resolve(LoadWorkspaces, listedWithNorthstar),
+      ...joinedNorthstarShown
     )
   })
 
@@ -651,53 +693,50 @@ describe("joining a workspace", () => {
     )
   })
 
-  it("shows the list alone when the invitation was accepted after the person closed the form", () => {
+  it("shows the list alone, with no toast, when the invitation was accepted after the person closed the form", () => {
     story(
       update,
       given(invited),
-      message(Message.SucceededJoin({ member: northstar.member })),
+      message(Message.SucceededJoin()),
       Command.expectExact(LoadWorkspaces()),
       model((model) => {
         expect(model.entering).toEqual(Option.none())
       }),
-      Command.resolve(
-        LoadWorkspaces,
-        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
-      ),
-      expectNoOutMessage(),
+      Command.resolve(LoadWorkspaces, listedWithNorthstar),
+      Command.expectNone(),
       model((model) => {
-        expect(model.workspaces).toEqual(
-          Workspaces.Loaded({ memberships: [membership, northstar], invitations: [atlasInvitation] })
-        )
+        expect(model.workspaces).toEqual(loaded([membership, northstar], [atlasInvitation]))
+        expect(model.toasts).toEqual([])
       })
     )
   })
 
-  it("shows the list alone when the person closes the dialog while it is read again", () => {
+  it("shows the list alone, with no toast, when the person closes the dialog while it is read again", () => {
     story(
       update,
-      given(openingNorthstar),
+      given(joinedNorthstar),
       message(fromDialog(DialogBlock.Message.RequestedClose())),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
       }),
-      message(
-        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
-      ),
+      message(listedWithNorthstar),
       expectNoOutMessage(),
-      Command.expectNone()
+      Command.expectNone(),
+      model((model) => {
+        expect(model.toasts).toEqual([])
+      })
     )
   })
 
-  it("closes the dialog and shows the list when the list does not have the workspace joined", () => {
+  it("closes the dialog without a toast when the list does not have the workspace joined", () => {
     story(
       update,
       given(invited),
       ...joinFilled,
       message(Message.SubmittedJoin()),
-      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin()),
       Command.resolve(
         LoadWorkspaces,
         Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [atlasInvitation] })
@@ -707,45 +746,77 @@ describe("joining a workspace", () => {
       model((model) => {
         expect(model.entering).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.workspaces).toEqual(
-          Workspaces.Loaded({ memberships: [membership], invitations: [atlasInvitation] })
-        )
+        expect(model.toasts).toEqual([])
+        expect(model.workspaces).toEqual(loaded([membership], [atlasInvitation]))
       })
     )
   })
 
-  it("keeps the dialog on the workspace joined when the list could not be read, and reads it again on request", () => {
+  it("keeps the dialog on the join when the list could not be read, and reads the list again, sending nothing, on request", () => {
     story(
       update,
       given(invited),
       ...joinFilled,
       message(Message.SubmittedJoin()),
-      Command.resolve(AcceptInvitation, Message.SucceededJoin({ member: northstar.member })),
-      Command.resolve(
-        LoadWorkspaces,
-        Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." })
-      ),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin()),
+      Command.resolve(LoadWorkspaces, Message.FailedLoadWorkspaces()),
       expectNoOutMessage(),
       model((model) => {
         expect(model.entering).toEqual(
-          Option.some(
-            Entering.Opening({
-              workspaceId: northstar.workspace.id,
-              workspaceName: Option.some("Northstar Studio"),
-              reloadFailed: true
-            })
-          )
+          Option.some(Entering.Joined({ invitation: northstarInvitation, reloadFailed: true }))
         )
         expect(model.dialog.isOpen).toBe(true)
       }),
       message(Message.ClickedTryAgain()),
       Command.expectExact(LoadWorkspaces()),
-      Command.resolve(
-        LoadWorkspaces,
-        Message.SucceededLoadWorkspaces({ memberships: [membership, northstar], invitations: [atlasInvitation] })
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(Entering.Joined({ invitation: northstarInvitation, reloadFailed: false }))
+        )
+      }),
+      Command.resolve(LoadWorkspaces, listedWithNorthstar),
+      Command.expectHas(Dialog.test.CloseDialog),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.toasts).toEqual([{ id: 1, text: "Joined Northstar Studio" }])
+      }),
+      ...joinedNorthstarShown
+    )
+  })
+
+  it("names the toast for the workspace the listing has, even when the host had no name for the invitation's", () => {
+    story(
+      update,
+      given(
+        modifyFields(showing(loaded([], [unnamedInvitation])), {
+          entering: () => Option.some(Entering.Joined({ invitation: unnamedInvitation, reloadFailed: false })),
+          dialog: (dialog) => modifyFields(dialog, { isOpen: () => true })
+        })
       ),
-      expectOutMessage(OutMessage.OpenedWorkspace({ membership: northstar })),
-      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+      message(
+        Message.SucceededLoadWorkspaces({
+          memberships: [
+            Schema.decodeSync(WorkspaceDirectory.Membership)({
+              workspace: { id: "workspace-6", name: "Mercier & Co", createdBy: "bob", ownerMemberId: "member-9" },
+              member: {
+                id: "member-31",
+                workspaceId: "workspace-6",
+                identity: { _tag: "Human", id: "alice" },
+                name: "Alice",
+                status: "active"
+              },
+              people: 4
+            })
+          ],
+          invitations: []
+        })
+      ),
+      model((model) => {
+        expect(model.toasts).toEqual([{ id: 1, text: "Joined Mercier & Co" }])
+      }),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Command.resolve(FocusWorkspaceRow, Message.CompletedFocusWorkspaceRow()),
+      Command.resolve(ExpireToast, Message.ExpiredToast({ toastId: 1 }))
     )
   })
 })
@@ -754,7 +825,7 @@ describe("a session the host no longer knows", () => {
   it("is reported as ended when the host rejects it for the listing", () => {
     story(
       update,
-      given(showing(Workspaces.Failed({ error: "The host could not be reached." }))),
+      given(showing(Workspaces.Unreachable())),
       message(Message.ClickedTryAgain()),
       Command.expectExact(LoadWorkspaces()),
       expectNoOutMessage(),
@@ -770,6 +841,18 @@ describe("a session the host no longer knows", () => {
       ...filled,
       message(Message.SubmittedCreate()),
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
+      Command.resolve(LoadWorkspaces, Message.RejectedSession()),
+      expectOutMessage(OutMessage.EndedSession())
+    )
+  })
+
+  it("is reported as ended when the host rejects it for the listing read again after a workspace was joined", () => {
+    story(
+      update,
+      given(invited),
+      ...joinFilled,
+      message(Message.SubmittedJoin()),
+      Command.resolve(AcceptInvitation, Message.SucceededJoin()),
       Command.resolve(LoadWorkspaces, Message.RejectedSession()),
       expectOutMessage(OutMessage.EndedSession())
     )
@@ -803,10 +886,25 @@ describe("a session the host no longer knows", () => {
 })
 
 describe("the listing", () => {
-  it("is read again when the person asks after it could not be read", () => {
+  it("starts under way, for the person's address, with the name it suggests for them", () => {
     story(
       update,
-      given(showing(Workspaces.Failed({ error: "The host could not be reached." }))),
+      given(started),
+      model((model) => {
+        expect(model.workspaces).toEqual(Workspaces.Loading())
+        expect(model.suggestedName).toBe("Alice")
+      })
+    )
+  })
+
+  it("is not reached when the first read fails, and is read again when the person asks", () => {
+    story(
+      update,
+      given(started),
+      message(Message.FailedLoadWorkspaces()),
+      model((model) => {
+        expect(model.workspaces).toEqual(Workspaces.Unreachable())
+      }),
       message(Message.ClickedTryAgain()),
       Command.expectExact(LoadWorkspaces()),
       model((model) => {
@@ -815,8 +913,53 @@ describe("the listing", () => {
       }),
       Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] })),
       model((model) => {
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership], invitations: [] }))
+        expect(model.workspaces).toEqual(loaded([membership], []))
       })
+    )
+  })
+
+  it("keeps what it listed when reading it again fails, saying so, and says nothing once it is read again", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.FailedLoadWorkspaces()),
+      model((model) => {
+        expect(model.workspaces).toEqual(
+          Workspaces.Loaded({ memberships: [membership], invitations: [], reloadFailed: true })
+        )
+      }),
+      message(Message.ClickedTryAgain()),
+      Command.expectExact(LoadWorkspaces()),
+      model((model) => {
+        expect(model.workspaces).toEqual(loaded([membership], []))
+      }),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
+      ),
+      model((model) => {
+        expect(model.workspaces).toEqual(loaded([membership, acme], []))
+      })
+    )
+  })
+})
+
+describe("opening a workspace", () => {
+  it("reports the membership of the workspace picked from the listing", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedWorkspace({ workspaceId: membership.workspace.id })),
+      expectOutMessage(OutMessage.OpenedWorkspace({ membership }))
+    )
+  })
+
+  it("reports none for a workspace the listing does not hold", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedWorkspace({ workspaceId: northstar.workspace.id })),
+      expectNoOutMessage()
     )
   })
 })

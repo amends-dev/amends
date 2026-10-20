@@ -1,6 +1,7 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
+import { SelectOnFocus } from "./command.ts"
 import { Entering, WorkspacesDefinition } from "./definition.ts"
 
 /** Stop what the person was doing in the dialog, whether the workspace was created or joined or not. */
@@ -27,5 +28,8 @@ export const DialogBinding = WorkspacesDefinition.bindChild(DialogBlock, {
   }
 })
 
-export const WorkspacesComposition = WorkspacesDefinition.makeComposition({ bindings: [DialogBinding] })
+export const WorkspacesComposition = WorkspacesDefinition.makeComposition({
+  bindings: [DialogBinding],
+  mounts: [SelectOnFocus]
+})
 export type WorkspacesViewBuilder = Block.ViewBuilderFor<typeof WorkspacesComposition>

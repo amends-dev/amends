@@ -52,7 +52,7 @@ The look is [`@amends-dev/design`](../design/README.md)'s. `vite.config.ts` runs
 no class: classes come from a renderer, and the renderers live in the design package. The screens
 outside a workspace are composed from it: the root view frames the sign-in page and the workspace
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
-forms, fields, rows, and the modal that creates a workspace or joins one from the design's `centered`, `control`, `form`, `directory`, and `modal` modules.
+forms, fields, rows, and the modal that creates a workspace or joins one from the design's `centered`, `control`, `form`, `directory`, `pane` (its empty state), `toast`, and `modal` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination, `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations, `feature/groups` the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
@@ -464,26 +464,39 @@ the pages that compose them; the root composes the pages.
   refused, until they dismiss it, shown as toasts over the shell's corner.
 - `page/signIn`: signing in, a step at a time: an email to send a code to, then the code, from
   which the person can change the email or ask for a new code to the same address; it keeps the
-  session a right code gives, and reports it. It starts with an address, if the root has one to give,
-  and a notice, such as that the session ended, which shows over the email field in the caution tone,
+  session a right code gives, and reports it. It starts with an address, which the root gives when it
+  has one, and a notice, such as that the session ended, which shows over the email field in the caution tone,
   stays as the address is typed, and goes when the address is sent.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
-  members it has, "Owner" when they own it, and the name they go by in it, such as "4 members · Owner · as
-  Alex"; it reports the one picked. The line under the heading counts what the listing holds, "2 workspaces ·
-  2 pending invitations", the workspaces alone when none wait, or "2 invitations waiting for you." when the
-  person belongs to none, and the empty listing says there is no workspace and to create one. The
+  members it has and "Owner" when they own it, such as "4 members · Owner"; it reports the one picked. It
+  takes the account's email as its init argument, not a view input, since `update` needs it: the model keeps
+  `suggestedName`, the part of the address before its "@" with its first letter in capitals
+  (`suggestNameFromEmail`, "Dave" for dave@example.com), as the name a person joining is offered. The line under
+  the heading counts what the listing holds, "2 workspaces · 2 pending invitations", the workspaces alone when
+  none wait, "2 invitations waiting for you." when the person belongs to none, and "Create a workspace to get
+  started." when there is nothing, which also shows the design's `paneEmpty`, "No workspaces yet", its line, and a
+  primary "Create workspace" button with the `mark-new` icon, and no button at the end of the heading's line. The
   invitations still open to the person, which the host lists with the workspaces, follow them under an
   "Invitations" heading with their count, each keyed by its ID, as the design's `rowWithButton`: the first
   letter of the workspace's name ("?" when the host has none), the name or "Workspace invitation", "Pending
   invitation · Expires in 7 days" (`expiryLabel` in `seen.ts`, from the time now, which the root gives the view),
-  and an "Accept invite" button named for the workspace. A failed listing says why and offers Try again, which
-  reads it again. A "Create workspace" button at the end of the heading's line, in every state of the listing,
-  and an invitation's "Accept invite" button open one modal, on a `DialogBlock` bound as `dialog`. The model's
-  `entering` is what the person is doing in it, which is `Entering`, one union for both ways into a workspace:
-  filling the form for creating (`FillingCreate`) or for joining (`FillingJoin`), the request on its way
-  (`SendingCreate`, `SendingJoin`), and `Opening`, which both come to once the workspace exists or the person
-  is in it, so that the workspace's ID and name (as far as the invitation gave one) and whether the listing
-  could be read again are kept once, and the page reports the opened workspace once the listing has it.
+  and an "Accept invite" button named for the workspace; with invitations and no workspace, the design's
+  `footnote` after them says "Accept an invitation above, or create your own workspace.". Each workspace's row
+  is the design's `row` with an ID, `workspace-{id}` (`workspaceRowId`), which focus moves to.
+  - The listing, `Workspaces`, is `Loading`, `Loaded`, or `Unreachable`. The first read failing is
+    `Unreachable`, a screen of its own, the design's `paneEmpty` with `level: 1`: "Can't reach your workspace
+    host", "You're still signed in. Try again once the host is running.", and a primary Try again that reads it
+    again, with no heading and no Create workspace button. A read after the list was shown, as it is once a
+    workspace is created or joined, or on Try again, keeps what was listed: `Loaded` carries `reloadFailed`,
+    and when the read failed it says "Couldn't refresh your workspaces." as an alert over the list with a quiet
+    Try again, which reads it again and takes the alert away until it fails again.
+  - A "Create workspace" button at the end of the heading's line, while the listing is loading or has anything
+    to list, and the empty listing's, and an invitation's "Accept invite" button open one modal, on a
+    `DialogBlock` bound as `dialog`. The model's `entering` is what the person is doing in it, which is
+    `Entering`: filling the form for creating (`FillingCreate`), the request on its way (`SendingCreate`), and
+    `Opening`, once the workspace exists, with its ID, its name, and whether the listing could be read again;
+    and for joining, filling the form (`FillingJoin`), the request on its way (`SendingJoin`), and `Joined`,
+    once the person is in the workspace, with the invitation and whether the listing could be read again.
   - Creating asks for the workspace's name and what people there will call the person, and creates it over HTTP,
     `client.workspaces.create`, as its owner and first member. Each attempt sends a request key as the
     `idempotency-key`, made by the command with the browser's `Crypto`, and a failed attempt keeps the key it
@@ -491,24 +504,41 @@ the pages that compose them; the root composes the pages.
     a second; changing a name starts a new request, since it is no longer the one that was sent. The command
     takes the names without the space around them and words each refusal for the person: at the name or the
     member name ("Use 1 to 80 characters, with no invisible ones."), or about the whole form for an identity that
-    may not create workspaces, values the host did not accept, and a host that was unavailable, unsure, or not
-    reached, the last three as "try again", which is safe with the same key.
-  - Joining is "Join {workspace}" ("Join workspace" when the host has no name for it), over the invitation
-    the person answered, and asks for the name people there will call them, `client.workspaces.acceptInvitation`.
-    Accepting again returns the same member, so the request carries no key and may be sent again as it was. The
-    command takes the name without the space around it and words each refusal for the person: at the name when
-    it does not hold or the host did not accept it ("Use 1 to 80 characters, with no invisible ones.", "That name
-    was not accepted."), or about the form for an invitation addressed to another account, one no longer open
-    (revoked or expired), a workspace that no longer exists, and a host that was unavailable, unsure, or not
-    reached, the last three as "try again". A failure returns to the form with its reason, to send again.
+    may not create workspaces, values the host did not accept, and, for a host that was unavailable, unsure, or
+    not reached, "We couldn't confirm creation. Try again with this name to safely check the same request.", which
+    is safe with the same key. Once the workspace exists the dialog is titled "Workspace created", described by
+    "{name} is ready.", and says "Opening your workspace…" while the listing is read again; the page reports the
+    opened workspace once the listing has it. If the listing cannot be read, the dialog says "Your workspace was
+    created, but we couldn't refresh the list. Try again to open it." with Close and a primary Try again.
+  - Joining is "Join {workspace}" ("Join this workspace" when the host has no name for it), over the invitation
+    the person answered, described by "What should people there call you? You can change it later.", and asks for
+    the name people there will call them, `client.workspaces.acceptInvitation`, in a "Your name" field filled in
+    with `suggestedName` and selected when it takes focus, by the `SelectOnFocus` mount on the field, which the
+    design's `field` takes among its `attributes`. Accepting again returns the same member, so the request
+    carries no key and may be sent again as it was. The command takes the name without the space around it and
+    words each refusal for the person: at the name when it does not hold
+    ("Use 1 to 80 characters, with no invisible ones."), or about the form: "This invitation changed while you
+    were accepting it. Try again." (`Changed`), "This invitation isn't addressed to this address." (`Denied`),
+    "This invitation is no longer available." (`Conflict`, an invitation revoked or expired, and `NotFound`),
+    "This invitation can't be accepted as it is." (`Invalid`), and, for a host that was unavailable, unsure, or
+    not reached, "We couldn't accept the invitation. Try again when the host is available." A failure returns to
+    the form with its reason, to send again. Once the person is in the workspace the listing is read again, and
+    once it is the dialog closes, a toast says "Joined {workspace}" (the name the listing has), and focus moves to
+    that workspace's row in Your workspaces, since the invitation's button has gone; the workspace is not opened.
+    If the listing cannot be read, the dialog stays and says "Joined, but we couldn't load your workspaces. Try
+    again." with Close and a primary Try again, which reads the listing again and sends nothing.
+  - The toast is the design's `toast` with `role: "status"` and a Dismiss, in its `toastStack`, which the page
+    renders at the end, since the centered screen has no shell. The model keeps `toasts`, each with an ID taken
+    from `nextToastId`, so that the time of a toast the person dismissed cannot take another's. Showing one
+    starts `ExpireToast`, a command that waits five seconds (`Effect.sleep`, so a test moves the clock) and
+    reports `ExpiredToast`, which takes the toast away as `DismissedToast` does; `FocusWorkspaceRow` moves focus
+    to the row with `Dom.focus`, completing when the row is not there.
   - A request the host answers with `Authentication.Unauthorized` (told with `Schema.is`), because it does not
     know the session, ends in `RejectedSession`, whichever request it was, and the page reports `EndedSession`;
     the root signs the person out. Any other failure is worded for the person, as each request does.
   - Closing the dialog ends what was being done, except while a request is on its way: it opens again, so that a
-    workspace is not created, nor an invitation accepted, unseen. Once the workspace exists or the person is
-    in it, the dialog is the workspace's name over "Opening {name}…"; if the listing cannot be read, it says the
-    person is in the workspace and the list could not be reloaded, with Try again, and Close leaves the listing
-    to say the same.
+    workspace is not created, nor an invitation accepted, unseen. Closing it while the listing is read again
+    leaves the listing to show the result alone, without a toast.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
   rail has "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings". Each
   destination is marked while it is open; Home is open while nothing, the inbox, the tasks in triage,
@@ -592,7 +622,8 @@ the pages that compose them; the root composes the pages.
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
   workspaces, and the one open, the width of the window, the time now, and whether the page runs on an Apple
-  platform. Signing in lists the workspaces; signing
+  platform. Signing in lists the workspaces, which the page asks for with the account's email, so that it can
+  suggest a name for joining one; signing
   out, from the workspace list or from the open workspace's sidebar, which asks the root, is one step
   in `composition.ts`, and its command, `command.ts`, forgets the session, the person's stores, and
   their sync identity first, so it works offline, then removes the browser's sync key and ends the
@@ -839,21 +870,28 @@ browser's storage. Each Block's tests sit beside it:
   one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
   `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
   with the members their text mentions, and with none when it mentions no one. The workspaces page's
-  stories open an empty form, send its names with no key and read the list again once the workspace
-  exists to report it opened, keep the key of a failed request for the request sent again and start a
-  new one once a name changes, clear the refusal at the field typed in and the one about the form, ignore
-  a close while the request is on its way, which opens the dialog again, end on a close at any other
-  point, and show the list alone when the workspace is not in it or the dialog was closed; for joining
-  they open the form over the invitation clicked and none for one the listing does not hold, send the
-  name with the invitation's IDs and read the list again once the person is in to report the workspace
-  opened, as a workspace the host has no name for, return to the form with why a request failed and send
-  it again as it was, clear the refusal as the name is typed, ignore a close while the request is on its
-  way, and end as creating does, and report the session ended when any request is rejected as
-  unauthorized; the `LoadWorkspaces`, `CreateWorkspace`, and `AcceptInvitation` handlers run over a stub
-  `HttpClient` that gives a canned status and body, to show the path, key, and names they send and each
-  refusal as the person reads it, and that a session the host does not know (status 401,
-  `Authentication.Unauthorized`) ends each of them in `RejectedSession`. The sign-in Block's stories and
-  scenes show the notice it starts with, kept as the address is typed and gone once it is sent.
+  stories start the listing for the person's address with the name it suggests, open an empty form, send
+  its names with no key and read the list again once the workspace exists to report it opened, keep the key
+  of a failed request for the request sent again and start a new one once a name changes, clear the refusal at
+  the field typed in and the one about the form, ignore a close while the request is on its way, which opens
+  the dialog again, end on a close at any other point, and show the list alone when the workspace is not in
+  it or the dialog was closed; for joining they open the form over the invitation clicked, with the name
+  suggested, and none for one the listing does not hold, send the name with the invitation's IDs and read the
+  list again once the person is in, then close the dialog, show a toast naming the workspace the listing has,
+  and focus its row, without opening it, start the toast's time and take the toast away when the time is up
+  or the person dismisses it, with an ID of its own that a later toast does not take, return to the form with
+  why a request failed and send it again as it was, clear the refusal as the name is typed, ignore a close
+  while the request is on its way, close without a toast when the dialog was closed or the list does not have
+  the workspace, keep the dialog on the join when the list could not be read and read it again, sending
+  nothing, on request, and end as creating does; for the listing they keep the list when reading it again
+  fails and say the host was not reached when the first read does, and report the session ended when any
+  request is rejected as unauthorized; the `LoadWorkspaces`, `CreateWorkspace`, and `AcceptInvitation`
+  handlers run over a stub `HttpClient` that gives a canned status and body, to show the path, key, and names
+  they send and each refusal as the person reads it, and that a session the host does not know (status 401,
+  `Authentication.Unauthorized`) ends each of them in `RejectedSession`; `FocusWorkspaceRow` runs over a button
+  in the document, which it focuses, and `ExpireToast` over `TestClock`, which it waits five seconds on.
+  The sign-in Block's stories and scenes show the notice it starts with, kept as the address is typed and
+  gone once it is sent.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
   edited one, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
@@ -987,19 +1025,25 @@ browser's storage. Each Block's tests sit beside it:
   it and, at `Phone`, from the drawer over the drawer, and a group found opening and closing the search.
   The root's show the key that opens the search opening it in an open workspace and doing nothing before
   one is open, and the shortcut it gives the workspace by the platform. The workspaces page's scenes
-  show each row with the name the person goes by and "Owner" only for a workspace they own, the count
-  line in each of its forms, the invitations under their heading, each by its workspace's mark and name or
-  "Workspace invitation" with when it expires, read from the time now, and its Accept invite button named
-  for the workspace, the heading's
-  Create workspace button in every state of the listing, a failed listing read again, the empty listing
-  saying what to do, and the dialog taking a workspace's names, sending them, saying at each field and for
-  the form why they were refused, and opening the workspace created, or saying the list could not be
-  read, with a way to try again; the dialog from an invitation's button, "Join {workspace}" or "Join
-  workspace", with its field taking the focus, the sending state, the refusal at the field and under it,
-  and joining opening the workspace, or saying the list could not be read. A scene opens and closes
+  show each row with its members and "Owner" only for a workspace the person owns, on a button with an ID of
+  its own, the count line in each of its forms, the invitations under their heading, each by its
+  workspace's mark and name or "Workspace invitation" with when it expires, read from the time now, and its
+  Accept invite button named for the workspace, and the line after them when the person belongs to no
+  workspace; the heading's secondary Create workspace button while the listing loads or has anything to list;
+  the host not reached the first time as a screen of its own, with a primary Try again, read again; a read that
+  failed after the list was shown as an alert over the list it kept, with a quiet Try again; the empty
+  listing as its heading, its line, and the empty state with a primary Create workspace, which opens the
+  form, in place of the heading's button; and the dialog taking a workspace's names, sending them, saying at each
+  field and for the form why they were refused, and opening the workspace created, or saying the list could not
+  be refreshed, with Close and a way to try again; the dialog from an invitation's button, "Join {workspace}" or
+  "Join this workspace", described by its line, with its field filled in with the name suggested, taking the
+  focus and watching it to select the text, the sending state, each refusal at the field and under it, and
+  joining closing the dialog and showing the toast with its Dismiss, the workspace's row focused and the
+  toast gone when its time is up, or the dialog saying the person joined and the list could not be loaded,
+  with Close and a primary Try again that reads it again. A scene opens and closes
   a dialog by resolving its commands and mount, `Dialog.test.ShowDialog`, `Dialog.test.AcquireResources`,
-  and `Dialog.test.CloseDialog` from `@foldkit/ui`, and a story sends the dialog's own message through
-  its Binding's `embedView`.
+  and `Dialog.test.CloseDialog` from `@foldkit/ui`, resolves the field's `SelectOnFocus` mount and expects it
+  ended, and a story sends the dialog's own message through its Binding's `embedView`.
 - The flags' tests stub the browser's `navigator`: the page runs on an Apple platform by
   `userAgentData.platform` where the browser has it, over `navigator.platform`, and by the latter where it
   has not, and `namesApplePlatform` takes the names macOS, iOS, and iPadOS give and no other system's.
