@@ -1,6 +1,8 @@
 import { Grant, Scope } from "@amends-dev/core/authorization"
 import { Group, GroupMembership, GroupPermissions } from "@amends-dev/core/group"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import type { Task } from "@amends-dev/core/task"
+import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock, RadioGroup } from "@foldkit/ui"
 import { DateTime, Option, Schema } from "effect"
@@ -37,13 +39,14 @@ import {
   general,
   membership,
   scout,
+  scoutAgent,
   turnOf
 } from "../../../test/fixtures.ts"
 import { pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { panelIs } from "../../../test/panelSize.ts"
 import { GroupsBlock } from "./block.ts"
 import { CreateTeam, FocusTeamMembers, JoinGroup, StartConversation } from "./command.ts"
-import { Message, type NewActivity, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
+import { Message, type Model, type NewActivity, OutMessage, Starting, VisibilityRadioGroupBlock } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -151,6 +154,57 @@ const withPeople = modifyFields(listed, { members: () => [member, bob, scout] })
 /** The same, with the conversation with Bob read too. */
 const withConversation = modifyFields(listed, {
   groups: (groups) => [...groups, { group: withBob, pending: false, members: 2 }]
+})
+
+/** A member of the workspace who is no agent, `id` and `name` theirs, and, unless they have left, active. */
+const person = (id: string, name: string, status: Member.Member["status"] = "active") =>
+  Schema.decodeSync(Member.Member)({
+    id,
+    workspaceId: "workspace-1",
+    identity: { _tag: "Human", id: id.replace("member", "human") },
+    name,
+    status
+  })
+
+/** A member who has no conversation with the person alone. */
+const carol = person("member-9", "Carol")
+
+/** A conversation of the person with Bob and Carol. */
+const withBobAndCarol = Schema.decodeSync(Group.Group)({
+  id: "direct-2",
+  workspaceId: "workspace-1",
+  kind: "Direct",
+  memberIds: ["member-1", "member-2", "member-9"],
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
+/** A conversation of the person with Scout, the agent. */
+const withScout = Schema.decodeSync(Group.Group)({
+  id: "direct-3",
+  workspaceId: "workspace-1",
+  kind: "Direct",
+  memberIds: ["member-1", "member-3"],
+  createdBy: "member-1",
+  createdAt: "2026-10-18T12:00:00Z"
+})
+
+/** Scout as the server says it can't run: the connection of its model was removed. */
+const incompleteScout = Schema.decodeSync(ReplicaRecord.Agent)({
+  ...Schema.encodeSync(ReplicaRecord.Agent)(scoutAgent),
+  readiness: { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "model" }] }
+})
+
+/** The conversations with Bob, with Scout, and with Bob and Carol together, read with the agent that Scout is. */
+const withConversations = modifyFields(listed, {
+  members: () => [member, bob, scout, carol],
+  groups: (groups) => [
+    ...groups,
+    { group: withBob, pending: false, members: 2 },
+    { group: withScout, pending: false, members: 2 },
+    { group: withBobAndCarol, pending: false, members: 3 }
+  ],
+  agents: (): Model["agents"] => [{ agent: scoutAgent, pending: false }]
 })
 
 describe("the groups", () => {
@@ -268,7 +322,10 @@ describe("the groups", () => {
 
   it("show the dot as the store reports activity not read, and take it away once the group is read", () => {
     const signals = (newActivity: ReadonlyArray<NewActivity>) =>
-      Subscription.emit(subscriptions.signals, Message.ReceivedSignals({ newActivity, waiting: [], turns: [] }))
+      Subscription.emit(
+        subscriptions.signals,
+        Message.ReceivedSignals({ newActivity, waiting: [], turns: [], agents: [] })
+      )
 
     scene(
       { update, view: sceneView(), subscriptions: GroupsBlock.subscriptions },
@@ -619,6 +676,190 @@ describe("the groups", () => {
       expect(role("heading", { name: "Direct messages", level: 2 })).toExist(),
       expect(within(role("button", { name: "Bob" }), text("B"))).toExist(),
       expect(text("No messages yet")).toBeAbsent()
+    )
+  })
+
+  it("mark a conversation by the member it is with in their tone, neutral for a person and lilac for an agent", () => {
+    scene(
+      { update, view: sceneView() },
+      given(withConversations),
+      expect(within(role("button", { name: "Bob" }), text("B"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("button", { name: "Scout" }), text("S"))).toHaveClass("bg-avatar-lilac-bg")
+    )
+  })
+
+  it("draw a conversation with several people as one mark of the first letters of two names, and name them all", () => {
+    scene(
+      { update, view: sceneView() },
+      given(withConversations),
+      expect(within(role("button", { name: "Bob, Carol" }), text("BC"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("button", { name: "Bob, Carol" }), selector(".tooltip-anchor"))).toBeAbsent()
+    )
+    const withBobAndScout = Schema.decodeSync(Group.Group)({
+      id: "direct-4",
+      workspaceId: "workspace-1",
+      kind: "Direct",
+      memberIds: ["member-1", "member-2", "member-3"],
+      createdBy: "member-1",
+      createdAt: "2026-10-18T12:00:00Z"
+    })
+
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(withConversations, {
+          groups: (groups) => [...groups, { group: withBobAndScout, pending: false, members: 3 }],
+          agents: () => [{ agent: incompleteScout, pending: false }]
+        })
+      ),
+      expect(within(role("button", { name: "Bob, Scout" }), text("BS"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("button", { name: "Bob, Scout" }), selector(".tooltip-anchor"))).toBeAbsent()
+    )
+  })
+
+  it("mark a conversation by the letters of its members' IDs until the workspace's members are read", () => {
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(withConversation, { members: () => [] })),
+      expect(within(role("button", { name: "member-2" }), text("M"))).toHaveClass("bg-avatar-neutral-bg")
+    )
+  })
+
+  it("say in a conversation with an agent how it stands, by its patch, and why in a tooltip on hover", () => {
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(withConversations, { agents: () => [{ agent: incompleteScout, pending: false }] })),
+      expect(within(role("button", { name: "Scout, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
+      ),
+      expect(
+        within(role("button", { name: "Scout, Needs setup" }), text("Its model connection was removed."))
+      ).toExist(),
+      expect(role("button", { name: "Scout" })).toBeAbsent(),
+      expect(within(role("button", { name: "Bob" }), selector(".tooltip-anchor"))).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(withConversations, { agents: () => [{ agent: incompleteScout, pending: true }] })),
+      expect(role("button", { name: "Scout, Needs setup" })).toBeAbsent(),
+      expect(role("button", { name: "Scout" })).toExist()
+    )
+  })
+
+  it("move the logo of a conversation with an agent while it is at work wherever it is, and name the row by where", () => {
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(withConversations, { turns: () => [turnOf("turn-1", "running")] })),
+      expect(within(role("button", { name: "Scout, Working in #General" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("button", { name: "Scout, Working in #General" }), text("Working in #General"))).toExist(),
+      expect(within(role("button", { name: "General, Working" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("button", { name: "Bob" }), selector("svg.logo-working"))).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(withConversations, { turns: () => [turnOf("turn-1", "queued")] })),
+      expect(within(role("button", { name: "Scout, Queued in #General" }), selector("svg.logo-thread"))).toExist()
+    )
+  })
+
+  it("count what waits in a conversation with an agent as 'for you', or draw the dot while it has activity not read", () => {
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(withConversations, {
+          waiting: () => [{ groupId: withScout.id, count: 2 }],
+          newActivity: () => [
+            { groupId: withScout.id, latestAt: later },
+            { groupId: withBob.id, latestAt: later }
+          ]
+        })
+      ),
+      expect(role("button", { name: "Scout" })).toHaveAttr("aria-description", "2 for you"),
+      expect(within(role("button", { name: "Scout" }), text("2"))).toExist(),
+      expect(within(role("button", { name: "Scout" }), selector("span.bg-indicator"))).toBeAbsent(),
+      expect(role("button", { name: "Bob" })).toHaveAttr("aria-description", "new activity"),
+      expect(within(role("button", { name: "Bob" }), selector("span.bg-indicator"))).toExist()
+    )
+    scene(
+      { update, view: sceneView() },
+      given(modifyFields(withConversations, { newActivity: () => [{ groupId: withScout.id, latestAt: later }] })),
+      expect(role("button", { name: "Scout" })).toHaveAttr("aria-description", "new activity"),
+      expect(within(role("button", { name: "Scout" }), selector("span.bg-indicator"))).toExist(),
+      expect(role("button", { name: "Bob" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("list after the conversations the members the person has none with alone yet, by name as they read it", () => {
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(withConversations, {
+          members: (members) => [...members, person("member-7", "Émile"), person("member-8", "Aaron", "removed")]
+        })
+      ),
+      expectAll(all.selector("li button")).toHaveCount(7),
+      expect(nth(all.selector("li button"), 2)).toHaveAttr("aria-label", "Bob"),
+      expect(nth(all.selector("li button"), 3)).toHaveAttr("aria-label", "Bob, Carol"),
+      expect(nth(all.selector("li button"), 4)).toHaveAttr("aria-label", "Scout"),
+      expect(nth(all.selector("li button"), 5)).toHaveAttr("aria-label", "Carol"),
+      expect(nth(all.selector("li button"), 6)).toHaveAttr("aria-label", "Émile"),
+      expect(role("button", { name: "Aaron" })).toBeAbsent(),
+      expect(role("button", { name: "Alice" })).toBeAbsent()
+    )
+  })
+
+  it("mark a teammate by their tone, and say of an agent how it stands and what it is doing, as in a conversation", () => {
+    const withoutConversations = modifyFields(listed, {
+      members: () => [member, bob, scout, carol],
+      agents: () => [{ agent: incompleteScout, pending: false }]
+    })
+
+    scene(
+      { update, view: sceneView() },
+      given(withoutConversations),
+      expect(within(role("button", { name: "Carol" }), text("C"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("button", { name: "Scout, Needs setup" }), text("S"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(
+        within(role("button", { name: "Scout, Needs setup" }), text("Its model connection was removed."))
+      ).toExist(),
+      expect(role("button", { name: "Carol" })).not.toHaveAttr("aria-description"),
+      expect(role("button", { name: "Carol" })).not.toHaveAttr("aria-current")
+    )
+    scene(
+      { update, view: sceneView() },
+      given(
+        modifyFields(withoutConversations, {
+          agents: () => [{ agent: scoutAgent, pending: false }],
+          turns: () => [turnOf("turn-1", "running")]
+        })
+      ),
+      expect(within(role("button", { name: "Scout, Working in #General" }), selector("svg.logo-working"))).toExist()
+    )
+  })
+
+  it("start a conversation with a teammate the sidebar lists, in the dialog with them chosen and the message next", () => {
+    scene(
+      { update, view: withDialog },
+      given(withConversations),
+      click(role("button", { name: "Carol" })),
+      ...dialogOpened(),
+      expect(role("dialog", { name: "New conversation" })).toExist(),
+      expect(label("With")).toHaveValue(carol.id),
+      expect(label("First message")).toHaveAttr("data-foldkit-dialog-initial-focus", ""),
+      expect(label("With")).not.toHaveAttr("data-foldkit-dialog-initial-focus"),
+      type(label("First message"), "Lunch?"),
+      click(role("button", { name: "Start" })),
+      Command.expectHas(
+        StartConversation({
+          workspaceId: workspace.id,
+          memberId: member.id,
+          withMemberId: carol.id,
+          text: "Lunch?"
+        }),
+        Dialog.test.CloseDialog
+      ),
+      Command.resolve(StartConversation, Message.WroteAction()),
+      ...dialogClosed()
     )
   })
 

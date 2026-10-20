@@ -17,7 +17,6 @@ import {
 import { activityList, detailList } from "@amends-dev/design/details"
 import { activityCell, cellWithDetail, columns, loadingRows, row } from "@amends-dev/design/directory"
 import { form } from "@amends-dev/design/form"
-import type { MarkStatus } from "@amends-dev/design/mark"
 import { modal } from "@amends-dev/design/modal"
 import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs, paneToolbar } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
@@ -33,6 +32,7 @@ import {
   turnLabel,
   type TurnUnderWay
 } from "../../agentActivity.ts"
+import { issueSentence, sidebarActivity, statusOfAgent } from "../../agentStanding.ts"
 import { calendarDate, memberName } from "../../seen.ts"
 import { Integrations } from "../connections/definition.ts"
 import { AgentsComposition, type AgentsViewBuilder, DialogBinding } from "./composition.ts"
@@ -69,42 +69,6 @@ import {
   turnsOfAgent
 } from "./definition.ts"
 import { setupFields } from "./setupFields.ts"
-
-/** Why an agent can't run, as a sentence. */
-const issueSentence = (issue: Agent.Issue): string =>
-  Agent.Issue.match(issue, {
-    Removed: ({ part }) => `Its ${part} connection was removed.`,
-    Uninstalled: ({ part }) => `Its ${part} connection's integration isn't installed on this host.`,
-    Invalid: ({ description }) => (description.endsWith(".") ? description : `${description}.`),
-    SandboxRequired: () => "Its harness works only in a sandbox, and it has none.",
-    NoHarness: () => "No connection gives a harness it can run on."
-  })
-
-/**
- * How an agent stands, as the patch on its mark says it: Needs setup, with why on hover, when it can't run as it
- * is set up; otherwise, while it is at work, that it is, with where on hover, such as "Working in #general". A ready
- * agent that is idle shows nothing, and so does one still on its way, since the server tells how ready a new agent is
- * once it has it.
- */
-const statusOf = ({ agent, pending }: AgentItem, activity: Option.Option<AgentActivity>): MarkStatus | undefined =>
-  pending
-    ? undefined
-    : Agent.Readiness.match(agent.readiness, {
-        Ready: (): MarkStatus | undefined =>
-          Option.getOrUndefined(Option.map(activity, (at) => ({ kind: "available", label: activityLabel(at) }))),
-        Incomplete: ({ issues }): MarkStatus | undefined => ({
-          kind: "attention",
-          label: "Needs setup",
-          detail: issueSentence(issues[0])
-        })
-      })
-
-/** What a sidebar row says of the agent being at work: the words, and how the logo moves, as its state does. */
-const sidebarActivity = (activity: Option.Option<AgentActivity>) =>
-  Option.match(activity, {
-    onNone: () => ({}),
-    onSome: (at) => ({ activity: activityLabel(at), activityMotion: motionOfState[at.state] })
-  })
 
 /** The harness an agent runs on, as a line: `Auto`, or the connection's name. */
 const harnessLine = (agent: AgentItem["agent"], model: Model): string =>
@@ -177,7 +141,7 @@ export const sidebarView = AgentsComposition.makeView.withInputs<SidebarInputs>(
 
                 return sidebarItem(h, {
                   mark: { text: nameOfAgent(model, item.agent).slice(0, 1), tone: "lilac" },
-                  status: statusOf(item, activity),
+                  status: statusOfAgent(item, activity),
                   ...sidebarActivity(activity),
                   label: nameOfAgent(model, item.agent),
                   isPending: item.pending,
@@ -224,7 +188,7 @@ const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => 
       row(h, {
         mark: { text: name.slice(0, 1), tone: "lilac" },
         markSize: "md",
-        status: statusOf(item, activity),
+        status: statusOfAgent(item, activity),
         title: name,
         ...(pending ? { meta: "Sending…" } : {}),
         cells: [
@@ -545,7 +509,7 @@ const agentPage = (item: AgentItem, model: Model, workspaceName: string, h: Agen
     header: {
       title: name,
       mark: { text: name.slice(0, 1), tone: "lilac" },
-      status: statusOf(item, activityOfAgent(model, item)),
+      status: statusOfAgent(item, activityOfAgent(model, item)),
       phoneContext: workspaceName,
       ...(item.pending ? { context: "Sending…" } : {})
     },

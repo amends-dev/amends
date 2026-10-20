@@ -1,5 +1,6 @@
-import { GroupPermissions } from "@amends-dev/core/group"
+import { type Group, GroupPermissions } from "@amends-dev/core/group"
 import type { Task } from "@amends-dev/core/task"
+import type { Member } from "@amends-dev/core/workspace"
 import {
   button,
   choiceGroup,
@@ -20,10 +21,12 @@ import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { type ActivityState, motionOfState, stateInGroup, stateWord } from "../../agentActivity.ts"
+import { sidebarActivity, statusOfAgent } from "../../agentStanding.ts"
 import { memberChoice } from "../../memberChoice.ts"
 import { includedHint, pickerPeople, pickerPeopleChosen, youInPicker } from "../../memberPicker.ts"
 import { may, workspaceTarget } from "../../permissions.ts"
-import { groupName, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
+import { groupName, memberMark, pluralize, statusLabel, statusShape, visibilityHint } from "../../seen.ts"
+import type { AgentItem } from "../agents/definition.ts"
 import {
   DialogBinding,
   GroupsComposition,
@@ -31,9 +34,12 @@ import {
   MembersBinding,
   VisibilityBinding
 } from "./composition.ts"
+import { conversationMark, soleOtherIn } from "./conversation.ts"
 import {
+  activityOfAgentHere,
   type BrowseTab,
   discoverable,
+  findAgentOfMember,
   type GroupItem,
   hasNewActivityIn,
   isTeamReady,
@@ -43,6 +49,7 @@ import {
   others,
   Starting,
   teamMembersId,
+  teammates,
   type TeamItem,
   teamVisibilityId,
   waitingIn,
@@ -81,11 +88,45 @@ const waitingCountName = "for you"
 /** What a row of the sidebar says of an agent being at work in the group, and how the logo moves as its state does. */
 const groupActivity = (state: ActivityState) => ({ activity: stateWord[state], activityMotion: motionOfState[state] })
 
+/** What a row says of an agent being at work in the group `groupId`, while one is. */
+const activityInGroup = (model: Model, groupId: Group.Group["id"]) =>
+  Option.match(stateInGroup(model.turns, groupId), { onNone: () => ({}), onSome: groupActivity })
+
+/** How an agent stands and what it is doing, as the patch on its mark and the logo at the end of its row say it. */
+const standingOfAgent = (item: AgentItem, model: Model) => {
+  const activity = activityOfAgentHere(model, item)
+
+  return { status: statusOfAgent(item, activity), ...sidebarActivity(activity) }
+}
+
+/** What marks a team's row: the channel's drawing, and the logo while an agent is at work in the team. */
+const teamLook = (group: Group.Team, model: Model) => ({
+  icon: "mark-channel" as const,
+  ...activityInGroup(model, group.id)
+})
+
 /**
- * A group as a row of the sidebar, a team by its mark and a conversation by the first letter of the other member's
- * name, the group picked marked, and under it the thread open in it, when there is one. What waits for the person in
- * it is a count, read as "2 for you", or, with none, a dot while it has activity they have not read; the logo moves
- * while an agent is at work in it.
+ * What marks a conversation's row: the mark of who it is with, as `conversationMark` says. A conversation with an
+ * agent says what the agent is doing wherever it is, and how it stands, as the agents' section does; any other says
+ * whether an agent is at work in the conversation itself.
+ */
+const conversationLook = (group: Group.Direct, model: Model) => {
+  const mark = conversationMark(model.members, group, model.memberId)
+
+  return Option.match(
+    Option.flatMap(soleOtherIn(group, model.memberId), (memberId) => findAgentOfMember(model, memberId)),
+    {
+      onNone: () => ({ mark, ...activityInGroup(model, group.id) }),
+      onSome: (item) => ({ mark, ...standingOfAgent(item, model) })
+    }
+  )
+}
+
+/**
+ * A group as a row of the sidebar: a team by the channel's drawing and a conversation by the mark of who it is with,
+ * the group picked marked, and under it the thread open in it, when there is one. What waits for the person in it is a
+ * count, read as "2 for you", or, with none, a dot while it has activity they have not read; the logo moves while an
+ * agent is at work, as `teamLook` and `conversationLook` say.
  */
 const groupRow = (
   { group, pending }: GroupItem,
@@ -93,22 +134,36 @@ const groupRow = (
   openThread: Option.Option<OpenThread>,
   h: GroupsViewBuilder
 ): Html => {
-  const name = groupName(group, model.members, model.memberId)
   const isCurrent = Option.contains(model.selected, group.id)
   const waiting = waitingIn(model, group.id)
 
   return sidebarItem(h, {
-    ...(group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: { text: name.slice(0, 1) } }),
-    label: name,
+    ...(group.kind === "Team" ? teamLook(group, model) : conversationLook(group, model)),
+    label: groupName(group, model.members, model.memberId),
     ...(waiting > 0 ? { count: waiting, countName: waitingCountName } : {}),
     isUnread: hasNewActivityIn(model, group.id),
-    ...Option.match(stateInGroup(model.turns, group.id), { onNone: () => ({}), onSome: groupActivity }),
     isPending: pending,
     isCurrent,
     onClick: Message.ClickedGroup({ groupId: group.id }),
     ...(isCurrent && Option.isSome(openThread) ? { children: [openThreadRow(openThread.value)] } : {})
   })
 }
+
+/**
+ * A member the person has no conversation with yet as a row of the sidebar, by their mark in their tone and their name;
+ * an agent says how it stands and what it is doing, as in a conversation with it. The row starts the conversation.
+ */
+const teammateRow = (member: Member.Member, model: Model, h: GroupsViewBuilder): Html =>
+  sidebarItem(h, {
+    mark: memberMark(member),
+    ...Option.match(findAgentOfMember(model, member.id), {
+      onNone: () => ({}),
+      onSome: (item) => standingOfAgent(item, model)
+    }),
+    label: member.name,
+    isCurrent: false,
+    onClick: Message.ClickedTeammate({ memberId: member.id })
+  })
 
 /**
  * The modal for what the person is starting: a team, or a conversation with another member. While nothing is being
@@ -225,9 +280,10 @@ const teamRows = (
 /**
  * The sidebar's sections of the groups, in the order `yours` gives them: the teams the person belongs to, with Browse
  * groups and, where they may start a team, Create group beside the title, and their conversations, with New message,
- * which is there whoever else is in the workspace. The Groups title opens the browse page on the teams the person
- * belongs to and is current while it shows; Browse groups opens it on the teams they may join. The buttons that start
- * a team or a conversation open the dialog `dialogView` renders.
+ * which is there whoever else is in the workspace, and, after the conversations, the members they have none with yet,
+ * by name, each of which opens the dialog with them chosen. The Groups title opens the browse page on the teams the
+ * person belongs to and is current while it shows; Browse groups opens it on the teams they may join. The buttons that
+ * start a team or a conversation open the dialog `dialogView` renders.
  */
 export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread, isBrowsing }, h) => {
   const own = yours(model)
@@ -267,7 +323,10 @@ export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { 
           { size: "compact" }
         )
       ],
-      children: conversations.map((item) => groupRow(item, model, openThread, h))
+      children: [
+        ...conversations.map((item) => groupRow(item, model, openThread, h)),
+        ...teammates(model).map((member) => teammateRow(member, model, h))
+      ]
     })
   ])
 })

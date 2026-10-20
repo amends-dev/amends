@@ -562,7 +562,8 @@ below it counted at each level above.
   What a group's row says besides its name is read by a second subscription, `ReadSignals`, into one
   `ReceivedSignals`, which no row waits for (`readSignals` over the store's records, and `receivedSignals`, which
   makes the message from them): the groups with activity the person has not read, how many of their notifications
-  wait in each group, and the turns under way. A group has activity the person has not read as core's
+  wait in each group, the turns under way, and the workspace's agents, with whether a change to each is on its way.
+  A group has activity the person has not read as core's
   `Group.hasNewActivity` says it for the row of a group (`findNewActivity` in `signals.ts`): the latest activity of
   its threads that counts as new, a published message (`ThreadActivity.newActivity`), came after the person last read
   the group (their `GroupRead`), or, if they never have, after they were admitted to it; each such group is kept with
@@ -584,7 +585,24 @@ below it counted at each level above.
   current while the page it opens shows (the view input `isBrowsing`). The Direct messages section lists
   the conversations and has no line of its own for none, and its New message button is shown always, as `apps/ui`'s
   is, whoever else is in the workspace: with nobody else its dialog, "New conversation", has a member choice with
-  only "Choose a member" to pick and a first message to write, and Start sends nothing until a member is chosen. A
+  only "Choose a member" to pick and a first message to write, and Start sends nothing until a member is chosen.
+  A conversation's row is marked by the member it is with, in their tone as `memberMark` gives it, neutral for a
+  person and lilac for an agent (`conversationMark` in `conversation.ts`), where it had their first letter alone.
+  A conversation with several people, which core allows a direct group to be, has no one's mark to wear and `apps/ui`
+  draws none, so its row has one of its own: the first letters of the names of the first two on the neutral tone, and
+  all of the names as its label. A conversation with one agent says how the agent stands and what it is doing as the
+  Agents section does, by the same functions (`statusOfAgent` and `sidebarActivity` in `agentStanding.ts`): a patch
+  on the mark, "Scout, Needs setup", with why in a tooltip on hover, or, while it is at work, the logo moving at the
+  end of the row and the patch saying where, "Scout, Working in #General", wherever the agent is at work rather than
+  only in the conversation, as `apps/ui`'s direct message rows take the agent's activity from its status; the count
+  of what waits and the dot are the group row's own. A conversation with a person, or with several, moves the logo
+  while an agent is at work in the conversation itself, as a team does. After the conversations the section lists
+  the workspace's other active members the person has no conversation with alone yet (`teammates`), by name as they
+  read it, each on their mark in their tone, and an agent among them with its patch and its logo as in a
+  conversation; they have no count and no dot, since there is no group yet. A teammate's row sends `ClickedTeammate`,
+  which does what `RequestedConversationWith` does for the parent: it opens the conversation of the two when one has
+  appeared since the row was drawn, and otherwise opens the New conversation dialog with the member chosen and the
+  focus on the first message, and Start writes the conversation as it does for a member chosen in the dialog. A
   row's count is read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
   `countName`). `browseView` is the page it asks for, a main pane titled Groups with two tabs, each counted once the groups are
   read: Your groups, the teams the person belongs to, and Discover, the public teams they do not, Your groups at
@@ -1298,6 +1316,10 @@ reads the turns under way and the groups through its `ReadActivity` subscription
 state of its turn, the oldest turn first, which the store gives a group's thread list as `working`, and `workingLabel`
 says one in a line with its agent's name, "Yumi working". `stateInGroup` takes the most pressing state among the turns under way in one group,
 whichever agents they are of, which the sidebar's group rows move the logo as.
+`agentStanding.ts`, how an agent stands and what it is doing as a row of the sidebar says it, is shared by the agents
+feature's section and the groups feature's direct messages: `statusOfAgent` makes the patch on its mark (Needs setup,
+with `issueSentence` of the first thing in the way, or where it is at work, and nothing for an idle agent or one still
+on its way), and `sidebarActivity` the words and motion of its logo.
 `taskList.ts`, tasks as the design's `taskList`, with the status of each drawn and the assignee named, is the threads
 feature's Tasks tab's and the tasks feature's, which adds the place of the group after each title, and holds the words
 the two say where the filters leave none (`noTasksMatch`).
@@ -1658,7 +1680,13 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   same message; the groups listed in the
   sidebar's sections, the teams to join not among them, in order, "No groups yet" only once the groups are read,
   no line for conversations, New message always and its dialog with no one to choose when nobody else is in the
-  workspace, a conversation by its other member, one still on
+  workspace, a conversation by its other member in their tone, neutral for a person and lilac for an agent, and one
+  with several people by the first letters of two names and all of them as its label, an agent's with its patch and
+  why in a tooltip, "Scout, Needs setup", and with the logo moving and where it is at work, "Scout, Working in
+  #General", wherever it is, its count and its dot, the members with no conversation yet after the conversations, by
+  name and each in their tone, with an agent among them carrying the same, a click on one opening the New
+  conversation dialog with them chosen and the focus on the first message and then writing the conversation, or
+  opening the conversation if it has appeared, a conversation still on
   its way marked "Sending…" at the end of its row, with the thread open under the group picked, drawn by the status of
   the task it tracks in each of the six, with the word for it, in ink once the task is done, and by the message icon
   when it tracks none, under a conversation as under a team, what waits for the
@@ -1920,7 +1948,11 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
   the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity
   from them, idle or by the most pressing state and each place once, and the words for them, and the agents at work
-  in one thread from its turns, by state and oldest first, and their line, and the most pressing state of a group's turns, whichever agents they are of. `Drafts`'
+  in one thread from its turns, by state and oldest first, and their line, and the most pressing state of a group's
+  turns, whichever agents they are of, and `agentStanding.ts`: the patch of an agent that needs setup, with why, or is
+  at work, with where, and none while it is idle or its change is on its way, and the words and motion of its logo,
+  and `feature/groups/conversation.ts`: whom a conversation is with, and its mark, one member's in their tone, or the
+  first letters of two names, or the letters of an ID before the members are read. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

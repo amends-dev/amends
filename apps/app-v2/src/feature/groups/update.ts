@@ -171,6 +171,16 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
         )
     })
 
+  /**
+   * Open the conversation of the person and `memberId` when there is one, and otherwise ask for a new one with them
+   * chosen, to write the first message of.
+   */
+  const talkWith = (memberId: MemberId.MemberId) =>
+    Option.match(conversationWith(model, memberId), {
+      onSome: ({ group }) => pickGroup(model, group.id),
+      onNone: () => Update.combine(model, [openConversationForm(Option.some(memberId)), DialogBinding.requestOpen()])
+    })
+
   return Message.match(message, {
     ReceivedGroups: ({ groups, members, memberships, grants }) =>
       finishCreating(
@@ -182,12 +192,13 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
           grants: () => grants
         })
       ),
-    ReceivedSignals: ({ newActivity, waiting, turns }) =>
+    ReceivedSignals: ({ newActivity, waiting, turns, agents }) =>
       Update.combine(model, [
         GroupsDefinition.stepFields(() => ({
           newActivity: () => newActivity,
           waiting: () => waiting,
-          turns: () => turns
+          turns: () => turns,
+          agents: () => agents
         })),
         readOpenGroup
       ]),
@@ -241,11 +252,8 @@ export const update = GroupsComposition.makeUpdate((model, message) => {
     CompletedFocusTeamMembers: () => ({ model }),
     ClickedNewConversation: () =>
       Update.combine(model, [openConversationForm(Option.none()), DialogBinding.requestOpen()]),
-    RequestedConversationWith: ({ memberId }) =>
-      Option.match(conversationWith(model, memberId), {
-        onSome: ({ group }) => pickGroup(model, group.id),
-        onNone: () => Update.combine(model, [openConversationForm(Option.some(memberId)), DialogBinding.requestOpen()])
-      }),
+    ClickedTeammate: ({ memberId }) => talkWith(memberId),
+    RequestedConversationWith: ({ memberId }) => talkWith(memberId),
     ChoseConversationMember: ({ memberId: chosen }) => ({
       model: atStarting(
         model,

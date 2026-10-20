@@ -14,6 +14,7 @@ import {
   conversationWithBob,
   design,
   general,
+  scoutAgent,
   turnOf
 } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
@@ -805,6 +806,43 @@ describe("the groups", () => {
     )
   })
 
+  it("start a conversation with a teammate the sidebar lists as asking for one with them does, in its dialog", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedTeammate({ memberId: bobId })),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.starting).toEqual(Option.some(Starting.Conversation({ memberId: Option.some(bobId), text: "" })))
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.selected).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("open the conversation instead when one with the teammate has appeared since the sidebar listed them", () => {
+    const withConversation = modifyFields(listed, {
+      groups: () => [
+        { group: general, pending: false, members: 2 },
+        { group: conversationWithBob, pending: false, members: 2 }
+      ]
+    })
+
+    story(
+      update,
+      given(withConversation),
+      message(Message.ClickedTeammate({ memberId: bobId })),
+      expectOutMessage(OutMessage.SelectedGroup({ groupId: conversationWithBob.id })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.selected).toEqual(Option.some(conversationWithBob.id))
+        expect(model.starting).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
   describe("reading what a group's row says", () => {
     const firstAt = DateTime.makeUnsafe("2026-10-18T12:10:00Z")
     const laterAt = DateTime.makeUnsafe("2026-10-18T12:20:00Z")
@@ -812,7 +850,7 @@ describe("the groups", () => {
     const markGeneralRead = MarkGroupRead({ workspaceId, memberId, groupId: general.id })
     const inGeneral = modifyFields(browsing, { selected: () => Option.some(general.id) })
 
-    it("keep what is unread, what waits, and the turns under way, as the store reports them", () => {
+    it("keep what is unread, what waits, the turns under way, and the agents, as the store reports them", () => {
       const turn = turnOf("turn-1", "running")
 
       story(
@@ -822,7 +860,8 @@ describe("the groups", () => {
           Message.ReceivedSignals({
             newActivity: [unread],
             waiting: [{ groupId: design.id, count: 2 }],
-            turns: [turn]
+            turns: [turn],
+            agents: [{ agent: scoutAgent, pending: false }]
           })
         ),
         Command.expectNone(),
@@ -830,12 +869,13 @@ describe("the groups", () => {
           expect(model.newActivity).toEqual([unread])
           expect(model.waiting).toEqual([{ groupId: design.id, count: 2 }])
           expect(model.turns).toEqual([turn])
+          expect(model.agents).toEqual([{ agent: scoutAgent, pending: false }])
           expect(hasNewActivityIn(model, general.id)).toBe(true)
           expect(hasNewActivityIn(model, design.id)).toBe(false)
           expect(waitingIn(model, design.id)).toBe(2)
           expect(waitingIn(model, general.id)).toBe(0)
         }),
-        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [], agents: [] })),
         model((model) => {
           expect(hasNewActivityIn(model, general.id)).toBe(false)
           expect(waitingIn(model, design.id)).toBe(0)
@@ -847,19 +887,26 @@ describe("the groups", () => {
       story(
         update,
         given(inGeneral),
-        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [], agents: [] })),
         Command.expectNone(),
-        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [], agents: [] })),
         Command.expectExact(markGeneralRead),
         Command.resolve(MarkGroupRead, Message.WroteAction()),
         model((model) => {
           expect(model.readRequested).toEqual(Option.some(unread))
         }),
-        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [], agents: [] })),
         Command.expectNone(),
-        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [], waiting: [], turns: [], agents: [] })),
         Command.expectNone(),
-        message(Message.ReceivedSignals({ newActivity: [{ ...unread, latestAt: laterAt }], waiting: [], turns: [] })),
+        message(
+          Message.ReceivedSignals({
+            newActivity: [{ ...unread, latestAt: laterAt }],
+            waiting: [],
+            turns: [],
+            agents: []
+          })
+        ),
         Command.expectExact(markGeneralRead),
         Command.resolve(MarkGroupRead, Message.WroteAction()),
         model((model) => {
@@ -872,18 +919,25 @@ describe("the groups", () => {
       story(
         update,
         given(browsing),
-        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [], agents: [] })),
         Command.expectNone(),
         model((model) => {
           expect(model.readRequested).toEqual(Option.none())
         }),
-        message(Message.ReceivedSignals({ newActivity: [{ ...unread, groupId: design.id }], waiting: [], turns: [] })),
+        message(
+          Message.ReceivedSignals({
+            newActivity: [{ ...unread, groupId: design.id }],
+            waiting: [],
+            turns: [],
+            agents: []
+          })
+        ),
         Command.expectNone()
       )
       story(
         update,
         given(modifyFields(browsing, { selected: () => Option.some(design.id) })),
-        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [] })),
+        message(Message.ReceivedSignals({ newActivity: [unread], waiting: [], turns: [], agents: [] })),
         Command.expectNone()
       )
     })

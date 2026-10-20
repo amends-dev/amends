@@ -6,7 +6,9 @@
  * parent tells it which group is open and when to talk with a member: the conversation of the two when there is one,
  * and otherwise a new one to write the first message of. The browse page's Discover tab joins a public team in place
  * and reports it, with where it is, to be confirmed. A group's row says what waits for the person in it, whether it has
- * activity they have not read, and whether an agent is at work in it, and the Block marks the group open as read.
+ * activity they have not read, and whether an agent is at work in it, and the Block marks the group open as read. A
+ * conversation's row is marked by the member it is with, an agent's with how it stands and what it is doing, and after
+ * the conversations the sidebar lists the members the person has none with yet, to start one.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -26,6 +28,7 @@ import { defineTaggedUnion } from "foldkit/schema"
 import { modifyFields } from "foldkit/struct"
 import { MembersComboboxBlock } from "../../memberPicker.ts"
 import { foldAccents, groupName, isJoinable } from "../../seen.ts"
+import { activityOfAgent, AgentItem } from "../agents/definition.ts"
 
 /** A group the person can see, whether it is still being created, and how many members it has. */
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
@@ -93,7 +96,8 @@ export type BrowseTab = typeof BrowseTab.Type
  * the group picked, the browse page's tab and search, the teams being joined, what they are starting and the dialog it
  * is in, with the radio group and the combobox of its form, the groups with activity the person has not read and when
  * they last asked to mark the group open as read, how many notifications wait for them in each group, the turns under
- * way, how many times the person asked to read the groups again, and why the last read or write failed.
+ * way, the workspace's agents, how many times the person asked to read the groups again, and why the last read or write
+ * failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -114,6 +118,7 @@ export const Model = Schema.Struct({
   readRequested: Schema.Option(NewActivity),
   waiting: Schema.Array(Waiting),
   turns: Schema.Array(ReplicaRecord.Turn),
+  agents: Schema.Array(AgentItem),
   reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
@@ -129,7 +134,8 @@ export const Message = defineMessageUnion({
   ReceivedSignals: {
     newActivity: Schema.Array(NewActivity),
     waiting: Schema.Array(Waiting),
-    turns: Schema.Array(ReplicaRecord.Turn)
+    turns: Schema.Array(ReplicaRecord.Turn),
+    agents: Schema.Array(AgentItem)
   },
   FailedRead: { error: Schema.String },
   ClickedTryAgain: {},
@@ -153,6 +159,7 @@ export const Message = defineMessageUnion({
   ChoseConversationMember: { memberId: Schema.Option(MemberId.MemberId) },
   TypedConversationText: { text: Schema.String },
   SubmittedConversation: {},
+  ClickedTeammate: { memberId: MemberId.MemberId },
   RequestedConversationWith: { memberId: MemberId.MemberId },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }
@@ -264,6 +271,37 @@ export const conversationWith = (model: Model, memberId: MemberId.MemberId): Opt
 /** The workspace's other active members, whom the person may start a conversation with. */
 export const others = (model: Model): ReadonlyArray<Member.Member> =>
   model.members.filter((member) => member.id !== model.memberId && member.status === "active")
+
+/**
+ * The workspace's other active members the person has no conversation with alone yet, by name as they read it, in any
+ * case and whatever the accents: whom the sidebar lists after their conversations, to start one.
+ */
+export const teammates = (model: Model): ReadonlyArray<Member.Member> =>
+  Array.sort(
+    others(model).filter(({ id }) => Option.isNone(conversationWith(model, id))),
+    Order.combine(
+      Order.mapInput(Order.String, ({ name }: Member.Member) => foldAccents(name)),
+      Order.mapInput(Order.String, ({ id }: Member.Member) => id)
+    )
+  )
+
+/** The agent whose membership is `memberId`, when the member is one. */
+export const findAgentOfMember = (
+  model: Pick<Model, "agents">,
+  memberId: MemberId.MemberId
+): Option.Option<AgentItem> => Array.findFirst(model.agents, ({ agent }) => agent.memberId === memberId)
+
+/** What the agent is doing, from the turns under way, in the places as the person names them. */
+export const activityOfAgentHere = (model: Model, item: AgentItem) =>
+  activityOfAgent(
+    {
+      turns: model.turns,
+      groups: model.groups.map(({ group }) => group),
+      members: model.members,
+      memberId: model.memberId
+    },
+    item
+  )
 
 /** What `starting` becomes when the team being started is changed as `change` makes it, if one is. */
 export const onTeam = (change: (team: TeamForm) => TeamForm) =>

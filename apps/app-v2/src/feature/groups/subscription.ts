@@ -2,7 +2,7 @@
  * The workspace's groups and members, the person's own admissions, and what they may do, read from their store as
  * they change, all of them together, so that the groups are read once each has been; and, apart from those, what the
  * groups' rows say: which have activity the person has not read, how many notifications wait for them in each, and
- * which turns are under way.
+ * which turns are under way, and how the agents stand, which the rows of conversations with an agent say.
  */
 
 import type { ReplicaRecord } from "@amends-dev/core/replica"
@@ -13,7 +13,7 @@ import * as Stream from "effect/Stream"
 import { activityStateOf } from "../../agentActivity.ts"
 import type * as Pending from "../../store/Pending.ts"
 import type * as Replica from "../../store/Replica.ts"
-import type * as Store from "../../store/Store.ts"
+import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { GroupsDefinition, Message } from "./definition.ts"
 import { countWaiting, findNewActivity } from "./signals.ts"
@@ -31,6 +31,7 @@ export const receivedSignals = (
     activities: Held<"ThreadActivity">
     notifications: Held<"Notification">
     turns: Held<"Turn">
+    agents: Held<"Agent">
   }>
 ) =>
   Message.ReceivedSignals({
@@ -47,7 +48,8 @@ export const receivedSignals = (
     ),
     turns: records.turns
       .map(({ record }) => record.value)
-      .filter(({ status }) => Option.isSome(activityStateOf(status)))
+      .filter(({ status }) => Option.isSome(activityStateOf(status))),
+    agents: records.agents.map(({ record, pending }) => ({ agent: record.value, pending }))
   })
 
 /** The groups' signals as `store` holds the records they are read from, each time any of them changes. */
@@ -58,10 +60,11 @@ export const readSignals = (store: Store.Store["Service"], memberId: MemberId.Me
     store.every("Thread"),
     store.every("ThreadActivity"),
     store.every("Notification"),
-    store.every("Turn")
+    store.every("Turn"),
+    store.list("Agent", Store.workspacePlace)
   ).pipe(
-    Stream.map(([reads, memberships, threads, activities, notifications, turns]) =>
-      receivedSignals(memberId, { reads, memberships, threads, activities, notifications, turns })
+    Stream.map(([reads, memberships, threads, activities, notifications, turns, agents]) =>
+      receivedSignals(memberId, { reads, memberships, threads, activities, notifications, turns, agents })
     )
   )
 
