@@ -1,5 +1,5 @@
 /**
- * The person's inbox: their notifications, every one or only those waiting, newest first, under the
+ * The person's inbox: their notifications, only those waiting, which it opens on, or every one, newest first, under the
  * days they came, each by the author of the message its activity is about, what they did, the group
  * it comes from, and what the message says, as far as the store holds them. They open a
  * notification's thread beside the inbox, which marks that notification seen, and the row stays
@@ -21,7 +21,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { authorName, type Day, groupByDay, initials, messageRuns, placeName } from "../../seen.ts"
+import { authorMark, authorName, type Day, groupByDay, messageRuns, placeName } from "../../seen.ts"
 import { ThreadBlock } from "../thread/block.ts"
 
 /**
@@ -36,8 +36,8 @@ export const InboxItem = Schema.Struct({
 })
 export type InboxItem = typeof InboxItem.Type
 
-/** Which notifications the inbox shows: every one, or only those still waiting. */
-export const Tab = Schema.Literals(["All", "Unread"])
+/** Which notifications the inbox shows: only those still waiting, or every one. */
+export const Tab = Schema.Literals(["Unread", "All"])
 export type Tab = typeof Tab.Type
 
 /**
@@ -59,7 +59,8 @@ export const pageSize = 20
 /**
  * The person's notifications, whether they were read yet, which of them the inbox shows, how many of the newest it
  * lists, the one they opened with its thread, the groups and the people that name where they come from and who wrote
- * them, how many times the person asked to read them again, and why the last read or write failed.
+ * them, the workspace's name, how many times the person asked to read them again, whether they asked to mark every
+ * notification seen and the write is on its way, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -72,7 +73,9 @@ export const Model = Schema.Struct({
   groups: Schema.Array(Group.Group),
   members: Schema.Array(Member.Member),
   contacts: Schema.Array(Contact.Contact),
+  workspaceName: Schema.Option(Schema.String),
   reads: Schema.Int,
+  isMarkingAllSeen: Schema.Boolean,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -81,6 +84,7 @@ export const Message = defineMessageUnion({
   ReceivedInbox: { items: Schema.Array(InboxItem) },
   ReceivedGroups: { groups: Schema.Array(Group.Group) },
   ReceivedPeople: { members: Schema.Array(Member.Member), contacts: Schema.Array(Contact.Contact) },
+  ReceivedWorkspaceName: { workspaceName: Schema.Option(Schema.String) },
   FailedRead: { error: Schema.String },
   ClickedTryAgain: {},
   ChoseTab: { tab: Tab },
@@ -90,7 +94,9 @@ export const Message = defineMessageUnion({
   ClickedMarkAllSeen: {},
   RequestedCloseThread: {},
   WroteAction: {},
-  FailedWriteAction: { error: Schema.String }
+  FailedWriteAction: { error: Schema.String },
+  WroteAllSeen: {},
+  FailedWriteAllSeen: { error: Schema.String }
 })
 export type Message = typeof Message.Type
 
@@ -228,24 +234,28 @@ export const selectedReasonWords = (model: Model): Option.Option<string> =>
     )
   )
 
-/** Who wrote the message a notification's activity is about, with their letters, while the store holds it. */
-const notificationAuthor = (item: InboxItem, model: Model): Option.Option<Readonly<{ name: string; mark: string }>> =>
-  Option.map(item.message, (message) => {
-    const name = authorName(message.author, model.members, model.contacts)
-    return { name, mark: initials(name) }
-  })
+/** Who wrote the message a notification's activity is about, with their mark, while the store holds it. */
+const notificationAuthor = (
+  item: InboxItem,
+  model: Model
+): Option.Option<Readonly<{ name: string; mark: MarkContent }>> =>
+  Option.map(item.message, ({ author }) => ({
+    name: authorName(author, model.members, model.contacts),
+    mark: authorMark(author, model.members, model.contacts)
+  }))
 
 /**
- * A notification's first line: the mark and name of who wrote the message its activity is about and what
- * they did, or, while the store lacks the message, that there was activity.
+ * A notification's first line: the mark and name of who wrote the message its activity is about and what they did,
+ * with the mark on the author's tone, or, while the store lacks the message, that there was activity, with the message
+ * icon for a mark.
  */
 export const notificationHeadline = (
   item: InboxItem,
   model: Model
 ): Readonly<{ mark: MarkContent; author: string; activity: string }> =>
   Option.match(Option.all([notificationAuthor(item, model), notificationReason(item, model.memberId)]), {
-    onNone: () => ({ mark: { text: "?" }, author: "Activity", activity: "in a thread" }),
-    onSome: ([{ name, mark }, reason]) => ({ mark: { text: mark }, author: name, activity: doneForReason[reason] })
+    onNone: () => ({ mark: { icon: "message" }, author: "Activity", activity: "in a thread" }),
+    onSome: ([{ name, mark }, reason]) => ({ mark, author: name, activity: doneForReason[reason] })
   })
 
 /**

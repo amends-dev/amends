@@ -34,6 +34,7 @@ import {
   opening,
   reply,
   saying,
+  scout,
   task,
   thread
 } from "../../../test/fixtures.ts"
@@ -74,13 +75,16 @@ const seen = (item: typeof bobsReply) => ({
   notification: { ...item.notification, state: Notification.State.cases.Seen.make({ seenAt: now }) }
 })
 
-/** The inbox read, with the notification, general, and the workspace's members. */
-const opened = modifyFields(init(workspace.id, member.id).model, {
+/** The inbox as it opens, on Unread, read, with the notification, general, and the workspace's members. */
+const readOnUnread = modifyFields(init(workspace.id, member.id).model, {
   isLoaded: () => true,
   items: () => [bobsReply],
   groups: () => [general],
   members: () => [member, bob]
 })
+
+/** The inbox read, on All, which lists the notifications that were seen too. */
+const opened = modifyFields(readOnUnread, { tab: () => "All" })
 
 /** The thread of the notification read, with its opening and Bob's reply, which the notification tells of. */
 const threadRead = modifyFields(initThread(workspace.id, member.id, thread.id).model, {
@@ -144,6 +148,98 @@ describe("the inbox", () => {
     )
   })
 
+  it("opens on Unread, with the tabs Unread and then All, and lists only what waits under it", () => {
+    const seenMention = {
+      ...seen(bobsReply),
+      notification: { ...seen(bobsReply).notification, id: Notification.NotificationId.make("notification-2") },
+      message: Option.some(mention)
+    }
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(readOnUnread, { items: () => [bobsReply, seenMention] })),
+      expect(nth(all.role("tab"), 0)).toHaveText("Unread1"),
+      expect(nth(all.role("tab"), 1)).toHaveText("All"),
+      expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
+      expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "false"),
+      expect(role("button", { name: "Bob replied" })).toExist(),
+      expect(role("button", { name: "Bob mentioned you" })).toBeAbsent(),
+      click(role("tab", { name: "All" })),
+      expect(role("button", { name: "Bob mentioned you" })).toExist()
+    )
+  })
+
+  it("counts Unread even when nothing waits", () => {
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(readOnUnread, { items: () => [seen(bobsReply)] })),
+      expect(role("tab", { name: "Unread" })).toHaveText("Unread0"),
+      expect(role("tab", { name: "Unread" })).toHaveAttr("aria-description", "0"),
+      expect(role("tab", { name: "All" })).toHaveText("All"),
+      expect(role("tab", { name: "All" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("sets each day's name before one rule that runs on, not between two", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(within(notifications, text("Today"))).toExist(),
+      expectAll(all.selector("li div.border-dashed")).toHaveCount(1)
+    )
+  })
+
+  it("dims Mark all seen while the write is on its way, and offers it again if the write fails", () => {
+    scene(
+      { update, view: sceneView, subscriptions: InboxBlock.subscriptions },
+      given(opened),
+      expect(role("button", { name: "Mark all seen" })).not.toBeDisabled(),
+      click(role("button", { name: "Mark all seen" })),
+      expect(role("button", { name: "Mark all seen" })).toBeDisabled(),
+      Command.resolve(
+        MarkAllNotificationsSeen,
+        Message.FailedWriteAllSeen({ error: "This browser could not keep that. Try again." })
+      ),
+      expect(role("button", { name: "Mark all seen" })).not.toBeDisabled(),
+      expect(role("alert")).toHaveText("This browser could not keep that. Try again."),
+      click(role("button", { name: "Mark all seen" })),
+      expect(role("button", { name: "Mark all seen" })).toBeDisabled(),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAllSeen()),
+      expect(role("button", { name: "Mark all seen" })).not.toBeDisabled(),
+      expect(role("alert")).toBeAbsent()
+    )
+  })
+
+  it("marks each notification with the letters of its author on their tone, an agent's on the lilac", () => {
+    const fromScout = {
+      ...bobsReply,
+      notification: notificationOf("notification-2", 3, 6),
+      message: Option.some({ ...reply, author: ThreadMessage.Author.cases.Member.make({ memberId: scout.id }) })
+    }
+
+    scene(
+      { update, view: sceneView },
+      given(modifyFields(opened, { items: () => [bobsReply, fromScout], members: () => [member, bob, scout] })),
+      expect(within(item(2), selector("span.bg-avatar-neutral-bg"))).toHaveText("B"),
+      expect(within(item(1), selector("span.bg-avatar-lilac-bg"))).toHaveText("S")
+    )
+  })
+
+  it("names the workspace under the title for phones, once the store gives its name", () => {
+    scene(
+      { update, view: sceneView, subscriptions: InboxBlock.subscriptions },
+      given(opened),
+      expect(role("heading", { name: "Inbox", level: 1 })).toExist(),
+      expect(text("Mercier & Co")).toBeAbsent(),
+      Subscription.emit(
+        subscriptions.inbox,
+        Message.ReceivedWorkspaceName({ workspaceName: Option.some("Mercier & Co") })
+      ),
+      expect(within(role("main"), text("Mercier & Co"))).toHaveClass("max-tablet:block"),
+      expect(within(role("main"), text("Mercier & Co"))).toHaveClass("hidden")
+    )
+  })
+
   it("marks them all seen, then keeps them on All without a dot, and shows none on Unread", () => {
     scene(
       { update, view: sceneView, subscriptions: InboxBlock.subscriptions },
@@ -155,15 +251,15 @@ describe("the inbox", () => {
       Command.expectExact(
         MarkAllNotificationsSeen({ ...asMember, through: { recordedAt: notification.recordedAt, id: notification.id } })
       ),
-      Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAllSeen()),
       // Once the store reports it seen, it is on All with nothing to do about it.
       Subscription.emit(subscriptions.inbox, Message.ReceivedInbox({ items: [seen(bobsReply)] })),
       expect(within(notifications, role("button", { name: "Bob replied" }))).toExist(),
       expect(within(notifications, text("Unread"))).toBeAbsent(),
       expect(role("button", { name: "Mark seen" })).toBeAbsent(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
-      expect(role("tab", { name: "Unread" })).toHaveText("Unread"),
-      expect(role("tab", { name: "Unread" })).not.toHaveAttr("aria-description"),
+      expect(role("tab", { name: "Unread" })).toHaveText("Unread0"),
+      expect(role("tab", { name: "Unread" })).toHaveAttr("aria-description", "0"),
       click(role("tab", { name: "Unread" })),
       expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "false"),
@@ -378,6 +474,8 @@ describe("the inbox", () => {
       { update, view: sceneView },
       given(modifyFields(opened, { items: () => [{ ...bobsReply, thread: Option.none(), message: Option.none() }] })),
       expect(text("Activity")).toExist(),
+      expect(within(item(1), selector("span.size-8 svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(text("?")).toBeAbsent(),
       expect(text("Unavailable thread")).toExist(),
       expect(text("You can no longer see this thread.")).toExist(),
       expect(role("button", { name: "Activity in a thread" })).toExist(),
@@ -425,8 +523,8 @@ describe("the inbox", () => {
       seenWritten,
       draftRead,
       Subscription.emit(subscriptions.inbox, Message.ReceivedInbox({ items: [seen(bobsReply)] })),
-      expect(role("tab", { name: "Unread" })).toHaveText("Unread"),
-      expect(role("tab", { name: "Unread" })).not.toHaveAttr("aria-description"),
+      expect(role("tab", { name: "Unread" })).toHaveText("Unread0"),
+      expect(role("tab", { name: "Unread" })).toHaveAttr("aria-description", "0"),
       expect(within(notifications, role("button", { name: "Bob replied" }))).toExist(),
       expect(within(notifications, text("Unread"))).toBeAbsent(),
       expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
@@ -456,7 +554,7 @@ describe("the inbox", () => {
           through: { recordedAt: other.notification.recordedAt, id: other.notification.id }
         })
       ),
-      Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAllSeen()),
       expect(role("complementary", { name: "Thread" })).toExist(),
       expect(within(current, text("Bob"))).toExist()
     )
@@ -491,19 +589,20 @@ describe("the inbox", () => {
     scene(
       { update, view: sceneView },
       given(modifyFields(init(workspace.id, member.id).model, { isLoaded: () => true })),
-      expect(role("heading", { name: "No activity yet", level: 2 })).toExist(),
-      expect(text("Mentions, replies, and new threads in groups you follow appear here.")).toExist(),
-      expect(selector("svg g.art-breathing")).toBeAbsent(),
-      expect(selector("svg path.art-caret")).toExist(),
-      expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
-      click(role("tab", { name: "Unread" })),
+      expect(role("tab", { name: "Unread" })).toHaveAttr("aria-selected", "true"),
       expect(role("heading", { name: "You're all caught up", level: 2 })).toExist(),
       expect(text("You've seen everything that came to you.")).toExist(),
       expect(selector("svg g.art-breathing")).toExist(),
       expect(role("heading", { name: "No activity yet" })).toBeAbsent(),
+      expect(role("button", { name: "Mark all seen" })).toBeAbsent(),
       click(role("button", { name: "View all activity" })),
       expect(role("tab", { name: "All" })).toHaveAttr("aria-selected", "true"),
-      expect(role("heading", { name: "No activity yet", level: 2 })).toExist()
+      expect(role("heading", { name: "No activity yet", level: 2 })).toExist(),
+      expect(text("Mentions, replies, and new threads in groups you follow appear here.")).toExist(),
+      expect(selector("svg g.art-breathing")).toBeAbsent(),
+      expect(selector("svg path.art-caret")).toExist(),
+      click(role("tab", { name: "Unread" })),
+      expect(role("heading", { name: "You're all caught up", level: 2 })).toExist()
     )
   })
 

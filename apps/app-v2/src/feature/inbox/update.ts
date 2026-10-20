@@ -36,6 +36,9 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     ReceivedPeople: ({ members, contacts }) => ({
       model: modifyFields(model, { members: () => members, contacts: () => contacts })
     }),
+    ReceivedWorkspaceName: ({ workspaceName }) => ({
+      model: modifyFields(model, { workspaceName: () => workspaceName })
+    }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
@@ -58,13 +61,22 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     ClickedMarkAllSeen: () =>
       Option.match(newestWaiting(model), {
         onNone: () => ({ model }),
-        onSome: ({ recordedAt, id }) => ({
-          model,
-          commands: [MarkAllNotificationsSeen({ workspaceId, memberId, through: { recordedAt, id } })]
-        })
+        onSome: ({ recordedAt, id }) =>
+          model.isMarkingAllSeen
+            ? { model }
+            : {
+                model: modifyFields(model, { isMarkingAllSeen: () => true }),
+                commands: [MarkAllNotificationsSeen({ workspaceId, memberId, through: { recordedAt, id } })]
+              }
       }),
     RequestedCloseThread: () => Update.combine(model, [closeThread]),
     WroteAction: () => ({ model: modifyFields(model, { notice: () => Option.none() }) }),
-    FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) })
+    FailedWriteAction: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    WroteAllSeen: () => ({
+      model: modifyFields(model, { isMarkingAllSeen: () => false, notice: () => Option.none() })
+    }),
+    FailedWriteAllSeen: ({ error }) => ({
+      model: modifyFields(model, { isMarkingAllSeen: () => false, notice: () => Option.some(error) })
+    })
   })
 })

@@ -210,6 +210,26 @@ export const authorName = (
     Contact: ({ contactId }) => contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
   })
 
+/**
+ * `author`'s mark: a member's own, on the agent's tone for an agent, or the letters of the name a channel's contact gave,
+ * or of the name a member without a record here is called.
+ */
+export const authorMark = (
+  author: ThreadMessage.Author,
+  members: ReadonlyArray<Member.Member>,
+  contacts: ReadonlyArray<Contact.Contact>
+): MarkContent => {
+  const maybeMember = ThreadMessage.Author.match(author, {
+    Member: ({ memberId }) => Option.fromUndefinedOr(members.find((member) => member.id === memberId)),
+    Contact: () => Option.none<Member.Member>()
+  })
+
+  return Option.match(maybeMember, {
+    onNone: () => ({ text: initials(authorName(author, members, contacts)) }),
+    onSome: memberMark
+  })
+}
+
 const deletedText = "This message was deleted."
 
 /**

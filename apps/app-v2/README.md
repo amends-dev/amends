@@ -133,9 +133,10 @@ and the one that begins a conversation, are not the composer, and suggest no one
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
 turns it embeds are the design's `paneSection`s, an `entryList` of `entry`s, each its agent's initials
-and name with a `badge` for how it stands, its buttons in a `buttonRow`, and its `log`. The inbox has `paneTabs` of All and Unread, which counts those waiting while any wait, under its title, and lists its
-notifications as `notification`s in a `messageList`, under a `divider` for each day, each its
-author's initials and name and what they did, its place, its text, which opens the thread, how long
+and name with a `badge` for how it stands, its buttons in a `buttonRow`, and its `log`. The inbox has `paneTabs` of Unread and All, which counts those waiting, none too, under its title, with the workspace's name under the title
+on phones (`phoneContext`), and lists its
+notifications as `notification`s in a `messageList`, under a `divider` for each day, its label before the rule that runs on, each its
+author's initials, on their tone, and name and what they did, its place, its text, which opens the thread, how long
 ago it came, and a dot while it waits, the row of the notification whose thread is open drawn
 current, with Mark all seen among the header's actions, a quiet Show older after the list, in a
 centered `buttonRow`, while there are older notifications, and `paneEmpty` when a tab has nothing. The settings' Workspace page is a `paneColumn` of a `form` of the workspace's name, and `paneSection`s
@@ -418,17 +419,20 @@ below it counted at each level above.
   Block reports what was opened, a group (`OpenedGroup`), a thread in its group (`OpenedThread`), or a
   person (`OpenedPerson`), and closes its dialog, which, however it closes, forgets what was typed and
   found. It does not act on a person itself: its parent decides what opening a person is.
-- `feature/inbox`: the person's notifications, newest first, on two tabs: All, every notification
-  the store gives, waiting or seen, and Unread, those still waiting, counted while any wait, All at first. Each
-  tab's notifications sit under a divider for each day they came on by the person's own clock, named
-  as it is from the time now (`dayLabel`), and each is a row of its own: who wrote the message its
-  activity is about, by their name and initials, and what they did, which is why the person is told
+- `feature/inbox`: the person's notifications, newest first, on two tabs: Unread, those still waiting,
+  counted whether any wait or none, and All, every notification the store gives, waiting or seen, Unread at first.
+  Each tab's notifications sit under a divider for each day they came on by the person's own clock, named
+  as it is from the time now (`dayLabel`), its label before the rule that runs on (`align: "start"`, as `apps/ui`
+  has it), and each is a row of its own: who wrote the message its
+  activity is about, by their name and initials, on their tone (`authorMark` in `seen.ts`: an agent's lilac, a
+  person's and a contact's neutral), and what they did, which is why the person is told
   (`notificationReason`): the message mentions them ("mentioned you"), it opens the thread ("started
   a thread"), or it replies ("replied"); where it comes from, a team as `#` and its name, a
   conversation as the others in it and "Direct message", and "Unavailable thread" while the store
   lacks the thread, with no place while it lacks the thread's group; what the message says, each
   mention in it a chip (`notificationText`, by the inbox's members); and how long ago it came (`ageLabel`), with a dot while it waits. While the store lacks the message, the
-  first line says "Activity in a thread" under the mark "?", and the text says what it can. The time
+  first line says "Activity in a thread" beside the design's `message` icon in place of letters, and the text says
+  what it can. The time
   now is its view input, as the page gives it, so the days and ages follow the clock. A notification's
   text opens its thread beside the inbox, which marks it seen at once, if it waits, and selects it:
   the row stays selected, in its place, with `aria-current` and the design's current look, while its
@@ -437,7 +441,8 @@ below it counted at each level above.
   group, the message its activity is about, and the thread Block that shows the thread, bound as a
   keyed occurrence as the group binds its own, so opening another makes a fresh one. There is no way
   to mark one notification seen but to open it; Mark all seen, in the header while any wait, marks
-  every one up to the newest that waits and keeps the selection. The Unread count and Mark all seen
+  every one up to the newest that waits and keeps the selection, and is dimmed while that write is on its way
+  (`isMarkingAllSeen`, until `WroteAllSeen` or `FailedWriteAllSeen`, which says why in the notice). The Unread count and Mark all seen
   follow what waits alone (`waitingCount`), so the count can be none while the selected row is still
   listed (`shownItems`), and the caught-up state shows only once the thread is closed and nothing
   waits. `threadView` is the thread open as a side pane, as the group's is (the thread Block's
@@ -451,7 +456,8 @@ below it counted at each level above.
   the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
   when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
   pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
-  nothing, since it asked. The Block offers a count of what waits for its parent to show.
+  nothing, since it asked. The Block offers a count of what waits for its parent to show. The workspace's name, which
+  the inbox's own subscription reads with the groups and the people, is the line under the title on phones.
   Until the store has answered (`isLoaded`) the list is a line, "Loading your inbox…", and when the first read failed
   it is "Can't load your inbox" with why, in the place of the list. A tab with nothing says "No activity yet" on
   All, and "You're all caught up" on Unread with a "View all activity" button that chooses All. The store gives every
@@ -1326,7 +1332,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
   activity alone while the thread is, the unread ones with a dot and no button to mark one seen, the
-  seen ones on All without the dot and not on Unread, the tabs counted and chosen, all marked seen,
+  seen ones on All without the dot and not on Unread, the tabs, Unread first and the inbox opening on it, counted
+  even at none, and chosen, each day's divider before one rule, the marks on the author's tone and the message
+  icon of an activity whose message the store lacks, the workspace's name under the title for phones, all marked
+  seen, dimmed while that write is on its way and offered again if it fails,
   which keeps the thread open, one's thread opened by its text, which marks it seen unless it was and
   fails visibly, its row current and moving as another is opened, kept on Unread once seen with only
   what waits counted, an empty All saying there is nothing yet and an empty Unread saying all is

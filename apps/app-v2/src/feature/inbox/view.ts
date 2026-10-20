@@ -55,23 +55,20 @@ const unreadInbox = (model: Model, h: InboxViewBuilder): Html =>
     action: button(h, "Try again", Message.ClickedTryAgain())
   })
 
-/** The tabs under the title: every notification, and those waiting, counted while any wait. */
-const tabs = (model: Model, h: InboxViewBuilder): Html => {
-  const waiting = waitingCount(model)
-
-  return paneTabs(h, {
+/** The tabs under the title: those waiting, counted even when none wait, and every notification. */
+const tabs = (model: Model, h: InboxViewBuilder): Html =>
+  paneTabs(h, {
     label: "Inbox",
     tabs: [
-      { label: "All", isCurrent: model.tab === "All", onClick: Message.ChoseTab({ tab: "All" }) },
       {
         label: "Unread",
-        ...(waiting > 0 ? { count: waiting } : {}),
+        count: waitingCount(model),
         isCurrent: model.tab === "Unread",
         onClick: Message.ChoseTab({ tab: "Unread" })
-      }
+      },
+      { label: "All", isCurrent: model.tab === "All", onClick: Message.ChoseTab({ tab: "All" }) }
     ]
   })
-}
 
 /**
  * A notification as the design's row: the author of what its activity is about and what they did, where it
@@ -113,16 +110,18 @@ const notifications = (model: Model, now: DateTime.Utc, h: InboxViewBuilder): Ht
     : messageList(h, {
         label: "Notifications",
         children: byDay(items, now).flatMap((day) => [
-          divider(h, day.label),
+          divider(h, day.label, { align: "start" }),
           ...day.items.map((item) => notificationRow(item, model, now, h))
         ])
       })
 }
 
 /**
- * The notifications the tab lists, newest first, under the days they came, to open beside the inbox, with the one
- * open kept in its place, and Show older after them while the tab keeps older ones, or what a tab says when it has
- * none, and a line that says they are being read until they are.
+ * The notifications the tab lists, newest first, under the days they came, each day's name before the rule that runs
+ * on, to open beside the inbox, with the one open kept in its place, and Show older after them while the tab keeps
+ * older ones, or what a tab says when it has none, and a line that says they are being read until they are. The
+ * workspace's name is under the title on phones. Mark all seen is in the header while any notification waits, dimmed
+ * while the write that marks them is on its way.
  */
 export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   pane(h, {
@@ -131,8 +130,12 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
     header: {
       title: "Inbox",
       icon: "mark-mail",
+      ...Option.match(model.workspaceName, { onNone: () => ({}), onSome: (phoneContext) => ({ phoneContext }) }),
       tabs: tabs(model, h),
-      actions: waitingCount(model) === 0 ? [] : [button(h, "Mark all seen", Message.ClickedMarkAllSeen())]
+      actions:
+        waitingCount(model) === 0
+          ? []
+          : [button(h, "Mark all seen", Message.ClickedMarkAllSeen(), { isDisabled: model.isMarkingAllSeen })]
     },
     body: [
       paneColumn(

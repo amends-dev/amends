@@ -3,12 +3,12 @@ import * as Option from "effect/Option"
 import { InboxComposition } from "./composition.ts"
 import { Model, pageSize } from "./definition.ts"
 
-/** The inbox before it is read, with nothing waiting and no thread open, showing the first page of notifications. */
+/** The inbox before it is read, on the notifications that wait, with no thread open, showing the first page of them. */
 export const init = InboxComposition.makeInit((workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) => ({
   model: Model.make({
     workspaceId,
     memberId,
-    tab: "All",
+    tab: "Unread",
     shown: pageSize,
     isLoaded: false,
     items: [],
@@ -16,7 +16,9 @@ export const init = InboxComposition.makeInit((workspaceId: WorkspaceId.Workspac
     groups: [],
     members: [],
     contacts: [],
+    workspaceName: Option.none(),
     reads: 0,
+    isMarkingAllSeen: false,
     notice: Option.none()
   })
 }))

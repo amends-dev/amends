@@ -7,8 +7,13 @@ import { InboxDefinition, Message } from "./definition.ts"
 
 const written = [Message.WroteAction, Message.FailedWriteAction]
 
+const allWritten = [Message.WroteAllSeen, Message.FailedWriteAllSeen]
+
 /** Why `error` kept the action from being written, as the person reads it. */
 const failed = (error: string) => Message.FailedWriteAction({ error })
+
+/** Why `error` kept every notification from being marked seen, as the person reads it. */
+const failedAll = (error: string) => Message.FailedWriteAllSeen({ error })
 
 /** Mark the notification `notificationId` seen. */
 export const MarkNotificationSeen = InboxDefinition.command("MarkNotificationSeen", {
@@ -24,9 +29,9 @@ export const MarkNotificationSeen = InboxDefinition.command("MarkNotificationSee
 /** Mark every notification seen, up to and including the one `through` names. */
 export const MarkAllNotificationsSeen = InboxDefinition.command("MarkAllNotificationsSeen", {
   args: { ...Stores.AsMember, through: NotificationStore.Cursor },
-  messages: written,
+  messages: allWritten,
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
+    const write = Stores.writer(yield* Stores.Stores, Message.WroteAllSeen(), failedAll)
     return ({ through, ...member }) => write(member, (store) => store.write("NotificationsSeenThrough", { through }))
   }
 })

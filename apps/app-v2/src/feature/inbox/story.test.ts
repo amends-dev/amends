@@ -8,6 +8,7 @@ import { modifyFields } from "foldkit/struct"
 import {
   bob,
   conversationWithBob,
+  dana,
   general,
   membership,
   mention,
@@ -16,6 +17,7 @@ import {
   opening,
   reply,
   saying,
+  scout,
   thread
 } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../composer/block.ts"
@@ -90,7 +92,11 @@ const markedSeen = (item: InboxItem): InboxItem => ({
 const many = (count: number): ReadonlyArray<InboxItem> =>
   Array.from({ length: count }, (_, index) => itemOf(notificationOf(`notification-${index + 1}`, index + 1, 5 + index)))
 
-const listed = init(workspace.id, member.id).model
+/** The inbox as it opens, before anything is read. */
+const opened = init(workspace.id, member.id).model
+
+/** The inbox once the person chose All, which lists every notification. */
+const listed = modifyFields(opened, { tab: () => "All" })
 
 /** The inbox once it knows general and the workspace's members. */
 const known = modifyFields(listed, { groups: () => [general], members: () => [member, bob] })
@@ -133,25 +139,45 @@ describe("the inbox", () => {
 
   it("tells who wrote what a notification is about and what they did, or that there was activity", () => {
     expect(notificationHeadline(itemOf(older), known)).toEqual({
-      mark: { text: "B" },
+      mark: { text: "B", tone: "neutral" },
       author: "Bob",
       activity: "replied"
     })
     expect(notificationHeadline({ ...itemOf(older), message: Option.some(mention) }, known)).toEqual({
-      mark: { text: "B" },
+      mark: { text: "B", tone: "neutral" },
       author: "Bob",
       activity: "mentioned you"
     })
     expect(notificationHeadline({ ...itemOf(older), message: Option.some(opening) }, known)).toEqual({
-      mark: { text: "A" },
+      mark: { text: "A", tone: "neutral" },
       author: "Alice",
       activity: "started a thread"
     })
     expect(notificationHeadline(withoutThread(older), known)).toEqual({
-      mark: { text: "?" },
+      mark: { icon: "message" },
       author: "Activity",
       activity: "in a thread"
     })
+  })
+
+  it("marks the author on the tone of who they are: an agent's lilac, a person's and a contact's neutral", () => {
+    const writtenBy = (author: ThreadMessage.ThreadMessage["author"]) => ({
+      ...itemOf(older),
+      message: Option.some({ ...reply, author })
+    })
+    const people = modifyFields(known, { members: () => [member, bob, scout], contacts: () => [dana] })
+
+    expect(notificationHeadline(itemOf(older), people).mark).toEqual({ text: "B", tone: "neutral" })
+    expect(
+      notificationHeadline(writtenBy(ThreadMessage.Author.cases.Member.make({ memberId: scout.id })), people)
+    ).toEqual({ mark: { text: "S", tone: "lilac" }, author: "Scout", activity: "replied" })
+    expect(
+      notificationHeadline(writtenBy(ThreadMessage.Author.cases.Contact.make({ contactId: dana.id })), people)
+    ).toEqual({ mark: { text: "D" }, author: "Dana", activity: "replied" })
+    expect(
+      notificationHeadline(writtenBy(ThreadMessage.Author.cases.Member.make({ memberId: scout.id })), known).mark,
+      "a member the store does not hold"
+    ).toEqual({ text: "S" })
   })
 
   it("tells where a notification comes from: a team, a conversation, or a thread the store lacks", () => {
@@ -248,8 +274,37 @@ describe("the inbox", () => {
     )
   })
 
-  it("starts on All", () => {
-    expect(listed.tab).toBe("All")
+  it("opens on Unread, with no workspace name read and no write under way", () => {
+    expect(opened.tab).toBe("Unread")
+    expect(opened.workspaceName).toEqual(Option.none())
+    expect(opened.isMarkingAllSeen).toBe(false)
+  })
+
+  it("lists only the notifications that wait when it opens, though it holds every one", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ReceivedInbox({ items: [itemOf(older), itemOf(seen), itemOf(newer)] })),
+      model((model) => {
+        expect(idsOf(shownItems(model))).toEqual([newer.id, older.id])
+        expect(waitingCount(model)).toBe(2)
+      })
+    )
+  })
+
+  it("holds the name of the workspace as the store gives it", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ReceivedWorkspaceName({ workspaceName: Option.some("Mercier & Co") })),
+      model((model) => {
+        expect(model.workspaceName).toEqual(Option.some("Mercier & Co"))
+      }),
+      message(Message.ReceivedWorkspaceName({ workspaceName: Option.none() })),
+      model((model) => {
+        expect(model.workspaceName).toEqual(Option.none())
+      })
+    )
   })
 
   it("groups the notifications that came on one day, keeping their order, under what the day is called", () => {
@@ -525,13 +580,64 @@ describe("the inbox", () => {
       Command.expectExact(
         MarkAllNotificationsSeen({ ...asMember, through: { recordedAt: newer.recordedAt, id: newer.id } })
       ),
-      Command.resolve(MarkAllNotificationsSeen, Message.WroteAction()),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAllSeen()),
       model((model) => {
         expect(Option.map(model.selected, ({ notificationId }) => notificationId)).toEqual(Option.some(older.id))
       }),
       message(Message.ReceivedInbox({ items: [itemOf(seen)] })),
       message(Message.ClickedMarkAllSeen()),
       Command.expectNone()
+    )
+  })
+
+  it("asks to mark every notification seen once while the write is on its way, and is ready again when it ends", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(newer), itemOf(older)] })),
+      model((model) => {
+        expect(model.isMarkingAllSeen).toBe(false)
+      }),
+      message(Message.ClickedMarkAllSeen()),
+      Command.expectExact(
+        MarkAllNotificationsSeen({ ...asMember, through: { recordedAt: newer.recordedAt, id: newer.id } })
+      ),
+      model((model) => {
+        const again = update(model, Message.ClickedMarkAllSeen())
+
+        expect(model.isMarkingAllSeen).toBe(true)
+        expect(again.model).toEqual(model)
+        expect(again.commands).toBeUndefined()
+      }),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAllSeen()),
+      model((model) => {
+        expect(model.isMarkingAllSeen).toBe(false)
+      })
+    )
+  })
+
+  it("is ready to mark every notification seen again, and says why, when the write could not be kept", () => {
+    story(
+      update,
+      given(known),
+      message(Message.ReceivedInbox({ items: [itemOf(older)] })),
+      message(Message.ClickedMarkAllSeen()),
+      Command.resolve(
+        MarkAllNotificationsSeen,
+        Message.FailedWriteAllSeen({ error: "This browser could not keep that. Try again." })
+      ),
+      model((model) => {
+        expect(model.isMarkingAllSeen).toBe(false)
+        expect(model.notice).toEqual(Option.some("This browser could not keep that. Try again."))
+      }),
+      message(Message.ClickedMarkAllSeen()),
+      Command.expectExact(
+        MarkAllNotificationsSeen({ ...asMember, through: { recordedAt: older.recordedAt, id: older.id } })
+      ),
+      Command.resolve(MarkAllNotificationsSeen, Message.WroteAllSeen()),
+      model((model) => {
+        expect(model.notice).toEqual(Option.none())
+      })
     )
   })
 
@@ -552,7 +658,7 @@ describe("the inbox", () => {
       message(Message.ClickedMarkAllSeen()),
       Command.resolve(
         MarkAllNotificationsSeen,
-        Message.FailedWriteAction({ error: "This browser could not keep that. Try again." })
+        Message.FailedWriteAllSeen({ error: "This browser could not keep that. Try again." })
       ),
       message(Message.ClickedOpen({ notificationId: older.id })),
       Command.resolve(MarkNotificationSeen, Message.WroteAction()),

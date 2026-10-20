@@ -632,7 +632,10 @@ describe("a workspace", () => {
       { update, view: sceneView },
       given(opened),
       expect(role("main", { name: "Inbox" })).toExist(),
-      expect(within(role("main", { name: "Inbox" }), role("tab", { name: "All" }))).toHaveAttr("aria-selected", "true"),
+      expect(within(role("main", { name: "Inbox" }), role("tab", { name: "Unread" }))).toHaveAttr(
+        "aria-selected",
+        "true"
+      ),
       expect(role("main", { name: "Studio" })).toBeAbsent(),
       expect(text("Pick a group, or open your inbox.")).toBeAbsent(),
       expect(role("navigation", { name: "Studio" })).toExist(),
