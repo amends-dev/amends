@@ -4,8 +4,9 @@ import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { ageLabel, reasonSubtitle } from "../../seen.ts"
-import { followView, replyView, sidePane } from "../thread/view.ts"
+import { ageLabel, reasonSubtitle, sideSubtitle } from "../../seen.ts"
+import { aboutOf, hasTurnLog } from "../thread/definition.ts"
+import { followView, replyView, sidePane, turnLogView } from "../thread/view.ts"
 import { InboxComposition, type InboxViewBuilder, ThreadBinding } from "./composition.ts"
 import {
   byDay,
@@ -167,13 +168,26 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
  * The thread of the notification the person opened as the side pane (see `sidePane`), a task's when it tracks one, with
  * the message the notification is about highlighted in it, the reason the notification came as its subtitle, such as
  * "Mention · #general", while the store holds the message, and the button that closes it, Close beside the title and
- * Back, named for the Inbox, before it on a phone, and nothing while none is open.
+ * Back, named for the Inbox, before it on a phone; or, while the person follows the log of one of its turns, that log
+ * in its place, beside the inbox; and nothing while no thread is open.
  */
 export const threadView = InboxComposition.makeView.withInputs<ThreadViewInputs>((model, { now }, h) =>
   Option.match(model.selected, {
     onNone: () => h.empty,
     onSome: (selected) => {
       const group = findGroup(model, selected.groupId)
+
+      if (hasTurnLog(selected.model)) {
+        return h.block(
+          ThreadBinding.embedView({
+            key: selected.threadId,
+            slotId: "turn-log",
+            model: selected.model,
+            view: turnLogView,
+            viewInputs: { where: sideSubtitle(aboutOf(selected.model), group, model.members, model.memberId) }
+          })
+        )
+      }
 
       return sidePane(h, {
         thread: selected.model,

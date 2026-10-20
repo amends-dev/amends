@@ -33,7 +33,7 @@ import { defineTaggedUnion } from "foldkit/schema"
 import { activityOf, type AgentActivity, turnsUnderWay } from "../../agentActivity.ts"
 import * as AgentSetup from "../../agentSetup.ts"
 import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
-import { foldAccents } from "../../seen.ts"
+import { connectionNameIn, foldAccents } from "../../seen.ts"
 import { ConnectionItem, connectionItemsGiving, findIntegration, Integrations } from "../connections/definition.ts"
 import { givableRoles, WorkspaceItem } from "../settings/definition.ts"
 
@@ -263,7 +263,10 @@ export const findAgentName = (
 
 /** What the connection `connectionId` is called, or "Removed connection" once it is gone. */
 export const connectionName = (model: Pick<Model, "connections">, connectionId: string): string =>
-  model.connections.find(({ connection }) => connection.id === connectionId)?.connection.name ?? "Removed connection"
+  connectionNameIn(
+    model.connections.map(({ connection }) => connection),
+    connectionId
+  )
 
 /** Whether the person may rename the agent and change how it is set up. */
 export const mayConfigure = (model: Pick<Model, "workspaceId" | "grants">, agent: AgentItem["agent"]): boolean =>

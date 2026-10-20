@@ -145,8 +145,8 @@ and the one that begins a conversation, are not the composer, and suggest no one
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
 turns its timeline embeds are the design's `turnRow`s, each its agent's mark and name with a `turnStatus` for how it
-stands, its buttons, what it says under its line, and its `log`, or, for a turn that replied, a `turnLog` under its
-reply. The inbox has `paneTabs` of Unread and All, which counts those waiting, none too, under its title, with the workspace's name under the title
+stands, its buttons, and what it says under its line, or, for a turn that replied, View turn log among its reply's
+actions. A turn's log is the side pane, made of the design's `turnLog` pieces. The inbox has `paneTabs` of Unread and All, which counts those waiting, none too, under its title, with the workspace's name under the title
 on phones (`phoneContext`), and lists its
 notifications as `notification`s in a `messageList`, under a `divider` for each day, its label before the rule that runs on, each its
 author's initials, on their tone, and name and what they did, its place, its text, which opens the thread, how long
@@ -243,8 +243,10 @@ below it counted at each level above.
   do. A turn is an entry at the moment its agent took on the work (core's `Turn.createdAt`, the time of its
   `turn.created` activity, which a retry gets of its own), drawn by the turns Block as a row, one embedding of its
   view for each turn, whose input is the turn's id; a turn that replied is its reply instead, found by the
-  messages its `messageIds` name, which have View turn log among their actions, and its log opens under the last of
-  them, so a turn shows as a row only while none of its replies is among the thread's messages. Why the turns could
+  messages its `messageIds` name, which have View turn log among their actions, so a turn shows as a row only while
+  none of its replies is among the thread's messages. The log of a turn, from its row or from its reply, is not drawn
+  among the messages: it is the side pane, in place of the thread (`turnLogView`, for the group and the inbox to show
+  while `hasTurnLog` says the person follows one), and Back to thread returns to the thread at its end. Why the turns could
   not be read shows above the timeline. A note is a quiet line of the design's `note` with the time it happened,
   its full date and time as its title (`fullTimeOf`), from the thread's activity in the replica (the store's
   `deriveParticipationChanges`, by the member whose part it was; the person is "You"): "Sara followed this
@@ -305,39 +307,76 @@ below it counted at each level above.
   the task the same three are read, each caption over its value. A line says "Sending…" under them
   while a change is on its way. The thread embeds it.
 - `feature/turns`: a thread's agents' turns, each as its row where its agent took on the work, with its agent by
-  name and how it stands. The person stops a turn while it is active and retries it once nothing but who may direct
-  its agent keeps it from running again, when they may use that agent, by core's `Turn.directRequirement`. They
-  follow a turn's log, which opens with its items and then grows as the turn writes it, until the turn ends, or until
-  they hide it or it could not be followed, which says why and offers to follow it again; one log at a time. Its
-  views each take the id of a turn as their input, and the thread embeds them where it places the turn. `view` is the
-  turn's row, as `apps/ui`'s `TurnRow` draws it, a group named for the agent's turn, "Atlas's turn": the agent's
-  mark in its tone, its name in the agent's color, and its state as `apps/ui`'s `TurnStatus` words and marks it
-  (`stateOf`: "Queued", "Working", "Stopping…", "Completed" with a check, "Failed" with a warning in the caution
-  colors, "Stopped" with a dash, the logo moving while it is queued, working, or stopping), then its buttons: View log,
-  quiet, which shows the log and hides it (`aria-expanded`, since `apps/ui` opens the log in a pane of its own, which
-  is a later step, and until then it opens under the row); Stop, the secondary button, named "Stop Atlas", for someone
-  who may direct the agent while the turn is active, which while it stops is disabled and named "Stopping", to whoever
-  reads it; and Retry, for someone who may direct the agent when nothing else keeps the turn from running again,
-  which `apps/ui` offers as Retry too. Under the first line, a finished turn says (`endingOf`) why it failed, with no
-  "Agent settings" link, which `apps/ui` has to open the agent's page and a thread has no way to ask for, since its
-  parents, the group and the inbox, would have to carry the request to the page; "Atlas stopped taking part in this
-  thread." when its agent left the thread (core's cancel reason `participation-ended`), "The task no longer asks Atlas
-  to work on it." when its task was taken from it (`task-changed`), nothing when someone asked it to stop, and "No
-  reply posted." when it completed with no `messageIds`; "Sending…" says while a change to it is on its way. A stop
-  or a retry that did not go through says why under the row as an alert, in `apps/ui`'s words (`problem.ts`,
-  `problemText`): "Couldn't stop the turn. Try again." and "Couldn't start another attempt. Try again." when the browser
-  could not keep the action (`FailedStop`, `FailedRetry`, forgotten when the person tries again), and, from the
-  rejection the server wrote back, which the subscription reads from the store's actions (`refusalsOf`: the latest of
-  each turn's stop and retry, left unsaid while a later one is on its way or was kept), "This turn has already
-  finished." (`TurnNotActive`), "This turn is still running.", "This turn already replied.", "A newer turn followed
-  this one.", and "Atlas no longer takes part in this thread." (the four reasons of `NotRetryable`), "You can't direct
-  Atlas." (`Denied`), and "This turn is no longer available." (`NotFound`); the toast of the refusal stays beside it,
-  until the person dismisses it, and takes the row's line with it. While the log is shown, it is a list, once it has
-  items, with where following it stands under it (still opening, nothing written yet while it is followed with no
-  items, the turn ended, or why it failed); a log still opening shows that alone. `replyActionView` is View turn
-  log, the quiet icon button the reply of a turn has among its message's actions, pressed while the log shows, and
-  `replyLogView` the log, as the design's `turnLog`, under that message. Why the turns could not be read is the Block's
-  `notice`, which the thread shows above its timeline.
+  name and how it stands, and the log of one of them as the side pane. The person stops a turn while it is active and
+  retries it once nothing but who may direct its agent keeps it from running again, when they may use that agent, by
+  core's `Turn.directRequirement`. They follow a turn's log, which opens with its items and then grows as the turn
+  writes it, until the turn ends, or until they go back to the thread or it could not be followed, which says why and
+  offers to follow it again; one log at a time. The row's views take the id of a turn as their input, and the thread
+  embeds them where it places the turn. `view` is the turn's row, as `apps/ui`'s `TurnRow` draws it, a group named for
+  the agent's turn, "Atlas's turn": the agent's mark in its tone, its name in the agent's color, and its state as
+  `apps/ui`'s `TurnStatus` words and marks it (`stateOf`: "Queued", "Working", "Stopping…", "Completed" with a check,
+  "Failed" with a warning in the caution colors, "Stopped" with a dash, the logo moving while it is queued, working, or
+  stopping), then its buttons: View log, quiet, which opens the turn's log in the side pane; Stop, the secondary button,
+  named "Stop Atlas", for someone who may direct the agent while the turn is active, which while it stops is disabled
+  and named "Stopping", to whoever reads it; and Retry, for someone who may direct the agent when nothing else keeps the
+  turn from running again, which `apps/ui` offers as Retry too. Under the first line, a finished turn says
+  (`endingOf`) why it failed, with no "Agent settings" link, which `apps/ui` has to open the agent's page and a thread
+  has no way to ask for, since its parents, the group and the inbox, would have to carry the request to the page;
+  "Atlas stopped taking part in this thread." when its agent left the thread (core's cancel reason
+  `participation-ended`), "The task no longer asks Atlas to work on it." when its task was taken from it
+  (`task-changed`), nothing when someone asked it to stop, and "No reply posted." when it completed with no
+  `messageIds`; "Sending…" says while a change to it is on its way. A stop or a retry that did not go through says why
+  under the row as an alert, in `apps/ui`'s words (`problem.ts`, `problemText`): "Couldn't stop the turn. Try again."
+  and "Couldn't start another attempt. Try again." when the browser could not keep the action (`FailedStop`,
+  `FailedRetry`, forgotten when the person tries again), and, from the rejection the server wrote back, which the
+  subscription reads from the store's actions (`refusalsOf`: the latest of each turn's stop and retry, left unsaid
+  while a later one is on its way or was kept), "This turn has already finished." (`TurnNotActive`), "This turn is
+  still running.", "This turn already replied.", "A newer turn followed this one.", and "Atlas no longer takes part in
+  this thread." (the four reasons of `NotRetryable`), "You can't direct Atlas." (`Denied`), and "This turn is no longer
+  available." (`NotFound`); the toast of the refusal stays beside it, until the person dismisses it, and takes the
+  row's line with it. `replyActionView` is View turn log, the quiet icon button the reply of a turn has among its
+  message's actions, which opens the same log. Why the turns could not be read is the Block's `notice`, which the
+  thread shows above its timeline.
+
+  `logPaneView`, given where the thread is (`where`, "Thread in #general", which the group and the inbox word as they
+  word their side pane's subtitle), is the turn log as `apps/ui`'s `TurnLog` draws it, the design's side `pane`
+  titled "Turn log": Back to thread, on every layout (`paneBack` with `isAlways`, since it is not the way the pane
+  closes), Stop while the turn can be stopped and Close turn log in the header, and under the title the agent and how
+  its turn stands. Its body follows its end (`followsEnd`) and holds, from the top: what the turn ran on, a line each
+  (`summaryOf`): where it works, the model by its connection's name and its id, "Harness · opencode", and "Sandbox ·
+  Daytona" or "No sandbox", or, before the turn started, why there is nothing to say; the Activity, a list of
+  entries, oldest first, each with its time (`timeOf`, in full as its title) in `apps/ui`'s words (`wordsOf`):
+  "Work accepted" and "Turn started", which the turn records, "Thread input received" for each input the log holds,
+  the request and prior conversation for the first of the turn that began its agent's session in the thread and
+  another message or "N more messages" for the rest, a response the agent recorded as a card, "Reply recorded" and
+  "This response was posted to the thread." once the turn ended with a reply, "Response recorded" and "Not posted to
+  the thread." until then, "Interrupted" with its reason and "Trying again." when the run goes on, and how the turn
+  ended, "Reply posted", "Turn completed" with "No reply was posted.", "Turn failed" with why, or "Turn stopped" with
+  whether someone asked, its agent left, or its task changed; the Queued card while the turn waits; the caution card
+  "Review the agent's setup" for a turn that failed; and why a stop or retry did not go through, as an alert. The
+  footer is the first of these that fits (`footerOf`): "New activity · Jump to latest", which scrolls to the end, when
+  the log grew while the person was not near its end; "Retry turn", with "Previous log stays available.", when they
+  may use the agent and nothing else keeps the turn from running again; "View reply in thread", when the turn posted
+  a reply; "Waiting for activity" while it is queued; "Following live" while it works or stops; and "This turn has
+  finished." The pane says "Loading the turn log…" while the log opens, "This turn log isn't available" with "It may
+  be in a thread you can no longer open." when the host does not have it for the person (a `NotFound` of the log
+  stream, `FoundLogUnavailable`) or the thread has no such turn, and "Can't load this turn log" with why and Try again
+  when it could not be followed. The turn log needs the workspace's connections to name what the turn ran on, so the
+  Block reads the active ones from the store, and a connection since removed is "Removed connection".
+
+  The pane is the turns Block's own view, not one a parent draws from the Block's state, because closing it leaves the
+  thread too, which has to reach the page whichever way the pane is drawn, so the Block reports `ClosedLog` and
+  `ReturnedToThread` and its parents carry them: the thread folds going back into
+  scrolling its messages to their end (`ScrollMessagesToEnd` without `onlyIfNearEnd`, as the thread opens) and
+  reports `ClosedTurnLog`, which the group and the inbox fold into closing the thread and report as `ClosedThread`,
+  which Home already folds; the thread pane is simply not drawn while a log is followed. Going back to the thread
+  returns to its end, not to where the person had scrolled, as `apps/ui` remounts it at the bottom too. The app cannot
+  tell apart what `apps/ui` draws as a reply draft (the log records only the steps a turn completed, with nothing to
+  say that a response is still being written) or as reconnecting (the stream fails to Try again instead of
+  reconnecting), so it draws neither card. "New activity · Jump to latest" is decided when the log grows (the Command
+  `FollowLogEnd` measures the pane's body before the render and scrolls only if the person was near its end), not as
+  they scroll, since Foldkit's scroll message carries only `scrollTop`, so it can stay on until the next arrival or a click.
+
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, which agents are at work in it, when it was last active, its task, whether it is still being started,
   and how much is new, and a composer to
@@ -428,7 +467,7 @@ below it counted at each level above.
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
   open when its parent gives one, and reports nothing for it. It reports `OpenedThread` when the
-  person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, or Back, so its parent can
+  person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, Back, or Close turn log, so its parent can
   hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. It
@@ -691,8 +730,9 @@ below it counted at each level above.
   with the thread's bell, Follow thread, and Close thread, or Close task, beside the title and, below 48rem, Back to Inbox
   before it, both sending
   `ClickedClose`, the thread's messages, with the one the notification is about drawn current, and
-  the reply composer in the footer, and nothing while none is selected. It reports `OpenedThread`
-  when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
+  the reply composer in the footer, or, while the person follows the log of one of its turns, that log in its place,
+  and nothing while none is selected. It reports `OpenedThread`
+  when a thread opens and `ClosedThread` when the person closes it, or its turn's log, so its parent can hold the side
   pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
   nothing, since it asked. The Block offers a count of what waits for its parent to show. The workspace's name, which
   Home gives its view as it gives the group's, is the line under the title on phones.
@@ -912,8 +952,8 @@ below it counted at each level above.
   `apps/ui` names its link, "Working in #general: open its log" (or "Working: open its log" while the group is not
   read), the design's `activityList` with an `action`; it reports `OpenedThread` with the group and the thread the turn
   works in (`ClickedTurn`, from `TurnUnderWay`), which the page opens in Home, where the thread's timeline has the
-  turn's row, with its View log. `apps/ui` opens the turn's own log beside its thread; the thread Block has no way to open
-  one turn's log, so the person views it from the pane, and the button opens the thread. A person who may not configure the agent reads the
+  turn's row, with its View log. `apps/ui` opens the turn's own log beside its thread; the button opens the thread, and
+  the person opens the log from the turn's row. A person who may not configure the agent reads the
   same fields disabled, with no buttons; an agent the workspace does not list says "This agent isn't here" and
   offers "Show all agents", and nothing shows before the agents are read. The Block keeps what the person
   changed on each agent's page (`edits`: a name and a whole setup, each saved apart, from the name the agent
@@ -1214,7 +1254,8 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   `browseView`, the same child as the sidebar's under a second slot, which the Block asks for with `RequestedBrowse`:
   Home goes there as it goes to any list, closing the side pane's dialog and the thread beside the inbox and marking
   no group open, and picking a group on that page opens it, which leaves the page. Its side pane (`threadView`, given
-  the time now) is the thread open in the open group, or beside the open inbox (`inbox-thread`, the inbox's
+  the time now) is the thread open in the open group, or the log of one of its turns in its place while the person
+  follows it, or beside the open inbox (`inbox-thread`, the inbox's
   `threadView`), only while one is, and `asideDialogView`, given the `toView` the shell passes the page, is the
   dialog around it; `dialogView` is the groups' dialogs, for starting a team or a conversation. The page lends the
   shell each of them. The thread's side pane is beside the main pane only from 80rem (`Split`); at every other width
@@ -1453,8 +1494,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
 - `conversationScroll.test.ts` gives a pane body the extent a browser would measure, with happy-dom's `scrollHeight`
   and `clientHeight` stubbed, and reads back the `scrollTop` the effects set: near the end is less than 80px, a list
   scrolls to the end when the render has committed unless a message is current and it is told to keep the view, a list
-  in a body not anchored to the bottom is left alone, the person is measured before the render grows the pane and
-  scrolled to the end it made only if they were near, and a message is revealed in the middle. They run live, since the
+  in a body neither anchored to the bottom nor following its end, as a turn's log does, is left alone, the person is measured before the render grows the pane and
+  scrolled to the end it made only if they were near, which it says, and a message is revealed in the middle. They run live, since the
   effects wait for an animation frame. happy-dom lays nothing out, so a real scroll, the browser clamping `scrollTop`
   to the end, a short list resting against the composer, and `scrollIntoView` moving a real pane are not observed here.
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
@@ -1463,8 +1504,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   from what was seen, unless nothing changes; a thread's turns stopped while they are active and retried
   only when nothing else keeps them from it, a stop or retry the browser could not keep said until the person tries
   again, and what the server refused read from the store's actions, and a turn's log followed from viewing it until
-  the turn ends or the person hides it, passing over another turn's, and followed again after it
-  could not be; a thread's messages scrolled to their end as the thread opens and again when it comes back, and
+  the turn ends or the person goes back to the thread, opened at its end and kept there as it grows, passing over
+  another turn's, with what it did not follow said as new, going back and closing reported, and followed again after
+  it could not be or was not available; a thread's messages scrolled to their end as the thread opens and again when it comes back, and
   followed as a message or a note is added, and left alone when a read adds none or typing changes; a thread started from
   the composer, a task started on the Tasks tab, the tab chosen, and the status, the
   assignee, and the order chosen from their menus, which change only the Block's own model, a group's threads scrolled to
@@ -1649,9 +1691,11 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   rows by someone who may not, and made by someone who may create tasks; a thread's turns as rows by their
   agents' names and initials and the words and marks of how they stand, each line under a finished row, stopped and
   retried by someone who may use the agent and not otherwise, Stop named for the agent and, while the turn stops,
-  disabled and named Stopping, every problem of a stop or retry in its words under the row, a turn's log followed as it
-  is written, until the turn ends or it could not be followed, a turn that replied as its reply with View turn log
-  and its log under it, and the thread placing its agents' turns among its messages at the moment they took on the
+  disabled and named Stopping, every problem of a stop or retry in its words under the row, a turn's log as the side pane, followed as it
+  is written, with its header, Back, Stop, and Close, what the turn ran on, each entry of its activity in its words
+  and at its time, each card, each footer, and the three states of the pane, a turn that replied as its reply with View
+  turn log, the log opened in the side pane in place of the thread and going back to the thread's end, and the
+  thread placing its agents' turns among its messages at the moment they took on the
   work, under the day, and the notes of who followed it or stopped taking part in it, for the person as "You" and
   for someone else, in each way, among them by their time, and its three states: loading until the store answers,
   not available once it answers without the thread, and not readable with a Try again that reads it again, in the

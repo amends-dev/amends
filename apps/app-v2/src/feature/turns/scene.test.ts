@@ -7,8 +7,11 @@ import { DateTime, Option } from "effect"
 import {
   Command,
   Subscription,
+  all,
   click,
   expect,
+  expectAll,
+  expectOutMessage,
   given,
   role,
   scene,
@@ -18,15 +21,16 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { bob, membership, scout, turnOf } from "../../../test/fixtures.ts"
+import { bob, connectionOf, membership, scout, turnOf } from "../../../test/fixtures.ts"
+import { fullTimeOf, timeOf } from "../../seen.ts"
 import { TurnsBlock } from "./block.ts"
-import { RetryTurn, StopTurn } from "./command.ts"
-import { Message, type Model, type TurnItem } from "./definition.ts"
+import { FollowLogEnd, RetryTurn, ScrollLogToEnd, StopTurn } from "./command.ts"
+import { LogState, Message, type Model, OutMessage, type TurnItem, type TurnLog } from "./definition.ts"
 import { init } from "./init.ts"
 import { type TurnProblem, problemText } from "./problem.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { replyActionView, replyLogView, view } from "./view.ts"
+import { logPaneView, replyActionView, view } from "./view.ts"
 
 const { workspace, member } = membership
 const threadId = ThreadId.ThreadId.make("thread-1")
@@ -327,124 +331,465 @@ describe("why a stop or a retry did not go through", () => {
   })
 })
 
-describe("a turn's log", () => {
-  it("is followed as it is written, under the row, until the turn ends or it could not be followed", () => {
+describe("a turn's log, as the side pane", () => {
+  const where = "Thread in #general"
+  const logPane = (model: Model, h: Parameters<ReturnType<typeof rowOf>>[1]) =>
+    h.div([], [withViewInputs(logPaneView, { where })()(model, h)])
+
+  const connections = [
+    connectionOf("connection-1", "Anthropic"),
+    connectionOf("connection-2", "opencode"),
+    connectionOf("connection-3", "Daytona")
+  ]
+  const ranOn = {
+    selection: {
+      harness: { connectionId: "connection-2" },
+      model: { connectionId: "connection-1", id: "claude-sonnet-5" },
+      sandbox: { connectionId: "connection-3" }
+    }
+  }
+  const working = turnOf("turn-1", "running", ranOn)
+  const queued = turnOf("turn-1", "queued")
+  const broken = turnOf("turn-2", "failed", { ...ranOn, finishedAt: "2026-10-18T12:09:00Z" })
+  const replied = turnOf("turn-7", "completed", {
+    ...ranOn,
+    messageIds: ["message-2"],
+    finishedAt: "2026-10-18T12:07:00Z"
+  })
+
+  const taken = DateTime.makeUnsafe("2026-10-18T12:04:00Z")
+  const input = Turn.LogItem.cases.InputTaken.make({ at: taken, messages: 1 })
+  const response = Turn.LogItem.cases.Responded.make({
+    at: DateTime.makeUnsafe("2026-10-18T12:05:00Z"),
+    responseId: "response-1",
+    text: "Looks **good**.",
+    parts: [0],
+    reply: true
+  })
+
+  /** The log of `turnId` as the person follows it, with nothing new out of their view unless `changes` says so. */
+  const logOf = (turnId: TurnId.TurnId, changes: Partial<Omit<TurnLog, "turnId">> = {}): TurnLog => ({
+    turnId,
+    items: [],
+    state: LogState.Following(),
+    hasNewActivity: false,
+    ...changes
+  })
+
+  /** The thread's `turns`, with the log the person follows, and what the workspace's connections are called. */
+  const showing = (turns: ReadonlyArray<TurnItem>, turnLog: TurnLog, grants: typeof mayUseAgents = []) =>
+    modifyFields(opened(turns, grants), { log: () => Option.some(turnLog), connections: () => connections })
+
+  it("is Turn log in the side pane, with the agent and how its turn stands under the title", () => {
     scene(
-      { update, view: rowOf(running.id), subscriptions: TurnsBlock.subscriptions },
-      given(opened([itemOf(running)])),
-      expect(role("list", { name: "Log" })).toBeAbsent(),
-      expect(role("button", { name: "View log" })).toHaveAttr("aria-expanded", "false"),
-      click(role("button", { name: "View log" })),
-      expect(role("button", { name: "View log" })).toHaveAttr("aria-expanded", "true"),
-      // While it opens the log has nothing to list, so its hint stands alone, with no empty box under it.
-      expect(within(role("group", { name: "Scout's turn" }), text("Opening the log…"))).toExist(),
-      expect(role("list", { name: "Log" })).toBeAbsent(),
-      Subscription.emit(
-        subscriptions.log,
-        Message.ReceivedLog({ turnId: running.id, logMessage: Turn.LogMessage.cases.Opened.make({ items: [] }) })
-      ),
-      // Followed with nothing written, the hint says where it stands.
-      expect(text("Opening the log…")).toBeAbsent(),
-      expect(text("Nothing written yet.")).toExist(),
-      expect(role("list", { name: "Log" })).toBeAbsent(),
-      Subscription.emit(
-        subscriptions.log,
-        Message.ReceivedLog({
-          turnId: running.id,
-          logMessage: Turn.LogMessage.cases.Opened.make({
-            items: [Turn.LogItem.cases.InputTaken.make({ at, messages: 1 })]
-          })
-        })
-      ),
-      expect(text("Nothing written yet.")).toBeAbsent(),
-      expect(within(role("list", { name: "Log" }), text("Read 1 message"))).toExist(),
-      Subscription.emit(
-        subscriptions.log,
-        Message.ReceivedLog({
-          turnId: running.id,
-          logMessage: Turn.LogMessage.cases.Changed.make({
-            changes: [
-              {
-                index: 1,
-                item: Turn.LogItem.cases.Responded.make({
-                  at,
-                  responseId: "response-1",
-                  text: "Looks good.",
-                  parts: [0],
-                  reply: true
-                })
-              }
-            ]
-          })
-        })
-      ),
-      expect(within(role("list", { name: "Log" }), text("Replied: Looks good."))).toExist(),
-      Subscription.emit(
-        subscriptions.log,
-        Message.ReceivedLog({ turnId: running.id, logMessage: Turn.LogMessage.cases.Ended.make({}) })
-      ),
-      expect(text("The turn has ended.")).toExist(),
-      click(role("button", { name: "View log" })),
-      expect(role("list", { name: "Log" })).toBeAbsent(),
-      expect(role("button", { name: "View log" })).toHaveAttr("aria-expanded", "false"),
-      click(role("button", { name: "View log" })),
-      Subscription.emit(
-        subscriptions.log,
-        Message.FailedFollowLog({ turnId: running.id, error: "The log could not be followed. Check the connection." })
-      ),
-      expect(text("The log could not be followed. Check the connection.")).toExist(),
-      click(role("button", { name: "Try again" })),
-      expect(text("Opening the log…")).toExist(),
-      expect(text("The log could not be followed. Check the connection.")).toBeAbsent()
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      expect(role("heading", { name: "Turn log" })).toExist(),
+      expect(within(role("complementary"), text("Scout"))).toExist(),
+      expect(within(role("complementary"), role("status"))).toHaveText("Working"),
+      expect(selector("[data-follows-end]")).toExist()
     )
   })
 
-  it("shows under the row of the turn that is followed, and under no other", () => {
-    const following = modifyFields(opened([itemOf(running), itemOf(failed)]), {
-      log: () => Option.some({ turnId: running.id, items: [], state: { _tag: "Opening" as const } })
-    })
+  it("is nothing while the person follows no log", () => {
+    scene({ update, view: logPane }, given(opened([itemOf(working)])), expect(role("complementary")).toBeAbsent())
+  })
+
+  it("goes back to the thread, which says so and shows no log, and closes with the thread", () => {
     scene(
-      { update, view: rowOf(failed.id) },
-      given(following),
-      expect(text("Opening the log…")).toBeAbsent(),
-      expect(role("button", { name: "View log" })).toHaveAttr("aria-expanded", "false")
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      click(role("button", { name: "Back to thread" })),
+      expectOutMessage(OutMessage.ReturnedToThread()),
+      expect(role("complementary")).toBeAbsent()
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      click(role("button", { name: "Close turn log" })),
+      expectOutMessage(OutMessage.ClosedLog())
+    )
+  })
+
+  it("offers Stop in the header to someone who may use the agent, while the turn can be stopped", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id), mayUseAgents)),
+      click(role("button", { name: "Stop Scout" })),
+      Command.expectExact(StopTurn({ workspaceId: workspace.id, memberId: member.id, turnId: working.id })),
+      Command.resolve(StopTurn, Message.WroteAction())
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      expect(role("button", { name: "Stop Scout" })).toBeAbsent()
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(replied)], logOf(replied.id), mayUseAgents)),
+      expect(role("button", { name: "Stop Scout" })).toBeAbsent()
+    )
+  })
+
+  it("says what the turn ran on: where it works, the model, the harness, and the sandbox", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      expect(text(where)).toExist(),
+      expect(text("Anthropic · claude-sonnet-5")).toHaveClass("font-mono"),
+      expect(text("Harness · opencode")).toExist(),
+      expect(text("Sandbox · Daytona")).toExist()
+    )
+    scene(
+      { update, view: logPane },
+      given(
+        showing(
+          [itemOf(turnOf("turn-1", "running", { selection: { ...ranOn.selection, sandbox: null } }))],
+          logOf(working.id)
+        )
+      ),
+      expect(text("No sandbox")).toExist()
+    )
+  })
+
+  it("says why there is nothing to say of what a turn ran on before it started", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(queued)], logOf(queued.id))),
+      expect(text("The harness, model, and sandbox are recorded when work starts.")).toExist()
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(turnOf("turn-1", "failed"))], logOf(working.id))),
+      expect(text("This turn failed before execution started.")).toExist()
+    )
+  })
+
+  it("lists the activity under its own name, each entry with the time it happened and in full on hover", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(queued)], logOf(queued.id))),
+      expect(role("list", { name: "Activity" })).toExist(),
+      expect(within(role("list", { name: "Activity" }), text("Work accepted"))).toExist(),
+      expect(
+        within(role("list", { name: "Activity" }), text("Scout picked up the request from this thread."))
+      ).toExist(),
+      expect(selector("time")).toHaveText(timeOf(queued.createdAt)),
+      expect(selector("time")).toHaveAttr("title", fullTimeOf(queued.createdAt))
+    )
+  })
+
+  it("lists what the log holds after the turn started, in order, and a reply the turn posted at its end", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(replied)], logOf(replied.id, { items: [input, response], state: LogState.Ended() }))),
+      // The divider that heads the activity is an item of it too, before the five entries.
+      expectAll(all.selector("li")).toHaveCount(6),
+      expect(text("Work accepted")).toExist(),
+      expect(text("Turn started")).toExist(),
+      expect(text("Thread input received")).toExist(),
+      expect(text("The request and prior conversation were added.")).toExist(),
+      expect(text("Reply recorded")).toExist(),
+      expect(text("Reply posted")).toExist(),
+      expect(text("Turn completed. Open the reply in its thread.")).toExist(),
+      expect(within(role("list", { name: "Activity" }), text(timeOf(replied.finishedAt ?? taken)))).toExist()
+    )
+  })
+
+  it("shows a response the agent recorded as a card, its markdown read, and says it went to the thread", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(replied)], logOf(replied.id, { items: [input, response], state: LogState.Ended() }))),
+      expect(text("Complete")).toExist(),
+      expect(selector("strong")).toHaveText("good"),
+      expect(text("This response was posted to the thread.")).toExist()
+    )
+    scene(
+      { update, view: logPane },
+      given(
+        showing(
+          [itemOf(working)],
+          logOf(working.id, { items: [Turn.LogItem.cases.Responded.make({ ...response, reply: false })] })
+        )
+      ),
+      expect(text("Response recorded")).toExist(),
+      expect(text("Not posted to the thread.")).toExist()
+    )
+  })
+
+  it("says a run was interrupted, and that it tries again when it will", () => {
+    const interrupted = (retryable: boolean) =>
+      Turn.LogItem.cases.Interrupted.make({ at: taken, reason: "The model stalled.", retryable })
+
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id, { items: [interrupted(true)] }))),
+      expect(text("Interrupted")).toExist(),
+      expect(text("The model stalled. Trying again.")).toExist()
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id, { items: [interrupted(false)] }))),
+      expect(text("The model stalled.")).toExist()
+    )
+  })
+
+  it("says a turn failed and why, with the card that asks for a review of its agent's setup", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(broken)], logOf(broken.id, { state: LogState.Ended() }))),
+      expect(text("Turn failed")).toExist(),
+      expect(text("The model was unavailable.")).toExist(),
+      expect(text("Review the agent's setup")).toExist(),
+      expect(text("Fix what stopped this turn before starting another attempt.")).toHaveClass("text-ink"),
+      expect(text("This turn has finished.")).toExist()
+    )
+  })
+
+  it("says a turn stopped, and why", () => {
+    const stopped = (changes: NonNullable<Parameters<typeof turnOf>[2]>) =>
+      turnOf("turn-4", "cancelled", { finishedAt: "2026-10-18T12:09:00Z", ...changes })
+    const stoppedFor = (line: string, changes: NonNullable<Parameters<typeof turnOf>[2]>) => {
+      const turn = stopped(changes)
+
+      scene(
+        { update, view: logPane },
+        given(showing([itemOf(turn)], logOf(turn.id, { state: LogState.Ended() }))),
+        expect(text("Turn stopped")).toExist(),
+        expect(text(line)).toExist()
+      )
+    }
+
+    stoppedFor("It stopped as asked. Its output stays in this log.", {})
+    stoppedFor("Scout stopped taking part in this thread.", { cancelReason: "participation-ended" })
+    stoppedFor("The task no longer asks Scout to work on it. Its output stays in this log.", {
+      cancelReason: "task-changed"
+    })
+  })
+
+  it("says that a turn ended with no reply posted", () => {
+    const finished = turnOf("turn-3", "completed", { finishedAt: "2026-10-18T12:09:00Z" })
+
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(finished)], logOf(finished.id, { state: LogState.Ended() }))),
+      expect(text("Turn completed")).toExist(),
+      expect(text("No reply was posted.")).toExist(),
+      expect(text("This turn has finished.")).toExist()
+    )
+  })
+
+  it("says that a turn waits, in a card and at the foot", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(queued)], logOf(queued.id))),
+      expect(within(role("complementary"), role("status"))).toHaveText("Queued"),
+      expect(text("Waiting to start. There is no output yet.")).toExist(),
+      expect(text("Waiting for activity")).toExist(),
+      expect(text("Following live")).toBeAbsent(),
+      expect(text("Review the agent's setup")).toBeAbsent()
+    )
+  })
+
+  it("says it is followed live while the turn works", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      expect(text("Following live")).toExist(),
+      expect(text("Waiting to start. There is no output yet.")).toBeAbsent()
+    )
+  })
+
+  it("offers a new attempt at the foot of a failed turn to someone who may use the agent", () => {
+    scene(
+      { update, view: logPane },
+      given(
+        showing([itemOf(broken, { retryOpen: true })], logOf(broken.id, { state: LogState.Ended() }), mayUseAgents)
+      ),
+      expect(text("Previous log stays available.")).toExist(),
+      click(role("button", { name: "Retry turn" })),
+      Command.expectExact(RetryTurn({ workspaceId: workspace.id, memberId: member.id, turnId: broken.id })),
+      Command.resolve(RetryTurn, Message.WroteAction())
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(broken, { retryOpen: true })], logOf(broken.id, { state: LogState.Ended() }))),
+      expect(role("button", { name: "Retry turn" })).toBeAbsent(),
+      expect(text("This turn has finished.")).toExist()
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(broken)], logOf(broken.id, { state: LogState.Ended() }), mayUseAgents)),
+      expect(role("button", { name: "Retry turn" })).toBeAbsent()
+    )
+  })
+
+  it("offers the reply at the foot of a turn that posted one, which goes back to the thread", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(replied)], logOf(replied.id, { state: LogState.Ended() }))),
+      click(role("button", { name: "View reply in thread" })),
+      expectOutMessage(OutMessage.ReturnedToThread()),
+      expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("says that something new is out of view and jumps to it, which scrolls to the end", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id, { hasNewActivity: true }))),
+      expect(text("Following live")).toBeAbsent(),
+      click(role("button", { name: "New activity · Jump to latest" })),
+      Command.expectExact(ScrollLogToEnd({ turnId: working.id })),
+      Command.resolve(ScrollLogToEnd, Message.CompletedScrollLogToEnd()),
+      expect(role("button", { name: "New activity · Jump to latest" })).toBeAbsent(),
+      expect(text("Following live")).toExist()
+    )
+  })
+
+  it("says why a stop or a retry did not go through, as an alert under the activity", () => {
+    scene(
+      { update, view: logPane },
+      given(
+        modifyFields(showing([itemOf(working)], logOf(working.id), mayUseAgents), {
+          refused: () => [{ turnId: working.id, problem: "finished" }]
+        })
+      ),
+      expect(role("alert")).toHaveText("This turn has already finished."),
+      expect(role("alert")).toHaveClass("text-caution-text")
+    )
+  })
+
+  it("says while it opens that it is loading, with no footer", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id, { state: LogState.Opening() }))),
+      expect(text("Loading the turn log…")).toExist(),
+      expect(role("list", { name: "Activity" })).toBeAbsent(),
+      expect(text("Following live")).toBeAbsent()
+    )
+  })
+
+  it("says it is not available when the host has none for the person, or the thread has no such turn", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id, { state: LogState.Unavailable() }))),
+      expect(text("This turn log isn't available")).toExist(),
+      expect(text("It may be in a thread you can no longer open.")).toExist(),
+      expect(role("list", { name: "Activity" })).toBeAbsent(),
+      expect(role("button", { name: "Close turn log" })).toExist()
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(broken)], logOf(working.id))),
+      expect(text("This turn log isn't available")).toExist(),
+      expect(role("button", { name: "Back to thread" })).toExist(),
+      expect(role("status")).toBeAbsent()
+    )
+  })
+
+  it("says why it could not be followed, and follows it again when asked", () => {
+    scene(
+      { update, view: logPane },
+      given(
+        showing(
+          [itemOf(working)],
+          logOf(working.id, {
+            state: LogState.Failed({ error: "The log could not be followed. Check the connection." })
+          })
+        )
+      ),
+      expect(text("Can't load this turn log")).toExist(),
+      expect(text("The log could not be followed. Check the connection.")).toExist(),
+      click(role("button", { name: "Try again" })),
+      expect(text("Loading the turn log…")).toExist(),
+      expect(text("Can't load this turn log")).toBeAbsent()
     )
   })
 })
 
-describe("a turn that replied", () => {
-  const replied = turnOf("turn-7", "completed", { messageIds: ["message-2"] })
+describe("showing a turn's log", () => {
+  const working = turnOf("turn-1", "running")
+  const replied = turnOf("turn-7", "completed", { messageIds: ["message-2"], finishedAt: "2026-10-18T12:07:00Z" })
+  const where = "Thread in #general"
 
-  /** The action of the reply and the log under it, as the thread places them next to the message. */
-  const aroundReply = (model: Model, h: Parameters<ReturnType<typeof rowOf>>[1]) =>
-    h.div(
-      [],
-      [
-        withViewInputs(replyActionView, { turnId: replied.id })()(model, h),
-        withViewInputs(replyLogView, { turnId: replied.id })()(model, h)
-      ]
-    )
+  /** The row of `turnId` beside the pane that shows its log, as the thread and the side pane place them. */
+  const rowBesideLog = (turnId: TurnId.TurnId) => (model: Model, h: Parameters<ReturnType<typeof rowOf>>[1]) =>
+    h.div([], [rowOf(turnId)(model, h), withViewInputs(logPaneView, { where })()(model, h)])
 
-  it("is its reply, with View turn log as the message's action, pressed while its log is shown", () => {
-    const logged: Model = modifyFields(opened([itemOf(replied)]), {
-      log: () => Option.some({ turnId: replied.id, items: [], state: { _tag: "Following" as const } })
-    })
-
+  it("follows the log from the row, opening at its end and keeping it there as the turn writes it", () => {
     scene(
-      { update, view: aroundReply },
+      { update, view: rowBesideLog(working.id), subscriptions: TurnsBlock.subscriptions },
+      given(opened([itemOf(working)])),
+      expect(role("complementary")).toBeAbsent(),
+      click(role("button", { name: "View log" })),
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      expect(text("Loading the turn log…")).toExist(),
+      Subscription.emit(
+        subscriptions.log,
+        Message.ReceivedLog({ turnId: working.id, logMessage: Turn.LogMessage.cases.Opened.make({ items: [] }) })
+      ),
+      Command.expectExact(ScrollLogToEnd({ turnId: working.id })),
+      Command.resolve(ScrollLogToEnd, Message.CompletedScrollLogToEnd()),
+      expect(text("Loading the turn log…")).toBeAbsent(),
+      expect(text("Work accepted")).toExist(),
+      expect(text("Thread input received")).toBeAbsent(),
+      Subscription.emit(
+        subscriptions.log,
+        Message.ReceivedLog({
+          turnId: working.id,
+          logMessage: Turn.LogMessage.cases.Changed.make({
+            changes: [{ index: 0, item: Turn.LogItem.cases.InputTaken.make({ at, messages: 1 }) }]
+          })
+        })
+      ),
+      Command.expectExact(FollowLogEnd({ turnId: working.id })),
+      Command.resolve(FollowLogEnd, Message.FollowedLogEnd()),
+      expect(text("Thread input received")).toExist(),
+      Subscription.emit(
+        subscriptions.log,
+        Message.ReceivedLog({ turnId: working.id, logMessage: Turn.LogMessage.cases.Ended.make({}) })
+      ),
+      expect(text("Thread input received")).toExist()
+    )
+  })
+
+  it("says when the log could not be followed, or is out of reach, and follows it again from the pane", () => {
+    scene(
+      { update, view: rowBesideLog(working.id), subscriptions: TurnsBlock.subscriptions },
+      given(opened([itemOf(working)])),
+      click(role("button", { name: "View log" })),
+      Subscription.emit(
+        subscriptions.log,
+        Message.FailedFollowLog({ turnId: working.id, error: "The log could not be followed. Check the connection." })
+      ),
+      expect(text("The log could not be followed. Check the connection.")).toExist(),
+      click(role("button", { name: "Try again" })),
+      expect(text("Loading the turn log…")).toExist(),
+      Subscription.emit(subscriptions.log, Message.FoundLogUnavailable({ turnId: working.id })),
+      expect(text("This turn log isn't available")).toExist()
+    )
+  })
+
+  it("opens from View turn log, the action of the reply the turn posted", () => {
+    scene(
+      {
+        update,
+        view: (model, h) =>
+          h.div(
+            [],
+            [
+              withViewInputs(replyActionView, { turnId: replied.id })()(model, h),
+              withViewInputs(logPaneView, { where })()(model, h)
+            ]
+          )
+      },
       given(opened([itemOf(replied)])),
-      expect(role("button", { name: "View turn log" })).toHaveAttr("aria-pressed", "false"),
-      expect(role("group", { name: "Scout's turn log" })).toBeAbsent(),
+      expect(role("complementary")).toBeAbsent(),
       click(role("button", { name: "View turn log" })),
-      expect(role("button", { name: "View turn log" })).toHaveAttr("aria-pressed", "true"),
-      expect(within(role("group", { name: "Scout's turn log" }), text("Opening the log…"))).toExist(),
-      click(role("button", { name: "View turn log" })),
-      expect(role("group", { name: "Scout's turn log" })).toBeAbsent()
-    )
-    scene(
-      { update, view: aroundReply },
-      given(logged),
-      expect(within(role("group", { name: "Scout's turn log" }), text("Nothing written yet."))).toExist()
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      expect(text("Loading the turn log…")).toExist()
     )
   })
 })

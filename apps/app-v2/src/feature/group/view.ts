@@ -21,9 +21,11 @@ import {
   memberMark,
   memberName,
   pluralize,
+  sideSubtitle,
   visibilityHint
 } from "../../seen.ts"
-import { followView, replyView, sidePane } from "../thread/view.ts"
+import { aboutOf, hasTurnLog } from "../thread/definition.ts"
+import { followView, replyView, sidePane, turnLogView } from "../thread/view.ts"
 import { selfName, showsConversation } from "../threads/definition.ts"
 import {
   cantLoadConversation,
@@ -537,24 +539,42 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
 /**
  * The thread open in the group as the side pane (see `sidePane`), a task's when the thread tracks one, with the button
  * that closes it, Close beside the title and Back before it on a phone, which goes back to the Tasks tab when the
- * tasks are what the group lists, and to the group otherwise. Nothing while none is open.
+ * tasks are what the group lists, and to the group otherwise; or, while the person follows the log of one of its
+ * turns, that log in its place, where it is. Nothing while no thread is open.
  */
 export const threadView = GroupComposition.makeView.withInputs<ThreadViewInputs>((model, { now }, h) =>
   Option.match(model.thread, {
     onNone: () => h.empty,
-    onSome: ({ threadId, model: open }) =>
-      sidePane(h, {
-        thread: open,
-        group: Option.map(model.group, ({ group }) => group),
-        members: model.members,
-        self: model.memberId,
-        backTo: model.threads.tab === "Tasks" ? "Tasks" : nameOf(model),
-        onClose: Message.ClickedAllThreads(),
-        follow: h.block(
-          ThreadBinding.embedView({ key: threadId, slotId: "thread-follow", model: open, view: followView })
-        ),
-        body: h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open, viewInputs: { now } })),
-        reply: h.block(ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView }))
-      })
+    onSome: ({ threadId, model: open }) => {
+      const group = Option.map(model.group, ({ group }) => group)
+
+      return hasTurnLog(open)
+        ? h.block(
+            ThreadBinding.embedView({
+              key: threadId,
+              slotId: "turn-log",
+              model: open,
+              view: turnLogView,
+              viewInputs: { where: sideSubtitle(aboutOf(open), group, model.members, model.memberId) }
+            })
+          )
+        : sidePane(h, {
+            thread: open,
+            group,
+            members: model.members,
+            self: model.memberId,
+            backTo: model.threads.tab === "Tasks" ? "Tasks" : nameOf(model),
+            onClose: Message.ClickedAllThreads(),
+            follow: h.block(
+              ThreadBinding.embedView({ key: threadId, slotId: "thread-follow", model: open, view: followView })
+            ),
+            body: h.block(
+              ThreadBinding.embedView({ key: threadId, slotId: "thread", model: open, viewInputs: { now } })
+            ),
+            reply: h.block(
+              ThreadBinding.embedView({ key: threadId, slotId: "thread-reply", model: open, view: replyView })
+            )
+          })
+    }
   })
 )

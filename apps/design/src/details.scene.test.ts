@@ -11,7 +11,6 @@ import {
   detailList,
   entry,
   entryList,
-  log,
   person,
   properties,
   property,
@@ -598,27 +597,6 @@ describe("entry", () => {
       given(initial),
       expect(role("button", { name: /Scout/ })).toBeAbsent(),
       expect(role("button", { name: "Stop" })).toExist()
-    )
-  })
-})
-
-describe("log", () => {
-  it("is an ordered list named by its label with a line for each item", () => {
-    scene(
-      {
-        update,
-        view: viewOf((h) =>
-          log(h, {
-            label: "Log",
-            items: ["Read 1 message", "Replied: Looks good.", "Stopped short: The model was unavailable."]
-          })
-        )
-      },
-      given(initial),
-      expect(role("list", { name: "Log" })).toExist(),
-      expect(within(role("list", { name: "Log" }), text("Read 1 message"))).toExist(),
-      expect(within(role("list", { name: "Log" }), text("Replied: Looks good."))).toExist(),
-      expect(within(role("list", { name: "Log" }), text("Stopped short: The model was unavailable."))).toExist()
     )
   })
 })

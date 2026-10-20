@@ -14,13 +14,16 @@ import { followEnd, isNearEnd, nearEnd, revealMessage, scrollToEnd } from "./con
 const extent = (scrollHeight: number, scrollTop: number) => ({ scrollHeight, scrollTop, clientHeight: 400 })
 
 /**
- * The conversation `list`, with a message that is current when `current`, in a pane body that is anchored to `anchor`.
+ * The conversation `list`, with a message that is current when `current`, in a pane body that is anchored to the
+ * `bottom`, follows its `end`, as a turn's log does, or is anchored to neither, to the `top`.
  */
 const conversation = (
-  options: Readonly<{ anchor: "bottom" | "top"; current?: boolean; scrollHeight: number; scrollTop: number }>
+  options: Readonly<{ anchor: "bottom" | "end" | "top"; current?: boolean; scrollHeight: number; scrollTop: number }>
 ) => {
+  const marker = { bottom: 'data-anchor="bottom"', end: "data-follows-end", top: "" }[options.anchor]
+
   document.body.innerHTML = `
-    <div id="body" ${options.anchor === "bottom" ? 'data-anchor="bottom"' : ""}>
+    <div id="body" ${marker}>
       <ol id="list"><li>Plans</li><li ${options.current === true ? 'aria-current="true"' : ""}>Sounds good</li></ol>
     </div>`
   const body = document.getElementById("body")!
@@ -92,6 +95,16 @@ describe("scrolling a conversation to its end", () => {
     })
   )
 
+  it.live("scrolls the activity of a turn's log, in a pane body that follows its end, as it does a conversation", () =>
+    Effect.gen(function* () {
+      const body = conversation({ anchor: "end", scrollHeight: 1000, scrollTop: 0 })
+
+      yield* scrollToEnd("list", { unlessCurrent: false })
+
+      expect(body.scrollTop).toBe(1000)
+    })
+  )
+
   it.live("does nothing for a list that is not in the page", () =>
     Effect.gen(function* () {
       document.body.innerHTML = ""
@@ -103,23 +116,37 @@ describe("scrolling a conversation to its end", () => {
 })
 
 describe("following the end of a conversation", () => {
-  it.live("scrolls to the end when the person is near it, since more was added after they looked", () =>
+  it.live("scrolls to the end when the person is near it, since more was added after they looked, and says so", () =>
     Effect.gen(function* () {
       const body = conversation({ anchor: "bottom", scrollHeight: 1000, scrollTop: 560 })
 
-      yield* followEnd("list")
+      expect(yield* followEnd("list")).toBe(true)
 
       expect(body.scrollTop).toBe(1000)
     })
   )
 
-  it.live("leaves the person where they scrolled to when they are further from the end", () =>
+  it.live("leaves the person where they scrolled to when they are further from the end, and says so", () =>
     Effect.gen(function* () {
       const body = conversation({ anchor: "bottom", scrollHeight: 1000, scrollTop: 100 })
 
-      yield* followEnd("list")
+      expect(yield* followEnd("list")).toBe(false)
 
       expect(body.scrollTop).toBe(100)
+    })
+  )
+
+  it.live("follows the end of a turn's log as it does a conversation's", () =>
+    Effect.gen(function* () {
+      const near = conversation({ anchor: "end", scrollHeight: 1000, scrollTop: 560 })
+
+      expect(yield* followEnd("list")).toBe(true)
+      expect(near.scrollTop).toBe(1000)
+
+      const far = conversation({ anchor: "end", scrollHeight: 1000, scrollTop: 100 })
+
+      expect(yield* followEnd("list")).toBe(false)
+      expect(far.scrollTop).toBe(100)
     })
   )
 
@@ -148,7 +175,7 @@ describe("following the end of a conversation", () => {
     Effect.gen(function* () {
       const body = conversation({ anchor: "top", scrollHeight: 1000, scrollTop: 560 })
 
-      yield* followEnd("list")
+      expect(yield* followEnd("list")).toBe(false)
 
       expect(body.scrollTop).toBe(560)
     })

@@ -4,8 +4,8 @@ import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
-import { PostReply, RevealHighlightedMessage, TellTyping } from "./command.ts"
-import { type Model, ThreadDefinition } from "./definition.ts"
+import { PostReply, RevealHighlightedMessage, ScrollMessagesToEnd, TellTyping } from "./command.ts"
+import { type Model, OutMessage, ThreadDefinition } from "./definition.ts"
 
 /**
  * What the person sends from the composer is their reply, and typing is said at once, then at
@@ -47,9 +47,29 @@ export const TaskBinding = ThreadDefinition.bindChild(TaskBlock, {
   init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] }
 })
 
+/**
+ * Going back to the thread from a turn's log shows it at its end, as it opens, and closing the log is reported, since
+ * it leaves the thread too.
+ */
+const foldTurnsOutMessage = TurnsBlock.OutMessage.match({
+  ReturnedToThread: () =>
+    ThreadDefinition.step((model: Model) => ({
+      model,
+      commands: [ScrollMessagesToEnd({ threadId: model.threadId, onlyIfNearEnd: false })]
+    })),
+  ClosedLog: () => ThreadDefinition.stepNoop()
+})
+
+/** Closing the log of a turn is the person closing the thread's pane. */
+const forwardTurnsOutMessage = TurnsBlock.OutMessage.match({
+  ReturnedToThread: () => undefined,
+  ClosedLog: () => OutMessage.ClosedTurnLog()
+})
+
 export const TurnsBinding = ThreadDefinition.bindChild(TurnsBlock, {
   field: "turns",
-  init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] }
+  init: { contextToArgs: ({ workspaceId, memberId, threadId }) => [workspaceId, memberId, threadId] },
+  outMessage: { forward: forwardTurnsOutMessage, fold: foldTurnsOutMessage }
 })
 
 export const ThreadComposition = ThreadDefinition.makeComposition({

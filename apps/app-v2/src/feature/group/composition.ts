@@ -78,6 +78,17 @@ export const MembersBinding = GroupDefinition.bindChild(MembersComboboxBlock, {
   outMessage: { fold: foldMembersOutMessage }
 })
 
+/** Close the thread open in the group. */
+export const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Option.none() }))
+
+/** The person closing the log of one of the open thread's turns leaves the thread too. */
+const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
+  ThreadBlock.OutMessage.match(outMessage, { ClosedTurnLog: () => closeThread })
+
+/** Closing the log of one of the open thread's turns is reported to the group's parent as the thread closing. */
+const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
+  ThreadBlock.OutMessage.match(outMessage, { ClosedTurnLog: () => OutMessage.ClosedThread() })
+
 /** The open thread, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
   readAll: (model) => Option.toArray(model.thread),
@@ -87,7 +98,8 @@ export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
   writeAt: (model, threadId, nextThread) =>
     modifyFields(model, {
       thread: Option.map((open) => (open.threadId === threadId ? { threadId, model: nextThread } : open))
-    })
+    }),
+  outMessage: { forward: forwardThreadOutMessage, fold: foldThreadOutMessage }
 })
 
 export const GroupComposition = GroupDefinition.makeComposition({

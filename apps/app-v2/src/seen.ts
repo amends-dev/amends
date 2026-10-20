@@ -1,5 +1,6 @@
 /**
- * What the person sees of the workspace's records: what a member and a group are called, what letters mark them, and
+ * What the person sees of the workspace's records: what a member, a connection, and a group are called, what letters
+ * mark them, and
  * where a group is as a line says it, who wrote a message and what it says, as the markdown a view shows and as the
  * words it comes to without its syntax, with a mention in it as its member's current name, when a time was, by its time
  * of day, short or whole, its day, either as a message shows it, and how long ago it was, the date something was made,
@@ -14,6 +15,7 @@ import type { Contact } from "@amends-dev/core/channel"
 import type { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import type { Presence } from "@amends-dev/core/presence"
+import type { ReplicaRecord } from "@amends-dev/core/replica"
 import type { Task } from "@amends-dev/core/task"
 import { type Thread, type ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
@@ -226,6 +228,12 @@ export const memberMark = (member: Member.Member): MarkContent => ({
 /** `memberId` by their name among `members`, or their ID until names are read. */
 export const memberName = (members: ReadonlyArray<Member.Member>, memberId: MemberId.MemberId): string =>
   members.find((member) => member.id === memberId)?.name ?? memberId
+
+/** What the connection `connectionId` is called among `connections`, or "Removed connection" once it is gone. */
+export const connectionNameIn = (
+  connections: ReadonlyArray<Pick<ReplicaRecord.Connection, "id" | "name">>,
+  connectionId: string
+): string => connections.find(({ id }) => id === connectionId)?.name ?? "Removed connection"
 
 /** A group's name: a team's own, or a conversation's other members than `self`, by their names. */
 export const groupName = (

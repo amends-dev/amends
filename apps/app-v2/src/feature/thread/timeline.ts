@@ -3,6 +3,7 @@
  * took on the work that did not reply, and the notes of who followed the thread or stopped taking part in it.
  */
 
+import type { ReplicaRecord } from "@amends-dev/core/replica"
 import type { ThreadMessageId } from "@amends-dev/core/thread"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -65,19 +66,12 @@ export const timelineOf = (
   return { opening: Option.fromUndefinedOr(opening), after: after.toSorted(byWhenThenKind) }
 }
 
-/**
- * The turn that posted the message `messageId` as its reply, and whether it is the last of that turn's replies in
- * the thread.
- */
+/** The turn that posted the message `messageId` as its reply. */
 export const turnPostingReply = (
   model: Model,
   messageId: ThreadMessageId.ThreadMessageId
-): Option.Option<Readonly<{ item: TurnItem; isLast: boolean }>> =>
+): Option.Option<ReplicaRecord.Turn> =>
   Option.map(
     Option.fromUndefinedOr(model.turns.turns.find(({ turn }) => turn.messageIds.includes(messageId))),
-    (item) => ({
-      item,
-      isLast:
-        item.turn.messageIds.findLast((id) => model.messages.some(({ message }) => message.id === id)) === messageId
-    })
+    ({ turn }) => turn
   )

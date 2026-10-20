@@ -3,7 +3,7 @@ import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
-import { InboxComposition, selectNotification } from "./composition.ts"
+import { closeThread, InboxComposition, selectNotification } from "./composition.ts"
 import {
   InboxDefinition,
   isNotificationWaiting,
@@ -15,9 +15,6 @@ import {
   pageSize,
   threadOfNotification
 } from "./definition.ts"
-
-/** Close the thread opened beside the inbox, which leaves no notification selected. */
-const closeThread = InboxDefinition.stepFields(() => ({ selected: () => Option.none() }))
 
 /** Mark the notification `notificationId` seen, unless it already is. */
 const writeSeenWhenWaiting = (notificationId: Notification.NotificationId) =>

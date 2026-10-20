@@ -1,7 +1,7 @@
 /**
  * What a pane says about one thing: its facts as labelled values, a few properties under a caption each, a mark of
  * how it stands, where an agent's turn stands, a person it is about, the places an agent is at work, the people and
- * what stands for them that it lists, and the log an agent wrote.
+ * what stands for them that it lists.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -79,11 +79,6 @@ const entryBody = "flex min-w-0 flex-1 flex-col gap-2"
 const entryTitleLine = "flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1"
 
 const entryTitle = "min-w-0 text-item font-medium wrap-break-word text-ink"
-
-const logLook =
-  "m-0 max-h-60 list-none overflow-y-auto bg-subtle px-3 py-2 font-mono text-hint text-ink-secondary focus-ring"
-
-const logLine = "whitespace-pre-wrap wrap-break-word"
 
 export type BadgeTone = keyof typeof badgeTones
 
@@ -325,7 +320,7 @@ export type EntryConfig<Message> = EntryContent &
 /**
  * One item of an `entryList`, keyed by `key`: the `mark` letters at the start when it has them, then the
  * `title` with the `trailing` pieces after it, such as a `badge` or a quiet word, wrapping onto a new line
- * when they do not fit, and the `children` under it, such as a failure, buttons, or a `log`, 8px apart.
+ * when they do not fit, and the `children` under it, such as a failure or buttons, 8px apart.
  *
  * With `onClick` the whole entry is one button that sends it, with `key` as its id so that a field can name it
  * as its active descendant, filled on hover. While it `isActive` it is filled with `selected` and is
@@ -373,16 +368,3 @@ export const entry = <Message, Requirements>(
         ]
       )
 }
-
-/**
- * What an agent wrote as it worked, one `items` line each, in the mono font on `subtle`, an ordered list named
- * by `label`. It is 15rem tall at most and scrolls past that, with the keyboard too.
- */
-export const log = <Message, Requirements>(
-  h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; items: ReadonlyArray<string> }>
-): Html =>
-  h.ol(
-    [h.AriaLabel(config.label), h.Tabindex(0), h.Class(logLook)],
-    config.items.map((item) => h.li([h.Class(logLine)], [item]))
-  )

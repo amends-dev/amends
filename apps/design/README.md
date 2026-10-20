@@ -69,12 +69,12 @@ six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with
 tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls
 with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
-entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
+entries that are buttons, the second of them active, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as the threads of a group under their day, with the time of day after each author, a person's mark on the slate ground and an agent's on the lilac with its name in the agent's color, the task a thread tracks as a chip, the button that opens each thread, and a reply as the action the pointer brings up, the open thread's row filled and following a click; a person's messages within five minutes stacked under the one before; the button of a thread with replies, with one reply, three people, more people than it shows, replies not read yet, and while an agent works and someone types; a thread with no replies yet, with Reply in thread and what is going on beside it; the chip of a task in each drawing a status has; and, as a list, with a note,
 an edited mark after the text, a deleted message, actions, and meta, with a mention in the text as a chip, in a message and in
 the current row, with markdown in the text as blocks in a message and as a preview in a notification, with a form in place of the text, and set apart by dividers, centered and at the
-start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a turn's log opened under its row, a stop that did not go through, a turn that replied with View turn log among its message's actions and its log under it, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
+start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a stop that did not go through, a turn that replied with View turn log among its message's actions, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
@@ -205,7 +205,7 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   it, in the label's color; the label still names the button, and the icon is hidden from assistive
   technology. `options.name` is what assistive technology calls the button when its label alone does not tell
   it from the buttons around it, such as "Revoke invitation for casey@mercier.example" for "Revoke"; it begins
-  with the label. `options.isExpanded` is for a button that shows or hides what is under it, such as a turn's log:
+  with the label. `options.isExpanded` is for a button that shows or hides what is under it:
   whether it is shown now, which it says as `aria-expanded` and draws with the `subtle` fill of a quiet button. The actions that create something use `mark-new`, which the reference's buttons use,
   not `plus`, which is smaller and lighter and has no mark's weight. `options.hasChevron` draws a chevron after the
   label and tightens the padding, for a button that opens a menu. A button is 36px tall, a quiet
@@ -875,8 +875,8 @@ What a pane says about one thing.
 - `entry(h, { key, mark?, title, trailing?, children? })` is one item of it, keyed by `key`: the `mark`
   letters, the `sm` mark, at the start when it has them, then a column of the `title` at item size in
   medium weight with the `trailing` pieces after it, wrapping onto a new line when they do not fit,
-  such as a `badge`, a `hint`, or `sending`, and under it the `children`, 8px apart, such as a failure,
-  a `buttonRow`, and a `log`. A row has 8px above and below. Given `onClick`, the whole entry is one
+  such as a `badge`, a `hint`, or `sending`, and under it the `children`, 8px apart, such as a failure
+  and a `buttonRow`. A row has 8px above and below. Given `onClick`, the whole entry is one
   button that sends it, with `key` as its id so that a field can name it as its active descendant,
   filled `hover` on hover and 12px in from the list's edge, and it has no `children`, since a button
   holds no buttons. The button is named by what is in it, its title and its trailing pieces. With
@@ -884,16 +884,13 @@ What a pane says about one thing.
   the arrow keys of the field above the list, whose focus stays in the field, and would open with Enter.
   (`aria-selected` is not for a button, so the entry says it is current, as the sidebar's and a
   message's current rows do.)
-- `log(h, { label, items })` is an `ol` named by `label` on `subtle`, one `items` line each in the mono
-  font at hint size, wrapping long lines. It is 15rem tall at most and scrolls past that, and takes
-  keyboard focus so a keyboard can scroll it.
 
 ### `@amends-dev/design/message`
 
 What a conversation is made of.
 
 - `messageList(h, { label, id?, children })` is an `ol` named by `label`, a column with no list style, of
-  `message`s, `notification`s, `divider`s, `event`s, `note`s, `turnRow`s, and `turnLog`s. Given an `id`, a Command can find
+  `message`s, `notification`s, `divider`s, `event`s, `note`s, and `turnRow`s. Given an `id`, a Command can find
   the list to keep the pane that scrolls around it at its end.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
   then a column of the author line, the text, and what lies under it. The mark is on the `slate` ground of a person,
@@ -993,7 +990,7 @@ What a conversation is made of.
   it at `meta` size in `ink-muted`, in a `time` element that is given the moment it was (`dateTime`) and a longer
   `title` for a tooltip, when the caller has them. It has 10px above and below, as a message's row does, and draws nothing before its words, which sets it apart from
   an `event`.
-- `turnRow(h, { key, label, mark, name, status, actions, detail?, detailAction?, problem?, children? })` is an agent's turn where it
+- `turnRow(h, { key, label, mark, name, status, actions, detail?, detailAction?, problem? })` is an agent's turn where it
   took on the work, an item of the list among its messages and notes, a `group` named `label` for assistive technology,
   such as "Atlas's turn", as `apps/ui`'s `TurnRow` draws it: the agent's `mark` at 24px in its lilac tone, the `name` at
   item size in medium weight in the agent's color (`text-agent`), the `status` after it (a `turnStatus`), and the
@@ -1001,13 +998,8 @@ What a conversation is made of.
   a line of their own under the name. Under the first line, in line with the name, 4px down, the `detail` says how the
   turn ended, such as "No reply posted.", at `control` size in `ink-secondary`, with the `detailAction`, a `lineButton`
   such as Agent settings, at its end, 12px from it, or under it below 48rem, and with no effect when there is no
-  `detail` to hold it; the `problem` says why a stop or retry
-  did not go through, at `control` size in the caution color, as an alert; and the `children` follow, 8px apart, such
-  as the turn's `log`.
-- `turnLog(h, { key, label, children })` is the log of the turn that posted the message above it, an item of the list
-  right under that message, 44px in from the list's edge so that it lies in line with the message's text and 10px
-  below, holding a `group` named `label` whose `children` are 8px apart, such as the `log` and where following it
-  stands.
+  `detail` to hold it; and the `problem` says why a stop or retry
+  did not go through, at `control` size in the caution color, as an alert.
 - `description(h, { text, body?, actions?, isCurrent? })` is the text that describes the thing a pane is about, such as
   a task: `text` at item size in `ink`, a `MessageText`, markdown as the blocks of `richText`, its line breaks kept and
   a mention in it a chip, as `apps/ui`'s task pane sets it, 11px under the `property` caption above it. `body` takes the text's place, such as
@@ -1405,7 +1397,7 @@ and values, a value that is a button, a person's mark in its size and tone, hidd
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
-those with a modifier, left to the browser, and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; the list under a
+those with a modifier, left to the browser; a grid's fields found by their labels; a field's `maxLength`; a choice group by `role("radiogroup", { name })` of `role("radio")`s with `aria-checked`, described by its hint, chosen by a click and moved by the arrow keys, and disabled as a whole; the members picker by its combobox found by its label and described by its hint, the locked chip with no Remove button, a chip for each person chosen with a Remove button named for them, the list of those not in the field with how many are available, narrowed by what is typed whatever its case, the line for none matching and for everyone being in, a click and Enter that pick, with the text emptied and the list kept open, Escape that closes it, and Backspace that removes the last chip in the empty field and leaves them while there is text; a count of members in the singular and the plural before a rule hidden from assistive technology; and a list of members by its name, a row each with its note, and a quiet button named for the person, dimmed while it is disabled; the list under a
 field of chips by the label of its search, with no combobox, the people offered as buttons named by their name and kind, how many are available, the
 line for none matching and for everyone being in, a pick that becomes a chip and leaves the list, and Backspace that removes the last chip in the empty
 input and leaves them while there is text; a

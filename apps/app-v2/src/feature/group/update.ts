@@ -11,7 +11,7 @@ import {
   RenameGroup,
   UnfollowGroup
 } from "./command.ts"
-import { DialogBinding, GroupComposition, MembersBinding } from "./composition.ts"
+import { closeThread, DialogBinding, GroupComposition, MembersBinding } from "./composition.ts"
 import {
   chooseToAdmit,
   GroupDefinition,
@@ -30,9 +30,6 @@ const inGroup = ({ workspaceId, memberId, groupId }: Model) => ({ workspaceId, m
 
 /** Show the settings' section `tab`. */
 const showSettingsTab = (tab: SettingsTab) => GroupDefinition.stepFields(() => ({ settingsTab: () => tab }))
-
-/** Close the thread open in the group. */
-const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Option.none() }))
 
 /** Start the draft of the team's name from its name, for someone who may rename the team, so its field is live. */
 const startRenaming = GroupDefinition.step((model: Model) => ({

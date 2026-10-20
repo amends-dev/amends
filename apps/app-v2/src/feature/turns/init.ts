@@ -13,6 +13,7 @@ export const init = TurnsComposition.makeInit(
       threadId,
       turns: [],
       members: [],
+      connections: [],
       grants: [],
       log: Option.none(),
       refused: [],

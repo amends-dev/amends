@@ -2,8 +2,8 @@
  * What a conversation is made of: the list of messages, each by its author with its time and, under the first
  * message of a thread, the task it tracks, the button that opens it with who replied to it and who is at work there,
  * the notifications that tell of them, the line that tells what happened to the thing the conversation is about, the
- * quiet line that tells who took part or stopped, an agent's turn where it took on the work and the log that follows
- * it, the text that describes it, and the rule that sets a part of the list apart, such as a day or the replies.
+ * quiet line that tells who took part or stopped, an agent's turn where it took on the work, the text that
+ * describes it, and the rule that sets a part of the list apart, such as a day or the replies.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -130,12 +130,6 @@ const turnDetail = "col-[2/-1] m-0 text-control text-ink-secondary"
 const turnDetailWithAction = `${turnDetail} flex items-baseline justify-between gap-3 max-tablet:flex-col max-tablet:gap-1`
 
 const turnProblem = "col-[2/-1] m-0 text-control text-caution-text"
-
-const turnUnder = "col-[2/-1] flex min-w-0 flex-col gap-2"
-
-const turnLogItem = "ps-11 pb-2.5"
-
-const turnLogLook = "flex min-w-0 flex-col gap-2"
 
 const dividerLine = "flex items-center gap-3 py-2.5 text-meta text-ink-muted uppercase"
 
@@ -707,8 +701,7 @@ const renderTurnDetail = <Message, Requirements>(
  * narrower than 22.5rem the actions drop to a line of their own under the name. Under the first line, 4px down and in
  * line with the name, the `detail` says how the turn ended, such as "No reply posted.", at `control` size in
  * `ink-secondary`, with the `detailAction`, such as a `lineButton`, at its end, 12px from it, or under it on a phone;
- * the `problem` says why a stop or retry did not go through, in the caution color, as an alert; and the `children`
- * follow, 8px apart.
+ * and the `problem` says why a stop or retry did not go through, in the caution color, as an alert.
  */
 export const turnRow = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -722,12 +715,9 @@ export const turnRow = <Message, Requirements>(
     detail?: string | undefined
     detailAction?: Html | undefined
     problem?: string | undefined
-    children?: ReadonlyArray<Html>
   }>
-): Html => {
-  const children = config.children ?? []
-
-  return h.keyed("li")(
+): Html =>
+  h.keyed("li")(
     config.key,
     [h.Class(turnFrame)],
     [
@@ -738,27 +728,10 @@ export const turnRow = <Message, Requirements>(
           h.span([h.Class(turnWho)], [h.span([h.Class(turnName)], [config.name]), config.status]),
           config.actions.length === 0 ? h.empty : h.div([h.Class(turnActions)], config.actions),
           renderTurnDetail(h, config.detail, config.detailAction),
-          config.problem === undefined ? h.empty : h.p([h.Role("alert"), h.Class(turnProblem)], [config.problem]),
-          children.length === 0 ? h.empty : h.div([h.Class(turnUnder)], children)
+          config.problem === undefined ? h.empty : h.p([h.Role("alert"), h.Class(turnProblem)], [config.problem])
         ]
       )
     ]
-  )
-}
-
-/**
- * The log of the turn that posted the message above it, an item of a `messageList` right under that message, a group
- * named `label` in line with the message's text, 44px from the list's edge, its `children` 8px apart, such as the `log`
- * and where following it stands.
- */
-export const turnLog = <Message, Requirements>(
-  h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ key: string; label: string; children: ReadonlyArray<Html> }>
-): Html =>
-  h.keyed("li")(
-    config.key,
-    [h.Class(turnLogItem)],
-    [h.div([h.Role("group"), h.AriaLabel(config.label), h.Class(turnLogLook)], config.children)]
   )
 
 /**

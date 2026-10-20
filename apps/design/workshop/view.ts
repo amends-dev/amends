@@ -36,7 +36,6 @@ import {
   detailList,
   entry,
   entryList,
-  log,
   person,
   properties,
   property,
@@ -104,7 +103,6 @@ import {
   replyInThreadButton,
   taskChip,
   type ThreadWork,
-  turnLog,
   turnRow
 } from "../src/message.ts"
 import { type ModalRender, modal, modalList } from "../src/modal.ts"
@@ -2481,24 +2479,11 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A turn's log opened under its row, and the row of a stop that did not go through",
+      "The row of a stop that did not go through",
       [
         messageList(h, {
-          label: "Opened turn",
+          label: "Refused turn",
           children: [
-            turnRow(h, {
-              key: "opened",
-              label: "Atlas's turn",
-              mark: "A",
-              name: "Atlas",
-              status: turnStatus(h, "failed"),
-              actions: [
-                button(h, "View log", press, { variant: "quiet", isExpanded: true }),
-                button(h, "Retry", press)
-              ],
-              detail: "The model provider is unavailable.",
-              children: [log(h, { label: "Log", items: logLines }), hint(h, "The turn has ended.")]
-            }),
             turnRow(h, {
               key: "refused",
               label: "Yumi's turn",
@@ -2506,7 +2491,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               name: "Yumi",
               status: turnStatus(h, "working"),
               actions: [
-                button(h, "View log", press, { variant: "quiet", isExpanded: false }),
+                button(h, "View log", press, { variant: "quiet" }),
                 button(h, "Stop", press, { name: "Stop Yumi" })
               ],
               problem: "This turn has already finished."
@@ -2518,7 +2503,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A turn that replied is its reply, with View turn log among the message's actions, and its log under it",
+      "A turn that replied is its reply, with View turn log among the message's actions",
       [
         messageList(h, {
           label: "Reply",
@@ -2529,12 +2514,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "Atlas",
               time: "9:28 AM",
               text: "Deploy the API first, verify compatibility, then release clients on Thursday.",
-              actions: [iconButton(h, { icon: "list", label: "View turn log", onClick: press }, { isPressed: true })]
-            }),
-            turnLog(h, {
-              key: "reply-log",
-              label: "Atlas's turn log",
-              children: [log(h, { label: "Log", items: logLines }), hint(h, "The turn has ended.")]
+              actions: [iconButton(h, { icon: "list", label: "View turn log", onClick: press })]
             })
           ]
         })
@@ -2580,7 +2560,7 @@ const turnStates: ReadonlyArray<TurnState> = ["queued", "working", "stopping", "
 /** An agent's turn in each state, with what it offers and says, as a thread's list holds them. */
 const turnRowSamples = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
   const press = Message.ClickedButton()
-  const viewLog = button(h, "View log", press, { variant: "quiet", isExpanded: false })
+  const viewLog = button(h, "View log", press, { variant: "quiet" })
   const row = (
     key: string,
     name: string,
@@ -4781,17 +4761,6 @@ const longConfirmation = (h: ApplicationViewBuilder): Html =>
     action: { label: "Undo", onClick: Message.ClickedButton() }
   })
 
-const logLines: ReadonlyArray<string> = [
-  "Read 2 messages",
-  "Replied: Reproduced on both. Images over 5 MB hit the crash.",
-  "Stopped short: The model was unavailable."
-]
-
-const longLogLines: ReadonlyArray<string> = Array.from(
-  { length: 24 },
-  (_, index) => `Read ${index + 1} ${index === 0 ? "message" : "messages"}`
-)
-
 const turnEntries = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
   const press = Message.ClickedButton()
 
@@ -4817,10 +4786,8 @@ const turnEntries = (h: ApplicationViewBuilder): ReadonlyArray<Html> => {
         notice(h, Option.some("The model was unavailable.")),
         buttonRow(h, [
           button(h, "Run again", press, { variant: "quiet" }),
-          button(h, "Hide log", press, { variant: "quiet" })
-        ]),
-        log(h, { label: "Log", items: logLines }),
-        hint(h, "The turn has ended.")
+          button(h, "Show log", press, { variant: "quiet" })
+        ])
       ]
     }),
     entry(h, {
@@ -4996,8 +4963,6 @@ const detailsGroup = (
       ],
       sidePaneColumn
     ),
-    sample(h, "Log", [log(h, { label: "Log", items: logLines })], sidePaneColumn),
-    sample(h, "Log, scrolling past 15rem", [log(h, { label: "Long log", items: longLogLines })], sidePaneColumn),
     sample(
       h,
       "Pane sections: a task to change, a task to read, and the turns",

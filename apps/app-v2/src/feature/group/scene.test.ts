@@ -18,6 +18,7 @@ import {
   click,
   expect,
   expectAll,
+  expectOutMessage,
   focus,
   given,
   inside,
@@ -48,12 +49,16 @@ import {
   saying,
   scout,
   task,
-  thread
+  thread,
+  turnOf
 } from "../../../test/fixtures.ts"
 import { pickerClosed, pickerEnded, pickerOpened, pickerPicked, pickerReady } from "../../../test/memberPickerSteps.ts"
 import { panelIs } from "../../../test/panelSize.ts"
+import { ThreadBlock } from "../thread/block.ts"
+import { ScrollMessagesToEnd } from "../thread/command.ts"
 import { ThreadsBlock } from "../threads/block.ts"
 import { ScrollThreadsToEnd } from "../threads/command.ts"
+import { LogState } from "../turns/definition.ts"
 import {
   AdmitMembers,
   FocusAdmitMembers,
@@ -64,7 +69,7 @@ import {
   RenameGroup,
   UnfollowGroup
 } from "./command.ts"
-import { Message, type Model } from "./definition.ts"
+import { Message, type Model, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import * as GroupView from "./view.ts"
@@ -1488,6 +1493,63 @@ describe("a group's side pane", () => {
 
   it("renders nothing while no thread is open", () => {
     scene({ update, view: sidePane }, given(opened), expect(role("complementary")).toBeAbsent())
+  })
+})
+
+describe("a group's side pane, while the log of a turn is followed", () => {
+  const replied = turnOf("turn-1", "completed", { messageIds: ["message-2"], finishedAt: "2026-10-18T12:07:00Z" })
+
+  /** The team with the thread open and the log of the turn that replied in it followed. */
+  const withTurnLog = modifyFields(withThread, {
+    thread: Option.map((open) => ({
+      ...open,
+      model: {
+        ...open.model,
+        turns: modifyFields(open.model.turns, {
+          turns: () => [{ turn: replied, pending: false, retryOpen: false }],
+          members: () => [member, bob, scout],
+          log: () => Option.some({ turnId: replied.id, items: [], state: LogState.Following(), hasNewActivity: false })
+        })
+      }
+    }))
+  })
+
+  const backToThread = [
+    Command.expectExact(ScrollMessagesToEnd({ threadId, onlyIfNearEnd: false })),
+    Command.resolve(ScrollMessagesToEnd, ThreadBlock.Message.CompletedScrollMessagesToEnd())
+  ]
+
+  it("is the turn log in place of the thread, saying where the thread is", () => {
+    scene(
+      { update, view: sidePane },
+      given(withTurnLog),
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      expect(within(role("complementary", { name: "Turn log" }), text("Thread in #Design"))).toExist(),
+      expect(role("complementary", { name: "Thread" })).toBeAbsent(),
+      expect(role("form", { name: "Reply in thread" })).toBeAbsent()
+    )
+  })
+
+  it("goes back to the thread, which is where it was and shows no log", () => {
+    scene(
+      { update, view: sidePane },
+      given(withTurnLog),
+      click(role("button", { name: "Back to thread" })),
+      ...backToThread,
+      expect(role("complementary", { name: "Turn log" })).toBeAbsent(),
+      expect(role("complementary", { name: "Thread" })).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), role("list", { name: "Messages" }))).toExist()
+    )
+  })
+
+  it("closes the thread with the log, which the page is told", () => {
+    scene(
+      { update, view: sidePane },
+      given(withTurnLog),
+      click(role("button", { name: "Close turn log" })),
+      expectOutMessage(OutMessage.ClosedThread()),
+      expect(role("complementary")).toBeAbsent()
+    )
   })
 })
 

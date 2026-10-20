@@ -6,7 +6,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button, lineButton } from "./control.ts"
-import { log, turnStatus } from "./details.ts"
+import { turnStatus } from "./details.ts"
 import type { MarkContent } from "./mark.ts"
 import {
   description,
@@ -20,7 +20,6 @@ import {
   repliesButton,
   replyInThreadButton,
   taskChip,
-  turnLog,
   turnRow
 } from "./message.ts"
 
@@ -1392,8 +1391,7 @@ describe("turnRow", () => {
             button(h, "Retry", Message.ClickedEdit({ key: "turn-1" }))
           ],
           detail: "The model provider is unavailable.",
-          problem: "Couldn't start another attempt. Try again.",
-          children: [log(h, { label: "Log", items: ["Read 3 messages"] })]
+          problem: "Couldn't start another attempt. Try again."
         })
       ]
     })
@@ -1528,14 +1526,6 @@ describe("turnRow", () => {
     )
   })
 
-  it("holds its children, such as the log, under all that", () => {
-    scene(
-      { update, view: viewOf(turn) },
-      given(initial),
-      expect(within(role("group", { name: "Atlas's turn" }), role("list", { name: "Log" }))).toExist()
-    )
-  })
-
   it("has no line, alert, or actions of its own when it has nothing to say or do", () => {
     scene(
       { update, view: viewOf(bare) },
@@ -1543,33 +1533,6 @@ describe("turnRow", () => {
       expect(role("alert")).toBeAbsent(),
       expect(role("button")).toBeAbsent(),
       expect(within(role("group", { name: "Atlas's turn" }), selector("p"))).toBeAbsent()
-    )
-  })
-})
-
-describe("turnLog", () => {
-  const logged = (_: Model, h: HtmlBuilder<Message>) =>
-    messageList(h, {
-      label: "Thread",
-      children: [
-        message(h, { key: "reply", mark: "A", author: "Atlas", text: "Deploy the API first." }),
-        turnLog(h, {
-          key: "reply-log",
-          label: "Atlas's turn log",
-          children: [log(h, { label: "Log", items: ["Read 3 messages", "Replied: Deploy the API first."] })]
-        })
-      ]
-    })
-
-  it("is an item of the list under the message that was posted, a group in line with the message's text", () => {
-    scene(
-      { update, view: viewOf(logged) },
-      given(initial),
-      expect(within(role("list", { name: "Thread" }), role("group", { name: "Atlas's turn log" }))).toExist(),
-      expect(nth(all.role("listitem"), 1)).toHaveClass("ps-11"),
-      expect(nth(all.role("listitem"), 1)).toHaveClass("pb-2.5"),
-      expect(within(role("group", { name: "Atlas's turn log" }), role("list", { name: "Log" }))).toExist(),
-      expect(text("Read 3 messages")).toExist()
     )
   })
 })

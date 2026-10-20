@@ -2,7 +2,9 @@
  * A thread as the person reads and takes part in it: its title and messages, their part in it, how
  * far they have read, who types there, the task it tracks, its agents' turns, and a composer to
  * reply. They rename it, edit and delete their own messages, and follow it or stop; reading it
- * marks it read through its latest activity.
+ * marks it read through its latest activity. The side pane shows the log of one of its turns in its place while the
+ * person follows it, and the thread goes back to its end when they return to it; it reports when they close the log,
+ * which leaves the thread too.
  */
 
 import { Contact } from "@amends-dev/core/channel"
@@ -19,7 +21,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { memberName, messageWords, typingNames } from "../../seen.ts"
+import { memberName, messageWords, type SideAbout, typingNames } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
@@ -133,7 +135,19 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-export const ThreadDefinition = Block.makeDefinition("Thread", { Model, Message, ChildInitContext })
+/** The thread reports that the person closed the log of a turn, which leaves the thread too. */
+export const OutMessage = defineMessageUnion({
+  ClosedTurnLog: {}
+})
+export type OutMessage = typeof OutMessage.Type
+
+export const ThreadDefinition = Block.makeDefinition("Thread", { Model, Message, OutMessage, ChildInitContext })
+
+/** Whether the log of a turn is open, which the side pane shows in place of the thread. */
+export const hasTurnLog = (model: Model): boolean => Option.isSome(model.turns.log)
+
+/** What a side pane is about: the task the thread tracks, or the thread. */
+export const aboutOf = (model: Model): SideAbout => (Option.isSome(model.task.task) ? "Task" : "Thread")
 
 /** The `id` of the list of the messages of `threadId`, which the scroll that keeps it at its end finds it by. */
 export const messagesListId = (threadId: ThreadId.ThreadId): string => `thread-messages-${threadId}`

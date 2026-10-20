@@ -35,10 +35,11 @@ import {
   typingLine,
   whenLabel
 } from "../../seen.ts"
-import { replyActionView, replyLogView } from "../turns/view.ts"
+import { logPaneView, replyActionView } from "../turns/view.ts"
 import { RevealHighlightedMessage } from "./command.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import {
+  aboutOf,
   type Availability,
   availabilityOf,
   Message,
@@ -170,7 +171,7 @@ const messageView = (
   const { body, actions } = editControls(item, model, h)
   const turnActions = Option.match(turnPostingReply(model, item.message.id), {
     onNone: () => [],
-    onSome: ({ item: { turn } }) => [
+    onSome: (turn) => [
       h.block(
         TurnsBinding.embedView({
           slotId: `turn-log-action-${item.message.id}`,
@@ -199,36 +200,6 @@ const messageView = (
 }
 
 /**
- * A message of the timeline, and under it, when it is the last reply of an agent's turn, that turn's log while it is
- * followed.
- */
-const postedView = (
-  item: MessageItem,
-  model: Model,
-  inputs: ViewInputs,
-  timeLabel: TimeLabel,
-  h: ThreadViewBuilder
-): ReadonlyArray<Html> => [
-  messageView(item, model, inputs, timeLabel, h),
-  ...Option.match(turnPostingReply(model, item.message.id), {
-    onNone: () => [],
-    onSome: ({ item: { turn }, isLast }) =>
-      isLast
-        ? [
-            h.block(
-              TurnsBinding.embedView({
-                slotId: `turn-log-${turn.id}`,
-                model: model.turns,
-                view: replyLogView,
-                viewInputs: { turnId: turn.id }
-              })
-            )
-          ]
-        : []
-  })
-]
-
-/**
  * An entry of the timeline: a message, the row of the agent's turn where it took on the work, which the turns Block
  * draws, or the quiet line of who followed the thread or stopped taking part in it.
  */
@@ -240,7 +211,7 @@ const entryView = (
   h: ThreadViewBuilder
 ): ReadonlyArray<Html> =>
   Entry.match(entry, {
-    Posted: ({ item }) => postedView(item, model, inputs, timeLabel, h),
+    Posted: ({ item }) => [messageView(item, model, inputs, timeLabel, h)],
     Noted: ({ change }) => [
       note(h, {
         key: change.id,
@@ -417,6 +388,14 @@ export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, in
   )
 })
 
+/** Where the turn log is, such as "Thread in #general", which its summary says first. */
+export type TurnLogInputs = Readonly<{ where: string }>
+
+/** The log of the turn the person follows, which the turns Block draws as the side pane, in place of the thread. */
+export const turnLogView = ThreadComposition.makeView.withInputs<TurnLogInputs>((model, { where }, h) =>
+  h.block(TurnsBinding.embedView({ slotId: "turn-log", model: model.turns, view: logPaneView, viewInputs: { where } }))
+)
+
 /** The composer to reply in the thread, for a pane's footer. */
 export const replyView = ThreadComposition.makeView((model, h) =>
   h.block(
@@ -464,7 +443,7 @@ export const sidePane = <Message, Requirements>(
   config: SidePane<Message>
 ): Html => {
   const tracked = Option.map(config.thread.task.task, ({ task }) => task)
-  const about = Option.isSome(tracked) ? "Task" : "Thread"
+  const about = aboutOf(config.thread)
   const availability = availabilityOf(config.thread)
 
   return pane(h, {

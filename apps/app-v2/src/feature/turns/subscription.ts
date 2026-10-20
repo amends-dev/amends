@@ -1,23 +1,37 @@
 /**
- * The thread's turns, the workspace's members, what the person may do, and the stops and retries the server refused,
- * read from their store as they change; and the log of the turn they follow, read over HTTP while it is followed,
- * since no replica holds it.
+ * The thread's turns, the workspace's members and connections, what the person may do, and the stops and retries the
+ * server refused, read from their store as they change; and the log of the turn they follow, read over HTTP while it is
+ * followed, since no replica holds it.
  */
 
+import { CoreError } from "@amends-dev/core/error"
 import { ThreadId } from "@amends-dev/core/thread"
-import { TurnId } from "@amends-dev/core/turn"
+import { type Turn, TurnId } from "@amends-dev/core/turn"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Api from "../../api.ts"
+import * as Store from "../../store/Store.ts"
 import * as Stores from "../../store/Stores.ts"
 import { followed, Message, TurnsDefinition } from "./definition.ts"
 import { refusalsOf } from "./problem.ts"
 
 /** How the person reads that a log could not be followed. */
 const unfollowable = "The log could not be followed. Check the connection."
+
+/**
+ * What following a turn's log through `logMessages` tells the Block: each message of the log, and, when it fails, that
+ * the log is out of reach, as it is for a turn in a thread the person can no longer open, or that it could not be
+ * followed.
+ */
+export const logMessagesOf = <E, R>(turnId: TurnId.TurnId, logMessages: Stream.Stream<Turn.LogMessage, E, R>) =>
+  logMessages.pipe(
+    Stream.map((logMessage) => Message.ReceivedLog({ turnId, logMessage })),
+    Stream.catchIf(Schema.is(CoreError.NotFound), () => Stream.make(Message.FoundLogUnavailable({ turnId }))),
+    Stream.catchCause(() => Stream.make(Message.FailedFollowLog({ turnId, error: unfollowable })))
+  )
 
 export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
   turns: entry(
@@ -27,6 +41,7 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
       messages: [
         Message.ReceivedTurns,
         Message.ReceivedMembers,
+        Message.ReceivedConnections,
         Message.ReceivedGrants,
         Message.ReceivedRefusals,
         Message.FailedRead
@@ -50,8 +65,19 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
                 Stream.merge(
                   Stream.map(store.members, (members) => Message.ReceivedMembers({ members })),
                   Stream.merge(
-                    Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants })),
-                    Stream.map(store.actions, (actions) => Message.ReceivedRefusals({ refusals: refusalsOf(actions) }))
+                    Stream.map(store.list("Connection", Store.workspacePlace), (connections) =>
+                      Message.ReceivedConnections({
+                        connections: connections
+                          .filter(({ record }) => record.value.status === "active")
+                          .map(({ record }) => record.value)
+                      })
+                    ),
+                    Stream.merge(
+                      Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants })),
+                      Stream.map(store.actions, (actions) =>
+                        Message.ReceivedRefusals({ refusals: refusalsOf(actions) })
+                      )
+                    )
                   )
                 )
               )
@@ -65,7 +91,7 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
     "FollowLog",
     { workspaceId: WorkspaceId.WorkspaceId, turnId: Schema.NullOr(TurnId.TurnId) },
     {
-      messages: [Message.ReceivedLog, Message.FailedFollowLog],
+      messages: [Message.ReceivedLog, Message.FoundLogUnavailable, Message.FailedFollowLog],
       modelToDependencies: (model) => ({
         workspaceId: model.workspaceId,
         turnId: Option.getOrNull(followed(model))
@@ -74,11 +100,11 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
         return ({ workspaceId, turnId }) =>
           turnId === null
             ? Stream.empty
-            : Stream.unwrap(
-                Effect.flatMap(Api.asMember(workspaceId), (client) => client.turns.watchLog({ params: { turnId } }))
-              ).pipe(
-                Stream.map((logMessage) => Message.ReceivedLog({ turnId, logMessage })),
-                Stream.catchCause(() => Stream.make(Message.FailedFollowLog({ turnId, error: unfollowable })))
+            : logMessagesOf(
+                turnId,
+                Stream.unwrap(
+                  Effect.flatMap(Api.asMember(workspaceId), (client) => client.turns.watchLog({ params: { turnId } }))
+                )
               )
       }
     }

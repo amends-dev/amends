@@ -5,6 +5,7 @@ import {
   ThreadMessageId,
   ThreadParticipationId
 } from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { DateTime, Option, Schema } from "effect"
@@ -16,6 +17,7 @@ import {
   click,
   expect,
   expectAll,
+  expectOutMessage,
   given,
   label,
   nth,
@@ -34,6 +36,7 @@ import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
 import { TurnsBlock } from "../turns/block.ts"
+import { ScrollLogToEnd } from "../turns/command.ts"
 import { subscriptions as turnsSubscriptions } from "../turns/subscription.ts"
 import { ThreadBlock } from "./block.ts"
 import {
@@ -47,11 +50,17 @@ import {
   TellTyping,
   UnfollowThread
 } from "./command.ts"
-import { type Following, Message, type ParticipationChange, type ParticipationChangeKind } from "./definition.ts"
+import {
+  type Following,
+  Message,
+  OutMessage,
+  type ParticipationChange,
+  type ParticipationChangeKind
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { followView, replyView, view } from "./view.ts"
+import { followView, replyView, turnLogView, view } from "./view.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 const memberId = MemberId.MemberId.make("member-1")
@@ -101,6 +110,10 @@ const sceneView = withViewInputs(view, { now })()
 /** The side pane's bell, body and footer, as the group's side pane puts them. */
 const sidePane = (model: Parameters<typeof sceneView>[0], h: Parameters<typeof sceneView>[1]) =>
   h.div([], [followView(model, h), sceneView(model, h), replyView(model, h)])
+
+/** The side pane, and the log of a turn as the group puts it in place of the thread, so that both can be looked at. */
+const sidePaneAndTurnLog = (model: Parameters<typeof sceneView>[0], h: Parameters<typeof sceneView>[1]) =>
+  h.div([], [sidePane(model, h), withViewInputs(turnLogView, { where: "Thread in #general" })()(model, h)])
 
 /** The thread read with `messages`, written by alice and bob, whose names are read. */
 const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.ThreadMessage; pending: boolean }>>) => [
@@ -553,17 +566,68 @@ describe("a thread", () => {
       expect(role("group", { name: "Scout's turn" })).toBeAbsent(),
       expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist(),
       expectAll(all.role("button", { name: "View turn log" })).toHaveCount(1),
-      expect(role("button", { name: "View turn log" })).toHaveAttr("aria-pressed", "false"),
-      expect(role("group", { name: "Scout's turn log" })).toBeAbsent(),
-      click(role("button", { name: "View turn log" })),
-      expect(role("button", { name: "View turn log" })).toHaveAttr("aria-pressed", "true"),
-      expect(within(role("group", { name: "Scout's turn log" }), text("Opening the log…"))).toExist(),
-      // The log sits right under the message that was posted.
       expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
-      expect(within(nth(all.role("listitem"), 4), role("group", { name: "Scout's turn log" }))).toExist(),
+      expect(within(nth(all.role("listitem"), 3), role("button", { name: "View turn log" }))).toExist(),
+      // Its log is not drawn among the messages: it opens in the side pane.
       click(role("button", { name: "View turn log" })),
-      expect(role("group", { name: "Scout's turn log" })).toBeAbsent()
+      expect(role("group", { name: "Scout's turn log" })).toBeAbsent(),
+      expectAll(all.role("button", { name: "View turn log" })).toHaveCount(1)
     )
+  })
+
+  describe("the log of a turn, opened", () => {
+    const replied = turnOf("turn-1", "completed", { messageIds: ["message-2"], createdAt: "2026-10-18T12:02:00Z" })
+    const readyToOpen = [
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      ...turnsRead(replied)
+    ]
+
+    it("shows in the side pane, and goes back to the thread at its end", () => {
+      scene(
+        { update, view: sidePaneAndTurnLog, subscriptions: ThreadBlock.subscriptions },
+        ...readyToOpen,
+        expect(role("complementary", { name: "Turn log" })).toBeAbsent(),
+        click(role("button", { name: "View turn log" })),
+        expect(role("complementary", { name: "Turn log" })).toExist(),
+        expect(text("Loading the turn log…")).toExist(),
+        click(role("button", { name: "Back to thread" })),
+        Command.expectExact(ScrollMessagesToEnd({ threadId, onlyIfNearEnd: false })),
+        Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
+        expect(role("complementary", { name: "Turn log" })).toBeAbsent(),
+        expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist()
+      )
+    })
+
+    it("is reported closed, which leaves the thread too", () => {
+      scene(
+        { update, view: sidePaneAndTurnLog, subscriptions: ThreadBlock.subscriptions },
+        ...readyToOpen,
+        click(role("button", { name: "View turn log" })),
+        click(role("button", { name: "Close turn log" })),
+        expectOutMessage(OutMessage.ClosedTurnLog())
+      )
+    })
+
+    it("goes back to the thread from the reply it names", () => {
+      scene(
+        { update, view: sidePaneAndTurnLog, subscriptions: ThreadBlock.subscriptions },
+        ...readyToOpen,
+        click(role("button", { name: "View turn log" })),
+        Subscription.emit(
+          turnsSubscriptions.log,
+          TurnsBlock.Message.ReceivedLog({
+            turnId: replied.id,
+            logMessage: Turn.LogMessage.cases.Opened.make({ items: [] })
+          })
+        ),
+        Command.resolve(ScrollLogToEnd, TurnsBlock.Message.CompletedScrollLogToEnd()),
+        click(role("button", { name: "View reply in thread" })),
+        Command.expectExact(ScrollMessagesToEnd({ threadId, onlyIfNearEnd: false })),
+        Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
+        expect(role("complementary", { name: "Turn log" })).toBeAbsent()
+      )
+    })
   })
 
   it("says who followed the thread or stopped taking part in it, as the person or as someone else", () => {
@@ -660,16 +724,17 @@ describe("a thread", () => {
     )
   })
 
-  it("gives a turn's row its buttons and its log, which opens under the row", () => {
+  it("gives a turn's row its buttons, and its log opens in the side pane", () => {
     scene(
-      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      { update, view: sidePaneAndTurnLog, subscriptions: ThreadBlock.subscriptions },
       given(opened),
       ...readWith({ message: opening, pending: false }),
       ...turnsRead(turnOf("turn-1", "running")),
       expect(within(role("group", { name: "Scout's turn" }), text("Scout"))).toExist(),
       expect(within(role("group", { name: "Scout's turn" }), role("status"))).toHaveText("Working"),
       click(role("button", { name: "View log" })),
-      expect(within(role("group", { name: "Scout's turn" }), text("Opening the log…"))).toExist()
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      expect(within(role("group", { name: "Scout's turn" }), text("Loading the turn log…"))).toBeAbsent()
     )
   })
 

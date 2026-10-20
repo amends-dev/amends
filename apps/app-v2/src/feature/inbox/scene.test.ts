@@ -37,13 +37,15 @@ import {
   saying,
   scout,
   task,
-  thread
+  thread,
+  turnOf
 } from "../../../test/fixtures.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { ReadDraft } from "../composer/command.ts"
 import { ThreadBlock } from "../thread/block.ts"
-import { RevealHighlightedMessage } from "../thread/command.ts"
+import { RevealHighlightedMessage, ScrollMessagesToEnd } from "../thread/command.ts"
 import { init as initThread } from "../thread/init.ts"
+import { LogState } from "../turns/definition.ts"
 import { InboxBlock } from "./block.ts"
 import { MarkAllNotificationsSeen, MarkNotificationSeen } from "./command.ts"
 import { Message, OutMessage, pageSize } from "./definition.ts"
@@ -864,5 +866,59 @@ describe("the inbox's side pane", () => {
 
   it("renders nothing while no thread is open", () => {
     scene({ update, view: sidePane }, given(opened), expect(role("complementary")).toBeAbsent())
+  })
+})
+
+describe("the inbox's side pane, while the log of a turn is followed", () => {
+  const replied = turnOf("turn-1", "completed", { messageIds: ["message-2"], finishedAt: "2026-10-18T12:07:00Z" })
+
+  /** The inbox with the notification's thread open and the log of the turn that replied in it followed. */
+  const withTurnLog = modifyFields(opened, {
+    selected: () =>
+      Option.map(selectedOf(notification.id), (selected) => ({
+        ...selected,
+        model: modifyFields(selected.model, {
+          turns: (turns) =>
+            modifyFields(turns, {
+              turns: () => [{ turn: replied, pending: false, retryOpen: false }],
+              members: () => [member, bob, scout],
+              log: () =>
+                Option.some({ turnId: replied.id, items: [], state: LogState.Following(), hasNewActivity: false })
+            })
+        })
+      }))
+  })
+
+  it("is the turn log in place of the thread, saying where the thread is", () => {
+    scene(
+      { update, view: sidePane },
+      given(withTurnLog),
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      expect(within(role("complementary", { name: "Turn log" }), text("Thread in #General"))).toExist(),
+      expect(role("complementary", { name: "Thread" })).toBeAbsent()
+    )
+  })
+
+  it("goes back to the thread, which shows no log", () => {
+    scene(
+      { update, view: sidePane },
+      given(withTurnLog),
+      click(role("button", { name: "Back to thread" })),
+      Command.expectExact(ScrollMessagesToEnd({ threadId: thread.id, onlyIfNearEnd: false })),
+      Command.resolve(ScrollMessagesToEnd, ThreadBlock.Message.CompletedScrollMessagesToEnd()),
+      revealed,
+      expect(role("complementary", { name: "Turn log" })).toBeAbsent(),
+      expect(role("complementary", { name: "Thread" })).toExist()
+    )
+  })
+
+  it("closes the thread with the log, which the page is told", () => {
+    scene(
+      { update, view: sidePane },
+      given(withTurnLog),
+      click(role("button", { name: "Close turn log" })),
+      expectOutMessage(OutMessage.ClosedThread()),
+      expect(role("complementary")).toBeAbsent()
+    )
   })
 })
