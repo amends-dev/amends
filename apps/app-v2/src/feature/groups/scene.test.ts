@@ -11,6 +11,7 @@ import {
   click,
   expect,
   expectAll,
+  expectNoOutMessage,
   expectOutMessage,
   given,
   label,
@@ -27,7 +28,7 @@ import {
 import { modifyFields } from "foldkit/struct"
 import { aliceInDesign, aliceInGeneral, art, bob, design, general, membership } from "../../../test/fixtures.ts"
 import { GroupsBlock } from "./block.ts"
-import { CreateTeam, StartConversation } from "./command.ts"
+import { CreateTeam, JoinGroup, StartConversation } from "./command.ts"
 import { Message, OutMessage, Starting } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
@@ -470,8 +471,34 @@ describe("the sidebar's way to browse", () => {
   })
 })
 
+/** A public team named `name`, which the person made. */
+const publicTeam = (id: string, name: string) =>
+  Schema.decodeSync(Group.Group)({
+    id,
+    workspaceId: "workspace-1",
+    kind: "Team",
+    visibility: "Public",
+    name,
+    createdBy: "member-1",
+    createdAt: "2026-10-18T12:00:00Z"
+  })
+
+/** The groups before they are read: nothing listed, and no reason yet why. */
+const unread = init(workspace.id, member.id).model
+
+/** The groups read, with the person in every public team there is, so there is none to join. */
+const joinedEveryPublicTeam = modifyFields(listed, {
+  memberships: (memberships) => [...memberships, admittedTo(announcements.id)]
+})
+
+/** The groups read, on the Discover tab. */
+const discovering = modifyFields(listed, { browse: (browse) => modifyFields(browse, { tab: () => "Discover" }) })
+
+/** What joining the public team `announcements` asks the person's store to write. */
+const joinAnnouncements = JoinGroup({ workspaceId: workspace.id, memberId: member.id, groupId: announcements.id })
+
 describe("the browse page", () => {
-  it("is the main pane, titled Groups, with the groups the person belongs to on its first tab", () => {
+  it("is the main pane, titled Groups, with the teams the person belongs to on its first tab", () => {
     scene(
       { update, view: browseView },
       given(withConversation),
@@ -480,46 +507,80 @@ describe("the browse page", () => {
       expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-selected", "true"),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "false"),
       expect(text("Public and private groups you've joined.")).toExist(),
-      expect(text("3 groups")).toExist()
+      expect(text("2 groups")).toExist(),
+      expect(role("list", { name: "Your groups" })).toExist(),
+      expect(role("button", { name: "Bob" })).toBeAbsent()
     )
   })
 
-  it("counts each tab, the groups the person belongs to, and the public teams they may join", () => {
+  it("counts each tab, the teams the person belongs to and the public teams they may join, once they are read", () => {
     scene(
       { update, view: browseView },
       given(withConversation),
-      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "3"),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "2"),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "1")
     )
+    scene(
+      { update, view: browseView },
+      given(unread),
+      expect(role("tab", { name: "Your groups" })).not.toHaveAttr("aria-description"),
+      expect(role("tab", { name: "Discover" })).not.toHaveAttr("aria-description")
+    )
   })
 
-  it("lists each group with its mark, its visibility, and its members, a team by # and a conversation by letters", () => {
+  it("lists each team with the channel's drawing, its visibility, and its members, and Open → to open it", () => {
     scene(
       { update, view: browseView },
       given(withConversation),
-      expect(role("list", { name: "Groups" })).toExist(),
       expect(role("button", { name: "General" })).toHaveAttr("aria-description", "Public · 2 members"),
       expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "Private · 1 member"),
-      expect(role("button", { name: "Bob" })).toHaveAttr("aria-description", "Direct · 2 members"),
-      expect(within(role("button", { name: "Design" }), text("#"))).toExist(),
+      expect(within(role("button", { name: "Design" }), selector("svg"))).toExist(),
+      expect(within(role("button", { name: "Design" }), text("#"))).toBeAbsent(),
       expect(within(role("button", { name: "Design" }), text("Private"))).toExist(),
       expect(within(role("button", { name: "Design" }), text("1 member"))).toExist(),
       expect(within(role("button", { name: "Design" }), text("Open →"))).toExist(),
-      expect(within(role("button", { name: "Bob" }), text("B"))).toExist(),
-      expect(within(role("button", { name: "Bob" }), text("Direct"))).toExist(),
-      expect(role("button", { name: "Announcements" })).toBeAbsent()
+      expect(role("button", { name: "Announcements" })).toBeAbsent(),
+      expectAll(all.role("button", { name: /^Join/ })).toHaveCount(0)
     )
   })
 
-  it("lists the public teams the person may join on the Discover tab", () => {
+  it("lists the teams with general first and then by name, in any case and whatever the accents", () => {
+    const teams = [
+      privateTeam("zebra", "Zebra"),
+      privateTeam("emile", "Émile"),
+      privateTeam("general", "general"),
+      privateTeam("emma", "emma"),
+      privateTeam("alpha", "alpha")
+    ]
+    const belonging = modifyFields(unread, {
+      isLoaded: () => true,
+      groups: () => teams.map((group) => ({ group, pending: false, members: 1 })),
+      memberships: () => teams.map(({ id }) => admittedTo(id))
+    })
+
+    scene(
+      { update, view: browseView },
+      given(belonging),
+      expect(nth(all.selector("li button"), 0)).toHaveAttr("aria-label", "general"),
+      expect(nth(all.selector("li button"), 1)).toHaveAttr("aria-label", "alpha"),
+      expect(nth(all.selector("li button"), 2)).toHaveAttr("aria-label", "Émile"),
+      expect(nth(all.selector("li button"), 3)).toHaveAttr("aria-label", "emma"),
+      expect(nth(all.selector("li button"), 4)).toHaveAttr("aria-label", "Zebra")
+    )
+  })
+
+  it("lists the public teams the person may join on the Discover tab, each with Join in place of Open →", () => {
     scene(
       { update, view: browseView },
       given(withConversation),
       click(role("tab", { name: "Discover" })),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
-      expect(text("Public groups you can join.")).toExist(),
+      expect(text("Public groups you haven't joined. Join one to read its threads.")).toExist(),
       expect(text("1 group")).toExist(),
+      expect(role("list", { name: "Public groups" })).toExist(),
       expect(role("button", { name: "Announcements" })).toHaveAttr("aria-description", "Public · 3 members"),
+      expect(role("button", { name: "Join #Announcements" })).toHaveText("Join"),
+      expect(within(role("button", { name: "Announcements" }), text("Open →"))).toBeAbsent(),
       expect(role("button", { name: "General" })).toBeAbsent(),
       expect(role("button", { name: "Bob" })).toBeAbsent()
     )
@@ -531,11 +592,11 @@ describe("the browse page", () => {
       given(listed),
       expect(label("Search groups")).toHaveAttr("placeholder", "Search your groups…"),
       click(role("tab", { name: "Discover" })),
-      expect(label("Search groups")).toHaveAttr("placeholder", "Search groups to join…")
+      expect(label("Search groups")).toHaveAttr("placeholder", "Search public groups…")
     )
   })
 
-  it("narrows the tab to the groups whose name has the letters typed, in any case, a conversation by its members", () => {
+  it("narrows the tab to the teams whose name has the letters typed, in any case", () => {
     scene(
       { update, view: browseView },
       given(withConversation),
@@ -543,14 +604,11 @@ describe("the browse page", () => {
       expect(role("button", { name: "Design" })).toExist(),
       expect(role("button", { name: "General" })).toBeAbsent(),
       expect(text("1 group")).toExist(),
-      type(label("Search groups"), "bo"),
-      expect(role("button", { name: "Bob" })).toExist(),
-      expect(role("button", { name: "Design" })).toBeAbsent(),
       type(label("Search groups"), "  design "),
       expect(role("button", { name: "Design" })).toExist(),
       expect(text("1 group")).toExist(),
       type(label("Search groups"), "  "),
-      expect(text("3 groups")).toExist()
+      expect(text("2 groups")).toExist()
     )
   })
 
@@ -560,44 +618,209 @@ describe("the browse page", () => {
       given(withConversation),
       click(role("tab", { name: "Discover" })),
       type(label("Search groups"), "gen"),
-      expect(role("button", { name: "Announcements" })).toBeAbsent(),
+      expect(role("button", { name: "Join #Announcements" })).toBeAbsent(),
       expect(text("0 groups")).toExist(),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "1")
     )
   })
 
-  it("says no group matches a search that finds none, with what was typed", () => {
+  it("says no group matches a search that finds none, as a quiet line and not an empty state", () => {
     scene(
       { update, view: browseView },
       given(withConversation),
       type(label("Search groups"), "zzz"),
-      expect(role("heading", { name: "No groups match", level: 2 })).toExist(),
-      expect(art("nothing-here")).toExist(),
-      expect(text('Nothing matches "zzz".')).toExist(),
-      expect(role("list", { name: "Groups" })).toBeAbsent(),
+      expect(text("No groups match this search.")).toExist(),
+      expect(role("heading", { level: 2 })).toBeAbsent(),
+      expect(art("nothing-here")).toBeAbsent(),
+      expect(role("list", { name: "Your groups" })).toBeAbsent(),
       expect(text("0 groups")).toExist()
     )
   })
 
-  it("says there is nothing to discover while every public team is one the person is in", () => {
+  it("says the person has joined every public group while there is none to join, as a quiet line", () => {
     scene(
       { update, view: browseView },
-      given(modifyFields(listed, { groups: (groups) => groups.filter(({ group }) => group.id !== announcements.id) })),
+      given(joinedEveryPublicTeam),
       click(role("tab", { name: "Discover" })),
-      expect(role("heading", { name: "Nothing to discover", level: 2 })).toExist(),
-      expect(art("rest")).toExist(),
-      expect(text("Every public group is one you're in.")).toExist(),
+      expect(text("You've joined every public group.")).toExist(),
+      expect(role("heading", { level: 2 })).toBeAbsent(),
+      expect(art("rest")).toBeAbsent(),
       expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "0")
     )
   })
 
-  it("says the person is in no groups while the list of their groups is empty", () => {
+  it("says the person has joined no groups while the list of their teams is empty, as a quiet line", () => {
     scene(
       { update, view: browseView },
-      given(modifyFields(listed, { groups: () => [] })),
-      expect(role("heading", { name: "No groups yet", level: 2 })).toExist(),
-      expect(art("sew-in")).toExist(),
-      expect(text("The groups you join are listed here.")).toExist()
+      given(modifyFields(listed, { memberships: () => [] })),
+      expect(text("You haven't joined any groups yet.")).toExist(),
+      expect(role("heading", { level: 2 })).toBeAbsent(),
+      expect(art("sew-in")).toBeAbsent(),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "0")
+    )
+  })
+
+  it("keeps a conversation out of the person's groups, so a person with only conversations has joined none", () => {
+    scene(
+      { update, view: browseView },
+      given(
+        modifyFields(unread, {
+          isLoaded: () => true,
+          groups: () => [{ group: withBob, pending: false, members: 2 }],
+          members: () => [bob],
+          memberships: () => []
+        })
+      ),
+      expect(text("You haven't joined any groups yet.")).toExist(),
+      expect(role("button", { name: "Bob" })).toBeAbsent(),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "0")
+    )
+  })
+
+  it("keeps the labels of the columns over the list whatever it is showing", () => {
+    const columnsShown = [
+      listed,
+      modifyFields(listed, { memberships: () => [] }),
+      unread,
+      modifyFields(unread, { notice: () => Option.some("This browser could not read the groups.") })
+    ]
+
+    for (const model of columnsShown) {
+      scene(
+        { update, view: browseView },
+        given(model),
+        expect(text("Visibility")).toExist(),
+        expect(text("Members")).toExist()
+      )
+    }
+  })
+
+  it("says the groups are being read until they are, and lists them once they are", () => {
+    scene(
+      { update, view: browseView, subscriptions: GroupsBlock.subscriptions },
+      given(unread),
+      expect(role("status")).toHaveText("Loading groups…"),
+      expect(text("You haven't joined any groups yet.")).toBeAbsent(),
+      expect(role("list", { name: "Your groups" })).toBeAbsent(),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      Subscription.emit(
+        subscriptions.groups,
+        Message.ReceivedGroups({
+          groups: listed.groups,
+          members: listed.members,
+          memberships: listed.memberships,
+          grants: listed.grants
+        })
+      ),
+      expect(text("Loading groups…")).toBeAbsent(),
+      expect(role("button", { name: "Design" })).toExist(),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "2")
+    )
+  })
+
+  it("says the groups could not be read, with Try again, which asks to read them again", () => {
+    scene(
+      { update, view: browseView, subscriptions: GroupsBlock.subscriptions },
+      given(unread),
+      Subscription.emit(subscriptions.groups, Message.FailedRead({ error: "This browser could not read the groups." })),
+      expect(role("status")).toHaveText(/^Can't load the groups\./),
+      expect(role("alert")).toBeAbsent(),
+      expect(text("Loading groups…")).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(text("Can't load the groups.")).toBeAbsent(),
+      expect(role("status")).toHaveText("Loading groups…"),
+      Subscription.emit(
+        subscriptions.groups,
+        Message.ReceivedGroups({ groups: [], members: [], memberships: [], grants: [] })
+      ),
+      expect(text("You haven't joined any groups yet.")).toExist()
+    )
+  })
+
+  it("opens a team from its row, on either tab, and the row still opens a team the person may join", () => {
+    scene(
+      { update, view: browseView },
+      given(withConversation),
+      click(role("button", { name: "Design" })),
+      expectOutMessage(OutMessage.SelectedGroup({ groupId: design.id }))
+    )
+    scene(
+      { update, view: browseView },
+      given(discovering),
+      click(role("button", { name: "Announcements" })),
+      expectOutMessage(OutMessage.SelectedGroup({ groupId: announcements.id }))
+    )
+  })
+
+  it("joins a public team from its row, with the button disabled while it is being joined", () => {
+    scene(
+      { update, view: browseView },
+      given(discovering),
+      expect(role("button", { name: "Join #Announcements" })).toBeEnabled(),
+      click(role("button", { name: "Join #Announcements" })),
+      Command.expectHas(joinAnnouncements),
+      expect(role("button", { name: "Join #Announcements" })).toBeDisabled(),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-selected", "true"),
+      Command.resolve(JoinGroup, Message.SucceededJoinGroup({ groupId: announcements.id })),
+      expectOutMessage(OutMessage.JoinedGroup({ groupId: announcements.id, place: "#Announcements" })),
+      expect(role("button", { name: "Join #Announcements" })).toBeEnabled()
+    )
+  })
+
+  it("lists a team the person joined with their own, and no longer among those to join", () => {
+    scene(
+      { update, view: browseView, subscriptions: GroupsBlock.subscriptions },
+      given(discovering),
+      Subscription.emit(
+        subscriptions.groups,
+        Message.ReceivedGroups({
+          groups: listed.groups,
+          members: listed.members,
+          memberships: [...listed.memberships, admittedTo(announcements.id)],
+          grants: listed.grants
+        })
+      ),
+      expect(role("button", { name: "Join #Announcements" })).toBeAbsent(),
+      expect(text("You've joined every public group.")).toExist(),
+      expect(role("tab", { name: "Discover" })).toHaveAttr("aria-description", "0"),
+      expect(role("tab", { name: "Your groups" })).toHaveAttr("aria-description", "3")
+    )
+  })
+
+  it("joins only the team whose button was pressed", () => {
+    const ideas = publicTeam("ideas", "Ideas")
+
+    scene(
+      { update, view: browseView },
+      given(
+        modifyFields(discovering, {
+          groups: (groups) => [...groups, { group: ideas, pending: false, members: 1 }]
+        })
+      ),
+      click(role("button", { name: "Join #Ideas" })),
+      Command.expectHas(JoinGroup({ workspaceId: workspace.id, memberId: member.id, groupId: ideas.id })),
+      expect(role("button", { name: "Join #Ideas" })).toBeDisabled(),
+      expect(role("button", { name: "Join #Announcements" })).toBeEnabled(),
+      Command.resolve(JoinGroup, Message.SucceededJoinGroup({ groupId: ideas.id }))
+    )
+  })
+
+  it("says why a join could not be kept in a line over the list, and offers the button again", () => {
+    scene(
+      { update, view: browseView },
+      given(discovering),
+      click(role("button", { name: "Join #Announcements" })),
+      Command.resolve(
+        JoinGroup,
+        Message.FailedJoinGroup({ groupId: announcements.id, error: "This browser could not keep that. Try again." })
+      ),
+      expect(role("alert")).toHaveText("This browser could not keep that. Try again."),
+      expect(role("button", { name: "Join #Announcements" })).toBeEnabled(),
+      expectNoOutMessage(),
+      click(role("button", { name: "Join #Announcements" })),
+      Command.expectHas(joinAnnouncements),
+      expect(role("alert")).toBeAbsent(),
+      Command.resolve(JoinGroup, Message.SucceededJoinGroup({ groupId: announcements.id }))
     )
   })
 
@@ -605,7 +828,8 @@ describe("the browse page", () => {
     scene(
       { update, view: browseView },
       given(
-        modifyFields(init(workspace.id, member.id).model, {
+        modifyFields(unread, {
+          isLoaded: () => true,
           groups: () => [
             { group: general, pending: false, members: 2 },
             { group: design, pending: true, members: 1 }
@@ -615,15 +839,6 @@ describe("the browse page", () => {
       ),
       expect(role("button", { name: "Design" })).toHaveAttr("aria-description", "Sending… · Private · 1 member"),
       expect(role("button", { name: "General" })).toHaveAttr("aria-description", "Public · 2 members")
-    )
-  })
-
-  it("opens a group from its row", () => {
-    scene(
-      { update, view: browseView },
-      given(withConversation),
-      click(role("button", { name: "Design" })),
-      expectOutMessage(OutMessage.SelectedGroup({ groupId: design.id }))
     )
   })
 
@@ -648,11 +863,12 @@ describe("the browse page", () => {
     )
   })
 
-  it("shows why a read or a write failed", () => {
+  it("shows why a read or a write failed, over the list, once the groups are read", () => {
     scene(
       { update, view: browseView },
       given(modifyFields(listed, { notice: () => Option.some("This browser could not read the groups.") })),
-      expect(role("alert")).toHaveText("This browser could not read the groups.")
+      expect(role("alert")).toHaveText("This browser could not read the groups."),
+      expect(role("button", { name: "Design" })).toExist()
     )
   })
 })

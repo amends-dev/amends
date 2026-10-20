@@ -1,6 +1,6 @@
-/** Starting a team or a conversation, each an action written to the person's store. */
+/** Starting a team or a conversation, or joining a public team, each an action written to the person's store. */
 
-import { Group } from "@amends-dev/core/group"
+import { Group, GroupId } from "@amends-dev/core/group"
 import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import { MemberId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
@@ -50,4 +50,17 @@ export const StartConversation = GroupsDefinition.command("StartConversation", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(CreateTeam.layer, StartConversation.layer)
+/** Join the public team `groupId`. */
+export const JoinGroup = GroupsDefinition.command("JoinGroup", {
+  args: { ...Stores.AsMember, groupId: GroupId.GroupId },
+  messages: [Message.SucceededJoinGroup, Message.FailedJoinGroup],
+  handler: function* () {
+    const stores = yield* Stores.Stores
+    return ({ groupId, ...member }) =>
+      Stores.writer(stores, Message.SucceededJoinGroup({ groupId }), (error) =>
+        Message.FailedJoinGroup({ groupId, error })
+      )(member, (store) => store.write("GroupJoined", { groupId }))
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(CreateTeam.layer, StartConversation.layer, JoinGroup.layer)

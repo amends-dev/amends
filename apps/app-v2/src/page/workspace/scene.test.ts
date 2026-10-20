@@ -1,4 +1,5 @@
 import { BuiltinRoles, GrantResolver } from "@amends-dev/core/authorization"
+import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, it } from "@effect/vitest"
@@ -84,7 +85,7 @@ import {
 import { Integrations, Written as ConnectionWritten } from "../../feature/connections/definition.ts"
 import { GroupBlock } from "../../feature/group/block.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
-import { CreateTeam } from "../../feature/groups/command.ts"
+import { CreateTeam, JoinGroup } from "../../feature/groups/command.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
@@ -187,8 +188,22 @@ const withBrowsableGroup = atHome(opened, (home) =>
   modifyFields(home, {
     groups: (groups) =>
       modifyFields(groups, {
+        isLoaded: () => true,
         groups: () => [{ group: general, pending: false, members: 3 }],
         memberships: () => [aliceInGeneral]
+      })
+  })
+)
+
+/** A public team Alice does not belong to. */
+const launches = { ...general, id: GroupId.GroupId.make("launches"), name: "launches" }
+
+/** The groups read as above, with the public team `launches` to join beside the general group. */
+const withJoinableGroup = atHome(withBrowsableGroup, (home) =>
+  modifyFields(home, {
+    groups: (groups) =>
+      modifyFields(groups, {
+        groups: (listed) => [...listed, { group: launches, pending: false, members: 1 }]
       })
   })
 )
@@ -1814,6 +1829,24 @@ describe("a workspace", () => {
       expect(role("main", { name: "Groups" })).toBeAbsent(),
       expect(role("main", { name: "A group" })).toExist(),
       expect(role("button", { name: "General" })).toHaveAttr("aria-current", "page")
+    )
+  })
+
+  it("confirms a group joined from the browse page, offering to open it, and leaves the page as it is", () => {
+    scene(
+      { update, view: sceneView },
+      given(withJoinableGroup),
+      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Browse groups" }))),
+      click(within(role("main", { name: "Groups" }), role("button", { name: "Join #launches" }))),
+      expect(within(role("main", { name: "Groups" }), role("button", { name: "Join #launches" }))).toBeDisabled(),
+      expect(text("Joined #launches")).toBeAbsent(),
+      Command.resolve(JoinGroup, GroupsBlock.Message.SucceededJoinGroup({ groupId: launches.id })),
+      expect(role("main", { name: "Groups" })).toExist(),
+      expect(within(role("list", { name: "Notifications" }), text("Joined #launches"))).toExist(),
+      expect(within(role("list", { name: "Notifications" }), role("button", { name: "Open" }))).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(text("Joined #launches")).toBeAbsent(),
+      expect(role("main", { name: "Groups" })).toExist()
     )
   })
 

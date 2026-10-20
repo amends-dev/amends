@@ -206,6 +206,29 @@ describe("home", () => {
     }
   })
 
+  it("reports a group the person joined, as the group is named, and stays where it is", () => {
+    story(
+      update,
+      given(
+        modifyFields(opened, {
+          groups: (groups) =>
+            modifyFields(groups, {
+              isLoaded: () => true,
+              groups: () => [{ group: general, pending: false, members: 3 }],
+              joining: () => [groupId]
+            })
+        })
+      ),
+      message(fromGroups(GroupsBlock.Message.ChoseBrowseTab({ tab: "Discover" }))),
+      message(fromGroups(GroupsBlock.Message.SucceededJoinGroup({ groupId }))),
+      expectOutMessage(OutMessage.JoinedGroup({ groupId, place: "#General" })),
+      model((model) => {
+        expect(Open.isAnyOf(["Inbox"])(model.open)).toBe(true)
+        expect(model.groups.joining).toEqual([])
+      })
+    )
+  })
+
   it("shows the inbox when its parent resets it, leaving no group marked, and reports nothing", () => {
     story(
       update,

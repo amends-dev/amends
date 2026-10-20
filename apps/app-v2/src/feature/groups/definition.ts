@@ -4,7 +4,8 @@
  * to and the public teams they may join, on a tab each, narrowed by a search; and the modal where they start a team,
  * or a conversation with another member. It reports the group the person picks and when they ask to browse, and its
  * parent tells it which group is open and when to talk with a member: the conversation of the two when there is one,
- * and otherwise a new one to write the first message of.
+ * and otherwise a new one to write the first message of. The browse page's Discover tab joins a public team in place
+ * and reports it, with where it is, to be confirmed.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -24,6 +25,11 @@ import { foldAccents, groupName, isJoinable } from "../../seen.ts"
 export const GroupItem = Schema.Struct({ group: Group.Group, pending: Schema.Boolean, members: Schema.Int })
 export type GroupItem = typeof GroupItem.Type
 
+/** A group the person can see that is a team, which has a name and is public or private. */
+export type TeamItem = GroupItem & Readonly<{ group: Group.Team }>
+
+const isTeamItem = (item: GroupItem): item is TeamItem => item.group.kind === "Team"
+
 /** What the person is starting: a team, by name, or a conversation with another member. */
 export const Starting = defineTaggedUnion({
   Team: { name: Schema.String, isPublic: Schema.Boolean },
@@ -37,8 +43,8 @@ export type BrowseTab = typeof BrowseTab.Type
 
 /**
  * Whether the groups are read, the groups, the workspace's members, the person's own admissions, what they may do,
- * the group picked, the browse page's tab and search, what they are starting and the dialog it is in, and why the
- * last read or write failed.
+ * the group picked, the browse page's tab and search, the teams being joined, what they are starting and the dialog it
+ * is in, how many times the person asked to read the groups again, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -50,8 +56,10 @@ export const Model = Schema.Struct({
   grants: Schema.Array(Grant.Grant),
   selected: Schema.Option(GroupId.GroupId),
   browse: Schema.Struct({ tab: BrowseTab, query: Schema.String }),
+  joining: Schema.Array(GroupId.GroupId),
   starting: Schema.Option(Starting),
   dialog: DialogBlock.Model,
+  reads: Schema.Int,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -64,12 +72,16 @@ export const Message = defineMessageUnion({
     grants: Schema.Array(Grant.Grant)
   },
   FailedRead: { error: Schema.String },
+  ClickedTryAgain: {},
   ClickedGroup: { groupId: GroupId.GroupId },
   InformedOfOpenGroup: { groupId: Schema.Option(GroupId.GroupId) },
   ClickedGroupsTitle: {},
   ClickedBrowse: {},
   ChoseBrowseTab: { tab: BrowseTab },
   TypedBrowseQuery: { query: Schema.String },
+  ClickedJoin: { groupId: GroupId.GroupId },
+  SucceededJoinGroup: { groupId: GroupId.GroupId },
+  FailedJoinGroup: { groupId: GroupId.GroupId, error: Schema.String },
   ClickedNewTeam: {},
   TypedTeamName: { name: Schema.String },
   ToggledTeamPublic: { isPublic: Schema.Boolean },
@@ -84,9 +96,14 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
+/**
+ * What the Block asks of its parent: to open the group the person picked, to show the browse page, and to confirm
+ * that the person joined a group, with where it is as a line says it, "#launches".
+ */
 export const OutMessage = defineMessageUnion({
   SelectedGroup: { groupId: GroupId.GroupId },
-  RequestedBrowse: {}
+  RequestedBrowse: {},
+  JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String }
 })
 export type OutMessage = typeof OutMessage.Type
 
@@ -115,15 +132,26 @@ export const yours = (model: Model): ReadonlyArray<GroupItem> =>
     byGeneralThenName(model)
   )
 
+/** The teams the person belongs to, in order: what the browse page lists as their groups, with no conversation. */
+export const yourTeams = (model: Model): ReadonlyArray<TeamItem> => yours(model).filter(isTeamItem)
+
+/** The group `groupId`, while the person can see it. */
+export const findGroup = (model: Model, groupId: GroupId.GroupId): Option.Option<GroupItem> =>
+  Array.findFirst(model.groups, ({ group }) => group.id === groupId)
+
 /** The public teams the person may join and does not belong to, in order. */
-export const discoverable = (model: Model): ReadonlyArray<GroupItem> =>
+export const discoverable = (model: Model): ReadonlyArray<TeamItem> =>
   Array.sort(
-    model.groups.filter(({ group }) => isJoinable(group) && !belongsTo(model, group)),
+    model.groups.filter(isTeamItem).filter(({ group }) => isJoinable(group) && !belongsTo(model, group)),
     byGeneralThenName(model)
   )
 
 /** The groups of `items` whose name, as the person reads it, contains `query` in any case: all of them for none. */
-export const matching = (model: Model, items: ReadonlyArray<GroupItem>, query: string): ReadonlyArray<GroupItem> => {
+export const matching = <Item extends GroupItem>(
+  model: Model,
+  items: ReadonlyArray<Item>,
+  query: string
+): ReadonlyArray<Item> => {
   const wanted = query.trim().toLowerCase()
   return wanted === ""
     ? items

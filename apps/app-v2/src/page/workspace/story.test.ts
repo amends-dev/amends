@@ -37,6 +37,7 @@ import {
 } from "../../../test/fixtures.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { ExpireConfirmation } from "../../feature/actions/command.ts"
+import { Offer } from "../../feature/actions/definition.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
 import { LoadModels } from "../../feature/agents/command.ts"
 import { Written as AgentWritten } from "../../feature/agents/definition.ts"
@@ -644,6 +645,34 @@ describe("a workspace", () => {
         expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
         expect(model.agents.dialog.isOpen).toBe(true)
       })
+    )
+  })
+
+  it("confirms to the person in a toast that they joined a group, offering to open it, and stays put", () => {
+    story(
+      update,
+      given(
+        modifyFields(opened, {
+          home: (home) =>
+            modifyFields(home, {
+              groups: (groups) =>
+                modifyFields(groups, {
+                  isLoaded: () => true,
+                  groups: () => [{ group: general, pending: false, members: 2 }],
+                  joining: () => [groupId]
+                })
+            })
+        })
+      ),
+      message(fromGroups(GroupsBlock.Message.SucceededJoinGroup({ groupId }))),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([
+          { id: 1, text: "Joined #General", offer: Option.some(Offer.OpenGroup({ groupId })) }
+        ])
+        expect(HomeOpen.isAnyOf(["Inbox"])(model.home.open)).toBe(true)
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
     )
   })
 

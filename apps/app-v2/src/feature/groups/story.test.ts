@@ -6,11 +6,19 @@ import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Array, Effect, Layer, Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
-import { bob, conversationWithBob, design, general } from "../../../test/fixtures.ts"
+import { aliceInDesign, aliceInGeneral, bob, conversationWithBob, design, general } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import { CreateTeam, StartConversation } from "./command.ts"
+import { CreateTeam, JoinGroup, StartConversation } from "./command.ts"
 import { DialogBinding } from "./composition.ts"
-import { byGeneralThenName, conversationWith, Message, OutMessage, Starting } from "./definition.ts"
+import {
+  byGeneralThenName,
+  conversationWith,
+  discoverable,
+  Message,
+  OutMessage,
+  Starting,
+  yourTeams
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -20,6 +28,29 @@ const bobId = MemberId.MemberId.make("member-2")
 const groupId = GroupId.GroupId.make("general")
 
 const listed = init(workspaceId, memberId).model
+
+/** A public team the person does not belong to. */
+const launches = { ...general, id: GroupId.GroupId.make("launches"), name: "launches" }
+
+/** A private team the person does not belong to, which nothing offers them. */
+const secret = { ...design, id: GroupId.GroupId.make("secret"), name: "secret" }
+
+/** The groups read: two teams the person belongs to, a public and a private team they do not, and a conversation. */
+const browsing = modifyFields(listed, {
+  isLoaded: () => true,
+  groups: () => [
+    { group: general, pending: false, members: 2 },
+    { group: design, pending: false, members: 1 },
+    { group: launches, pending: false, members: 3 },
+    { group: secret, pending: false, members: 1 },
+    { group: conversationWithBob, pending: false, members: 2 }
+  ],
+  members: () => [bob],
+  memberships: () => [aliceInGeneral, aliceInDesign]
+})
+
+/** The write of joining the team `launches`, as the person's command makes it. */
+const joinLaunches = JoinGroup({ workspaceId, memberId, groupId: launches.id })
 
 /** What the dialog reports, as the groups receive it. */
 const fromDialog = (message: typeof DialogBlock.Message.Type) =>
@@ -233,6 +264,137 @@ describe("the groups", () => {
         ({ group }) => group.id
       )
     ).toEqual(["Alpha", conversationWithBob.id, "Carol", "Zed"])
+  })
+
+  it("list as the person's groups the teams they belong to, and to join the public teams they do not", () => {
+    expect(yourTeams(browsing).map(({ group }) => group.id)).toEqual([general.id, design.id])
+    expect(discoverable(browsing).map(({ group }) => group.id)).toEqual([launches.id])
+  })
+
+  it("join a public team, and report it joined as the team is named, when it is written", () => {
+    story(
+      update,
+      given(browsing),
+      message(Message.ClickedJoin({ groupId: launches.id })),
+      Command.expectHas(joinLaunches),
+      model((model) => {
+        expect(model.joining).toEqual([launches.id])
+      }),
+      Command.resolve(JoinGroup, Message.SucceededJoinGroup({ groupId: launches.id })),
+      expectOutMessage(OutMessage.JoinedGroup({ groupId: launches.id, place: "#launches" })),
+      model((model) => {
+        expect(model.joining).toEqual([])
+        expect(model.notice).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("send nothing for a team already being joined", () => {
+    story(
+      update,
+      given(modifyFields(browsing, { joining: () => [launches.id] })),
+      message(Message.ClickedJoin({ groupId: launches.id })),
+      Command.expectNone(),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.joining).toEqual([launches.id])
+      })
+    )
+  })
+
+  it("report nothing joined for a team it can no longer see, which is no longer being joined", () => {
+    story(
+      update,
+      given(modifyFields(listed, { joining: () => [launches.id] })),
+      message(Message.SucceededJoinGroup({ groupId: launches.id })),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.joining).toEqual([])
+      })
+    )
+  })
+
+  it("say why a join failed, and join again on the next click, which takes the reason away", () => {
+    story(
+      update,
+      given(browsing),
+      message(Message.ClickedJoin({ groupId: launches.id })),
+      Command.resolve(
+        JoinGroup,
+        Message.FailedJoinGroup({ groupId: launches.id, error: "This browser could not keep that. Try again." })
+      ),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.joining).toEqual([])
+        expect(model.notice).toEqual(Option.some("This browser could not keep that. Try again."))
+      }),
+      message(Message.ClickedJoin({ groupId: launches.id })),
+      Command.expectHas(joinLaunches),
+      model((model) => {
+        expect(model.joining).toEqual([launches.id])
+        expect(model.notice).toEqual(Option.none())
+      }),
+      Command.resolve(JoinGroup, Message.SucceededJoinGroup({ groupId: launches.id })),
+      expectOutMessage(OutMessage.JoinedGroup({ groupId: launches.id, place: "#launches" }))
+    )
+  })
+
+  it("join each public team on its own, so one being joined does not hold up another", () => {
+    const ideas = { ...launches, id: GroupId.GroupId.make("ideas"), name: "ideas" }
+
+    story(
+      update,
+      given(
+        modifyFields(browsing, {
+          groups: (groups) => [...groups, { group: ideas, pending: false, members: 1 }],
+          joining: () => [launches.id]
+        })
+      ),
+      message(Message.ClickedJoin({ groupId: ideas.id })),
+      Command.expectHas(JoinGroup({ workspaceId, memberId, groupId: ideas.id })),
+      model((model) => {
+        expect(model.joining).toEqual([launches.id, ideas.id])
+      }),
+      Command.resolve(JoinGroup, Message.SucceededJoinGroup({ groupId: ideas.id })),
+      model((model) => {
+        expect(model.joining).toEqual([launches.id])
+      })
+    )
+  })
+
+  it.effect("write the join of a public team to the person's store, and tell it written", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+
+      const result = yield* joinLaunches.effect.pipe(Effect.provide(Layer.provide(JoinGroup.layer, layer)))
+
+      expect(written).toEqual([{ action: "GroupJoined", payload: { groupId: launches.id } }])
+      expect(result).toEqual(Message.SucceededJoinGroup({ groupId: launches.id }))
+    })
+  )
+
+  it("read the groups again each time the person asks to after they could not be, without a reason in the way", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.FailedRead({ error: "This browser could not read the groups." })),
+      model((model) => {
+        expect(model.reads).toBe(0)
+        expect(model.notice).toEqual(Option.some("This browser could not read the groups."))
+      }),
+      message(Message.ClickedTryAgain()),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.reads).toBe(1)
+        expect(model.notice).toEqual(Option.none())
+        expect(model.isLoaded).toBe(false)
+      }),
+      message(Message.FailedRead({ error: "This browser could not read the groups." })),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.reads).toBe(2)
+      })
+    )
   })
 
   it("drop what the person was starting when the dialog closes, and report the group picked once", () => {

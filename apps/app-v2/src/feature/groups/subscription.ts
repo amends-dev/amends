@@ -4,6 +4,7 @@
  */
 
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { GroupsDefinition, Message } from "./definition.ts"
@@ -11,10 +12,10 @@ import { GroupsDefinition, Message } from "./definition.ts"
 export const subscriptions = GroupsDefinition.subscriptions((entry) => ({
   groups: entry(
     "ReadGroups",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
     {
       messages: [Message.ReceivedGroups, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId }) => ({ workspaceId, memberId }),
+      modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId }) =>

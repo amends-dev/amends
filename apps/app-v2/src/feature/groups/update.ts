@@ -3,11 +3,13 @@ import type { MemberId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
-import { CreateTeam, StartConversation } from "./command.ts"
+import { placeName } from "../../seen.ts"
+import { CreateTeam, JoinGroup, StartConversation } from "./command.ts"
 import { DialogBinding, GroupsComposition } from "./composition.ts"
 import {
   type BrowseTab,
   conversationWith,
+  findGroup,
   GroupsDefinition,
   Message,
   type Model,
@@ -65,6 +67,32 @@ const browseOn = (model: Model, tab: BrowseTab) => ({
   outMessage: OutMessage.RequestedBrowse()
 })
 
+/** The model without `groupId` among the teams being joined, once the join is written or could not be. */
+const joined = (model: Model, groupId: GroupId.GroupId) =>
+  modifyFields(model, { joining: (joining) => joining.filter((id) => id !== groupId) })
+
+/** Join the public team `groupId`, which is being joined until the action is written, unless it already is. */
+const joinGroup = (model: Model, groupId: GroupId.GroupId) =>
+  model.joining.includes(groupId)
+    ? { model }
+    : {
+        model: modifyFields(model, { joining: (joining) => [...joining, groupId], notice: () => Option.none() }),
+        commands: [JoinGroup({ workspaceId: model.workspaceId, memberId: model.memberId, groupId })]
+      }
+
+/** Tell the parent the person joined `groupId`, where it is as a line says it, when the Block can still see it. */
+const reportJoined = (model: Model, groupId: GroupId.GroupId) => {
+  const next = joined(model, groupId)
+
+  return Option.match(findGroup(model, groupId), {
+    onNone: () => ({ model: next }),
+    onSome: ({ group }) => ({
+      model: next,
+      outMessage: OutMessage.JoinedGroup({ groupId, place: placeName(group, model.members, model.memberId) })
+    })
+  })
+}
+
 /** Write the team `name`, public when `isPublic`, to the person's store. */
 const writeTeam = (name: string, isPublic: boolean) =>
   GroupsDefinition.step((model: Model) => ({
@@ -91,6 +119,9 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
       })
     }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
     ClickedGroup: ({ groupId }) => pickGroup(model, groupId),
     InformedOfOpenGroup: ({ groupId }) => ({ model: modifyFields(model, { selected: () => groupId }) }),
     ClickedGroupsTitle: () => browseOn(model, "Yours"),
@@ -100,6 +131,11 @@ export const update = GroupsComposition.makeUpdate((model, message) =>
     }),
     TypedBrowseQuery: ({ query }) => ({
       model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })
+    }),
+    ClickedJoin: ({ groupId }) => joinGroup(model, groupId),
+    SucceededJoinGroup: ({ groupId }) => reportJoined(model, groupId),
+    FailedJoinGroup: ({ groupId, error }) => ({
+      model: modifyFields(joined(model, groupId), { notice: () => Option.some(error) })
     }),
     ClickedNewTeam: () => Update.combine(model, [openTeamForm, DialogBinding.requestOpen()]),
     TypedTeamName: ({ name }) => ({

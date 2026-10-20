@@ -422,21 +422,27 @@ below it counted at each level above.
   is, whoever else is in the workspace: with nobody else its dialog, "New conversation", has a member choice with
   only "Choose a member" to pick and a first message to write, and Start sends nothing until a member is chosen. A
   row's count would be read aloud as `apps/ui` reads it ("5 unread", "5 to triage", "2 for you", by the design's
-  `countName`); the sidebar's group rows show no count, so there is none to name. `browseView` is the page it asks for, a main
-  pane titled Groups with two tabs, Your groups, the teams the person belongs to and their
-  conversations, as the sidebar lists them, and Discover, the public teams they may join and do not
-  belong to, each counted, Your groups at first, and Create group, the same as the sidebar's "+" for
-  a team, where they may start one. The toolbar over the rows holds a search field, whose label is hidden and whose
-  placeholder follows the tab, and which takes no focus as the page opens; under it, a line says what the tab
-  lists with how many groups the search leaves at its end, "4 groups", over the labels of the
-  columns, Group, Visibility, and Members; and then a row for each group: `#` for a team and the other
-  members' initials for a conversation, the group's name as the person reads it, a badge of Public,
-  Private, or Direct, how many members it has, "12 members", "Sending…" under the name while it is
-  on its way, and Open →, which reports the group picked as the sidebar's row does. The search
-  keeps the groups whose name contains what was typed, in any case, ignoring spaces at either end;
-  the tabs keep one search between them. A search that finds none says "No groups match" with what was
-  typed, and a tab with no groups says so: Discover, "Nothing to discover", since every public team is
-  one the person is in, and Your groups, "No groups yet". The dialog for a new team or a conversation
+  `countName`); the sidebar's group rows show no count, so there is none to name. `browseView` is the page it asks for, a main pane titled Groups with two tabs, each counted once the groups are
+  read: Your groups, the teams the person belongs to, and Discover, the public teams they do not, Your groups at
+  first, and Create group, the same as the sidebar's, where they may start a team. A conversation is on neither; the
+  sidebar lists it. The toolbar over the rows holds a search field, whose label is hidden and whose placeholder
+  follows the tab, "Search your groups…" and "Search public groups…", and which takes no focus as the page opens;
+  under it, a line says what the tab lists, "Public and private groups you've joined." and "Public groups you haven't
+  joined. Join one to read its threads.", with how many groups the search leaves at its end, "4 groups" and none
+  before the groups are read, over the labels of the columns, Group, Visibility, and Members, which show whether the
+  list has rows, none, or is not there yet. A row is the channel's drawing, the team's name, a badge of Public or
+  Private, how many members it has, "12 members", and "Sending…" under the name while it is on its way. On Your
+  groups its end is Open →, and on Discover a Join button named for the team, "Join #launches", disabled while the
+  join is being written (`joining`, so a second click sends nothing); on both tabs the row itself opens the group, as
+  the sidebar's does. Joining writes `GroupJoined` (`JoinGroup`), and once it is written the Block reports
+  `JoinedGroup`, with where the team is as a line says it, for the workspace page to confirm with "Joined #launches"
+  and the offer to open it; a join the store could not keep says why in the line over the list (`notice`) and leaves
+  Join to press again. Until the groups are read the list is the quiet line "Loading groups…", and a read that failed
+  says "Can't load the groups." with Try again (`ClickedTryAgain`, which raises `reads`, the dependency that restarts
+  the subscription), as the other destinations do. The search keeps the teams whose name contains what was typed, in
+  any case, ignoring spaces at either end; the tabs keep one search between them. A tab with no teams to list says so
+  in a quiet line and not an empty state: "No groups match this search." when the search found none, and otherwise
+  "You've joined every public group." on Discover and "You haven't joined any groups yet." on Your groups. The dialog for a new team or a conversation
   is `dialogView`, a view of its own that renders only that dialog, with nothing in it while it is
   closed, and neither the sidebar's view nor the browse page holds it: below 64rem the sidebar is on
   the page only while the navigation drawer is open, and a dialog the framework shows has to be in the
@@ -776,7 +782,7 @@ below it counted at each level above.
 - `feature/actions`: the person's actions the server has not finished, each with why it was
   refused, until they dismiss it, shown as the design's `toast`s in its `toastStack` over the shell's bottom end
   corner, with Dismiss; and what the page confirms to the person that they did, which a Block reports and the page
-  hands it with `confirm`, such as "Name saved", shown as the design's `confirmation`s in its `confirmationStack`,
+  hands it with `confirm`, such as "Name saved" or, for a group joined from the browse page, "Joined #launches", shown as the design's `confirmation`s in its `confirmationStack`,
   centered at the bottom of the window, 24px above its edge and any home indicator, each with a check before its
   words, no Dismiss, and at most one thing it offers to do next. A confirmation goes by itself after five seconds
   (`ExpireConfirmation`, which waits with `Effect.sleep`, so a test moves the clock), each under an ID of its own
@@ -1030,7 +1036,9 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   (`informViewport`), Home puts the pane where the width wants it: crossing 80rem either way moves the pane between
   its dialog and the card without closing the thread. The Block reports `Navigated` when the person moved within it,
   from the sidebar's Inbox, Triage, Tasks, and Browse groups, a group picked, or a task's thread opened, so the page
-  closes the navigation drawer and the side pane's dialog and shows Home. The page asks it for the rest: to reset
+  closes the navigation drawer and the side pane's dialog and shows Home. It reports `JoinedGroup` too, from the groups
+  Block's, for the page to confirm to the person with the offer to open the group; joining moves nowhere. The page
+  asks it for the rest: to reset
   (`requestReset`), which closes the thread, leaves no group marked, shows the inbox, and closes the dialog, as leaving
   Home does; to open a group without a thread (`requestOpenGroup`) or a thread in its group (`requestOpenThread`);
   and to select or start the conversation with a member (`requestConversationWith`), which reports `Navigated` only
@@ -1246,8 +1254,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   or the dialog closes, dropping what was being started, and reporting the group picked once, asking
   to browse each time, Browse groups on Discover and the title on Your groups, keeping the browse page's search,
   the groups read once they are received, and their order, general first and then by name in any case and
-  whatever the accents, a conversation among the teams by the others' names, and selecting the conversation
-  with a member asked for, or opening the dialog with the member chosen when there is none, a team
+  whatever the accents, a conversation among the teams by the others' names, the teams the person belongs to and the public teams they may
+  join told from the conversations, a public team joined once and reported as it is named when the join is written,
+  why a join could not be kept and joining again, the groups read again each time the person asks after they could
+  not be, and selecting the conversation with a member asked for, or opening the dialog with the member chosen when there is none, a team
   with that member in it not being that conversation; the search opening on an empty field, searching
   for what is typed only once it holds more than spaces, keeping the rows shown while the next search
   is on its way, dropping an answer for an earlier query, saying why a search failed and searching again
@@ -1345,7 +1355,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
   one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
   `Stores` whose store keeps what is written: a thread, a reply, an edit, and a conversation written
-  with the members their text mentions, and with none when it mentions no one. The workspaces page's
+  with the members their text mentions, and with none when it mentions no one, and a public team joined by the
+  action `GroupJoined`. The workspaces page's
   stories start the listing for the person's address with the name it suggests, open an empty form, send
   its names with no key and read the list again once the workspace exists to report it opened, keep the key
   of a failed request for the request sent again and start a new one once a name changes, clear the refusal at
@@ -1422,11 +1433,15 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   once written, only from someone who may create one, a conversation started with the member chosen in
   a dialog of its own, both in a view apart from the sidebar's, with the sidebar's buttons that open
   them and the same team taken from the workspace's sidebar, the dialog for a conversation taking the
-  focus on its member choice, or on the first message when the member is chosen, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted and chosen, each
-  group's mark, visibility, and members, a team and a conversation told apart, the search narrowing
-  either tab in any case and with spaces ignored, nothing matching, nothing to discover, no groups yet, a
-  team on its way, a group opened from its row, and Create group only for someone who may create
-  one, opening the dialog with no sidebar on the page; the inbox's notifications under the day they came, by their
+  focus on its member choice, or on the first message when the member is chosen, and the groups to browse: Browse groups in the sidebar's header asking for them on Discover and the title on Your groups, the tabs counted
+  once the groups are read and chosen, each team's channel drawing, visibility, and members, no conversation among them,
+  the teams in the sidebar's order, the search narrowing either tab in any case and with spaces ignored, its
+  placeholder and the line over the list following the tab, nothing matching, every public team joined, no groups
+  joined, each as a quiet line, the columns' labels over every state, the groups being read and not read, with
+  Try again reading them again, a team on its way, a group opened from its row on either tab, a team joined from
+  its Join button, which is disabled while the join is written, reports it, and then leaves Discover for Your groups,
+  a join that could not be kept saying why over the list and offered again, and Create group only for someone who
+  may create one, opening the dialog with no sidebar on the page; the inbox's notifications under the day they came, by their
   author and what they did, the place they come from, how long ago, and what they say, with a mention
   in it as a chip and a deleted message said so, a mention, the opening of a thread, and a reply told
   apart, with no place while the group is unknown and the
@@ -1526,8 +1541,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   their page and are marked while it shows, with a member opened in the side pane beside the Members, in its dialog
   below `Split`, and left whenever another page or destination is picked; the groups to browse opened from the
   sidebar's button, and from the drawer, which it closes, with
-  a group opened from its row and a team started from Create group, also at `Phone` where the sidebar is
-  in the shut drawer, the sidebar naming the workspace with
+  a group opened from its row, a group joined from its Join button confirmed with the offer to open it and the
+  confirmation gone with the time, and a team started from Create group, also at `Phone` where the
+  sidebar is in the shut drawer, the sidebar naming the workspace with
   who is signed in and the way out in its footer, the sidebar in place with no Menu button from `Desktop`, the
   Menu button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
   sidebar, its scrim closing it, or an item of the sidebar, a group picked among them, closing it, and
