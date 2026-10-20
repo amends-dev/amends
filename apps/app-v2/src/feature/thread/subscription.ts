@@ -1,8 +1,12 @@
-/** The thread, who could have written in it, and who is present, read from the person's store as they change. */
+/**
+ * The thread, who could have written in it, and who is present, read from the person's store as they change, and the
+ * thread again each time the person asks to try again.
+ */
 
 import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Stores from "../../store/Stores.ts"
 import { Message, ThreadDefinition } from "./definition.ts"
@@ -10,10 +14,15 @@ import { Message, ThreadDefinition } from "./definition.ts"
 export const subscriptions = ThreadDefinition.subscriptions((entry) => ({
   thread: entry(
     "ReadThread",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, threadId: ThreadId.ThreadId },
+    {
+      workspaceId: WorkspaceId.WorkspaceId,
+      memberId: MemberId.MemberId,
+      threadId: ThreadId.ThreadId,
+      reads: Schema.Int
+    },
     {
       messages: [Message.ReceivedThread, Message.ReceivedPeople, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId, threadId }) => ({ workspaceId, memberId, threadId }),
+      modelToDependencies: ({ workspaceId, memberId, threadId, reads }) => ({ workspaceId, memberId, threadId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
         return ({ workspaceId, memberId, threadId }) =>
@@ -24,6 +33,7 @@ export const subscriptions = ThreadDefinition.subscriptions((entry) => ({
                   store.thread(threadId),
                   ({ thread, messages, participation, participationChanges, latest, readThrough }) =>
                     Message.ReceivedThread({
+                      hasThread: Option.isSome(thread),
                       title: Option.flatMap(thread, ({ record }) => Option.fromNullOr(record.value.title)),
                       messages: messages.map(({ record, pending }) => ({ message: record.value, pending })),
                       following: Option.map(participation, ({ record, pending }) => ({

@@ -60,23 +60,26 @@ export const Editing = Schema.Struct({ messageId: ThreadMessageId.ThreadMessageI
 export type Editing = typeof Editing.Type
 
 /**
- * The thread's title, when it has one, its messages, the person's part in it, the changes to who takes part in it, the
- * sequence of its latest activity, how far they have read it and asked to, the title or message being changed,
- * whether they said lately that they type there, who could have written its messages, who is
- * present, the reply being written, the task it tracks, its agents' turns, and why the last read or
- * write failed.
+ * The thread's title, when it has one, whether the store has answered and whether it holds the thread, its messages,
+ * the person's part in it, the changes to who takes part in it, the sequence of its latest activity, how far they have
+ * read it and asked to, the title or message being changed, whether they said lately that they type there, who could
+ * have written its messages, who is present, the reply being written, the task it tracks, its agents' turns, how many
+ * times the person asked to read it again, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   threadId: ThreadId.ThreadId,
   title: Schema.Option(Schema.String),
+  isLoaded: Schema.Boolean,
+  hasThread: Schema.Boolean,
   messages: Schema.Array(MessageItem),
   following: Schema.Option(Following),
   changes: Schema.Array(ParticipationChange),
   latest: Schema.Int,
   readThrough: Schema.Int,
   readRequested: Schema.Int,
+  reads: Schema.Int,
   renaming: Schema.Option(Schema.String),
   editing: Schema.Option(Editing),
   typingTold: Schema.Boolean,
@@ -99,6 +102,7 @@ export const ChildInitContext = Schema.Struct({
 
 export const Message = defineMessageUnion({
   ReceivedThread: {
+    hasThread: Schema.Boolean,
     title: Schema.Option(Schema.String),
     messages: Schema.Array(MessageItem),
     following: Schema.Option(Following),
@@ -109,6 +113,7 @@ export const Message = defineMessageUnion({
   ReceivedPeople: { members: Schema.Array(Member.Member), contacts: Schema.Array(Contact.Contact) },
   ReceivedPresence: { present: Schema.Array(Presence.Present) },
   FailedRead: { error: Schema.String },
+  ClickedTryAgain: {},
   ClickedRename: {},
   TypedTitle: { title: Schema.String },
   SubmittedRename: {},
@@ -127,6 +132,25 @@ export const Message = defineMessageUnion({
 export type Message = typeof Message.Type
 
 export const ThreadDefinition = Block.makeDefinition("Thread", { Model, Message, ChildInitContext })
+
+/**
+ * Whether the person's replica has the thread, so that it is shown: `Loading` until the store has answered, `Failed`
+ * when it could not be read, and, once it answered without the thread, `Unavailable`, as it is for a thread in a group
+ * the person never had or lost the right to read.
+ */
+export type Availability = "Available" | "Loading" | "Failed" | "Unavailable"
+
+export const availabilityOf = (model: Model): Availability => {
+  if (model.hasThread) {
+    return "Available"
+  }
+
+  if (model.isLoaded) {
+    return "Unavailable"
+  }
+
+  return Option.isSome(model.notice) ? "Failed" : "Loading"
+}
 
 /**
  * The thread's title, or the words of its opening message as a reader hears them, a mention as the member's

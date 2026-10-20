@@ -265,7 +265,18 @@ below it counted at each level above.
   tracks one; the header has the thread's title, or its first message's words, before a message icon
   or the task's status drawing, a subtitle (the group's, or the inbox's own), Back, named for where
   it goes back to, such as "Back to Design", "Back to Tasks", or "Back to Inbox", before the title on
-  a phone, and the bell and Close thread, or Close task, after it.
+  a phone, and the bell and Close thread, or Close task, after it. The thread tells whether it is shown as the group
+  tells it for itself (`availabilityOf`): it is `Loading` until the store has answered its first read
+  (`isLoaded`), `Available` once the answer held the thread (`hasThread`, which the store's `thread` read gives from
+  the replica's thread), `Unavailable` once it answered without it, as it does for a thread in a group the person no
+  longer belongs to or never did, and `Failed` when the read failed before it answered. Until it is shown the body
+  says so as `apps/ui` does: "Loading the thread…"; "This thread isn't available" over "It may be in a group you
+  no longer belong to."; and "Can't load this thread" over "Try again once the host is reachable." with a Try again
+  that reads it again (`ClickedTryAgain` clears why and counts `reads`, which the thread's read depends on, as the
+  inbox's and the group's do). A read that fails after the thread was held keeps showing it, with why above it. The
+  side pane leaves out the bell while the thread is not shown, since it would say whether the person follows a thread
+  they have not read, and the composer when it is not available, as `apps/ui` leaves it out, and keeps it while the
+  thread loads or could not be read, as `apps/ui` does.
 - `feature/task`: the task a thread tracks: its status, assignee, and priority, which the person
   changes from what they saw, when they may, assigning an agent only when they may use it; or,
   while the thread tracks none, making it one, when they may create tasks in its group. Its view is
@@ -1457,7 +1468,10 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   is written, until the turn ends or it could not be followed, a turn that replied as its reply with View turn log
   and its log under it, and the thread placing its agents' turns among its messages at the moment they took on the
   work, under the day, and the notes of who followed it or stopped taking part in it, for the person as "You" and
-  for someone else, in each way, among them by their time; a group's main pane, titled by its name or by
+  for someone else, in each way, among them by their time, and its three states: loading until the store answers,
+  not available once it answers without the thread, and not readable with a Try again that reads it again, in the
+  pane of a group with the bell left out while it is not shown and the composer when it is not available;
+  a group's main pane, titled by its name or by
   a conversation's other member, with the drawing of a channel or of a message before it, the workspace's name
   under it on a phone, its tabs named for it, its members as a stack of three marks named for how many there are, which
   opens them in the settings, the person's part in it as a bell named Following and pressed while they follow, and
@@ -1685,7 +1699,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and changed shows at once and becomes the server's, while a change from a stale value comes back
   refused, and a thread started as a task shows its task in its group's list at once in triage and then as the
   server made it, and a task in each of two groups lists with the name of its group and the replies its
-  thread has, and a thread the person stops following and follows again notes both in the thread, none for starting it, as it is written and once the server has it; and a connection added over HTTP, to an integration the test host installs, reaches the
+  thread has, and a thread the person stops following and follows again notes both in the thread, none for starting it, and a
+  thread the replica lacks reads as absent once it answers and as present once it holds it, as it is written and once the server has it; and a connection added over HTTP, to an integration the test host installs, reaches the
   store, and its rename and removal show at once, then as the server made them (the stub host the page's and the connections' command tests send their requests through is `test/host.ts`); and an agent added
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,

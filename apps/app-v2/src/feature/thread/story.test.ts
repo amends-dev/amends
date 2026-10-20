@@ -20,7 +20,7 @@ import {
   UnfollowThread
 } from "./command.ts"
 import { ReplyBinding } from "./composition.ts"
-import { Message, type Model, titleOf } from "./definition.ts"
+import { availabilityOf, Message, type Model, titleOf } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -60,6 +60,7 @@ const savingDraft = (text: string) => SaveDraft({ workspaceId, memberId, place: 
 const received = (latest: number, readThrough: number, active = true) =>
   message(
     Message.ReceivedThread({
+      hasThread: true,
       title: Option.none(),
       messages: [{ message: opening, pending: false }],
       following: Option.some({ participationId, active, pending: false }),
@@ -68,6 +69,117 @@ const received = (latest: number, readThrough: number, active = true) =>
       readThrough
     })
   )
+
+/** The store answering that it holds the thread, or that it does not. */
+const answered = (hasThread: boolean) =>
+  message(
+    Message.ReceivedThread({
+      hasThread,
+      title: Option.none(),
+      messages: [],
+      following: Option.none(),
+      changes: [],
+      latest: 0,
+      readThrough: 0
+    })
+  )
+
+const unreadable = "This browser could not read that. Try again."
+
+describe("a thread being read", () => {
+  it("is loading until the store answers, available once it holds the thread, and unavailable once it answers without", () => {
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Loading")
+        expect(model.isLoaded).toBe(false)
+      }),
+      answered(true),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+        expect(model.isLoaded).toBe(true)
+      })
+    )
+    story(
+      update,
+      given(opened),
+      answered(false),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Unavailable")
+        expect(model.isLoaded).toBe(true)
+      })
+    )
+  })
+
+  it("is unavailable again when a thread it held is no longer there, and available when it comes back", () => {
+    story(
+      update,
+      given(opened),
+      answered(true),
+      answered(false),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Unavailable")
+      }),
+      answered(true),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+      })
+    )
+  })
+
+  it("has failed when the read did, until the person asks to try again, which reads it again", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.FailedRead({ error: unreadable })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Failed")
+        expect(model.reads).toBe(0)
+      }),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Loading")
+        expect(model.notice).toEqual(Option.none())
+        expect(model.reads).toBe(1)
+      }),
+      message(Message.FailedRead({ error: unreadable })),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.reads).toBe(2)
+      }),
+      answered(true),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+      })
+    )
+  })
+
+  it("is available, with the reason, when a later read fails after the thread was held", () => {
+    story(
+      update,
+      given(opened),
+      answered(true),
+      message(Message.FailedRead({ error: unreadable })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Available")
+        expect(model.notice).toEqual(Option.some(unreadable))
+      })
+    )
+  })
+
+  it("is unavailable, not failed, when the store answered without the thread before a read failed", () => {
+    story(
+      update,
+      given(opened),
+      answered(false),
+      message(Message.FailedRead({ error: unreadable })),
+      model((model) => {
+        expect(availabilityOf(model)).toBe("Unavailable")
+      })
+    )
+  })
+})
 
 describe("a thread's title", () => {
   const formatted = { message: saying(opening, "**Plans** for the [week](https://example.com)"), pending: false }

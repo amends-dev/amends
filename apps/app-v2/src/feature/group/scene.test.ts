@@ -134,8 +134,8 @@ const openedToRename = modifyFields(opened, {
   grants: (grants) => [...grants, Grant.make(GroupPermissions.Rename, inWorkspace)]
 })
 
-/** The team with a thread open in it, titled. */
-const withThread = modifyFields(
+/** The team with a thread open in it, titled, before the store has answered whether it holds the thread. */
+const withUnreadThread = modifyFields(
   modifyFields(init(workspace.id, member.id, design.id, Option.some(threadId)).model, {
     group: () => opened.group,
     memberships: () => opened.memberships,
@@ -149,6 +149,14 @@ const withThread = modifyFields(
     }))
   }
 )
+
+/** The team with a thread open in it, read: the store holds it. */
+const withThread = modifyFields(withUnreadThread, {
+  thread: Option.map((open) => ({
+    ...open,
+    model: modifyFields(open.model, { isLoaded: () => true, hasThread: () => true })
+  }))
+})
 
 /** The general group, which every member belongs to. */
 const openedGeneral = modifyFields(init(workspace.id, member.id, general.id, Option.none()).model, {
@@ -1001,6 +1009,60 @@ describe("a group's side pane", () => {
       given(withThread),
       expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Follow thread" }))).toExist()
     )
+  })
+
+  describe("while the thread is not shown", () => {
+    const pane = role("complementary", { name: "Thread" })
+
+    it("says that the thread is loading, with neither the bell, whose state is not known, nor its timeline, but a composer", () => {
+      scene(
+        { update, view: sidePane },
+        given(withUnreadThread),
+        expect(within(pane, text("Loading the thread…"))).toExist(),
+        expect(within(pane, role("button", { name: "Follow thread" }))).toBeAbsent(),
+        expect(within(pane, role("list", { name: "Messages" }))).toBeAbsent(),
+        expect(within(pane, role("button", { name: "Close thread" }))).toExist(),
+        expect(within(pane, role("form", { name: "Reply in thread" }))).toExist()
+      )
+    })
+
+    it("says that the thread is not available, with neither the bell nor a composer, and the way back", () => {
+      scene(
+        { update, view: sidePane },
+        given(
+          modifyFields(withUnreadThread, {
+            thread: Option.map((open) => ({
+              ...open,
+              model: modifyFields(open.model, { isLoaded: () => true })
+            }))
+          })
+        ),
+        expect(within(pane, role("heading", { name: "This thread isn't available" }))).toExist(),
+        expect(within(pane, text("It may be in a group you no longer belong to."))).toExist(),
+        expect(within(pane, role("button", { name: "Follow thread" }))).toBeAbsent(),
+        expect(within(pane, role("form", { name: "Reply in thread" }))).toBeAbsent(),
+        expect(within(pane, role("button", { name: "Close thread" }))).toExist(),
+        click(role("button", { name: "Close thread" })),
+        expect(role("complementary", { name: "Thread" })).toBeAbsent()
+      )
+    })
+
+    it("says that the thread could not be loaded, with Try again, and no bell", () => {
+      scene(
+        { update, view: sidePane },
+        given(
+          modifyFields(withUnreadThread, {
+            thread: Option.map((open) => ({
+              ...open,
+              model: modifyFields(open.model, { notice: () => Option.some("This browser could not read that.") })
+            }))
+          })
+        ),
+        expect(within(pane, role("heading", { name: "Can't load this thread" }))).toExist(),
+        expect(within(pane, role("button", { name: "Try again" }))).toExist(),
+        expect(within(pane, role("button", { name: "Follow thread" }))).toBeAbsent()
+      )
+    })
   })
 
   it("is the complementary landmark named Task for a thread that tracks one, with its status, subtitle, and close", () => {

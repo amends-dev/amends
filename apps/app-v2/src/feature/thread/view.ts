@@ -9,6 +9,7 @@ import {
   field,
   hint,
   iconButton,
+  loadingLine,
   notice,
   submit,
   textarea
@@ -16,7 +17,7 @@ import {
 import { property } from "@amends-dev/design/details"
 import { form } from "@amends-dev/design/form"
 import { description, divider, event, message, messageList, note } from "@amends-dev/design/message"
-import { pane, paneBack, paneClose, paneColumn, paneStack } from "@amends-dev/design/pane"
+import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneStack } from "@amends-dev/design/pane"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
@@ -35,7 +36,16 @@ import {
 } from "../../seen.ts"
 import { replyActionView, replyLogView } from "../turns/view.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
-import { Message, type MessageItem, type Model, noteOf, titleOf, typingIn } from "./definition.ts"
+import {
+  type Availability,
+  availabilityOf,
+  Message,
+  type MessageItem,
+  type Model,
+  noteOf,
+  titleOf,
+  typingIn
+} from "./definition.ts"
 import { Entry, timelineOf, turnPostingReply, whenOf } from "./timeline.ts"
 
 /**
@@ -353,19 +363,50 @@ const threadColumn = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): H
   ])
 
 /**
+ * What the pane says in place of the thread while it is not shown, as `apps/ui` says it: that it is being read; that it
+ * is not available, as it is for a thread in a group the person no longer belongs to; or that it could not be read,
+ * with the button to read it again.
+ */
+const stateView = (availability: Exclude<Availability, "Available">, h: ThreadViewBuilder): Html => {
+  switch (availability) {
+    case "Loading":
+      return loadingLine(h, "Loading the thread…")
+    case "Unavailable":
+      return paneEmpty(h, {
+        art: "held-back",
+        title: "This thread isn't available",
+        copy: "It may be in a group you no longer belong to."
+      })
+    case "Failed":
+      return paneEmpty(h, {
+        art: "came-apart",
+        title: "Can't load this thread",
+        copy: "Try again once the host is reachable.",
+        action: button(h, "Try again", Message.ClickedTryAgain())
+      })
+  }
+}
+
+/**
  * The thread as the side pane's body: its title to change, the task it tracks, and its timeline, the opening first and
  * the replies and the agents' turns after it; or, for a thread that tracks a task, the task's properties, its
- * description, and its activity.
+ * description, and its activity. Until the store has the thread, or when it has not, the state says so instead.
  */
-export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
-  Option.match(
+export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+  const availability = availabilityOf(model)
+
+  if (availability !== "Available") {
+    return h.section([h.AriaLabel("Thread")], [paneColumn(h, [stateView(availability, h)])])
+  }
+
+  return Option.match(
     Option.map(model.task.task, ({ task }) => task),
     {
       onNone: () => h.section([h.AriaLabel("Thread")], [threadColumn(model, inputs, h)]),
       onSome: (task) => h.section([h.AriaLabel("Task")], [taskColumn(task, model, inputs, h)])
     }
   )
-)
+})
 
 /** The composer to reply in the thread, for a pane's footer. */
 export const replyView = ThreadComposition.makeView((model, h) =>
@@ -405,7 +446,9 @@ export type SidePane<Message> = Readonly<{
 /**
  * The thread open as the side pane, as `apps/ui` has it: a thread is titled by a message and subtitled "Thread in
  * #general", with the bell that follows it and Close thread; a thread that tracks a task by its status, subtitled "Task
- * in #general", with Close task. Back, which a phone shows in place of Close, is named for where it goes back to.
+ * in #general", with Close task. Back, which a phone shows in place of Close, is named for where it goes back to. While
+ * the thread is not shown the bell is not either, since it would say whether the person follows a thread they have not
+ * read, and a thread that is not available has no composer, as in `apps/ui`.
  */
 export const sidePane = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -413,6 +456,7 @@ export const sidePane = <Message, Requirements>(
 ): Html => {
   const tracked = Option.map(config.thread.task.task, ({ task }) => task)
   const about = Option.isSome(tracked) ? "Task" : "Thread"
+  const availability = availabilityOf(config.thread)
 
   return pane(h, {
     variant: "side",
@@ -425,9 +469,12 @@ export const sidePane = <Message, Requirements>(
       }),
       subtitle: config.subtitle ?? sideSubtitle(about, config.group, config.members, config.self),
       leading: paneBack(h, config.onClose, `Back to ${config.backTo}`),
-      actions: [config.follow, paneClose(h, config.onClose, `Close ${about.toLowerCase()}`)]
+      actions: [
+        ...(availability === "Available" ? [config.follow] : []),
+        paneClose(h, config.onClose, `Close ${about.toLowerCase()}`)
+      ]
     },
     body: [config.body],
-    footer: [config.reply]
+    ...(availability === "Unavailable" ? {} : { footer: [config.reply] })
   })
 }

@@ -143,6 +143,8 @@ const withConversation = modifyFields(withThread, {
               thread: Option.map((openThread) => ({
                 ...openThread,
                 model: modifyFields(openThread.model, {
+                  isLoaded: () => true,
+                  hasThread: () => true,
                   messages: () => [
                     { message: opening, pending: false },
                     { message: reply, pending: false }

@@ -88,6 +88,8 @@ const opened = modifyFields(readOnUnread, { tab: () => "All" })
 
 /** The thread of the notification read, with its opening and Bob's reply, which the notification tells of. */
 const threadRead = modifyFields(initThread(workspace.id, member.id, thread.id).model, {
+  isLoaded: () => true,
+  hasThread: () => true,
   title: () => Option.some("Composer paste crash"),
   messages: () => [
     { message: opening, pending: false },

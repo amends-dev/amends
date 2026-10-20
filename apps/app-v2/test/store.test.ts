@@ -429,6 +429,29 @@ describe("Store", () => {
       }).pipe(Effect.scoped, Effect.provide(browser))
   )
 
+  it.live("a thread the replica lacks reads as absent once the replica answers, and as present once it holds it", () =>
+    Effect.gen(function* () {
+      const services = yield* host
+      const gateway = Context.get(services, Gateway.Gateway)
+      const workspace = yield* gateway.createWorkspace(alice, { name: "Studio", memberName: Member.Name.make("Alice") })
+      const apiUrl = HttpServer.formatAddress(yield* serve(services, yield* Effect.scope))
+      const store = yield* openStore(apiUrl, workspace, yield* Effect.scope)
+      yield* firstWhere(store.list("Workspace", Store.workspacePlace), (held) => held.length === 1)
+
+      const absent = yield* firstWhere(store.thread(ThreadId.ThreadId.make("thread-missing")), () => true)
+      expect(Option.isNone(absent.thread)).toBe(true)
+      expect(absent.messages).toEqual([])
+
+      yield* store.write("ThreadStarted", { groupId: Group.GeneralId, text: "Hello", mentions: [] })
+      const [started] = yield* firstWhere(
+        store.threads(Group.GeneralId),
+        ([thread]) => thread?.thread.pending === false
+      )
+      const present = yield* firstWhere(store.thread(started!.thread.record.value.id), () => true)
+      expect(Option.isSome(present.thread)).toBe(true)
+    }).pipe(Effect.scoped, Effect.provide(browser))
+  )
+
   it.live("a thread started as a task shows its task at once in its group, then as the host made it", () =>
     Effect.gen(function* () {
       const services = yield* host

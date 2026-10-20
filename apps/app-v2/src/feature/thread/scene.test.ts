@@ -104,6 +104,7 @@ const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.T
   Subscription.emit(
     subscriptions.thread,
     Message.ReceivedThread({
+      hasThread: true,
       title: Option.none(),
       messages,
       following: Option.none(),
@@ -136,6 +137,7 @@ const readWithChanges = (
   Subscription.emit(
     subscriptions.thread,
     Message.ReceivedThread({
+      hasThread: true,
       title: Option.none(),
       messages,
       following: Option.none(),
@@ -160,9 +162,92 @@ const participationId = ThreadParticipationId.ThreadParticipationId.make("partic
 
 const opened = init(workspaceId, memberId, threadId).model
 
+/** The thread once the store has answered that it holds it, and has nothing in it yet. */
+const read = modifyFields(opened, { isLoaded: () => true, hasThread: () => true })
+
 /** The thread when it tracks a task, which is in triage and assigned to no one. */
-const trackingTask = modifyFields(opened, {
+const trackingTask = modifyFields(read, {
   task: (taskModel) => modifyFields(taskModel, { task: () => Option.some({ task, pending: false }) })
+})
+
+/** The thread read when the store answered `hasThread`. */
+const answered = (hasThread: boolean) =>
+  Subscription.emit(
+    subscriptions.thread,
+    Message.ReceivedThread({
+      hasThread,
+      title: Option.none(),
+      messages: [],
+      following: Option.none(),
+      changes: [],
+      latest: 0,
+      readThrough: 0
+    })
+  )
+
+describe("a thread being read", () => {
+  it("says that it is loading until the store answers, and then shows its timeline", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      expect(within(role("region", { name: "Thread" }), role("status"))).toHaveText("Loading the thread…"),
+      expect(role("list", { name: "Messages" })).toBeAbsent(),
+      expect(role("button", { name: "Rename" })).toBeAbsent(),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      answered(true),
+      expect(text("Loading the thread…")).toBeAbsent(),
+      expect(role("list", { name: "Messages" })).toExist()
+    )
+  })
+
+  it("says that it is not available once the store answers without it, and shows it again when it comes back", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      answered(false),
+      expect(
+        within(role("region", { name: "Thread" }), role("heading", { name: "This thread isn't available", level: 2 }))
+      ).toExist(),
+      expect(text("It may be in a group you no longer belong to.")).toExist(),
+      expect(text("Loading the thread…")).toBeAbsent(),
+      expect(role("list", { name: "Messages" })).toBeAbsent(),
+      expect(role("button", { name: "Rename" })).toBeAbsent(),
+      expect(role("button", { name: "Try again" })).toBeAbsent(),
+      answered(true),
+      expect(role("heading", { name: "This thread isn't available" })).toBeAbsent(),
+      expect(role("list", { name: "Messages" })).toExist()
+    )
+  })
+
+  it("says that it could not be read, with a Try again that reads it again", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      Subscription.emit(subscriptions.thread, Message.FailedRead({ error: "This browser could not read that." })),
+      expect(
+        within(role("region", { name: "Thread" }), role("heading", { name: "Can't load this thread", level: 2 }))
+      ).toExist(),
+      expect(text("Try again once the host is reachable.")).toExist(),
+      expect(role("list", { name: "Messages" })).toBeAbsent(),
+      click(role("button", { name: "Try again" })),
+      expect(role("heading", { name: "Can't load this thread" })).toBeAbsent(),
+      expect(text("Loading the thread…")).toExist(),
+      answered(true),
+      expect(role("list", { name: "Messages" })).toExist()
+    )
+  })
+
+  it("keeps showing a thread it held, with why, when a later read fails", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      answered(true),
+      Subscription.emit(subscriptions.thread, Message.FailedRead({ error: "This browser could not read that." })),
+      expect(role("list", { name: "Messages" })).toExist(),
+      expect(text("This browser could not read that.")).toExist(),
+      expect(role("heading", { name: "Can't load this thread" })).toBeAbsent()
+    )
+  })
 })
 
 describe("a thread", () => {
@@ -259,7 +344,7 @@ describe("a thread", () => {
 
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
-      given(opened),
+      given(read),
       Subscription.emit(
         subscriptions.thread,
         Message.ReceivedPeople({ members: [alice, bob, carol, dana], contacts: [] })
@@ -349,6 +434,7 @@ describe("a thread", () => {
       Subscription.emit(
         subscriptions.thread,
         Message.ReceivedThread({
+          hasThread: true,
           title: Option.none(),
           messages: [],
           following,

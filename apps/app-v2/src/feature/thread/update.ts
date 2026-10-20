@@ -9,11 +9,13 @@ const inThread = ({ workspaceId, memberId, threadId }: Model) => ({ workspaceId,
 
 export const update = ThreadComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ReceivedThread: ({ title, messages, following, changes, latest, readThrough }) => {
+    ReceivedThread: ({ hasThread, title, messages, following, changes, latest, readThrough }) => {
       // Reading it open marks it read through its latest activity, once for each.
       const marking = latest > Math.max(readThrough, model.readRequested)
       return {
         model: modifyFields(model, {
+          isLoaded: () => true,
+          hasThread: () => hasThread,
           title: () => title,
           messages: () => messages,
           following: () => following,
@@ -30,6 +32,9 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
     }),
     ReceivedPresence: ({ present }) => ({ model: modifyFields(model, { present: () => present }) }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
+    ClickedTryAgain: () => ({
+      model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })
+    }),
     ClickedRename: () => ({
       model: modifyFields(model, { renaming: () => Option.some(Option.getOrElse(model.title, () => "")) })
     }),
