@@ -5,24 +5,28 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, type MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Option, Result, Schema } from "effect"
+import { DateTime, Option, Result, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
   bob,
   bobIsMember,
+  design,
+  general,
   grantsOf,
   integrationGiving,
   keylessConnection,
   membership,
+  now,
   offered,
   reviewer,
   reviewerAgent,
   roleOf,
   roles,
   scout,
-  scoutAgent
+  scoutAgent,
+  turnOf
 } from "../../../test/fixtures.ts"
 import { type Draft, empty } from "../../agentSetup.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
@@ -37,6 +41,7 @@ import {
   findAgentName,
   findCreatedAgent,
   isAddingReady,
+  activityOfAgent,
   isDialogBusy,
   isNameChanged,
   isSetupChanged,
@@ -54,6 +59,7 @@ import {
   SetupTarget,
   shownAgents,
   startingRoles,
+  turnsOfAgent,
   Written
 } from "./definition.ts"
 import { init } from "./init.ts"
@@ -1639,5 +1645,60 @@ describe("the setup of an agent", () => {
     ).toBe(false)
     expect(isDialogBusy(removingAgent(true))).toBe(true)
     expect(isDialogBusy(removingAgent(false))).toBe(false)
+  })
+})
+
+describe("what the agents are doing", () => {
+  const underWay = [
+    { ...turnOf("turn-1", "running"), createdAt: DateTime.add(now, { minutes: 1 }) },
+    { ...turnOf("turn-2", "queued"), groupId: design.id, createdAt: DateTime.add(now, { minutes: 2 }) }
+  ]
+  const [scoutItem] = opened.agents
+
+  it("is read from the turns under way and the groups they are in, replacing what was read before", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ReceivedActivity({ turns: underWay, groups: [general, design] })),
+      model((model) => {
+        expect(model.turns).toEqual(underWay)
+        expect(model.groups).toEqual([general, design])
+      }),
+      message(Message.ReceivedActivity({ turns: [], groups: [general] })),
+      model((model) => {
+        expect(model.turns).toEqual([])
+        expect(model.groups).toEqual([general])
+      }),
+      expectNoOutMessage()
+    )
+  })
+
+  it("is idle for an agent with no turn under way, and otherwise its state and each place", () => {
+    const working = { ...opened, turns: underWay, groups: [general, design] }
+
+    expect(turnsOfAgent(opened, scoutItem!)).toEqual([])
+    expect(activityOfAgent(opened, scoutItem!)).toEqual(Option.none())
+    expect(turnsOfAgent(working, scoutItem!).map(({ state }) => state)).toEqual(["working", "queued"])
+    expect(activityOfAgent(working, scoutItem!)).toEqual(
+      Option.some({ state: "working", places: ["#General", "#Design"] })
+    )
+  })
+
+  it("is nothing for an agent still on its way, which has run no turn", () => {
+    const working = { ...opened, turns: underWay, groups: [general, design] }
+
+    expect(turnsOfAgent(working, { ...scoutItem!, pending: true })).toEqual([])
+    expect(activityOfAgent(working, { ...scoutItem!, pending: true })).toEqual(Option.none())
+  })
+
+  it("is read again, with the agents, when the person tries again", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedTryAgain()),
+      model((model) => {
+        expect(model.reads).toBe(opened.reads + 1)
+      })
+    )
   })
 })

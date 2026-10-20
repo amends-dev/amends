@@ -625,15 +625,20 @@ below it counted at each level above.
   "Add agent", whose dialog says beside the model connection when no connection gives models, and the title a button that opens the list and is current while it shows (the view
   input `isListOpen`), an agent's row being current instead while its page shows (`openAgentId`); an agent that needs setup has a caution triangle on its mark, with "Needs
   setup" in a tooltip on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
-  ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
+  ready and at work has the filled square on its mark, with what it is doing in the tooltip and after its name,
+  "Atlas, Working in #design", and the logo at the row's end, moving as its turn does (`motionOfState`); one that is
+  ready and idle shows nothing, and so does one still on its way, which says "Sending…" at its end. The
   Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
   many agents it holds, an "Add agent" button that opens the dialog, a toolbar with a search that narrows the tab by name, in any case
   and whatever the accents, and a row for each agent in the design's columns Agent, Harness,
   Model, and Activity: the lilac 32px mark and name, the harness (a connection's name, or "Auto")
   over its sandbox (a connection's name, or "No sandbox"), the model's id over its connection's
-  name ("Removed connection" once it is gone), and the activity, which stays blank until turns
-  say what an agent is at work on. An agent that needs setup shows what keeps it from running,
-  the first reason, in a sentence on its mark. With no agents the list offers adding the first
+  name ("Removed connection" once it is gone), and the activity, which is blank while the agent is idle
+  and otherwise the logo moving as its most pressing turn does, the state ("Working", "Queued", or
+  "Stopping") over the places it is at work ("#general", or "#general + 1 more"), which below 48rem
+  follow the state on the line under the name; the row's description repeats it in words. An agent that
+  needs setup shows what keeps it from running, the first reason, in a sentence on its mark, and its
+  activity too while it has one. With no agents the list offers adding the first
   ("An administrator can add agents to your workspace." for a person who may not), the Needs setup
   tab says every agent can run, and a search with no match says so and clears from "Clear search".
   The Block reports `RequestedBrowse` when the person browses from the sidebar, and `OpenedAgent`
@@ -645,8 +650,10 @@ below it counted at each level above.
   form, the field "Agent name" with a secondary "Save name", disabled until the name is changed to one that
   is not blank; a Setup form, under a dashed stitch, of the setup fields with a primary "Save setup", disabled
   until the setup changes, and "Discard changes" beside it while it has; and Details: the role, which is
-  changed in Settings › Members, as any member's is, the current activity, "Idle" until turns say what an agent
-  is at work on, and who created the agent, with the day. A person who may not configure the agent reads the
+  changed in Settings › Members, as any member's is, the current activity, "Idle" or a line for each turn
+  under way, the most pressing first, the logo moving as it does, the state, and the place, such as
+  "Working #general", and who created the agent, with the day. (`apps/ui` makes each line a link that opens
+  the turn's log beside its thread; here a line is not a link, since the Block has no way to open a thread.) A person who may not configure the agent reads the
   same fields disabled, with no buttons; an agent the workspace does not list says "This agent isn't here" and
   offers "Show all agents", and nothing shows before the agents are read. The Block keeps what the person
   changed on each agent's page (`edits`: a name and a whole setup, each saved apart, from the name the agent
@@ -980,7 +987,15 @@ channels, adding a connection, replacing its key, checking it, and listing the m
 offers an agent.
 
 `settingsForm.ts`, an integration's settings form as the person fills it in, is the connections
-feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's.
+feature's, and `agentSetup.ts`, an agent's setup as the person fills it in, is the agents feature's, as is
+`agentActivity.ts`, what an agent is doing, read from its turns. A turn that is queued, running, or being
+stopped is under way, as Queued, Working, or Stopping, and a turn that finished is not (`activityStateOf`);
+`turnsUnderWay` lists an agent's, the most pressing first (working, then stopping, then queued) and the oldest
+first within a state, each in the place its group is named by, as the person reads it (`placeName`), or in none
+while the store lacks the group; `activityOf` takes the most pressing state and each place once, and none for an agent
+with no turn, which is idle. `placesLine`, `activityLabel`, and `turnLabel` say them in words, "#general + 1 more" and
+"Working in #general", and `motionOfState` says how the logo moves for each: threaded, lit, or tugged. The Block
+reads the turns under way and the groups through its `ReadActivity` subscription, apart from the agents.
 `taskTable.ts`, tasks as the design's `directory` rows under the labels of its columns, with the badge
 of each status, is the threads feature's Tasks tab's and the tasks feature's, which adds a column for the group.
 `taskFilter.ts`, what a list of tasks is narrowed to besides the letters typed, the status and the assignee, each
@@ -1505,7 +1520,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   a mention as "@" and the member's current name or the name it recorded, and the rest of the
   markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
-  draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes. `Drafts`'
+  draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
+  the state of a turn in each status, the turns under way of an agent, ordered, and named by place, its activity
+  from them, idle or by the most pressing state and each place once, and the words for them. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

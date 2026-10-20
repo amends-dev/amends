@@ -1,11 +1,12 @@
 import { Agent } from "@amends-dev/core/agent"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
+import type { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
-import { Option, Schema } from "effect"
+import { DateTime, Option, Schema } from "effect"
 import {
   Command,
   Mount,
@@ -35,17 +36,21 @@ import {
   art,
   bob,
   bobIsMember,
+  design,
+  general,
   grantsOf,
   integrationGiving,
   keylessConnection,
   membership,
+  now,
   offered,
   reviewer,
   reviewerAgent,
   roleOf,
   roles,
   scout,
-  scoutAgent
+  scoutAgent,
+  turnOf
 } from "../../../test/fixtures.ts"
 import { calendarDate } from "../../seen.ts"
 import { Integrations } from "../connections/definition.ts"
@@ -1300,6 +1305,245 @@ describe("an agent's page", () => {
       expect(removeDialog).toBeAbsent(),
       expect(label("Agent name")).toHaveValue("Scout"),
       expect(role("button", { name: "Remove agent" })).toExist()
+    )
+  })
+})
+
+/** Agent `agentId`'s turn `id` in `status`, in the group `groupId`, created `minutes` after the time now. */
+const turnOfAgent = (
+  agentId: string,
+  id: string,
+  status: Parameters<typeof turnOf>[1],
+  groupId: GroupId.GroupId,
+  minutes: number
+) => ({
+  ...turnOf(id, status),
+  agentId: Identity.AgentId.make(agentId),
+  groupId,
+  createdAt: DateTime.add(now, { minutes })
+})
+
+/**
+ * Scout working in general and waiting in design, Nora waiting in general, and Review helper, who can't run, stopping
+ * in design.
+ */
+const atWork: Model = modifyFields(withSeveral, {
+  groups: () => [general, design],
+  turns: () => [
+    turnOfAgent("agent-1", "turn-1", "running", general.id, 1),
+    turnOfAgent("agent-1", "turn-2", "queued", design.id, 2),
+    turnOfAgent("agent-2", "turn-3", "queued", general.id, 3),
+    turnOfAgent("agent-3", "turn-4", "cancelling", design.id, 4)
+  ]
+})
+
+describe("what the agents are doing, in the list", () => {
+  const scoutRow = role("button", { name: "Scout, Working in #General + 1 more" })
+  const noraRow = role("button", { name: "Nora, Queued in #General" })
+  const helperRow = role("button", { name: "Review helper, Needs setup" })
+
+  it("says in the Activity column the state of an agent at work, with the logo moving as it does, over where", () => {
+    scene(
+      { update, view },
+      given(atWork),
+      expect(within(scoutRow, text("Working"))).toExist(),
+      expect(within(scoutRow, text("#General + 1 more"))).toExist(),
+      expect(within(scoutRow, selector("svg.logo-working"))).toExist(),
+      expect(within(noraRow, text("Queued"))).toExist(),
+      expect(within(noraRow, text("#General"))).toExist(),
+      expect(within(noraRow, selector("svg.logo-thread"))).toExist(),
+      expect(within(helperRow, text("Stopping"))).toExist(),
+      expect(within(helperRow, text("#Design"))).toExist(),
+      expect(within(helperRow, selector("svg.logo-tug"))).toExist()
+    )
+  })
+
+  it("puts the state before the place on one line below 48rem, where the cells fold under the name", () => {
+    scene(
+      { update, view },
+      given(atWork),
+      expect(within(scoutRow, text("· #General + 1 more"))).toExist(),
+      expect(within(noraRow, text("· #General"))).toExist()
+    )
+  })
+
+  it("leaves the Activity blank for an agent that is idle, or whose turns have all finished", () => {
+    scene(
+      { update, view },
+      given(
+        modifyFields(withSeveral, {
+          groups: () => [general],
+          turns: () => [
+            turnOfAgent("agent-1", "turn-1", "completed", general.id, 1),
+            turnOfAgent("agent-1", "turn-2", "failed", general.id, 2),
+            turnOfAgent("agent-1", "turn-3", "cancelled", general.id, 3)
+          ]
+        })
+      ),
+      expect(role("button", { name: "Scout" })).toExist(),
+      expect(within(role("button", { name: "Scout" }), selector("svg"))).toBeAbsent(),
+      expect(within(role("button", { name: "Nora" }), selector("svg"))).toBeAbsent()
+    )
+  })
+
+  it("names the agent by what it is doing in its mark's tooltip, as it names one that needs setup", () => {
+    scene(
+      { update, view },
+      given(atWork),
+      expect(within(scoutRow, text("Working in #General + 1 more"))).toExist(),
+      expect(within(scoutRow, text("Working in #General + 1 more"))).not.toHaveClass("text-caution-text"),
+      expect(within(noraRow, text("Queued in #General"))).toExist(),
+      expect(within(helperRow, text("Needs setup"))).toHaveClass("text-caution-text")
+    )
+  })
+
+  it("describes the row by the activity beside what it runs on", () => {
+    scene(
+      { update, view },
+      given(atWork),
+      expect(scoutRow).toHaveAttr(
+        "aria-description",
+        "Auto · No sandbox · test-model · Models · Working in #General + 1 more"
+      )
+    )
+  })
+
+  it("follows the turns the store holds, as they start and finish", () => {
+    scene(
+      { update, view, subscriptions: AgentsBlock.subscriptions },
+      given(withSeveral),
+      expect(role("button", { name: "Nora" })).toExist(),
+      Subscription.emit(
+        subscriptions.activity,
+        Message.ReceivedActivity({
+          turns: [turnOfAgent("agent-2", "turn-3", "queued", general.id, 3)],
+          groups: [general]
+        })
+      ),
+      expect(noraRow).toExist(),
+      expect(within(noraRow, selector("svg.logo-thread"))).toExist(),
+      Subscription.emit(
+        subscriptions.activity,
+        Message.ReceivedActivity({
+          turns: [turnOfAgent("agent-2", "turn-3", "running", general.id, 3)],
+          groups: [general]
+        })
+      ),
+      expect(role("button", { name: "Nora, Working in #General" })).toExist(),
+      expect(within(role("button", { name: "Nora, Working in #General" }), selector("svg.logo-working"))).toExist(),
+      Subscription.emit(subscriptions.activity, Message.ReceivedActivity({ turns: [], groups: [general] })),
+      expect(role("button", { name: "Nora" })).toExist(),
+      expect(within(role("button", { name: "Nora" }), selector("svg"))).toBeAbsent()
+    )
+  })
+
+  it("says the state alone while the store has not the group of the turn", () => {
+    scene(
+      { update, view },
+      given(modifyFields(atWork, { groups: () => [] })),
+      expect(role("button", { name: "Scout, Working" })).toExist(),
+      expect(within(role("button", { name: "Scout, Working" }), text("Working"))).toExist()
+    )
+  })
+})
+
+describe("what the agents are doing, in the sidebar", () => {
+  const sidebar = withViewInputs(sidebarView, { isListOpen: true, openAgentId: Option.none() })()
+
+  it("names a row by what its agent is doing and ends it with the logo moving as its turn does", () => {
+    scene(
+      { update, view: sidebar },
+      given(atWork),
+      expect(
+        within(role("button", { name: "Scout, Working in #General + 1 more" }), selector("svg.logo-working"))
+      ).toExist(),
+      expect(within(role("button", { name: "Nora, Queued in #General" }), selector("svg.logo-thread"))).toExist(),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), selector("svg.logo-tug"))).toExist()
+    )
+  })
+
+  it("puts the patch of an agent at work on its mark, saying where on hover, and none on one that is idle", () => {
+    scene(
+      { update, view: sidebar },
+      given(modifyFields(atWork, { turns: (turns) => turns.filter(({ agentId }) => agentId === "agent-1") })),
+      expect(
+        within(role("button", { name: "Scout, Working in #General + 1 more" }), text("Working in #General + 1 more"))
+      ).toExist(),
+      expect(within(role("button", { name: "Nora" }), selector(".tooltip-anchor"))).toBeAbsent(),
+      expect(within(role("button", { name: "Nora" }), selector("svg"))).toBeAbsent()
+    )
+  })
+
+  it("shows an agent on its way without activity, as it shows it without a patch", () => {
+    scene(
+      { update, view: sidebar },
+      given(modifyFields(atWork, { agents: (agents) => agents.map((item) => ({ ...item, pending: true })) })),
+      expect(role("button", { name: "Scout" })).toExist(),
+      expect(within(role("button", { name: "Scout" }), selector("svg"))).toBeAbsent()
+    )
+  })
+})
+
+describe("what an agent is doing, on its page", () => {
+  const workspaceName = workspace.name
+  const pageOf = (id: string) => withViewInputs(agentView, { agentId: Identity.AgentId.make(id), workspaceName })()
+  const activity = role("list", { name: "Turns under way" })
+
+  it("lists a line for each turn under way, the most pressing first, with the logo moving as it does and where", () => {
+    scene(
+      { update, view: pageOf("agent-1") },
+      given(atWork),
+      expect(text("Current activity")).toExist(),
+      expect(text("Idle")).toBeAbsent(),
+      expect(within(activity, text("Working"))).toExist(),
+      expect(within(activity, text("#General"))).toExist(),
+      expect(within(activity, text("Queued"))).toExist(),
+      expect(within(activity, text("#Design"))).toExist(),
+      expect(within(activity, selector("svg.logo-working"))).toExist(),
+      expect(within(activity, selector("svg.logo-thread"))).toExist(),
+      expectAll(all.role("listitem")).toHaveCount(2)
+    )
+  })
+
+  it("says Queued in a place, for an agent whose only turn waits", () => {
+    scene(
+      { update, view: pageOf("agent-2") },
+      given(atWork),
+      expect(within(activity, text("Queued"))).toExist(),
+      expect(within(activity, text("#General"))).toExist(),
+      expect(within(activity, selector("svg.logo-thread"))).toExist(),
+      expect(text("Idle")).toBeAbsent()
+    )
+  })
+
+  it("says Idle for an agent with no turn under way", () => {
+    scene(
+      { update, view: pageOf("agent-2") },
+      given(modifyFields(atWork, { turns: () => [] })),
+      expect(text("Idle")).toExist(),
+      expect(activity).toBeAbsent()
+    )
+  })
+
+  it("shows what the agent is doing in its header's status, which an agent that needs setup keeps saying first", () => {
+    scene({ update, view: pageOf("agent-1") }, given(atWork), expect(text("Working in #General + 1 more")).toExist())
+    scene(
+      { update, view: pageOf("agent-3") },
+      given(atWork),
+      expect(text("Needs setup")).toExist(),
+      expect(text("Stopping in #Design")).toBeAbsent(),
+      expect(within(activity, text("Stopping"))).toExist(),
+      expect(within(activity, selector("svg.logo-tug"))).toExist()
+    )
+  })
+
+  it("lists a turn whose group is not read by its state alone", () => {
+    scene(
+      { update, view: pageOf("agent-1") },
+      given(modifyFields(atWork, { groups: () => [] })),
+      expect(within(activity, text("Working"))).toExist(),
+      expect(within(activity, text("Queued"))).toExist(),
+      expect(within(activity, text("#General"))).toBeAbsent()
     )
   })
 })

@@ -1,22 +1,22 @@
 /**
- * The workspace's agents, as a section of the sidebar to pick one from, each by its name with how it
- * stands; as a list page, All and those that need setup on a tab each, narrowed by a search, each
- * with its harness and sandbox, its model and connection; as the page of one, where, for a person
- * who may configure it, they rename it and set it up again, and see why it can't run, and, for a person
- * who may remove members, remove it; and adding one, for a person who may, on the harnesses, models,
- * and sandboxes the workspace's connections give. Adding and removing happen in a dialog the workspace
- * page lends the shell. The Block reports when the person asks to browse, the agent they pick, and what
- * they did, which the workspace page shows the list or the agent's page for, and confirms. An agent's
- * role is its membership's, in the settings. The workspace page lists the host's integrations once and
- * informs the Block of them,
- * which say what each connection gives, and a model connection lists its models over HTTP as a
- * setup chooses it.
+ * The workspace's agents, as a section of the sidebar to pick one from, each by its name with how it stands and what
+ * it is doing; as a list page, All and those that need setup on a tab each, narrowed by a search, each with its harness
+ * and sandbox, its model and connection, and where it is at work; as the page of one, where, for a person who may
+ * configure it, they rename it and set it up again, and see why it can't run and what it is doing, and, for a person
+ * who may remove members, remove it; and adding one, for a person who may, on the harnesses, models, and sandboxes the
+ * workspace's connections give. Adding and removing happen in a dialog the workspace page lends the shell. The Block
+ * reports when the person asks to browse, the agent they pick, and what they did, which the workspace page shows the
+ * list or the agent's page for, and confirms. An agent's role is its membership's, in the settings. The workspace page
+ * lists the host's integrations once and informs the Block of them, which say what each connection gives, and a model
+ * connection lists its models over HTTP as a setup chooses it. What an agent is doing is read from the turns the store
+ * holds (see `agentActivity.ts`).
  */
 
 import { Connection as ConnectionContract, type Integration } from "@amends-dev/connection"
 import { Agent, AgentPermissions } from "@amends-dev/core/agent"
 import { BuiltinRoles, Grant, Role } from "@amends-dev/core/authorization"
 import { Connection } from "@amends-dev/core/connection"
+import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Member, MemberId, MemberPermissions, WorkspaceId } from "@amends-dev/core/workspace"
@@ -28,6 +28,7 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
+import { activityOf, type AgentActivity, turnsUnderWay } from "../../agentActivity.ts"
 import * as AgentSetup from "../../agentSetup.ts"
 import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
 import { foldAccents } from "../../seen.ts"
@@ -141,9 +142,10 @@ export type BrowseTab = typeof BrowseTab.Type
 /**
  * The workspace's agents, once they are read, and the members they are, the connections they run on and the
  * integrations that say what those give, the roles and the workspace that say which role a new
- * agent may start with, what the person may do, the list page's tab and search, the dialog and what it is
- * for, adding an agent or confirming one's removal, what they changed on the agents' pages, the models the
- * connections offer, how many times the person asked to read them again, and why the last read or write failed.
+ * agent may start with, what the person may do, the turns under way and the groups that name where, the list
+ * page's tab and search, the dialog and what it is for, adding an agent or confirming one's removal, what they
+ * changed on the agents' pages, the models the connections offer, how many times the person asked to read them
+ * again, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -156,6 +158,8 @@ export const Model = Schema.Struct({
   roles: Schema.Array(Role.Role),
   workspace: Schema.Option(WorkspaceItem),
   grants: Schema.Array(Grant.Grant),
+  turns: Schema.Array(ReplicaRecord.Turn),
+  groups: Schema.Array(Group.Group),
   browse: Schema.Struct({ tab: BrowseTab, query: Schema.String }),
   dialog: DialogBlock.Model,
   adding: Schema.Option(Adding),
@@ -176,6 +180,7 @@ export const Message = defineMessageUnion({
     workspace: Schema.Option(WorkspaceItem),
     grants: Schema.Array(Grant.Grant)
   },
+  ReceivedActivity: { turns: Schema.Array(ReplicaRecord.Turn), groups: Schema.Array(Group.Group) },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String },
   FailedRead: { error: Schema.String },
@@ -277,6 +282,21 @@ export const mayCreate = (model: Pick<Model, "workspaceId" | "grants">): boolean
  */
 export const mayAdd = (model: Pick<Model, "workspaceId" | "grants" | "integrations">): boolean =>
   mayCreate(model) && areIntegrationsListed(model)
+
+/**
+ * The turns of the agent that are under way, the most pressing first, each in the group it is in as the person names
+ * it. An agent still on its way has none.
+ */
+export const turnsOfAgent = (
+  model: Pick<Model, "turns" | "groups" | "members" | "memberId">,
+  { agent, pending }: AgentItem
+) => (pending ? [] : turnsUnderWay(agent.id, model.turns, model.groups, model.members, model.memberId))
+
+/** What the agent is doing, from its turns under way: nothing while it is idle. */
+export const activityOfAgent = (
+  model: Pick<Model, "turns" | "groups" | "members" | "memberId">,
+  item: AgentItem
+): Option.Option<AgentActivity> => activityOf(turnsOfAgent(model, item))
 
 /** The name of the agent, its membership's, or "An agent" while the members are not read. */
 export const nameOfAgent = (model: Pick<Model, "members">, agent: AgentItem["agent"]): string =>

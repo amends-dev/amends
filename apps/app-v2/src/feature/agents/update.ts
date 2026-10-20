@@ -403,6 +403,9 @@ export const update = AgentsComposition.makeUpdate((model, message) => {
       })
       return Option.isSome(withoutGone.adding) ? finishAdding(withoutGone) : closeRemovalOfGoneAgent(withoutGone)
     },
+    ReceivedActivity: ({ turns, groups }) => ({
+      model: modifyFields(model, { turns: () => turns, groups: () => groups })
+    }),
     ReceivedIntegrations: ({ integrations }) => ({
       model: modifyFields(model, { integrations: () => Integrations.Loaded({ integrations }) })
     }),

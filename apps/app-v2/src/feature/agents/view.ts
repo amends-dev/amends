@@ -14,8 +14,8 @@ import {
   searchField,
   submit
 } from "@amends-dev/design/control"
-import { detailList } from "@amends-dev/design/details"
-import { cellWithDetail, columns, loadingRows, row } from "@amends-dev/design/directory"
+import { activityList, detailList } from "@amends-dev/design/details"
+import { activityCell, cellWithDetail, columns, loadingRows, row } from "@amends-dev/design/directory"
 import { form } from "@amends-dev/design/form"
 import type { MarkStatus } from "@amends-dev/design/mark"
 import { modal } from "@amends-dev/design/modal"
@@ -24,10 +24,19 @@ import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@ame
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
+import {
+  activityLabel,
+  type AgentActivity,
+  motionOfState,
+  placesLine,
+  stateWord,
+  type TurnUnderWay
+} from "../../agentActivity.ts"
 import { calendarDate, memberName } from "../../seen.ts"
 import { Integrations } from "../connections/definition.ts"
 import { AgentsComposition, type AgentsViewBuilder, DialogBinding } from "./composition.ts"
 import {
+  activityOfAgent,
   type Adding,
   type AgentAction,
   type AgentItem,
@@ -55,7 +64,8 @@ import {
   SetupTarget,
   setupDraftOf,
   shownAgents,
-  startingRoles
+  startingRoles,
+  turnsOfAgent
 } from "./definition.ts"
 import { setupFields } from "./setupFields.ts"
 
@@ -71,16 +81,29 @@ const issueSentence = (issue: Agent.Issue): string =>
 
 /**
  * How an agent stands, as the patch on its mark says it: Needs setup, with why on hover, when it can't run as it
- * is set up. A ready agent shows nothing, and so does one still on its way, since the server tells how ready a new
- * agent is once it has it.
+ * is set up; otherwise, while it is at work, that it is, with where on hover, such as "Working in #general". A ready
+ * agent that is idle shows nothing, and so does one still on its way, since the server tells how ready a new agent is
+ * once it has it.
  */
-const statusOf = ({ agent, pending }: AgentItem): MarkStatus | undefined =>
+const statusOf = ({ agent, pending }: AgentItem, activity: Option.Option<AgentActivity>): MarkStatus | undefined =>
   pending
     ? undefined
     : Agent.Readiness.match(agent.readiness, {
-        Ready: () => undefined,
-        Incomplete: ({ issues }) => ({ kind: "attention", label: "Needs setup", detail: issueSentence(issues[0]) })
+        Ready: (): MarkStatus | undefined =>
+          Option.getOrUndefined(Option.map(activity, (at) => ({ kind: "available", label: activityLabel(at) }))),
+        Incomplete: ({ issues }): MarkStatus | undefined => ({
+          kind: "attention",
+          label: "Needs setup",
+          detail: issueSentence(issues[0])
+        })
       })
+
+/** What a sidebar row says of the agent being at work: the words, and how the logo moves, as its state does. */
+const sidebarActivity = (activity: Option.Option<AgentActivity>) =>
+  Option.match(activity, {
+    onNone: () => ({}),
+    onSome: (at) => ({ activity: activityLabel(at), activityMotion: motionOfState[at.state] })
+  })
 
 /** The harness an agent runs on, as a line: `Auto`, or the connection's name. */
 const harnessLine = (agent: AgentItem["agent"], model: Model): string =>
@@ -148,24 +171,42 @@ export const sidebarView = AgentsComposition.makeView.withInputs<SidebarInputs>(
         children:
           listed.length === 0 && model.isLoaded
             ? [sidebarEmpty(h, "No agents yet")]
-            : listed.map((item) =>
-                sidebarItem(h, {
+            : listed.map((item) => {
+                const activity = activityOfAgent(model, item)
+
+                return sidebarItem(h, {
                   mark: { text: nameOfAgent(model, item.agent).slice(0, 1), tone: "lilac" },
-                  status: statusOf(item),
+                  status: statusOf(item, activity),
+                  ...sidebarActivity(activity),
                   label: nameOfAgent(model, item.agent),
                   isPending: item.pending,
                   isCurrent: Option.contains(openAgentId, item.agent.id),
                   onClick: Message.ClickedAgent({ agentId: item.agent.id })
                 })
-              )
+              })
       })
     ])
   }
 )
 
 /**
+ * The list's Activity cell for an agent: the logo moving as its most pressing turn does, the state, and over it the
+ * places it is at work; blank while the agent is idle.
+ */
+const activityCellOf = (activity: Option.Option<AgentActivity>, h: AgentsViewBuilder): Html =>
+  Option.match(activity, {
+    onNone: () => h.empty,
+    onSome: ({ state, places }) =>
+      activityCell(h, {
+        state: stateWord[state],
+        motion: motionOfState[state],
+        ...(places.length === 0 ? {} : { place: placesLine(places) })
+      })
+  })
+
+/**
  * An agent as a row of the list: its lilac mark with how it stands as a patch on it, its name, its harness over its
- * sandbox, its model over its connection, and, blank while it is idle, what it is at work on, which no turn tells yet.
+ * sandbox, its model over its connection, and, blank while it is idle, where it is at work and in what state.
  */
 const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => {
   const { agent, pending } = item
@@ -173,6 +214,7 @@ const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => 
   const harness = harnessLine(agent, model)
   const sandbox = sandboxLine(agent, model)
   const connection = connectionName(model, agent.model.connectionId)
+  const activity = activityOfAgent(model, item)
 
   return h.keyed("li")(
     agent.id,
@@ -181,15 +223,21 @@ const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => 
       row(h, {
         mark: { text: name.slice(0, 1), tone: "lilac" },
         markSize: "md",
-        status: statusOf(item),
+        status: statusOf(item, activity),
         title: name,
         ...(pending ? { meta: "Sending…" } : {}),
         cells: [
           cellWithDetail(h, { value: harness, detail: sandbox }),
           cellWithDetail(h, { value: agent.model.id, detail: connection }),
-          h.empty
+          activityCellOf(activity, h)
         ],
-        cellsText: [harness, sandbox, agent.model.id, connection].join(" · "),
+        cellsText: [
+          harness,
+          sandbox,
+          agent.model.id,
+          connection,
+          ...Option.toArray(Option.map(activity, activityLabel))
+        ].join(" · "),
         onClick: Message.ClickedAgent({ agentId: agent.id })
       })
     ]
@@ -418,6 +466,21 @@ const setupForm = (
   ])
 }
 
+/** A turn under way as a line of the agent's page: the logo as the turn goes, its state, and the place it is in. */
+const turnLine = (turn: TurnUnderWay) => ({
+  key: turn.turnId,
+  state: stateWord[turn.state],
+  motion: motionOfState[turn.state],
+  place: Option.getOrUndefined(turn.place)
+})
+
+/** What the agent is doing now, a line for each turn under way, the most pressing first, or Idle when it has none. */
+const currentActivity = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html | string => {
+  const turns = turnsOfAgent(model, item)
+
+  return turns.length === 0 ? "Idle" : activityList(h, { label: "Turns under way", lines: turns.map(turnLine) })
+}
+
 /**
  * What the agent's page says about it that is not set up by the person: its role, what it is at work on, and who made
  * it.
@@ -429,7 +492,7 @@ const detailsSection = (item: AgentItem, model: Model, h: AgentsViewBuilder): Ht
     children: [
       detailList(h, [
         { label: "Role", value: "Changed in Settings › Members, as any member's is." },
-        { label: "Current activity", value: "Idle" },
+        { label: "Current activity", value: currentActivity(item, model, h) },
         {
           label: "Created by",
           value: `${memberName(model.members, item.agent.createdBy)} · ${calendarDate(item.agent.createdAt)}`
@@ -473,7 +536,7 @@ const agentPage = (item: AgentItem, model: Model, workspaceName: string, h: Agen
     header: {
       title: name,
       mark: { text: name.slice(0, 1), tone: "lilac" },
-      status: statusOf(item),
+      status: statusOf(item, activityOfAgent(model, item)),
       phoneContext: workspaceName,
       ...(item.pending ? { context: "Sending…" } : {})
     },
