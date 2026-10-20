@@ -6,10 +6,13 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const SettingsBlock = SettingsComposition.assembleBlock({
+const SettingsBlockValue = SettingsComposition.assembleBlock({
   init,
   update,
   view,
   subscriptions,
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type SettingsBlockType = typeof SettingsBlockValue
+export interface SettingsBlock extends SettingsBlockType {}
+export const SettingsBlock: SettingsBlock = SettingsBlockValue

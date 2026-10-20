@@ -6,10 +6,13 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const ThreadBlock = ThreadComposition.assembleBlock({
+const ThreadBlockValue = ThreadComposition.assembleBlock({
   init,
   update,
   view,
   subscriptions,
   EffectsLayer: Layer.mergeAll(EffectsLayer, subscriptions.layer)
 })
+type ThreadBlockType = typeof ThreadBlockValue
+export interface ThreadBlock extends ThreadBlockType {}
+export const ThreadBlock: ThreadBlock = ThreadBlockValue

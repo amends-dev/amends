@@ -166,6 +166,15 @@ person's store of the workspace, writes actions to it, and reports facts about i
 parent, so it embeds wherever those identities are known. `feature/` holds the features and `page/`
 the pages that compose them; the root composes the pages.
 
+Each `block.ts` exports its completed Block under a name of its own: the assembled value stays
+private as `XBlockValue`, `type XBlockType = typeof XBlockValue` takes its type,
+`interface XBlock extends XBlockType {}` names that, and `XBlock` is the value, declared as the
+interface. The parents that bind the Block, and theirs, then refer to the name, where otherwise each
+would work through the whole structure of the Block and of everything it binds again. That keeps
+room for the app to grow: TypeScript stops checking one expression at 5,000,000 type instantiations
+(TS2589), and the workspace page's `makeUpdate` is the first to reach it, with every Block bound
+below it counted at each level above.
+
 - `feature/composer`: what the person writes at a place, a reply in a thread or a new thread in a
   group, kept as a draft in their browser until they send it. It reports what it sends, and that
   its text changed. Its view takes how the box is labelled, what it shows while it is empty, what

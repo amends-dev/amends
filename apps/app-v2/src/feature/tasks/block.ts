@@ -4,10 +4,13 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { tasksView } from "./view.ts"
 
-export const TasksBlock = TasksComposition.assembleBlock({
+const TasksBlockValue = TasksComposition.assembleBlock({
   init,
   update,
   view: tasksView,
   subscriptions,
   EffectsLayer: subscriptions.layer
 })
+type TasksBlockType = typeof TasksBlockValue
+export interface TasksBlock extends TasksBlockType {}
+export const TasksBlock: TasksBlock = TasksBlockValue

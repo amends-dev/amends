@@ -7,7 +7,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const ConnectionsBlock = ConnectionsComposition.assembleBlock({
+const ConnectionsBlockValue = ConnectionsComposition.assembleBlock({
   init,
   update,
   view,
@@ -18,3 +18,6 @@ export const ConnectionsBlock = ConnectionsComposition.assembleBlock({
   },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type ConnectionsBlockType = typeof ConnectionsBlockValue
+export interface ConnectionsBlock extends ConnectionsBlockType {}
+export const ConnectionsBlock: ConnectionsBlock = ConnectionsBlockValue

@@ -4,4 +4,7 @@ import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const ComposerBlock = ComposerComposition.assembleBlock({ init, update, view, EffectsLayer })
+const ComposerBlockValue = ComposerComposition.assembleBlock({ init, update, view, EffectsLayer })
+type ComposerBlockType = typeof ComposerBlockValue
+export interface ComposerBlock extends ComposerBlockType {}
+export const ComposerBlock: ComposerBlock = ComposerBlockValue

@@ -7,7 +7,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const AgentsBlock = AgentsComposition.assembleBlock({
+const AgentsBlockValue = AgentsComposition.assembleBlock({
   init,
   update,
   view,
@@ -18,3 +18,6 @@ export const AgentsBlock = AgentsComposition.assembleBlock({
   },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type AgentsBlockType = typeof AgentsBlockValue
+export interface AgentsBlock extends AgentsBlockType {}
+export const AgentsBlock: AgentsBlock = AgentsBlockValue

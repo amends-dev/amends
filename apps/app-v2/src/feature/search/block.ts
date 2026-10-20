@@ -5,10 +5,13 @@ import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const SearchBlock = SearchComposition.assembleBlock({
+const SearchBlockValue = SearchComposition.assembleBlock({
   init,
   update,
   view,
   operations: { requestOpen: Message.RequestedOpen },
   EffectsLayer
 })
+type SearchBlockType = typeof SearchBlockValue
+export interface SearchBlock extends SearchBlockType {}
+export const SearchBlock: SearchBlock = SearchBlockValue

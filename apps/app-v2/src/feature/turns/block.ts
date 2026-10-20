@@ -6,10 +6,13 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const TurnsBlock = TurnsComposition.assembleBlock({
+const TurnsBlockValue = TurnsComposition.assembleBlock({
   init,
   update,
   view,
   subscriptions,
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type TurnsBlockType = typeof TurnsBlockValue
+export interface TurnsBlock extends TurnsBlockType {}
+export const TurnsBlock: TurnsBlock = TurnsBlockValue

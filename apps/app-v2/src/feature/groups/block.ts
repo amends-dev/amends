@@ -7,7 +7,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const GroupsBlock = GroupsComposition.assembleBlock({
+const GroupsBlockValue = GroupsComposition.assembleBlock({
   init,
   update,
   view,
@@ -18,3 +18,6 @@ export const GroupsBlock = GroupsComposition.assembleBlock({
   },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type GroupsBlockType = typeof GroupsBlockValue
+export interface GroupsBlock extends GroupsBlockType {}
+export const GroupsBlock: GroupsBlock = GroupsBlockValue

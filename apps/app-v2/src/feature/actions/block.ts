@@ -7,7 +7,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const ActionsBlock = ActionsComposition.assembleBlock({
+const ActionsBlockValue = ActionsComposition.assembleBlock({
   init,
   update,
   view,
@@ -15,3 +15,6 @@ export const ActionsBlock = ActionsComposition.assembleBlock({
   operations: { confirm: Message.Confirmed },
   EffectsLayer: Layer.mergeAll(Dismiss.layer, ExpireConfirmation.layer, subscriptions.layer)
 })
+type ActionsBlockType = typeof ActionsBlockValue
+export interface ActionsBlock extends ActionsBlockType {}
+export const ActionsBlock: ActionsBlock = ActionsBlockValue

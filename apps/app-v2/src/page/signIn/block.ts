@@ -4,4 +4,7 @@ import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const SignInBlock = SignInComposition.assembleBlock({ init, update, view, EffectsLayer })
+const SignInBlockValue = SignInComposition.assembleBlock({ init, update, view, EffectsLayer })
+type SignInBlockType = typeof SignInBlockValue
+export interface SignInBlock extends SignInBlockType {}
+export const SignInBlock: SignInBlock = SignInBlockValue

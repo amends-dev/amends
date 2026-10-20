@@ -4,7 +4,7 @@ import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const HomeBlock = HomeComposition.assembleBlock({
+const HomeBlockValue = HomeComposition.assembleBlock({
   init,
   update,
   view,
@@ -16,3 +16,6 @@ export const HomeBlock = HomeComposition.assembleBlock({
     informViewport: Message.InformedOfViewport
   }
 })
+type HomeBlockType = typeof HomeBlockValue
+export interface HomeBlock extends HomeBlockType {}
+export const HomeBlock: HomeBlock = HomeBlockValue

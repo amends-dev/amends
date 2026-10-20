@@ -7,7 +7,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const ChannelsBlock = ChannelsComposition.assembleBlock({
+const ChannelsBlockValue = ChannelsComposition.assembleBlock({
   init,
   update,
   view,
@@ -18,3 +18,6 @@ export const ChannelsBlock = ChannelsComposition.assembleBlock({
   },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type ChannelsBlockType = typeof ChannelsBlockValue
+export interface ChannelsBlock extends ChannelsBlockType {}
+export const ChannelsBlock: ChannelsBlock = ChannelsBlockValue

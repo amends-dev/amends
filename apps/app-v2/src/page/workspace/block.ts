@@ -5,7 +5,7 @@ import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const WorkspaceBlock = WorkspaceComposition.assembleBlock({
+const WorkspaceBlockValue = WorkspaceComposition.assembleBlock({
   init,
   update,
   view,
@@ -15,3 +15,6 @@ export const WorkspaceBlock = WorkspaceComposition.assembleBlock({
   },
   EffectsLayer: LoadIntegrations.layer
 })
+type WorkspaceBlockType = typeof WorkspaceBlockValue
+export interface WorkspaceBlock extends WorkspaceBlockType {}
+export const WorkspaceBlock: WorkspaceBlock = WorkspaceBlockValue

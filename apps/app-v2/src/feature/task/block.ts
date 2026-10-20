@@ -6,10 +6,13 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const TaskBlock = TaskComposition.assembleBlock({
+const TaskBlockValue = TaskComposition.assembleBlock({
   init,
   update,
   view,
   subscriptions,
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type TaskBlockType = typeof TaskBlockValue
+export interface TaskBlock extends TaskBlockType {}
+export const TaskBlock: TaskBlock = TaskBlockValue

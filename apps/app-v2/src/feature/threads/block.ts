@@ -6,10 +6,13 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const ThreadsBlock = ThreadsComposition.assembleBlock({
+const ThreadsBlockValue = ThreadsComposition.assembleBlock({
   init,
   update,
   view,
   subscriptions,
   EffectsLayer: Layer.mergeAll(StartThread.layer, FocusComposer.layer, subscriptions.layer)
 })
+type ThreadsBlockType = typeof ThreadsBlockValue
+export interface ThreadsBlock extends ThreadsBlockType {}
+export const ThreadsBlock: ThreadsBlock = ThreadsBlockValue

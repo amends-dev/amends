@@ -7,7 +7,7 @@ import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
 
-export const InboxBlock = InboxComposition.assembleBlock({
+const InboxBlockValue = InboxComposition.assembleBlock({
   init,
   update,
   view,
@@ -15,3 +15,6 @@ export const InboxBlock = InboxComposition.assembleBlock({
   operations: { requestCloseThread: Message.RequestedCloseThread },
   EffectsLayer: Layer.merge(EffectsLayer, subscriptions.layer)
 })
+type InboxBlockType = typeof InboxBlockValue
+export interface InboxBlock extends InboxBlockType {}
+export const InboxBlock: InboxBlock = InboxBlockValue
