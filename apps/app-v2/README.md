@@ -904,7 +904,11 @@ the pages that compose them; the root composes the pages.
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days; the workspace
   list's view takes it too, for when each invitation closes. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
-  session, and the browser's services beneath them.
+  session, and the browser's services beneath them, and gives it `crash.ts`'s view for when it stops on an unexpected
+  error: apps/ui's crash screen, outside the session, so with the brand alone in its header, the state art of something
+  that came apart, "Something went wrong", what happened, and a primary Reload. Foldkit draws it after it has stopped
+  dispatching, so its builder has no message to send, and Reload is a link to the page's own address, which loads the page
+  again.
 
 A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
 it opens the person's store of a workspace on the first read or write, shares it among all of them,
@@ -1034,7 +1038,9 @@ with the error rather than leaving the replica silently behind.
 browser's storage. Each Block's tests sit beside it. The commands that call the host are run over a client that answers
 what a test names, which can be that its call dies, and the message they end in is given to the form's update, to show
 it leaves its sending state with the general failure. `appearance.test.ts` runs the script of `index.html` against the
-key `keepAppearance` keeps, to show the two agree:
+key `keepAppearance` keeps, to show the two agree. `crash.test.ts` renders the crash view: the heading and its words, the
+state art, the brand alone in the header, and Reload as a link to the page's own address. `entry.test.ts` imports the
+entry with the runtime stubbed, so that nothing boots, and shows that it assembles the application with that view:
 
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply

@@ -6,6 +6,7 @@ import * as Layer from "effect/Layer"
 import { Runtime } from "foldkit"
 import { EffectsLayer } from "./command.ts"
 import { ApplicationComposition } from "./composition.ts"
+import { crashView } from "./crash.ts"
 import { Flags, flags } from "./flags.ts"
 import { init } from "./init.ts"
 import { ApplicationLayer } from "./services.ts"
@@ -21,6 +22,7 @@ const application = ApplicationComposition.assembleApplication({
   EffectsLayer: Layer.mergeAll(EffectsLayer, subscriptions.layer),
   Flags,
   container: document.getElementById("root"),
+  crash: { view: crashView },
   devTools: { Message: ApplicationComposition.Message }
 })
 
