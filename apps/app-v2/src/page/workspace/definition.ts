@@ -12,9 +12,9 @@
  * connections, the agents, and the channels of them, and lists them again when one asks. Its search, in a dialog over
  * the page, opens from the sidebar and when its parent asks, and what it finds opens a group, a thread in its group,
  * or a conversation with a member, in Home. Its rail ends with the person's account, which the settings draw: a menu
- * of their Appearance, the way to another workspace, the workspace's settings, a dialog that changes their name, which
- * the settings open, and signing out. It reports when the person leaves it, and every other entry they choose, which
- * the app acts on; the workspace's settings show when the app asks.
+ * of their Appearance, the way to another workspace, the workspace's settings, which it shows, a dialog that changes
+ * their name, which the settings open, and signing out. It reports when the person leaves it, and the entries they
+ * choose that the app acts on.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
@@ -34,7 +34,7 @@ import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ConnectionsBlock } from "../../feature/connections/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
-import { ReportedAccountEntry, workspaceName } from "../../feature/settings/definition.ts"
+import { workspaceName } from "../../feature/settings/definition.ts"
 import { HomeBlock } from "./home/block.ts"
 
 /** The pages of the settings, each of which the sidebar lists: the workspace's own, and its members. */
@@ -104,6 +104,10 @@ export const ChildInitContext = Schema.Struct({
   viewport: Viewport
 })
 
+/** The entries of the account menu that the app acts on: an Appearance, the way to another workspace, and signing out. */
+export const AppAccountEntry = Schema.Literals(["System", "Light", "Dark", "SwitchWorkspace", "SignOut"])
+export type AppAccountEntry = typeof AppAccountEntry.Type
+
 export const Message = defineMessageUnion({
   ClickedAllWorkspaces: {},
   ClickedHome: {},
@@ -115,7 +119,6 @@ export const Message = defineMessageUnion({
   ClickedMenu: {},
   ClickedSearch: {},
   RequestedSearch: {},
-  RequestedWorkspaceSettings: {},
   InformedOfViewport: { viewport: Viewport },
   ReceivedIntegrations: { integrations: Schema.Array(Connection.IntegrationView) },
   FailedLoadIntegrations: { error: Schema.String }
@@ -124,7 +127,7 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ClosedWorkspace: {},
-  ChoseAccountEntry: { entry: ReportedAccountEntry }
+  ChoseAccountEntry: { entry: AppAccountEntry }
 })
 export type OutMessage = typeof OutMessage.Type
 

@@ -61,12 +61,7 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import { Result } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { AccountBinding } from "../../feature/settings/composition.ts"
-import {
-  AccountEntry,
-  AccountMenu,
-  type ReportedAccountEntry,
-  Written as SettingsWritten
-} from "../../feature/settings/definition.ts"
+import { AccountEntry, AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
@@ -81,7 +76,7 @@ import {
   SearchBinding,
   SettingsBinding
 } from "./composition.ts"
-import { Message, Open, OutMessage, openMemberId } from "./definition.ts"
+import { type AppAccountEntry, Message, Open, OutMessage, openMemberId } from "./definition.ts"
 import { HomeBlock } from "./home/block.ts"
 import { GroupBinding, GroupsBinding, InboxBinding, TasksBinding } from "./home/composition.ts"
 import { isThreadOpen, Open as HomeOpen } from "./home/definition.ts"
@@ -442,14 +437,7 @@ describe("a workspace", () => {
   })
 
   it("reports the entry the person chooses in the account menu that the app acts on, and nothing for a new name", () => {
-    const reported: ReadonlyArray<ReportedAccountEntry> = [
-      "System",
-      "Light",
-      "Dark",
-      "SwitchWorkspace",
-      "WorkspaceSettings",
-      "SignOut"
-    ]
+    const reported: ReadonlyArray<AppAccountEntry> = ["System", "Light", "Dark", "SwitchWorkspace", "SignOut"]
 
     for (const entry of reported) {
       story(
@@ -463,18 +451,19 @@ describe("a workspace", () => {
     story(update, given(opened), message(choseAccountEntry("ChangeName")), expectNoOutMessage())
   })
 
-  it("shows the workspace's settings page when the app asks, in place of what is open", () => {
+  it("shows the workspace's settings page when the person chooses it in the account menu, in place of what is open", () => {
     story(
       update,
       given(opened),
       message(Message.ClickedMembers()),
-      message(Message.RequestedWorkspaceSettings()),
+      message(choseAccountEntry("WorkspaceSettings")),
+      expectNoOutMessage(),
       model((model) => {
         expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
       }),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
-      message(Message.RequestedWorkspaceSettings()),
+      message(choseAccountEntry("WorkspaceSettings")),
       model((model) => {
         expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
         expect(model.home.groups.selected).toEqual(Option.none())

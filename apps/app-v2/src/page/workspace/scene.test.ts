@@ -1517,7 +1517,6 @@ describe("a workspace", () => {
       ["Light", "Light"],
       ["Dark", "Dark"],
       ["Switch workspace", "SwitchWorkspace"],
-      ["Workspace settings", "WorkspaceSettings"],
       ["Sign out", "SignOut"]
     ] as const
 
@@ -1532,6 +1531,21 @@ describe("a workspace", () => {
         expect(role("menu")).toBeAbsent()
       )
     }
+  })
+
+  it("shows the workspace's settings from the account menu, as the rail's Settings does, and closes the menu", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(role("main", { name: "Workspace" })).toBeAbsent(),
+      ...openMenu(AccountMenu, accountButton),
+      click(role("menuitem", { name: "Workspace settings" })),
+      expectNoOutMessage(),
+      ...acknowledgeMenuClosed(AccountMenu),
+      expect(role("menu")).toBeAbsent(),
+      expect(role("main", { name: "Workspace" })).toExist(),
+      expect(sidebarButton("Workspace")).toHaveAttr("aria-current", "page")
+    )
   })
 
   it("changes the person's name from the account menu in a compact dialog, and confirms it in a toast", () => {

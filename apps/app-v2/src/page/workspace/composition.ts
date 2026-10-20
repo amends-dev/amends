@@ -4,6 +4,7 @@ import type { MemberId } from "@amends-dev/core/workspace"
 import { isAsideInDialog } from "@amends-dev/design/shell"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
@@ -16,7 +17,7 @@ import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
 import { LoadIntegrations } from "./command.ts"
-import { type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
+import { AppAccountEntry, type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 import { HomeBlock } from "./home/block.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
@@ -150,7 +151,8 @@ const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
 
 /**
  * A member opening in the settings opens beside the page, and opens the side pane's dialog where the pane is one;
- * closing it closes both. What the person did is confirmed to them in a toast: renaming the workspace or themselves,
+ * closing it closes both. Choosing the workspace's settings in the account menu shows the Workspace page, as the rail's
+ * Settings does. What the person did is confirmed to them in a toast: renaming the workspace or themselves,
  * changing a member's role, handing the workspace over, inviting someone, and revoking an invitation. Removing a
  * member confirms it too, and closes the member, who is no longer there to show.
  */
@@ -165,7 +167,8 @@ const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
   TransferredOwnership: ({ name }) => ActionsBinding.confirm({ text: settingsToast.ownerChanged(name) }),
   InvitedMember: () => ActionsBinding.confirm({ text: settingsToast.invitationCreated }),
   RevokedInvitation: () => ActionsBinding.confirm({ text: settingsToast.invitationRevoked }),
-  ChoseAccountEntry: () => WorkspaceDefinition.stepNoop()
+  ChoseAccountEntry: ({ entry }) =>
+    entry === "WorkspaceSettings" ? switchTo(showSettings("Workspace")) : WorkspaceDefinition.stepNoop()
 })
 
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
@@ -242,7 +245,7 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   field: "settings",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
   outMessage: {
-    /** The entry the person chooses in the account menu is reported to the app, which acts on it. */
+    /** The entries of the account menu that the app acts on are reported to it. */
     forward: SettingsBlock.OutMessage.match({
       OpenedMember: () => undefined,
       ClosedMember: () => undefined,
@@ -253,7 +256,8 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
       TransferredOwnership: () => undefined,
       InvitedMember: () => undefined,
       RevokedInvitation: () => undefined,
-      ChoseAccountEntry: ({ entry }) => OutMessage.ChoseAccountEntry({ entry })
+      ChoseAccountEntry: ({ entry }) =>
+        Schema.is(AppAccountEntry)(entry) ? OutMessage.ChoseAccountEntry({ entry }) : undefined
     }),
     fold: foldSettingsOutMessage
   }

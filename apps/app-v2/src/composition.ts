@@ -11,10 +11,10 @@ import { modifyFields } from "foldkit/struct"
 import type { Appearance } from "./appearance.ts"
 import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
 import { ApplicationDefinition } from "./definition.ts"
-import type { ReportedAccountEntry } from "./feature/settings/definition.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
+import type { AppAccountEntry } from "./page/workspace/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
@@ -106,26 +106,23 @@ const closeWorkspace = ApplicationDefinition.step((model: Model) => ({
 
 /**
  * What choosing an entry of the account menu does: an Appearance is shown and kept, another workspace is the list of
- * workspaces, the workspace's settings are the open workspace's to show, and signing out is signing out.
+ * workspaces, and signing out is signing out.
  */
-// NOTE: Workspace settings comes back to the workspace page as an operation, not handled where the menu reports it: a
-// fold that switches the page's destination takes the page's update past the depth TypeScript instantiates (TS2589).
-const chooseAccountEntry = (workspaceId: WorkspaceId.WorkspaceId, entry: ReportedAccountEntry) =>
+const chooseAccountEntry = (entry: AppAccountEntry) =>
   Match.value(entry).pipe(
     Match.whenOr("System", "Light", "Dark", chooseAppearance),
     Match.when("SwitchWorkspace", () => closeWorkspace),
-    Match.when("WorkspaceSettings", () => WorkspaceBinding.requestWorkspaceSettings(workspaceId)),
     Match.when("SignOut", () => signOut),
     Match.exhaustive
   )
 
 const foldWorkspaceOutMessage = (
-  workspaceId: WorkspaceId.WorkspaceId,
+  _workspaceId: WorkspaceId.WorkspaceId,
   outMessage: typeof WorkspaceBlock.OutMessage.Type
 ) =>
   WorkspaceBlock.OutMessage.match(outMessage, {
     ClosedWorkspace: () => closeWorkspace,
-    ChoseAccountEntry: ({ entry }) => chooseAccountEntry(workspaceId, entry)
+    ChoseAccountEntry: ({ entry }) => chooseAccountEntry(entry)
   })
 
 export const WorkspaceBinding = ApplicationDefinition.bindChild(WorkspaceBlock, {

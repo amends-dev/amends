@@ -11,8 +11,7 @@ export const WorkspaceBlock = WorkspaceComposition.assembleBlock({
   view,
   operations: {
     informViewport: Message.InformedOfViewport,
-    requestSearch: Message.RequestedSearch,
-    requestWorkspaceSettings: Message.RequestedWorkspaceSettings
+    requestSearch: Message.RequestedSearch
   },
   EffectsLayer: LoadIntegrations.layer
 })

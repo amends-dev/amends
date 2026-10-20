@@ -54,7 +54,6 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
     ClickedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
     RequestedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
-    RequestedWorkspaceSettings: () => Update.combine(model, [switchTo(showSettings("Workspace"))]),
     InformedOfViewport: ({ viewport }) =>
       Update.combine(model, [
         showViewport(viewport),

@@ -816,12 +816,10 @@ the pages that compose them; the root composes the pages.
   and their Appearance: a button named "Account: {name}", their initials on a mark, with their name once the settings
   hold it and the address until then. It opens to the right of the rail with that name over the address, an Appearance
   group of System, Light, and Dark with the current one checked, then Switch workspace, Workspace settings, "Change your
-  name…", and Sign out. The settings open the name dialog themselves and report the other entries, which the page
-  forwards to the root as `ChoseAccountEntry`: the root shows and keeps an Appearance, leaves the workspace for the list
-  of the person's workspaces, signs out, or asks the workspace for its settings (`requestWorkspaceSettings`, which shows
-  the Workspace page as the rail's Settings does). The workspace's settings go to the root and back because a fold that
-  switches the page's destination takes the page's `makeUpdate`, over twelve bindings, past what TypeScript instantiates
-  (TS2589). Menu items are `menuitem`s whose names say `(selected)` for the Appearance chosen, since the Block cannot
+  name…", and Sign out. The settings open the name dialog themselves and report the other entries. The page shows the
+  Workspace page of the settings for Workspace settings, as the rail's Settings does, and forwards the rest to the root as
+  `ChoseAccountEntry` (`AppAccountEntry`): the root shows and keeps an Appearance, leaves the workspace for the list of
+  the person's workspaces, or signs out. Menu items are `menuitem`s whose names say `(selected)` for the Appearance chosen, since the Block cannot
   draw a `menuitemradio`.
 
 - `page/workspace/home`: Home, the first destination of the rail, a Block of the page's own that owns what the
@@ -1137,7 +1135,7 @@ key `keepAppearance` keeps, to show the two agree:
   them, opening the navigation drawer, closing it as its dialog asks and by every navigation to an item of a sidebar, and not by a destination picked
   on the rail, which shows it, showing the connections, the agents, and the settings for what their sidebars ask, reporting to the root each entry of
   the account menu it acts on, asking the settings for their name dialog, and no one, when the person chooses to change their name, showing the
-  settings' Workspace page when the root asks, and taking the window's width, closing the drawer once the sidebar is in place and informing Home of
+  settings' Workspace page when the person chooses the workspace's settings in the account menu, which the root is told nothing of, and taking the window's width, closing the drawer once the sidebar is in place and informing Home of
   it, which moves the thread open between its dialog and the card; the member open beside the settings' Members and its dialog, which
   every navigation closes; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
