@@ -807,8 +807,8 @@ the pages that compose them; the root composes the pages.
   (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
   the toasts come inside whichever dialog is open, where they can be read and dismissed. The page
   binds another `DialogBlock` for it as `aside` (`AsideBinding`, id `workspace-aside`) and lends the
-  shell the pane's view with the dialog's, and whether the dialog is open. `isAsideFloating(viewport)`
-  decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
+  shell the pane's view with the dialog's, and whether the dialog is open. The design's
+  `isAsideInDialog(viewport)` decides whether the pane is a dialog. The page opens the dialog (`showAside`, which does nothing
   at `Split`) as the open group or the inbox reports `OpenedThread`, and as a task's thread opens
   its group, and closes it (`hideAside`) as the group or the inbox reports `ClosedThread` and in every
   navigation, since the thread goes with its group. What the agents report that the person did is confirmed in

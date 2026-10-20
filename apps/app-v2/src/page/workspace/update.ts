@@ -1,3 +1,4 @@
+import { isAsideInDialog } from "@amends-dev/design/shell"
 import type { Viewport } from "@amends-dev/design/viewport"
 import * as Update from "foldkit/update"
 import {
@@ -19,7 +20,7 @@ import {
   switchTo,
   WorkspaceComposition
 } from "./composition.ts"
-import { isAsideFloating, isAsideShowing, Message, OutMessage, WorkspaceDefinition } from "./definition.ts"
+import { isAsideShowing, Message, OutMessage, WorkspaceDefinition } from "./definition.ts"
 
 /** Lay the workspace out for a window of the width `viewport`. */
 const showViewport = (viewport: Viewport) => WorkspaceDefinition.stepFields(() => ({ viewport: () => viewport }))
@@ -34,7 +35,7 @@ const placeAside = WorkspaceDefinition.step((model) => {
     return WorkspaceDefinition.stepNoop()
   }
 
-  if (isAsideFloating(model.viewport)) {
+  if (isAsideInDialog(model.viewport)) {
     return showAside
   }
 

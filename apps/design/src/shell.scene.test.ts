@@ -7,7 +7,7 @@ import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
 import { pane, paneBack, paneClose } from "./pane.ts"
 import { rail } from "./rail.ts"
-import { shell } from "./shell.ts"
+import { isAsideInDialog, shell } from "./shell.ts"
 import { sidebar, sidebarHeader, sidebarItem, sidebarSection } from "./sidebar.ts"
 import { toast, toastStack } from "./toast.ts"
 import type { Viewport } from "./viewport.ts"
@@ -359,6 +359,18 @@ describe("shell", () => {
         ).toExist(),
         expect(within(role("dialog", { name: "Thread" }), role("heading", { name: "Thread", level: 2 }))).toExist(),
         expect(role("main")).toExist()
+      )
+    }
+  })
+
+  it("is in a dialog, by isAsideInDialog, where the shell holds the side pane in one, and not beside the main pane", () => {
+    for (const viewport of ["Phone", "Tablet", "Desktop", "Split"] as const) {
+      scene(
+        { update, view },
+        given(inWindow(viewport, { isAsideOpen: true })),
+        isAsideInDialog(viewport)
+          ? expect(within(role("dialog", { name: "Thread" }), role("complementary"))).toExist()
+          : expect(role("dialog")).toBeAbsent()
       )
     }
   })

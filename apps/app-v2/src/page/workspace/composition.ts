@@ -3,6 +3,7 @@ import { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { MemberId } from "@amends-dev/core/workspace"
+import { isAsideInDialog } from "@amends-dev/design/shell"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
@@ -21,7 +22,7 @@ import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
-import { isAsideFloating, type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
+import { type Model, Open, OutMessage, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
 const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
@@ -265,7 +266,7 @@ const foldAsideOutMessage = DialogBlock.OutMessage.match({
   Opened: () => WorkspaceDefinition.stepNoop(),
   Closed: () =>
     WorkspaceDefinition.step((model: Model) =>
-      isAsideFloating(model.viewport) ? closeWhatAsideShows : WorkspaceDefinition.stepNoop()
+      isAsideInDialog(model.viewport) ? closeWhatAsideShows : WorkspaceDefinition.stepNoop()
     ),
   CompletedClose: () => WorkspaceDefinition.stepNoop()
 })
@@ -284,7 +285,7 @@ export const AsideBinding = WorkspaceDefinition.bindChild(DialogBlock, {
 
 /** Open the side pane's dialog, where the window's width puts the side pane in one. */
 export const showAside = WorkspaceDefinition.step((model: Model) =>
-  isAsideFloating(model.viewport) ? AsideBinding.requestOpen() : WorkspaceDefinition.stepNoop()
+  isAsideInDialog(model.viewport) ? AsideBinding.requestOpen() : WorkspaceDefinition.stepNoop()
 )
 
 /** Close the side pane's dialog; closing one that is closed does nothing. */

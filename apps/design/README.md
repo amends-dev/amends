@@ -491,9 +491,10 @@ The frame of the first four layout patterns, which the modules below fill.
   The viewport decides what is rendered, not what CSS hides: at `Desktop` and `Split` the sidebar is
   in the card, and below them it is in the drawer instead, never in both; at `Phone` the rail is in
   the drawer too, and the frame holds neither. The side pane is beside the main pane at `Split` and
-  in its dialog at every other viewport, never in both. The controls, rows, and headers keep their
-  touch sizes in CSS, from `max-desktop:`, and so does the room a pane's header leaves for the menu
-  button.
+  in its dialog at every other viewport, never in both. `isAsideInDialog(viewport)` is that decision
+  for a page that opens the dialog and closes what it shows when the dialog closes: true everywhere
+  but `Split`. The controls, rows, and headers keep their touch sizes in CSS, from `max-desktop:`, and
+  so does the room a pane's header leaves for the menu button.
 
   The `menu` is `{ onOpen, isOpen, dialog }`. Where the frame lacks the sidebar, the shell draws the
   menu button, an `iconButton` named Menu that sends `onOpen`, at the top start of the card over the
@@ -946,7 +947,7 @@ the rail and the sidebar, `main`, and `complementary`, with its notices, and by 
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere
 before; the side pane in place at `Split` and otherwise inside the dialog named Thread, or by the label it is given, once it is
-visible and nowhere before; the notices' live region once, inside the dialog that is visible and
+visible and nowhere before, which `isAsideInDialog` agrees with at every viewport; the notices' live region once, inside the dialog that is visible and
 in the frame otherwise; and the dialogs it is lent, in the frame at every viewport and last, after the
 drawer's and the side pane's, empty while closed, with the notices left in the frame while one is
 open. They query a class only where a layout is what is under test, such as the classes that fold a

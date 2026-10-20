@@ -61,6 +61,12 @@ const frames: Record<Viewport, Frame> = {
   Split: { hasRail: true, hasSidebar: true, asideLayout: "Beside" }
 }
 
+/**
+ * Whether the side pane is in a dialog at `viewport`, floating or filling the window, and not beside the main pane:
+ * where the page opens its dialog, and where closing the dialog is the person leaving what the pane shows.
+ */
+export const isAsideInDialog = (viewport: Viewport): boolean => frames[viewport].asideLayout !== "Beside"
+
 /** A dialog the page lends the shell from the `DialogBlock` it binds. */
 export type ShellDialog<Message, Requirements> = Readonly<{
   /** Whether the dialog is open, from the `isOpen` of the `DialogBlock`'s model. */

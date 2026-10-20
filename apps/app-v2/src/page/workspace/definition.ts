@@ -125,9 +125,6 @@ export const isMemberOpen = (model: Model): boolean => Option.isSome(openMemberI
 /** Whether the side pane has something to show: the thread open, or the member open in the settings. */
 export const isAsideShowing = (model: Model): boolean => isThreadOpen(model) || isMemberOpen(model)
 
-/** Whether the side pane is in a dialog at `viewport`, not beside the main pane, which is from `Split` alone. */
-export const isAsideFloating = (viewport: Viewport): boolean => viewport !== "Split"
-
 /**
  * What the groups, actions, inbox, tasks, connections, agents, settings, channels, and search are made from: the
  * workspace, as the member.
