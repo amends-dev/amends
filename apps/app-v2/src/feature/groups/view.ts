@@ -180,9 +180,9 @@ const teammateRow = (
 const existingConversationLine = "You already have a conversation with them."
 
 /**
- * The modal for what the person is starting: a team, or a conversation with the people they choose, which is New message
- * as `apps/ui` has it. A conversation they have with exactly those people is opened, not started, and the modal says
- * so. While nothing is being started the dialog has no content to show, so it is an empty frame.
+ * The modal for what the person is starting: a team, or a conversation with the people they choose, which is New
+ * message as `apps/ui` has it. A conversation they have with exactly those people is opened, not started, and the modal
+ * says so. While nothing is being started the dialog has no content to show, so it is an empty frame.
  */
 const startingModal = (render: RenderInfo, model: Model, h: GroupsViewBuilder): Html =>
   Option.match(model.starting, {

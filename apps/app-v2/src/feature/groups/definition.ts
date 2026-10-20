@@ -312,7 +312,10 @@ export const activityOfAgentHere = (model: Model, item: AgentItem) =>
 export const onTeam = (change: (team: TeamForm) => TeamForm) =>
   Option.map(Starting.matchOrElse({ Team: change }, (same) => same))
 
-/** What `starting` becomes when the members chosen, of the team or of the conversation, are changed as `change` makes them. */
+/**
+ * What `starting` becomes when the members chosen, of the team or of the conversation, are changed as `change` makes
+ * them.
+ */
 export const onMemberIds = (
   change: (memberIds: ReadonlyArray<MemberId.MemberId>) => ReadonlyArray<MemberId.MemberId>
 ) =>

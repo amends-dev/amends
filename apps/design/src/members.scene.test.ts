@@ -96,7 +96,9 @@ const view = Composition.makeView((model, h) =>
   })
 )
 
-/** The picker as a dialog's first field: a label of its own, no one locked, a placeholder, and attributes on its input. */
+/**
+ * The picker as a dialog's first field: a label of its own, no one locked, a placeholder, and attributes on its input.
+ */
 const viewWithAttributes = Composition.makeView((model, h) =>
   memberPicker(h, {
     id: "members",
