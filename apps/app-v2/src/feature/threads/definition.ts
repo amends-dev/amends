@@ -1,9 +1,9 @@
 /**
- * A group's threads, as the person lists them on a tab each: all of them, oldest first under the days they
- * were created, each with its opening message, who replied to it, the task it tracks, and how much of it is
- * new; and the ones that track a task, as a table the person narrows by status, by assignee, and by what they
- * search for, and sorts by latest activity or by when the thread was started. A composer starts a thread, or on the Tasks tab a thread that tracks a task, which the Tasks tab's
- * New task moves the focus to. It reports the thread the person picks.
+ * A group's threads, as the person lists them on a tab each: all of them, oldest first under the days they were
+ * created, each with its opening message, who replied to it, the task it tracks, and how much of it is new; and the
+ * ones that track a task, as a table the person narrows by status, by assignee, and by what they search for, and sorts
+ * by latest activity or by when the thread was started. A composer starts a thread, or on the Tasks tab a thread that
+ * tracks a task, which the Tasks tab's New task moves the focus to. It reports the thread the person picks.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -48,7 +48,10 @@ export type ThreadItem = typeof ThreadItem.Type
 export const ThreadsTab = Schema.Literals(["Threads", "Tasks"])
 export type ThreadsTab = typeof ThreadsTab.Type
 
-/** How the Tasks tab orders its tasks: by latest activity, or by when their threads were started, newest or oldest first. */
+/**
+ * How the Tasks tab orders its tasks: by latest activity, or by when their threads were started, newest or oldest
+ * first.
+ */
 export const TaskSort = Schema.Literals(["Latest", "Newest", "Oldest"])
 export type TaskSort = typeof TaskSort.Type
 

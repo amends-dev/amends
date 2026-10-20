@@ -127,7 +127,9 @@ export const threadView = HomeComposition.makeView.withInputs<ThreadInputs>((mod
 /** How the shell draws the side pane's dialog, which it lends. */
 export type AsideDialogInputs = Readonly<{ toView: (render: RenderInfo) => Html }>
 
-/** The side pane's dialog, which the shell draws around the thread and keeps in the document whether or not it is open. */
+/**
+ * The side pane's dialog, which the shell draws around the thread and keeps in the document whether or not it is open.
+ */
 export const asideDialogView = HomeComposition.makeView.withInputs<AsideDialogInputs>((model, { toView }, h) =>
   h.block(AsideBinding.embedView({ slotId: "aside", model: model.aside, viewInputs: { toView } }))
 )
