@@ -1,12 +1,17 @@
-/** Reading the draft at the composer's place once it opens, and keeping it as the person writes. */
+/**
+ * Reading the draft at the composer's place once it opens, and keeping it as the person writes it, and reading and
+ * setting the selection in its box, which no handler of the builder gives.
+ */
 
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as Render from "foldkit/render"
 import * as Drafts from "../../store/Drafts.ts"
 import * as Stores from "../../store/Stores.ts"
-import { ComposerDefinition, Message } from "./definition.ts"
+import { ComposerDefinition, Message, Reading } from "./definition.ts"
 
 /** Read the draft at `place`; one that cannot be read is empty. */
 export const ReadDraft = ComposerDefinition.command("ReadDraft", {
@@ -44,4 +49,52 @@ export const SaveDraft = ComposerDefinition.command("SaveDraft", {
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(ReadDraft.layer, SaveDraft.layer)
+/**
+ * Read the selection of the box `id`, as it stands before the render in progress commits, which is what the person
+ * selected, and say what it was read for.
+ */
+export const ReadSelection = ComposerDefinition.command("ReadSelection", {
+  args: { id: Schema.String, reading: Reading },
+  messages: [Message.ReceivedSelection],
+  handler: function* () {
+    return ({ id, reading }) =>
+      Effect.sync(() => {
+        const box = document.getElementById(id)
+
+        return Message.ReceivedSelection({
+          reading,
+          selection:
+            box instanceof HTMLTextAreaElement
+              ? Option.some({ from: box.selectionStart, to: box.selectionEnd })
+              : Option.none()
+        })
+      })
+  }
+})
+
+/**
+ * Select the text of the box `id` from `from` to `to` and give it the focus, once the render in progress has committed,
+ * so that the person goes on typing where the text was changed for them: setting a box's value moves the caret to its
+ * end.
+ */
+export const SelectText = ComposerDefinition.command("SelectText", {
+  args: { id: Schema.String, from: Schema.Int, to: Schema.Int },
+  messages: [Message.CompletedSelectText],
+  handler: function* () {
+    return ({ id, from, to }) =>
+      Effect.gen(function* () {
+        yield* Render.afterCommit
+
+        const box = document.getElementById(id)
+
+        if (box instanceof HTMLTextAreaElement) {
+          box.focus()
+          box.setSelectionRange(from, to)
+        }
+
+        return Message.CompletedSelectText()
+      })
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(ReadDraft.layer, SaveDraft.layer, ReadSelection.layer, SelectText.layer)

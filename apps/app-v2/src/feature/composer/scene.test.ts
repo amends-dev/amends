@@ -1,7 +1,7 @@
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import {
   Command,
   all,
@@ -24,8 +24,8 @@ import {
 } from "foldkit/scene"
 import { bob, membership } from "../../../test/fixtures.ts"
 import * as Drafts from "../../store/Drafts.ts"
-import { SaveDraft } from "./command.ts"
-import { Message, OutMessage } from "./definition.ts"
+import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
+import { boxId, Message, OutMessage, Reading } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -57,6 +57,16 @@ const empty = init(workspaceId, memberId, place).model
 const draft = (text: string) => SaveDraft({ workspaceId, memberId, place, text })
 
 const typingReply = label("Reply in thread")
+
+/** The caret is put after the text the pick wrote, and the draft is kept with the link. */
+const selecting = (at: number) => SelectText({ id: boxId(place), from: at, to: at })
+
+/** The pick of a mention is kept as the draft and the box is told where the caret goes. */
+const picked = (markdown: string, caret: number) => [
+  Command.expectExact(draft(markdown), selecting(caret)),
+  Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+  Command.resolve(SelectText, Message.CompletedSelectText())
+]
 
 /** The textarea's draft is kept as the person types it. */
 const typed = (text: string) => [
@@ -108,16 +118,15 @@ describe("a composer mentioning a member", () => {
     )
   })
 
-  it("picks the member clicked, writing the link in place of the letters and a space after it", () => {
+  it("picks the member clicked, showing their name in place of the letters and a space after it, and writing the link", () => {
     scene(
       { update, view: sceneView },
       given(empty),
       ...typed("Hi @al"),
       click(role("option", { name: "Álvaro Ruiz" })),
       expectOutMessage(OutMessage.ChangedText({ text: "Hi [@Álvaro Ruiz](member:member-4) " })),
-      Command.expectExact(draft("Hi [@Álvaro Ruiz](member:member-4) ")),
-      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
-      expect(role("textbox", { name: "Reply in thread" })).toHaveValue("Hi [@Álvaro Ruiz](member:member-4) "),
+      ...picked("Hi [@Álvaro Ruiz](member:member-4) ", 16),
+      expect(role("textbox", { name: "Reply in thread" })).toHaveValue("Hi @Álvaro Ruiz "),
       expect(role("listbox")).toBeAbsent(),
       expect(role("textbox", { name: "Reply in thread" })).not.toHaveAttr("aria-expanded")
     )
@@ -137,8 +146,7 @@ describe("a composer mentioning a member", () => {
       expect(role("option", { name: "Álvaro Ruiz" })).toHaveAttr("aria-selected", "true"),
       keydown(typingReply, "Enter"),
       expectHandled(),
-      Command.expectExact(draft("Hi [@Álvaro Ruiz](member:member-4) ")),
-      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      ...picked("Hi [@Álvaro Ruiz](member:member-4) ", 16),
       expect(role("listbox")).toBeAbsent()
     )
   })
@@ -155,8 +163,7 @@ describe("a composer mentioning a member", () => {
       expect(role("listbox")).toExist(),
       keydown(typingReply, "Tab"),
       expectHandled(),
-      Command.expectExact(draft("Hi [@Alan Turing](member:member-3) ")),
-      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+      ...picked("Hi [@Alan Turing](member:member-3) ", 16)
     )
   })
 
@@ -181,6 +188,132 @@ describe("a composer mentioning a member", () => {
       given(empty),
       ...typed("Hello"),
       expect(role("textbox", { name: "Reply in thread" })).not.toHaveAttr("aria-autocomplete")
+    )
+  })
+})
+
+describe("a composer showing a mention", () => {
+  const pickedAlvaro = [
+    ...typed("Hi @al"),
+    click(role("option", { name: "Álvaro Ruiz" })),
+    ...picked("Hi [@Álvaro Ruiz](member:member-4) ", 16)
+  ]
+
+  it("shows it in the box as the name with an @, which is what the person reads and edits", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...pickedAlvaro,
+      expect(typingReply).toHaveValue("Hi @Álvaro Ruiz "),
+      expect(role("listbox")).toBeAbsent()
+    )
+  })
+
+  it("keeps it a link in the draft as the person writes on after it", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...pickedAlvaro,
+      type(typingReply, "Hi @Álvaro Ruiz, thanks"),
+      expectOutMessage(OutMessage.ChangedText({ text: "Hi [@Álvaro Ruiz](member:member-4), thanks" })),
+      Command.expectExact(draft("Hi [@Álvaro Ruiz](member:member-4), thanks")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      type(typingReply, "Oh, Hi @Álvaro Ruiz, thanks"),
+      Command.expectExact(draft("Oh, Hi [@Álvaro Ruiz](member:member-4), thanks")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(typingReply).toHaveValue("Oh, Hi @Álvaro Ruiz, thanks")
+    )
+  })
+
+  it("sends it as the link to the member", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...pickedAlvaro,
+      keydown(typingReply, "Enter"),
+      expectOutMessage(OutMessage.SubmittedText({ text: "Hi [@Álvaro Ruiz](member:member-4) " })),
+      Command.expectExact(draft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(typingReply).toHaveValue("")
+    )
+  })
+
+  it("removes it whole when the person deletes its last letter, as Backspace just after it does, and puts the caret where it was", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...pickedAlvaro,
+      // Backspace over the space after it takes only the space.
+      type(typingReply, "Hi @Álvaro Ruiz"),
+      Command.expectExact(draft("Hi [@Álvaro Ruiz](member:member-4)")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(typingReply).toHaveValue("Hi @Álvaro Ruiz"),
+      // Backspace just after it takes it all.
+      type(typingReply, "Hi @Álvaro Rui"),
+      expectOutMessage(OutMessage.ChangedText({ text: "Hi " })),
+      ...picked("Hi ", 3),
+      expect(typingReply).toHaveValue("Hi ")
+    )
+  })
+
+  it("turns it back into plain text when the person edits its letters", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...pickedAlvaro,
+      type(typingReply, "Hi @Álvaro Ruoz "),
+      Command.expectExact(draft("Hi @Álvaro Ruoz ")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      expect(typingReply).toHaveValue("Hi @Álvaro Ruoz "),
+      keydown(typingReply, "Enter"),
+      expectOutMessage(OutMessage.SubmittedText({ text: "Hi @Álvaro Ruoz " })),
+      Command.expectExact(draft("")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+    )
+  })
+
+  it("shows a mention in the draft that was read as the name, and keeps it a link in the draft", () => {
+    const read = update(empty, Message.ReceivedDraft({ text: "Hi [@Álvaro Ruiz](member:member-4), see you" })).model
+
+    scene(
+      { update, view: sceneView },
+      given(read),
+      expect(typingReply).toHaveValue("Hi @Álvaro Ruiz, see you"),
+      expect(role("listbox")).toBeAbsent(),
+      type(typingReply, "Hi @Álvaro Ruiz, see you soon"),
+      Command.expectExact(draft("Hi [@Álvaro Ruiz](member:member-4), see you soon")),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft())
+    )
+  })
+
+  it("starts a mention at the caret with a button: reads where it is, writes an @ there, and lists the people", () => {
+    const mentionReading = Reading.cases.Mention.make({})
+
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      ...typed("Hi there"),
+      click(role("button", { name: "Mention someone" })),
+      Command.expectExact(ReadSelection({ id: boxId(place), reading: mentionReading })),
+      Command.resolve(
+        ReadSelection,
+        Message.ReceivedSelection({ reading: mentionReading, selection: Option.some({ from: 3, to: 3 }) })
+      ),
+      Command.expectExact(draft("Hi @there"), selecting(4)),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      Command.resolve(SelectText, Message.CompletedSelectText()),
+      expect(typingReply).toHaveValue("Hi @there"),
+      expect(role("listbox", { name: "People to mention" })).toExist(),
+      expectAll(all.role("option")).toHaveCount(3)
+    )
+  })
+
+  it("has the button beside Send, named Mention someone", () => {
+    scene(
+      { update, view: sceneView },
+      given(empty),
+      expect(role("button", { name: "Mention someone" })).toHaveAttr("type", "button"),
+      expect(role("button", { name: "Send" })).toHaveAttr("type", "submit")
     )
   })
 })
@@ -325,8 +458,7 @@ describe("a composer sending", () => {
       keydown(typingReply, "Enter"),
       expectHandled(),
       expectOutMessage(OutMessage.ChangedText({ text: "Hi [@Alan Turing](member:member-3) " })),
-      Command.expectExact(draft("Hi [@Alan Turing](member:member-3) ")),
-      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      ...picked("Hi [@Alan Turing](member:member-3) ", 16),
       expect(role("listbox")).toBeAbsent(),
       keydown(typingReply, "Enter"),
       expectOutMessage(OutMessage.SubmittedText({ text: "Hi [@Alan Turing](member:member-3) " })),

@@ -1,48 +1,104 @@
-import { ThreadMessage } from "@amends-dev/core/thread"
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
-import { SaveDraft } from "./command.ts"
+import { editedText, pickMention, readMarkdown, replaceRange, type Written, writeMarkdown } from "../../mentions.ts"
+import { ReadSelection, SaveDraft, SelectText } from "./command.ts"
 import { ComposerComposition } from "./composition.ts"
-import { completeTail, Message, type Model, OutMessage, Picking, tailQuery } from "./definition.ts"
+import {
+  boxId,
+  Message,
+  type Model,
+  OutMessage,
+  Picking,
+  pickingAfterTyping,
+  Reading,
+  type Selection,
+  writtenOf
+} from "./definition.ts"
 
-/** Keep `text` as the draft of `model`'s place. */
-const saveDraft = ({ workspaceId, memberId, place }: Model, text: string) =>
-  SaveDraft({ workspaceId, memberId, place, text })
+/** Keep `written` as the draft of `model`'s place, as the markdown it says. */
+const saveDraft = ({ workspaceId, memberId, place }: Model, written: Written) =>
+  SaveDraft({ workspaceId, memberId, place, text: writeMarkdown(written) })
 
 /**
- * The mention being typed once the box holds `text`: the one it was while it is for the same letters, so a
- * dismissed list stays dismissed and the active suggestion stays active.
+ * The box holds `written`: it is kept as the draft and reported to whatever holds the composer, with the mention being
+ * typed, if there is one. Given a `caret`, it is put there once the box shows the text, where the person goes on
+ * typing, since setting the value of a box moves its caret to its end.
  */
-const pickingAfterTyping = (text: string, picking: Option.Option<Picking>) =>
-  Option.map(tailQuery(text), (query) =>
-    Option.getOrElse(
-      Option.filter(picking, (current) => current.query === query),
-      () => Picking.make({ query, activeIndex: 0, isDismissed: false })
-    )
-  )
-
-/** The box holds `text`: it is kept as the draft and reported to whatever holds the composer. */
-const changeText = (model: Model, text: string, picking: Option.Option<Picking>) => ({
-  model: modifyFields(model, { text: () => Option.some(text), picking: () => picking }),
-  commands: [saveDraft(model, text)],
-  outMessage: OutMessage.ChangedText({ text })
+const changeWritten = (
+  model: Model,
+  written: Written,
+  picking: Option.Option<Picking>,
+  caret: Option.Option<number>
+) => ({
+  model: modifyFields(model, {
+    text: () => Option.some(written.text),
+    mentions: () => written.mentions,
+    picking: () => picking
+  }),
+  commands: [
+    saveDraft(model, written),
+    ...Option.toArray(Option.map(caret, (at) => SelectText({ id: boxId(model.place), from: at, to: at })))
+  ],
+  outMessage: OutMessage.ChangedText({ text: writeMarkdown(written) })
 })
+
+/** The selection read, kept within the text. */
+const withinText = (text: string, selection: Option.Option<Selection>): Selection =>
+  Option.match(selection, {
+    onNone: () => ({ from: text.length, to: text.length }),
+    onSome: ({ from, to }) => ({ from: Math.min(from, text.length), to: Math.min(to, text.length) })
+  })
+
+/**
+ * The mention button read where the caret is: "@" is written there, after a space unless the text before the caret ends
+ * in one or is empty, in place of what was selected, the list opens for it, and the caret is after it.
+ */
+const startMention = (model: Model, written: Written, { from, to }: Selection) => {
+  const before = written.text.slice(0, from)
+  const typed = before === "" || /\s$/u.test(before) ? "@" : " @"
+  const caret = from + typed.length
+
+  return changeWritten(
+    model,
+    replaceRange(written, from, to, typed),
+    Option.some(Picking.make({ from: caret - 1, query: "", activeIndex: 0, isDismissed: false })),
+    Option.some(caret)
+  )
+}
 
 export const update = ComposerComposition.makeUpdate((model, message) =>
   Message.match(message, {
     // A draft read once the place opened fills it in, unless the person began writing there meanwhile.
-    ReceivedDraft: ({ text }) => ({ model: modifyFields(model, { text: Option.orElseSome(() => text) }) }),
-    TypedText: ({ text }) => changeText(model, text, pickingAfterTyping(text, model.picking)),
-    // The mention at the end of the text becomes the link to the member, and the list closes.
-    PickedMention: ({ memberId, name }) =>
-      changeText(
+    ReceivedDraft: ({ text }) =>
+      Option.match(model.text, {
+        onSome: () => ({ model }),
+        onNone: () => {
+          const read = readMarkdown(text)
+
+          return { model: modifyFields(model, { text: () => Option.some(read.text), mentions: () => read.mentions }) }
+        }
+      }),
+    TypedText: ({ text }) => {
+      const edit = editedText(writtenOf(model), text)
+
+      // A mention removed whole leaves the box showing more than the model holds, and the caret at its end.
+      return changeWritten(
         model,
-        completeTail(
-          Option.getOrElse(model.text, () => ""),
-          ThreadMessage.mentionText(memberId, name)
-        ),
-        Option.none()
-      ),
+        edit.written,
+        pickingAfterTyping(edit.written, edit.caret, model.picking),
+        edit.written.text === text ? Option.none() : Option.some(edit.caret)
+      )
+    },
+    // The letters typed after the "@" become the member's name, and the list closes.
+    PickedMention: ({ memberId, name }) =>
+      Option.match(model.picking, {
+        onNone: () => ({ model }),
+        onSome: ({ from, query }) => {
+          const edit = pickMention(writtenOf(model), { from, to: from + 1 + query.length }, { memberId, name })
+
+          return changeWritten(model, edit.written, Option.none(), Option.some(edit.caret))
+        }
+      }),
     // The view counts the suggestions, so it says which one is active.
     MovedSuggestion: ({ to }) => ({
       model: modifyFields(model, {
@@ -54,15 +110,27 @@ export const update = ComposerComposition.makeUpdate((model, message) =>
         picking: Option.map((picking) => Picking.make({ ...picking, isDismissed: true }))
       })
     }),
+    ClickedMention: () => ({
+      model,
+      commands: [ReadSelection({ id: boxId(model.place), reading: Reading.cases.Mention.make({}) })]
+    }),
+    ReceivedSelection: ({ reading, selection }) => {
+      const written = writtenOf(model)
+
+      return Reading.match(reading, {
+        Mention: () => startMention(model, written, withinText(written.text, selection))
+      })
+    },
     SubmittedText: () => {
-      const text = Option.getOrElse(model.text, () => "")
-      if (text.trim() === "") return { model }
+      const written = writtenOf(model)
+      if (written.text.trim() === "") return { model }
       return {
-        model: modifyFields(model, { text: () => Option.some(""), picking: () => Option.none() }),
-        commands: [saveDraft(model, "")],
-        outMessage: OutMessage.SubmittedText({ text })
+        model: modifyFields(model, { text: () => Option.some(""), mentions: () => [], picking: () => Option.none() }),
+        commands: [saveDraft(model, { text: "", mentions: [] })],
+        outMessage: OutMessage.SubmittedText({ text: writeMarkdown(written) })
       }
     },
-    CompletedSaveDraft: () => ({ model })
+    CompletedSaveDraft: () => ({ model }),
+    CompletedSelectText: () => ({ model })
   })
 )

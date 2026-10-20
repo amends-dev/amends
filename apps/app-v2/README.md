@@ -136,11 +136,15 @@ Enter that confirms a conversion, neither send nor pick nor add a line: Foldkit'
 modifiers and not whether the event is composing, so `inputMethod.ts` keeps those keys, for as long as the app runs,
 from every handler of the page. A send that is refused comes back later, from the server, and the text is not
 put back in the box, as `apps/ui` keeps the draft of a send that failed. Foldkit's builder gives a handler the key pressed and the value of the box, and nothing
-gives the caret, so the composer reads the mention being typed at the end of the text, an "@" at its
-start or after a space and the letters after it with no space among them, and suggests members for
-that alone; a mention typed in the middle of the text is left as typed. A link written there, or by
-hand, still addresses its member, since a write reads the text. The textarea that edits a message is not the
-composer, and suggests no one.
+gives the caret, so the composer finds it from what the person typed, the end of the text that differs from the text
+before, and reads the mention being typed up to it, an "@" at the start of the text or after a space and the letters after it
+with no space among them, so a mention typed in the middle of the text is suggested for too. What a box shows of a
+mention is its member's name with an "@", and the box is the text, so the mention is a span the Block keeps of that
+text (`src/mentions.ts`), written as a link when the text is kept, reported, or sent, so a draft read from the
+browser, or a message loaded for editing, shows the names. A link written by hand still addresses its member, since a
+write reads the text. The textarea that edits a message shows its mentions the same way, as names, keeps and drops them as
+the composer does, and writes them as links when saved, but suggests no one; it is not the composer. When the person removes a mention whole from the textarea of an edit, the
+caret moves to its end, since that form sets no selection.
 
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
@@ -209,16 +213,30 @@ below it counted at each level above.
   "Message Bob", "Reply in thread"), and the workspace's members, and is the design's `composer`: its button is named
   Send and is unavailable while the draft is empty or only spaces, and Enter sends it. Sending clears the box at once and the
   write is held as the store holds any action, so Send has no state of its own for a message on its way, which `apps/ui`'s
-  composer has because it keeps the draft until the send succeeds; a draft of only spaces sends nothing. While the text ends in
-  a mention being typed (`tailQuery`), the Block lists up to eight of the people with a word of their name starting
+  composer has because it keeps the draft until the send succeeds; a draft of only spaces sends nothing. While the
+  caret is at the end of a mention being typed (`mentionQueryAt`: an "@" at the start of the text or after a space and
+  the letters after it, up to the caret), the Block lists up to eight of the people with a word of their name starting
   with its letters, whatever their case or accents, other than the person and the removed, in the members' order
   (`suggestMembers`), as a list named "People to mention", each with their mark at 22px in their tone, an agent's
   lilac (`memberMark`), and the view hands the design's list the keys: the arrows move the active
   suggestion around the list (`MovedSuggestion` carries the index the view counted), Enter or Tab picks
-  it (`PickedMention` writes `ThreadMessage.mentionText` in place of the "@" and the letters, and a
-  space, as typing does: kept as the draft and reported), and Escape dismisses the list
-  (`DismissedSuggestions`) until the letters change. A draft read as the place opens opens no list. The mention
-  is still written as a link in the text, not as a chip in the box: a box that shows it as one is a later step.
+  it, and Escape dismisses the list (`DismissedSuggestions`) until the letters change. A draft read as the place opens
+  opens no list, and neither does a name already picked. A picked mention shows in the box as "@" and the name, "@Sara
+  Lind", in place of the letters typed, and a space follows it, as typing does; the Block keeps which spans of its text
+  are picked mentions (`mentions`, from `src/mentions.ts`) and writes each as `ThreadMessage.mentionText`, the link
+  `[@Sara Lind](member:<id>)`, in what it saves as the draft, reports (`ChangedText`), and sends (`SubmittedText`), so
+  that the draft, the report, and the message stay markdown and what the person sees is the name. A draft read, or a
+  message loaded for editing, goes the other way: each mention link shows as its name, and its span is kept. A span
+  moves with the text written before it and stays while the text after it changes; it is dropped, leaving its words as
+  plain text, when an edit reaches into it or when letters are written against it, which run it on into another word;
+  and Backspace just after it removes it whole: an edit that deletes a mention's last letters, by what differs between
+  the text before and after (`editedText`), takes the rest of the mention with it, and the caret is put where it was
+  (`SelectText`). Where the caret is is found from the same difference, the end of what the person typed, since no
+  handler of the builder gives it; the button "Mention someone", beside Send, reads the selection instead
+  (`ReadSelection`, which no render has changed yet) and writes "@" there in place of what is selected, after a space
+  unless the text before it is empty or ends in one, opens the list for it, and puts the caret after it. A command
+  that sets the box's value moves the caret to its end, so the Block sets the selection after the render commits
+  (`Render.afterCommit`, in `SelectText`), and no timer is used.
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
   part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
   composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
@@ -1558,8 +1576,16 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   tasks of a group's threads kept to a status, an assignee, and a search and ordered latest active, newest, or
   oldest first, and counted while open; a composer filling in its
   draft only while nothing was written, keeping what is written, and sending it once, listing members for
-  a mention typed at the end of the text and for no other, keeping the list closed for the letters it
-  was dismissed for, opening none for a draft read, and writing the member picked as a link; a group
+  a mention typed up to the caret, at the end of the text or in the middle of it, and for no mention elsewhere, keeping
+  the list closed for the letters it was dismissed for, opening none for a draft read or for the name of a mention
+  already picked, showing the member picked as their name and keeping and sending the link, showing the mentions of
+  a draft read as names, moving the mentions with the text before them and dropping one that is edited or that letters
+  are written against, removing one whole as Backspace just after it does and putting the caret where it was, and
+  starting a mention at the caret with its button, reading the selection and writing the "@", in place of what is
+  selected, after a space or not; a thread's message loaded for editing with its mentions as names, saved as the
+  links, and as plain text once the name is edited, and `mentions.ts`: a markdown text read as text and spans and
+  written back, whatever is escaped in a name, a range replaced, and an edit found by comparing the text before and
+  after it, and a mention picked; a group
   opening its settings on General, with the draft of the team's name started only for someone who
   may rename it, renamed from the name seen, writing nothing when the name is unchanged, and closing
   its settings, which drop their drafts, whichever way they close, and close of themselves when the group is no

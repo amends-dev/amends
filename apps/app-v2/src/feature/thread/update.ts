@@ -1,5 +1,6 @@
 import * as Option from "effect/Option"
 import { modifyFields } from "foldkit/struct"
+import { editedText, readMarkdown, writeMarkdown } from "../../mentions.ts"
 import {
   DeleteMessage,
   EditMessage,
@@ -62,11 +63,22 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
     ClickedCancelRename: () => ({ model: modifyFields(model, { renaming: () => Option.none() }) }),
     ClickedEdit: ({ messageId }) => ({
       model: modifyFields(model, {
-        editing: () => Option.map(textOf(model, messageId), ({ text }) => ({ messageId, draft: text }))
+        editing: () =>
+          Option.map(textOf(model, messageId), ({ text }) => {
+            const read = readMarkdown(text)
+
+            return { messageId, draft: read.text, mentions: read.mentions }
+          })
       })
     }),
     TypedEdit: ({ text }) => ({
-      model: modifyFields(model, { editing: Option.map((editing) => modifyFields(editing, { draft: () => text })) })
+      model: modifyFields(model, {
+        editing: Option.map((editing) => {
+          const edited = editedText({ text: editing.draft, mentions: editing.mentions }, text).written
+
+          return modifyFields(editing, { draft: () => edited.text, mentions: () => edited.mentions })
+        })
+      })
     }),
     SubmittedEdit: () =>
       Option.match(
@@ -75,14 +87,14 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
         ),
         {
           onNone: () => ({ model }),
-          onSome: ({ messageId, draft, revision }) => ({
+          onSome: ({ messageId, draft, mentions, revision }) => ({
             model: modifyFields(model, { editing: () => Option.none() }),
             commands: [
               EditMessage({
                 workspaceId: model.workspaceId,
                 memberId: model.memberId,
                 messageId,
-                text: draft,
+                text: writeMarkdown({ text: draft, mentions }),
                 expectedRevision: revision
               })
             ]

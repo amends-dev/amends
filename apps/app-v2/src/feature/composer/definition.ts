@@ -1,9 +1,9 @@
 /**
  * A composer: what the person writes at a place, a reply in a thread or a new thread in a group,
  * kept as a draft in their browser until they send it. It reports what it sends, and that its text
- * changed, to whatever holds it. While the person types a mention at the end of the text, `@` and
- * some letters of a name, it lists the people they may mean, and writes the one they pick into the
- * text as a link.
+ * changed, to whatever holds it. While the person types a mention, `@` and some letters of a name, it
+ * lists the people they may mean, and shows the one they pick as their name in the text. A button
+ * starts a mention at the caret.
  */
 
 import { type Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -11,22 +11,40 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { PickedMention, type Written } from "../../mentions.ts"
 import { foldAccents } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 
 /**
- * The mention being typed at the end of the text: the letters after its "@", which of the suggestions
- * is active, and whether the person dismissed the list for these letters.
+ * The mention being typed: where its "@" is in the text, the letters after it, which of the suggestions is active,
+ * and whether the person dismissed the list for these letters.
  */
-export const Picking = Schema.Struct({ query: Schema.String, activeIndex: Schema.Int, isDismissed: Schema.Boolean })
+export const Picking = Schema.Struct({
+  from: Schema.Int,
+  query: Schema.String,
+  activeIndex: Schema.Int,
+  isDismissed: Schema.Boolean
+})
 export type Picking = typeof Picking.Type
 
-/** Whose composer, at which place, its text, once its draft is read, and the mention being typed. */
+/** The text selected in the box, from where it starts to where it ends; a caret is a selection of none. */
+export const Selection = Schema.Struct({ from: Schema.Int, to: Schema.Int })
+export type Selection = typeof Selection.Type
+
+/** What the selection is read for: to start a mention where it is. */
+export const Reading = Schema.TaggedUnion({ Mention: {} })
+export type Reading = typeof Reading.Type
+
+/**
+ * Whose composer, at which place, the text it shows once its draft is read, the members picked in that text, and the
+ * mention being typed.
+ */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   place: Drafts.Place,
   text: Schema.Option(Schema.String),
+  mentions: Schema.Array(PickedMention),
   picking: Schema.Option(Picking)
 })
 export type Model = typeof Model.Type
@@ -37,8 +55,11 @@ export const Message = defineMessageUnion({
   PickedMention: { memberId: MemberId.MemberId, name: Schema.String },
   MovedSuggestion: { to: Schema.Int },
   DismissedSuggestions: {},
+  ClickedMention: {},
+  ReceivedSelection: { reading: Reading, selection: Schema.Option(Selection) },
   SubmittedText: {},
-  CompletedSaveDraft: {}
+  CompletedSaveDraft: {},
+  CompletedSelectText: {}
 })
 export type Message = typeof Message.Type
 
@@ -58,18 +79,52 @@ export const boxId = (place: Drafts.Place): string =>
     Conversation: ({ memberIds }) => `conversation-${memberIds.join("-")}`
   })
 
-const mentionAtEnd = /(^|\s)@([^\s@]*)$/u
+/** What the box shows and the members picked in it. */
+export const writtenOf = (model: Model): Written => ({
+  text: Option.getOrElse(model.text, () => ""),
+  mentions: model.mentions
+})
+
+const mentionBeforeCaret = /(^|\s)@([^\s@]*)$/u
 
 /**
- * The letters after the "@" that ends `text`, when it ends in a mention being typed: an "@" at the start
- * or after a space, and no space after it. A mention typed anywhere else in the text is left as typed.
+ * The mention being typed that the caret is at the end of, when it is: an "@" at the start of the text or after a
+ * space, with the letters after it, no space among them, up to the caret. A mention typed anywhere else, or past the
+ * caret, is left as typed.
  */
-export const tailQuery = (text: string): Option.Option<string> =>
-  Option.map(Option.fromNullishOr(mentionAtEnd.exec(text)), ([, , query]) => query ?? "")
+export const mentionQueryAt = (text: string, caret: number): Option.Option<Readonly<{ from: number; query: string }>> =>
+  Option.map(
+    Option.fromNullishOr(mentionBeforeCaret.exec(text.slice(0, caret))),
+    ({ 0: match, 1: lead, 2: query }) => ({
+      from: caret - match.length + (lead ?? "").length,
+      query: query ?? ""
+    })
+  )
 
-/** `text` with the mention being typed at its end written as `mention`, and a space after it. */
-export const completeTail = (text: string, mention: string): string =>
-  text.replace(mentionAtEnd, (_, lead: string) => `${lead}${mention} `)
+/**
+ * The mention being typed once the box holds `written` with the caret at `caret`: not a picked mention, and, for the
+ * letters it was dismissed for, as dismissed and as active as it was.
+ */
+export const pickingAfterTyping = (
+  written: Written,
+  caret: number,
+  picking: Option.Option<Picking>
+): Option.Option<Picking> =>
+  Option.map(
+    Option.filter(
+      mentionQueryAt(written.text, caret),
+      ({ from, query }) =>
+        !written.mentions.some((mention) => mention.from < from + 1 + query.length && from < mention.to)
+    ),
+    ({ from, query }) =>
+      Option.match(
+        Option.filter(picking, (current) => current.query === query),
+        {
+          onNone: () => Picking.make({ from, query, activeIndex: 0, isDismissed: false }),
+          onSome: (current) => Picking.make({ ...current, from })
+        }
+      )
+  )
 
 /** The most people the list suggests. */
 export const maxSuggestions = 8

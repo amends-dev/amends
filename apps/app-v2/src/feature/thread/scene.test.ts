@@ -863,6 +863,31 @@ describe("a thread", () => {
     )
   })
 
+  it("loads a message that mentions a member into its form with the name shown, and saves the mention as its link", () => {
+    const asked = saying(opening, `Plans with ${ThreadMessage.mentionText(bob.id, "Bob")}, ready?`)
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: asked, pending: false }),
+      click(role("button", { name: "Edit" })),
+      expect(label("Edit")).toHaveValue("Plans with @Bob, ready?"),
+      type(label("Edit"), "Plans with @Bob, ready for Friday?"),
+      expect(label("Edit")).toHaveValue("Plans with @Bob, ready for Friday?"),
+      click(role("button", { name: "Save" })),
+      Command.expectExact(
+        EditMessage({
+          workspaceId,
+          memberId,
+          messageId: opening.id,
+          text: `Plans with ${ThreadMessage.mentionText(bob.id, "Bob")}, ready for Friday?`,
+          expectedRevision: 1
+        })
+      ),
+      Command.resolve(EditMessage, Message.WroteAction())
+    )
+  })
+
   it("shows a mention in a message as a chip with the name the member has now, among the words around it", () => {
     const asked = saying(
       opening,

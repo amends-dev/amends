@@ -22,6 +22,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
+import { PickedMention } from "../../mentions.ts"
 import { memberName, messageWords, type SideAbout, typingNames } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
@@ -58,8 +59,15 @@ export const ParticipationChange = Schema.Struct({
 })
 export type ParticipationChange = typeof ParticipationChange.Type
 
-/** A message being edited, and its new text. */
-export const Editing = Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId, draft: Schema.String })
+/**
+ * A message being edited, and its new text as the box shows it, in which a mention is "@" and the member's name, with
+ * the members mentioned in it.
+ */
+export const Editing = Schema.Struct({
+  messageId: ThreadMessageId.ThreadMessageId,
+  draft: Schema.String,
+  mentions: Schema.Array(PickedMention)
+})
 export type Editing = typeof Editing.Type
 
 /**

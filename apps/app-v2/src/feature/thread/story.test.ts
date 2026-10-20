@@ -433,3 +433,102 @@ describe("a thread", () => {
     )
   })
 })
+
+describe("a thread editing a message that mentions a member", () => {
+  const bobId = MemberId.MemberId.make("member-2")
+  const mentioning = Schema.decodeSync(ThreadMessage.ThreadMessage)({
+    id: "message-2",
+    workspaceId: "workspace-1",
+    threadId: "thread-1",
+    author: { _tag: "Member", memberId: "member-1" },
+    via: null,
+    publishedAt: "2026-10-18T12:05:00Z",
+    content: {
+      _tag: "Text",
+      text: "Thanks [@Bob](member:member-2), see [the plan](https://example.com)",
+      mentions: ["member-2"],
+      revision: 1,
+      editedAt: null
+    }
+  })
+
+  const readMentioning = message(
+    Message.ReceivedThread({
+      hasThread: true,
+      title: Option.none(),
+      messages: [{ message: mentioning, pending: false }],
+      following: Option.none(),
+      changes: [],
+      latest: 1,
+      readThrough: 1
+    })
+  )
+
+  const opensForEditing = [
+    readMentioning,
+    Command.resolve(ScrollMessagesToEnd, Message.CompletedScrollMessagesToEnd()),
+    message(Message.ClickedEdit({ messageId: mentioning.id }))
+  ]
+
+  it("loads it with the mention shown as the name, and the mention as its span", () => {
+    story(
+      update,
+      given(opened),
+      ...opensForEditing,
+      model((model) => {
+        expect(model.editing).toEqual(
+          Option.some({
+            messageId: mentioning.id,
+            draft: "Thanks @Bob, see [the plan](https://example.com)",
+            mentions: [{ memberId: bobId, from: 7, to: 11 }]
+          })
+        )
+      })
+    )
+  })
+
+  it("saves it with the mention as the link, whatever else was changed around it", () => {
+    story(
+      update,
+      given(opened),
+      ...opensForEditing,
+      message(Message.TypedEdit({ text: "Many thanks @Bob, see [the plan](https://example.com)" })),
+      model((model) => {
+        expect(Option.map(model.editing, ({ mentions }) => mentions)).toEqual(
+          Option.some([{ memberId: bobId, from: 12, to: 16 }])
+        )
+      }),
+      message(Message.SubmittedEdit()),
+      Command.expectExact(
+        EditMessage({
+          workspaceId,
+          memberId,
+          messageId: mentioning.id,
+          text: "Many thanks [@Bob](member:member-2), see [the plan](https://example.com)",
+          expectedRevision: 1
+        })
+      ),
+      Command.resolve(EditMessage, Message.WroteAction())
+    )
+  })
+
+  it("saves it as plain text once the person edited the name", () => {
+    story(
+      update,
+      given(opened),
+      ...opensForEditing,
+      message(Message.TypedEdit({ text: "Thanks @Bobby, see [the plan](https://example.com)" })),
+      message(Message.SubmittedEdit()),
+      Command.expectExact(
+        EditMessage({
+          workspaceId,
+          memberId,
+          messageId: mentioning.id,
+          text: "Thanks @Bobby, see [the plan](https://example.com)",
+          expectedRevision: 1
+        })
+      ),
+      Command.resolve(EditMessage, Message.WroteAction())
+    )
+  })
+})

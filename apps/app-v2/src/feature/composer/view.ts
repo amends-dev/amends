@@ -8,7 +8,7 @@ import { boxId, Message, type Model, suggestMembers } from "./definition.ts"
 
 /**
  * What the box shows while it is empty, which also names it, and the members the person may mention in it. Its
- * button is named Send.
+ * button is named Send, and the button that starts a mention Mention someone.
  */
 export type ViewInputs = Readonly<{
   placeholder: string
@@ -65,6 +65,7 @@ export const view = ComposerComposition.makeView.withInputs<ViewInputs>((model, 
     onInput: (text) => Message.TypedText({ text }),
     onSubmit: Message.SubmittedText(),
     submitLabel: "Send",
+    mention: { label: "Mention someone", onClick: Message.ClickedMention() },
     suggestions: Option.getOrUndefined(suggestionsOf(model, members))
   })
 )
