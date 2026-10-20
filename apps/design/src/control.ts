@@ -437,7 +437,7 @@ export const noticeBox = <Message, Requirements>(
   return h.div(
     [h.Role("note"), h.AriaLabel(config.title), h.Class(`${noticeBoxBase} ${noticeBoxLooks[tone]}`)],
     [
-      h.span([h.Class(noticeBoxMark)], [statusMark(h, { kind: noticeBoxMarks[tone], label: config.title })]),
+      h.span([h.Class(noticeBoxMark)], [statusMark(h, noticeBoxMarks[tone])]),
       h.div(
         [h.Class(noticeBoxColumn)],
         [

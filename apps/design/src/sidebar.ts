@@ -6,7 +6,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
-import { activityMark, type MarkContent, type MarkStatus, mark, statusMark } from "./mark.ts"
+import { activityMark, type MarkContent, type MarkStatus, mark, statusMark, statusTooltip } from "./mark.ts"
 
 const sidebarColumn = "flex w-66 flex-none flex-col overflow-hidden bg-panel"
 
@@ -167,7 +167,9 @@ const renderItemEnd = <Message, Requirements>(
 
   return [
     config.activity === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(itemActivity)], [activityMark(h)]),
-    config.status === undefined || config.mark !== undefined ? h.empty : statusMark(h, config.status),
+    config.status === undefined || config.mark !== undefined
+      ? h.empty
+      : statusTooltip(h, config.status, [statusMark(h, config.status.kind)]),
     config.count === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(itemCount)], [`${config.count}`])
   ]
 }

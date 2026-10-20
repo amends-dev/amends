@@ -36,7 +36,7 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -333,12 +333,17 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
     setup) a triangle in `caution-mark`, as `@amends-dev/ui` draws it, a little wider than tall; `"blocked"` (can't run,
     unavailable) a square in `danger-mark` with a 1.5px bar of the knockout across its middle, inset 20% each side. The
     patch is 8px on a 24px mark, 9px on 28 and 32, and 10px on 40, as the mocks and `@amends-dev/ui` size it, and 7px on
-    20px and 22px, the least `@amends-dev/ui` draws. The mark's `title` is the status's `label`, with the `detail` after a colon
-    when there is one, which the browser shows on hover; a tooltip is for later. A mark stays hidden from assistive
-    technology, since it knows only the letters: the row that holds it is named by the name and then the status's label,
-    "Atlas, Needs setup".
-- `statusMark(h, status)` is a status's shape alone, 9px, with the same `title` and hidden from assistive technology, for the
-  end of a row whose item has no mark of its own, such as a connection.
+    20px and 22px, the least `@amends-dev/ui` draws. A mark with a status is wrapped in a `tooltip` that says it, as
+    `@amends-dev/ui` wraps its avatars: the status's `label` as the title, why under it when there is a `detail`, and
+    the title in the tone of the shape, `caution` for the triangle and `danger` for the barred square, none for the
+    other two. It is above the mark, or below it with `statusPlacement: "below"`, as a pane's header mark is, since the
+    window has no room above it. A mark stays hidden from assistive technology, since it knows only the letters, and
+    so is the tooltip: the row that holds it is named by the name and then the status's label, "Atlas, Needs setup".
+- `statusTooltip(h, status, children, placement?)` is that tooltip for `children`, which a row uses for what it draws
+  of a status beside the mark, such as `statusMark`.
+- `statusMark(h, kind)` is a status's shape alone, 9px, for the end of a row whose item has no mark of its own, such as
+  a connection, and hidden from assistive technology. It says nothing on hover; the sidebar wraps it in
+  `statusTooltip`, and the boxed note's mark is this shape with none.
 - `activityMark(h)` is the logo at 1rem in its `working` motion, which a row shows at its end while the thing it
   stands for is at work, in the color of the text around it and hidden from assistive technology.
 - `markCluster(h, { marks, label, onClick })` is a button named `label` that gathers the people a group
@@ -631,8 +636,8 @@ The third and fourth layout patterns share one structure.
   spacing, such as `paneBack`, then the title with an `icon` or a `mark` before it and
   `context` after it in `ink-secondary`, and `actions` at the right. The `mark` is a `mark`'s letters and
   tone, `{ text, tone? }`, the 24px square for a person or an agent that a page about one shows in place of
-  an icon, and its `status` is the patch on it, as a sidebar row's is, which an `sr-only` word after the
-  title says too. The `phoneContext` is a quiet line under the title below 48rem only, such as the
+  an icon, and its `status` is the patch on it, as a sidebar row's is, with its tooltip below the mark, since the
+  header is at the window's top, and which an `sr-only` word after the title says too. The `phoneContext` is a quiet line under the title below 48rem only, such as the
   workspace's name, which a phone's row has no room for beside the title; from 48rem it is not shown, and a
   title with one stacks over it there. The main pane's row starts 40px
   further in below 64rem, for the shell's menu button over it; its tabs and subtitle keep the pane's

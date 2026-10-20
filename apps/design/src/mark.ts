@@ -8,6 +8,7 @@ import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, type IconSize, icon } from "./icon.ts"
 import { logo } from "./logo.ts"
+import { type TooltipPlacement, type TooltipTone, tooltip } from "./tooltip.ts"
 
 const markBase = "relative grid flex-none place-items-center font-medium uppercase"
 
@@ -63,6 +64,13 @@ const statusShapes = {
 
 const statusBar = "absolute inset-x-[20%] top-1/2 h-[1.5px] -translate-y-1/2 bg-status-knockout"
 
+const statusTones: Readonly<Record<keyof typeof statusShapes, TooltipTone | undefined>> = {
+  available: undefined,
+  offline: undefined,
+  attention: "caution",
+  blocked: "danger"
+}
+
 const clusterLook =
   "inline-flex flex-none cursor-pointer items-center gap-0.5 border border-outline bg-transparent p-0.5 focus-ring hover:bg-hover max-desktop:min-h-11"
 
@@ -81,8 +89,8 @@ export type MarkTone = keyof typeof markTones
  * How something stands, by the shape of its mark, which says it without color: `available`, online or at work,
  * a filled square; `offline`, a hollow square; `attention`, that something is missing, a triangle; and
  * `blocked`, that it cannot run or is unavailable, a square with a bar. The `label` is the word for it, such as
- * "Needs setup", which a row adds to its name and the mark shows on hover, and the `detail` says why, in a
- * sentence, which follows it on hover.
+ * "Needs setup", which a row adds to its name and the mark shows in a tooltip on hover, and the `detail` says why,
+ * in a sentence, which follows it there.
  */
 export type MarkStatus = Readonly<{ kind: keyof typeof statusShapes; label: string; detail?: string }>
 
@@ -93,10 +101,6 @@ export type MarkStatus = Readonly<{ kind: keyof typeof statusShapes; label: stri
 export type MarkContent = Readonly<{ tone?: MarkTone }> &
   (Readonly<{ text: string; icon?: never }> | Readonly<{ icon: IconName; text?: never }>)
 
-/** What the mark shows on hover: its word, and why when it says. */
-const hoverText = (status: MarkStatus): string =>
-  status.detail === undefined ? status.label : `${status.label}: ${status.detail}`
-
 const renderStatusShape = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   kind: MarkStatus["kind"],
@@ -105,28 +109,45 @@ const renderStatusShape = <Message, Requirements>(
   h.span([h.Class(`${statusShapes[kind]} ${sizeClass}`)], kind === "blocked" ? [h.span([h.Class(statusBar)])] : [])
 
 /**
+ * `children` with the tooltip a `status` says: its label as the title, tinted `caution` for a triangle and `danger` for
+ * a barred square, as `@amends-dev/ui` tints it, and why, if it says, under it. `placement` is above unless given.
+ */
+export const statusTooltip = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  status: MarkStatus,
+  children: ReadonlyArray<Html>,
+  placement?: TooltipPlacement
+): Html =>
+  tooltip(h, {
+    title: status.label,
+    detail: status.detail,
+    tone: statusTones[status.kind],
+    placement,
+    children
+  })
+
+/**
  * The `text` letters, upper-cased, or the `icon`, in a square on the ground of its `tone`, `neutral` unless given:
  * `xs` 20px, `choice` 22px, `sm` (the default) 24px, `account` 28px, `md` 32px, or `lg` 40px. An icon is drawn at the
  * size that fits its square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md`) and takes the color of the ground's text. A mark
  * with a `status` has its patch over the bottom end corner, overhanging it by 2px, in a notch 2px wider all round that
  * is cut from the surface behind it, in the color of `status-knockout`, which a row that is hovered or current sets to
  * its own. The patch is 8px on `sm`, 9px on `account` and `md`, 10px on `lg`, and 7px on `xs` and `choice`, the least
- * the design draws. The status is the word on hover, in the `title`. A mark is hidden from assistive technology, since the name it
- * abbreviates is always beside it, and the row that holds it adds the status to its own name, "Atlas, Needs setup".
+ * the design draws. The status is a tooltip over the mark on hover (`statusTooltip`), above it unless
+ * `statusPlacement` says below, for a mark with no room above. A mark is hidden from assistive technology, since the
+ * name it abbreviates is always beside it, and the row that holds it adds the status to its own name, "Atlas, Needs
+ * setup".
  */
 export const mark = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: MarkContent & Readonly<{ size?: MarkSize; status?: MarkStatus | undefined }>
+  config: MarkContent &
+    Readonly<{ size?: MarkSize; status?: MarkStatus | undefined; statusPlacement?: TooltipPlacement | undefined }>
 ): Html => {
   const size = config.size ?? "sm"
   const { status } = config
 
-  return h.span(
-    [
-      h.AriaHidden(true),
-      ...(status === undefined ? [] : [h.Title(hoverText(status))]),
-      h.Class(`${markBase} ${markSizes[size]} ${markTones[config.tone ?? "neutral"]}`)
-    ],
+  const square = h.span(
+    [h.AriaHidden(true), h.Class(`${markBase} ${markSizes[size]} ${markTones[config.tone ?? "neutral"]}`)],
     [
       config.icon === undefined ? config.text : icon(h, config.icon, { size: iconSizes[size] }),
       status === undefined
@@ -134,17 +155,19 @@ export const mark = <Message, Requirements>(
         : h.span([h.Class(`${patchCut} ${patchCutSizes[size]}`)], [renderStatusShape(h, status.kind, patchSizes[size])])
     ]
   )
+
+  return status === undefined ? square : statusTooltip(h, status, [square], config.statusPlacement)
 }
 
 /**
- * A `status` as its shape alone, 9px, for the end of a row whose item has no mark of its own, such as a
- * connection. The word is on hover in the `title`, and the row adds it to its own name, as it does for a mark.
+ * A status's shape alone, 9px, for the end of a row whose item has no mark of its own, such as a connection. It is
+ * hidden from assistive technology, and says nothing on hover: a row that wants the word there wraps it in
+ * `statusTooltip`, and adds the word to its own name, as it does for a mark.
  */
-export const statusMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, status: MarkStatus): Html =>
-  h.span(
-    [h.AriaHidden(true), h.Title(hoverText(status)), h.Class("flex flex-none")],
-    [renderStatusShape(h, status.kind, "size-2.25")]
-  )
+export const statusMark = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  kind: MarkStatus["kind"]
+): Html => h.span([h.AriaHidden(true), h.Class("flex flex-none")], [renderStatusShape(h, kind, "size-2.25")])
 
 /**
  * The logo in its working motion, 1rem, which a row shows at its end while the thing it stands for is at work. It

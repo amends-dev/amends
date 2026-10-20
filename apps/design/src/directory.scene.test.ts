@@ -587,13 +587,16 @@ describe("row with a status", () => {
     )
   })
 
-  it("puts the patch on its mark, which shows the word and the reason on hover and is hidden from assistive technology", () => {
+  it("puts the patch on its mark, which shows the word and the reason in a tooltip on hover and is hidden from assistive technology", () => {
     scene(
       { update, view: viewOf(rows) },
       given(initial),
-      expect(within(reviewHelper, text("R"))).toHaveAttr("title", "Needs setup: Its model connection was removed."),
+      expect(within(reviewHelper, text("R"))).not.toHaveAttr("title"),
       expect(within(reviewHelper, text("R"))).toHaveAttr("aria-hidden", "true"),
-      expect(within(role("button", { name: "Nora" }), text("N"))).not.toHaveAttr("title")
+      expect(within(reviewHelper, text("Needs setup"))).toHaveClass("text-caution-text"),
+      expect(within(reviewHelper, text("Its model connection was removed."))).toExist(),
+      expect(within(reviewHelper, selector(".tooltip-above"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Nora" }), selector(".tooltip-anchor"))).toBeAbsent()
     )
   })
 
@@ -735,13 +738,13 @@ describe("row with an icon for a mark", () => {
     scene(
       { update, view: viewOf(rows) },
       given(initial),
-      expect(within(role("button", { name: "Search tools, Needs setup" }), selector("span.relative svg"))).toExist(),
-      expect(within(role("button", { name: "Search tools, Needs setup" }), selector("span.relative"))).toHaveAttr(
-        "title",
-        "Needs setup: The key is missing."
+      expect(within(role("button", { name: "Search tools, Needs setup" }), selector("span.size-8 svg"))).toExist(),
+      expect(within(role("button", { name: "Search tools, Needs setup" }), text("The key is missing."))).toExist(),
+      expect(within(role("button", { name: "Search tools, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
       ),
-      expect(within(role("button", { name: "Local models" }), selector("span.relative svg"))).toExist(),
-      expect(within(role("button", { name: "Local models" }), selector("span.relative"))).not.toHaveAttr("title")
+      expect(within(role("button", { name: "Local models" }), selector("span.size-8 svg"))).toExist(),
+      expect(within(role("button", { name: "Local models" }), selector(".tooltip-anchor"))).toBeAbsent()
     )
   })
 

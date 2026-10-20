@@ -496,7 +496,7 @@ the pages that compose them; the root composes the pages.
   destinations, has a section for each thing a connection gives, Models, Tools, Sandboxes, and Harnesses, listing
   the connections whose integration gives it, so one that gives two is in both, then a last section, Channels. A
   connection is a row on the connections icon, with its status as a shape at the end of the row, named after the
-  status and with it on hover: Needs setup, a caution triangle, with why, when it can't be used, and
+  status and with it in a tooltip on hover: Needs setup, a caution triangle, with why, when it can't be used, and
   Unavailable, a danger square with a bar, when its integration isn't installed on this host (such a connection
   gives nothing the sidebar can tell, so it is in no section while the list shows it); a connection that is ready
   shows nothing, and so does one still on its way, which says "Sending…". The row of the connection whose page
@@ -565,7 +565,7 @@ the pages that compose them; the root composes the pages.
   (`list`, "Browse agents") and, where the person may create agents and the host listed its integrations,
   "Add agent", whose dialog says beside the model connection when no connection gives models, and the title a button that opens the list and is current while it shows (the view
   input `isListOpen`), an agent's row being current instead while its page shows (`openAgentId`); an agent that needs setup has a caution triangle on its mark, with "Needs
-  setup" on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
+  setup" in a tooltip on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
   ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
   Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
   many agents it holds, an "Add agent" button that opens the dialog, a toolbar with a search that narrows the tab by name, in any case

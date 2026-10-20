@@ -42,7 +42,15 @@ import {
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { logo, logoMotions } from "../src/logo.ts"
-import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
+import {
+  activityMark,
+  type MarkSize,
+  type MarkStatus,
+  mark,
+  markCluster,
+  statusMark,
+  statusTooltip
+} from "../src/mark.ts"
 import { type ChoiceMenuChoice, choiceMenu, type MenuGroup, menu } from "../src/menu.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
@@ -1469,7 +1477,7 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
     ...markStatuses.map((status) =>
       sample(
         h,
-        `Status ${status.label.toLowerCase()}, at every size: 20px, 22, 24, 28, 32, and 40, with its patch 7, 7, 8, 9, 9, and 10px`,
+        `Status ${status.label.toLowerCase()}, at every size: 20px, 22, 24, 28, 32, and 40, with its patch 7, 7, 8, 9, 9, and 10px, and its word in a tooltip on hover`,
         markSizes.map((size) => mark(h, { text: "AM", size, status })),
         iconSizeRow
       )
@@ -1486,8 +1494,8 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
     ),
     sample(
       h,
-      "A status mark alone, 9px, for an item with no mark of its own, and the logo's mark of what is at work",
-      [...markStatuses.map((status) => statusMark(h, status)), activityMark(h)],
+      "A status mark alone, 9px, for an item with no mark of its own, in its tooltip, and the logo's mark of what is at work",
+      [...markStatuses.map((status) => statusTooltip(h, status, [statusMark(h, status.kind)])), activityMark(h)],
       iconSizeRow
     ),
     sample(

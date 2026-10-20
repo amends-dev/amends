@@ -523,16 +523,18 @@ describe("the agents", () => {
         "Harness · Sandbox · test-model · Models"
       ),
       expect(within(role("button", { name: "Builder" }), text("B"))).toHaveClass("bg-avatar-lilac-bg"),
-      expect(within(role("button", { name: "Builder" }), selector("[title]"))).toBeAbsent(),
+      expect(within(role("button", { name: "Builder" }), selector(".tooltip-anchor"))).toBeAbsent(),
       expect(role("button", { name: "Stranded, Needs setup" })).toHaveAttr(
         "aria-description",
         "Auto · No sandbox · old-model · Removed connection"
       ),
-      // The patch says why on hover, by the first thing in the way.
-      expect(within(role("button", { name: "Stranded, Needs setup" }), text("S"))).toHaveAttr(
-        "title",
-        "Needs setup: Its model connection was removed."
-      )
+      // The patch says why on hover, in a tooltip, by the first thing in the way.
+      expect(within(role("button", { name: "Stranded, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
+      ),
+      expect(
+        within(role("button", { name: "Stranded, Needs setup" }), text("Its model connection was removed."))
+      ).toExist()
     )
   })
 
@@ -553,10 +555,10 @@ describe("the agents", () => {
       scene(
         { update, view },
         given(modifyFields(opened, { agents: () => [{ agent: stranded(issue), pending: false }] })),
-        expect(within(role("button", { name: "Scout, Needs setup" }), text("S"))).toHaveAttr(
-          "title",
-          `Needs setup: ${sentence}`
-        )
+        expect(within(role("button", { name: "Scout, Needs setup" }), text("Needs setup"))).toHaveClass(
+          "text-caution-text"
+        ),
+        expect(within(role("button", { name: "Scout, Needs setup" }), text(sentence))).toExist()
       )
     }
   })
@@ -737,15 +739,17 @@ describe("the agents list", () => {
     scene(
       { update, view },
       given(withSeveral),
-      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveAttr(
-        "title",
-        "Needs setup: Its sandbox connection was removed."
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
       ),
+      expect(
+        within(role("button", { name: "Review helper, Needs setup" }), text("Its sandbox connection was removed."))
+      ).toExist(),
       expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveClass(
         "bg-avatar-lilac-bg"
       ),
       expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveClass("size-8"),
-      expect(within(role("button", { name: "Nora" }), text("N"))).not.toHaveAttr("title")
+      expect(within(role("button", { name: "Nora" }), selector(".tooltip-anchor"))).toBeAbsent()
     )
   })
 
@@ -857,11 +861,13 @@ describe("the agents' section of the sidebar", () => {
       expect(role("button", { name: "Review helper, Needs setup" })).toExist(),
       expect(within(role("button", { name: "Nora" }), text("N"))).toHaveClass("bg-avatar-lilac-bg"),
       expect(within(role("button", { name: "Nora" }), text("N"))).toHaveClass("size-6"),
-      expect(within(role("button", { name: "Nora" }), text("N"))).not.toHaveAttr("title"),
-      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveAttr(
-        "title",
-        "Needs setup: Its sandbox connection was removed."
+      expect(within(role("button", { name: "Nora" }), selector(".tooltip-anchor"))).toBeAbsent(),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
       ),
+      expect(
+        within(role("button", { name: "Review helper, Needs setup" }), text("Its sandbox connection was removed."))
+      ).toExist(),
       expect(role("button", { name: "Nora" })).not.toHaveAttr("aria-current")
     )
   })
@@ -990,7 +996,8 @@ describe("an agent's page", () => {
       expect(role("note", { name: "This agent can't run as it is set up" })).toExist(),
       expect(text("Its model connection was removed.")).toExist(),
       expect(text("Its harness works only in a sandbox, and it has none.")).toExist(),
-      expect(text("Needs setup")).toHaveClass("sr-only")
+      expect(selector(".sr-only")).toHaveText("Needs setup"),
+      expect(selector(".text-caution-text.font-medium")).toHaveText("Needs setup")
     )
   })
 

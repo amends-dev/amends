@@ -210,19 +210,24 @@ describe("the connections list", () => {
         })
       ),
       expect(role("button", { name: "Search tools, Needs setup" })).toExist(),
-      expect(within(role("button", { name: "Search tools, Needs setup" }), selector("[title]"))).toHaveAttr(
-        "title",
-        "Needs setup: MCP server takes no key"
+      expect(within(role("button", { name: "Search tools, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
       ),
+      expect(within(role("button", { name: "Search tools, Needs setup" }), text("MCP server takes no key"))).toExist(),
       expect(role("button", { name: "Vertex · Research, Unavailable" })).toHaveAttr(
         "aria-description",
         "Integration not installed · API key"
       ),
-      expect(within(role("button", { name: "Vertex · Research, Unavailable" }), selector("[title]"))).toHaveAttr(
-        "title",
-        "Unavailable: Its integration isn't installed on this host."
+      expect(within(role("button", { name: "Vertex · Research, Unavailable" }), text("Unavailable"))).toHaveClass(
+        "text-danger-text"
       ),
-      expect(within(role("button", { name: "Anthropic · Team" }), selector("[title]"))).toBeAbsent()
+      expect(
+        within(
+          role("button", { name: "Vertex · Research, Unavailable" }),
+          text("Its integration isn't installed on this host.")
+        )
+      ).toExist(),
+      expect(within(role("button", { name: "Anthropic · Team" }), selector(".tooltip-anchor"))).toBeAbsent()
     )
   })
 
@@ -596,10 +601,10 @@ describe("the connections' sections of the sidebar", () => {
         })
       ),
       expectAll(all.role("button", { name: "Hosted, Needs setup" })).toHaveCount(2),
-      expect(within(first(all.role("button", { name: "Hosted, Needs setup" })), selector("[title]"))).toHaveAttr(
-        "title",
-        "Needs setup: The key was refused"
-      )
+      expect(within(first(all.role("button", { name: "Hosted, Needs setup" })), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
+      ),
+      expect(within(first(all.role("button", { name: "Hosted, Needs setup" })), text("The key was refused"))).toExist()
     )
     scene(
       { update, view: sidebar() },
@@ -609,10 +614,15 @@ describe("the connections' sections of the sidebar", () => {
         })
       ),
       expectAll(all.role("button", { name: "Hosted, Unavailable" })).toHaveCount(2),
-      expect(within(first(all.role("button", { name: "Hosted, Unavailable" })), selector("[title]"))).toHaveAttr(
-        "title",
-        "Unavailable: Its integration isn't installed on this host."
-      )
+      expect(within(first(all.role("button", { name: "Hosted, Unavailable" })), text("Unavailable"))).toHaveClass(
+        "text-danger-text"
+      ),
+      expect(
+        within(
+          first(all.role("button", { name: "Hosted, Unavailable" })),
+          text("Its integration isn't installed on this host.")
+        )
+      ).toExist()
     )
   })
 

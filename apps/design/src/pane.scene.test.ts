@@ -276,10 +276,13 @@ describe("pane", () => {
       given(initial),
       expect(within(role("main"), text("Y"))).toHaveClass("bg-avatar-lilac-bg"),
       expect(within(role("main"), text("Y"))).toHaveClass("size-6"),
-      expect(within(role("main"), text("Y"))).toHaveAttr("title", "Needs setup: Its model connection was removed."),
+      expect(within(role("main"), text("Y"))).not.toHaveAttr("title"),
       expect(within(role("main"), text("Y"))).toHaveAttr("aria-hidden", "true"),
       expect(within(role("main"), role("heading", { name: "Yumi", level: 1 }))).toExist(),
-      expect(within(role("main"), text("Needs setup"))).toHaveClass("sr-only")
+      expect(within(role("main"), selector(".sr-only"))).toHaveText("Needs setup"),
+      expect(within(role("main"), selector(".text-caution-text"))).toHaveText("Needs setup"),
+      expect(within(role("main"), text("Its model connection was removed."))).toExist(),
+      expect(within(role("main"), selector(".tooltip-below"))).toHaveAttr("aria-hidden", "true")
     )
   })
 

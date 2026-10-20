@@ -4,7 +4,7 @@ import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "./mark.ts"
+import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark, statusTooltip } from "./mark.ts"
 
 const marks = (_: null, h: HtmlBuilder<never>) =>
   h.div(
@@ -164,11 +164,9 @@ describe("mark with an icon", () => {
           )
       },
       given(null),
-      expect(selector("span.relative")).toHaveAttr(
-        "title",
-        "Unavailable: Its integration isn't installed on this host."
-      ),
-      expect(within(selector("span.relative"), selector("span.bg-danger-mark"))).toExist()
+      expect(text("Unavailable")).toHaveClass("text-danger-text"),
+      expect(text("Its integration isn't installed on this host.")).toExist(),
+      expect(within(selector("span.size-8"), selector("span.bg-danger-mark"))).toExist()
     )
   })
 })
@@ -248,7 +246,7 @@ describe("mark with a status", () => {
     )
   })
 
-  it("says its word on hover, with why when it says, and stays hidden from assistive technology", () => {
+  it("says its word on hover in a tooltip, with why when it says and a tone by its shape, and stays hidden from assistive technology", () => {
     scene(
       {
         ...still,
@@ -264,32 +262,110 @@ describe("mark with a status", () => {
                   label: "Unavailable",
                   detail: "Its integration isn't installed on this host."
                 }
-              })
+              }),
+              mark(h, { text: "A", status: { kind: "available", label: "Online" } })
             ]
           )
       },
       given(null),
-      expect(text("R")).toHaveAttr("title", "Needs setup"),
+      expect(text("R")).not.toHaveAttr("title"),
       expect(text("R")).toHaveAttr("aria-hidden", "true"),
-      expect(text("S")).toHaveAttr("title", "Unavailable: Its integration isn't installed on this host."),
+      expect(text("Needs setup")).toHaveClass("text-caution-text"),
+      expect(text("Unavailable")).toHaveClass("text-danger-text"),
+      expect(text("Its integration isn't installed on this host.")).toHaveClass("text-ink-secondary"),
+      expect(text("Online")).toHaveClass("text-ink"),
       expect(role("img")).toBeAbsent()
+    )
+  })
+
+  it("puts the tooltip above the mark, or below it when it says it has no room above", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div(
+            [],
+            [
+              h.div([h.Id("above")], [mark(h, { text: "R", status: { kind: "attention", label: "Needs setup" } })]),
+              h.div(
+                [h.Id("below")],
+                [
+                  mark(h, {
+                    text: "S",
+                    status: { kind: "attention", label: "Needs setup" },
+                    statusPlacement: "below"
+                  })
+                ]
+              )
+            ]
+          )
+      },
+      given(null),
+      expect(within(selector("#above"), selector(".tooltip-above"))).toExist(),
+      expect(within(selector("#above"), selector(".tooltip-below"))).toBeAbsent(),
+      expect(within(selector("#below"), selector(".tooltip-below"))).toExist(),
+      expect(within(selector("#below"), selector(".tooltip-above"))).toBeAbsent()
+    )
+  })
+
+  it("is wrapped in the trigger of its tooltip only when it has a status", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div(
+            [h.Id("marks")],
+            [mark(h, { text: "S" }), mark(h, { text: "R", status: { kind: "attention", label: "Needs setup" } })]
+          )
+      },
+      given(null),
+      expectAll(all.selector("#marks .tooltip-anchor")).toHaveCount(1),
+      expect(within(selector(".tooltip-anchor"), text("R"))).toExist()
+    )
+  })
+})
+
+describe("statusTooltip", () => {
+  it("is the status's label as the title, why under it, and the tone of its shape: none, caution, or danger", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div(
+            [],
+            [
+              statusTooltip(h, { kind: "offline", label: "Offline" }, [h.span([], ["o"])]),
+              statusTooltip(h, { kind: "attention", label: "Needs setup", detail: "The key is missing." }, [
+                h.span([], ["n"])
+              ]),
+              statusTooltip(h, { kind: "blocked", label: "Unavailable" }, [h.span([], ["u"])], "below")
+            ]
+          )
+      },
+      given(null),
+      expect(text("Offline")).toHaveClass("text-ink"),
+      expect(text("Needs setup")).toHaveClass("text-caution-text"),
+      expect(text("The key is missing.")).toExist(),
+      expect(text("Unavailable")).toHaveClass("text-danger-text"),
+      expect(selector(".tooltip-below")).toExist(),
+      expect(text("o")).toExist()
     )
   })
 })
 
 describe("statusMark", () => {
-  it("is the shape alone at 9px, with its word on hover, hidden from assistive technology", () => {
+  it("is the shape alone at 9px, hidden from assistive technology, with nothing to say on hover", () => {
     scene(
       {
         ...still,
-        view: (_: null, h: HtmlBuilder<never>) =>
-          h.div([h.Id("end")], [statusMark(h, { kind: "attention", label: "Needs setup" })])
+        view: (_: null, h: HtmlBuilder<never>) => h.div([h.Id("end")], [statusMark(h, "attention")])
       },
       given(null),
-      expect(selector("#end [title]")).toHaveAttr("title", "Needs setup"),
-      expect(selector("#end [title]")).toHaveAttr("aria-hidden", "true"),
-      expect(selector("#end [title] span")).toHaveClass("size-2.25"),
-      expect(selector("#end [title] span")).toHaveClass("bg-caution-mark"),
+      expect(within(selector("#end"), selector("[aria-hidden]"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(selector("#end"), selector("span span"))).toHaveClass("size-2.25"),
+      expect(within(selector("#end"), selector("span span"))).toHaveClass("bg-caution-mark"),
+      expect(within(selector("#end"), selector("[title]"))).toBeAbsent(),
+      expect(within(selector("#end"), selector(".tooltip-anchor"))).toBeAbsent(),
       expect(role("img")).toBeAbsent()
     )
   })

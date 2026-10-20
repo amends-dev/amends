@@ -141,7 +141,9 @@ const renderTitleLeading = <Message, Requirements>(
     return h.span([h.Class(titleIcon[variant])], [icon(h, header.icon, { size: variant === "main" ? "md" : "sm" })])
   }
 
-  return header.mark === undefined ? h.empty : mark(h, { ...header.mark, status: header.status })
+  return header.mark === undefined
+    ? h.empty
+    : mark(h, { ...header.mark, status: header.status, statusPlacement: "below" })
 }
 
 const renderTitle = <Message, Requirements>(

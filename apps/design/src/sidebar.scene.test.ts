@@ -394,20 +394,27 @@ describe("sidebarItem with a status", () => {
     )
   })
 
-  it("puts the patch on the mark, with its word on hover, hidden from assistive technology like the mark", () => {
+  it("puts the patch on the mark, with its word and why in a tooltip on hover, hidden from assistive technology like the mark", () => {
     scene(
       { update, view: sidebarView(agentsSidebar) },
       given(initial),
-      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveAttr(
-        "title",
-        "Needs setup: Its sandbox was removed."
-      ),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).not.toHaveAttr("title"),
       expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveAttr(
         "aria-hidden",
         "true"
       ),
       expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveClass("size-6"),
-      expect(within(role("button", { name: "Nora" }), text("N"))).not.toHaveAttr("title"),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("Needs setup"))).toHaveClass(
+        "text-caution-text"
+      ),
+      expect(
+        within(role("button", { name: "Review helper, Needs setup" }), text("Its sandbox was removed."))
+      ).toHaveClass("text-ink-secondary"),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), selector(".invisible"))).toHaveAttr(
+        "aria-hidden",
+        "true"
+      ),
+      expect(within(role("button", { name: "Nora" }), selector(".tooltip-anchor"))).toBeAbsent(),
       expect(role("img")).toBeAbsent()
     )
   })
@@ -466,11 +473,16 @@ describe("sidebarItem with a status", () => {
       },
       given(initial),
       expect(role("button", { name: "OpenAI-compatible, Unavailable" })).toExist(),
-      expect(within(role("button", { name: "OpenAI-compatible, Unavailable" }), selector("[title]"))).toHaveAttr(
-        "title",
-        "Unavailable: Its integration isn't installed on this host."
+      expect(within(role("button", { name: "OpenAI-compatible, Unavailable" }), text("Unavailable"))).toHaveClass(
+        "text-danger-text"
       ),
-      expect(within(role("button", { name: "Team" }), selector("[title]"))).toBeAbsent()
+      expect(
+        within(
+          role("button", { name: "OpenAI-compatible, Unavailable" }),
+          text("Its integration isn't installed on this host.")
+        )
+      ).toExist(),
+      expect(within(role("button", { name: "Team" }), selector(".tooltip-anchor"))).toBeAbsent()
     )
   })
 
