@@ -72,6 +72,8 @@ export type ModalConfig<Message> = Readonly<{
   title: string
   /** A quieter word beside the title, such as the group the modal is about. */
   context?: string
+  /** What assistive technology calls the button in the header that closes the modal, "Close" unless given. */
+  closeLabel?: string
   /** A line at the start of the body, which describes the dialog to assistive technology. */
   description?: string
   /** The `paneTabs` under the title, for a modal with sections. */
@@ -111,7 +113,10 @@ const renderHeader = <Message, Requirements>(
               config.context === undefined ? h.empty : h.span([h.Class(contextText)], [config.context])
             ]
           ),
-          h.div([h.Class(closeSlot)], [iconButtonWith(h, render.closeButton, { icon: "mark-close", label: "Close" })])
+          h.div(
+            [h.Class(closeSlot)],
+            [iconButtonWith(h, render.closeButton, { icon: "mark-close", label: config.closeLabel ?? "Close" })]
+          )
         ]
       ),
       config.tabs === undefined ? h.empty : h.div([h.Class(tabsSlot)], [config.tabs])

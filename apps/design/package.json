@@ -17,6 +17,7 @@
     "./icon": "./src/icon.ts",
     "./logo": "./src/logo.ts",
     "./mark": "./src/mark.ts",
+    "./members": "./src/members.ts",
     "./menu": "./src/menu.ts",
     "./message": "./src/message.ts",
     "./modal": "./src/modal.ts",

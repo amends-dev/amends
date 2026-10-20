@@ -6,8 +6,10 @@
  * open, and how often a button was pressed.
  */
 
+import { Multi } from "@foldkit/ui/combobox"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Menu from "@foldkit/ui/menu"
+import * as RadioGroup from "@foldkit/ui/radioGroup"
 import * as Schema from "effect/Schema"
 import { makeApplicationDefinition } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -60,6 +62,16 @@ export const TaskPriorityMenu = Menu.create<TaskPriority>()
 export const TaskAssigneeMenu = Menu.create<TaskAssignee>()
 export const AccountMenu = Menu.create<AccountEntry>()
 
+export const Visibility = Schema.Literals(["Public", "Private"])
+export type Visibility = typeof Visibility.Type
+
+export const MembersPicker = Multi.create()
+export const VisibilityRadioGroup = RadioGroup.create<Visibility>()
+
+/** Which of the workshop's pickers a message is about: the empty one, the one with chips, and the ones in the modals. */
+export const MemberPlace = Schema.Literals(["empty", "chosen", "create", "add"])
+export type MemberPlace = typeof MemberPlace.Type
+
 export const Destination = Schema.Literals(["home", "agents", "connections", "settings"])
 export type Destination = typeof Destination.Type
 
@@ -84,6 +96,7 @@ export const Model = Schema.Struct({
   filledDraft: Schema.String,
   editText: Schema.String,
   groupName: Schema.String,
+  newGroupName: Schema.String,
   openThread: Schema.String,
   destination: Destination,
   paneTab: PaneTab,
@@ -97,6 +110,20 @@ export const Model = Schema.Struct({
   chooserModal: DialogBlock.Model,
   confirmModal: DialogBlock.Model,
   compactModal: DialogBlock.Model,
+  createModal: DialogBlock.Model,
+  emptyPicker: MembersPicker.Model,
+  emptyMembers: Schema.Array(Schema.String),
+  chosenPicker: MembersPicker.Model,
+  chosenMembers: Schema.Array(Schema.String),
+  createPicker: MembersPicker.Model,
+  createMembers: Schema.Array(Schema.String),
+  addPicker: MembersPicker.Model,
+  addMembers: Schema.Array(Schema.String),
+  heldMembers: Schema.Array(Schema.String),
+  visibility: Visibility,
+  visibilityGroup: VisibilityRadioGroup.Model,
+  lockedVisibilityGroup: VisibilityRadioGroup.Model,
+  createVisibilityGroup: VisibilityRadioGroup.Model,
   memberFilter: MemberFilter,
   memberFilterMenu: MemberFilterMenu.Model,
   assigneeFilter: AssigneeFilter,
@@ -140,6 +167,7 @@ export const Message = defineMessageUnion({
   TypedFilledDraft: { value: Schema.String },
   TypedEdit: { value: Schema.String },
   TypedGroupName: { value: Schema.String },
+  TypedNewGroupName: { value: Schema.String },
   OpenedThread: { key: Schema.String },
   ChangedDestination: { destination: Destination },
   ChangedPaneTab: { tab: PaneTab },
@@ -152,6 +180,10 @@ export const Message = defineMessageUnion({
   ClickedOpenChooserModal: {},
   ClickedOpenConfirmModal: {},
   ClickedOpenCompactModal: {},
+  ClickedOpenCreateModal: {},
+  ClickedRemoveMember: { place: MemberPlace, id: Schema.String },
+  ClickedAddMembers: {},
+  ClickedRemoveHeldMember: { id: Schema.String },
   TypedIntegrationQuery: { value: Schema.String },
   PickedIntegration: {},
   ChangedModalTab: { tab: ModalTab },
@@ -159,6 +191,7 @@ export const Message = defineMessageUnion({
   SubmittedWideModal: {},
   SubmittedConfirmModal: {},
   SubmittedCompactModal: {},
+  SubmittedCreateModal: {},
   ChangedPlan: { plan: Plan },
   ChangedTaskStatus: { status: TaskStatus },
   ChangedTaskPriority: { priority: TaskPriority },

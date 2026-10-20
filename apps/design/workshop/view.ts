@@ -9,6 +9,7 @@ import {
   button,
   buttonRow,
   type Choice,
+  choiceGroup,
   choiceSelect,
   codeInput,
   column,
@@ -73,6 +74,13 @@ import {
   taskStatusShapes
 } from "../src/mark.ts"
 import {
+  type GroupMember,
+  memberCount,
+  memberList as groupMemberList,
+  memberPicker,
+  type PickerPerson
+} from "../src/members.ts"
+import {
   type ChoiceMenuChoice,
   choiceMenu,
   type MenuGroup,
@@ -124,12 +132,19 @@ import { confirmation, confirmationStack, toast, toastStack } from "../src/toast
 import { tooltip } from "../src/tooltip.ts"
 import {
   AccountBinding,
+  AddPickerBinding,
   type ApplicationViewBuilder,
   ApplicationComposition,
   AssigneeFilterBinding,
   ChooserModalBinding,
+  ChosenPickerBinding,
   CompactModalBinding,
   ConfirmModalBinding,
+  CreateModalBinding,
+  CreatePickerBinding,
+  CreateVisibilityBinding,
+  EmptyPickerBinding,
+  LockedVisibilityBinding,
   MemberFilterBinding,
   MembersPaneFilterBinding,
   ModalBinding,
@@ -141,6 +156,7 @@ import {
   TaskStatusBinding,
   ToolbarFilterBinding,
   ToolbarSortBinding,
+  VisibilityBinding,
   WideModalBinding
 } from "./composition.ts"
 import {
@@ -157,7 +173,8 @@ import {
   type TaskFilter,
   type TaskPriority,
   type TaskSort,
-  type TaskStatus
+  type TaskStatus,
+  type Visibility
 } from "./definition.ts"
 
 const pageColumn = "mx-auto flex max-w-3xl flex-col px-6 py-8"
@@ -4376,21 +4393,6 @@ const groupPrivateToggle = (h: ApplicationViewBuilder, id: string, model: Model)
     onToggle: (isOn) => Message.ToggledGroupPrivate({ isOn })
   })
 
-const groupMembers = (h: ApplicationViewBuilder): Html =>
-  entryList(h, {
-    label: "Members",
-    children: [
-      entry(h, {
-        key: "alex",
-        mark: "AM",
-        title: "Alex Morgan",
-        trailing: [badge(h, { label: "Admin", tone: "success" })]
-      }),
-      entry(h, { key: "yumi", mark: "Y", title: "Yumi", trailing: [hint(h, "Joined yesterday")] }),
-      entry(h, { key: "sara", mark: "S", title: "Sara" })
-    ]
-  })
-
 const renameModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
   modal(h, render, {
     title: "Rename group",
@@ -4405,6 +4407,7 @@ const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mod
   modal(h, render, {
     title: "Group settings",
     context: "# general",
+    closeLabel: "Close settings",
     description: "Changes apply to everyone in the group.",
     tabs: paneTabs(h, {
       label: "Group settings",
@@ -4416,7 +4419,7 @@ const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mod
         },
         {
           label: "Members",
-          count: 7,
+          count: model.heldMembers.length + 1,
           isCurrent: model.modalTab === "members",
           onClick: Message.ChangedModalTab({ tab: "members" })
         }
@@ -4428,7 +4431,7 @@ const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mod
             groupNameField(h, "wide-modal-group-name", model, render),
             groupPrivateToggle(h, "wide-modal-group-private", model)
           ]
-        : [groupMembers(h)],
+        : membersTab(h, model),
     ...(model.modalTab === "general"
       ? { cancelLabel: "Cancel", footer: [submit(h, "Save changes")] }
       : { leading: [button(h, "Invite people", Message.ClickedButton())], cancelLabel: "Done" }),
@@ -4532,6 +4535,236 @@ const chooserModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mode
   })
 }
 
+const pickerPeople: ReadonlyArray<PickerPerson> = [
+  { id: "alex", name: "Alex Morgan", mark: { text: "AM" }, kind: "Person" },
+  { id: "caleb", name: "Caleb", mark: { text: "C" }, kind: "Person" },
+  { id: "graeme", name: "Graeme", mark: { text: "G" }, kind: "Person" },
+  { id: "oliver", name: "Oliver", mark: { text: "O" }, kind: "Person" },
+  { id: "sara", name: "Sara", mark: { text: "S" }, kind: "Person" },
+  { id: "yumi", name: "Yumi", mark: { text: "Y", tone: "lilac" }, kind: "Agent" }
+]
+
+const youPerson: PickerPerson = { id: "you", name: "You", mark: { text: "JM" }, kind: "Person" }
+
+/** The people of the picker whose IDs are `ids`, in that order. */
+const peopleOf = (ids: ReadonlyArray<string>): ReadonlyArray<PickerPerson> =>
+  ids.flatMap((id) => pickerPeople.filter((person) => person.id === id))
+
+const visibilityChoices: ReadonlyArray<readonly [Visibility, string]> = [
+  ["Public", "Public"],
+  ["Private", "Private"]
+]
+
+const visibilityHints: Readonly<Record<Visibility, string>> = {
+  Public: "Anyone in the workspace can find this group and join it.",
+  Private: "Only people added to this group can find it."
+}
+
+const membersHint = (chosen: number): string =>
+  chosen === 0 ? "You're included automatically. Add others now or later." : `${chosen + 1} members, including you.`
+
+const emptyMemberPicker = (h: ApplicationViewBuilder, model: Model): Html =>
+  memberPicker(h, {
+    id: "workshop-empty-picker",
+    label: "Add members",
+    chosen: peopleOf(model.emptyMembers),
+    candidates: pickerPeople,
+    query: model.emptyPicker.inputValue,
+    isOpen: model.emptyPicker.isOpen,
+    onRemove: (id) => Message.ClickedRemoveMember({ place: "empty", id }),
+    embed: (viewInputs) =>
+      h.block(EmptyPickerBinding.embedView({ slotId: "empty-picker", model: model.emptyPicker, viewInputs }))
+  })
+
+const chosenMemberPicker = (h: ApplicationViewBuilder, model: Model): Html =>
+  memberPicker(h, {
+    id: "workshop-chosen-picker",
+    label: "Members",
+    locked: [youPerson],
+    chosen: peopleOf(model.chosenMembers),
+    candidates: pickerPeople,
+    query: model.chosenPicker.inputValue,
+    isOpen: model.chosenPicker.isOpen,
+    hint: membersHint(model.chosenMembers.length),
+    onRemove: (id) => Message.ClickedRemoveMember({ place: "chosen", id }),
+    embed: (viewInputs) =>
+      h.block(ChosenPickerBinding.embedView({ slotId: "chosen-picker", model: model.chosenPicker, viewInputs }))
+  })
+
+const visibilityRadioGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  choiceGroup(h, {
+    id: "workshop-visibility",
+    label: "Visibility",
+    choices: visibilityChoices,
+    value: model.visibility,
+    hint: visibilityHints[model.visibility],
+    embed: (viewInputs) =>
+      h.block(VisibilityBinding.embedView({ slotId: "visibility", model: model.visibilityGroup, viewInputs }))
+  })
+
+const lockedVisibilityRadioGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  choiceGroup(h, {
+    id: "workshop-locked-visibility",
+    label: "Visibility",
+    choices: visibilityChoices,
+    value: model.visibility,
+    hint: "Only the owner can change this.",
+    isDisabled: true,
+    embed: (viewInputs) =>
+      h.block(
+        LockedVisibilityBinding.embedView({
+          slotId: "locked-visibility",
+          model: model.lockedVisibilityGroup,
+          viewInputs
+        })
+      )
+  })
+
+const createGroupModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Create group",
+    description: "Set a name, visibility, and members.",
+    body: [
+      field(
+        h,
+        {
+          id: "create-group-name",
+          label: "Group name",
+          type: "text",
+          value: model.newGroupName,
+          placeholder: "e.g. release-planning",
+          maxLength: 80,
+          isAutofocus: false,
+          attributes: render.initialFocus,
+          onInput: (value) => Message.TypedNewGroupName({ value })
+        },
+        Option.none()
+      ),
+      choiceGroup(h, {
+        id: "workshop-create-visibility",
+        label: "Visibility",
+        choices: visibilityChoices,
+        value: model.visibility,
+        hint: visibilityHints[model.visibility],
+        embed: (viewInputs) =>
+          h.block(
+            CreateVisibilityBinding.embedView({
+              slotId: "create-visibility",
+              model: model.createVisibilityGroup,
+              viewInputs
+            })
+          )
+      }),
+      memberPicker(h, {
+        id: "workshop-create-picker",
+        label: "Members",
+        locked: [youPerson],
+        chosen: peopleOf(model.createMembers),
+        candidates: pickerPeople,
+        query: model.createPicker.inputValue,
+        isOpen: model.createPicker.isOpen,
+        hint: membersHint(model.createMembers.length),
+        onRemove: (id) => Message.ClickedRemoveMember({ place: "create", id }),
+        embed: (viewInputs) =>
+          h.block(CreatePickerBinding.embedView({ slotId: "create-picker", model: model.createPicker, viewInputs }))
+      })
+    ],
+    cancelLabel: "Cancel",
+    footer: [submit(h, "Create group", { isDisabled: model.newGroupName.trim() === "" })],
+    onSubmit: Message.SubmittedCreateModal()
+  })
+
+/** The people a group holds, as the settings' Members tab lists them: the reader first, then who was added. */
+const heldMembers = (model: Model): ReadonlyArray<GroupMember<Message>> => [
+  { key: "you", name: "Jamie Morgan", mark: { text: "JM" }, note: "You" },
+  ...peopleOf(model.heldMembers).map((person): GroupMember<Message> => ({
+    key: person.id,
+    name: person.name,
+    mark: person.mark,
+    ...(person.kind === "Agent" ? { note: "Agent" } : {}),
+    action: {
+      label: "Remove",
+      name: `Remove ${person.name}`,
+      onClick: Message.ClickedRemoveHeldMember({ id: person.id })
+    }
+  }))
+]
+
+const addMembersLabel = (chosen: number): string => (chosen > 0 ? `Add ${chosen}` : "Add")
+
+const membersTab = (h: ApplicationViewBuilder, model: Model): ReadonlyArray<Html> => {
+  const held = heldMembers(model)
+
+  return [
+    memberPicker(h, {
+      id: "workshop-add-picker",
+      label: "Add members",
+      chosen: peopleOf(model.addMembers),
+      candidates: pickerPeople.filter(({ id }) => !model.heldMembers.includes(id)),
+      query: model.addPicker.inputValue,
+      isOpen: model.addPicker.isOpen,
+      action: button(h, addMembersLabel(model.addMembers.length), Message.ClickedAddMembers(), {
+        variant: model.addMembers.length > 0 ? "primary" : "secondary",
+        wide: true,
+        isDisabled: model.addMembers.length === 0
+      }),
+      onRemove: (id) => Message.ClickedRemoveMember({ place: "add", id }),
+      embed: (viewInputs) =>
+        h.block(AddPickerBinding.embedView({ slotId: "add-picker", model: model.addPicker, viewInputs }))
+    }),
+    memberCount(h, held.length),
+    groupMemberList(h, { label: "Members", members: held })
+  ]
+}
+
+const membersColumn = "flex max-w-md flex-col gap-4"
+
+const membersGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  group(h, "Members", [
+    sample(
+      h,
+      "A members picker, empty: the search mark and the placeholder, the list opening as it takes focus",
+      [emptyMemberPicker(h, model)],
+      membersColumn
+    ),
+    sample(
+      h,
+      "With the person locked as You, two chosen, and a hint under it that counts them",
+      [chosenMemberPicker(h, model)],
+      membersColumn
+    ),
+    sample(
+      h,
+      "The people a group holds: how many, before a dashed rule, then each with their mark, You or Agent beside their name, and Remove",
+      [memberCount(h, 3), groupMemberList(h, { label: "Group members", members: heldMembers(model) })],
+      membersColumn
+    ),
+    sample(
+      h,
+      "A group of one",
+      [
+        memberCount(h, 1),
+        groupMemberList(h, {
+          label: "Only member",
+          members: [{ key: "you", name: "Jamie Morgan", mark: { text: "JM" }, note: "You" }]
+        })
+      ],
+      membersColumn
+    ),
+    sample(
+      h,
+      "Visibility: one choice among boxed options, with what the chosen one means under them",
+      [visibilityRadioGroup(h, model)],
+      membersColumn
+    ),
+    sample(
+      h,
+      "Visibility that no one can change, its choices dimmed",
+      [lockedVisibilityRadioGroup(h, model)],
+      membersColumn
+    )
+  ])
+
 const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
   group(h, "Modal", [
     sample(h, "A context, a field with the initial focus, a toggle, and a footer", [
@@ -4544,6 +4777,20 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
         })
       )
     ]),
+    sample(
+      h,
+      "A form with a description, a field with a placeholder, a choice, and a members picker with the person locked; its action waits for a name",
+      [
+        button(h, "Open the create group modal", Message.ClickedOpenCreateModal()),
+        h.block(
+          CreateModalBinding.embedView({
+            slotId: "create-modal",
+            model: model.createModal,
+            viewInputs: { hasDescription: true, toView: (render) => createGroupModal(h, render, model) }
+          })
+        )
+      ]
+    ),
     sample(h, "A confirmation, with Cancel at the start of the footer and the primary action at its end", [
       button(h, "Open the confirmation", Message.ClickedOpenConfirmModal()),
       h.block(
@@ -4746,6 +4993,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           noticeGroup(h),
           toastGroup(h),
           modalGroup(h, model),
+          membersGroup(h, model),
           iconGroup(h),
           logoGroup(h),
           markGroup(h),

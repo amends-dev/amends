@@ -114,6 +114,19 @@ describe("modal over a dialog's published groups", () => {
     )
   })
 
+  it("names its close button for what it closes when given a close label", () => {
+    scene(
+      {
+        update,
+        view: (_model: Model, h: HtmlBuilder<Message>) =>
+          modal(h, visibleRender, { title: "Group settings", closeLabel: "Close settings", body: [] })
+      },
+      given(initial),
+      expect(role("button", { name: "Close settings" })).toExist(),
+      expect(role("button", { name: "Close" })).toBeAbsent()
+    )
+  })
+
   it("has a Close button, a Cancel button, and the footer's action, which submits the form", () => {
     scene(
       { update, view: settingsView(visibleRender) },

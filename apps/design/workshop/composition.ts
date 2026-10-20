@@ -1,17 +1,20 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Schema from "effect/Schema"
 import type { Block } from "foldkit"
+import * as Update from "foldkit/update"
 import {
   AccountMenu,
   Appearance,
   ApplicationDefinition,
   AssigneeFilterMenu,
   MemberFilterMenu,
+  MembersPicker,
   TaskAssigneeMenu,
   TaskFilterMenu,
   TaskPriorityMenu,
   TaskSortMenu,
-  TaskStatusMenu
+  TaskStatusMenu,
+  VisibilityRadioGroup
 } from "./definition.ts"
 
 const foldDialogOutMessage = DialogBlock.OutMessage.match({
@@ -48,6 +51,107 @@ export const CompactModalBinding = ApplicationDefinition.bindChild(DialogBlock, 
   field: "compactModal",
   init: { contextToArgs: () => [{ id: "workshop-compact-modal" }] },
   outMessage: { fold: foldDialogOutMessage }
+})
+
+export const CreateModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "createModal",
+  init: { contextToArgs: () => [{ id: "workshop-create-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
+/** Choosing a person adds them to the field, empties what was typed, and keeps the list open for the next. */
+export const EmptyPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+  field: "emptyPicker",
+  init: { contextToArgs: () => [{ id: "workshop-empty-picker" }] },
+  outMessage: {
+    fold: MembersPicker.OutMessage.match({
+      Selected: ({ value }) =>
+        Update.combine([
+          ApplicationDefinition.stepFields(() => ({ emptyMembers: (members) => [...members, value] })),
+          EmptyPickerBinding.requestClose(),
+          EmptyPickerBinding.requestOpen()
+        ]),
+      ClearedSelection: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const ChosenPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+  field: "chosenPicker",
+  init: { contextToArgs: () => [{ id: "workshop-chosen-picker" }] },
+  outMessage: {
+    fold: MembersPicker.OutMessage.match({
+      Selected: ({ value }) =>
+        Update.combine([
+          ApplicationDefinition.stepFields(() => ({ chosenMembers: (members) => [...members, value] })),
+          ChosenPickerBinding.requestClose(),
+          ChosenPickerBinding.requestOpen()
+        ]),
+      ClearedSelection: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const CreatePickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+  field: "createPicker",
+  init: { contextToArgs: () => [{ id: "workshop-create-picker" }] },
+  outMessage: {
+    fold: MembersPicker.OutMessage.match({
+      Selected: ({ value }) =>
+        Update.combine([
+          ApplicationDefinition.stepFields(() => ({ createMembers: (members) => [...members, value] })),
+          CreatePickerBinding.requestClose(),
+          CreatePickerBinding.requestOpen()
+        ]),
+      ClearedSelection: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const AddPickerBinding = ApplicationDefinition.bindChild(MembersPicker, {
+  field: "addPicker",
+  init: { contextToArgs: () => [{ id: "workshop-add-picker" }] },
+  outMessage: {
+    fold: MembersPicker.OutMessage.match({
+      Selected: ({ value }) =>
+        Update.combine([
+          ApplicationDefinition.stepFields(() => ({ addMembers: (members) => [...members, value] })),
+          AddPickerBinding.requestClose(),
+          AddPickerBinding.requestOpen()
+        ]),
+      ClearedSelection: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const VisibilityBinding = ApplicationDefinition.bindChild(VisibilityRadioGroup, {
+  field: "visibilityGroup",
+  init: { contextToArgs: () => [{ id: "workshop-visibility" }] },
+  outMessage: {
+    fold: VisibilityRadioGroup.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ visibility: () => value }))
+    })
+  }
+})
+
+export const LockedVisibilityBinding = ApplicationDefinition.bindChild(VisibilityRadioGroup, {
+  field: "lockedVisibilityGroup",
+  init: { contextToArgs: () => [{ id: "workshop-locked-visibility" }] },
+  outMessage: {
+    fold: VisibilityRadioGroup.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ visibility: () => value }))
+    })
+  }
+})
+
+export const CreateVisibilityBinding = ApplicationDefinition.bindChild(VisibilityRadioGroup, {
+  field: "createVisibilityGroup",
+  init: { contextToArgs: () => [{ id: "workshop-create-visibility" }] },
+  outMessage: {
+    fold: VisibilityRadioGroup.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ visibility: () => value }))
+    })
+  }
 })
 
 export const MemberFilterBinding = ApplicationDefinition.bindChild(MemberFilterMenu, {
@@ -190,6 +294,14 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     ChooserModalBinding,
     ConfirmModalBinding,
     CompactModalBinding,
+    CreateModalBinding,
+    EmptyPickerBinding,
+    ChosenPickerBinding,
+    CreatePickerBinding,
+    AddPickerBinding,
+    VisibilityBinding,
+    LockedVisibilityBinding,
+    CreateVisibilityBinding,
     MemberFilterBinding,
     AssigneeFilterBinding,
     TaskFilterBinding,

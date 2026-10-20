@@ -8,6 +8,7 @@
 
 import * as Button from "@foldkit/ui/button"
 import * as Input from "@foldkit/ui/input"
+import type * as RadioGroup from "@foldkit/ui/radioGroup"
 import * as Select from "@foldkit/ui/select"
 import * as Switch from "@foldkit/ui/switch"
 import * as Textarea from "@foldkit/ui/textarea"
@@ -104,6 +105,15 @@ const switchLabel =
 
 const switchLabelDisabled =
   "cursor-default text-item text-ink-disabled select-none max-desktop:flex max-desktop:min-h-11 max-desktop:items-center"
+
+const choiceOptions = "flex gap-2 max-tablet:grid max-tablet:grid-cols-2"
+
+const choiceOption =
+  "group relative flex min-h-10 w-36 cursor-pointer items-center gap-2 border border-outline bg-field px-3 text-control font-medium text-ink-secondary focus-ring hover:border-outline-strong data-checked:border-outline-selected data-checked:bg-subtle data-checked:text-ink data-disabled:cursor-default data-disabled:text-ink-disabled max-desktop:min-h-11 max-tablet:w-auto"
+
+const choiceLabel = "flex-1 text-start"
+
+const choiceCheck = "flex flex-none invisible group-data-checked:visible"
 
 const noticeBase = "text-hint"
 
@@ -516,12 +526,12 @@ const describeField = <Message, Requirements>(
 
 /**
  * A labelled input, focused as it shows unless `isAutofocus` says otherwise, with why its value was refused, if
- * it was. The `placeholder` shows an example of what to enter while it is empty, and the `hint` is a line of what
- * to know about the input, 8px under it. With `isLabelHidden` the label does not show above the input and still
- * names it, for a field in a section that already names it. The `attributes` go onto the input, such as a
- * dialog's `initialFocus`, which a field in a dialog takes with `isAutofocus` off, and the keys the caller
- * answers, `answerKeys`, for a field above a list its keys walk. A field that `isDisabled` shows its value and
- * takes none, for a page the person may read and not change.
+ * it was. The `placeholder` shows an example of what to enter while it is empty, `maxLength` is the most
+ * characters it takes, and the `hint` is a line of what to know about the input, 8px under it. With `isLabelHidden`
+ * the label does not show above the input and still names it, for a field in a section that already names it. The
+ * `attributes` go onto the input, such as a dialog's `initialFocus`, which a field in a dialog takes with
+ * `isAutofocus` off, and the keys the caller answers, `answerKeys`, for a field above a list its keys walk. A field
+ * that `isDisabled` shows its value and takes none, for a page the person may read and not change.
  */
 export const field = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -532,6 +542,7 @@ export const field = <Message, Requirements>(
     value: string
     onInput: (value: string) => Message
     placeholder?: string
+    maxLength?: number
     hint?: string
     isAutofocus?: boolean
     isDisabled?: boolean
@@ -562,6 +573,7 @@ export const field = <Message, Requirements>(
               ...attributes.input,
               ...(config.attributes ?? []),
               ...(config.placeholder === undefined ? [] : [h.Placeholder(config.placeholder)]),
+              ...(config.maxLength === undefined ? [] : [h.Maxlength(config.maxLength)]),
               h.Class(inputBox)
             ]),
             ...describeField(h, attributes.description, config.hint, error)
@@ -770,6 +782,63 @@ export const toggle = <Message, Requirements>(
     },
     h
   )
+
+/**
+ * One choice among a few boxed options, such as a group's visibility, in a row, two columns on a phone: the `label`
+ * names the group for assistive technology and is shown over it, each of `choices` is a value and how the person
+ * reads it, the chosen one filled, outlined, and checked, and the `hint` under them says what the chosen one means. The
+ * arrow keys move the choice, Space chooses, and a click does. It is the look of `@foldkit/ui`'s headless radio
+ * group, which a Block binds as a child with an `id` through `init`, folds `Selected({ value })` into the value it
+ * holds, and embeds through `embed`: `(viewInputs) => h.block(Binding.embedView({ slotId, model, viewInputs }))`.
+ * The `id` is the one the group was initialized with, which the hint is named by.
+ */
+export const choiceGroup = <Value extends string, Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    id: string
+    label: string
+    choices: ReadonlyArray<readonly [Value, string]>
+    value: Value
+    hint?: string
+    isDisabled?: boolean
+    embed: (viewInputs: RadioGroup.ViewInputs<Value>) => Html
+  }>
+): Html => {
+  const hintId = `${config.id}-hint`
+  const labelOf = (value: Value) => config.choices.find(([choice]) => choice === value)?.[1] ?? value
+
+  return config.embed({
+    options: config.choices.map(([value]) => value),
+    selectedValue: Option.some(config.value),
+    ariaLabel: config.label,
+    orientation: "Horizontal",
+    isDisabled: config.isDisabled ?? false,
+    toView: (render) =>
+      h.div(
+        [h.Class(fieldColumn)],
+        [
+          h.span([h.AriaHidden(true), h.Class(fieldLabel)], [config.label]),
+          h.div(
+            [
+              ...render.group,
+              ...(config.hint === undefined ? [] : [h.AriaDescribedBy(hintId)]),
+              h.Class(choiceOptions)
+            ],
+            render.options.map((choice) =>
+              h.button(
+                [...choice.option, h.Class(choiceOption)],
+                [
+                  h.span([...choice.label, h.Class(choiceLabel)], [labelOf(choice.value)]),
+                  h.span([h.Class(choiceCheck)], [icon(h, "check", { size: "sm" })])
+                ]
+              )
+            )
+          ),
+          config.hint === undefined ? h.empty : h.p([h.Id(hintId), h.Class(hintText)], [config.hint])
+        ]
+      )
+  })
+}
 
 const detailOf = <Value extends string>(choice: Choice<Value>): ChoiceDetail | undefined =>
   choice.length === 3 ? choice[2] : undefined

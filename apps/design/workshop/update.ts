@@ -1,13 +1,28 @@
+import * as Match from "effect/Match"
 import { modifyFields } from "foldkit/struct"
 import {
   ApplicationComposition,
   ChooserModalBinding,
   CompactModalBinding,
   ConfirmModalBinding,
+  CreateModalBinding,
   ModalBinding,
   WideModalBinding
 } from "./composition.ts"
-import { Message } from "./definition.ts"
+import { Message, type MemberPlace, type Model } from "./definition.ts"
+
+/** The model without the person `id` among the people the picker of `place` holds. */
+const withoutMember = (model: Model, place: MemberPlace, id: string) => {
+  const remove = (members: ReadonlyArray<string>) => members.filter((member) => member !== id)
+
+  return Match.value(place).pipe(
+    Match.when("empty", () => modifyFields(model, { emptyMembers: remove })),
+    Match.when("chosen", () => modifyFields(model, { chosenMembers: remove })),
+    Match.when("create", () => modifyFields(model, { createMembers: remove })),
+    Match.when("add", () => modifyFields(model, { addMembers: remove })),
+    Match.exhaustive
+  )
+}
 
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
@@ -26,6 +41,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     TypedFilledDraft: ({ value }) => ({ model: modifyFields(model, { filledDraft: () => value }) }),
     TypedEdit: ({ value }) => ({ model: modifyFields(model, { editText: () => value }) }),
     TypedGroupName: ({ value }) => ({ model: modifyFields(model, { groupName: () => value }) }),
+    TypedNewGroupName: ({ value }) => ({ model: modifyFields(model, { newGroupName: () => value }) }),
     OpenedThread: ({ key }) => ({ model: modifyFields(model, { openThread: () => key }) }),
     ChangedDestination: ({ destination }) => ({ model: modifyFields(model, { destination: () => destination }) }),
     ChangedPaneTab: ({ tab }) => ({ model: modifyFields(model, { paneTab: () => tab }) }),
@@ -38,6 +54,17 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     ClickedOpenChooserModal: () => ChooserModalBinding.requestOpen()(model),
     ClickedOpenConfirmModal: () => ConfirmModalBinding.requestOpen()(model),
     ClickedOpenCompactModal: () => CompactModalBinding.requestOpen()(model),
+    ClickedOpenCreateModal: () => CreateModalBinding.requestOpen()(model),
+    ClickedRemoveMember: ({ place, id }) => ({ model: withoutMember(model, place, id) }),
+    ClickedAddMembers: () => ({
+      model: modifyFields(model, {
+        heldMembers: (held) => [...held, ...model.addMembers],
+        addMembers: () => []
+      })
+    }),
+    ClickedRemoveHeldMember: ({ id }) => ({
+      model: modifyFields(model, { heldMembers: (held) => held.filter((member) => member !== id) })
+    }),
     TypedIntegrationQuery: ({ value }) => ({ model: modifyFields(model, { integrationQuery: () => value }) }),
     PickedIntegration: () => ChooserModalBinding.requestClose()(model),
     ChangedModalTab: ({ tab }) => ({ model: modifyFields(model, { modalTab: () => tab }) }),
@@ -45,6 +72,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     SubmittedWideModal: () => WideModalBinding.requestClose()(model),
     SubmittedConfirmModal: () => ConfirmModalBinding.requestClose()(model),
     SubmittedCompactModal: () => CompactModalBinding.requestClose()(model),
+    SubmittedCreateModal: () => CreateModalBinding.requestClose()(model),
     ChangedPlan: ({ plan }) => ({ model: modifyFields(model, { plan: () => plan }) }),
     ChangedTaskStatus: ({ status }) => ({ model: modifyFields(model, { taskStatus: () => status }) }),
     ChangedTaskPriority: ({ priority }) => ({ model: modifyFields(model, { taskPriority: () => priority }) }),

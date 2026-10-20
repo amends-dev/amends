@@ -1,9 +1,11 @@
 import { describe, it } from "@effect/vitest"
+import * as RadioGroup from "@foldkit/ui/radioGroup"
 import { Option, Schema } from "effect"
-import type { Update } from "foldkit"
+import { type Update, makeApplicationDefinition } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
+  Command,
   all,
   change,
   click,
@@ -32,6 +34,7 @@ import {
   buttonContent,
   buttonRow,
   type Choice,
+  choiceGroup,
   choiceSelect,
   codeInput,
   column,
@@ -1477,6 +1480,143 @@ describe("a button that opens a menu", () => {
       },
       given(initial),
       expect(role("button", { name: "Status" })).toHaveClass("aria-expanded:border-outline-strong")
+    )
+  })
+})
+
+const Visibility = Schema.Literals(["Public", "Private"])
+type Visibility = typeof Visibility.Type
+
+const VisibilityGroup = RadioGroup.create<Visibility>()
+
+const VisibilityModel = Schema.Struct({
+  group: VisibilityGroup.Model,
+  visibility: Visibility
+})
+
+const VisibilityDefinition = makeApplicationDefinition({ Model: VisibilityModel, Message: Schema.Never })
+
+const VisibilityBinding = VisibilityDefinition.bindChild(VisibilityGroup, {
+  field: "group",
+  init: { contextToArgs: () => [{ id: "visibility" }] },
+  outMessage: {
+    fold: VisibilityGroup.OutMessage.match({
+      Selected: ({ value }) => VisibilityDefinition.stepFields(() => ({ visibility: () => value }))
+    })
+  }
+})
+
+const VisibilityComposition = VisibilityDefinition.makeComposition({ bindings: [VisibilityBinding] })
+
+const visibilityInit = VisibilityComposition.makeInit((visibility: Visibility) => ({ model: { visibility } }))
+
+const visibilityUpdate = VisibilityComposition.makeUpdate()
+
+const visibilityChoices: ReadonlyArray<readonly [Visibility, string]> = [
+  ["Public", "Public"],
+  ["Private", "Private"]
+]
+
+const visibilityView = (isDisabled: boolean) =>
+  VisibilityComposition.makeView((model, h) =>
+    choiceGroup(h, {
+      id: "visibility",
+      label: "Visibility",
+      choices: visibilityChoices,
+      value: model.visibility,
+      hint: "Only people added to this group can find it.",
+      isDisabled,
+      embed: (viewInputs) =>
+        h.block(VisibilityBinding.embedView({ slotId: "visibility", model: model.group, viewInputs }))
+    })
+  )
+
+const focusedOption = Command.resolve(RadioGroup.test.FocusOption, VisibilityGroup.Message.CompletedFocusOption())
+
+describe("choiceGroup", () => {
+  it("is a radio group named by its label, with one radio for each choice", () => {
+    scene(
+      { update: visibilityUpdate, view: visibilityView(false) },
+      given(visibilityInit("Private").model),
+      expect(role("radiogroup", { name: "Visibility" })).toExist(),
+      expect(role("radio", { name: "Public" })).toExist(),
+      expect(role("radio", { name: "Private" })).toExist(),
+      expect(role("radio", { name: "Private" })).toHaveAttr("aria-checked", "true"),
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-checked", "false")
+    )
+  })
+
+  it("describes the group by the hint under it", () => {
+    scene(
+      { update: visibilityUpdate, view: visibilityView(false) },
+      given(visibilityInit("Private").model),
+      expect(text("Only people added to this group can find it.")).toExist(),
+      expect(role("radiogroup", { name: "Visibility" })).toHaveAccessibleDescription(
+        "Only people added to this group can find it."
+      )
+    )
+  })
+
+  it("chooses the one clicked", () => {
+    scene(
+      { update: visibilityUpdate, view: visibilityView(false) },
+      given(visibilityInit("Private").model),
+      click(role("radio", { name: "Public" })),
+      focusedOption,
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-checked", "true"),
+      expect(role("radio", { name: "Private" })).toHaveAttr("aria-checked", "false")
+    )
+  })
+
+  it("moves the choice with the arrow keys", () => {
+    scene(
+      { update: visibilityUpdate, view: visibilityView(false) },
+      given(visibilityInit("Private").model),
+      keydown(role("radio", { name: "Private" }), "ArrowLeft"),
+      focusedOption,
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-checked", "true")
+    )
+  })
+
+  it("is disabled as a whole while it is told", () => {
+    scene(
+      { update: visibilityUpdate, view: visibilityView(true) },
+      given(visibilityInit("Public").model),
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-checked", "true"),
+      expect(role("radio", { name: "Public" })).toHaveAttr("aria-disabled", "true"),
+      expect(role("radio", { name: "Private" })).toHaveAttr("aria-disabled", "true"),
+      expect(role("radio", { name: "Private" })).toBeDisabled()
+    )
+  })
+})
+
+describe("field maxLength", () => {
+  it("limits the input to the most characters it takes, and sets no limit unless given one", () => {
+    scene(
+      {
+        update,
+        view: viewOf((model, h) => [
+          field(
+            h,
+            {
+              id: "email",
+              label: "Email",
+              type: "email",
+              value: model.email,
+              maxLength: 80,
+              onInput: (value) => Message.TypedEmail({ value })
+            },
+            Option.none()
+          )
+        ])
+      },
+      given(initial),
+      expect(label("Email")).toHaveAttr("maxLength", "80")
+    )
+    scene(
+      { update, view: viewOf((model, h) => [emailField(model, h, Option.none())]) },
+      given(initial),
+      expect(label("Email")).not.toHaveAttr("maxLength")
     )
   })
 })
