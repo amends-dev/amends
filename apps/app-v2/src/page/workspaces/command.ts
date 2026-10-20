@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
 import { FormErrors, Message, noFormErrors, WorkspacesDefinition } from "./definition.ts"
 
-/** List the workspaces the person belongs to. */
+/** List the workspaces the person belongs to and the invitations waiting for them. */
 export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
   messages: [Message.SucceededLoadWorkspaces, Message.FailedLoadWorkspaces],
   handler: function* () {
@@ -19,7 +19,7 @@ export const LoadWorkspaces = WorkspacesDefinition.command("LoadWorkspaces", {
       Effect.gen(function* () {
         const client = yield* Api.signedIn
         const listing = yield* client.me.workspaces()
-        return Message.SucceededLoadWorkspaces({ memberships: listing.memberships })
+        return Message.SucceededLoadWorkspaces({ memberships: listing.memberships, invitations: listing.invitations })
       }).pipe(
         Effect.orElseSucceed(() => Message.FailedLoadWorkspaces({ error: "The host could not be reached. Try again." }))
       )

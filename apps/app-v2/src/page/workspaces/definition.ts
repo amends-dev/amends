@@ -1,10 +1,11 @@
 /**
- * The workspaces the person belongs to, as the host lists them, to open one, and the modal where they create
- * another. It reports the one they pick or create.
+ * The workspaces the person belongs to and the invitations waiting for them, as the host lists them, to open a
+ * workspace or accept an invitation, and the modal where they create a workspace. It reports the one they pick,
+ * create, or join.
  */
 
 import { Request } from "@amends-dev/core/request"
-import { Workspace, WorkspaceId } from "@amends-dev/core/workspace"
+import { Invitation, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
@@ -13,10 +14,16 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
 
+/** An invitation still open to the person, with its workspace's name when the host has one. */
+export type PendingInvitation = typeof WorkspaceDirectory.PendingInvitation.Type
+
 /** The listing: under way, done, or not reached, with why. */
 export const Workspaces = defineTaggedUnion({
   Loading: {},
-  Loaded: { memberships: Schema.Array(WorkspaceDirectory.Membership) },
+  Loaded: {
+    memberships: Schema.Array(WorkspaceDirectory.Membership),
+    invitations: Schema.Array(WorkspaceDirectory.PendingInvitation)
+  },
   Failed: { error: Schema.String }
 })
 export type Workspaces = typeof Workspaces.Type
@@ -61,10 +68,14 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
-  SucceededLoadWorkspaces: { memberships: Schema.Array(WorkspaceDirectory.Membership) },
+  SucceededLoadWorkspaces: {
+    memberships: Schema.Array(WorkspaceDirectory.Membership),
+    invitations: Schema.Array(WorkspaceDirectory.PendingInvitation)
+  },
   FailedLoadWorkspaces: { error: Schema.String },
   ClickedTryAgain: {},
   ClickedWorkspace: { workspaceId: WorkspaceId.WorkspaceId },
+  ClickedAccept: { invitationId: Invitation.InvitationId },
   ClickedCreate: {},
   TypedName: { name: Schema.String },
   TypedMemberName: { memberName: Schema.String },

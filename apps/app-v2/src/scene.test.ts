@@ -43,7 +43,7 @@ const choosing: Model = {
   page: Page.SignedIn({
     account: session.account,
     workspaces: modifyFields(WorkspacesBlock.init().model, {
-      workspaces: () => Workspaces.Loaded({ memberships: [membership] })
+      workspaces: () => Workspaces.Loaded({ memberships: [membership], invitations: [] })
     }),
     workspace: Option.none()
   }),
@@ -57,7 +57,7 @@ const inWorkspace: Model = {
   page: Page.SignedIn({
     account: session.account,
     workspaces: modifyFields(WorkspacesBlock.init().model, {
-      workspaces: () => Workspaces.Loaded({ memberships: [membership] })
+      workspaces: () => Workspaces.Loaded({ memberships: [membership], invitations: [] })
     }),
     workspace: Option.some({
       workspaceId: membership.workspace.id,

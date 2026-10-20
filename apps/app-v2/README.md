@@ -429,7 +429,14 @@ the pages that compose them; the root composes the pages.
   session a right code gives, and reports it.
 - `page/workspaces`: the workspaces the person belongs to, listed over HTTP, each with how many
   members it has, "Owner" when they own it, and the name they go by in it, such as "4 members · Owner · as
-  Alex"; it reports the one picked. A failed listing says why and offers Try again, which reads it again. A
+  Alex"; it reports the one picked. The line under the heading counts what the listing holds, "2 workspaces ·
+  2 pending invitations", the workspaces alone when none wait, or "2 invitations waiting for you." when the
+  person belongs to none, and the empty listing says there is no workspace and to create one. The
+  invitations still open to the person, which the host lists with the workspaces, follow them under an
+  "Invitations" heading with their count, each keyed by its ID, as the design's `rowWithButton`: the first
+  letter of the workspace's name ("?" when the host has none), the name or "Workspace invitation", "Pending
+  invitation · Expires in 7 days" (`expiryLabel` in `seen.ts`, from the time now, which the root gives the view),
+  and an "Accept invite" button named for the workspace, which does nothing yet. A failed listing says why and offers Try again, which reads it again. A
   "Create workspace" button at the end of the heading's line, in every state of the listing, opens a modal
   on a `DialogBlock` bound as `dialog`, which asks for the workspace's name and what people there will call
   the person, and creates it over HTTP, `client.workspaces.create`, as its owner and first member. The model's
@@ -538,7 +545,8 @@ the pages that compose them; the root composes the pages.
   `Mod` decides from the user agent, also from a field, and sends `PressedSearchKey` while a workspace is open, which the update asks the workspace
   to open its search for; with none open the key is left to the browser. Nothing acts on the time, so it goes no further than views: the root's view gives the open
   workspace's view the time now beside the email, as a view input and not a message, and the page
-  gives it on to the inbox and the open group, the destinations that show ages and days. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
+  gives it on to the inbox and the open group, the destinations that show ages and days; the workspace
+  list's view takes it too, for when each invitation closes. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
   session, and the browser's services beneath them.
 
 A Block's commands and subscriptions reach the store through `store/Stores.ts`, an ordinary service:
@@ -875,7 +883,10 @@ browser's storage. Each Block's tests sit beside it:
   it and, at `Phone`, from the drawer over the drawer, and a group found opening and closing the search.
   The root's show the key that opens the search opening it in an open workspace and doing nothing before
   one is open, and the shortcut it gives the workspace by the platform. The workspaces page's scenes
-  show each row with the name the person goes by and "Owner" only for a workspace they own, the heading's
+  show each row with the name the person goes by and "Owner" only for a workspace they own, the count
+  line in each of its forms, the invitations under their heading, each by its workspace's mark and name or
+  "Workspace invitation" with when it expires, read from the time now, and its Accept invite button named
+  for the workspace, the heading's
   Create workspace button in every state of the listing, a failed listing read again, the empty listing
   saying what to do, and the dialog taking a workspace's names, sending them, saying at each field and for
   the form why they were refused, and opening the workspace created, or saying the list could not be
@@ -936,7 +947,8 @@ browser's storage. Each Block's tests sit beside it:
   but the person by name, whatever the case or accents, and at most eight of each in the order given,
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
-  times fixed on the clock of the machine the tests run on, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the runs of a text and of a message and of a thread's row,
+  times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days,
+  in hours, soon, and once it has, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the runs of a text and of a message and of a thread's row,
   a mention as "@" and the member's current name or the name it recorded, and the rest of the
   markdown as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a

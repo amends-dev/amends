@@ -5,7 +5,8 @@
  * message shows it, and how long ago it was, which day each of a list's items falls on, how a thread is
  * titled, where it is, and how many replies it has, whether anyone may join a group, how two texts are
  * compared when the person searches and whether a thread's title or opening has what they search for,
- * how a task's status and priority and a turn's status read, and which statuses leave a task open.
+ * how a task's status and priority and a turn's status read, which statuses leave a task open, and when an
+ * invitation closes.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -103,6 +104,18 @@ export const ageLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string 
   const day = dayOf(at)
   const today = dayOf(now)
   return daysBefore(day, today) <= 0 ? `${Math.floor(elapsed / millisPerHour)}h ago` : readDay(day, today, "short")
+}
+
+/**
+ * How long after `now` it will be `at`, as an invitation says when it closes: "Expires in 7 days" and "Expires in
+ * 3 hours", by the whole days and hours left, then "Expires soon" under an hour, and "Expired" once `at` has come.
+ */
+export const expiryLabel = (at: DateTime.DateTime, now: DateTime.DateTime): string => {
+  const remaining = DateTime.toEpochMillis(at) - DateTime.toEpochMillis(now)
+  if (remaining <= 0) return "Expired"
+  if (remaining < millisPerHour) return "Expires soon"
+  if (remaining < millisPerDay) return `Expires in ${pluralize(Math.floor(remaining / millisPerHour), "hour", "hours")}`
+  return `Expires in ${pluralize(Math.floor(remaining / millisPerDay), "day", "days")}`
 }
 
 /** `memberId` by their name among `members`, or their ID until names are read. */

@@ -33,7 +33,7 @@ const refusedForm = (text: string) => FormErrors.make({ ...noFormErrors, form: O
 
 const showing = (workspaces: Workspaces) => modifyFields(init().model, { workspaces: () => workspaces })
 
-const listed = showing(Workspaces.Loaded({ memberships: [membership] }))
+const listed = showing(Workspaces.Loaded({ memberships: [membership], invitations: [] }))
 
 /** What the dialog reports, as the page receives it. */
 const fromDialog = (message: typeof DialogBlock.Message.Type) =>
@@ -103,13 +103,16 @@ describe("creating a workspace", () => {
         expect(model.dialog.isOpen).toBe(true)
       }),
       expectNoOutMessage(),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership, acme] })),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
+      ),
       expectOutMessage(OutMessage.OpenedWorkspace({ membership: acme })),
       Command.expectExact(Dialog.test.CloseDialog),
       model((model) => {
         expect(model.create).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme] }))
+        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme], invitations: [] }))
       }),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
     )
@@ -140,7 +143,10 @@ describe("creating a workspace", () => {
       message(Message.SubmittedCreate()),
       Command.expectExact(CreateWorkspace({ name: "Acme", memberName: "Alex", key: Option.some(key) })),
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership, acme] })),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
+      ),
       expectOutMessage(OutMessage.OpenedWorkspace({ membership: acme })),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
     )
@@ -277,10 +283,13 @@ describe("creating a workspace", () => {
       model((model) => {
         expect(model.create).toEqual(Option.none())
       }),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership, acme] })),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
+      ),
       expectNoOutMessage(),
       model((model) => {
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme] }))
+        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme], invitations: [] }))
       })
     )
   })
@@ -295,11 +304,11 @@ describe("creating a workspace", () => {
         expect(model.create).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
       }),
-      message(Message.SucceededLoadWorkspaces({ memberships: [membership, acme] })),
+      message(Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })),
       expectNoOutMessage(),
       Command.expectNone(),
       model((model) => {
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme] }))
+        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership, acme], invitations: [] }))
       })
     )
   })
@@ -311,13 +320,13 @@ describe("creating a workspace", () => {
       ...filled,
       message(Message.SubmittedCreate()),
       Command.resolve(CreateWorkspace, Message.SucceededCreate({ workspace: acme.workspace })),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] })),
       expectNoOutMessage(),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       model((model) => {
         expect(model.create).toEqual(Option.none())
         expect(model.dialog.isOpen).toBe(false)
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership] }))
+        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership], invitations: [] }))
       })
     )
   })
@@ -345,7 +354,10 @@ describe("creating a workspace", () => {
         expect(model.create).toEqual(Option.some(Creating.Opening({ workspace: acme.workspace, reloadFailed: false })))
         expect(model.workspaces).toEqual(Workspaces.Loading())
       }),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership, acme] })),
+      Command.resolve(
+        LoadWorkspaces,
+        Message.SucceededLoadWorkspaces({ memberships: [membership, acme], invitations: [] })
+      ),
       expectOutMessage(OutMessage.OpenedWorkspace({ membership: acme })),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
     )
@@ -363,9 +375,9 @@ describe("the listing", () => {
         expect(model.workspaces).toEqual(Workspaces.Loading())
         expect(model.create).toEqual(Option.none())
       }),
-      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      Command.resolve(LoadWorkspaces, Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] })),
       model((model) => {
-        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership] }))
+        expect(model.workspaces).toEqual(Workspaces.Loaded({ memberships: [membership], invitations: [] }))
       })
     )
   })

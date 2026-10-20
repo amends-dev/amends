@@ -67,8 +67,8 @@ const reload = WorkspacesDefinition.step((model: Model) => ({
 
 export const update = WorkspacesComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    SucceededLoadWorkspaces: ({ memberships }) => {
-      const listed = modifyFields(model, { workspaces: () => Workspaces.Loaded({ memberships }) })
+    SucceededLoadWorkspaces: ({ memberships, invitations }) => {
+      const listed = modifyFields(model, { workspaces: () => Workspaces.Loaded({ memberships, invitations }) })
       return Option.match(openingIn(model), {
         onNone: () => ({ model: listed }),
         onSome: ({ workspace }) =>
@@ -97,6 +97,7 @@ export const update = WorkspacesComposition.makeUpdate((model, message) =>
           onSome: (membership) => ({ model, outMessage: OutMessage.OpenedWorkspace({ membership }) })
         }
       ),
+    ClickedAccept: () => ({ model }),
     ClickedCreate: () => Update.combine(model, [openForm, DialogBinding.requestOpen()]),
     TypedName: ({ name }) => ({
       model: atForm(model, (form) =>

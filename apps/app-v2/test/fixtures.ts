@@ -36,6 +36,37 @@ export const membership = Schema.decodeSync(WorkspaceDirectory.Membership)({
   people: 1
 })
 
+/** An invitation of alice to the workspace `workspaceId`, which closes at `expiresAt`, as the directory lists it. */
+const invitationOfAlice = (id: string, workspaceId: string, expiresAt: string, workspaceName?: string) =>
+  Schema.decodeSync(WorkspaceDirectory.PendingInvitation)({
+    details: {
+      id,
+      workspaceId,
+      recipientId: "alice",
+      recipientEmail: "alice@example.com",
+      roleId: BuiltinRoles.MemberId,
+      expiresAt,
+      inviterMemberId: "member-9",
+      issuedAt: "2026-10-18T12:00:00Z"
+    },
+    state: { _tag: "Pending" },
+    ...(workspaceName === undefined ? {} : { workspaceName })
+  })
+
+/** Alice's invitation to Northstar Studio, which closes seven days after `now`. */
+export const northstarInvitation = invitationOfAlice(
+  "invitation-4",
+  "workspace-4",
+  "2026-10-25T12:30:00Z",
+  "Northstar Studio"
+)
+
+/** Alice's invitation to Atlas Labs, which closes three days after `now`. */
+export const atlasInvitation = invitationOfAlice("invitation-5", "workspace-5", "2026-10-21T12:30:00Z", "Atlas Labs")
+
+/** Alice's invitation to a workspace the directory has no record of, which closes three hours after `now`. */
+export const unnamedInvitation = invitationOfAlice("invitation-6", "workspace-6", "2026-10-18T15:30:00Z")
+
 export const general = Schema.decodeSync(Group.Group)({
   id: "general",
   workspaceId: "workspace-1",

@@ -22,7 +22,11 @@ export const view = ApplicationComposition.makeView((model, h) => ({
             brand: "amends",
             width: "directory",
             actions: [inline(h, [account.email]), button(h, "Sign out", Message.ClickedSignOut())],
-            children: [h.block(WorkspacesBinding.embedView({ slotId: "workspaces", model: workspaces }))]
+            children: [
+              h.block(
+                WorkspacesBinding.embedView({ slotId: "workspaces", model: workspaces, viewInputs: { now: model.now } })
+              )
+            ]
           }),
         onSome: ({ workspaceId, model: opened }) =>
           h.block(

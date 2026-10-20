@@ -51,7 +51,11 @@ const fromSignIn = (model: Model, message: typeof SignInBlock.Message.Type) =>
 
 /** What the workspace list reports, as the root receives it. */
 const fromWorkspaces = (message: typeof WorkspacesBlock.Message.Type) =>
-  WorkspacesBinding.embedView({ slotId: "workspaces", model: WorkspacesBlock.init().model }).toParentMessage(message)
+  WorkspacesBinding.embedView({
+    slotId: "workspaces",
+    model: WorkspacesBlock.init().model,
+    viewInputs: { now }
+  }).toParentMessage(message)
 
 /** What the open workspace reports, as the root receives it. */
 const fromWorkspace = (message: typeof WorkspaceBlock.Message.Type) =>
@@ -81,7 +85,10 @@ describe("the app", () => {
       Command.resolve(CheckCode, SignInBlock.Message.SucceededSignIn({ session })),
       // Signed in, the workspaces are listed.
       Command.expectExact(LoadWorkspaces()),
-      Command.resolve(LoadWorkspaces, WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] })),
+      Command.resolve(
+        LoadWorkspaces,
+        WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] })
+      ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       // Opened, the workspace asks the host once for the integrations its connections, agents, and channels read.
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
@@ -112,7 +119,9 @@ describe("the app", () => {
     story(
       update,
       given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
-      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(
+        fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
+      ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(fromWorkspace(WorkspaceBlock.Message.ClickedSignOut())),
@@ -158,7 +167,9 @@ describe("the app", () => {
         expect(model.viewport).toBe("Phone")
       }),
       message(Message.ChangedViewport({ viewport: "Tablet" })),
-      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(
+        fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
+      ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       model((model) => {
@@ -183,7 +194,9 @@ describe("the app", () => {
       model((model) => {
         expect(model.now).toEqual(later)
       }),
-      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(
+        fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
+      ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(Message.Ticked({ now: latest })),
@@ -202,7 +215,9 @@ describe("the app", () => {
       model((model) => {
         expect(model.viewport).toBe("Desktop")
       }),
-      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(
+        fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
+      ),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
       Command.resolve(LoadIntegrations, WorkspaceBlock.Message.ReceivedIntegrations({ integrations: [] })),
       message(Message.ChangedViewport({ viewport: "Phone" })),
@@ -219,7 +234,9 @@ describe("the app", () => {
       given(init({ session: Option.some(session), viewport: "Split", now, isApplePlatform: true }).model),
       message(Message.PressedSearchKey()),
       Command.expectNone(),
-      message(fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership] }))),
+      message(
+        fromWorkspaces(WorkspacesBlock.Message.SucceededLoadWorkspaces({ memberships: [membership], invitations: [] }))
+      ),
       message(Message.PressedSearchKey()),
       Command.expectNone(),
       message(fromWorkspaces(WorkspacesBlock.Message.ClickedWorkspace({ workspaceId: membership.workspace.id }))),
