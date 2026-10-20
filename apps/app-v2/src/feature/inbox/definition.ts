@@ -59,7 +59,7 @@ export const pageSize = 20
 /**
  * The person's notifications, whether they were read yet, which of them the inbox shows, how many of the newest it
  * lists, the one they opened with its thread, the groups and the people that name where they come from and who wrote
- * them, the workspace's name, how many times the person asked to read them again, whether they asked to mark every
+ * them, how many times the person asked to read them again, whether they asked to mark every
  * notification seen and the write is on its way, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
@@ -73,7 +73,6 @@ export const Model = Schema.Struct({
   groups: Schema.Array(Group.Group),
   members: Schema.Array(Member.Member),
   contacts: Schema.Array(Contact.Contact),
-  workspaceName: Schema.Option(Schema.String),
   reads: Schema.Int,
   isMarkingAllSeen: Schema.Boolean,
   notice: Schema.Option(Schema.String)
@@ -84,7 +83,6 @@ export const Message = defineMessageUnion({
   ReceivedInbox: { items: Schema.Array(InboxItem) },
   ReceivedGroups: { groups: Schema.Array(Group.Group) },
   ReceivedPeople: { members: Schema.Array(Member.Member), contacts: Schema.Array(Contact.Contact) },
-  ReceivedWorkspaceName: { workspaceName: Schema.Option(Schema.String) },
   FailedRead: { error: Schema.String },
   ClickedTryAgain: {},
   ChoseTab: { tab: Tab },

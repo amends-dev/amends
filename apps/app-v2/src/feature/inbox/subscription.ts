@@ -1,12 +1,9 @@
 /**
  * The person's notifications, with the threads and messages they are about, and the groups and
- * people that name them, and the workspace's name, read from their store as they change, and again each time the
- * person asks to try again.
+ * people that name them, read from their store as they change, and again each time the person asks to try again.
  */
 
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
-import * as Array from "effect/Array"
-import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Store from "../../store/Store.ts"
@@ -18,13 +15,7 @@ export const subscriptions = InboxDefinition.subscriptions((entry) => ({
     "ReadInbox",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
     {
-      messages: [
-        Message.ReceivedInbox,
-        Message.ReceivedGroups,
-        Message.ReceivedPeople,
-        Message.ReceivedWorkspaceName,
-        Message.FailedRead
-      ],
+      messages: [Message.ReceivedInbox, Message.ReceivedGroups, Message.ReceivedPeople, Message.FailedRead],
       modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
       handler: function* () {
         const stores = yield* Stores.Stores
@@ -46,14 +37,7 @@ export const subscriptions = InboxDefinition.subscriptions((entry) => ({
                   Stream.map(store.list("Group", Store.workspacePlace), (groups) =>
                     Message.ReceivedGroups({ groups: groups.map(({ record }) => record.value) })
                   ),
-                  Stream.merge(
-                    Stream.map(store.people, (people) => Message.ReceivedPeople(people)),
-                    Stream.map(store.list("Workspace", Store.workspacePlace), (workspaces) =>
-                      Message.ReceivedWorkspaceName({
-                        workspaceName: Option.map(Array.head(workspaces), ({ record }) => record.value.name)
-                      })
-                    )
-                  )
+                  Stream.map(store.people, (people) => Message.ReceivedPeople(people))
                 )
               )
             )

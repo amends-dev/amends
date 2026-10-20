@@ -52,7 +52,7 @@ import { threadView, view } from "./view.ts"
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
 
-const sceneView = withViewInputs(view, { now })()
+const sceneView = withViewInputs(view, { now, workspaceName: "Mercier & Co" })()
 const sceneThreadView = withViewInputs(threadView, { now })()
 
 /** The inbox with its side pane beside it, as the page puts them, which holds nothing while no thread is open. */
@@ -225,16 +225,11 @@ describe("the inbox", () => {
     )
   })
 
-  it("names the workspace under the title for phones, once the store gives its name", () => {
+  it("names the workspace it is given under the title for phones", () => {
     scene(
-      { update, view: sceneView, subscriptions: InboxBlock.subscriptions },
+      { update, view: sceneView },
       given(opened),
       expect(role("heading", { name: "Inbox", level: 1 })).toExist(),
-      expect(text("Mercier & Co")).toBeAbsent(),
-      Subscription.emit(
-        subscriptions.inbox,
-        Message.ReceivedWorkspaceName({ workspaceName: Option.some("Mercier & Co") })
-      ),
       expect(within(role("main"), text("Mercier & Co"))).toHaveClass("max-tablet:block"),
       expect(within(role("main"), text("Mercier & Co"))).toHaveClass("hidden")
     )

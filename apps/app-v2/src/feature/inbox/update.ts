@@ -36,9 +36,6 @@ export const update = InboxComposition.makeUpdate((model, message) => {
     ReceivedPeople: ({ members, contacts }) => ({
       model: modifyFields(model, { members: () => members, contacts: () => contacts })
     }),
-    ReceivedWorkspaceName: ({ workspaceName }) => ({
-      model: modifyFields(model, { workspaceName: () => workspaceName })
-    }),
     FailedRead: ({ error }) => ({ model: modifyFields(model, { notice: () => Option.some(error) }) }),
     ClickedTryAgain: () => ({
       model: modifyFields(model, { notice: () => Option.none(), reads: (reads) => reads + 1 })

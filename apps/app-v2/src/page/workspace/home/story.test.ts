@@ -54,7 +54,11 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
 
 /** What the inbox reports, as Home receives it. */
 const fromInbox = (message: typeof InboxBlock.Message.Type) =>
-  InboxBinding.embedView({ slotId: "inbox", model: opened.inbox, viewInputs: { now } }).toParentMessage(message)
+  InboxBinding.embedView({
+    slotId: "inbox",
+    model: opened.inbox,
+    viewInputs: { now, workspaceName: "Studio" }
+  }).toParentMessage(message)
 
 /** What the tasks report, as Home receives it. */
 const fromTasks = (message: typeof TasksBlock.Message.Type) =>

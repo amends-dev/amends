@@ -26,11 +26,12 @@ export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
 
 /**
  * The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the
- * time now, and the group the workspace's name too.
+ * time now, and the inbox and the group the workspace's name too.
  */
 export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
   Open.match(model.open, {
-    Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),
+    Inbox: () =>
+      h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now, workspaceName } })),
     Triage: () =>
       h.block(TasksBinding.embedView({ slotId: "triage", model: model.tasks, view: triageView, viewInputs: { now } })),
     Tasks: () =>

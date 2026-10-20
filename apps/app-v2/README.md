@@ -486,7 +486,7 @@ below it counted at each level above.
   when a thread opens and `ClosedThread` when the person closes it, so its parent can hold the side
   pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
   nothing, since it asked. The Block offers a count of what waits for its parent to show. The workspace's name, which
-  the inbox's own subscription reads with the groups and the people, is the line under the title on phones.
+  Home gives its view as it gives the group's, is the line under the title on phones.
   Until the store has answered (`isLoaded`) the list is a line, "Loading your inbox…", and when the first read failed
   it is "Can't load your inbox" with why, in the place of the list. A tab with nothing says "No activity yet" on
   All, and "You're all caught up" on Unread with a "View all activity" button that chooses All. The store gives every

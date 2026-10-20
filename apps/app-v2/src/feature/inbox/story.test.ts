@@ -274,9 +274,8 @@ describe("the inbox", () => {
     )
   })
 
-  it("opens on Unread, with no workspace name read and no write under way", () => {
+  it("opens on Unread, with no write under way", () => {
     expect(opened.tab).toBe("Unread")
-    expect(opened.workspaceName).toEqual(Option.none())
     expect(opened.isMarkingAllSeen).toBe(false)
   })
 
@@ -288,21 +287,6 @@ describe("the inbox", () => {
       model((model) => {
         expect(idsOf(shownItems(model))).toEqual([newer.id, older.id])
         expect(waitingCount(model)).toBe(2)
-      })
-    )
-  })
-
-  it("holds the name of the workspace as the store gives it", () => {
-    story(
-      update,
-      given(opened),
-      message(Message.ReceivedWorkspaceName({ workspaceName: Option.some("Mercier & Co") })),
-      model((model) => {
-        expect(model.workspaceName).toEqual(Option.some("Mercier & Co"))
-      }),
-      message(Message.ReceivedWorkspaceName({ workspaceName: Option.none() })),
-      model((model) => {
-        expect(model.workspaceName).toEqual(Option.none())
       })
     )
   })

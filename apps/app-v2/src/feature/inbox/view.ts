@@ -25,8 +25,14 @@ import {
   waitingCount
 } from "./definition.ts"
 
-/** The time now, which the days the notifications came on and how long ago they came are read from. */
-export type ViewInputs = Readonly<{ now: DateTime.Utc }>
+/**
+ * The time now, which the days the notifications came on and how long ago they came are read from, and the workspace's
+ * name, which a phone shows under the inbox's title.
+ */
+export type ViewInputs = Readonly<{ now: DateTime.Utc; workspaceName: string }>
+
+/** The time now, which the days the thread's messages were published on are read from. */
+export type ThreadViewInputs = Readonly<{ now: DateTime.Utc }>
 
 /** What the body says when a tab has nothing to list; on Unread, with the way to see what was seen. */
 const nothingToList = (tab: Tab, h: InboxViewBuilder): Html =>
@@ -123,14 +129,14 @@ const notifications = (model: Model, now: DateTime.Utc, h: InboxViewBuilder): Ht
  * workspace's name is under the title on phones. Mark all seen is in the header while any notification waits, dimmed
  * while the write that marks them is on its way.
  */
-export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
+export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { now, workspaceName }, h) =>
   pane(h, {
     variant: "main",
     label: "Inbox",
     header: {
       title: "Inbox",
       icon: "mark-mail",
-      ...Option.match(model.workspaceName, { onNone: () => ({}), onSome: (phoneContext) => ({ phoneContext }) }),
+      phoneContext: workspaceName,
       tabs: tabs(model, h),
       actions:
         waitingCount(model) === 0
@@ -163,7 +169,7 @@ export const view = InboxComposition.makeView.withInputs<ViewInputs>((model, { n
  * "Mention · #general", while the store holds the message, and the button that closes it, Close beside the title and
  * Back, named for the Inbox, before it on a phone, and nothing while none is open.
  */
-export const threadView = InboxComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
+export const threadView = InboxComposition.makeView.withInputs<ThreadViewInputs>((model, { now }, h) =>
   Option.match(model.selected, {
     onNone: () => h.empty,
     onSome: (selected) => {
