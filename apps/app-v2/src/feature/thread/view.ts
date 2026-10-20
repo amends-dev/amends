@@ -243,7 +243,10 @@ const activityView = (task: Task.Task, model: Model, inputs: ViewInputs, h: Thre
   ])
 }
 
-/** A thread that tracks a task: its properties, its description, its turns, and its activity, as `apps/ui` lays a task out. */
+/**
+ * A thread that tracks a task: its properties, its description, its turns, and its activity, as `apps/ui` lays a task
+ * out.
+ */
 const taskColumn = (task: Task.Task, model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html =>
   paneStack(h, [
     renameAction(model, h),

@@ -9,8 +9,9 @@
  * - creates the menu's Block once, `Menu.create<Value>()`, with `Value` the choices' values, and binds it as a
  *   child, with an `id` for the menu through `init`;
  * - folds the Block's `Selected` out message into whatever the choice was for;
- * - renders the menu with `menu`, `choiceMenu`, or `propertyMenu`, whose `embed` embeds the bound Block with the view
- *   inputs the design builds: `(viewInputs) => h.block(MenuBinding.embedView({ slotId, model: model.menu, viewInputs }))`.
+ * - renders the menu with `menu`, `choiceMenu`, or `propertyMenu`, whose `embed` embeds the bound Block with the
+ *   view inputs the design builds:
+ *   `(viewInputs) => h.block(MenuBinding.embedView({ slotId, model: model.menu, viewInputs }))`.
  */
 
 import type { AnchorConfig, ViewInputs } from "@foldkit/ui/menu"

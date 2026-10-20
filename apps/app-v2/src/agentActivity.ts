@@ -15,9 +15,6 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import { placeName } from "./seen.ts"
 
-/** A turn as the workspace's store holds it. */
-export type StoredTurn = ReplicaRecord.Turn
-
 /** Where a turn under way stands: waiting to start, working, or stopping as asked. */
 export type ActivityState = "queued" | "working" | "stopping"
 
@@ -42,7 +39,9 @@ export const stateWord: Readonly<Record<ActivityState, string>> = {
   stopping: "Stopping"
 }
 
-/** How the logo moves for a state: the thread drawn through while it waits, the stitches lit at work, the patch tugged. */
+/**
+ * How the logo moves for a state: the thread drawn through while it waits, the stitches lit at work, the patch tugged.
+ */
 export const motionOfState: Readonly<Record<ActivityState, LogoMotion>> = {
   queued: "thread",
   working: "working",
@@ -56,7 +55,7 @@ export type TurnUnderWay = Readonly<{ turnId: TurnId.TurnId; state: ActivityStat
 export type AgentActivity = Readonly<{ state: ActivityState; places: ReadonlyArray<string> }>
 
 /** A stored turn that is under way, and the state it is in. */
-type StoredTurnUnderWay = Readonly<{ turn: StoredTurn; state: ActivityState }>
+type StoredTurnUnderWay = Readonly<{ turn: ReplicaRecord.Turn; state: ActivityState }>
 
 const byPressing: Order.Order<StoredTurnUnderWay> = Order.combine(
   Order.mapInput(Order.Number, ({ state }: StoredTurnUnderWay) => mostPressingFirst.indexOf(state)),
@@ -69,7 +68,7 @@ const byPressing: Order.Order<StoredTurnUnderWay> = Order.combine(
  */
 export const turnsUnderWay = (
   agentId: Identity.AgentId,
-  turns: ReadonlyArray<StoredTurn>,
+  turns: ReadonlyArray<ReplicaRecord.Turn>,
   groups: ReadonlyArray<Group.Group>,
   members: ReadonlyArray<Member.Member>,
   self: MemberId.MemberId
@@ -105,7 +104,10 @@ export const activityOf = (turns: ReadonlyArray<TurnUnderWay>): Option.Option<Ag
 export const placesLine = (places: ReadonlyArray<string>): string =>
   places.length > 1 ? `${places[0]} + ${places.length - 1} more` : (places[0] ?? "")
 
-/** What an agent is doing in words, as its mark says it: "Working in #general", or only "Working" while no place is read. */
+/**
+ * What an agent is doing in words, as its mark says it: "Working in #general", or only "Working" while no place is
+ * read.
+ */
 export const activityLabel = ({ state, places }: AgentActivity): string =>
   places.length === 0 ? stateWord[state] : `${stateWord[state]} in ${placesLine(places)}`
 
