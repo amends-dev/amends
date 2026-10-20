@@ -77,7 +77,7 @@ the current row, with markdown in the text as blocks in a message and as a previ
 start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a turn's log opened under its row, a stop that did not go through, a turn that replied with View turn log among its message's actions and its log under it, and a turn's row in a column 20rem wide, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
-groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the shell twice, with and without its side pane, each in a
+groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
 frame of fixed height, its inbox, triage, and a group with their counts read aloud with what they count, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
@@ -704,7 +704,7 @@ The frame of the first four layout patterns, which the modules below fill.
   `indicator-bar`, as a current row is. A group without a label is the list alone, as a sidebar's first is. Sections sit 22px
   apart. `children` are `sidebarItem`s or a `sidebarEmpty`; a section with none at all, as one still loading has, is its
   heading and actions alone, with no list.
-- `sidebarItem(h, { icon?, mark?, status?, label, count?, countName?, activity?, activityMotion?, isPending?, isCurrent, onClick, children? })` is a
+- `sidebarItem(h, { icon?, mark?, status?, label, count?, countName?, activity?, activityMotion?, isPending?, isUnread?, isCurrent, onClick, children? })` is a
   38px row, 44px on touch, one button: an `icon`, or a `mark`, `{ text, tone? }`, on a 24px square for a
   person or an agent, then the `label` in `ink-secondary` and a `count` in a badge at the end. A `status` is how the item
   stands: the patch on its mark, cut out of the row's own fill, so that `status-knockout` is `hover`'s while the row is hovered
@@ -714,14 +714,21 @@ The frame of the first four layout patterns, which the modules below fill.
   unless given, `thread` while the turn waits, `tug` while it stops), and the words only name it. A row that
   says it by a `status` of kind `available` has the filled square on its mark instead, with the words in its tooltip. A row that
   `isPending`, as a group still being created is, says "Sending…" at its end at `meta` size in
-  `ink-muted` in place of those and the count; a pending row has no count, activity, or status shape. The button is named by
+  `ink-muted` in place of those and the count; a pending row has no count, activity, or status shape. A row that
+  `isUnread`, for what has activity the person has not seen, reads its label in `ink` and medium weight and ends in a 7px
+  round dot of `indicator`, hidden from assistive technology, in the count's place: a row with a count shows the count and
+  no dot, and a pending row neither. The button is named by
   the label and then the status's label, "Atlas, Needs setup", or, with no status, the activity's words, "Atlas, Working in
-  #design", and described by the count or "Sending…". A count is a bare number to the eye, so `countName` says what it
+  #design", and described by the count, "Sending…", or "new activity" for the dot. A count is a bare number to the eye, so `countName` says what it
   counts, as `apps/ui` does, and the row is described by the number and the name, "5 unread" for the inbox, "5 to
   triage" for Triage, and "2 for you" for a group; a row that gives none is described by the number alone. The current row is `aria-current="page"`, filled `selected`, in `ink`
-  and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick? }`
+  and medium weight, with the `indicator-bar`. `children` are `{ icon?, taskStatus?, label, isCurrent, onClick? }`
   rows under it at hint size, 32px, 44px on touch, indented and joined to it by a dashed connector in `stitch`,
-  such as a group's open thread. A row with an `onClick` is a button; one without is a plain row, a
+  such as a group's open thread. A thread that tracks a task gives its `taskStatus`, `{ shape, label }`: the drawing of
+  `taskStatus` at 0.875rem, hidden from assistive technology, in place of the `icon`, with the status's `label` and a
+  comma before the row's own label, in an `sr-only` span, so that a reader hears "Doing, Composer paste crash"; a row
+  with an `icon` and no `taskStatus` draws the icon, as a thread with no task draws the message icon. A row with an
+  `onClick` is a button; one without is a plain row, a
   `span` with the same look and no hover, pointer, or focus ring, that says where the person is, and
   is `aria-current="page"` while it is current.
 - `sidebarSections(h, children)` is the column of `sidebarSection`s a Block renders for the sidebar,
@@ -1342,7 +1349,7 @@ end, kept out of the body that scrolls, which starts flush under it, and a pane 
 whose body is anchored to the bottom by the classes that rest its first element there, and says so in `data-anchor`; the quiet
 search by its hidden label, its placeholder and its magnifier, hidden from assistive technology; the theme's two dark
 blocks, which give the same values, by `theme.test.ts`; a sidebar item by its name, which has the status's word after the label, with
-`aria-current` and its count, read as "5 unread" when the row names what it counts, the row under it as a button or as a plain row, the working logo at the end of a row at
+`aria-current` and its count, read as "5 unread" when the row names what it counts, the dot of an unread row, read as "new activity", with its label in ink and medium weight, and no dot beside a count or while the row is pending, the row under it as a button or as a plain row, drawn with the status of a task in place of its icon and a word for it that only assistive technology reads, the working logo at the end of a row at
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
 section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title; a pane's empty state by

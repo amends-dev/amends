@@ -12,6 +12,7 @@ import {
   sidebarFooter,
   sidebarHeader,
   sidebarItem,
+  type SidebarSubItem,
   sidebarSection,
   sidebarSections
 } from "./sidebar.ts"
@@ -639,6 +640,222 @@ describe("sidebarItem with a status", () => {
       expect(role("button", { name: "Scout, Working in #design" })).toHaveAttr("aria-description", "Sending…"),
       expect(within(role("button", { name: "Scout, Working in #design" }), selector("svg"))).toBeAbsent(),
       expect(within(role("button", { name: "Scout, Working in #design" }), text("2"))).toBeAbsent()
+    )
+  })
+})
+
+describe("sidebarItem when unread", () => {
+  const groups = (model: Model, h: HtmlBuilder<Message>) =>
+    sidebarSection(h, {
+      label: "Groups",
+      children: [
+        sidebarItem(h, {
+          icon: "mark-channel",
+          label: "product",
+          isUnread: true,
+          isCurrent: model.current === "product",
+          onClick: open("product")
+        }),
+        sidebarItem(h, {
+          icon: "mark-channel",
+          label: "general",
+          isCurrent: model.current === "general",
+          onClick: open("general")
+        }),
+        sidebarItem(h, {
+          icon: "mark-channel",
+          label: "design",
+          count: 2,
+          countName: "for you",
+          isUnread: true,
+          isCurrent: model.current === "design",
+          onClick: open("design")
+        }),
+        sidebarItem(h, {
+          icon: "mark-channel",
+          label: "launch",
+          isPending: true,
+          isUnread: true,
+          isCurrent: model.current === "launch",
+          onClick: open("launch")
+        })
+      ]
+    })
+
+  it("closes the row with a dot, 7px and round, hidden from assistive technology, where a count would be", () => {
+    scene(
+      { update, view: sidebarView(groups) },
+      given(initial),
+      expect(within(role("button", { name: "product" }), selector("span.bg-indicator"))).toExist(),
+      expect(within(role("button", { name: "product" }), selector("span.bg-indicator"))).toHaveAttr(
+        "aria-hidden",
+        "true"
+      ),
+      expect(within(role("button", { name: "product" }), selector("span.bg-indicator"))).toHaveClass("size-1.75"),
+      expect(within(role("button", { name: "product" }), selector("span.bg-indicator"))).toHaveClass("rounded-full"),
+      expect(within(role("button", { name: "general" }), selector("span.bg-indicator"))).toBeAbsent()
+    )
+  })
+
+  it("describes the row by new activity and names it by its label alone, which a row that is read has no description of", () => {
+    scene(
+      { update, view: sidebarView(groups) },
+      given(initial),
+      expect(role("button", { name: "product" })).toHaveAttr("aria-description", "new activity"),
+      expect(role("button", { name: "general" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("reads the label in ink and medium weight, which a row that is read does not", () => {
+    scene(
+      { update, view: sidebarView(groups) },
+      given(initial),
+      expect(within(role("button", { name: "product" }), text("product"))).toHaveClass("font-medium"),
+      expect(within(role("button", { name: "product" }), text("product"))).toHaveClass("text-ink"),
+      expect(within(role("button", { name: "general" }), text("general"))).not.toHaveClass("font-medium"),
+      expect(within(role("button", { name: "general" }), text("general"))).not.toHaveClass("text-ink")
+    )
+  })
+
+  it("draws the count and not the dot when it has a count, and describes the row by the count", () => {
+    scene(
+      { update, view: sidebarView(groups) },
+      given(initial),
+      expect(within(role("button", { name: "design" }), text("2"))).toExist(),
+      expect(within(role("button", { name: "design" }), selector("span.bg-indicator"))).toBeAbsent(),
+      expect(role("button", { name: "design" })).toHaveAttr("aria-description", "2 for you"),
+      expect(within(role("button", { name: "design" }), text("design"))).toHaveClass("font-medium")
+    )
+  })
+
+  it("says Sending… in place of the dot while it is pending", () => {
+    scene(
+      { update, view: sidebarView(groups) },
+      given(initial),
+      expect(within(role("button", { name: "launch" }), text("Sending…"))).toExist(),
+      expect(within(role("button", { name: "launch" }), selector("span.bg-indicator"))).toBeAbsent(),
+      expect(role("button", { name: "launch" })).toHaveAttr("aria-description", "Sending…")
+    )
+  })
+
+  it("draws the dot after the logo of an agent at work, and names the row by the activity's words", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((_, h) =>
+          sidebarSection(h, {
+            label: "Direct messages",
+            children: [
+              sidebarItem(h, {
+                mark: { text: "AT", tone: "lilac" },
+                status: { kind: "available", label: "Working in #design" },
+                activity: "Working in #design",
+                label: "Atlas",
+                isUnread: true,
+                isCurrent: false,
+                onClick: open("Atlas")
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Atlas, Working in #design" })).toHaveAttr("aria-description", "new activity"),
+      expect(within(role("button", { name: "Atlas, Working in #design" }), selector("svg.logo-working"))).toExist(),
+      expect(within(role("button", { name: "Atlas, Working in #design" }), selector("span.bg-indicator"))).toExist()
+    )
+  })
+})
+
+describe("a row under an item, with the status of a task", () => {
+  const shapes = [
+    ["triage", "Triage", "M8 4.6 V8.8"],
+    ["progress", "Doing", "M8 3.6 A4.4 4.4 0 0 0 8 12.4 Z"],
+    ["paused", "Held", "M6.5 5.8 V10.2"],
+    ["dismissed", "Dismissed", "M6.2 6.2 L9.8 9.8"]
+  ] as const
+
+  const here = selector('[aria-current="page"]:not(button)')
+
+  const under = (children: ReadonlyArray<SidebarSubItem<Message>>) => (_: Model, h: HtmlBuilder<Message>) =>
+    sidebarSection(h, {
+      label: "Groups",
+      children: [
+        sidebarItem(h, { icon: "mark-channel", label: "general", isCurrent: true, onClick: open("general"), children })
+      ]
+    })
+
+  it("draws where the task stands in place of the icon, 0.875rem and hidden from assistive technology", () => {
+    for (const [shape, label, path] of shapes) {
+      scene(
+        {
+          update,
+          view: sidebarView(
+            under([{ taskStatus: { shape, label }, icon: "message", label: "Composer paste crash", isCurrent: true }])
+          )
+        },
+        given(initial),
+        expect(within(here, selector("svg[viewBox='0 0 16 16']"))).toHaveAttr("width", "0.875rem"),
+        expect(within(here, selector("svg[viewBox='0 0 16 16']"))).toHaveAttr("aria-hidden", "true"),
+        expect(within(here, selector(`svg path[d^='${path}']`))).toExist(),
+        expect(within(here, selector("svg circle[r='6.4']"))).toExist(),
+        expect(within(here, selector("svg[viewBox='0 0 24 24']"))).toBeAbsent()
+      )
+    }
+  })
+
+  it("says the status's word for assistive technology before the label, and shows no word", () => {
+    scene(
+      {
+        update,
+        view: sidebarView(
+          under([{ taskStatus: { shape: "triage", label: "Triage" }, label: "Composer paste crash", isCurrent: true }])
+        )
+      },
+      given(initial),
+      expect(within(here, selector("span.sr-only"))).toHaveText("Triage, "),
+      expect(within(here, text("Composer paste crash"))).toExist()
+    )
+  })
+
+  it("is a button with the same drawing when it has a click, and the drawing of a finished task is ink", () => {
+    scene(
+      {
+        update,
+        view: sidebarView(
+          under([
+            {
+              taskStatus: { shape: "done", label: "Done" },
+              label: "Release notes",
+              isCurrent: false,
+              onClick: open("Release notes")
+            }
+          ])
+        )
+      },
+      given(initial),
+      expect(within(role("button", { name: /Release notes/ }), selector("svg[viewBox='0 0 16 16']"))).toHaveClass(
+        "text-ink"
+      ),
+      expect(within(role("button", { name: /Release notes/ }), selector("svg circle"))).toHaveAttr(
+        "fill",
+        "currentColor"
+      ),
+      click(role("button", { name: /Release notes/ })),
+      expect(role("status")).toHaveText("Current Release notes, searches 0, creations 0")
+    )
+  })
+
+  it("draws the icon when the row has no task", () => {
+    scene(
+      {
+        update,
+        view: sidebarView(under([{ icon: "message", label: "Pricing", isCurrent: true }]))
+      },
+      given(initial),
+      expect(within(here, selector("svg[viewBox='0 0 24 24']"))).toExist(),
+      expect(within(here, selector("svg[viewBox='0 0 16 16']"))).toBeAbsent(),
+      expect(within(here, selector("span.sr-only"))).toBeAbsent()
     )
   })
 })

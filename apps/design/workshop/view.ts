@@ -217,6 +217,12 @@ const shellFrame = "h-176 outline outline-outline [contain:layout] [--amends-scr
 
 const toastFrame = "h-64 bg-canvas outline outline-outline [contain:layout]"
 
+const sidebarSamples = "flex flex-wrap items-end gap-8"
+
+const sidebarSample = "flex w-66 max-w-full flex-none flex-col"
+
+const sidebarFrame = "flex h-192 w-66 flex-none outline outline-outline [contain:layout]"
+
 const iconSizeRow = "flex items-end gap-4"
 
 const conversationColumn = "flex max-w-xl flex-col px-3"
@@ -3549,12 +3555,22 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
             sidebarItem(h, {
               icon: "mark-channel",
               label: "general",
+              activity: "Working",
               isCurrent: true,
               onClick: press,
               children: [
                 isThreadOpen
-                  ? { icon: "circle-frame", label: "Composer paste crash", isCurrent: true }
-                  : { icon: "circle-frame", label: "Composer paste crash", isCurrent: false, onClick: press }
+                  ? {
+                      taskStatus: { shape: "progress", label: "Doing" },
+                      label: "Composer paste crash",
+                      isCurrent: true
+                    }
+                  : {
+                      taskStatus: { shape: "progress", label: "Doing" },
+                      label: "Composer paste crash",
+                      isCurrent: false,
+                      onClick: press
+                    }
               ]
             }),
             sidebarItem(h, {
@@ -3565,7 +3581,13 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
               isCurrent: false,
               onClick: press
             }),
-            sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press }),
+            sidebarItem(h, {
+              icon: "mark-channel",
+              label: "engineering",
+              isUnread: true,
+              isCurrent: false,
+              onClick: press
+            }),
             sidebarItem(h, { icon: "mark-channel", label: "launch", isPending: true, isCurrent: false, onClick: press })
           ]
         }),
@@ -3575,8 +3597,13 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
           children: isDirectMessagesEmpty
             ? [sidebarEmpty(h, "No conversations yet")]
             : [
-                sidebarItem(h, { mark: { text: "AM" }, label: "Alex Morgan", isCurrent: false, onClick: press }),
-                sidebarItem(h, { mark: { text: "Y" }, label: "Yumi", isCurrent: false, onClick: press })
+                sidebarItem(h, {
+                  mark: { text: "AM", tone: "slate" },
+                  label: "Alex Morgan",
+                  isCurrent: false,
+                  onClick: press
+                }),
+                sidebarItem(h, { mark: { text: "Y", tone: "lilac" }, label: "Yumi", isCurrent: false, onClick: press })
               ]
         })
       ])
@@ -3584,6 +3611,194 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
     footer: sidebarFooter(h, [hint(h, "12 members · as Alex")])
   })
 }
+
+const taskStatusSamples = [
+  { shape: "triage", label: "Triage", title: "Pricing page copy" },
+  { shape: "open", label: "To do", title: "Composer paste crash" },
+  { shape: "progress", label: "Doing", title: "Onboarding checklist" },
+  { shape: "paused", label: "Held", title: "Invite email layout" },
+  { shape: "done", label: "Done", title: "Release notes" },
+  { shape: "dismissed", label: "Dismissed", title: "Old landing page" }
+] as const
+
+/** The groups section: a group read, unread, with a count, with an agent at work in each state, and still sending. */
+const sidebarGroupsSection = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return sidebarSection(h, {
+    label: "Groups",
+    actions: [iconButton(h, { icon: "mark-new", label: "Create group", onClick: press }, { size: "compact" })],
+    children: [
+      sidebarItem(h, { icon: "mark-channel", label: "general", isCurrent: false, onClick: press }),
+      sidebarItem(h, { icon: "mark-channel", label: "product", isUnread: true, isCurrent: false, onClick: press }),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "design",
+        count: 2,
+        countName: "for you",
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "research",
+        count: 5,
+        countName: "for you",
+        isUnread: true,
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "engineering",
+        activity: "Working",
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "support",
+        activity: "Queued",
+        activityMotion: "thread",
+        isUnread: true,
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "ops",
+        activity: "Stopping",
+        activityMotion: "tug",
+        count: 1,
+        countName: "for you",
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, { icon: "mark-channel", label: "launch", isPending: true, isCurrent: false, onClick: press })
+    ]
+  })
+}
+
+/** The groups the open thread sits under: a thread that tracks a task, in each status, and one that tracks none. */
+const sidebarThreadsSection = (h: ApplicationViewBuilder): Html =>
+  sidebarSection(h, {
+    label: "Open thread",
+    children: [
+      ...taskStatusSamples.map(({ shape, label, title }) =>
+        sidebarItem(h, {
+          icon: "mark-channel",
+          label: `${label} task`,
+          isCurrent: true,
+          onClick: Message.ClickedButton(),
+          children: [{ taskStatus: { shape, label }, label: title, isCurrent: true }]
+        })
+      ),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "A thread with no task",
+        isCurrent: true,
+        onClick: Message.ClickedButton(),
+        children: [{ icon: "message", label: "Lunch on Friday?", isCurrent: true }]
+      }),
+      sidebarItem(h, {
+        icon: "mark-channel",
+        label: "A thread to open",
+        isCurrent: false,
+        onClick: Message.ClickedButton(),
+        children: [
+          {
+            taskStatus: { shape: "progress", label: "Doing" },
+            label: "Onboarding checklist",
+            isCurrent: false,
+            onClick: Message.ClickedButton()
+          }
+        ]
+      })
+    ]
+  })
+
+/**
+ * The direct messages section: a conversation with a person on the slate mark, with several people by the people icon,
+ * and with an agent as the agents' sidebar draws it, on the lilac mark with its patch, logo, and count, then the
+ * teammates there is no conversation with yet.
+ */
+const sidebarDirectMessagesSection = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return sidebarSection(h, {
+    label: "Direct messages",
+    actions: [iconButton(h, { icon: "mark-new", label: "New message", onClick: press }, { size: "compact" })],
+    children: [
+      sidebarItem(h, { mark: { text: "AM", tone: "slate" }, label: "Alex Morgan", isCurrent: false, onClick: press }),
+      sidebarItem(h, {
+        mark: { text: "SL", tone: "slate" },
+        label: "Sara Lind",
+        count: 2,
+        countName: "for you",
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, {
+        mark: { text: "OK", tone: "slate" },
+        label: "Oliver Kane",
+        isUnread: true,
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, { icon: "users", label: "Alex Morgan, Sara Lind", isCurrent: false, onClick: press }),
+      sidebarItem(h, {
+        mark: { text: "AT", tone: "lilac" },
+        status: { kind: "available", label: "Working in #design" },
+        activity: "Working in #design",
+        label: "Atlas",
+        count: 1,
+        countName: "for you",
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, {
+        mark: { text: "RH", tone: "lilac" },
+        status: needsSetup,
+        label: "Review helper",
+        isUnread: true,
+        isCurrent: false,
+        onClick: press
+      }),
+      sidebarItem(h, { mark: { text: "GM", tone: "slate" }, label: "Graeme Moss", isCurrent: false, onClick: press }),
+      sidebarItem(h, { mark: { text: "NO", tone: "lilac" }, label: "Nora", isCurrent: false, onClick: press })
+    ]
+  })
+}
+
+const sidebarSampleOf = (h: ApplicationViewBuilder, caption: string, section: Html): Html =>
+  h.div(
+    [h.Class(sidebarSample)],
+    [sample(h, caption, [h.div([h.Class(sidebarFrame)], [destinationSidebar(h, [section])])], "flex")]
+  )
+
+const sidebarSignalsGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Sidebar", [
+    h.div(
+      [h.Class(sidebarSamples)],
+      [
+        sidebarSampleOf(
+          h,
+          "Groups: read, unread with a dot and the label in ink, with a count read as 2 for you and no dot, an agent at work with the logo working, queued, and stopping, and one still sending",
+          sidebarGroupsSection(h)
+        ),
+        sidebarSampleOf(
+          h,
+          "The open thread under its group: the drawing of its task in each of the six statuses, the message icon when it tracks none, and a thread that is a button",
+          sidebarThreadsSection(h)
+        ),
+        sidebarSampleOf(
+          h,
+          "Direct messages: a person on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates there is no conversation with yet",
+          sidebarDirectMessagesSection(h)
+        )
+      ]
+    )
+  ])
 
 const destinationSidebar = (h: ApplicationViewBuilder, sections: ReadonlyArray<Html>): Html =>
   sidebar(h, {
@@ -5515,6 +5730,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           paneToolbarGroup(h, model),
           taskListGroup(h),
           paneColumnGroup(h, model.workspaceName),
+          sidebarSignalsGroup(h),
           shellGroup(h, model)
         ]
       )
