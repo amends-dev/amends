@@ -11,6 +11,7 @@ import {
   expectAll,
   given,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -105,6 +106,15 @@ const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.T
     })
   ),
   Subscription.emit(subscriptions.thread, Message.ReceivedPeople({ members: [alice, bob], contacts: [] }))
+]
+
+/** The thread's turns read, with the workspace's members who name their agents. */
+const turnsRead = (...turns: ReadonlyArray<ReturnType<typeof turnOf>>) => [
+  Subscription.emit(
+    turnsSubscriptions.turns,
+    TurnsBlock.Message.ReceivedTurns({ turns: turns.map((turn) => ({ turn, pending: false, retryOpen: false })) })
+  ),
+  Subscription.emit(turnsSubscriptions.turns, TurnsBlock.Message.ReceivedMembers({ members: [alice, bob, scout] }))
 ]
 
 const participationId = ThreadParticipationId.ThreadParticipationId.make("participation-1")
@@ -226,15 +236,19 @@ describe("a thread", () => {
     )
   })
 
-  it("says when each message was by its time of day today, and by its day before today", () => {
+  it("sets its timeline under a divider for each day, each message by its time of day", () => {
     const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
 
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
       ...readWith({ message: yesterday, pending: false }, { message: reply, pending: false }),
-      expect(text("Yesterday")).toExist(),
-      expect(text(timeOf(yesterday.publishedAt))).toBeAbsent(),
+      expect(nth(all.role("listitem"), 0)).toHaveText("Yesterday"),
+      expect(within(nth(all.role("listitem"), 1), text("Plans for the week"))).toExist(),
+      expect(nth(all.role("listitem"), 2)).toHaveText("1 reply"),
+      expect(nth(all.role("listitem"), 3)).toHaveText("Today"),
+      expect(within(nth(all.role("listitem"), 4), text("Sounds good"))).toExist(),
+      expect(text(timeOf(yesterday.publishedAt))).toExist(),
       expect(text(timeOf(reply.publishedAt))).toExist()
     )
   })
@@ -327,23 +341,115 @@ describe("a thread", () => {
     )
   })
 
-  it("lists its agents' turns, whose log the person follows", () => {
+  it("places an agent's turn among the messages at the moment it took on the work, under its day", () => {
+    const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
+    const tookWork = turnOf("turn-1", "running", {
+      createdAt: DateTime.formatIso(DateTime.add(yesterday.publishedAt, { minutes: 1 }))
+    })
+
     scene(
-      { update, view: sceneView, subscriptions: ThreadBlock.subscriptions },
-      given(init(workspaceId, memberId, threadId).model),
-      expect(role("region", { name: "Turns" })).toBeAbsent(),
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: yesterday, pending: false }, { message: reply, pending: false }),
+      ...turnsRead(tookWork),
+      expect(nth(all.role("listitem"), 0)).toHaveText("Yesterday"),
+      expect(within(nth(all.role("listitem"), 1), text("Plans for the week"))).toExist(),
+      expect(nth(all.role("listitem"), 2)).toHaveText("1 reply"),
+      expect(within(nth(all.role("listitem"), 3), role("group", { name: "Scout's turn" }))).toExist(),
+      expect(nth(all.role("listitem"), 4)).toHaveText("Today"),
+      expect(within(nth(all.role("listitem"), 5), text("Sounds good"))).toExist(),
+      // The turns are not a section of their own above the messages.
+      expect(role("region", { name: "Turns" })).toBeAbsent()
+    )
+  })
+
+  it("places a turn that took on the work between two messages of one day by the time it did", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      ...turnsRead(turnOf("turn-1", "running", { createdAt: "2026-10-18T12:02:00Z" })),
+      expect(nth(all.role("listitem"), 0)).toHaveText("Today"),
+      expect(within(nth(all.role("listitem"), 3), role("group", { name: "Scout's turn" }))).toExist(),
+      expect(within(nth(all.role("listitem"), 4), text("Sounds good"))).toExist(),
+      ...turnsRead(turnOf("turn-1", "running", { createdAt: "2026-10-18T12:10:00Z" })),
+      expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
+      expect(within(nth(all.role("listitem"), 4), role("group", { name: "Scout's turn" }))).toExist()
+    )
+  })
+
+  it("shows a turn that replied as its reply, with View turn log, and no row of its own", () => {
+    const replied = turnOf("turn-1", "completed", { messageIds: ["message-2"], createdAt: "2026-10-18T12:02:00Z" })
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      ...turnsRead(replied),
+      expect(role("group", { name: "Scout's turn" })).toBeAbsent(),
+      expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist(),
+      expectAll(all.role("button", { name: "View turn log" })).toHaveCount(1),
+      expect(role("button", { name: "View turn log" })).toHaveAttr("aria-pressed", "false"),
+      expect(role("group", { name: "Scout's turn log" })).toBeAbsent(),
+      click(role("button", { name: "View turn log" })),
+      expect(role("button", { name: "View turn log" })).toHaveAttr("aria-pressed", "true"),
+      expect(within(role("group", { name: "Scout's turn log" }), text("Opening the log…"))).toExist(),
+      // The log sits right under the message that was posted.
+      expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
+      expect(within(nth(all.role("listitem"), 4), role("group", { name: "Scout's turn log" }))).toExist(),
+      click(role("button", { name: "View turn log" })),
+      expect(role("group", { name: "Scout's turn log" })).toBeAbsent()
+    )
+  })
+
+  it("shows a turn as a row while the message it replied with is not in the thread", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }),
+      ...turnsRead(turnOf("turn-1", "completed", { messageIds: ["message-9"] })),
+      expect(role("group", { name: "Scout's turn" })).toExist(),
+      expect(role("button", { name: "View turn log" })).toBeAbsent()
+    )
+  })
+
+  it("gives a turn's row its buttons and its log, which opens under the row", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }),
+      ...turnsRead(turnOf("turn-1", "running")),
+      expect(within(role("group", { name: "Scout's turn" }), text("Scout"))).toExist(),
+      expect(within(role("group", { name: "Scout's turn" }), role("status"))).toHaveText("Working"),
+      click(role("button", { name: "View log" })),
+      expect(within(role("group", { name: "Scout's turn" }), text("Opening the log…"))).toExist()
+    )
+  })
+
+  it("places the turns of a thread that tracks a task among its activity, after the task was created", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      ...readWith({ message: opening, pending: false }, { message: reply, pending: false }),
+      ...turnsRead(turnOf("turn-1", "running", { createdAt: "2026-10-18T12:02:00Z" })),
+      expect(nth(all.role("listitem"), 0)).toHaveText("Activity"),
+      expect(within(nth(all.role("listitem"), 1), text(/^Alice created this task · /))).toExist(),
+      expect(within(nth(all.role("listitem"), 2), role("group", { name: "Scout's turn" }))).toExist(),
+      expect(within(nth(all.role("listitem"), 3), text("Sounds good"))).toExist(),
+      expect(role("region", { name: "Turns" })).toBeAbsent()
+    )
+  })
+
+  it("says why the turns could not be read, above its timeline", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }),
       Subscription.emit(
         turnsSubscriptions.turns,
-        TurnsBlock.Message.ReceivedTurns({
-          turns: [{ turn: turnOf("turn-1", "running"), pending: false, retryOpen: false }]
-        })
+        TurnsBlock.Message.FailedRead({ error: "This browser could not read the workspace's copy." })
       ),
-      Subscription.emit(turnsSubscriptions.turns, TurnsBlock.Message.ReceivedMembers({ members: [alice, bob, scout] })),
-      expect(role("region", { name: "Turns" })).toExist(),
-      expect(text("Scout")).toExist(),
-      expect(text("Running")).toExist(),
-      click(role("button", { name: "Show log" })),
-      expect(text("Opening the log…")).toExist()
+      expect(text("This browser could not read the workspace's copy.")).toExist()
     )
   })
 

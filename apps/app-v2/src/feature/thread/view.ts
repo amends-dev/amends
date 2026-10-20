@@ -22,16 +22,20 @@ import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import {
   authorName,
+  groupByDay,
   initials,
   messageText,
   repliesLabel,
   sideSubtitle,
   statusShape,
+  timeOf,
   typingLine,
   whenLabel
 } from "../../seen.ts"
+import { replyActionView, replyLogView } from "../turns/view.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, titleOf, typingIn } from "./definition.ts"
+import { Entry, timelineOf, turnPostingReply, whenOf } from "./timeline.ts"
 
 /**
  * The time now, which the days the messages were published on are read from, and, when a notification opened the
@@ -128,14 +132,18 @@ const editControls = (
   }
 }
 
+/** How a time in the timeline reads: its time of day under a day's divider, or by its day where no divider says it. */
+type TimeLabel = (at: DateTime.Utc) => string
+
 /**
  * A message, with editing and deleting for the person's own, and the form to change it while they edit it, drawn
- * current while it is the one highlighted.
+ * current while it is the one highlighted, and, when it is the reply of an agent's turn, View turn log.
  */
 const messageView = (
   item: MessageItem,
   model: Model,
-  { now, highlightedMessageId = Option.none() }: ViewInputs,
+  { highlightedMessageId = Option.none() }: ViewInputs,
+  timeLabel: TimeLabel,
   h: ThreadViewBuilder
 ): Html => {
   const edited = ThreadMessage.Content.matchOrElse(
@@ -145,32 +153,108 @@ const messageView = (
   )
   const author = authorName(item.message.author, model.members, model.contacts)
   const { body, actions } = editControls(item, model, h)
+  const turnActions = Option.match(turnPostingReply(model, item.message.id), {
+    onNone: () => [],
+    onSome: ({ item: { turn } }) => [
+      h.block(
+        TurnsBinding.embedView({
+          slotId: `turn-log-action-${item.message.id}`,
+          model: model.turns,
+          view: replyActionView,
+          viewInputs: { turnId: turn.id }
+        })
+      )
+    ]
+  })
 
   return message(h, {
     key: item.message.id,
     mark: initials(author),
     author,
-    time: whenLabel(item.message.publishedAt, now),
+    time: timeLabel(item.message.publishedAt),
     note: item.pending ? "Sending…" : undefined,
     text: messageText(item.message, model.members),
     isEdited: edited,
     isCurrent: Option.contains(highlightedMessageId, item.message.id),
     body,
-    actions
+    actions: [...actions, ...turnActions]
   })
 }
 
-/** The opening message, then, when there are replies, how many, and the replies. */
+/**
+ * A message of the timeline, and under it, when it is the last reply of an agent's turn, that turn's log while it is
+ * followed.
+ */
+const postedView = (
+  item: MessageItem,
+  model: Model,
+  inputs: ViewInputs,
+  timeLabel: TimeLabel,
+  h: ThreadViewBuilder
+): ReadonlyArray<Html> => [
+  messageView(item, model, inputs, timeLabel, h),
+  ...Option.match(turnPostingReply(model, item.message.id), {
+    onNone: () => [],
+    onSome: ({ item: { turn }, isLast }) =>
+      isLast
+        ? [
+            h.block(
+              TurnsBinding.embedView({
+                slotId: `turn-log-${turn.id}`,
+                model: model.turns,
+                view: replyLogView,
+                viewInputs: { turnId: turn.id }
+              })
+            )
+          ]
+        : []
+  })
+]
+
+/**
+ * An entry of the timeline: a message, or the row of the agent's turn where it took on the work, which the turns
+ * Block draws.
+ */
+const entryView = (
+  entry: Entry,
+  model: Model,
+  inputs: ViewInputs,
+  timeLabel: TimeLabel,
+  h: ThreadViewBuilder
+): ReadonlyArray<Html> =>
+  Entry.match(entry, {
+    Posted: ({ item }) => postedView(item, model, inputs, timeLabel, h),
+    Took: ({ item: { turn } }) => [
+      h.block(
+        TurnsBinding.embedView({ slotId: `turn-${turn.id}`, model: model.turns, viewInputs: { turnId: turn.id } })
+      )
+    ]
+  })
+
+/**
+ * The thread's timeline under a divider for each day, by the person's own clock: the opening message, then, when there
+ * are replies, how many, and the replies and the turns of agents that took on the work, as they happened.
+ */
 const messagesView = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html => {
-  const [opening, ...replies] = model.messages
+  const { opening, after } = timelineOf(model)
+  const replies = after.filter(Entry.isAnyOf(["Posted"])).length
+  const days = groupByDay(
+    [...Option.toArray(Option.map(opening, (item) => Entry.Posted({ item }))), ...after],
+    whenOf,
+    inputs.now
+  )
+  const repliesDivider = replies > 0 ? [divider(h, repliesLabel(replies), { align: "start" })] : []
 
   return messageList(h, {
     label: "Messages",
-    children: [
-      ...(opening === undefined ? [] : [messageView(opening, model, inputs, h)]),
-      ...(replies.length === 0 ? [] : [divider(h, repliesLabel(replies.length), { align: "start" })]),
-      ...replies.map((reply) => messageView(reply, model, inputs, h))
-    ]
+    children: days.flatMap(({ label, items }, dayIndex) => [
+      divider(h, label),
+      ...items.flatMap((entry, index) => [
+        ...entryView(entry, model, inputs, timeOf, h),
+        // The opening is the first of the first day, and the replies it has follow it.
+        ...(dayIndex === 0 && index === 0 && Option.isSome(opening) ? repliesDivider : [])
+      ])
+    ])
   })
 }
 
@@ -212,22 +296,21 @@ const descriptionView = (
 
 /**
  * What the task's activity is, under an Activity divider as `apps/ui`'s task pane has it: that the task was created,
- * by whom and when, then the replies to the opening, which is its description.
+ * by whom and when, then the replies to the opening, which is its description, and the turns of agents that took on
+ * the work, as they happened. No divider names a day here, so a time that was not today names its day.
  */
 const activityView = (task: Task.Task, model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html => {
-  const [, ...replies] = model.messages
+  const { after } = timelineOf(model)
   const creator = authorName(task.createdBy, model.members, model.contacts)
+  const timeLabel: TimeLabel = (at) => whenLabel(at, inputs.now)
 
   return column(h, [
     messageList(h, {
       label: "Activity",
       children: [
         divider(h, "Activity", { align: "start" }),
-        event(h, {
-          key: "task-created",
-          text: `${creator} created this task · ${whenLabel(task.createdAt, inputs.now)}`
-        }),
-        ...replies.map((reply) => messageView(reply, model, inputs, h))
+        event(h, { key: "task-created", text: `${creator} created this task · ${timeLabel(task.createdAt)}` }),
+        ...after.flatMap((entry) => entryView(entry, model, inputs, timeLabel, h))
       ]
     }),
     typingView(typingIn(model), h)
@@ -235,8 +318,7 @@ const activityView = (task: Task.Task, model: Model, inputs: ViewInputs, h: Thre
 }
 
 /**
- * A thread that tracks a task: its properties, its description, its turns, and its activity, as `apps/ui` lays a task
- * out.
+ * A thread that tracks a task: its properties, its description, and its activity, as `apps/ui` lays a task out.
  */
 const taskColumn = (task: Task.Task, model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html =>
   paneStack(h, [
@@ -244,26 +326,26 @@ const taskColumn = (task: Task.Task, model: Model, inputs: ViewInputs, h: Thread
     renamingView(model, h),
     h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
     descriptionView(model, inputs, h),
-    h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
     notice(h, model.notice),
+    notice(h, model.turns.notice),
     activityView(task, model, inputs, h)
   ])
 
-/** A thread that tracks no task: its title to change, the task it could become, its turns, and its messages. */
+/** A thread that tracks no task: its title to change, the task it could become, and its timeline. */
 const threadColumn = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): Html =>
   paneColumn(h, [
     renameAction(model, h),
     renamingView(model, h),
     h.block(TaskBinding.embedView({ slotId: "task", model: model.task })),
-    h.block(TurnsBinding.embedView({ slotId: "turns", model: model.turns })),
     notice(h, model.notice),
+    notice(h, model.turns.notice),
     column(h, [messagesView(model, inputs, h), typingView(typingIn(model), h)])
   ])
 
 /**
- * The thread as the side pane's body: its title to change, the task it tracks and its agents' turns, and its messages,
- * the opening first and the replies after it; or, for a thread that tracks a task, the task's properties, its
- * description, its turns, and its activity.
+ * The thread as the side pane's body: its title to change, the task it tracks, and its timeline, the opening first and
+ * the replies and the agents' turns after it; or, for a thread that tracks a task, the task's properties, its
+ * description, and its activity.
  */
 export const view = ThreadComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>
   Option.match(

@@ -1,7 +1,7 @@
 /**
- * A thread's agents' turns, as the person sees them: oldest first, each with its agent by name and
- * how it stands, which they stop while it runs, run again when nothing but who may direct its agent
- * keeps it from running again, and whose log they follow while online.
+ * A thread's agents' turns, as the person sees them where each took on the work: how it stands, which they stop while
+ * it runs, retry when nothing but who may direct its agent keeps it from running again, and whose log they follow
+ * while online.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
@@ -9,17 +9,25 @@ import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Turn, TurnId } from "@amends-dev/core/turn"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
+import type { TurnState } from "@amends-dev/design/details"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { defineTaggedUnion } from "foldkit/schema"
+import { Refusal } from "./problem.ts"
 
-/** A turn, whether a change to it is on its way, and whether nothing but who may direct its agent keeps it from running again. */
+/**
+ * A turn, whether a change to it is on its way, and whether nothing but who may direct its agent keeps it from
+ * running again.
+ */
 export const TurnItem = Schema.Struct({ turn: ReplicaRecord.Turn, pending: Schema.Boolean, retryOpen: Schema.Boolean })
 export type TurnItem = typeof TurnItem.Type
 
-/** How following a turn's log stands: opening, following as the turn writes it, ended with the turn, or failed, with why. */
+/**
+ * How following a turn's log stands: opening, following as the turn writes it, ended with the turn, or failed, with
+ * why.
+ */
 export const LogState = defineTaggedUnion({
   Opening: {},
   Following: {},
@@ -33,8 +41,9 @@ export const TurnLog = Schema.Struct({ turnId: TurnId.TurnId, items: Schema.Arra
 export type TurnLog = typeof TurnLog.Type
 
 /**
- * The thread's turns, oldest first, the workspace's members, who name their agents, what the person
- * may do, the log they follow, and why the last read or write failed.
+ * The thread's turns, oldest first, the workspace's members, who name their agents, what the person may do, the log
+ * they follow, the stops and retries the server refused, the one the browser could not keep, and why the last read
+ * failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -44,6 +53,8 @@ export const Model = Schema.Struct({
   members: Schema.Array(Member.Member),
   grants: Schema.Array(Grant.Grant),
   log: Schema.Option(TurnLog),
+  refused: Schema.Array(Refusal),
+  unkept: Schema.Option(Refusal),
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -52,23 +63,73 @@ export const Message = defineMessageUnion({
   ReceivedTurns: { turns: Schema.Array(TurnItem) },
   ReceivedMembers: { members: Schema.Array(Member.Member) },
   ReceivedGrants: { grants: Schema.Array(Grant.Grant) },
+  ReceivedRefusals: { refusals: Schema.Array(Refusal) },
   ReceivedLog: { turnId: TurnId.TurnId, logMessage: Turn.LogMessage },
   FailedRead: { error: Schema.String },
   FailedFollowLog: { turnId: TurnId.TurnId, error: Schema.String },
   ClickedStop: { turnId: TurnId.TurnId },
-  ClickedRunAgain: { turnId: TurnId.TurnId },
-  ClickedShowLog: { turnId: TurnId.TurnId },
+  ClickedRetry: { turnId: TurnId.TurnId },
+  ClickedViewLog: { turnId: TurnId.TurnId },
   ClickedHideLog: {},
   WroteAction: {},
-  FailedWriteAction: { error: Schema.String }
+  FailedStop: { turnId: TurnId.TurnId },
+  FailedRetry: { turnId: TurnId.TurnId }
 })
 export type Message = typeof Message.Type
 
 export const TurnsDefinition = Block.makeDefinition("Turns", { Model, Message })
 
-/** Whether the person may direct the agent of `turn`: stopping its turns and running them again both need it. */
+/** Whether the person may direct the agent of `turn`: stopping its turns and retrying them both need it. */
 export const directs = (model: Model, turn: ReplicaRecord.Turn): boolean =>
   Grant.anyCovers(model.grants, Turn.directRequirement(turn))
+
+/** Where a turn in each status stands, as `apps/ui` names it: running is working and cancelling is stopping. */
+const stateOfStatus: Readonly<Record<Turn.Status, TurnState>> = {
+  queued: "queued",
+  running: "working",
+  cancelling: "stopping",
+  completed: "done",
+  failed: "failed",
+  cancelled: "stopped"
+}
+
+/** Where `turn` stands. */
+export const stateOf = ({ status }: ReplicaRecord.Turn): TurnState => stateOfStatus[status]
+
+/**
+ * What a turn that ended says under its row, `agent` being its agent's name: why it failed; that its agent stopped
+ * taking part in the thread or that its task no longer asks it to work; that it ended without a reply. A turn that was
+ * stopped because the person asked, or is not over, or replied, says nothing.
+ */
+export const endingOf = (turn: ReplicaRecord.Turn, agent: string): Option.Option<string> => {
+  switch (turn.status) {
+    case "failed":
+      return Option.fromNullOr(turn.failure)
+    case "cancelled":
+      switch (turn.cancelReason) {
+        case "participation-ended":
+          return Option.some(`${agent} stopped taking part in this thread.`)
+        case "task-changed":
+          return Option.some(`The task no longer asks ${agent} to work on it.`)
+        default:
+          return Option.none()
+      }
+    case "completed":
+      return turn.messageIds.length === 0 ? Option.some("No reply posted.") : Option.none()
+    default:
+      return Option.none()
+  }
+}
+
+/**
+ * Why the last stop or retry of `turnId` did not go through: what the browser could not keep, else what the server
+ * refused.
+ */
+export const problemOf = (model: Model, turnId: TurnId.TurnId): Option.Option<Refusal["problem"]> =>
+  Option.orElse(
+    Option.filter(model.unkept, (unkept) => unkept.turnId === turnId),
+    () => Option.fromUndefinedOr(model.refused.find((refusal) => refusal.turnId === turnId))
+  ).pipe(Option.map(({ problem }) => problem))
 
 /**
  * The turn whose log is being followed: while it is opening or following, so that following it

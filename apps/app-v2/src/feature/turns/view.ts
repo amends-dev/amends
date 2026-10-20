@@ -1,36 +1,26 @@
-import { Turn } from "@amends-dev/core/turn"
-import { button, buttonRow, hint, notice, sending } from "@amends-dev/design/control"
-import { type BadgeTone, badge, entry, entryList, log } from "@amends-dev/design/details"
-import type { LogoMotion } from "@amends-dev/design/logo"
-import { paneSection } from "@amends-dev/design/pane"
+import { Turn, type TurnId } from "@amends-dev/core/turn"
+import { button, buttonRow, hint, iconButton, notice } from "@amends-dev/design/control"
+import { log, turnStatus } from "@amends-dev/design/details"
+import { turnLog, turnRow } from "@amends-dev/design/message"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { initials, memberName, turnStatusLabel } from "../../seen.ts"
+import { initials, memberName } from "../../seen.ts"
 import { TurnsComposition, type TurnsViewBuilder } from "./composition.ts"
-import { directs, LogState, Message, type Model, type TurnItem, type TurnLog } from "./definition.ts"
+import {
+  directs,
+  endingOf,
+  LogState,
+  Message,
+  type Model,
+  problemOf,
+  stateOf,
+  type TurnItem,
+  type TurnLog
+} from "./definition.ts"
+import { problemText } from "./problem.ts"
 
-/** How a turn stands, as the badge that says so is toned: in flight is cautious, well over is success. */
-const turnStatusTone: Readonly<Record<Turn.Status, BadgeTone>> = {
-  queued: "neutral",
-  running: "caution",
-  cancelling: "caution",
-  completed: "success",
-  failed: "danger",
-  cancelled: "neutral"
-}
-
-/**
- * How the logo moves in the badge of a turn that is under way, as apps/ui moves it: the thread drawn through while it
- * waits, the stitches lit while it runs, the patch tugged while it stops. A turn that has ended shows no logo.
- */
-const turnStatusMotion: Readonly<Record<Turn.Status, Option.Option<LogoMotion>>> = {
-  queued: Option.some("thread"),
-  running: Option.some("working"),
-  cancelling: Option.some("tug"),
-  completed: Option.none(),
-  failed: Option.none(),
-  cancelled: Option.none()
-}
+/** Which turn a view shows: the one that took on the work, by its id. */
+export type ViewInputs = Readonly<{ turnId: TurnId.TurnId }>
 
 /** One item of a turn's log, as the person reads it. */
 const logItemText = (item: Turn.LogItem) =>
@@ -48,7 +38,7 @@ const logStateView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html
     Ended: () => [hint(h, "The turn has ended.")],
     Failed: ({ error }) => [
       notice(h, Option.some(error)),
-      buttonRow(h, [button(h, "Try again", Message.ClickedShowLog({ turnId: turnLog.turnId }), { variant: "quiet" })])
+      buttonRow(h, [button(h, "Try again", Message.ClickedViewLog({ turnId: turnLog.turnId }), { variant: "quiet" })])
     ]
   })
 
@@ -58,59 +48,96 @@ const logView = (turnLog: TurnLog, h: TurnsViewBuilder): ReadonlyArray<Html> => 
   ...logStateView(turnLog, h)
 ]
 
-/**
- * A turn: its agent and how it stands, who ran it again, why it failed; for a person who may direct
- * its agent, stopping it while it runs and running it again when nothing else keeps it from running
- * again; and its log.
- */
-const turnView = ({ turn, pending, retryOpen }: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
-  const mayDirect = directs(model, turn)
-  const agent = memberName(model.members, turn.memberId)
-  const shownLog = Option.filter(model.log, ({ turnId }) => turnId === turn.id)
+/** The turn `turnId`, while the thread has it. */
+const findTurn = (model: Model, turnId: TurnId.TurnId): Option.Option<TurnItem> =>
+  Option.fromUndefinedOr(model.turns.find(({ turn }) => turn.id === turnId))
 
-  return entry(h, {
+/** The log of the turn `turnId`, while the person follows that one's. */
+const shownLog = (model: Model, turnId: TurnId.TurnId): Option.Option<TurnLog> =>
+  Option.filter(model.log, (followed) => followed.turnId === turnId)
+
+/**
+ * Stop, named for the agent, for someone who may direct it while its turn is active; while the turn is stopping, a Stop
+ * named "Stopping" that waits, whoever reads it.
+ */
+const stopView = ({ turn }: TurnItem, agent: string, model: Model, h: TurnsViewBuilder): ReadonlyArray<Html> => {
+  const isStopping = turn.status === "cancelling"
+
+  return (directs(model, turn) && Turn.stoppable(turn.status)) || isStopping
+    ? [
+        button(h, "Stop", Message.ClickedStop({ turnId: turn.id }), {
+          name: isStopping ? "Stopping" : `Stop ${agent}`,
+          isDisabled: isStopping
+        })
+      ]
+    : []
+}
+
+/**
+ * An agent's turn where it took on the work: its agent and how it stands, View log, which shows the log under the row
+ * and hides it, Stop while the turn is active and Retry when nothing but who may direct its agent keeps it from
+ * running again, what it says once it ended, "Sending…" while a change to it is on its way, why a stop or a retry did
+ * not go through, and the log.
+ */
+const rowView = (item: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
+  const { turn, pending, retryOpen } = item
+  const agent = memberName(model.members, turn.memberId)
+  const followedLog = shownLog(model, turn.id)
+
+  return turnRow(h, {
     key: turn.id,
+    label: `${agent}'s turn`,
     mark: initials(agent),
-    title: agent,
-    trailing: [
-      badge(h, {
-        label: turnStatusLabel[turn.status],
-        tone: turnStatusTone[turn.status],
-        ...Option.match(turnStatusMotion[turn.status], { onNone: () => ({}), onSome: (motion) => ({ motion }) })
-      }),
-      turn.retry === null ? h.empty : hint(h, `run again by ${memberName(model.members, turn.retry.by)}`),
-      sending(h, pending)
+    name: agent,
+    status: turnStatus(h, stateOf(turn)),
+    actions: [
+      button(
+        h,
+        "View log",
+        Option.isNone(followedLog) ? Message.ClickedViewLog({ turnId: turn.id }) : Message.ClickedHideLog(),
+        { variant: "quiet", isExpanded: Option.isSome(followedLog) }
+      ),
+      ...stopView(item, agent, model, h),
+      ...(directs(model, turn) && retryOpen ? [button(h, "Retry", Message.ClickedRetry({ turnId: turn.id }))] : [])
     ],
-    children: [
-      notice(h, Option.fromNullOr(turn.failure)),
-      buttonRow(h, [
-        mayDirect && Turn.stoppable(turn.status)
-          ? button(h, "Stop", Message.ClickedStop({ turnId: turn.id }), { variant: "quiet" })
-          : h.empty,
-        mayDirect && retryOpen
-          ? button(h, "Run again", Message.ClickedRunAgain({ turnId: turn.id }), { variant: "quiet" })
-          : h.empty,
-        Option.isNone(shownLog)
-          ? button(h, "Show log", Message.ClickedShowLog({ turnId: turn.id }), { variant: "quiet" })
-          : button(h, "Hide log", Message.ClickedHideLog(), { variant: "quiet" })
-      ]),
-      ...Option.match(shownLog, { onNone: () => [], onSome: (turnLog) => logView(turnLog, h) })
-    ]
+    detail: pending ? "Sending…" : Option.getOrUndefined(endingOf(turn, agent)),
+    problem: Option.getOrUndefined(Option.map(problemOf(model, turn.id), (problem) => problemText(problem, agent))),
+    children: Option.match(followedLog, { onNone: () => [], onSome: (followed) => logView(followed, h) })
   })
 }
 
-/** The thread's turns, oldest first: each agent's work on what was asked of it there. */
-export const view = TurnsComposition.makeView((model, h) =>
-  model.turns.length === 0
-    ? notice(h, model.notice)
-    : paneSection(h, {
-        title: "Turns",
-        children: [
-          notice(h, model.notice),
-          entryList(h, {
-            label: "Turns",
-            children: model.turns.map((item) => turnView(item, model, h))
-          })
-        ]
+/** The row of the turn that took on the work, or nothing for a turn the thread does not hold. */
+export const view = TurnsComposition.makeView.withInputs<ViewInputs>((model, { turnId }, h) =>
+  Option.match(findTurn(model, turnId), { onNone: () => h.empty, onSome: (item) => rowView(item, model, h) })
+)
+
+/**
+ * View turn log, the action of the message the turn posted as its reply, in place of a row of the turn's own: pressed
+ * while the log is followed, which hides it.
+ */
+export const replyActionView = TurnsComposition.makeView.withInputs<ViewInputs>((model, { turnId }, h) => {
+  const isShown = Option.isSome(shownLog(model, turnId))
+
+  return iconButton(
+    h,
+    {
+      icon: "list",
+      label: "View turn log",
+      onClick: isShown ? Message.ClickedHideLog() : Message.ClickedViewLog({ turnId })
+    },
+    { isPressed: isShown }
+  )
+})
+
+/** The log of the turn that posted a reply, under that message, while it is followed. */
+export const replyLogView = TurnsComposition.makeView.withInputs<ViewInputs>((model, { turnId }, h) =>
+  Option.match(Option.product(findTurn(model, turnId), shownLog(model, turnId)), {
+    onNone: () => h.empty,
+    onSome: ([{ turn }, followed]) =>
+      turnLog(h, {
+        key: `${turn.id}-log`,
+        label: `${memberName(model.members, turn.memberId)}'s turn log`,
+        children: logView(followed, h)
       })
+  })
 )

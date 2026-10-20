@@ -4202,16 +4202,6 @@ const detailsGroup = (
     ),
     sample(
       h,
-      "Badges with the logo moving: waiting (thread), running (working), and stopping (tug)",
-      [
-        badge(h, { label: "Queued", motion: "thread" }),
-        badge(h, { label: "Running", tone: "caution", motion: "working" }),
-        badge(h, { label: "Stopping", tone: "caution", motion: "tug" })
-      ],
-      sampleRow
-    ),
-    sample(
-      h,
       "Where a turn stands: the logo moving while it is queued (thread), working, and stopping (tug), and a still mark once it is done, failed, or stopped",
       turnStates.map((state) => turnStatus(h, state)),
       sampleRow

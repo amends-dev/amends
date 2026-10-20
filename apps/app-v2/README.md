@@ -91,8 +91,9 @@ shows `loadingLine`, "Loading your inbox…", "Loading settings…", "Loading th
 agents", "Couldn't load connections", "Can't load your inbox", with a Try again, as the settings have, that forgets why
 and reads again (`ClickedTryAgain`, which raises the Block's `reads`, the dependency that restarts its subscription, and
 shows the loading rows or line until the read answers).
-A turn's `badge` carries the
-logo moving while the turn waits (`thread`), runs (`working`), or stops (`tug`). The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
+A turn's state is the design's
+`turnStatus`, which carries the logo moving while the turn waits (`thread`), runs (`working`), or stops (`tug`), and a
+check, a warning, or a dash once it ended. The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
 and the pane of each destination (`page/workspace/home` renders Home's sidebar, main pane, side pane, and dialogs from its children's views), `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations and the modals they open, `feature/groups` the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
 a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
@@ -142,8 +143,9 @@ and the one that begins a conversation, are not the composer, and suggest no one
 
 The task a thread embeds is the design's `properties`: its status, assignee, and priority are
 `propertyMenu`s under their captions, or `propertyValue`s for someone who may not change them. The
-turns it embeds are the design's `paneSection`s, an `entryList` of `entry`s, each its agent's initials
-and name with a `badge` for how it stands, its buttons in a `buttonRow`, and its `log`. The inbox has `paneTabs` of Unread and All, which counts those waiting, none too, under its title, with the workspace's name under the title
+turns its timeline embeds are the design's `turnRow`s, each its agent's mark and name with a `turnStatus` for how it
+stands, its buttons, what it says under its line, and its `log`, or, for a turn that replied, a `turnLog` under its
+reply. The inbox has `paneTabs` of Unread and All, which counts those waiting, none too, under its title, with the workspace's name under the title
 on phones (`phoneContext`), and lists its
 notifications as `notification`s in a `messageList`, under a `divider` for each day, its label before the rule that runs on, each its
 author's initials, on their tone, and name and what they did, its place, its text, which opens the thread, how long
@@ -225,19 +227,27 @@ below it counted at each level above.
   id of a message to highlight (`highlightedMessageId`), which it draws as the current row, so the
   person sees what a notification was about, and the group gives none. For a thread that tracks no
   task it is a section named Thread: Rename, the form to rename it while the person does, the task
-  (making it one, where they may) and the turns, then its messages as a list, the opening first, how
-  many replies follow it, and the replies, each by its author's initials, name, and when it was
-  published (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with
+  (making it one, where they may), then its timeline as a list under a `divider` for each day it happened on by the
+  person's own clock (`groupByDay`, named as `dayLabel` names it): the opening first, how many replies follow it,
+  and the replies and the agents' turns after it, in the order they happened (`timeline.ts`, `timelineOf`, which
+  orders what happened at one moment so that a turn follows the message that asked for it). Each message is by its
+  author's initials, name, and when it was published (`timeOf`: its time of day, since a divider says its day), with
   "Sending…" after it, its text as markdown with each mention a chip (`messageText`, by the thread's members), or
   "Message deleted" in muted italics for a deleted one, " (edited)" quietly after the text of one that was edited, and
   Edit and Delete on the person's own, which the form to edit it replaces while they
-  do; and who else types, in a live region under them: "Ada is typing…", "Ada and Bob are typing…", and "Several people
-  are typing…" for three or more (`typingLine`). For a thread that tracks a task it is a
+  do. A turn is an entry at the moment its agent took on the work (core's `Turn.createdAt`, the time of its
+  `turn.created` activity, which a retry gets of its own), drawn by the turns Block as a row, one embedding of its
+  view for each turn, whose input is the turn's id; a turn that replied is its reply instead, found by the
+  messages its `messageIds` name, which have View turn log among their actions, and its log opens under the last of
+  them, so a turn shows as a row only while none of its replies is among the thread's messages. Why the turns could
+  not be read shows above the timeline. Who else types shows in a live region under it: "Ada is typing…", "Ada and
+  Bob are typing…", and "Several people are typing…" for three or more (`typingLine`). For a thread that tracks a
+  task it is a
   section named Task, laid out as `apps/ui`'s task pane is: Rename, which `apps/ui` has no place for
   and so stays at the top of the body, the task's properties, a "Description" caption over the
-  thread's opening, which is the task's description, with Edit and Delete on the person's own, the
-  turns, and under an "Activity" divider the line "Alice created this task · 12:01" and the replies
-  as messages, and who types. `apps/ui` links a task to the discussion it came from ("View original
+  thread's opening, which is the task's description, with Edit and Delete on the person's own, and under an
+  "Activity" divider the line "Alice created this task · 12:01" and the replies and the turns as they happened, with
+  no divider to name a day, so that a time that was not today names its day (`whenLabel`), and who types. `apps/ui` links a task to the discussion it came from ("View original
   discussion"); this view does not, since a thread names the thread it was derived from only in
   `Thread.origin`, no thread the app starts has one, and the link would have to ask the page to open
   another thread from inside a side pane. It shows no title, which the pane's header has. `followView` is the bell for that header, as
@@ -268,20 +278,40 @@ below it counted at each level above.
   it changes nothing, so the Block has no message for the choice. For someone who may not change
   the task the same three are read, each caption over its value. A line says "Sending…" under them
   while a change is on its way. The thread embeds it.
-- `feature/turns`: a thread's agents' turns, oldest first, each with its agent by name and how it
-  stands, who ran it again, and why it failed. The person stops a turn while it is active and runs
-  it again once nothing but who may direct its agent keeps it from running again, when they may
-  use that agent, by core's `Turn.directRequirement`. They follow a turn's log, which opens with
-  its items and then grows as the turn writes it, until the turn ends, or until they hide it or
-  it could not be followed, which says why and offers to follow it again; one log at a time. Its
-  view is a section titled Turns, a list of entries: each the agent's initials, name, and a badge
-  that says how the turn stands (queued and stopped are neutral, running and stopping cautious,
-  completed a success, failed a danger), the logo moving in it while the turn is queued, running, or stopping, with who ran it again and "Sending…" after it, then why it
-  failed, the buttons Stop, Run again, and Show log or Hide log, and, while the log is shown, the log
-  as a list, once it has items, with where following it stands under it (still opening, nothing
-  written yet while it is followed with no items, the turn ended, or why it failed); a log still
-  opening shows that alone. A thread with no turns shows only why they could
-  not be read. The thread embeds it.
+- `feature/turns`: a thread's agents' turns, each as its row where its agent took on the work, with its agent by
+  name and how it stands. The person stops a turn while it is active and retries it once nothing but who may direct
+  its agent keeps it from running again, when they may use that agent, by core's `Turn.directRequirement`. They
+  follow a turn's log, which opens with its items and then grows as the turn writes it, until the turn ends, or until
+  they hide it or it could not be followed, which says why and offers to follow it again; one log at a time. Its
+  views each take the id of a turn as their input, and the thread embeds them where it places the turn. `view` is the
+  turn's row, as `apps/ui`'s `TurnRow` draws it, a group named for the agent's turn, "Atlas's turn": the agent's
+  mark in its tone, its name in the agent's color, and its state as `apps/ui`'s `TurnStatus` words and marks it
+  (`stateOf`: "Queued", "Working", "Stopping…", "Completed" with a check, "Failed" with a warning in the caution
+  colors, "Stopped" with a dash, the logo moving while it is queued, working, or stopping), then its buttons: View log,
+  quiet, which shows the log and hides it (`aria-expanded`, since `apps/ui` opens the log in a pane of its own, which
+  is a later step, and until then it opens under the row); Stop, the secondary button, named "Stop Atlas", for someone
+  who may direct the agent while the turn is active, which while it stops is disabled and named "Stopping", to whoever
+  reads it; and Retry, for someone who may direct the agent when nothing else keeps the turn from running again,
+  which `apps/ui` offers as Retry too. Under the first line, a finished turn says (`endingOf`) why it failed, with no
+  "Agent settings" link, which `apps/ui` has to open the agent's page and a thread has no way to ask for, since its
+  parents, the group and the inbox, would have to carry the request to the page; "Atlas stopped taking part in this
+  thread." when its agent left the thread (core's cancel reason `participation-ended`), "The task no longer asks Atlas
+  to work on it." when its task was taken from it (`task-changed`), nothing when someone asked it to stop, and "No
+  reply posted." when it completed with no `messageIds`; "Sending…" says while a change to it is on its way. A stop
+  or a retry that did not go through says why under the row as an alert, in `apps/ui`'s words (`problem.ts`,
+  `problemText`): "Couldn't stop the turn. Try again." and "Couldn't start another attempt. Try again." when the browser
+  could not keep the action (`FailedStop`, `FailedRetry`, forgotten when the person tries again), and, from the
+  rejection the server wrote back, which the subscription reads from the store's actions (`refusalsOf`: the latest of
+  each turn's stop and retry, left unsaid while a later one is on its way or was kept), "This turn has already
+  finished." (`TurnNotActive`), "This turn is still running.", "This turn already replied.", "A newer turn followed
+  this one.", and "Atlas no longer takes part in this thread." (the four reasons of `NotRetryable`), "You can't direct
+  Atlas." (`Denied`), and "This turn is no longer available." (`NotFound`); the toast of the refusal stays beside it,
+  until the person dismisses it, and takes the row's line with it. While the log is shown, it is a list, once it has
+  items, with where following it stands under it (still opening, nothing written yet while it is followed with no
+  items, the turn ended, or why it failed); a log still opening shows that alone. `replyActionView` is View turn
+  log, the quiet icon button the reply of a turn has among its message's actions, pressed while the log shows, and
+  `replyLogView` the log, as the design's `turnLog`, under that message. Why the turns could not be read is the Block's
+  `notice`, which the thread shows above its timeline.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
   who wrote them, when it was last active, its task, whether it is still being started, and how much is new, and a composer to
   start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
@@ -729,9 +759,9 @@ below it counted at each level above.
   "Working #general", and who created the agent, with the day. As in `apps/ui`, each line is one button named as
   `apps/ui` names its link, "Working in #general: open its log" (or "Working: open its log" while the group is not
   read), the design's `activityList` with an `action`; it reports `OpenedThread` with the group and the thread the turn
-  works in (`ClickedTurn`, from `TurnUnderWay`), which the page opens in Home, where the thread's side pane lists its
-  turns and each turn's Show log. `apps/ui` opens the turn's own log beside its thread; the thread Block has no way to open
-  one turn's log, so the person shows it from the pane, and the button opens the thread. A person who may not configure the agent reads the
+  works in (`ClickedTurn`, from `TurnUnderWay`), which the page opens in Home, where the thread's timeline has the
+  turn's row, with its View log. `apps/ui` opens the turn's own log beside its thread; the thread Block has no way to open
+  one turn's log, so the person views it from the pane, and the button opens the thread. A person who may not configure the agent reads the
   same fields disabled, with no buttons; an agent the workspace does not list says "This agent isn't here" and
   offers "Show all agents", and nothing shows before the agents are read. The Block keeps what the person
   changed on each agent's page (`edits`: a name and a whole setup, each saved apart, from the name the agent
@@ -1136,7 +1166,7 @@ choice is.
   when it can; its local handler holds the action in the replica until the server completes it,
   with the records `store/Pending.ts` says it creates: a thread started in a group, with its opening
   message and the task it starts as, a conversation's direct group, a reply, a team and its
-  admissions, an admission, a role assignment, a thread's task, a turn run again, and an agent with
+  admissions, an admission, a role assignment, a thread's task, a turn retried, and an agent with
   its membership, role, and admission to the general group, and a channel, under the IDs
   core derives from the action's key, the request key the server runs it under, or from what it
   names, as a retry's from the turn it retries. An action whose payload only names a record it
@@ -1241,8 +1271,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply
   is written and stopped once it is sent, and why a write could not be kept; a task made and changed
-  from what was seen, unless nothing changes; a thread's turns stopped while they are active and run
-  again only when nothing else keeps them from it, and a turn's log followed from showing it until
+  from what was seen, unless nothing changes; a thread's turns stopped while they are active and retried
+  only when nothing else keeps them from it, a stop or retry the browser could not keep said until the person tries
+  again, and what the server refused read from the store's actions, and a turn's log followed from viewing it until
   the turn ends or the person hides it, passing over another turn's, and followed again after it
   could not be; a thread started from the composer, a task started on the Tasks tab, the tab chosen, and the status, the
   assignee, and the order chosen from their menus, which change only the Block's own model, the thread picked, and the
@@ -1412,10 +1443,13 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   the person, each with its mark in its tone, saying which is active and
   what the textarea completes from, picking by a click, by Enter, and by Tab, moving around the list
   with the arrows, and closing on Escape until other letters are typed; a task changed by someone who may, read as
-  rows by someone who may not, and made by someone who may create tasks; a thread's turns by their
-  agents' names and initials and the badges of how they stand, stopped and run again by someone who
-  may use the agent and not otherwise, a turn's log followed as it is written, until the turn ends
-  or it could not be followed, and the thread listing its agents' turns; a group's main pane, titled by its name or by
+  rows by someone who may not, and made by someone who may create tasks; a thread's turns as rows by their
+  agents' names and initials and the words and marks of how they stand, each line under a finished row, stopped and
+  retried by someone who may use the agent and not otherwise, Stop named for the agent and, while the turn stops,
+  disabled and named Stopping, every problem of a stop or retry in its words under the row, a turn's log followed as it
+  is written, until the turn ends or it could not be followed, a turn that replied as its reply with View turn log
+  and its log under it, and the thread placing its agents' turns among its messages at the moment they took on the
+  work, under the day; a group's main pane, titled by its name or by
   a conversation's other member, with the drawing of a channel or of a message before it, the workspace's name
   under it on a phone, its tabs named for it, its members as a stack of three marks named for how many there are, which
   opens them in the settings, the person's part in it as a bell named Following and pressed while they follow, and
@@ -1612,7 +1646,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   drawing, which `test/fixtures.ts`'s `art(kind)` finds by the part of it that moves, and a scene of the root view
   holds the logo in the brand, the session being checked under the account's header, and the host that could not be
   reached. A list that is being read is found by its `status` line and its rows hidden from assistive technology, and
-  a turn's badge by the motion class of the logo in it.
+  a turn's state by the motion class of the logo in it.
 - The flags' tests stub the browser's `navigator`: the page runs on an Apple platform by
   `userAgentData.platform` where the browser has it, over `navigator.platform`, and by the latter where it
   has not, and `namesApplePlatform` takes the names macOS, iOS, and iPadOS give and no other system's.
@@ -1627,7 +1661,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   up again, and renamed, a channel added under its ID, moved, and removed, an
   invitation revoked, notifications marked seen and settled by reading their thread, a task made
   from the thread the person sees or started with its thread, changed from the value seen, turns
-  stopped and run again, and refused actions applying nothing; `find`'s cover a record as the
+  stopped and retried, and refused actions applying nothing; `find`'s cover a record as the
   person's actions leave it.
 - The store's tests serve a host in process, the HTTP API and the sync server over memory storage
   on Bun, and open a store against it: the reset arrives, a change made over HTTP follows, and the

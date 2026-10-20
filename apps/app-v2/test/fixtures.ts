@@ -268,8 +268,12 @@ export const task = Schema.decodeSync(Task.Task)({
   createdAt: "2026-10-18T12:01:00Z"
 })
 
-/** Scout's turn `id` in the thread, in `status`. */
-export const turnOf = (id: string, status: Turn.Status) =>
+/** Scout's turn `id` in the thread, in `status`, with `changes` to what it records. */
+export const turnOf = (
+  id: string,
+  status: Turn.Status,
+  changes: Partial<(typeof ReplicaRecord.Turn)["Encoded"]> = {}
+) =>
   Schema.decodeSync(ReplicaRecord.Turn)({
     id,
     workspaceId: "workspace-1",
@@ -287,7 +291,8 @@ export const turnOf = (id: string, status: Turn.Status) =>
     cancelReason: null,
     createdAt: "2026-10-18T12:02:00Z",
     startedAt: status === "queued" ? null : "2026-10-18T12:02:01Z",
-    finishedAt: null
+    finishedAt: null,
+    ...changes
   })
 
 /** An integration the host installs, which takes a base URL and a key or none, as its readers see it. */

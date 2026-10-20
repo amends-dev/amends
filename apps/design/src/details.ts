@@ -1,13 +1,13 @@
 /**
  * What a pane says about one thing: its facts as labelled values, a few properties under a caption each, a mark of
- * how it stands, where an agent's turn stands, a person it is about, the places an agent is at work, the people or
- * agents' work it lists, and the log an agent wrote.
+ * how it stands, where an agent's turn stands, a person it is about, the places an agent is at work, the people and
+ * what stands for them that it lists, and the log an agent wrote.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
-import { type LogoMotion, logo } from "./logo.ts"
+import type { LogoMotion } from "./logo.ts"
 import { type MarkContent, type MarkSize, activityMark, mark } from "./mark.ts"
 
 const detailGrid = "m-0 grid grid-cols-[minmax(5rem,auto)_1fr] items-baseline gap-x-4 gap-y-2"
@@ -48,8 +48,6 @@ const badgeTones = {
   danger:
     "border-danger-border bg-danger-surface text-danger-text [--amends-status-knockout:var(--amends-danger-surface)]"
 }
-
-const badgeWithLogo = "gap-1"
 
 const turnChipBase =
   "inline-flex min-h-5.5 flex-none items-center gap-1.25 px-2 text-hint font-medium whitespace-nowrap"
@@ -150,22 +148,12 @@ export const propertyValue = <Message, Requirements>(
 
 /**
  * A small mark of how something stands, 20px tall: `neutral` (the default) on `subtle`, and `success`,
- * `caution`, and `danger` on their own surfaces with a border. With a `motion` the logo moves before the
- * label, 0.875rem, cut out of the badge's own surface, for what is under way: `thread` while it waits, `working`
- * while it runs, `tug` while it stops. The logo is hidden from assistive technology, since the label says it.
+ * `caution`, and `danger` on their own surfaces with a border.
  */
 export const badge = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; tone?: BadgeTone; motion?: LogoMotion }>
-): Html =>
-  h.span(
-    [
-      h.Class(
-        `${badgeBase} ${badgeTones[config.tone ?? "neutral"]}${config.motion === undefined ? "" : ` ${badgeWithLogo}`}`
-      )
-    ],
-    config.motion === undefined ? [config.label] : [logo(h, { size: "0.875rem", motion: config.motion }), config.label]
-  )
+  config: Readonly<{ label: string; tone?: BadgeTone }>
+): Html => h.span([h.Class(`${badgeBase} ${badgeTones[config.tone ?? "neutral"]}`)], [config.label])
 
 /**
  * Where an agent's turn stands: waiting to start, working, stopping as asked, done, failed, or stopped.
@@ -295,8 +283,8 @@ export const person = <Message, Requirements>(
   )
 
 /**
- * A list of people or agents' work, such as a thread's turns, named by `label`, a column of `entry`s with no
- * list style.
+ * A list of people and what stands for them, such as a workspace's members and the channels it brings conversations
+ * in from, named by `label`, a column of `entry`s with no list style.
  */
 export const entryList = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

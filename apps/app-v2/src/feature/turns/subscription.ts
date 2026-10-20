@@ -1,7 +1,7 @@
 /**
- * The thread's turns, the workspace's members, and what the person may do, read from their store as
- * they change; and the log of the turn they follow, read over HTTP while it is followed, since no
- * replica holds it.
+ * The thread's turns, the workspace's members, what the person may do, and the stops and retries the server refused,
+ * read from their store as they change; and the log of the turn they follow, read over HTTP while it is followed,
+ * since no replica holds it.
  */
 
 import { ThreadId } from "@amends-dev/core/thread"
@@ -14,6 +14,7 @@ import * as Stream from "effect/Stream"
 import * as Api from "../../api.ts"
 import * as Stores from "../../store/Stores.ts"
 import { followed, Message, TurnsDefinition } from "./definition.ts"
+import { refusalsOf } from "./problem.ts"
 
 /** How the person reads that a log could not be followed. */
 const unfollowable = "The log could not be followed. Check the connection."
@@ -23,7 +24,13 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
     "ReadTurns",
     { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, threadId: ThreadId.ThreadId },
     {
-      messages: [Message.ReceivedTurns, Message.ReceivedMembers, Message.ReceivedGrants, Message.FailedRead],
+      messages: [
+        Message.ReceivedTurns,
+        Message.ReceivedMembers,
+        Message.ReceivedGrants,
+        Message.ReceivedRefusals,
+        Message.FailedRead
+      ],
       modelToDependencies: ({ workspaceId, memberId, threadId }) => ({ workspaceId, memberId, threadId }),
       handler: function* () {
         const stores = yield* Stores.Stores
@@ -42,7 +49,10 @@ export const subscriptions = TurnsDefinition.subscriptions((entry) => ({
                 ),
                 Stream.merge(
                   Stream.map(store.members, (members) => Message.ReceivedMembers({ members })),
-                  Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants }))
+                  Stream.merge(
+                    Stream.map(store.grants, (grants) => Message.ReceivedGrants({ grants })),
+                    Stream.map(store.actions, (actions) => Message.ReceivedRefusals({ refusals: refusalsOf(actions) }))
+                  )
                 )
               )
             )

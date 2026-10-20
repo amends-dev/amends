@@ -15,6 +15,8 @@ export const init = TurnsComposition.makeInit(
       members: [],
       grants: [],
       log: Option.none(),
+      refused: [],
+      unkept: Option.none(),
       notice: Option.none()
     })
   })
