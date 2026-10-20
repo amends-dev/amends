@@ -189,9 +189,9 @@ const sidePaneDialog = <Message, Requirements>(
  * that the framework opens: it traps focus, makes the rest of the window inert, closes on Escape and on a
  * click on the scrim, and returns focus when it closes.
  *
- * The `notices`, a `toastStack`, are pinned to the window's bottom end corner over everything. While a
- * dialog is open the rest of the window is inert, so they are inside it, after its panel, and in the frame,
- * last, when neither is open.
+ * The `notices`, a `toastStack` of refusals pinned to the window's bottom end corner and a `confirmationStack`
+ * centered at its bottom, are over everything. While a dialog is open the rest of the window is inert, so they
+ * are inside it, after its panel, and in the frame, last, when neither is open.
  *
  * The `dialogs` are dialogs of the page's own that are not the shell's, such as a search or a form in a modal,
  * each the view of a `DialogBlock` the page binds, which renders nothing while it is closed. The shell renders

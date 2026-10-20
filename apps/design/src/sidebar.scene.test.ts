@@ -155,6 +155,91 @@ describe("sidebar", () => {
     )
   })
 
+  it("says what its count counts when the row names it, so that it is read as 5 unread and not as 5", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((model, h) =>
+          sidebarSection(h, {
+            children: [
+              sidebarItem(h, {
+                icon: "mark-mail",
+                label: "Inbox",
+                count: 5,
+                countName: "unread",
+                isCurrent: model.current === "Inbox",
+                onClick: open("Inbox")
+              }),
+              sidebarItem(h, {
+                icon: "mark-triage",
+                label: "Triage",
+                count: 5,
+                countName: "to triage",
+                isCurrent: model.current === "Triage",
+                onClick: open("Triage")
+              }),
+              sidebarItem(h, {
+                icon: "mark-channel",
+                label: "design",
+                count: 2,
+                countName: "for you",
+                isCurrent: model.current === "design",
+                onClick: open("design")
+              }),
+              sidebarItem(h, {
+                icon: "mark-tasks",
+                label: "Tasks",
+                count: 7,
+                isCurrent: model.current === "Tasks",
+                onClick: open("Tasks")
+              }),
+              sidebarItem(h, {
+                icon: "mark-settings",
+                label: "Settings",
+                countName: "unread",
+                isCurrent: model.current === "Settings",
+                onClick: open("Settings")
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Inbox" })).toHaveAttr("aria-description", "5 unread"),
+      expect(role("button", { name: "Triage" })).toHaveAttr("aria-description", "5 to triage"),
+      expect(role("button", { name: "design" })).toHaveAttr("aria-description", "2 for you"),
+      expect(within(role("button", { name: "Inbox" }), text("5"))).toExist(),
+      expect(within(role("button", { name: "Inbox" }), text("unread"))).toBeAbsent(),
+      expect(role("button", { name: "Tasks" })).toHaveAttr("aria-description", "7"),
+      expect(role("button", { name: "Settings" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("describes a pending row by Sending… even when it names its count", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((model, h) =>
+          sidebarSection(h, {
+            children: [
+              sidebarItem(h, {
+                icon: "mark-channel",
+                label: "launch",
+                count: 2,
+                countName: "for you",
+                isPending: true,
+                isCurrent: model.current === "launch",
+                onClick: open("launch")
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "launch" })).toHaveAttr("aria-description", "Sending…")
+    )
+  })
+
   it("says Sending… at the end of a pending row in the count's place, and describes the row by it", () => {
     scene(
       {

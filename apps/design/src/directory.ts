@@ -1,13 +1,13 @@
 /**
  * What a directory screen lists: a label over each group, with how many it holds, a line that says what a
  * list holds, the labels of a table's columns, a row for each thing in it, to open it, to answer it with a
- * button, or to read in a history, a quiet line after a list, and the placeholder rows that stand in for a list
- * while it loads.
+ * button, or to read in a history, a quiet line after a list, the quiet line that stands in for a list with no
+ * rows or that is being read, and the placeholder rows that stand in for a list while it loads.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { buttonWith } from "./control.ts"
+import { button, buttonWith } from "./control.ts"
 import type { LogoMotion } from "./logo.ts"
 import { activityMark, type MarkContent, type MarkStatus, mark } from "./mark.ts"
 
@@ -38,15 +38,32 @@ const columnsStitch = "h-0 border-t border-dashed border-stitch"
 
 const footnoteLine = "mt-6 text-control text-ink-secondary"
 
-const rowShape = "flex w-full items-center gap-4 ps-3 pe-4"
+const emptyLook = "m-0 px-3 py-8 text-control text-ink-secondary"
+
+const statusAction = "ms-3"
+
+const rowStart = "flex w-full items-center gap-4 ps-3"
+
+const rowShape = `${rowStart} pe-4`
 
 const rowHeights = { sm: "min-h-14", md: "min-h-19", lg: "min-h-19" }
 
 const compactRowHeight = "min-h-14"
 
-const rowButton = `${rowShape} group relative cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)] aria-[current=true]:bg-selected aria-[current=true]:[--amends-status-knockout:var(--amends-selected)] aria-[current=true]:indicator-bar`
+const rowLook =
+  "group relative cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)] aria-[current=true]:bg-selected aria-[current=true]:[--amends-status-knockout:var(--amends-selected)] aria-[current=true]:indicator-bar"
+
+const rowButton = `${rowShape} ${rowLook}`
+
+const rowButtonKeepingRoom = `${rowStart} pe-20 ${rowLook}`
+
+const rowButtonKeepingRoomFolded = `${rowButton} max-tablet:pe-20`
 
 const rowFoldsCells = "max-tablet:flex-wrap max-tablet:gap-y-2 max-tablet:py-3"
+
+const rowFrame = "relative"
+
+const rowOwnButton = "absolute inset-y-0 end-4 flex items-center"
 
 const rowText = "flex min-w-0 flex-1 flex-col gap-1"
 
@@ -150,6 +167,28 @@ export const summary = <Message, Requirements>(
  */
 export const footnote = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Class(footnoteLine)], [text])
+
+/**
+ * A quiet line in the place of a list that holds no rows, at control size in `ink-secondary`, 32px above and below and
+ * 12px in from the rows' edge, as `apps/ui` says "No groups match this search." where the search hides every group.
+ * The labels of `columns` stay over it.
+ */
+export const emptyLine = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
+  h.p([h.Class(emptyLook)], [text])
+
+/**
+ * The same line in the place of a list that is being read or could not be, such as "Loading groups…" or "Can't load
+ * the groups.", in a live region, a `status`, so that it is announced. An `action` after the words, 12px from them, is
+ * what the person can do about it, such as a quiet Try again.
+ */
+export const statusLine = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ text: string; action?: Html }>
+): Html =>
+  h.p(
+    [h.Role("status"), h.Class(emptyLook)],
+    [config.text, config.action === undefined ? h.empty : h.span([h.Class(statusAction)], [config.action])]
+  )
 
 /**
  * What a list shows while it is read for the first time: `count` rows (three unless given) in the shape of a
@@ -256,6 +295,18 @@ export const activityCell = <Message, Requirements>(
   )
 
 /**
+ * The classes of a row's button: a row with a button of its own keeps room for it at its end, below 48rem when it has
+ * cells, since they keep their action's room beside it, and always when it has none.
+ */
+const rowButtonLook = (config: Readonly<{ hasCells: boolean; hasOwnButton: boolean }>): string => {
+  if (!config.hasOwnButton) {
+    return rowButton
+  }
+
+  return config.hasCells ? rowButtonKeepingRoomFolded : rowButtonKeepingRoom
+}
+
+/**
  * How big a row's mark is, which sets how tall the row is: a 24px mark makes a compact row, 32px and 40px a roomy one,
  * unless the row `isCompact`.
  */
@@ -284,6 +335,13 @@ export type RowMarkSize = keyof typeof rowHeights
  * below it, which is what breaks the row after the title.
  *
  * An `id` is the button's own, for the app to move focus to a row, such as the one it has just added.
+ *
+ * A row the person can answer as well as open, such as a public group they may join, has a `button`: a `secondary`
+ * button at the row's end, 16px in from its edge and level with its middle, named by `name`, which begins with the
+ * label, such as "Join #launches", so that the buttons of several rows are told apart, and disabled while
+ * `isDisabled`. It sends its own `onClick` and not the row's, and lies over the row, beside the row's button and not
+ * inside it. A row with cells keeps its action's room for it, and one without keeps 5rem at its end; below 48rem,
+ * where the cells fold, the title keeps 5rem at the end as well. A row has an `action` or a `button`, not both.
  */
 export const row = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -297,6 +355,7 @@ export const row = <Message, Requirements>(
     cells?: ReadonlyArray<Html>
     cellsText?: string
     action?: string
+    button?: Readonly<{ label: string; name: string; isDisabled?: boolean; onClick: Message }>
     isCompact?: boolean
     isCurrent?: boolean
     onClick: Message
@@ -306,8 +365,10 @@ export const row = <Message, Requirements>(
   const hasCells = config.cells !== undefined
   const markSize = config.markSize ?? "lg"
   const height = config.isCompact === true ? compactRowHeight : rowHeights[markSize]
+  const { button: ownButton } = config
+  const look = rowButtonLook({ hasCells, hasOwnButton: ownButton !== undefined })
 
-  return Button.view(
+  const opener = Button.view(
     {
       onClick: config.onClick,
       toView: (attributes) =>
@@ -318,7 +379,7 @@ export const row = <Message, Requirements>(
             h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
             ...(description === "" ? [] : [h.AriaDescription(description)]),
             ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
-            h.Class(hasCells ? `${rowButton} ${height} ${rowFoldsCells}` : `${rowButton} ${height}`)
+            h.Class(hasCells ? `${look} ${height} ${rowFoldsCells}` : `${look} ${height}`)
           ],
           [
             mark(h, { ...config.mark, size: markSize, status: config.status }),
@@ -334,6 +395,26 @@ export const row = <Message, Requirements>(
         )
     },
     h
+  )
+
+  if (ownButton === undefined) {
+    return opener
+  }
+
+  return h.div(
+    [h.Class(rowFrame)],
+    [
+      opener,
+      h.div(
+        [h.Class(rowOwnButton)],
+        [
+          button(h, ownButton.label, ownButton.onClick, {
+            name: ownButton.name,
+            isDisabled: ownButton.isDisabled ?? false
+          })
+        ]
+      )
+    ]
   )
 }
 

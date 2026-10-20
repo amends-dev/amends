@@ -28,12 +28,12 @@ descriptions and a choice that can't be chosen and a hint, refused, and disabled
 tones, a boxed note in each of its three tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
 directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, a table of connections with a drawing on each mark and the authentication as a cell, a table of members with 32px marks in rows 56px tall, the second the member open beside the list, an agent's lilac mark, and the role and status as cells, a section with an action after its line over two rows with a quiet button, each on a drawing of a mail, the history of invitations as rows of an address over what it gives with the status in words and a quiet Revoke on the pending ones, and a section of two rows with a button
-named for their workspaces, with a footnote after them, and a table of three groups' rows
+named for their workspaces, with a footnote after them, and rows of public groups to join with a Join button over each row's end, one disabled, and one with no cells, and the quiet line of a list that holds no rows, while it is read, and when it could not be, with Try again, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
 sign-in's two steps, the second again with the announcement of a new code, and as the workspace picker five times, each with its pieces in `screenContent` as the app's
-pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header but the one after something went wrong, which is outside the session, with the brand alone in the header and Reload a link to the page itself; the toast alone, with a detail, as a confirmation, and as a stack of
-two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
+pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header but the one after something went wrong, which is outside the session, with the brand alone in the header and Reload a link to the page itself; the toast alone, with a detail, and as a stack of two refusals, and the confirmation alone, with an action, long, as a stack of two,
+and beside a refusal, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
 Members tab has an action at the start of its footer and Done at its end, as a compact one with a context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with an agent among them in its tone; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
@@ -48,7 +48,7 @@ start, and notifications under the days Today and Yesterday, unread with a dot a
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the shell twice, with and without its side pane, each in a
-frame of fixed height, its groups, one of them still on its way, and direct messages through
+frame of fixed height, its inbox, triage, and a group with their counts read aloud with what they count, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
 as a plain row under its group and the second with its notices; the shell once more with a task open on the Tasks tab in the side pane, whose header has the task's status before the title, a Close task button, and the subtitle "Task in #general", with the status, assignee, and priority as quiet menus under their captions that open and keep what is chosen, the description, and the activity over the replies, and the first shell's thread pane with the bell that follows it and Close thread; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
@@ -441,7 +441,7 @@ What a directory screen lists.
   row's cells fold under its title and no column is left to label.
 - `footnote(h, text)` is a quiet line after a list, 24px under it, at control size in `ink-secondary`, that
   says what else the person can do, such as "Accept an invitation above, or create your own workspace."
-- `row(h, { id?, mark, markSize?, isCompact?, status?, title, meta?, cells?, cellsText?, action?, isCurrent?, onClick })` is
+- `row(h, { id?, mark, markSize?, isCompact?, status?, title, meta?, cells?, cellsText?, action?, button?, isCurrent?, onClick })` is
   one button the width of its container, at least 76px tall: a square mark holding the `mark` letters, `{ text, tone? }`,
   or its drawing, `{ icon, tone? }`, as a connection's is, 40px (`markSize` `"lg"`, the default), 32px (`"md"`, as a
   list of agents draws it), or 24px (`"sm"`, which makes the row 56px tall), on `avatar-neutral` unless given the `lilac`
@@ -468,6 +468,18 @@ What a directory screen lists.
     what breaks the row after the title. A row without cells does not fold and keeps its action.
     `cellsText` is unchanged, so the folded row is described as it is wide. The folded cells start under a 24px
     mark's title, 40px in, as under a 32px mark's, 48px in, and a 40px one's, 56px in.
+- A row the person can answer as well as open, such as a public group they may join, has a `button`,
+  `{ label, name, isDisabled?, onClick }`: a `secondary` button at the row's end, 16px in from its edge and level with
+  its middle, named by `name`, which begins with the label, such as "Join #launches", so that the buttons of several rows
+  are told apart, and disabled while `isDisabled`. It sends its own `onClick` and not the row's, and lies over the row,
+  beside the row's button and inside neither, in a frame the row then has. A row with cells keeps its action's room for
+  it, and one without keeps 5rem at its end; below 48rem, where the cells fold, the title keeps 5rem as well. A row has
+  an `action` or a `button`, not both.
+- `emptyLine(h, text)` is a quiet line in the place of a list that holds no rows, at control size in `ink-secondary`,
+  32px above and below and 12px in from the rows' edge, as `apps/ui` says "No groups match this search."; the
+  labels of `columns` stay over it. `statusLine(h, { text, action? })` is the same line in a live region, a `status`,
+  for a list that is being read or could not be, such as "Loading groups…" or "Can't load the groups.", with an
+  `action` after the words, 12px from them, such as a quiet Try again.
 - `cellWithDetail(h, { value, detail? })` is a cell of two lines for a row: the `value` at control size in `ink`
   over the `detail` at hint size in `ink-secondary`, such as an agent's harness over its sandbox. Both end in an
   ellipsis. Below 48rem, where the cells fold under the title, the detail is not shown, so the folded line reads
@@ -536,8 +548,8 @@ The frame of the first four layout patterns, which the modules below fill.
 - `shell(h, { viewport, rail, sidebar, main, aside?, notices?, menu?, dialogs? })` puts the `rail` on the
   canvas, then one `panel` card holding the `sidebar`, a divider, the `main` pane, and, when there is
   an `aside`, its `view`, the side pane, at 440px at `Split`. Each is what its module renders. The
-  `notices`, a `toastStack`, are pinned to the window's bottom end corner, last in the frame or, while
-  a dialog is open, inside it. The frame is as tall as the viewport (`100dvh`, or
+  `notices`, a `toastStack` pinned to the window's bottom end corner and a `confirmationStack` centered at
+  its bottom, are last in the frame or, while a dialog is open, inside it. The frame is as tall as the viewport (`100dvh`, or
   `--amends-screen-height` where an ancestor sets it, as the workshop does), with an 8px gutter around
   the card. The `viewport` is the window's width, a `Viewport` that the app keeps in its model (see
   [the viewport](#the-viewport)), and the layout follows it:
@@ -649,7 +661,7 @@ The frame of the first four layout patterns, which the modules below fill.
   `indicator-bar`, as a current row is. A group without a label is the list alone, as a sidebar's first is. Sections sit 22px
   apart. `children` are `sidebarItem`s or a `sidebarEmpty`; a section with none at all, as one still loading has, is its
   heading and actions alone, with no list.
-- `sidebarItem(h, { icon?, mark?, status?, label, count?, activity?, activityMotion?, isPending?, isCurrent, onClick, children? })` is a
+- `sidebarItem(h, { icon?, mark?, status?, label, count?, countName?, activity?, activityMotion?, isPending?, isCurrent, onClick, children? })` is a
   38px row, 44px on touch, one button: an `icon`, or a `mark`, `{ text, tone? }`, on a 24px square for a
   person or an agent, then the `label` in `ink-secondary` and a `count` in a badge at the end. A `status` is how the item
   stands: the patch on its mark, cut out of the row's own fill, so that `status-knockout` is `hover`'s while the row is hovered
@@ -661,7 +673,9 @@ The frame of the first four layout patterns, which the modules below fill.
   `isPending`, as a group still being created is, says "Sending…" at its end at `meta` size in
   `ink-muted` in place of those and the count; a pending row has no count, activity, or status shape. The button is named by
   the label and then the status's label, "Atlas, Needs setup", or, with no status, the activity's words, "Atlas, Working in
-  #design", and described by the count or "Sending…". The current row is `aria-current="page"`, filled `selected`, in `ink`
+  #design", and described by the count or "Sending…". A count is a bare number to the eye, so `countName` says what it
+  counts, as `apps/ui` does, and the row is described by the number and the name, "5 unread" for the inbox, "5 to
+  triage" for Triage, and "2 for you" for a group; a row that gives none is described by the number alone. The current row is `aria-current="page"`, filled `selected`, in `ink`
   and medium weight, with the `indicator-bar`. `children` are `{ icon?, label, isCurrent, onClick? }`
   rows under it at hint size, 32px, 44px on touch, indented and joined to it by a dashed connector in `stitch`,
   such as a group's open thread. A row with an `onClick` is a button; one without is a plain row, a
@@ -904,22 +918,38 @@ What a conversation is made of.
 
 ### `@amends-dev/design/toast`
 
-What floats over a window's corner, for something that went wrong or something the person did, and the
-one thing to do about it.
+What floats over a window: a refusal in its bottom end corner, for something that went wrong, and a confirmation
+centered at its bottom, for something the person did.
 
-- `toastStack(h, children)` is the column of toasts pinned to the bottom end corner of the window,
+- `toastStack(h, children)` is the column of refusals pinned to the bottom end corner of the window,
   16px from each edge and 25rem wide at most, with 8px between them, above the panes and the scrim.
   It is `fixed`, so it stays in that corner wherever it renders, in the shell's frame or inside an
   open dialog, as the shell places it, or in a centered screen, which has no shell. A frame that shows it apart from a window, as the workshop's
   do, contains it with `contain: layout`. It is an `aria-live="polite"` region, there before the
   first toast so each is announced as it arrives. `children` are `toast`s, or a `notice`.
-- `toast(h, { text, detail?, role?, action: { label, onClick } })` is a `role="alert"` card, `raised` with
+- `toast(h, { text, detail?, role?, action: { label, onClick } })` is a `role="alert"` card for a refusal, `raised` with
   a border and `shadow-toast`: the `text` at body size, the `detail` under it at hint size in
   `ink-secondary`, clamped to three lines, such as the words an action carried, and at the right the
-  `action` as a quiet `button`, such as Dismiss. A confirmation of what the person did, such as "Joined
-  Northstar Studio", is `role: "status"`, which the stack's live region announces without interrupting
-  them, and an alert is for what went wrong. The app takes a toast away, when the person dismisses it or
-  after a while; the card has no timer of its own.
+  `action` as a quiet `button`, such as Dismiss. The person has to read a refusal, so it stays until the app takes
+  it away, when the person dismisses it; the card has no timer of its own. A `role` of `status` is what a confirmation
+  was before `confirmation`, kept only until the app's confirmations are `confirmation`s.
+- `confirmationStack(h, children)` is the list of confirmations centered at the bottom of the window, as `apps/ui`'s
+  toast region is: `fixed` from edge to edge, 24px above the bottom edge and above any home indicator
+  (`bottom: calc(1.5rem + env(safe-area-inset-bottom))`, which the app's `viewport-fit=cover` gives a value), at the
+  same height over the panes and the scrim as the refusals, one under the other 8px apart with the newest at the
+  bottom, each centered. It is an `ol` named "Notifications" and an `aria-live="polite"` region, there before the
+  first confirmation so each is announced as it arrives, and it lets a click through to the window except where a
+  confirmation is. It is fixed, so the shell places it as it does the refusals, in the open dialog or last in the
+  frame. `children` are `confirmation`s.
+- `confirmation(h, { key, text, action?: { label, onClick } })` is an item of that list and a `role="status"`, not an
+  alert, so it is announced without interrupting the person: a 16px check before the `text`, in a card at least 44px
+  tall and 28rem wide at most (the text wraps within it), `popover` with a border and `shadow-toast`, at control size
+  in medium weight, in `ink`. The one `action`, such as Open, is quiet text after it, 16px from the words, with a
+  `subtle` hover and a focus ring. A confirmation has no Dismiss: the app takes it away when its action is taken and by
+  itself after five seconds, and the card has no timer of its own. The `key` keeps one confirmation's item from
+  another's across renders. Refusals and confirmations are two stacks, so a refusal keeps its corner and its Dismiss
+  beside the confirmations; on a window so narrow that the two meet, the confirmation, which comes later in the
+  document, lies over the refusal until it goes.
 
 ### `@amends-dev/design/modal`
 
@@ -1057,7 +1087,7 @@ renderer family as a person does, through what the app's own tests query: a butt
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
 `aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, and its `aria-disabled` while it is disabled, which takes no click, the submit one's too, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
-landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, a compact row's 24px mark, its height, also with a 32px mark, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, a history row by its title, detail, and status as text, its quiet button named for what it acts on, disabled or absent, and its action moved under the status below 48rem, and a footnote by its text; the task list's labels, hidden from assistive technology, in the columns of the rows, with the Status label gone below 64rem and all of them below 48rem, a task by `role("button", { name })` of its title, described by all it says, in a `listitem` of the list named Tasks, its status drawn at 1rem and said in a word, its title quiet once finished, its assignee's mark in its tone or the people icon and Unassigned, its place after the title and under it below 48rem, its activity, its height, `aria-current` on the row open beside the list, and the quiet line that says no task matches; an
+landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, and the button of its own beside the row's, which it is not inside, named for the row, disabled alone, and sending its own message, and a list's quiet line, as a `status` while it is read, a compact row's 24px mark, its height, also with a 32px mark, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, a history row by its title, detail, and status as text, its quiet button named for what it acts on, disabled or absent, and its action moved under the status below 48rem, and a footnote by its text; the task list's labels, hidden from assistive technology, in the columns of the rows, with the Status label gone below 64rem and all of them below 48rem, a task by `role("button", { name })` of its title, described by all it says, in a `listitem` of the list named Tasks, its status drawn at 1rem and said in a word, its title quiet once finished, its assignee's mark in its tone or the people icon and Unassigned, its place after the title and under it below 48rem, its activity, its height, `aria-current` on the row open beside the list, and the quiet line that says no task matches; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; the logo the same, with a
 class for each motion and none without one; each state art drawn, hidden from assistive technology, and moving in
 the part its kind moves; the code input's six cells, the digits it keeps, its completion at the sixth, its
@@ -1074,7 +1104,7 @@ and a plain button holding its content; a pane's toolbar by its search found by 
 end, kept out of the body that scrolls, which starts flush under it, and a pane without one with its usual padding; the quiet
 search by its hidden label, its placeholder and its magnifier, hidden from assistive technology; the theme's two dark
 blocks, which give the same values, by `theme.test.ts`; a sidebar item by its name, which has the status's word after the label, with
-`aria-current` and its count, the row under it as a button or as a plain row, the working logo at the end of a row at
+`aria-current` and its count, read as "5 unread" when the row names what it counts, the row under it as a button or as a plain row, the working logo at the end of a row at
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
 section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title; a pane's empty state by
@@ -1084,7 +1114,7 @@ entry by its title, its mark hidden from assistive technology, its trailing piec
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
 those with a modifier, left to the browser, and a log by `role("list")` with a line for each item; a grid's fields found by their labels; a
-toast by `role("alert")`, or `role("status")` for a confirmation, with its text, detail, and button, in the stack's live region; a modal by its
+toast by `role("alert")` with its text, detail, and Dismiss, in the stack's live region, and a confirmation by `role("status")` in the list named Notifications, with its check, its text, its one action that takes it away, no Dismiss, and the classes that centre it at the bottom 24px above the edge and any home indicator; a modal by its
 title as a level 2 heading, which names the dialog once a real `DialogBlock` has opened it, its
 context, description, tabs, and footer, the buttons of the footer in the order they sit, the leading ones and a
 Cancel told to lead at the start and the rest at the end, the control given `initialFocus` by its marker, and Close and

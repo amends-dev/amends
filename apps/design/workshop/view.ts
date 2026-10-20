@@ -44,12 +44,14 @@ import {
   activityCell,
   cellWithDetail,
   columns,
+  emptyLine,
   footnote,
   historyRow,
   loadingRows,
   row,
   rowWithButton,
   section,
+  statusLine,
   summary
 } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
@@ -112,7 +114,7 @@ import {
 } from "../src/sidebar.ts"
 import { type StateArtKind, stateArt, stateArtKinds } from "../src/stateArt.ts"
 import { taskHeadings, taskList, taskListEmpty, type TaskListRow } from "../src/taskList.ts"
-import { toast, toastStack } from "../src/toast.ts"
+import { confirmation, confirmationStack, toast, toastStack } from "../src/toast.ts"
 import { tooltip } from "../src/tooltip.ts"
 import {
   AccountBinding,
@@ -914,6 +916,49 @@ const groupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   groupList(h)
 ]
 
+const groupColumns = (h: ApplicationViewBuilder): Html =>
+  columns(h, { label: "Group", cells: ["Visibility", "Members"] })
+
+const publicGroupRows: ReadonlyArray<Readonly<{ name: string; members: number; isJoining: boolean }>> = [
+  { name: "launches", members: 8, isJoining: false },
+  { name: "announcements", members: 24, isJoining: true }
+]
+
+const publicGroupList = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [h.AriaLabel("Public groups")],
+    publicGroupRows.map(({ name, members, isJoining }) =>
+      h.keyed("li")(
+        name,
+        [],
+        [
+          row(h, {
+            mark: { icon: "mark-channel" },
+            title: name,
+            cells: [badge(h, { label: "Public" }), h.span([], [`${members} members`])],
+            cellsText: `Public · ${members} members`,
+            button: {
+              label: "Join",
+              name: `Join #${name}`,
+              isDisabled: isJoining,
+              onClick: Message.ClickedButton()
+            },
+            onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
+
+const publicGroupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  summary(h, {
+    copy: "Public groups you haven't joined. Join one to read its threads.",
+    count: `${publicGroupRows.length} groups`
+  }),
+  groupColumns(h),
+  publicGroupList(h)
+]
+
 type MemberSample = Readonly<{ name: string; role: string; status: string; isAgent: boolean; isOpen: boolean }>
 
 const memberSamples: ReadonlyArray<MemberSample> = [
@@ -1318,6 +1363,49 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
           cells: [badge(h, { label: "Public" }), h.span([], ["12 members"])],
           cellsText: "Public · 12 members",
           onClick: Message.ClickedButton()
+        })
+      ],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Rows of public groups to join: the channel drawing, a Join button over the end of each row named for its group, the second disabled while it is on its way",
+      publicGroupTable(h),
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Row with a button and no cells, which keeps 5rem at its end for it",
+      [
+        row(h, {
+          mark: { icon: "mark-channel" },
+          title: "a-group-with-a-title-long-enough-to-be-cut-short-before-the-join-button-that-lies-over-the-end",
+          button: { label: "Join", name: "Join #launches", onClick: Message.ClickedButton() },
+          onClick: Message.ClickedButton()
+        })
+      ],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "A quiet line where the list holds no rows, under the labels of its columns",
+      [groupColumns(h), emptyLine(h, "No groups match this search.")],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "The same line while the list is read, in a live region",
+      [groupColumns(h), statusLine(h, { text: "Loading groups…" })],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "The same line when the list could not be read, with a quiet Try again after the words",
+      [
+        groupColumns(h),
+        statusLine(h, {
+          text: "Can't load the groups.",
+          action: button(h, "Try again", Message.ClickedButton(), { variant: "quiet" })
         })
       ],
       "flex max-w-2xl flex-col"
@@ -2935,8 +3023,22 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
     children: [
       sidebarSection(h, {
         children: [
-          sidebarItem(h, { icon: "mark-mail", label: "Inbox", count: 3, isCurrent: false, onClick: press }),
-          sidebarItem(h, { icon: "mark-triage", label: "Triage", isCurrent: false, onClick: press }),
+          sidebarItem(h, {
+            icon: "mark-mail",
+            label: "Inbox",
+            count: 3,
+            countName: "unread",
+            isCurrent: false,
+            onClick: press
+          }),
+          sidebarItem(h, {
+            icon: "mark-triage",
+            label: "Triage",
+            count: 5,
+            countName: "to triage",
+            isCurrent: false,
+            onClick: press
+          }),
           sidebarItem(h, { icon: "mark-tasks", label: "Tasks", isCurrent: false, onClick: press })
         ]
       }),
@@ -2960,7 +3062,14 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
                   : { icon: "circle-frame", label: "Composer paste crash", isCurrent: false, onClick: press }
               ]
             }),
-            sidebarItem(h, { icon: "mark-channel", label: "design", isCurrent: false, onClick: press }),
+            sidebarItem(h, {
+              icon: "mark-channel",
+              label: "design",
+              count: 2,
+              countName: "for you",
+              isCurrent: false,
+              onClick: press
+            }),
             sidebarItem(h, { icon: "mark-channel", label: "engineering", isCurrent: false, onClick: press }),
             sidebarItem(h, { icon: "mark-channel", label: "launch", isPending: true, isCurrent: false, onClick: press })
           ]
@@ -3617,11 +3726,21 @@ const postRefusal = (h: ApplicationViewBuilder): Html =>
     action: { label: "Dismiss", onClick: Message.ClickedButton() }
   })
 
+const nameSavedConfirmation = (h: ApplicationViewBuilder): Html =>
+  confirmation(h, { key: "name-saved", text: "Name saved" })
+
 const joinedConfirmation = (h: ApplicationViewBuilder): Html =>
-  toast(h, {
-    text: "Joined Northstar Studio",
-    role: "status",
-    action: { label: "Dismiss", onClick: Message.ClickedButton() }
+  confirmation(h, {
+    key: "joined",
+    text: "Joined #launches",
+    action: { label: "Open", onClick: Message.ClickedButton() }
+  })
+
+const longConfirmation = (h: ApplicationViewBuilder): Html =>
+  confirmation(h, {
+    key: "long",
+    text: "Casey Morgan was removed from Mercier & Co, and the conversations they started stay where they are",
+    action: { label: "Undo", onClick: Message.ClickedButton() }
   })
 
 const logLines: ReadonlyArray<string> = [
@@ -3910,14 +4029,40 @@ const toastGroup = (h: ApplicationViewBuilder): Html =>
     ),
     sample(
       h,
-      "A confirmation, a status and not an alert",
-      [h.div([h.Class(toastFrame)], [toastStack(h, [joinedConfirmation(h)])])],
+      "A stack of two",
+      [h.div([h.Class(toastFrame)], [toastStack(h, [renameRefusal(h), postRefusal(h)])])],
       "flex flex-col"
     ),
     sample(
       h,
-      "A stack of two",
-      [h.div([h.Class(toastFrame)], [toastStack(h, [renameRefusal(h), postRefusal(h)])])],
+      "A confirmation, centered at the bottom with a check before its words, a status and not an alert, with no Dismiss",
+      [h.div([h.Class(toastFrame)], [confirmationStack(h, [nameSavedConfirmation(h)])])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A confirmation with its one action, which runs it and takes the confirmation away",
+      [h.div([h.Class(toastFrame)], [confirmationStack(h, [joinedConfirmation(h)])])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A long confirmation wraps within 28rem, its action beside it",
+      [h.div([h.Class(toastFrame)], [confirmationStack(h, [longConfirmation(h)])])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A stack of two confirmations, the newest at the bottom, 8px apart",
+      [h.div([h.Class(toastFrame)], [confirmationStack(h, [nameSavedConfirmation(h), joinedConfirmation(h)])])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A refusal in the bottom end corner and a confirmation at the bottom: side by side in a wide window, and, as in this narrow frame, the confirmation over the refusal until it goes",
+      [
+        h.div([h.Class(toastFrame)], [toastStack(h, [renameRefusal(h)]), confirmationStack(h, [joinedConfirmation(h)])])
+      ],
       "flex flex-col"
     )
   ])

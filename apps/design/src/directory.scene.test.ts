@@ -10,16 +10,18 @@ import {
   activityCell,
   cellWithDetail,
   columns,
+  emptyLine,
   footnote,
   historyRow,
   loadingRows,
   row,
   rowWithButton,
   section,
+  statusLine,
   summary
 } from "./directory.ts"
 
-const Message = defineMessageUnion({ ClickedMercier: {}, ClickedFieldwork: {} })
+const Message = defineMessageUnion({ ClickedMercier: {}, ClickedFieldwork: {}, ClickedJoin: {}, ClickedTryAgain: {} })
 type Message = typeof Message.Type
 
 type Model = Readonly<{ opened: ReadonlyArray<string> }>
@@ -29,7 +31,9 @@ const initial: Model = { opened: [] }
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ClickedMercier: () => ({ model: modifyFields(model, { opened: (opened) => [...opened, "Mercier & Co"] }) }),
-    ClickedFieldwork: () => ({ model: modifyFields(model, { opened: (opened) => [...opened, "Fieldwork"] }) })
+    ClickedFieldwork: () => ({ model: modifyFields(model, { opened: (opened) => [...opened, "Fieldwork"] }) }),
+    ClickedJoin: () => ({ model: modifyFields(model, { opened: (opened) => [...opened, "Join"] }) }),
+    ClickedTryAgain: () => ({ model: modifyFields(model, { opened: (opened) => [...opened, "Try again"] }) })
   })
 
 const viewOf = (render: (h: HtmlBuilder<Message>) => ReadonlyArray<Html>) => (model: Model, h: HtmlBuilder<Message>) =>
@@ -758,6 +762,137 @@ describe("row with an icon for a mark", () => {
       ),
       click(role("button", { name: "Local models" })),
       expect(role("status")).toHaveText("Opened Fieldwork")
+    )
+  })
+})
+
+describe("row with a button of its own", () => {
+  const rows = (h: HtmlBuilder<Message>, isDisabled = false) => [
+    row(h, {
+      mark: { icon: "mark-channel" },
+      title: "launches",
+      cells: [badge(h, { label: "Public" }), h.span([], ["8 members"])],
+      cellsText: "Public · 8 members",
+      button: { label: "Join", name: "Join #launches", isDisabled, onClick: Message.ClickedJoin() },
+      onClick: Message.ClickedMercier()
+    }),
+    row(h, {
+      mark: { icon: "mark-channel" },
+      title: "ideas",
+      button: { label: "Join", name: "Join #ideas", onClick: Message.ClickedJoin() },
+      onClick: Message.ClickedFieldwork()
+    })
+  ]
+
+  it("is the row's button and a button beside it, not inside it, each sending its own message", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expectAll(all.selector("button button")).toHaveCount(0),
+      click(role("button", { name: "launches" })),
+      click(role("button", { name: "Join #launches" })),
+      expect(role("status")).toHaveText("Opened Mercier & Co, Join")
+    )
+  })
+
+  it("names each button by its label and its row, so that the buttons of several rows are told apart", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "Join #launches" })).toHaveText("Join"),
+      expect(role("button", { name: "Join #ideas" })).toHaveText("Join"),
+      expect(role("button", { name: "launches" })).toHaveAttr("aria-description", "Public · 8 members")
+    )
+  })
+
+  it("is a secondary button at the row's end, level with its middle, over the row", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "Join #launches" })).toHaveClass("bg-action-secondary"),
+      expect(selector("div.absolute")).toHaveClass("inset-y-0"),
+      expect(selector("div.absolute")).toHaveClass("end-4"),
+      expect(selector("div.absolute")).toHaveClass("items-center")
+    )
+  })
+
+  it("disables its button while told to, and leaves the row itself to open", () => {
+    scene(
+      { update, view: viewOf((h) => rows(h, true)) },
+      given(initial),
+      expect(role("button", { name: "Join #launches" })).toBeDisabled(),
+      expect(role("button", { name: "Join #ideas" })).not.toBeDisabled(),
+      click(role("button", { name: "launches" })),
+      expect(role("status")).toHaveText("Opened Mercier & Co")
+    )
+  })
+
+  it("keeps room for its button: a row with cells below 48rem, a row without them always", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "launches" })).toHaveClass("max-tablet:pe-20"),
+      expect(role("button", { name: "launches" })).toHaveClass("pe-4"),
+      expect(role("button", { name: "ideas" })).toHaveClass("pe-20"),
+      expect(role("button", { name: "ideas" })).not.toHaveClass("pe-4")
+    )
+  })
+
+  it("is a row like any other without one: no frame, and the room at its end it always had", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [row(h, { mark: { text: "F" }, title: "Fieldwork", onClick: Message.ClickedFieldwork() })])
+      },
+      given(initial),
+      expect(selector("div.relative")).toBeAbsent(),
+      expect(role("button", { name: "Fieldwork" })).toHaveClass("pe-4")
+    )
+  })
+})
+
+describe("emptyLine", () => {
+  it("says why a list has no rows, in quiet text 32px above and below and 12px in", () => {
+    scene(
+      { update, view: viewOf((h) => [emptyLine(h, "No groups match this search.")]) },
+      given(initial),
+      expect(text("No groups match this search.")).toHaveClass("text-ink-secondary"),
+      expect(text("No groups match this search.")).toHaveClass("text-control"),
+      expect(text("No groups match this search.")).toHaveClass("py-8"),
+      expect(text("No groups match this search.")).toHaveClass("px-3"),
+      expect(text("No groups match this search.")).not.toHaveAttr("role")
+    )
+  })
+})
+
+describe("statusLine", () => {
+  it("says what the list is waiting for in a live region, in the look of an empty line", () => {
+    scene(
+      { update, view: viewOf((h) => [statusLine(h, { text: "Loading groups…" })]) },
+      given(initial),
+      expect(text("Loading groups…")).toHaveAttr("role", "status"),
+      expect(text("Loading groups…")).toHaveClass("py-8"),
+      expect(text("Loading groups…")).toHaveClass("text-ink-secondary"),
+      expect(within(text("Loading groups…"), role("button"))).toBeAbsent()
+    )
+  })
+
+  it("holds the action it is given after the words, which sends its message", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          statusLine(h, {
+            text: "Can't load the groups.",
+            action: button(h, "Try again", Message.ClickedTryAgain(), { variant: "quiet" })
+          })
+        ])
+      },
+      given(initial),
+      expect(text("Can't load the groups.")).toHaveAttr("role", "status"),
+      expect(within(text("Can't load the groups."), role("button", { name: "Try again" }))).toExist(),
+      click(role("button", { name: "Try again" })),
+      expect(text("Opened Try again")).toExist()
     )
   })
 })

@@ -184,13 +184,22 @@ const itemName = (config: Readonly<{ label: string; status?: MarkStatus | undefi
   return state === undefined ? config.label : `${config.label}, ${state}`
 }
 
-/** What describes the row: "Sending…" while it is pending, and its count otherwise. */
-const itemDescription = (config: Readonly<{ count?: number; isPending?: boolean }>): string | undefined => {
+/**
+ * What describes the row: "Sending…" while it is pending, and its count otherwise, with what it counts when the row
+ * says: "5 unread", and "5" alone when it does not.
+ */
+const itemDescription = (
+  config: Readonly<{ count?: number; countName?: string; isPending?: boolean }>
+): string | undefined => {
   if (config.isPending === true) {
     return "Sending…"
   }
 
-  return config.count === undefined ? undefined : `${config.count}`
+  if (config.count === undefined) {
+    return undefined
+  }
+
+  return config.countName === undefined ? `${config.count}` : `${config.count} ${config.countName}`
 }
 
 /**
@@ -345,10 +354,12 @@ export const sidebarSections = <Message, Requirements>(
  * end in place of those and the count.
  *
  * The button is named by the label and then by the status's word, "Atlas, Needs setup", or by the activity's words
- * when there is no status, and described by "Sending…" or the count. The patch is cut out of the row's own
- * surface: while the row is hovered or current, `status-knockout` is that row's color. The current row is filled
- * with the 2px bar and `aria-current="page"`. `children` are the items under it, such as a group's open thread,
- * joined to it by a dashed line; one with no `onClick` is a plain row that says where the person is.
+ * when there is no status, and described by "Sending…" or the count. The count is a bare number to the eye, so
+ * `countName` says what it counts, as `apps/ui` does: "unread" for the inbox, "to triage" for Triage, "for you" for a
+ * group, read aloud as "5 unread"; a row that gives none is described by the number alone. The patch is cut out of
+ * the row's own surface: while the row is hovered or current, `status-knockout` is that row's color. The current row
+ * is filled with the 2px bar and `aria-current="page"`. `children` are the items under it, such as a group's open
+ * thread, joined to it by a dashed line; one with no `onClick` is a plain row that says where the person is.
  */
 export const sidebarItem = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -358,6 +369,7 @@ export const sidebarItem = <Message, Requirements>(
     status?: MarkStatus | undefined
     label: string
     count?: number
+    countName?: string
     activity?: string
     activityMotion?: LogoMotion | undefined
     isPending?: boolean
