@@ -48,8 +48,8 @@ export const TaskBinding = ThreadDefinition.bindChild(TaskBlock, {
 })
 
 /**
- * Going back to the thread from a turn's log shows it at its end, as it opens, and closing the log is reported, since
- * it leaves the thread too.
+ * Going back to the thread from a turn's log shows it at its end, as it opens. Closing the log, which leaves the thread
+ * too, and asking for an agent's settings are reported, since the thread's parents and the page act on them.
  */
 const foldTurnsOutMessage = TurnsBlock.OutMessage.match({
   ReturnedToThread: () =>
@@ -57,13 +57,15 @@ const foldTurnsOutMessage = TurnsBlock.OutMessage.match({
       model,
       commands: [ScrollMessagesToEnd({ threadId: model.threadId, onlyIfNearEnd: false })]
     })),
-  ClosedLog: () => ThreadDefinition.stepNoop()
+  ClosedLog: () => ThreadDefinition.stepNoop(),
+  OpenedAgent: () => ThreadDefinition.stepNoop()
 })
 
-/** Closing the log of a turn is the person closing the thread's pane. */
+/** Closing a turn's log is the person closing the thread's pane; an agent's settings are the page's to open. */
 const forwardTurnsOutMessage = TurnsBlock.OutMessage.match({
   ReturnedToThread: () => undefined,
-  ClosedLog: () => OutMessage.ClosedTurnLog()
+  ClosedLog: () => OutMessage.ClosedTurnLog(),
+  OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
 })
 
 export const TurnsBinding = ThreadDefinition.bindChild(TurnsBlock, {

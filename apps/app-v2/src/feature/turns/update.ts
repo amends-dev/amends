@@ -117,6 +117,7 @@ export const update = TurnsComposition.makeUpdate((model, message) => {
     ClickedBackToThread: () => returnToThread(model),
     ClickedViewReply: () => returnToThread(model),
     ClickedCloseLog: () => ({ model, outMessage: OutMessage.ClosedLog() }),
+    ClickedAgentSettings: ({ agentId }) => ({ model, outMessage: OutMessage.OpenedAgent({ agentId }) }),
     ClickedJumpToLatest: () =>
       Option.match(model.log, {
         onNone: () => ({ model }),

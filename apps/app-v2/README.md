@@ -320,9 +320,8 @@ below it counted at each level above.
   named "Stop Atlas", for someone who may direct the agent while the turn is active, which while it stops is disabled
   and named "Stopping", to whoever reads it; and Retry, for someone who may direct the agent when nothing else keeps the
   turn from running again, which `apps/ui` offers as Retry too. Under the first line, a finished turn says
-  (`endingOf`) why it failed, with no "Agent settings" link, which `apps/ui` has to open the agent's page and a thread
-  has no way to ask for, since its parents, the group and the inbox, would have to carry the request to the page;
-  "Atlas stopped taking part in this thread." when its agent left the thread (core's cancel reason
+  (`endingOf`) why it failed, with Agent settings after it, a `lineButton` as `apps/ui`'s link is, which asks for the
+  agent's page (`ClickedAgentSettings`, reported as `OpenedAgent` with the turn's agent); "Atlas stopped taking part in this thread." when its agent left the thread (core's cancel reason
   `participation-ended`), "The task no longer asks Atlas to work on it." when its task was taken from it
   (`task-changed`), nothing when someone asked it to stop, and "No reply posted." when it completed with no
   `messageIds`; "Sending…" says while a change to it is on its way. A stop or a retry that did not go through says why
@@ -353,7 +352,8 @@ below it counted at each level above.
   the thread." until then, "Interrupted" with its reason and "Trying again." when the run goes on, and how the turn
   ended, "Reply posted", "Turn completed" with "No reply was posted.", "Turn failed" with why, or "Turn stopped" with
   whether someone asked, its agent left, or its task changed; the Queued card while the turn waits; the caution card
-  "Review the agent's setup" for a turn that failed; and why a stop or retry did not go through, as an alert. The
+  "Review the agent's setup" for a turn that failed, with an Agent settings button that asks for the agent's page as the
+  row's does; and why a stop or retry did not go through, as an alert. The
   footer is the first of these that fits (`footerOf`): "New activity · Jump to latest", which scrolls to the end, when
   the log grew while the person was not near its end; "Retry turn", with "Previous log stays available.", when they
   may use the agent and nothing else keeps the turn from running again; "View reply in thread", when the turn posted
@@ -365,11 +365,13 @@ below it counted at each level above.
   Block reads the active ones from the store, and a connection since removed is "Removed connection".
 
   The pane is the turns Block's own view, not one a parent draws from the Block's state, because closing it leaves the
-  thread too, which has to reach the page whichever way the pane is drawn, so the Block reports `ClosedLog` and
-  `ReturnedToThread` and its parents carry them: the thread folds going back into
+  thread too, and Agent settings opens a page, which have to reach the page whichever way the pane is drawn, so the
+  Block reports `ClosedLog`, `OpenedAgent`, and `ReturnedToThread` and its parents carry them: the thread folds going back into
   scrolling its messages to their end (`ScrollMessagesToEnd` without `onlyIfNearEnd`, as the thread opens) and
-  reports `ClosedTurnLog`, which the group and the inbox fold into closing the thread and report as `ClosedThread`,
-  which Home already folds; the thread pane is simply not drawn while a log is followed. Going back to the thread
+  reports `ClosedTurnLog` and `OpenedAgent`, which the group and the inbox fold, the first into closing the thread and
+  reported as `ClosedThread`, which Home already folds, and the second not at all, only reported, for Home to report
+  to the workspace page, which opens the agent's page as picking the agent does (`OpenedAgent`, which resets Home
+  and with it closes the thread); the thread pane is simply not drawn while a log is followed. Going back to the thread
   returns to its end, not to where the person had scrolled, as `apps/ui` remounts it at the bottom too. The app cannot
   tell apart what `apps/ui` draws as a reply draft (the log records only the steps a turn completed, with nothing to
   say that a response is still being written) or as reconnecting (the stream fails to Try again instead of
@@ -468,7 +470,8 @@ below it counted at each level above.
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
   open when its parent gives one, and reports nothing for it. It reports `OpenedThread` when the
   person picks a thread and `ClosedThread` when they close it, by Close thread, Close task, Back, or Close turn log, so its parent can
-  hold the side pane in step; its parent closes the thread with the operation `requestCloseThread`,
+  hold the side pane in step, and `OpenedAgent` when they ask, from a turn that failed in the thread, for the settings
+  of its agent; its parent closes the thread with the operation `requestCloseThread`,
   which reports nothing, since it asked. They follow a group or stop, join a public team, and, in its
   settings, rename a team, leave one, and, where they manage its members, admit several at once and remove them. It
   has two views. `view`, its canonical one, is the group's main pane, anchored to the bottom while it lists threads, as
@@ -732,7 +735,8 @@ below it counted at each level above.
   `ClickedClose`, the thread's messages, with the one the notification is about drawn current, and
   the reply composer in the footer, or, while the person follows the log of one of its turns, that log in its place,
   and nothing while none is selected. It reports `OpenedThread`
-  when a thread opens and `ClosedThread` when the person closes it, or its turn's log, so its parent can hold the side
+  when a thread opens and `ClosedThread` when the person closes it, or its turn's log, and `OpenedAgent` when they ask, from a turn that
+  failed in the thread, for the settings of its agent, so its parent can hold the side
   pane in step; its parent closes the thread with the operation `requestCloseThread`, which reports
   nothing, since it asked. The Block offers a count of what waits for its parent to show. The workspace's name, which
   Home gives its view as it gives the group's, is the line under the title on phones.
@@ -1273,7 +1277,8 @@ offer })` takes `Offer.OpenGroup({ groupId })`, which shows as an Open button, a
   closes the navigation drawer and the side pane's dialog and shows Home. It reports `JoinedGroup` too, from the groups
   Block's, for the page to confirm to the person with the offer to open the group; joining moves nowhere. A group the
   person created, which the groups Block reports as `CreatedGroup`, Home opens without a thread, as picking it does, and
-  reports as it is, for the page to confirm. The page
+  reports as it is, for the page to confirm. The settings of an agent that a thread's turn asked for, which the open
+  group and the inbox report as `OpenedAgent`, Home reports as they are, for the page to open the agent's page. The page
   asks it for the rest: to reset
   (`requestReset`), which closes the thread, leaves no group marked, shows the inbox, and closes the dialog, as leaving
   Home does; to open a group without a thread (`requestOpenGroup`) or a thread in its group (`requestOpenThread`);
@@ -1691,7 +1696,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   rows by someone who may not, and made by someone who may create tasks; a thread's turns as rows by their
   agents' names and initials and the words and marks of how they stand, each line under a finished row, stopped and
   retried by someone who may use the agent and not otherwise, Stop named for the agent and, while the turn stops,
-  disabled and named Stopping, every problem of a stop or retry in its words under the row, a turn's log as the side pane, followed as it
+  disabled and named Stopping, Agent settings after why a turn failed and on the card of its log, every problem of a stop
+  or retry in its words under the row, a turn's log as the side pane, followed as it
   is written, with its header, Back, Stop, and Close, what the turn ran on, each entry of its activity in its words
   and at its time, each card, each footer, and the three states of the pane, a turn that replied as its reply with View
   turn log, the log opened in the side pane in place of the thread and going back to the thread's end, and the

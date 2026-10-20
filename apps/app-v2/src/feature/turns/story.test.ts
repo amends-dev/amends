@@ -285,6 +285,20 @@ describe("a turn's log", () => {
     )
   })
 
+  it("asks for the page of the agent whose turn failed, and changes nothing else", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ReceivedTurns({ turns: [itemOf(failed)] })),
+      message(Message.ClickedViewLog({ turnId: failed.id })),
+      message(Message.ClickedAgentSettings({ agentId: failed.agentId })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failed.agentId })),
+      model((model) => {
+        expect(Option.map(model.log, ({ turnId }) => turnId)).toEqual(Option.some(failed.id))
+      })
+    )
+  })
+
   it("shows why it could not be followed, and follows it again when asked", () => {
     story(
       update,

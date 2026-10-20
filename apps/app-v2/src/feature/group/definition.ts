@@ -15,6 +15,7 @@ import {
   GroupMembershipPermissions,
   GroupPermissions
 } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import { Presence } from "@amends-dev/core/presence"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -131,7 +132,8 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   OpenedThread: {},
-  ClosedThread: {}
+  ClosedThread: {},
+  OpenedAgent: { agentId: Identity.AgentId }
 })
 export type OutMessage = typeof OutMessage.Type
 

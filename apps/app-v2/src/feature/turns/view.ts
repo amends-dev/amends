@@ -1,6 +1,6 @@
 import type { ReplicaRecord } from "@amends-dev/core/replica"
 import { Turn, type TurnId } from "@amends-dev/core/turn"
-import { button, iconButton, loadingLine } from "@amends-dev/design/control"
+import { button, iconButton, lineButton, loadingLine } from "@amends-dev/design/control"
 import { turnStatus } from "@amends-dev/design/details"
 import { activityMark } from "@amends-dev/design/mark"
 import { turnRow } from "@amends-dev/design/message"
@@ -63,8 +63,8 @@ const problemView = (model: Model, turnId: TurnId.TurnId, agent: string): Option
 /**
  * An agent's turn where it took on the work: its agent and how it stands, View log, which shows the log in the side
  * pane, Stop while the turn is active and Retry when nothing but who may direct its agent keeps it from running again,
- * what it says once it ended, "Sending…" while a change to it is on its way, and why a stop or a retry did not go
- * through.
+ * what it says once it ended, with Agent settings after why it failed, "Sending…" while a change to it is on its way,
+ * and why a stop or a retry did not go through.
  */
 const rowView = (item: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
   const { turn, pending, retryOpen } = item
@@ -82,6 +82,10 @@ const rowView = (item: TurnItem, model: Model, h: TurnsViewBuilder): Html => {
       ...(directs(model, turn) && retryOpen ? [button(h, "Retry", Message.ClickedRetry({ turnId: turn.id }))] : [])
     ],
     detail: pending ? "Sending…" : Option.getOrUndefined(endingOf(turn, agent)),
+    detailAction:
+      turn.status === "failed" && !pending
+        ? lineButton(h, "Agent settings", Message.ClickedAgentSettings({ agentId: turn.agentId }))
+        : undefined,
     problem: Option.getOrUndefined(problemView(model, turn.id, agent))
   })
 }
@@ -121,7 +125,7 @@ const entryView = (entry: Entry, index: number, agent: string, h: TurnsViewBuild
 
 /**
  * The cards under the activity of a turn: that it waits to start, and, for a turn that failed, that its agent's setup
- * is to be reviewed.
+ * is to be reviewed, with the way to its settings.
  */
 const cardViews = (turn: ReplicaRecord.Turn, h: TurnsViewBuilder): ReadonlyArray<Html> => [
   ...(turn.status === "queued"
@@ -138,7 +142,8 @@ const cardViews = (turn: ReplicaRecord.Turn, h: TurnsViewBuilder): ReadonlyArray
         turnLogCard(h, {
           title: "Review the agent's setup",
           tone: "caution",
-          note: "Fix what stopped this turn before starting another attempt."
+          note: "Fix what stopped this turn before starting another attempt.",
+          action: button(h, "Agent settings", Message.ClickedAgentSettings({ agentId: turn.agentId }))
         })
       ]
     : [])

@@ -10,13 +10,25 @@ import { InboxDefinition, type Model, OutMessage } from "./definition.ts"
 /** Close the thread opened beside the inbox, which leaves no notification selected. */
 export const closeThread = InboxDefinition.stepFields(() => ({ selected: () => Option.none() }))
 
-/** The person closing the log of one of the open thread's turns leaves the thread too. */
+/**
+ * The person closing the log of one of the open thread's turns leaves the thread too; asking for the settings of an
+ * agent changes nothing in the inbox.
+ */
 const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
-  ThreadBlock.OutMessage.match(outMessage, { ClosedTurnLog: () => closeThread })
+  ThreadBlock.OutMessage.match(outMessage, {
+    ClosedTurnLog: () => closeThread,
+    OpenedAgent: () => InboxDefinition.stepNoop()
+  })
 
-/** Closing the log of one of the open thread's turns is reported to the inbox's parent as the thread closing. */
+/**
+ * Closing the log of one of the open thread's turns is reported to the inbox's parent as the thread closing, and the
+ * settings of an agent asked for as they are.
+ */
 const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
-  ThreadBlock.OutMessage.match(outMessage, { ClosedTurnLog: () => OutMessage.ClosedThread() })
+  ThreadBlock.OutMessage.match(outMessage, {
+    ClosedTurnLog: () => OutMessage.ClosedThread(),
+    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
+  })
 
 /** The thread opened beside the inbox, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const ThreadBinding = InboxDefinition.bindChild(ThreadBlock, {

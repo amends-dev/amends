@@ -4,10 +4,11 @@
  * reply. They rename it, edit and delete their own messages, and follow it or stop; reading it
  * marks it read through its latest activity. The side pane shows the log of one of its turns in its place while the
  * person follows it, and the thread goes back to its end when they return to it; it reports when they close the log,
- * which leaves the thread too.
+ * which leaves the thread too, and when they ask for the settings of the agent whose turn failed.
  */
 
 import { Contact } from "@amends-dev/core/channel"
+import { Identity } from "@amends-dev/core/identity"
 import { Presence } from "@amends-dev/core/presence"
 import {
   ThreadActivity,
@@ -135,9 +136,13 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-/** The thread reports that the person closed the log of a turn, which leaves the thread too. */
+/**
+ * The thread reports that the person closed the log of a turn, which leaves the thread too, and that they asked for the
+ * settings of the agent whose turn failed.
+ */
 export const OutMessage = defineMessageUnion({
-  ClosedTurnLog: {}
+  ClosedTurnLog: {},
+  OpenedAgent: { agentId: Identity.AgentId }
 })
 export type OutMessage = typeof OutMessage.Type
 

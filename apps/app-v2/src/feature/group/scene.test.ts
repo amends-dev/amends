@@ -1514,6 +1514,23 @@ describe("a group's side pane, while the log of a turn is followed", () => {
     }))
   })
 
+  const failedTurn = turnOf("turn-2", "failed", { finishedAt: "2026-10-18T12:09:00Z" })
+
+  /** The team with the thread open and the log of a turn that failed in it followed. */
+  const withFailedTurnLog = modifyFields(withThread, {
+    thread: Option.map((open) => ({
+      ...open,
+      model: {
+        ...open.model,
+        turns: modifyFields(open.model.turns, {
+          turns: () => [{ turn: failedTurn, pending: false, retryOpen: false }],
+          members: () => [member, bob, scout],
+          log: () => Option.some({ turnId: failedTurn.id, items: [], state: LogState.Ended(), hasNewActivity: false })
+        })
+      }
+    }))
+  })
+
   const backToThread = [
     Command.expectExact(ScrollMessagesToEnd({ threadId, onlyIfNearEnd: false })),
     Command.resolve(ScrollMessagesToEnd, ThreadBlock.Message.CompletedScrollMessagesToEnd())
@@ -1549,6 +1566,16 @@ describe("a group's side pane, while the log of a turn is followed", () => {
       click(role("button", { name: "Close turn log" })),
       expectOutMessage(OutMessage.ClosedThread()),
       expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("tells the page which agent's settings the person asked for, and keeps the thread and its log as they are", () => {
+    scene(
+      { update, view: sidePane },
+      given(withFailedTurnLog),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
+      expect(role("complementary", { name: "Turn log" })).toExist()
     )
   })
 })

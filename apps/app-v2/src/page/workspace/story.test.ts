@@ -1,5 +1,6 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { GroupId } from "@amends-dev/core/group"
+import { TurnId } from "@amends-dev/core/turn"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
@@ -53,18 +54,22 @@ import {
   Written as ConnectionWritten
 } from "../../feature/connections/definition.ts"
 import type { GroupBlock } from "../../feature/group/block.ts"
-import { ThreadsBinding } from "../../feature/group/composition.ts"
+import { ThreadBinding as GroupThreadBinding, ThreadsBinding } from "../../feature/group/composition.ts"
 import { init as initGroup } from "../../feature/group/init.ts"
 import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
+import { ThreadBinding as InboxThreadBinding } from "../../feature/inbox/composition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Item as SearchItem } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
 import { AccountBinding } from "../../feature/settings/composition.ts"
 import { AccountEntry, AccountMenu, Written as SettingsWritten } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
+import { TurnsBinding } from "../../feature/thread/composition.ts"
+import { init as initThread } from "../../feature/thread/init.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
+import { TurnsBlock } from "../../feature/turns/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { LoadIntegrations } from "./command.ts"
 import {
@@ -91,6 +96,8 @@ const groupId = GroupId.GroupId.make("general")
 const otherGroupId = GroupId.GroupId.make("design")
 
 const opened = init(workspaceId, memberId, "Studio", "Split").model
+
+const scoutTurnId = TurnId.TurnId.make("turn-1")
 
 const unreachable = "The host could not be reached. Try again."
 
@@ -341,6 +348,39 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
         now
       }
     }).toParentMessage(message)
+  )
+
+/** The thread of general, before it is read. */
+const openThreadModel = initThread(workspaceId, memberId, thread.id).model
+
+/** What the turns of a thread report, as the thread receives it. */
+const fromTurnsOfThread = (message: typeof TurnsBlock.Message.Type) =>
+  TurnsBinding.embedView({
+    slotId: "turn",
+    model: openThreadModel.turns,
+    viewInputs: { turnId: scoutTurnId }
+  }).toParentMessage(message)
+
+/** What the turns of the open group's thread report, as the thread, group, Home, and then the workspace receive it. */
+const fromTurnsOfGroupThread = (message: typeof TurnsBlock.Message.Type) =>
+  fromGroup(
+    GroupThreadBinding.embedView({
+      key: thread.id,
+      slotId: "thread",
+      model: openThreadModel,
+      viewInputs: { now, highlightedMessageId: Option.none() }
+    }).toParentMessage(fromTurnsOfThread(message))
+  )
+
+/** What the turns of the thread beside the inbox report, as the thread, inbox, Home, and workspace receive it. */
+const fromTurnsOfInboxThread = (message: typeof TurnsBlock.Message.Type) =>
+  fromInbox(
+    InboxThreadBinding.embedView({
+      key: thread.id,
+      slotId: "thread",
+      model: openThreadModel,
+      viewInputs: { now, highlightedMessageId: Option.none() }
+    }).toParentMessage(fromTurnsOfThread(message))
   )
 
 /** A dialog showing, as opening one asks it to, and closing, as closing one asks it to. */
@@ -1662,6 +1702,45 @@ describe("a workspace", () => {
         expect(model.open).toEqual(Open.Agent({ agentId }))
         expect(model.menu.isOpen).toBe(false)
         expect(model.search.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+})
+
+describe("a workspace, when the settings of the agent whose turn failed are asked for", () => {
+  it("opens the agent's page from a thread in a group, leaving the thread", () => {
+    story(
+      update,
+      given(opened),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(fromThreads(ThreadsBlock.Message.ClickedThread({ threadId: thread.id }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      model((model) => {
+        expect(isThreadOpen(model.home)).toBe(true)
+      }),
+      message(fromTurnsOfGroupThread(TurnsBlock.Message.ClickedAgentSettings({ agentId }))),
+      model((model) => {
+        expect(model.open).toEqual(Open.Agent({ agentId }))
+        expect(isThreadOpen(model.home)).toBe(false)
+      })
+    )
+  })
+
+  it("opens the agent's page from a thread beside the inbox, leaving the thread", () => {
+    story(
+      update,
+      given(opened),
+      ...notificationOpened,
+      ...threadBesideInboxOpened,
+      model((model) => {
+        expect(isThreadOpen(model.home)).toBe(true)
+      }),
+      message(fromTurnsOfInboxThread(TurnsBlock.Message.ClickedAgentSettings({ agentId }))),
+      model((model) => {
+        expect(model.open).toEqual(Open.Agent({ agentId }))
+        expect(model.home.inbox.selected).toEqual(Option.none())
+        expect(isThreadOpen(model.home)).toBe(false)
       })
     )
   })

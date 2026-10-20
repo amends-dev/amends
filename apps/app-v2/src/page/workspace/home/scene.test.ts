@@ -36,8 +36,10 @@ import {
   opening,
   reply,
   saying,
+  scout,
   task,
-  thread
+  thread,
+  turnOf
 } from "../../../../test/fixtures.ts"
 import { pickerEnded, pickerReady } from "../../../../test/memberPickerSteps.ts"
 import { ComposerBlock } from "../../../feature/composer/block.ts"
@@ -47,6 +49,8 @@ import { GroupsBlock } from "../../../feature/groups/block.ts"
 import { CreateTeam } from "../../../feature/groups/command.ts"
 import { InboxBlock } from "../../../feature/inbox/block.ts"
 import { MarkNotificationSeen } from "../../../feature/inbox/command.ts"
+import { init as initThread } from "../../../feature/thread/init.ts"
+import { LogState } from "../../../feature/turns/definition.ts"
 import { timeOf } from "../../../seen.ts"
 import { HomeBlock } from "./block.ts"
 import { Open, OutMessage } from "./definition.ts"
@@ -728,6 +732,82 @@ describe("home", () => {
       expect(role("main", { name: "Groups" })).toBeAbsent(),
       expect(role("main", { name: "A group" })).toExist(),
       expect(sidebarButton("Research")).toHaveAttr("aria-current", "page")
+    )
+  })
+})
+
+describe("Home, while the person follows the log of a turn that failed", () => {
+  const failedTurn = turnOf("turn-1", "failed", { finishedAt: "2026-10-18T12:09:00Z" })
+
+  /** The turns of a thread, with the failed turn's log followed. */
+  const turnsFollowing = (turns: ReturnType<typeof initThread>["model"]["turns"]) =>
+    modifyFields(turns, {
+      turns: () => [{ turn: failedTurn, pending: false, retryOpen: false }],
+      members: () => [member, bob, scout],
+      log: () => Option.some({ turnId: failedTurn.id, items: [], state: LogState.Ended(), hasNewActivity: false })
+    })
+
+  const inGroup = modifyFields(withThread, {
+    open: (open) =>
+      Open.matchOrElse(
+        open,
+        {
+          Group: ({ groupId, model: group }) =>
+            Open.Group({
+              groupId,
+              model: {
+                ...group,
+                thread: Option.map(group.thread, (openThread) => ({
+                  ...openThread,
+                  model: { ...openThread.model, turns: turnsFollowing(openThread.model.turns) }
+                }))
+              }
+            })
+        },
+        () => open
+      )
+  })
+
+  const besideInbox = modifyFields(opened, {
+    open: () => Open.Inbox(),
+    inbox: (inbox) =>
+      modifyFields(inbox, {
+        isLoaded: () => true,
+        groups: () => [general],
+        members: () => [member, bob],
+        selected: () =>
+          Option.some({
+            notificationId: notificationOf("notification-1", 2, 5).id,
+            threadId: thread.id,
+            groupId: general.id,
+            messageId: Option.none(),
+            model: (() => {
+              const model = initThread(workspace.id, member.id, thread.id).model
+              return { ...model, turns: turnsFollowing(model.turns) }
+            })()
+          })
+      })
+  })
+
+  it("reports the agent whose settings were asked for from a group's thread, and leaves the thread open", () => {
+    scene(
+      { update, view: sceneView },
+      given(inGroup),
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
+      expect(role("complementary", { name: "Turn log" })).toExist()
+    )
+  })
+
+  it("reports the agent whose settings were asked for from a thread beside the inbox", () => {
+    scene(
+      { update, view: sceneView },
+      given(besideInbox),
+      expect(role("complementary", { name: "Turn log" })).toExist(),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
+      expect(role("complementary", { name: "Turn log" })).toExist()
     )
   })
 })

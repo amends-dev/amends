@@ -2,10 +2,12 @@
  * A thread's agents' turns, as the person sees them where each took on the work: how it stands, which they stop while
  * it runs, retry when nothing but who may direct its agent keeps it from running again, and whose log they follow
  * while online, which the side pane shows in place of the thread. It reports when the person goes back to the thread
- * from the log and when they close it, which leaves the thread too.
+ * from the log, when they close it, which leaves the thread too, and when they ask for the settings of the agent whose
+ * turn failed.
  */
 
 import { Grant } from "@amends-dev/core/authorization"
+import { Identity } from "@amends-dev/core/identity"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { ThreadId } from "@amends-dev/core/thread"
 import { Turn, TurnId } from "@amends-dev/core/turn"
@@ -86,6 +88,7 @@ export const Message = defineMessageUnion({
   ClickedBackToThread: {},
   ClickedViewReply: {},
   ClickedCloseLog: {},
+  ClickedAgentSettings: { agentId: Identity.AgentId },
   ClickedJumpToLatest: {},
   CompletedScrollLogToEnd: {},
   FollowedLogEnd: {},
@@ -98,7 +101,8 @@ export type Message = typeof Message.Type
 
 export const OutMessage = defineMessageUnion({
   ReturnedToThread: {},
-  ClosedLog: {}
+  ClosedLog: {},
+  OpenedAgent: { agentId: Identity.AgentId }
 })
 export type OutMessage = typeof OutMessage.Type
 

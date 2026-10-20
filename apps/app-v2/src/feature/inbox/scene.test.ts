@@ -872,22 +872,24 @@ describe("the inbox's side pane", () => {
 describe("the inbox's side pane, while the log of a turn is followed", () => {
   const replied = turnOf("turn-1", "completed", { messageIds: ["message-2"], finishedAt: "2026-10-18T12:07:00Z" })
 
-  /** The inbox with the notification's thread open and the log of the turn that replied in it followed. */
-  const withTurnLog = modifyFields(opened, {
-    selected: () =>
-      Option.map(selectedOf(notification.id), (selected) => ({
-        ...selected,
-        model: modifyFields(selected.model, {
-          turns: (turns) =>
-            modifyFields(turns, {
-              turns: () => [{ turn: replied, pending: false, retryOpen: false }],
-              members: () => [member, bob, scout],
-              log: () =>
-                Option.some({ turnId: replied.id, items: [], state: LogState.Following(), hasNewActivity: false })
-            })
-        })
-      }))
-  })
+  /** The inbox with the notification's thread open and the log of `turn`, in `state`, followed. */
+  const withLogOf = (turn: typeof replied, state: LogState) =>
+    modifyFields(opened, {
+      selected: () =>
+        Option.map(selectedOf(notification.id), (selected) => ({
+          ...selected,
+          model: modifyFields(selected.model, {
+            turns: (turns) =>
+              modifyFields(turns, {
+                turns: () => [{ turn, pending: false, retryOpen: false }],
+                members: () => [member, bob, scout],
+                log: () => Option.some({ turnId: turn.id, items: [], state, hasNewActivity: false })
+              })
+          })
+        }))
+    })
+
+  const withTurnLog = withLogOf(replied, LogState.Following())
 
   it("is the turn log in place of the thread, saying where the thread is", () => {
     scene(
@@ -919,6 +921,18 @@ describe("the inbox's side pane, while the log of a turn is followed", () => {
       click(role("button", { name: "Close turn log" })),
       expectOutMessage(OutMessage.ClosedThread()),
       expect(role("complementary")).toBeAbsent()
+    )
+  })
+
+  it("tells the page which agent's settings the person asked for, and keeps the thread and its log as they are", () => {
+    const failedTurn = turnOf("turn-2", "failed", { finishedAt: "2026-10-18T12:09:00Z" })
+
+    scene(
+      { update, view: sidePane },
+      given(withLogOf(failedTurn, LogState.Ended())),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failedTurn.agentId })),
+      expect(role("complementary", { name: "Turn log" })).toExist()
     )
   })
 })

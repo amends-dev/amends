@@ -5,11 +5,13 @@
  * threads or beside the inbox, which stays, and the Block lays the pane out by the window's width, which its parent
  * informs it of: below 80rem the pane is in a dialog of its own, which follows the thread opening and closing. It
  * reports when the person moved within Home from its sidebar or its lists, when they joined a group, with where it is
- * as a line says it, and when they created one, and its parent asks it to open a group, a thread in its group, or a
- * conversation with a member, and to show the inbox again, as leaving Home does. Home opens on the inbox.
+ * as a line says it, when they created one, and when they asked, from a turn that failed in a thread, for the settings
+ * of its agent, and its parent asks it to open a group, a thread in its group, or a conversation with a member, and to
+ * show the inbox again, as leaving Home does. Home opens on the inbox.
  */
 
 import { GroupId } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
 import type { Task } from "@amends-dev/core/task"
 import { ThreadId } from "@amends-dev/core/thread"
 import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
@@ -103,7 +105,8 @@ export type Message = typeof Message.Type
 export const OutMessage = defineMessageUnion({
   Navigated: {},
   JoinedGroup: { groupId: GroupId.GroupId, place: Schema.String },
-  CreatedGroup: { groupId: GroupId.GroupId }
+  CreatedGroup: { groupId: GroupId.GroupId },
+  OpenedAgent: { agentId: Identity.AgentId }
 })
 export type OutMessage = typeof OutMessage.Type
 

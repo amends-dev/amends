@@ -140,12 +140,30 @@ describe("what a turn that ended says under its row", () => {
       expect(within(role("group", { name: "Scout's turn" }), selector("p"))).toBeAbsent()
     )
 
-  it("is why it failed, with no link to its agent's settings, which a thread has no way to open", () => {
-    under(failed, "The model was unavailable.")
+  it("is why it failed, with Agent settings at its end, which asks for the page of its agent", () => {
     scene(
       { update, view: rowOf(failed.id) },
       given(opened([itemOf(failed)])),
-      expect(role("link", { name: "Agent settings" })).toBeAbsent(),
+      expect(within(role("group", { name: "Scout's turn" }), text("The model was unavailable."))).toHaveClass(
+        "text-ink-secondary"
+      ),
+      expect(role("button", { name: "Agent settings" })).toHaveClass("text-ink-secondary"),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failed.agentId }))
+    )
+  })
+
+  it("offers no Agent settings under a turn that did not fail, or one that is only being sent", () => {
+    for (const turn of [running, completed, turnOf("turn-4", "cancelled", { cancelReason: "participation-ended" })]) {
+      scene(
+        { update, view: rowOf(turn.id) },
+        given(opened([itemOf(turn)])),
+        expect(role("button", { name: "Agent settings" })).toBeAbsent()
+      )
+    }
+    scene(
+      { update, view: rowOf(failed.id) },
+      given(opened([itemOf(failed, { pending: true })])),
       expect(role("button", { name: "Agent settings" })).toBeAbsent()
     )
   })
@@ -544,6 +562,20 @@ describe("a turn's log, as the side pane", () => {
       expect(text("Review the agent's setup")).toExist(),
       expect(text("Fix what stopped this turn before starting another attempt.")).toHaveClass("text-ink"),
       expect(text("This turn has finished.")).toExist()
+    )
+  })
+
+  it("offers Agent settings on the card that asks for a review of the setup, for the agent whose turn failed", () => {
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(broken)], logOf(broken.id, { state: LogState.Ended() }))),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: broken.agentId }))
+    )
+    scene(
+      { update, view: logPane },
+      given(showing([itemOf(working)], logOf(working.id))),
+      expect(role("button", { name: "Agent settings" })).toBeAbsent()
     )
   })
 

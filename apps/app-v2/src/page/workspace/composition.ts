@@ -100,14 +100,16 @@ const goToHome = () => Update.combine([MenuBinding.requestClose(), hideAside, sh
 
 /**
  * Home reports that the person moved within it, which shows it and closes the navigation drawer, that they joined a
- * group, which is confirmed to them, with the offer to open it, and that they created one, which is confirmed to them
- * and shown, as it is already open.
+ * group, which is confirmed to them, with the offer to open it, that they created one, which is confirmed to them
+ * and shown, as it is already open, and that they asked for the settings of an agent whose turn failed, which opens its
+ * page as picking the agent does.
  */
 const foldHomeOutMessage = HomeBlock.OutMessage.match({
   Navigated: () => goToHome(),
   JoinedGroup: ({ groupId, place }) =>
     ActionsBinding.confirm({ text: `Joined ${place}`, offer: Offer.OpenGroup({ groupId }) }),
-  CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()])
+  CreatedGroup: () => Update.combine([ActionsBinding.confirm({ text: "Group created" }), goToHome()]),
+  OpenedAgent: ({ agentId }) => goTo(showAgent(agentId))
 })
 
 /** Open the group `groupId` in Home, as picking it in the sidebar does, and show Home. */

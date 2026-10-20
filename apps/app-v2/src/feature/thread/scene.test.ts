@@ -738,6 +738,37 @@ describe("a thread", () => {
     )
   })
 
+  it("reports the agent whose failed turn asked for its settings, from the turn's row and from its log", () => {
+    const failed = turnOf("turn-1", "failed")
+
+    scene(
+      { update, view: sidePaneAndTurnLog, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }),
+      ...turnsRead(failed),
+      click(role("button", { name: "Agent settings" })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failed.agentId }))
+    )
+    scene(
+      { update, view: sidePaneAndTurnLog, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWith({ message: opening, pending: false }),
+      ...turnsRead(failed),
+      click(role("button", { name: "View log" })),
+      Subscription.emit(
+        turnsSubscriptions.log,
+        TurnsBlock.Message.ReceivedLog({
+          turnId: failed.id,
+          logMessage: Turn.LogMessage.cases.Opened.make({ items: [] })
+        })
+      ),
+      Command.resolve(ScrollLogToEnd, TurnsBlock.Message.CompletedScrollLogToEnd()),
+      expectAll(all.role("button", { name: "Agent settings" })).toHaveCount(2),
+      click(within(role("complementary", { name: "Turn log" }), role("button", { name: "Agent settings" }))),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: failed.agentId }))
+    )
+  })
+
   it("places the turns of a thread that tracks a task among its activity, after the task was created", () => {
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },

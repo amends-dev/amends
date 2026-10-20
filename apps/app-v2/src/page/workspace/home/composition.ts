@@ -94,11 +94,19 @@ const forwardGroupsOutMessage = GroupsBlock.OutMessage.match({
 
 /**
  * A notification's thread opening beside the inbox opens the side pane's dialog where the pane is one, and closing it
- * closes the dialog.
+ * closes the dialog. The settings of an agent that its thread's turn asked for are the page's to open, which Home
+ * reports as they are.
  */
 const foldInboxOutMessage = InboxBlock.OutMessage.match({
   OpenedThread: () => showAside,
-  ClosedThread: () => hideAside
+  ClosedThread: () => hideAside,
+  OpenedAgent: () => HomeDefinition.stepNoop()
+})
+
+const forwardInboxOutMessage = InboxBlock.OutMessage.match({
+  OpenedThread: () => undefined,
+  ClosedThread: () => undefined,
+  OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
 })
 
 /** Opening a task's thread opens it in its group. */
@@ -158,7 +166,7 @@ export const GroupsBinding = HomeDefinition.bindChild(GroupsBlock, {
 export const InboxBinding = HomeDefinition.bindChild(InboxBlock, {
   field: "inbox",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: foldInboxOutMessage }
+  outMessage: { forward: forwardInboxOutMessage, fold: foldInboxOutMessage }
 })
 
 export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
@@ -167,11 +175,22 @@ export const TasksBinding = HomeDefinition.bindChild(TasksBlock, {
   outMessage: { forward: forwardTasksOutMessage, fold: foldTasksOutMessage }
 })
 
-/** The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it. */
+/**
+ * The open group's thread opening opens the side pane's dialog where the pane is one, and closing it closes it. The
+ * settings of an agent that its thread's turn asked for are the page's to open, which Home reports as they are.
+ */
 const foldGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
   GroupBlock.OutMessage.match(outMessage, {
     OpenedThread: () => showAside,
-    ClosedThread: () => hideAside
+    ClosedThread: () => hideAside,
+    OpenedAgent: () => HomeDefinition.stepNoop()
+  })
+
+const forwardGroupOutMessage = (_groupId: GroupId.GroupId, outMessage: typeof GroupBlock.OutMessage.Type) =>
+  GroupBlock.OutMessage.match(outMessage, {
+    OpenedThread: () => undefined,
+    ClosedThread: () => undefined,
+    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
   })
 
 /**
@@ -188,7 +207,7 @@ export const GroupBinding = HomeDefinition.bindChild(GroupBlock, {
       open: (open) =>
         Open.isAnyOf(["Group"])(open) && open.groupId === groupId ? Open.Group({ groupId, model: nextGroup }) : open
     }),
-  outMessage: { fold: foldGroupOutMessage }
+  outMessage: { forward: forwardGroupOutMessage, fold: foldGroupOutMessage }
 })
 
 export const HomeComposition = HomeDefinition.makeComposition({

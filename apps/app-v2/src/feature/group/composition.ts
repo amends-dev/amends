@@ -81,13 +81,25 @@ export const MembersBinding = GroupDefinition.bindChild(MembersComboboxBlock, {
 /** Close the thread open in the group. */
 export const closeThread = GroupDefinition.stepFields(() => ({ thread: () => Option.none() }))
 
-/** The person closing the log of one of the open thread's turns leaves the thread too. */
+/**
+ * The person closing the log of one of the open thread's turns leaves the thread too; asking for the settings of an
+ * agent changes nothing in the group.
+ */
 const foldThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
-  ThreadBlock.OutMessage.match(outMessage, { ClosedTurnLog: () => closeThread })
+  ThreadBlock.OutMessage.match(outMessage, {
+    ClosedTurnLog: () => closeThread,
+    OpenedAgent: () => GroupDefinition.stepNoop()
+  })
 
-/** Closing the log of one of the open thread's turns is reported to the group's parent as the thread closing. */
+/**
+ * Closing the log of one of the open thread's turns is reported to the group's parent as the thread closing, and the
+ * settings of an agent asked for as they are.
+ */
 const forwardThreadOutMessage = (_threadId: ThreadId.ThreadId, outMessage: typeof ThreadBlock.OutMessage.Type) =>
-  ThreadBlock.OutMessage.match(outMessage, { ClosedTurnLog: () => OutMessage.ClosedThread() })
+  ThreadBlock.OutMessage.match(outMessage, {
+    ClosedTurnLog: () => OutMessage.ClosedThread(),
+    OpenedAgent: ({ agentId }) => OutMessage.OpenedAgent({ agentId })
+  })
 
 /** The open thread, a keyed occurrence, so opening another makes a fresh one and a late result cannot land in the wrong one. */
 export const ThreadBinding = GroupDefinition.bindChild(ThreadBlock, {
