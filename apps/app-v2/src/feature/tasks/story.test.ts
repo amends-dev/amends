@@ -200,28 +200,20 @@ describe("the workspace's tasks, as the person uses them", () => {
     )
   })
 
-  it("are narrowed by the status, the assignee, and the search the person chooses, each on its own", () => {
+  it("are narrowed by the search the person types, over the status and the assignee they chose in the menus", () => {
     story(
       update,
-      given(read),
-      message(Message.ChoseStatus({ status: "doing" })),
-      model((model) => {
-        expect(model.filter).toEqual({ status: "doing", assignee: "Anyone", query: "" })
-      }),
-      message(Message.ChoseAssignee({ assignee: "NoOne" })),
-      model((model) => {
-        expect(model.filter).toEqual({ status: "doing", assignee: "NoOne", query: "" })
-      }),
+      given(
+        modifyFields(read, { filter: () => ({ status: "doing" as const, assignee: "NoOne" as const, query: "" }) })
+      ),
       message(Message.TypedQuery({ query: "ship" })),
       model((model) => {
         expect(model.filter).toEqual({ status: "doing", assignee: "NoOne", query: "ship" })
         expect(model.items).toEqual(items)
       }),
-      message(Message.ChoseStatus({ status: "All" })),
-      message(Message.ChoseAssignee({ assignee: "Anyone" })),
       message(Message.TypedQuery({ query: "" })),
       model((model) => {
-        expect(model.filter).toEqual(listed.filter)
+        expect(model.filter).toEqual({ status: "doing", assignee: "NoOne", query: "" })
       }),
       Command.expectNone(),
       expectNoOutMessage()

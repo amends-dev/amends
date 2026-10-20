@@ -11,6 +11,7 @@ import {
   loadingLine,
   notice,
   noticeBox,
+  searchField,
   submit
 } from "@amends-dev/design/control"
 import { detailList } from "@amends-dev/design/details"
@@ -18,7 +19,7 @@ import { cellWithDetail, columns, loadingRows, row } from "@amends-dev/design/di
 import { form } from "@amends-dev/design/form"
 import type { MarkStatus } from "@amends-dev/design/mark"
 import { modal } from "@amends-dev/design/modal"
-import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneForm, paneSection, paneTabs, paneToolbar } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
@@ -209,35 +210,32 @@ const emptyList = (model: Model, h: AgentsViewBuilder): Html => {
     : paneEmpty(h, { art: "sew-in", title: "No agents yet" })
 }
 
-/** The search over the agents, the labels of the columns, and a row for each agent shown. */
-const agentList = (model: Model, h: AgentsViewBuilder): Html => {
-  const shown = shownAgents(model)
-
-  return column(h, [
-    field(
-      h,
-      {
+/** The search over the agents, and, over the rows, the labels of the columns once an agent is shown. */
+const agentToolbar = (model: Model, h: AgentsViewBuilder): ReadonlyArray<Html> => [
+  paneToolbar(h, {
+    start: [
+      searchField(h, {
         id: "search-agents",
         label: "Search agents",
-        type: "search",
-        value: model.browse.query,
-        onInput: (query) => Message.TypedBrowseQuery({ query }),
         placeholder: "Search agents…",
-        isAutofocus: false,
-        isLabelHidden: true
-      },
-      Option.none()
-    ),
-    ...(shown.length === 0
-      ? [emptyList(model, h)]
-      : [
-          columns(h, { label: "Agent", cells: ["Harness", "Model", "Activity"] }),
-          h.ul(
-            [h.AriaLabel("Agents")],
-            shown.map((item) => agentRow(item, model, h))
-          )
-        ])
-  ])
+        value: model.browse.query,
+        onInput: (query) => Message.TypedBrowseQuery({ query })
+      })
+    ]
+  }),
+  ...(shownAgents(model).length === 0 ? [] : [columns(h, { label: "Agent", cells: ["Harness", "Model", "Activity"] })])
+]
+
+/** A row for each agent shown, or what the list says when it has none to show. */
+const agentRows = (model: Model, h: AgentsViewBuilder): Html => {
+  const shown = shownAgents(model)
+
+  return shown.length === 0
+    ? emptyList(model, h)
+    : h.ul(
+        [h.AriaLabel("Agents")],
+        shown.map((item) => agentRow(item, model, h))
+      )
 }
 
 /** What the list says when the workspace has no agent at all, and what a person who may add one can do about it. */
@@ -291,13 +289,16 @@ const listBody = (model: Model, h: AgentsViewBuilder): Html => {
     return loadingRows(h, { label: "Loading agents…", markSize: "md" })
   }
 
-  return listedAgents(model).length === 0 ? noAgents(model, h) : agentList(model, h)
+  return listedAgents(model).length === 0 ? noAgents(model, h) : agentRows(model, h)
 }
+
+/** Whether the list has agents to search and label, which is when it has a toolbar. */
+const hasAgentList = (model: Model): boolean => model.isLoaded && listedAgents(model).length > 0
 
 /**
  * The agents as the list page, the main content: All and those that need setup on a tab each, with the button to add
- * one for a person who may, which opens the dialog `dialogView` renders, a search that narrows the tab by name, and a
- * row for each agent, which picking opens as its own page.
+ * one for a person who may, which opens the dialog `dialogView` renders, a toolbar with a search that narrows the tab
+ * by name, and a row for each agent, which picking opens as its own page.
  */
 export const view = AgentsComposition.makeView((model, h) =>
   pane(h, {
@@ -309,6 +310,7 @@ export const view = AgentsComposition.makeView((model, h) =>
       actions: mayAdd(model) ? [button(h, "Add agent", Message.ClickedAdd())] : [],
       tabs: browseTabs(model, h)
     },
+    ...(hasAgentList(model) ? { toolbar: agentToolbar(model, h) } : {}),
     body: [
       paneColumn(
         h,

@@ -1,7 +1,8 @@
 /**
  * Tasks as a table, the design's `directory` rows under the labels of its columns, which a group's Tasks tab and
  * the workspace's Triage and Tasks share: a row is a task's thread by its assignee, its title, who started it and
- * how many replies it has, where the task stands, and how long ago the thread was last written in, to open it.
+ * how many replies it has, where the task stands, and how long ago the thread was last written in, to open it. The
+ * labels go in the pane's toolbar, over the rows that scroll.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -25,14 +26,6 @@ const statusTones: Readonly<Record<Task.Status, BadgeTone>> = {
   dismissed: "neutral"
 }
 
-/** The statuses a list of tasks narrows to: every one, then each of `statuses` as the person reads it. */
-export const statusChoices = (
-  statuses: ReadonlyArray<Task.Status>
-): ReadonlyArray<readonly ["All" | Task.Status, string]> => [
-  ["All", "All statuses"],
-  ...statuses.map((status) => [status, statusLabel[status]] as const)
-]
-
 /** A task to list: the thread that tracks it, with its opening, replies, and last activity, its group, and the message that opens it. */
 export type TaskRow<Message> = Readonly<{
   task: Task.Task
@@ -48,16 +41,19 @@ export type TaskRow<Message> = Readonly<{
   onClick: Message
 }>
 
+/** Whether the table has a column for the group of each task, which a table of several groups' tasks needs. */
+export type TaskColumns = Readonly<{ hasGroupColumn: boolean }>
+
 /**
  * What the rows are read by: the members and the contacts that name who is assigned and who started a thread,
  * the time now, which ages are counted from, and whether the table has a column for the group of each task.
  */
-export type TaskTableView = Readonly<{
-  members: ReadonlyArray<Member.Member>
-  contacts: ReadonlyArray<Contact.Contact>
-  now: DateTime.Utc
-  hasGroupColumn: boolean
-}>
+export type TaskTableView = TaskColumns &
+  Readonly<{
+    members: ReadonlyArray<Member.Member>
+    contacts: ReadonlyArray<Contact.Contact>
+    now: DateTime.Utc
+  }>
 
 /**
  * A task as a row, keyed by its thread: its assignee's initials, or a dash for no one, its thread's title or
@@ -97,15 +93,19 @@ const renderRow = <Message, Requirements>(
   )
 }
 
-/** The labels of the columns over a list of tasks, named Tasks, one row for each of `rows`. */
-export const taskTable = <Message, Requirements>(
+/** The labels of the columns over a list of tasks. */
+export const taskColumns = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  { hasGroupColumn }: TaskColumns
+): Html => columns(h, { label: "Task", cells: [...(hasGroupColumn ? ["Group"] : []), "Status", "Activity"] })
+
+/** The list named Tasks, one row for each of `rows`. */
+export const taskRows = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   rows: ReadonlyArray<TaskRow<Message>>,
   view: TaskTableView
-): ReadonlyArray<Html> => [
-  columns(h, { label: "Task", cells: [...(view.hasGroupColumn ? ["Group"] : []), "Status", "Activity"] }),
+): Html =>
   h.ul(
     [h.AriaLabel("Tasks")],
     rows.map((taskRow) => renderRow(h, taskRow, view))
   )
-]

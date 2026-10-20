@@ -1,12 +1,15 @@
 /**
- * The root's side effect: signing out, which forgets the session, the person's stores, and the
+ * The root's side effects: signing out, which forgets the session, the person's stores, and the
  * identity they synced with, so it works offline, then, as far as the host can be reached, removes
- * the browser's sync key and ends the session there too.
+ * the browser's sync key and ends the session there too; and showing the person's Appearance on the
+ * page and keeping it for the next visit.
  */
 
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Api from "./api.ts"
+import { Appearance, keepAppearance, showAppearance } from "./appearance.ts"
 import { ApplicationDefinition } from "./definition.ts"
 import { Message } from "./message.ts"
 import * as Session from "./session.ts"
@@ -38,4 +41,22 @@ export const SignOut = ApplicationDefinition.command("SignOut", {
   }
 })
 
-export const EffectsLayer = SignOut.layer
+/** Show the Appearance on the page. */
+export const ShowAppearance = ApplicationDefinition.command("ShowAppearance", {
+  args: { appearance: Appearance },
+  messages: [Message.CompletedShowAppearance],
+  handler: function* () {
+    return ({ appearance }) => Effect.as(showAppearance(appearance), Message.CompletedShowAppearance())
+  }
+})
+
+/** Keep the Appearance for the next visit. */
+export const KeepAppearance = ApplicationDefinition.command("KeepAppearance", {
+  args: { appearance: Appearance },
+  messages: [Message.CompletedKeepAppearance],
+  handler: function* () {
+    return ({ appearance }) => Effect.as(keepAppearance(appearance), Message.CompletedKeepAppearance())
+  }
+})
+
+export const EffectsLayer = Layer.mergeAll(SignOut.layer, ShowAppearance.layer, KeepAppearance.layer)

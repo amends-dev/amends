@@ -4,11 +4,27 @@ import { Thread, ThreadMessage } from "@amends-dev/core/thread"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as Dom from "foldkit/dom"
+import * as Drafts from "../../store/Drafts.ts"
 import * as Stores from "../../store/Stores.ts"
+import { boxId } from "../composer/definition.ts"
 import { Message, ThreadsDefinition } from "./definition.ts"
 
 /** Why `error` kept the action from being written, as the person reads it. */
 const failed = (error: string) => Message.FailedWriteAction({ error })
+
+/** Move focus to the composer of `groupId`, such as to write the task that New task asks for. */
+export const FocusComposer = ThreadsDefinition.command("FocusComposer", {
+  args: { groupId: GroupId.GroupId },
+  messages: [Message.CompletedFocusComposer],
+  handler: function* () {
+    return ({ groupId }) =>
+      Dom.focus(`#${CSS.escape(boxId(Drafts.Place.cases.Thread.make({ groupId })))}`).pipe(
+        Effect.ignore,
+        Effect.as(Message.CompletedFocusComposer())
+      )
+  }
+})
 
 /** Start a thread in `groupId` with `text` as its opening message, and its task, started as `task`, when it has one. */
 export const StartThread = ThreadsDefinition.command("StartThread", {

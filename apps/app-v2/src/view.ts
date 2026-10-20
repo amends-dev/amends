@@ -32,7 +32,12 @@ export const view = ApplicationComposition.makeView((model, h) => ({
               key: workspaceId,
               slotId: "workspace",
               model: opened,
-              viewInputs: { email: account.email, now: model.now, isApplePlatform: model.isApplePlatform }
+              viewInputs: {
+                email: account.email,
+                appearance: model.appearance,
+                now: model.now,
+                isApplePlatform: model.isApplePlatform
+              }
             })
           )
       })

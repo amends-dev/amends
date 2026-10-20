@@ -194,42 +194,119 @@ describe("the settings", () => {
     )
   })
 
-  it("renames the person among the members", () => {
+  it("renames the person among the members, in a dialog that starts from the name they have", () => {
     story(
       update,
       given(opened),
       message(received(alice.id)),
+      message(Message.RequestedChangeName()),
+      dialogShown,
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(Entering.ChangingName({ name: "Alice", isSending: false, failure: Option.none() }))
+        )
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      // The name they have is no name to save, and neither is a blank one.
+      message(Message.SubmittedOwnName()),
+      Command.expectNone(),
+      message(Message.TypedOwnName({ name: "   " })),
+      message(Message.SubmittedOwnName()),
+      Command.expectNone(),
       message(Message.TypedOwnName({ name: "Alice M." })),
       message(Message.SubmittedOwnName()),
       Command.expectExact(RenameSelf({ ...asMember, name: "Alice M." })),
-      Command.resolve(RenameSelf, Message.WroteAction({ written: Written.RenameSelf() })),
       model((model) => {
-        expect(model.ownName).toEqual(Option.none())
+        expect(model.entering).toEqual(
+          Option.some(Entering.ChangingName({ name: "Alice M.", isSending: true, failure: Option.none() }))
+        )
+        expect(isDialogBusy(model)).toBe(true)
       }),
-      message(Message.TypedOwnName({ name: "Alice" })),
-      message(Message.SubmittedOwnName()),
-      Command.expectNone(),
+      Command.resolve(RenameSelf, Message.WroteAction({ written: Written.RenameSelf() })),
+      expectOutMessage(OutMessage.RenamedSelf()),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("says why the name could not be saved, keeps what was typed, and clears the failure as the person types", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.RequestedChangeName()),
+      dialogShown,
       message(Message.TypedOwnName({ name: "A" })),
       message(Message.SubmittedOwnName()),
       Command.resolve(RenameSelf, Message.FailedWriteAction({ written: Written.RenameSelf(), reason: "Invalid" })),
       model((model) => {
-        expect(Option.flatMap(model.ownName, ({ failure }) => failure)).toEqual(
-          Option.some({ action: "RenameSelf", reason: "Invalid" })
+        expect(model.entering).toEqual(
+          Option.some(
+            Entering.ChangingName({
+              name: "A",
+              isSending: false,
+              failure: Option.some({ action: "RenameSelf", reason: "Invalid" })
+            })
+          )
+        )
+        expect(model.dialog.isOpen).toBe(true)
+      }),
+      message(Message.TypedOwnName({ name: "Al" })),
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(Entering.ChangingName({ name: "Al", isSending: false, failure: Option.none() }))
         )
       })
     )
   })
 
-  it("will not rename a person the replica does not hold", () => {
+  it("asks for the dialog each time the page asks, and not before the replica holds the person", () => {
     story(
       update,
       given(opened),
-      message(Message.TypedOwnName({ name: "Alice M." })),
+      message(Message.RequestedChangeName()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      }),
+      message(received(alice.id)),
+      message(Message.RequestedChangeName()),
+      dialogShown,
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      dialogClosed,
+      message(Message.RequestedChangeName()),
+      dialogShown,
+      model((model) => {
+        expect(Option.exists(model.entering, Entering.isAnyOf(["ChangingName"]))).toBe(true)
+      })
+    )
+  })
+
+  it("will not rename a person the replica no longer holds", () => {
+    const gone = {
+      ...opened,
+      dialog: { ...opened.dialog, isOpen: true },
+      entering: Option.some(Entering.ChangingName({ name: "Alice M.", isSending: false, failure: Option.none() }))
+    }
+
+    story(
+      update,
+      given(gone),
       message(Message.SubmittedOwnName()),
       Command.expectNone(),
       model((model) => {
-        expect(Option.flatMap(model.ownName, ({ failure }) => failure)).toEqual(
-          Option.some({ action: "RenameSelf", reason: "Gone" })
+        expect(model.entering).toEqual(
+          Option.some(
+            Entering.ChangingName({
+              name: "Alice M.",
+              isSending: false,
+              failure: Option.some({ action: "RenameSelf", reason: "Gone" })
+            })
+          )
         )
       })
     )
@@ -436,7 +513,15 @@ describe("the settings", () => {
         expect(emptyRoster(model.filter)).toBe("No members match “zzz”.")
       }),
       message(Message.TypedMemberQuery({ query: "" })),
-      message(Message.ChoseMemberStatus({ status: "removed" })),
+      model((model) => {
+        expect(names(model)).toEqual(["Alice", "Bob", "Scout"])
+      })
+    )
+
+    // The roster's menu chooses those who left, which the Members page's scene does.
+    story(
+      update,
+      given({ ...readAs(alice.id), filter: { query: "", status: "removed" as const } }),
       model((model) => {
         expect(names(model)).toEqual([])
         expect(emptyRoster(model.filter)).toBe("Nobody has been removed from this workspace.")
@@ -985,10 +1070,13 @@ describe("what the settings tell the page the person did", () => {
       message(Message.SubmittedWorkspaceName()),
       Command.resolve(RenameWorkspace, Message.WroteAction({ written: Written.Rename() })),
       expectOutMessage(OutMessage.RenamedWorkspace()),
+      message(Message.RequestedChangeName()),
+      dialogShown,
       message(Message.TypedOwnName({ name: "Alice M." })),
       message(Message.SubmittedOwnName()),
       Command.resolve(RenameSelf, Message.WroteAction({ written: Written.RenameSelf() })),
       expectOutMessage(OutMessage.RenamedSelf()),
+      dialogClosed,
       message(Message.ClickedMember({ memberId: bob.id })),
       message(Message.ChoseRole({ roleId: BuiltinRoles.AdministratorId })),
       message(Message.SubmittedRole()),

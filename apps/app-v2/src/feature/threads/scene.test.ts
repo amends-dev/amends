@@ -28,11 +28,11 @@ import { timeOf } from "../../seen.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { SaveDraft } from "../composer/command.ts"
-import { StartThread } from "./command.ts"
+import { FocusComposer, StartThread } from "./command.ts"
 import { Message, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { composerView, tabsView, view } from "./view.ts"
+import { composerView, tabsView, toolbarView, view } from "./view.ts"
 
 const { member } = membership
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
@@ -147,6 +147,10 @@ const withTabs: typeof sceneView = (model, h) => h.div([], [tabsView(model, h), 
 /** The tabs over the composer. */
 const withTabsAndComposer: typeof sceneView = (model, h) =>
   h.div([], [tabsView(model, h), withViewInputs(composerView, inputs)()(model, h)])
+
+/** The Tasks tab under its toolbar, as a group's pane holds them. */
+const tasksTab: typeof sceneView = (model, h) =>
+  h.div([], [withViewInputs(toolbarView, inputs)()(model, h), sceneView(model, h)])
 
 /** The row of the tasks table at `index`. */
 const taskRow = (index: number) => nth(all.role("listitem"), index)
@@ -438,7 +442,7 @@ describe("a group's tabs", () => {
 describe("a group's tasks", () => {
   it("lists the threads that track a task as rows, latest active first, and none of the threads that do not", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, starting, shipping)),
       expect(role("list", { name: "Tasks" })).toExist(),
       expect(role("list", { name: "Threads" })).toBeAbsent(),
@@ -451,7 +455,7 @@ describe("a group's tasks", () => {
 
   it("shows each by its assignee's initials or a dash, its thread's title or opening, who started it, and its replies", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, shipping)),
       expect(within(role("button", { name: "Ship the release" }), text("A"))).toHaveAttr("aria-hidden", "true"),
       expect(within(role("button", { name: "Plans for the week" }), text("–"))).toHaveAttr("aria-hidden", "true"),
@@ -471,7 +475,7 @@ describe("a group's tasks", () => {
 
   it("says that a task is on its way while its thread is being started", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking({ ...shipping, pending: true })),
       expect(role("button", { name: "Ship the release" })).toHaveAttr(
         "aria-description",
@@ -482,19 +486,19 @@ describe("a group's tasks", () => {
 
   it("shows where each stands in a badge, and says how many tasks it lists", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(inStatus(alices, "done"), inStatus(shipping, "held"))),
       expect(text("Threads that track a task.")).toExist(),
       expect(text("2 tasks")).toExist(),
       expect(within(role("button", { name: "Plans for the week" }), text("Done"))).toExist(),
       expect(within(role("button", { name: "Ship the release" }), text("Held"))).toExist()
     )
-    scene({ update, view: sceneView }, given(tasking(shipping)), expect(text("1 task")).toExist())
+    scene({ update, view: tasksTab }, given(tasking(shipping)), expect(text("1 task")).toExist())
   })
 
   it("opens the thread of the task the person picks, as a thread of the list opens", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, shipping)),
       click(role("button", { name: "Plans for the week" })),
       expectOutMessage(OutMessage.SelectedThread({ threadId: openedId })),
@@ -505,7 +509,7 @@ describe("a group's tasks", () => {
 
   it("narrows to the tasks in the status the person chooses, and back to all of them", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, shipping)),
       expect(label("Status")).toHaveValue("All"),
       change(label("Status"), "doing"),
@@ -521,7 +525,7 @@ describe("a group's tasks", () => {
 
   it("narrows to the tasks whose thread's title or opening has the letters typed, in any case", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, shipping)),
       expect(label("Search tasks")).toHaveAttr("placeholder", "Search tasks…"),
       type(label("Search tasks"), "SHIP"),
@@ -539,7 +543,7 @@ describe("a group's tasks", () => {
 
   it("narrows by the status and the search together", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, shipping)),
       change(label("Status"), "triage"),
       type(label("Search tasks"), "ship"),
@@ -553,7 +557,7 @@ describe("a group's tasks", () => {
 
   it("says there are none yet, and how to start one, while no thread tracks a task", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(starting)),
       expect(role("heading", { name: "No tasks yet", level: 2 })).toExist(),
       expect(art("fill")).toExist(),
@@ -561,12 +565,12 @@ describe("a group's tasks", () => {
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist()
     )
-    scene({ update, view: sceneView }, given(tasking()), expect(role("heading", { name: "No tasks yet" })).toExist())
+    scene({ update, view: tasksTab }, given(tasking()), expect(role("heading", { name: "No tasks yet" })).toExist())
   })
 
   it("says that none match when a search or a status leaves none, and not that there are none yet", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(tasking(alices, shipping)),
       type(label("Search tasks"), "zzz"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
@@ -580,9 +584,19 @@ describe("a group's tasks", () => {
     )
   })
 
+  it("moves the focus to the composer when the person chooses New task, which starts one in this group", () => {
+    scene(
+      { update, view: tasksTab },
+      given(tasking(alices, shipping)),
+      click(role("button", { name: "New task" })),
+      Command.expectExact(FocusComposer({ groupId })),
+      Command.resolve(FocusComposer, Message.CompletedFocusComposer())
+    )
+  })
+
   it("says why the threads could not be read, over the tasks", () => {
     scene(
-      { update, view: sceneView },
+      { update, view: tasksTab },
       given(
         modifyFields(tasking(alices), { notice: () => Option.some("This browser could not read that. Try again.") })
       ),

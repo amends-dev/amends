@@ -15,6 +15,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Dom from "foldkit/dom"
 import * as Api from "../../api.ts"
+import { selectTextOnFocus } from "../../selectOnFocus.ts"
 import {
   FormErrors,
   JoinErrors,
@@ -192,20 +193,7 @@ export const ExpireToast = WorkspacesDefinition.command("ExpireToast", {
 export const SelectOnFocus = WorkspacesDefinition.mount("SelectOnFocus", {
   messages: [Message.CompletedSelectOnFocus],
   handler: function* () {
-    return ({ element }) =>
-      Effect.gen(function* () {
-        yield* Effect.acquireRelease(
-          Effect.sync(() => {
-            const selectText = () => {
-              if (element instanceof HTMLInputElement) element.select()
-            }
-            element.addEventListener("focus", selectText)
-            return selectText
-          }),
-          (selectText) => Effect.sync(() => element.removeEventListener("focus", selectText))
-        )
-        return Message.CompletedSelectOnFocus()
-      })
+    return ({ element }) => Effect.as(selectTextOnFocus(element), Message.CompletedSelectOnFocus())
   }
 })
 

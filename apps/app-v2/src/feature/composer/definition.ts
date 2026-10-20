@@ -50,6 +50,13 @@ export type OutMessage = typeof OutMessage.Type
 
 export const ComposerDefinition = Block.makeDefinition("Composer", { Model, Message, OutMessage })
 
+/** The id of the box at a place, so a label finds it and the focus can be moved to it. */
+export const boxId = (place: Drafts.Place): string =>
+  Drafts.Place.match(place, {
+    Reply: ({ threadId }) => `reply-${threadId}`,
+    Thread: ({ groupId }) => `thread-${groupId}`
+  })
+
 const mentionAtEnd = /(^|\s)@([^\s@]*)$/u
 
 /**

@@ -1,9 +1,9 @@
 import { GroupPermissions } from "@amends-dev/core/group"
-import { button, column, field, iconButton, notice, submit, textarea, toggle } from "@amends-dev/design/control"
+import { button, field, iconButton, notice, searchField, submit, textarea, toggle } from "@amends-dev/design/control"
 import { badge } from "@amends-dev/design/details"
 import { columns, row, summary } from "@amends-dev/design/directory"
 import { modal } from "@amends-dev/design/modal"
-import { pane, paneColumn, paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import { pane, paneColumn, paneEmpty, paneTabs, paneToolbar } from "@amends-dev/design/pane"
 import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
@@ -248,8 +248,8 @@ const browseRow = ({ group, pending, members }: GroupItem, model: Model, h: Grou
 
 /**
  * The browse page, the main pane's whole content: the groups the person belongs to and the public teams they
- * may join on a tab each, with how many, the button to start a team where they may, a search that narrows the
- * tab, and a row for each group, to open. The button opens the dialog `dialogView` renders.
+ * may join on a tab each, with how many, the button to start a team where they may, a toolbar with a search that
+ * narrows the tab, and a row for each group, to open. The button opens the dialog `dialogView` renders.
  */
 export const browseView = GroupsComposition.makeView((model, h) => {
   const { tab, query } = model.browse
@@ -284,37 +284,32 @@ export const browseView = GroupsComposition.makeView((model, h) => {
         ]
       })
     },
+    toolbar: [
+      paneToolbar(h, {
+        start: [
+          searchField(h, {
+            id: "browse-groups",
+            label: "Search groups",
+            placeholder: browseTabs[tab].placeholder,
+            value: query,
+            onInput: (query) => Message.TypedBrowseQuery({ query })
+          })
+        ]
+      }),
+      summary(h, { copy: browseTabs[tab].copy, count: pluralize(shown.length, "group", "groups") }),
+      ...(shown.length === 0 ? [] : [columns(h, { label: "Group", cells: ["Visibility", "Members"] })])
+    ],
     body: [
       paneColumn(
         h,
         [
           notice(h, model.notice),
-          column(h, [
-            field(
-              h,
-              {
-                id: "browse-groups",
-                label: "Search groups",
-                type: "search",
-                value: query,
-                onInput: (query) => Message.TypedBrowseQuery({ query }),
-                placeholder: browseTabs[tab].placeholder,
-                isAutofocus: false,
-                isLabelHidden: true
-              },
-              Option.none()
-            ),
-            summary(h, { copy: browseTabs[tab].copy, count: pluralize(shown.length, "group", "groups") }),
-            ...(shown.length === 0
-              ? [paneEmpty(h, none)]
-              : [
-                  columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
-                  h.ul(
-                    [h.AriaLabel("Groups")],
-                    shown.map((item) => browseRow(item, model, h))
-                  )
-                ])
-          ])
+          shown.length === 0
+            ? paneEmpty(h, none)
+            : h.ul(
+                [h.AriaLabel("Groups")],
+                shown.map((item) => browseRow(item, model, h))
+              )
         ],
         { isWide: true }
       )

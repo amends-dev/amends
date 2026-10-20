@@ -60,6 +60,7 @@ import {
   testApi,
   thread
 } from "../../../test/fixtures.ts"
+import { acknowledgeMenuClosed, chooseMenuItem, closeMenu, openMenu } from "../../../test/menu.ts"
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { Dismiss, ExpireConfirmation } from "../../feature/actions/command.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
@@ -87,11 +88,13 @@ import { MarkNotificationSeen } from "../../feature/inbox/command.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Search } from "../../feature/search/command.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { RenameSelf, SelectOnFocus } from "../../feature/settings/command.ts"
+import { Written as SettingsWritten } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { timeOf } from "../../seen.ts"
 import { WorkspaceBlock } from "./block.ts"
 import { LoadIntegrations } from "./command.ts"
-import { Message, Open, OutMessage } from "./definition.ts"
+import { AccountMenu, Message, Open, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 import { view } from "./view.ts"
@@ -108,14 +111,39 @@ const workspaceSubscriptions = WorkspaceBlock.subscriptions
 /** A button of the rail, which a section title of the sidebar with the same name is not. */
 const railButton = (name: string) => within(role("navigation", { name: "Destinations" }), role("button", { name }))
 
+/** The button of the account on the rail, which opens its menu. */
+const railAccountButton = (name: string) =>
+  within(role("navigation", { name: "Destinations" }), role("button", { name }))
+
 /** A button of the sidebar, which a button of the rail with the same name is not. */
 const sidebarButton = (name: string | RegExp) =>
   within(role("navigation", { name: "Studio" }), role("button", { name }))
 
-const sceneView = withViewInputs(view, { email: "alice@example.com", now, isApplePlatform: true })()
+const sceneView = withViewInputs(view, {
+  email: "alice@example.com",
+  appearance: "System",
+  now,
+  isApplePlatform: true
+})()
 
 /** The same page on a platform that is not Apple's, where a shortcut is made with Control. */
-const sceneViewOffApple = withViewInputs(view, { email: "alice@example.com", now, isApplePlatform: false })()
+const sceneViewOffApple = withViewInputs(view, {
+  email: "alice@example.com",
+  appearance: "System",
+  now,
+  isApplePlatform: false
+})()
+
+/** The same page in the Appearance the person chose to be Dark. */
+const sceneViewInDark = withViewInputs(view, {
+  email: "alice@example.com",
+  appearance: "Dark",
+  now,
+  isApplePlatform: true
+})()
+
+/** The button that opens the account menu on the rail, for a person who has no name yet. */
+const accountButton = "Account: alice@example.com"
 
 const threadId = ThreadId.ThreadId.make("thread-1")
 
@@ -1491,13 +1519,141 @@ describe("a workspace", () => {
     )
   })
 
-  it("shows who is signed in in the sidebar's footer, and asks to sign out from there", () => {
+  it("has no footer in the sidebar: who is signed in, and signing out, are in the account menu on the rail", () => {
     scene(
       { update, view: sceneView },
       given(opened),
-      expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toExist(),
-      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))),
-      expectOutMessage(OutMessage.RequestedSignOut())
+      expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toBeAbsent(),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))).toBeAbsent(),
+      expect(role("button", { name: "Sign out" })).toBeAbsent(),
+      expect(railAccountButton(accountButton)).toHaveAttr("aria-haspopup", "menu")
+    )
+  })
+
+  it("ends the rail with the person's account: their initials, named by the address they signed in with until they have a name", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(railAccountButton(accountButton)).toHaveAttr("aria-expanded", "false"),
+      expect(within(railAccountButton(accountButton), text("A"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("menu")).toBeAbsent()
+    )
+    scene(
+      { update, view: sceneView },
+      given(withSettings),
+      expect(railAccountButton("Account: Alice")).toExist(),
+      expect(role("button", { name: accountButton })).toBeAbsent()
+    )
+  })
+
+  it("opens the account menu to the right of the rail with their address alone, until they have a name", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      ...openMenu(AccountMenu, accountButton),
+      expect(railAccountButton(accountButton)).toHaveAttr("aria-expanded", "true"),
+      expect(within(role("menu"), text("alice@example.com"))).toExist(),
+      expect(within(role("menu"), text("Alice"))).toBeAbsent()
+    )
+  })
+
+  it("names the person over the address they signed in with in the account menu, once they have a name", () => {
+    scene(
+      { update, view: sceneView },
+      given(withSettings),
+      ...openMenu(AccountMenu, "Account: Alice"),
+      expect(within(role("menu"), text("Alice"))).toExist(),
+      expect(within(role("menu"), text("alice@example.com"))).toExist()
+    )
+  })
+
+  it("lists the Appearances with the current one checked, then the way to another workspace, the settings, a name, and out", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      ...openMenu(AccountMenu, accountButton),
+      expect(within(role("menu"), text("Appearance"))).toExist(),
+      expectAll(all.role("menuitem")).toHaveCount(7),
+      expect(role("menuitem", { name: "System (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Light" })).toExist(),
+      expect(role("menuitem", { name: "Dark" })).toExist(),
+      expect(role("menuitem", { name: "Switch workspace" })).toExist(),
+      expect(role("menuitem", { name: "Workspace settings" })).toExist(),
+      expect(role("menuitem", { name: "Change your name…" })).toExist(),
+      expect(role("menuitem", { name: "Sign out" })).toExist()
+    )
+    scene(
+      { update, view: sceneViewInDark },
+      given(opened),
+      ...openMenu(AccountMenu, accountButton),
+      expect(role("menuitem", { name: "Dark (selected)" })).toExist(),
+      expect(role("menuitem", { name: "System" })).toExist(),
+      expect(role("menuitem", { name: "Light" })).toExist()
+    )
+  })
+
+  it("closes the account menu with no choice when the person presses its button again", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      ...openMenu(AccountMenu, accountButton),
+      ...closeMenu(AccountMenu, accountButton),
+      expect(role("menu")).toBeAbsent()
+    )
+  })
+
+  it("reports to the app each entry of the account menu that it acts on, and closes the menu", () => {
+    const entries = [
+      ["System (selected)", "System"],
+      ["Light", "Light"],
+      ["Dark", "Dark"],
+      ["Switch workspace", "SwitchWorkspace"],
+      ["Workspace settings", "WorkspaceSettings"],
+      ["Sign out", "SignOut"]
+    ] as const
+
+    for (const [item, entry] of entries) {
+      scene(
+        { update, view: sceneView },
+        given(opened),
+        ...openMenu(AccountMenu, accountButton),
+        click(role("menuitem", { name: item })),
+        expectOutMessage(OutMessage.ChoseAccountEntry({ entry })),
+        ...acknowledgeMenuClosed(AccountMenu),
+        expect(role("menu")).toBeAbsent()
+      )
+    }
+  })
+
+  it("changes the person's name from the account menu in a compact dialog, and confirms it in a toast", () => {
+    const nameDialog = role("dialog", { name: "Change your name" })
+
+    scene(
+      { update, view: sceneView, subscriptions: workspaceSubscriptions },
+      given(withSettings),
+      expect(nameDialog).toBeAbsent(),
+      ...openMenu(AccountMenu, "Account: Alice"),
+      ...chooseMenuItem(AccountMenu, "Change your name…"),
+      // The menu tells the app nothing of this entry: the settings are asked to open their dialog.
+      Subscription.emit(workspaceSubscriptions["settings/settings"], SettingsBlock.Message.RequestedChangeName()),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      Mount.resolve(SelectOnFocus, SettingsBlock.Message.CompletedSelectOnFocus()),
+      inside(
+        nameDialog,
+        expect(role("textbox", { name: "Your name" })).toHaveValue("Alice"),
+        expect(role("button", { name: "Save name" })).toBeDisabled(),
+        type(role("textbox", { name: "Your name" }), "Alice M."),
+        click(role("button", { name: "Save name" }))
+      ),
+      Command.expectExact(RenameSelf({ workspaceId: workspace.id, memberId: member.id, name: "Alice M." })),
+      Command.resolve(RenameSelf, SettingsBlock.Message.WroteAction({ written: SettingsWritten.RenameSelf() })),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      Mount.expectEnded(SelectOnFocus),
+      expect(within(role("status"), text("Name saved"))).toExist(),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      expect(role("status")).toBeAbsent()
     )
   })
 

@@ -1,7 +1,8 @@
 import { DialogBlock } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
-import { isDialogBusy, SettingsDefinition } from "./definition.ts"
+import { SelectOnFocus } from "./command.ts"
+import { isDialogBusy, MemberStatusMenu, SettingsDefinition } from "./definition.ts"
 
 /** Stop what the person was doing in the dialog, whether the request in it was made or not. */
 export const leaveDialog = SettingsDefinition.stepFields(() => ({ entering: () => Option.none() }))
@@ -24,5 +25,21 @@ export const DialogBinding = SettingsDefinition.bindChild(DialogBlock, {
   }
 })
 
-export const SettingsComposition = SettingsDefinition.makeComposition({ bindings: [DialogBinding] })
+export const MemberStatusBinding = SettingsDefinition.bindChild(MemberStatusMenu, {
+  field: "statusMenu",
+  init: { contextToArgs: () => [{ id: "member-status" }] },
+  outMessage: {
+    /** Choosing whether the roster lists those who are in the workspace or who left narrows it to them. */
+    fold: MemberStatusMenu.OutMessage.match({
+      Selected: ({ value }) =>
+        SettingsDefinition.stepFields(() => ({ filter: (filter) => ({ ...filter, status: value }) })),
+      Closed: () => SettingsDefinition.stepNoop()
+    })
+  }
+})
+
+export const SettingsComposition = SettingsDefinition.makeComposition({
+  bindings: [DialogBinding, MemberStatusBinding],
+  mounts: [SelectOnFocus]
+})
 export type SettingsViewBuilder = Block.ViewBuilderFor<typeof SettingsComposition>

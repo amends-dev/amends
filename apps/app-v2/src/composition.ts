@@ -4,14 +4,17 @@
  */
 
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Block } from "foldkit"
 import { modifyFields } from "foldkit/struct"
-import { SignOut } from "./command.ts"
+import type { Appearance } from "./appearance.ts"
+import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
 import { ApplicationDefinition } from "./definition.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
+import type { AppEntry } from "./page/workspace/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 
 type SignedIn = Extract<Page, { readonly _tag: "SignedIn" }>
@@ -84,16 +87,38 @@ export const WorkspacesBinding = ApplicationDefinition.bindChild(WorkspacesBlock
   outMessage: { fold: foldWorkspacesOutMessage }
 })
 
+/** Choose the Appearance: the page shows it and the browser keeps it for the next visit. */
+const chooseAppearance = (appearance: Appearance) =>
+  ApplicationDefinition.step((model: Model) => ({
+    model: modifyFields(model, { appearance: () => appearance }),
+    commands: [ShowAppearance({ appearance }), KeepAppearance({ appearance })]
+  }))
+
+/** Leave the open workspace for the list of the person's workspaces. */
+const closeWorkspace = ApplicationDefinition.step((model: Model) => ({
+  model: atSignedIn(model, (page) => modifyFields(page, { workspace: () => Option.none() }))
+}))
+
+/**
+ * What choosing an entry of the account menu does: an Appearance is shown and kept, another workspace is the list of
+ * workspaces, signing out is signing out, and the settings are the open workspace's to show.
+ */
+const chooseAccountEntry = (workspaceId: WorkspaceId.WorkspaceId, entry: AppEntry) =>
+  Match.value(entry).pipe(
+    Match.whenOr("System", "Light", "Dark", chooseAppearance),
+    Match.when("SwitchWorkspace", () => closeWorkspace),
+    Match.when("WorkspaceSettings", () => WorkspaceBinding.requestWorkspaceSettings(workspaceId)),
+    Match.when("SignOut", () => signOut),
+    Match.exhaustive
+  )
+
 const foldWorkspaceOutMessage = (
-  _workspaceId: WorkspaceId.WorkspaceId,
+  workspaceId: WorkspaceId.WorkspaceId,
   outMessage: typeof WorkspaceBlock.OutMessage.Type
 ) =>
   WorkspaceBlock.OutMessage.match(outMessage, {
-    ClosedWorkspace: () =>
-      ApplicationDefinition.step((model: Model) => ({
-        model: atSignedIn(model, (page) => modifyFields(page, { workspace: () => Option.none() }))
-      })),
-    RequestedSignOut: () => signOut
+    ClosedWorkspace: () => closeWorkspace,
+    ChoseAccountEntry: ({ entry }) => chooseAccountEntry(workspaceId, entry)
   })
 
 export const WorkspaceBinding = ApplicationDefinition.bindChild(WorkspaceBlock, {

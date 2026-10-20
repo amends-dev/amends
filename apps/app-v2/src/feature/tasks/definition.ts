@@ -1,8 +1,9 @@
 /**
  * The tasks the person can see across the workspace, as the sidebar's Triage and Tasks list them: Triage, the
  * tasks in triage, which wait for someone to decide on them, and Tasks, every task that is neither done nor
- * dismissed, each as a table under a search and the choices of assignee and status that narrow it. The task's
- * controls are in its thread, in its group, so the Block writes nothing and reports the thread the person opens.
+ * dismissed, each as a table under a toolbar of a search and the menus of assignee and status that narrow it. The
+ * task's controls are in its thread, in its group, so the Block writes nothing and reports the thread the person
+ * opens.
  */
 
 import { Contact } from "@amends-dev/core/channel"
@@ -18,7 +19,13 @@ import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { modifyFields } from "foldkit/struct"
 import { isOpen, threadContains } from "../../seen.ts"
-import { TaskStatusFilter } from "../threads/definition.ts"
+import {
+  AssigneeFilter,
+  AssigneeFilterMenu,
+  isAssignedAs,
+  StatusFilterMenu,
+  TaskStatusFilter
+} from "../../taskFilter.ts"
 
 /**
  * A task, the thread that tracks it with its opening message, its group's name, how many messages follow the
@@ -35,13 +42,9 @@ export const TaskItem = Schema.Struct({
 })
 export type TaskItem = typeof TaskItem.Type
 
-/** Which tasks the list keeps by who they are assigned to: any, the person's own, or those assigned to no one. */
-export const AssigneeFilter = Schema.Literals(["Anyone", "Me", "NoOne"])
-export type AssigneeFilter = typeof AssigneeFilter.Type
-
 /**
  * The tasks as they were read, the members and the contacts that name who started a thread and who is assigned
- * to it, what the list is narrowed to, and why the last read failed.
+ * to it, what the list is narrowed to and the menus it is chosen in, and why the last read failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -50,6 +53,8 @@ export const Model = Schema.Struct({
   members: Schema.Array(Member.Member),
   contacts: Schema.Array(Contact.Contact),
   filter: Schema.Struct({ status: TaskStatusFilter, assignee: AssigneeFilter, query: Schema.String }),
+  statusMenu: StatusFilterMenu.Model,
+  assigneeMenu: AssigneeFilterMenu.Model,
   notice: Schema.Option(Schema.String)
 })
 export type Model = typeof Model.Type
@@ -58,8 +63,6 @@ export const Message = defineMessageUnion({
   ReceivedTasks: { items: Schema.Array(TaskItem) },
   ReceivedPeople: { members: Schema.Array(Member.Member), contacts: Schema.Array(Contact.Contact) },
   FailedRead: { error: Schema.String },
-  ChoseStatus: { status: TaskStatusFilter },
-  ChoseAssignee: { assignee: AssigneeFilter },
   TypedQuery: { query: Schema.String },
   ClickedTask: { groupId: GroupId.GroupId, threadId: ThreadId.ThreadId }
 })
@@ -83,15 +86,6 @@ export const openTasks = (items: ReadonlyArray<TaskItem>): ReadonlyArray<TaskIte
 /** How many of `items` are in triage. */
 export const triageCount = (items: ReadonlyArray<TaskItem>): number => triageTasks(items).length
 
-/** Whether a task assigned to `assignee` is one the person, `self`, wants, by what they chose to see. */
-const assignedAs: Readonly<
-  Record<AssigneeFilter, (assignee: MemberId.MemberId | null, self: MemberId.MemberId) => boolean>
-> = {
-  Anyone: () => true,
-  Me: (assignee, self) => assignee === self,
-  NoOne: (assignee) => assignee === null
-}
-
 const byLastActive = Order.mapInput(Order.flip(DateTime.Order), ({ lastActiveAt }: TaskItem) => lastActiveAt)
 
 /**
@@ -105,7 +99,7 @@ export const matching = (model: Model, items: ReadonlyArray<TaskItem>): Readonly
   return Array.sort(items, byLastActive).filter(
     ({ task, thread, opening }) =>
       (status === "All" || task.status === status) &&
-      assignedAs[assignee](task.assignee, model.memberId) &&
+      isAssignedAs(assignee, task.assignee, model.memberId) &&
       threadContains(thread, opening, model.members, query)
   )
 }

@@ -1,9 +1,9 @@
 /**
  * A group's threads, as the person lists them on a tab each: all of them, oldest first under the days they
- * were created on, each with its opening message, who replied to it, the task it tracks, and how much of it is
- * new; and the ones that track a task, latest active first, as a table the person narrows by status and by
- * what they search for. A composer starts a thread, or on the Tasks tab a thread that tracks a task. It
- * reports the thread the person picks.
+ * were created, each with its opening message, who replied to it, the task it tracks, and how much of it is
+ * new; and the ones that track a task, latest active first, as a table the person narrows by status and by what
+ * they search for. A composer starts a thread, or on the Tasks tab a thread that tracks a task, which the Tasks tab's
+ * New task moves the focus to. It reports the thread the person picks.
  */
 
 import { GroupId } from "@amends-dev/core/group"
@@ -18,6 +18,7 @@ import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
 import { type Day, groupByDay, isOpen, threadContains } from "../../seen.ts"
+import { TaskStatusFilter } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**
@@ -39,10 +40,6 @@ export type ThreadItem = typeof ThreadItem.Type
 /** The tabs of the group's threads: all of them, and the ones that track a task. */
 export const ThreadsTab = Schema.Literals(["Threads", "Tasks"])
 export type ThreadsTab = typeof ThreadsTab.Type
-
-/** Which tasks the Tasks tab lists by where they stand: every one, or those in one status. */
-export const TaskStatusFilter = Schema.Literals(["All", ...Task.Status.literals])
-export type TaskStatusFilter = typeof TaskStatusFilter.Type
 
 /**
  * The group's threads as they were read, whether they were yet, the tab shown, what the Tasks tab is narrowed to, the
@@ -74,6 +71,8 @@ export const Message = defineMessageUnion({
   ChoseTab: { tab: ThreadsTab },
   ChoseTaskStatus: { status: TaskStatusFilter },
   TypedTaskQuery: { query: Schema.String },
+  ClickedNewTask: {},
+  CompletedFocusComposer: {},
   ClickedThread: { threadId: ThreadId.ThreadId },
   WroteAction: {},
   FailedWriteAction: { error: Schema.String }

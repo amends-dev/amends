@@ -25,7 +25,7 @@ import { groupTarget, may } from "../../permissions.ts"
 import { groupName, initials, isJoinable, memberName, pluralize, threadSubtitle } from "../../seen.ts"
 import { titleOf } from "../thread/definition.ts"
 import { replyView } from "../thread/view.ts"
-import { composerView, tabsView } from "../threads/view.ts"
+import { composerView, tabsView, toolbarView } from "../threads/view.ts"
 import { DialogBinding, GroupComposition, type GroupViewBuilder, ThreadBinding, ThreadsBinding } from "./composition.ts"
 import { admitted, belongs, mayRename, Message, type Model, membersOf, teamName } from "./definition.ts"
 
@@ -303,6 +303,20 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
         ? { tabs: h.block(ThreadsBinding.embedView({ slotId: "tabs", model: model.threads, view: tabsView })) }
         : {})
     },
+    ...(isReadable && model.threads.tab === "Tasks"
+      ? {
+          toolbar: [
+            h.block(
+              ThreadsBinding.embedView({
+                slotId: "tasks-toolbar",
+                model: model.threads,
+                view: toolbarView,
+                viewInputs: threadsInputs
+              })
+            )
+          ]
+        }
+      : {}),
     body: [
       paneColumn(
         h,

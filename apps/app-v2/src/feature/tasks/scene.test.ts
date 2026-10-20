@@ -3,7 +3,6 @@ import { describe, it } from "@effect/vitest"
 import { DateTime, Option } from "effect"
 import {
   all,
-  change,
   click,
   expect,
   expectAll,
@@ -32,6 +31,8 @@ import {
   task,
   thread
 } from "../../../test/fixtures.ts"
+import { chooseFromMenu, chooseMenuItem, openMenu } from "../../../test/menu.ts"
+import { AssigneeFilterMenu, StatusFilterMenu } from "../../taskFilter.ts"
 import { OutMessage, type TaskItem } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
@@ -129,14 +130,14 @@ describe("the tasks in triage", () => {
       triaging,
       given(read),
       expect(label("Search tasks")).toHaveAttr("placeholder", "Search tasks…"),
-      expect(label("Assignee")).toHaveValue("Anyone"),
-      expect(label("Status")).toBeAbsent(),
-      change(label("Assignee"), "Me"),
-      expect(label("Assignee")).toHaveValue("Me"),
+      expect(role("button", { name: "Assignee: Anyone" })).toExist(),
+      expect(role("button", { name: "Status: Any status" })).toBeAbsent(),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Anyone", "Me"),
+      expect(role("button", { name: "Assignee: Me" })).toExist(),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       expect(text("Try different filters.")).toExist(),
       expect(text("0 tasks")).toExist(),
-      change(label("Assignee"), "NoOne"),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Me", "No one"),
       expect(role("button", { name: "Plans for the week" })).toExist(),
       type(label("Search tasks"), "PLANS"),
       expect(role("button", { name: "Plans for the week" })).toExist(),
@@ -239,17 +240,20 @@ describe("every open task", () => {
     scene(
       tasking,
       given(read),
-      expect(label("Status")).toHaveValue("All"),
-      expect(role("option", { name: "All statuses" })).toExist(),
-      expect(role("option", { name: "To do" })).toExist(),
-      expect(role("option", { name: "Held" })).toExist(),
-      expect(role("option", { name: "Done" })).toBeAbsent(),
-      expect(role("option", { name: "Dismissed" })).toBeAbsent(),
-      change(label("Status"), "triage"),
+      expect(role("button", { name: "Status: Any status" })).toExist(),
+      expect(within(role("button", { name: "Status: Any status" }), text("Status"))).toExist(),
+      ...openMenu(StatusFilterMenu, "Status: Any status"),
+      expect(role("menuitem", { name: "Any status (selected)" })).toExist(),
+      expect(role("menuitem", { name: "To do" })).toExist(),
+      expect(role("menuitem", { name: "Held" })).toExist(),
+      expect(role("menuitem", { name: "Done" })).toBeAbsent(),
+      expect(role("menuitem", { name: "Dismissed" })).toBeAbsent(),
+      ...chooseMenuItem(StatusFilterMenu, "Triage"),
+      expect(role("button", { name: "Status: Triage" })).toExist(),
       expectAll(all.role("listitem")).toHaveCount(1),
       expect(role("button", { name: "Plans for the week" })).toExist(),
       expect(text("1 task")).toExist(),
-      change(label("Status"), "All"),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Triage", "Any status"),
       expectAll(all.role("listitem")).toHaveCount(2)
     )
   })
@@ -258,14 +262,19 @@ describe("every open task", () => {
     scene(
       tasking,
       given(read),
-      expect(label("Assignee")).toHaveValue("Anyone"),
-      change(label("Assignee"), "Me"),
+      expect(role("button", { name: "Assignee: Anyone" })).toExist(),
+      expect(within(role("button", { name: "Assignee: Anyone" }), text("Assignee"))).toExist(),
+      ...openMenu(AssigneeFilterMenu, "Assignee: Anyone"),
+      expect(role("menuitem", { name: "Anyone (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Me" })).toExist(),
+      expect(role("menuitem", { name: "No one" })).toExist(),
+      ...chooseMenuItem(AssigneeFilterMenu, "Me"),
       expectAll(all.role("listitem")).toHaveCount(1),
       expect(role("button", { name: "Ship the release" })).toExist(),
-      change(label("Assignee"), "NoOne"),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Me", "No one"),
       expectAll(all.role("listitem")).toHaveCount(1),
       expect(role("button", { name: "Plans for the week" })).toExist(),
-      change(label("Assignee"), "Anyone"),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: No one", "Anyone"),
       expectAll(all.role("listitem")).toHaveCount(2)
     )
   })
@@ -291,13 +300,13 @@ describe("every open task", () => {
     scene(
       tasking,
       given(read),
-      change(label("Status"), "triage"),
-      change(label("Assignee"), "Me"),
+      ...chooseFromMenu(StatusFilterMenu, "Status: Any status", "Triage"),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Anyone", "Me"),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
       expect(text("0 tasks")).toExist(),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       expect(text("Try different filters.")).toExist(),
-      change(label("Assignee"), "Anyone"),
+      ...chooseFromMenu(AssigneeFilterMenu, "Assignee: Me", "Anyone"),
       type(label("Search tasks"), "zzz"),
       expect(role("heading", { name: "No tasks match", level: 2 })).toExist(),
       type(label("Search tasks"), "  "),

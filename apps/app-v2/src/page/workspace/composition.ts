@@ -21,7 +21,15 @@ import { SettingsBlock } from "../../feature/settings/block.ts"
 import { settingsToast } from "../../feature/settings/wording.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
-import { isAsideFloating, type Model, Open, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
+import {
+  AccountMenu,
+  isAsideFloating,
+  type Model,
+  Open,
+  OutMessage,
+  type SettingsPage,
+  WorkspaceDefinition
+} from "./definition.ts"
 
 /** List the integrations the host installs again, when a Block that showed them failing asks. */
 const loadIntegrationsAgain = WorkspaceDefinition.step((model: Model) => ({
@@ -352,6 +360,32 @@ export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {
   outMessage: { fold: foldSettingsOutMessage }
 })
 
+/** Ask the settings for the dialog that changes the person's name, which opens it. */
+const askSettingsToChangeName = WorkspaceDefinition.step((model: Model) => ({
+  model: modifyFields(model, {
+    settings: (settings) => modifyFields(settings, { nameChangeRequests: (requests) => requests + 1 })
+  })
+}))
+
+/**
+ * The entry the person chooses in the account menu is reported to the app, which acts on it, except changing their
+ * name, which the settings' dialog does.
+ */
+export const AccountBinding = WorkspaceDefinition.bindChild(AccountMenu, {
+  field: "account",
+  init: { contextToArgs: () => [{ id: "account" }] },
+  outMessage: {
+    forward: AccountMenu.OutMessage.match({
+      Selected: ({ value }) => (value === "ChangeName" ? undefined : OutMessage.ChoseAccountEntry({ entry: value })),
+      Closed: () => undefined
+    }),
+    fold: AccountMenu.OutMessage.match({
+      Selected: ({ value }) => (value === "ChangeName" ? askSettingsToChangeName : WorkspaceDefinition.stepNoop()),
+      Closed: () => WorkspaceDefinition.stepNoop()
+    })
+  }
+})
+
 export const ChannelsBinding = WorkspaceDefinition.bindChild(ChannelsBlock, {
   field: "channels",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
@@ -395,7 +429,8 @@ export const WorkspaceComposition = WorkspaceDefinition.makeComposition({
     AgentsBinding,
     SettingsBinding,
     ChannelsBinding,
-    GroupBinding
+    GroupBinding,
+    AccountBinding
   ]
 })
 export type WorkspaceViewBuilder = Block.ViewBuilderFor<typeof WorkspaceComposition>

@@ -9,6 +9,8 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedSignOut: () => Update.combine(model, [signOut]),
     CompletedSignOut: () => ({ model }),
+    CompletedShowAppearance: () => ({ model }),
+    CompletedKeepAppearance: () => ({ model }),
     ChangedViewport: ({ viewport }) =>
       Update.combine(model, [
         ApplicationDefinition.stepFields(() => ({ viewport: () => viewport })),

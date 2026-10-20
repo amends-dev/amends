@@ -47,7 +47,6 @@ const hasSidebarInPlace = (viewport: Viewport): boolean => viewport === "Desktop
 export const update = WorkspaceComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedAllWorkspaces: () => ({ model, outMessage: OutMessage.ClosedWorkspace() }),
-    ClickedSignOut: () => ({ model, outMessage: OutMessage.RequestedSignOut() }),
     ClickedHome: () => Update.combine(model, [switchTo(showNothing)]),
     ClickedInbox: () => Update.combine(model, [goTo(showInbox)]),
     ClickedTriage: () => Update.combine(model, [goTo(showTriage)]),
@@ -60,6 +59,7 @@ export const update = WorkspaceComposition.makeUpdate((model, message) =>
     ClickedMenu: () => Update.combine(model, [MenuBinding.requestOpen()]),
     ClickedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
     RequestedSearch: () => Update.combine(model, [SearchBinding.requestOpen()]),
+    RequestedWorkspaceSettings: () => Update.combine(model, [goTo(showSettings("Workspace"))]),
     InformedOfViewport: ({ viewport }) =>
       Update.combine(model, [
         showViewport(viewport),

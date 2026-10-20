@@ -1,15 +1,16 @@
 import { Task } from "@amends-dev/core/task"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
-import { choiceSelect, column, field, fieldGrid, loadingLine, notice } from "@amends-dev/design/control"
+import { button, choiceSelect, column, loadingLine, notice, searchField } from "@amends-dev/design/control"
 import { summary } from "@amends-dev/design/directory"
 import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
-import { paneEmpty, paneTabs } from "@amends-dev/design/pane"
+import { paneEmpty, paneTabs, paneToolbar, paneToolbarStack } from "@amends-dev/design/pane"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { authorName, initials, pluralize, repliesLabel, statusLabel, threadRuns, whenLabel } from "../../seen.ts"
-import { statusChoices, taskTable } from "../../taskTable.ts"
+import { statusChoices } from "../../taskFilter.ts"
+import { taskColumns, taskRows } from "../../taskTable.ts"
 import { ComposerBinding, ThreadsComposition, type ThreadsViewBuilder } from "./composition.ts"
 import { byDay, Message, type Model, openTaskCount, type ThreadItem, tasksOf } from "./definition.ts"
 
@@ -25,7 +26,7 @@ export type ViewInputs = Readonly<{
   now: DateTime.Utc
 }>
 
-/** The statuses the Tasks tab narrows to: every one, then each as the person reads it. */
+/** The statuses the Tasks tab narrows to: any, then each as the person reads it. */
 const taskStatusChoices = statusChoices(Task.Status.literals)
 
 /** The tabs under the group's title: its threads, and those that track a task, counted while any is open. */
@@ -120,8 +121,8 @@ const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): H
   ])
 
 /**
- * The threads that track a task, latest active first, as a table under a search and a choice of status that
- * narrow it, with how many it lists, or why it lists none.
+ * The threads that track a task, latest active first, as a table, or why it lists none: nothing is tracked yet, or
+ * nothing matches what the person narrowed it to.
  */
 const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Html => {
   const { status, query } = model.taskFilter
@@ -133,37 +134,9 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
 
   return column(h, [
     notice(h, model.notice),
-    fieldGrid(h, [
-      field(
-        h,
-        {
-          id: "task-search",
-          label: "Search tasks",
-          type: "search",
-          value: query,
-          onInput: (query) => Message.TypedTaskQuery({ query }),
-          placeholder: "Search tasks…",
-          isAutofocus: false,
-          isLabelHidden: true
-        },
-        Option.none()
-      ),
-      choiceSelect(
-        h,
-        {
-          id: "task-status",
-          label: "Status",
-          choices: taskStatusChoices,
-          value: status,
-          onChange: (status) => Message.ChoseTaskStatus({ status })
-        },
-        { isLabelHidden: true }
-      )
-    ]),
-    summary(h, { copy: "Threads that track a task.", count: pluralize(shown.length, "task", "tasks") }),
-    ...(shown.length === 0
-      ? [paneEmpty(h, none)]
-      : taskTable(
+    shown.length === 0
+      ? paneEmpty(h, none)
+      : taskRows(
           h,
           shown.map(({ item, task }) => ({
             task,
@@ -176,9 +149,46 @@ const tasksView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Htm
             onClick: Message.ClickedThread({ threadId: item.thread.id })
           })),
           { members: inputs.members, contacts: [], now: inputs.now, hasGroupColumn: false }
-        ))
+        )
   ])
 }
+
+/**
+ * The toolbar of the Tasks tab, for the pane that holds the tab: a search and the choice of status that narrow the
+ * tasks, and at its end New task, which moves the focus to the composer; under it, how many tasks the tab lists and the
+ * labels of its columns.
+ */
+export const toolbarView = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
+  const shown = tasksOf(model, inputs.members)
+
+  return paneToolbarStack(h, [
+    paneToolbar(h, {
+      start: [
+        searchField(h, {
+          id: "task-search",
+          label: "Search tasks",
+          placeholder: "Search tasks…",
+          value: model.taskFilter.query,
+          onInput: (query) => Message.TypedTaskQuery({ query })
+        }),
+        choiceSelect(
+          h,
+          {
+            id: "task-status",
+            label: "Status",
+            choices: taskStatusChoices,
+            value: model.taskFilter.status,
+            onChange: (status) => Message.ChoseTaskStatus({ status })
+          },
+          { isLabelHidden: true }
+        )
+      ],
+      end: [button(h, "New task", Message.ClickedNewTask(), { icon: "mark-new" })]
+    }),
+    summary(h, { copy: "Threads that track a task.", count: pluralize(shown.length, "task", "tasks") }),
+    ...(shown.length === 0 ? [] : [taskColumns(h, { hasGroupColumn: false })])
+  ])
+})
 
 /** What the tab shows: the group's threads, or the tasks they track. */
 export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, inputs, h) =>

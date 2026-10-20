@@ -5,11 +5,10 @@ import {
   choiceSelect,
   column,
   field,
-  fieldGrid,
   hint,
   loadingLine,
   notice,
-  sending,
+  searchField,
   submit
 } from "@amends-dev/design/control"
 import { badge, detailList, entry, entryList, person } from "@amends-dev/design/details"
@@ -17,15 +16,26 @@ import { columns, row, rowWithButton, section, summary } from "@amends-dev/desig
 import { form } from "@amends-dev/design/form"
 import type { IconName } from "@amends-dev/design/icon"
 import type { MarkContent } from "@amends-dev/design/mark"
+import { choiceMenu } from "@amends-dev/design/menu"
 import { modal } from "@amends-dev/design/modal"
-import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection } from "@amends-dev/design/pane"
+import {
+  pane,
+  paneBack,
+  paneClose,
+  paneColumn,
+  paneEmpty,
+  paneForm,
+  paneSection,
+  paneToolbar
+} from "@amends-dev/design/pane"
 import type { Viewport } from "@amends-dev/design/viewport"
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { initials } from "../../seen.ts"
-import { DialogBinding, SettingsComposition, type SettingsViewBuilder } from "./composition.ts"
+import { SelectOnFocus } from "./command.ts"
+import { DialogBinding, MemberStatusBinding, SettingsComposition, type SettingsViewBuilder } from "./composition.ts"
 import {
   accessOf,
   creatorOf,
@@ -50,7 +60,6 @@ import {
   mayRename,
   mayTransferOwnership,
   ownerOf,
-  ownNameDraft,
   ownName,
   pendingInvitations,
   roleDraftOf,
@@ -102,8 +111,9 @@ const markOf = ({ member }: MemberItem): MarkContent => ({
 })
 
 /**
- * A page of the settings, the main content: titled, with the workspace's name under the title on phones, and, while
- * the workspace is not read, what says so, or that it could not be, with a way to try again.
+ * A page of the settings, the main content: titled, with the workspace's name under the title on phones, the toolbar
+ * of a list once the workspace is read, and, while it is not, what says so, or that it could not be, with a way to try
+ * again.
  */
 const settingsPage = (
   h: SettingsViewBuilder,
@@ -113,6 +123,7 @@ const settingsPage = (
     icon: IconName
     context?: string
     actions?: ReadonlyArray<Html>
+    toolbar?: ReadonlyArray<Html>
     isWide?: boolean
     body: ReadonlyArray<Html>
   }>
@@ -129,6 +140,7 @@ const settingsPage = (
       ...(config.context === undefined ? {} : { context: config.context }),
       ...(config.actions === undefined ? {} : { actions: config.actions })
     },
+    ...(config.toolbar === undefined || Option.isNone(model.workspace) ? {} : { toolbar: config.toolbar }),
     body: [
       Option.isSome(model.workspace)
         ? paneColumn(
@@ -254,52 +266,9 @@ const ownershipSection = (model: Model, owner: MemberItem, h: SettingsViewBuilde
   })
 }
 
-/** The name the person goes by in the workspace, which they change here until their account has a menu of its own. */
-const ownNameSection = (model: Model, h: SettingsViewBuilder): Html => {
-  const isSaving = Option.exists(model.ownName, ({ isSaving }) => isSaving)
-  const name = ownNameDraft(model)
-
-  return paneSection(h, {
-    title: "Your name",
-    hasStitch: true,
-    trailing: [
-      sending(
-        h,
-        model.members.some(({ member, pending }) => pending && member.id === model.memberId)
-      )
-    ],
-    children: [
-      form(h, { onSubmit: Message.SubmittedOwnName(), label: "Your name", variant: "pane" }, [
-        field(
-          h,
-          {
-            id: "own-name",
-            label: "Your name",
-            type: "text",
-            value: name,
-            hint: "How others in this workspace see you.",
-            isAutofocus: false,
-            isDisabled: isSaving,
-            isLabelHidden: true,
-            onInput: (name) => Message.TypedOwnName({ name })
-          },
-          Option.none()
-        ),
-        failureView(
-          Option.flatMap(model.ownName, ({ failure }) => failure),
-          h
-        ),
-        buttonRow(h, [
-          submit(h, "Save name", { variant: "secondary", isDisabled: !isNameChanged(name, ownName(model)) || isSaving })
-        ])
-      ])
-    ]
-  })
-}
-
 /**
  * The Workspace page of the settings, the main content: the workspace's name, which the person renames when they
- * may, its ID and who made it, who owns it, and, at the end, the person's own name.
+ * may, its ID and who made it, and who owns it.
  */
 export const view = SettingsComposition.makeView((model, h) =>
   settingsPage(h, model, {
@@ -315,8 +284,7 @@ export const view = SettingsComposition.makeView((model, h) =>
       ...Option.match(ownerOf(model), {
         onNone: () => [],
         onSome: (owner) => [ownershipSection(model, owner, h)]
-      }),
-      ownNameSection(model, h)
+      })
     ]
   })
 )
@@ -354,48 +322,44 @@ const memberRow = (
   )
 }
 
-/** The search and the filter over the roster, then the roster, or what it says when it has no one to show. */
+/**
+ * The roster's toolbar: the search, and at its end whether the roster lists those who are in the workspace or who left,
+ * then the labels of the columns over a roster that has someone to show.
+ */
+const rosterToolbar = (model: Model, h: SettingsViewBuilder): ReadonlyArray<Html> => [
+  paneToolbar(h, {
+    start: [
+      searchField(h, {
+        id: "member-search",
+        label: "Search members",
+        placeholder: "Search members…",
+        value: model.filter.query,
+        onInput: (query) => Message.TypedMemberQuery({ query })
+      })
+    ],
+    end: [
+      choiceMenu(h, {
+        choices: filterChoices,
+        value: model.filter.status,
+        placement: "bottom-end",
+        embed: (viewInputs) =>
+          h.block(MemberStatusBinding.embedView({ slotId: "member-status", model: model.statusMenu, viewInputs }))
+      })
+    ]
+  }),
+  ...(shownMembers(model).length === 0 ? [] : [columns(h, { label: "Member", cells: ["Workspace role", "Status"] })])
+]
+
+/** The roster, or what it says when it has no one to show. */
 const roster = (model: Model, openMemberId: Option.Option<MemberId.MemberId>, h: SettingsViewBuilder): Html => {
   const shown = shownMembers(model)
 
-  return column(h, [
-    fieldGrid(h, [
-      field(
-        h,
-        {
-          id: "member-search",
-          label: "Search members",
-          type: "search",
-          value: model.filter.query,
-          placeholder: "Search members…",
-          isAutofocus: false,
-          isLabelHidden: true,
-          onInput: (query) => Message.TypedMemberQuery({ query })
-        },
-        Option.none()
-      ),
-      choiceSelect(
-        h,
-        {
-          id: "member-filter",
-          label: "Show members",
-          choices: filterChoices,
-          value: model.filter.status,
-          onChange: (status) => Message.ChoseMemberStatus({ status })
-        },
-        { isLabelHidden: true }
+  return shown.length === 0
+    ? paneEmpty(h, { art: emptyRosterArt(model.filter), title: emptyRoster(model.filter) })
+    : h.ul(
+        [h.AriaLabel(model.filter.status === "removed" ? "Removed members" : "Members")],
+        shown.map((item) => memberRow(item, model, openMemberId, h))
       )
-    ]),
-    ...(shown.length === 0
-      ? [paneEmpty(h, { art: emptyRosterArt(model.filter), title: emptyRoster(model.filter) })]
-      : [
-          columns(h, { label: "Member", cells: ["Workspace role", "Status"] }),
-          h.ul(
-            [h.AriaLabel(model.filter.status === "removed" ? "Removed members" : "Members")],
-            shown.map((item) => memberRow(item, model, openMemberId, h))
-          )
-        ])
-  ])
 }
 
 /** An invitation still to be accepted as a row: its address over what it gives and when it ends, with Revoke. */
@@ -472,9 +436,9 @@ export type MembersInputs = Readonly<{
 }>
 
 /**
- * The Members page of the settings, the main content: a search and a filter over the roster, which opens a member
- * in the side pane, and, where the person manages invitations, Invite people in its header and the invitations still
- * to be accepted after the roster, or on a phone as a card.
+ * The Members page of the settings, the main content: a toolbar of a search and a menu of whom to list over the
+ * roster, which opens a member in the side pane, and, where the person manages invitations, Invite people in its
+ * header and the invitations still to be accepted after the roster, or on a phone as a card.
  */
 export const membersView = SettingsComposition.makeView.withInputs<MembersInputs>(
   (model, { now, viewport, openMemberId }, h) => {
@@ -486,6 +450,7 @@ export const membersView = SettingsComposition.makeView.withInputs<MembersInputs
       icon: "users",
       isWide: true,
       ...(mayManageInvitations ? { actions: [button(h, "Invite people", Message.ClickedInvite())] } : {}),
+      toolbar: rosterToolbar(model, h),
       body: [
         roster(model, openMemberId, h),
         ...(mayManageInvitations
@@ -631,6 +596,7 @@ type InvitingEntering = Extract<Entering, { readonly _tag: "Inviting" }>
 type TransferringEntering = Extract<Entering, { readonly _tag: "Transferring" }>
 type RevokingEntering = Extract<Entering, { readonly _tag: "Revoking" }>
 type RemovingEntering = Extract<Entering, { readonly _tag: "Removing" }>
+type ChangingNameEntering = Extract<Entering, { readonly _tag: "ChangingName" }>
 
 /** The dialog that drafts an invitation: the address it is for and the role it gives, which stay under a failure. */
 const invitingModal = (render: RenderInfo, inviting: InvitingEntering, model: Model, h: SettingsViewBuilder): Html => {
@@ -803,6 +769,51 @@ const removingModal = (render: RenderInfo, removing: RemovingEntering, model: Mo
     onSubmit: Message.ConfirmedRemoval()
   })
 
+/**
+ * The dialog that changes the person's own name, which they see as it is now with its text selected: how others in the
+ * workspace see them. Saving waits for a name that is not blank and not the one they have.
+ */
+const changingNameModal = (
+  render: RenderInfo,
+  changing: ChangingNameEntering,
+  model: Model,
+  h: SettingsViewBuilder
+): Html => {
+  const refusal = Option.filter(changing.failure, ({ reason }) => reason === "Invalid")
+
+  return modal(h, render, {
+    title: "Change your name",
+    body: [
+      field(
+        h,
+        {
+          id: "own-name",
+          label: "Your name",
+          type: "text",
+          value: changing.name,
+          hint: "How others in this workspace see you.",
+          isAutofocus: false,
+          isDisabled: changing.isSending,
+          attributes: [...render.initialFocus, h.OnMount(SelectOnFocus()), h.Autocomplete("off"), h.Spellcheck(false)],
+          onInput: (name) => Message.TypedOwnName({ name })
+        },
+        Option.map(refusal, settingsMessage)
+      ),
+      failureView(
+        Option.filter(changing.failure, ({ reason }) => reason !== "Invalid"),
+        h
+      )
+    ],
+    cancelLabel: "Cancel",
+    footer: [
+      submit(h, changing.isSending ? "Saving…" : "Save name", {
+        isDisabled: changing.isSending || !isNameChanged(changing.name, ownName(model))
+      })
+    ],
+    onSubmit: Message.SubmittedOwnName()
+  })
+}
+
 /** What the dialog shows: what the person is doing in it, or an empty frame while they are not doing anything. */
 const dialogModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: SettingsViewBuilder): Html =>
   Option.match(model.entering, {
@@ -813,7 +824,8 @@ const dialogModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Set
         ViewingHistory: () => historyModal(render, model, now, h),
         Revoking: (revoking) => revokingModal(render, revoking, h),
         Transferring: (transferring) => transferringModal(render, transferring, model, h),
-        Removing: (removing) => removingModal(render, removing, model, h)
+        Removing: (removing) => removingModal(render, removing, model, h),
+        ChangingName: (changing) => changingNameModal(render, changing, model, h)
       })
   })
 
@@ -828,9 +840,10 @@ const hasDescription = (model: Model): boolean =>
 export type DialogInputs = Readonly<{ now: DateTime.Utc }>
 
 /**
- * The dialog for inviting someone, reading every invitation, revoking one, handing the workspace over, or removing a
- * member, which the page lends the shell: it renders its `dialog` element, with nothing in it while it is closed,
- * wherever the buttons that open it are, on the Members page, the Workspace page, or the member in the side pane.
+ * The dialog for inviting someone, reading every invitation, revoking one, handing the workspace over, removing a
+ * member, or changing the person's own name, which the page lends the shell: it renders its `dialog` element, with
+ * nothing in it while it is closed, wherever the buttons that open it are, on the Members page, the Workspace page, the
+ * member in the side pane, or the account menu on the rail.
  */
 export const dialogView = SettingsComposition.makeView.withInputs<DialogInputs>((model, { now }, h) =>
   h.block(

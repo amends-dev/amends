@@ -36,21 +36,30 @@ export const readSettings = (store: Store.Store["Service"]) =>
 
 /**
  * The settings are read once the Block opens, and again each time the person asks to refresh them, which a failed read
- * leaves them to ask for.
+ * leaves them to ask for. Each time the page asks for the dialog that changes the person's name, which counts the asks,
+ * the Block is told to open it, and the settings are read again.
  */
 export const subscriptions = SettingsDefinition.subscriptions((entry) => ({
   settings: entry(
     "ReadSettings",
-    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int },
+    { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, reads: Schema.Int, nameChanges: Schema.Int },
     {
-      messages: [Message.ReceivedSettings, Message.FailedRead],
-      modelToDependencies: ({ workspaceId, memberId, reads }) => ({ workspaceId, memberId, reads }),
+      messages: [Message.ReceivedSettings, Message.FailedRead, Message.RequestedChangeName],
+      modelToDependencies: ({ workspaceId, memberId, reads, nameChangeRequests }) => ({
+        workspaceId,
+        memberId,
+        reads,
+        nameChanges: nameChangeRequests
+      }),
       handler: function* () {
         const stores = yield* Stores.Stores
-        return ({ workspaceId, memberId }) =>
-          stores
-            .read(workspaceId, memberId, readSettings)
-            .pipe(Stream.catchCause(() => Stream.make(Message.FailedRead())))
+        return ({ workspaceId, memberId, nameChanges }) =>
+          Stream.merge(
+            stores
+              .read(workspaceId, memberId, readSettings)
+              .pipe(Stream.catchCause(() => Stream.make(Message.FailedRead()))),
+            nameChanges === 0 ? Stream.empty : Stream.make(Message.RequestedChangeName())
+          )
       }
     }
   )

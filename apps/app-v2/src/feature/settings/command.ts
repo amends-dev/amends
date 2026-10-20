@@ -11,6 +11,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import { selectTextOnFocus } from "../../selectOnFocus.ts"
 import * as Stores from "../../store/Stores.ts"
 import { Message, SettingsDefinition, Written } from "./definition.ts"
 
@@ -187,6 +188,14 @@ export const ExpireCopied = SettingsDefinition.command("ExpireCopied", {
   }
 })
 
+/** Select the text of the field it is mounted on each time the field takes focus, so that typing replaces it. */
+export const SelectOnFocus = SettingsDefinition.mount("SelectOnFocus", {
+  messages: [Message.CompletedSelectOnFocus],
+  handler: function* () {
+    return ({ element }) => Effect.as(selectTextOnFocus(element), Message.CompletedSelectOnFocus())
+  }
+})
+
 export const EffectsLayer = Layer.mergeAll(
   RenameWorkspace.layer,
   RenameSelf.layer,
@@ -196,5 +205,6 @@ export const EffectsLayer = Layer.mergeAll(
   Invite.layer,
   RevokeInvitation.layer,
   CopyWorkspaceId.layer,
-  ExpireCopied.layer
+  ExpireCopied.layer,
+  SelectOnFocus.layer
 )

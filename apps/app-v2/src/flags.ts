@@ -1,15 +1,17 @@
 /**
  * What the app starts from: the host's address, from `VITE_AMENDS_API_URL` or this page's own `/api`,
- * the session kept for it, the width of the window, the time now, and whether the page runs on an Apple
- * platform.
+ * the session kept for it, the Appearance kept from the last visit, the width of the window, the time now, and
+ * whether the page runs on an Apple platform.
  */
 
 import { Viewport, viewportOf, viewportQueries } from "@amends-dev/design/viewport"
 import * as SignIn from "@amends-dev/gateway/SignIn"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
+import type * as KeyValueStore from "effect/persistence/KeyValueStore"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
+import { Appearance, readKeptAppearance } from "./appearance.ts"
 import * as Session from "./session.ts"
 
 /** The host's address, as the page was built for, or where it is served from. */
@@ -17,6 +19,7 @@ export const apiUrl = (import.meta.env.VITE_AMENDS_API_URL as string | undefined
 
 export const Flags = Schema.Struct({
   session: Schema.Option(SignIn.Session),
+  appearance: Appearance,
   viewport: Viewport,
   now: Schema.DateTimeUtc,
   isApplePlatform: Schema.Boolean
@@ -56,13 +59,14 @@ const platformName = (): string =>
 const readIsApplePlatform = Effect.sync(() => namesApplePlatform(platformName()))
 
 /**
- * Read the flags as the page boots: the session kept from the last visit, if any, the window's width, the time
- * now, which the first render needs for the ages and days it shows, and whether the page runs on an Apple
- * platform.
+ * Read the flags as the page boots: the session kept from the last visit, if any, and the Appearance kept with it,
+ * the window's width, the time now, which the first render needs for the ages and days it shows, and whether the page
+ * runs on an Apple platform.
  */
-export const flags: Effect.Effect<Flags, never, Session.Session> = Effect.map(
+export const flags: Effect.Effect<Flags, never, Session.Session | KeyValueStore.KeyValueStore> = Effect.map(
   Effect.all({
     session: Effect.flatMap(Session.Session, (session) => session.current),
+    appearance: readKeptAppearance,
     viewport: readViewport,
     now: DateTime.now,
     isApplePlatform: readIsApplePlatform

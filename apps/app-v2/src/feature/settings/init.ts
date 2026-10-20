@@ -20,12 +20,12 @@ export const init = SettingsComposition.makeInit(
       isUnreadable: false,
       reads: 0,
       workspaceName: Option.none(),
-      ownName: Option.none(),
       filter: { query: "", status: "active" as const },
       selected: Option.none(),
       entering: Option.none(),
       copyAttempts: 0,
-      copiedAttempt: Option.none()
+      copiedAttempt: Option.none(),
+      nameChangeRequests: 0
     }
   })
 )

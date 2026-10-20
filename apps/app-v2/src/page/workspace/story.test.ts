@@ -4,7 +4,7 @@ import { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
-import { Command, expectOutMessage, given, message, model, story } from "foldkit/story"
+import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
 import { modifyFields } from "foldkit/struct"
 import {
   aliceOwns,
@@ -68,6 +68,7 @@ import { ThreadsBlock } from "../../feature/threads/block.ts"
 import * as Drafts from "../../store/Drafts.ts"
 import { LoadIntegrations } from "./command.ts"
 import {
+  AccountBinding,
   AgentsBinding,
   AsideBinding,
   ChannelsBinding,
@@ -80,7 +81,16 @@ import {
   SettingsBinding,
   TasksBinding
 } from "./composition.ts"
-import { isThreadOpen, Message, Open, OutMessage, openMemberId, openThreadTitle } from "./definition.ts"
+import {
+  AccountMenu,
+  type AppEntry,
+  isThreadOpen,
+  Message,
+  Open,
+  OutMessage,
+  openMemberId,
+  openThreadTitle
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -284,7 +294,30 @@ const fromAside = (message: typeof DialogBlock.Message.Type) =>
 /** The open group, before it is read, with no thread open. */
 const openGroupModel = initGroup(workspaceId, memberId, groupId, Option.none()).model
 
-/** What the open group reports, as the workspace receives it. */
+/** What the account menu reports, as the workspace receives it. */
+const fromAccount = (message: typeof AccountMenu.Message.Type) =>
+  AccountBinding.embedView({
+    slotId: "account",
+    model: opened.account,
+    viewInputs: { items: [], itemToConfig: () => ({ content: null }), buttonContent: null }
+  }).toParentMessage(message)
+
+/** The account menu's entries, in the order it lists them, as it reports the one the person chooses. */
+const accountEntries = [
+  "System",
+  "Light",
+  "Dark",
+  "SwitchWorkspace",
+  "WorkspaceSettings",
+  "ChangeName",
+  "SignOut"
+] as const
+
+/** The account menu reporting that the person chose `entry`. */
+const choseAccountEntry = (entry: (typeof accountEntries)[number]) =>
+  fromAccount(AccountMenu.Message.SelectedItem({ index: accountEntries.indexOf(entry), item: entry }))
+
+/** The open group, before it is read, with no thread open. */
 const fromGroup = (message: typeof GroupBlock.Message.Type) =>
   GroupBinding.embedView({ key: groupId, slotId: "group", model: openGroupModel, viewInputs: { now } }).toParentMessage(
     message
@@ -401,8 +434,64 @@ describe("a workspace", () => {
     )
   })
 
-  it("asks the root to sign the person out", () => {
-    story(update, given(opened), message(Message.ClickedSignOut()), expectOutMessage(OutMessage.RequestedSignOut()))
+  it("reports the entry the person chooses in the account menu that the app acts on, and nothing for the others", () => {
+    const appEntries: ReadonlyArray<AppEntry> = [
+      "System",
+      "Light",
+      "Dark",
+      "SwitchWorkspace",
+      "WorkspaceSettings",
+      "SignOut"
+    ]
+
+    for (const entry of appEntries) {
+      story(
+        update,
+        given(opened),
+        message(choseAccountEntry(entry)),
+        expectOutMessage(OutMessage.ChoseAccountEntry({ entry }))
+      )
+    }
+  })
+
+  it("asks the settings to open the dialog that changes the person's name, as often as they choose it, and tells the app nothing", () => {
+    story(
+      update,
+      given(opened),
+      model((model) => {
+        expect(model.settings.nameChangeRequests).toBe(0)
+      }),
+      message(choseAccountEntry("ChangeName")),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.settings.nameChangeRequests).toBe(1)
+      }),
+      message(choseAccountEntry("ChangeName")),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.settings.nameChangeRequests).toBe(2)
+        expect(Open.isAnyOf(["Nothing"])(model.open)).toBe(true)
+      })
+    )
+  })
+
+  it("shows the workspace's settings page when the app asks, in place of what is open", () => {
+    story(
+      update,
+      given(opened),
+      message(Message.ClickedMembers()),
+      message(Message.RequestedWorkspaceSettings()),
+      model((model) => {
+        expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
+      }),
+      message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
+      Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
+      message(Message.RequestedWorkspaceSettings()),
+      model((model) => {
+        expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Workspace")
+        expect(model.groups.selected).toEqual(Option.none())
+      })
+    )
   })
 
   it("goes home from the group open or a destination, to nothing open and no group marked", () => {
@@ -1109,9 +1198,9 @@ describe("a workspace", () => {
       update,
       given(settingsRead),
       message(Message.ClickedSettings()),
-      message(fromSettings(SettingsBlock.Message.TypedOwnName({ name: "Alice M." }))),
+      message(fromSettings(SettingsBlock.Message.TypedMemberQuery({ query: "bo" }))),
       model((model) => {
-        expect(Option.map(model.settings.ownName, ({ name }) => name)).toEqual(Option.some("Alice M."))
+        expect(model.settings.filter.query).toBe("bo")
         expect(openMemberId(model)).toEqual(Option.none())
       }),
       message(Message.ClickedMembers()),

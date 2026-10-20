@@ -54,7 +54,14 @@ outside a workspace are composed from it: the root view frames the sign-in page 
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, rows, and the modal that creates a workspace or joins one from the design's `centered`, `control`, `form`, `directory`, `pane` (its empty state), `toast`, and `modal` modules.
 The brand is the design's `logo`: the header of the centered screens holds it beside "amends", over `centeredAccount`
-and a Sign out for who is signed in, and the rail's is a button named "Amends home" that goes Home. What a pane says
+and a Sign out for who is signed in, and the rail's is a button named "Amends home" that goes Home. The rail ends with
+the person's account, the design's `railAccount`, a menu of their Appearance, the way to another workspace, the
+workspace's settings, a dialog that changes their name, and Sign out, which `page/workspace` binds. The Appearance,
+System, Light, or Dark, is the root's: `src/appearance.ts` shows it as `data-theme` on the page's root element, which the
+design's theme follows (System removes the attribute and leaves the browser's preference), and keeps it in the browser's
+key-value store, so that the next visit starts in it. A list's search and the choices that narrow it are the design's
+`paneToolbar` over its rows, a `searchField` and menus (`choiceMenu`, over Foldkit's `Menu` Block, which the list's
+Block binds to hold the menu's state and to fold its choice), where they were a row of selects. What a pane says
 when it has nothing to list, or could not read what it lists, is the design's `paneEmpty` with the `stateArt` that
 `@amends-dev/ui` draws for the state, in `@amends-dev/ui`'s words: `sew-in` for a first thing to make (no agents,
 no workspaces, no groups), `reach` for nothing connected (no connections, no channels), `fill` for a place waiting
@@ -115,8 +122,8 @@ ago it came, and a dot while it waits, the row of the notification whose thread 
 current, with Mark all seen among the header's actions, a quiet Show older after the list, in a
 centered `buttonRow`, while there are older notifications, and `paneEmpty` when a tab has nothing. The settings' Workspace page is a `paneColumn` of a `form` of the workspace's name, and `paneSection`s
 whose `detailList` has the ID with a quiet Copy ID and who made the workspace as a `person`, and whose
-Ownership has the owner as a `person`; its Members page, which passes `isWide`, is a `fieldGrid` of a search
-and a `choiceSelect` over the `directory`'s `columns` and 24px `row`s, and a member opens in the side pane as
+Ownership has the owner as a `person`; its Members page, which passes `isWide`, is a toolbar of a search
+and a menu of Active or Removed members over the `directory`'s `columns` and 24px `row`s, and a member opens in the side pane as
 a `person`, a `paneForm` of their role, and `paneSection`s of their access and membership, under `paneBack`. The
 invitations waiting after the roster are a `section` over `rowWithButton`s, or on a phone a `section` over one
 `row`; the settings' dialogs are `modal`s, the invitations in them an `entryList` of `entry`s with a `badge` each. The
@@ -224,9 +231,11 @@ the pages that compose them; the root composes the pages.
   conversation…", and once it has, a group with no thread welcomes the person, "Welcome to #General" for a team and
   "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
   caret blinking. On the Tasks tab it is the threads that track a
-  task as a table, latest active first by `lastActiveAt`: under a search field, whose label is hidden and
+  task as a table, latest active first by `lastActiveAt`: under a toolbar, the threads Block's `toolbarView`, which the
+  group's pane draws over the rows while the tab is open, of a search field, whose label is hidden and
   whose placeholder says "Search tasks…", beside a select of the status, All statuses or one by its name
-  (`statusLabel`), whose label is hidden too, a line says "Threads that track a task." with how many
+  (`statusLabel`), whose label is hidden too, and, at its end, New task, which moves the focus to the composer in the
+  footer (`ClickedNewTask`, the command `FocusComposer`), a line says "Threads that track a task." with how many
   tasks the search and the status leave at its end, "12 tasks", over the labels of the columns, Task,
   Status, and Activity, and a row for each task: the initials of its assignee, or a dash for no one, the
   thread's title or its opening's words (`threadWords`), "Started by Alice · 3 replies" under it, with
@@ -255,9 +264,11 @@ the pages that compose them; the root composes the pages.
   ("7 members", for a team its admitted ones and for a conversation both people), which opens the
   settings on the Members tab, or on General for a conversation, which has none; Follow as a bell,
   which is filled, named Unfollow, and pressed while the person follows the group, or Join, where
-  they apply; and a gear that opens the settings; and under them the tab's content, threads or tasks,
-  with the composer to start one in the footer, which a team the person has not joined does
-  not have. The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
+  they apply; and a gear that opens the settings; and under them, on the Tasks tab, the toolbar of the tasks, and the
+  tab's content, threads or tasks, with the composer to start one in the footer, which a team the person has not joined does
+  not have. The Tasks tab's status stays a select, and it has no menu of the assignee or sort, as `apps/ui`'s has: a Menu Block
+  bound in the threads Block adds a binding to the workspace page's tree, whose `makeUpdate` is at TypeScript's limit
+  (see `page/workspace`). The settings' dialog is a child of the Block, bound from `@foldkit/ui/dialog` and
   rendered with the design's `modal` inside the pane, titled "Group settings" with the group's name
   beside it. Its General tab holds the team's name, a field with a line under it saying who sees the
   name, and Save changes, which is disabled while the draft is the name the team has, for someone
@@ -292,10 +303,10 @@ the pages that compose them; the root composes the pages.
   pane titled Groups with two tabs, Your groups, the teams the person belongs to and their
   conversations, as the sidebar lists them, and Discover, the public teams they may join and do not
   belong to, each counted, Your groups at first, and Create group, the same as the sidebar's "+" for
-  a team, where they may start one. Under a search field, whose label is hidden and whose
-  placeholder follows the tab, and which takes no focus as the page opens, a line says what the tab
+  a team, where they may start one. The toolbar over the rows holds a search field, whose label is hidden and whose
+  placeholder follows the tab, and which takes no focus as the page opens; under it, a line says what the tab
   lists with how many groups the search leaves at its end, "4 groups", over the labels of the
-  columns, Group, Visibility, and Members, and a row for each group: `#` for a team and the other
+  columns, Group, Visibility, and Members; and then a row for each group: `#` for a team and the other
   members' initials for a conversation, the group's name as the person reads it, a badge of Public,
   Private, or Direct, how many members it has, "12 members", "Sending…" under the name while it is
   on its way, and Open →, which reports the group picked as the sidebar's row does. The search
@@ -373,10 +384,12 @@ the pages that compose them; the root composes the pages.
   the time now from its parent. `triageView` is titled Triage, "Tasks waiting for a decision.", and
   lists the tasks in triage (`triageTasks`); `tasksView`, the Block's canonical view, is titled Tasks,
   "Every open task you can see.", and lists every task that is neither done nor dismissed (`openTasks`).
-  Under the title are a search field, whose label is hidden and whose placeholder says "Search
-  tasks…", beside a select of whom a task is assigned to, Anyone, Me, or No one, and, on Tasks
-  alone, a select of the status, All statuses or one of the statuses of an open task, with its label
-  hidden too. A line says "Tasks in triage across your groups." or "Open tasks across your groups."
+  The pane's toolbar has a search field, whose label is hidden and whose placeholder says "Search
+  tasks…", beside a menu of whom a task is assigned to (`AssigneeFilterMenu`), Anyone, Me, or No one, whose button
+  says Assignee while it narrows to none and is named "Assignee: Anyone", and, on Tasks
+  alone, a menu of the status (`StatusFilterMenu`), Any status or one of the statuses of an open task, named
+  "Status: Any status". Each menu is a Foldkit `Menu` Block the Block binds (`AssigneeBinding`, `StatusBinding`), and
+  choosing from it sets the filter, so the Block has no message for the choice. The toolbar goes on with a line that says "Tasks in triage across your groups." or "Open tasks across your groups."
   with how many tasks the filters leave at its end, "12 tasks", over the labels of the columns,
   Task, Group, Status, and Activity, and a row for each, latest active first (`matching`): the same
   row as the group's Tasks tab has (`taskTable.ts`), with the name of the task's group as its first
@@ -390,7 +403,7 @@ the pages that compose them; the root composes the pages.
   will be listed there, and with filters that leave none, "No tasks match" and to try different
   ones. `triageCount` is how many tasks wait in triage, for the sidebar to show.
 - `feature/settings`: the workspace's settings as `apps/ui` has them, two pages, a member in the side pane, and
-  five dialogs, read together from the store. The Workspace page (`view`) is the workspace's name in a form with
+  six dialogs, read together from the store. The Workspace page (`view`) is the workspace's name in a form with
   Save changes, which waits for a name that is new and which only the owner may use, the field being disabled with
   "Only the workspace owner can rename it." for another; Details, with the workspace's ID, which Copy ID puts on
   the browser's clipboard (the `Clipboard` service, which the browser's services provide, so the command
@@ -399,10 +412,10 @@ the pages that compose them; the root composes the pages.
   the workspace; Ownership, with the owner as "{name} · You" when it is the person, "Workspace owner", and that a
   workspace has one owner, and, for the owner, that transferring ownership makes them an administrator and a
   Transfer ownership button, which waits, with "Invite another person before transferring ownership.", while there
-  is no one who can become the owner; and, at the end, the person's own name in a form with Save name, since the app
-  has no account menu to change it from. The Members page (`membersView`, which takes the time now, the
-  window's width, and the member the page has open as view inputs) is a search, "Search members…", and a filter of Active or Removed members
-  (`choiceSelect`, since the design has no menu), over the roster: `columns` for Member, Workspace role, and
+  is no one who can become the owner. The person's own name is not on the page: the account menu's "Change your name…"
+  opens a dialog for it, below. The Members page (`membersView`, which takes the time now, the
+  window's width, and the member the page has open as view inputs) is a toolbar of a search, "Search members…", and a menu of
+  Active or Removed members (`choiceMenu`, bound as `MemberStatusBinding`, its button named "Active members" or "Removed members"), over the roster: `columns` for Member, Workspace role, and
   Status, and a `row` for each member with a 24px mark (`markSize: "sm"`), their name, "Agent" under an agent's,
   their role, and their status, the row of the member the page has open drawn current. A phone shows the role and status under
   the name. Where the person manages invitations, Invite people is in the page's header, and after the roster are
@@ -420,14 +433,19 @@ the pages that compose them; the root composes the pages.
   What is on its way is marked "Sending…". Until the workspace is read the page says "Loading settings…", and
   "Can't load settings" with Try again when it could not be.
 
-  The five dialogs are one `DialogBlock` the Block binds (`DialogBinding`, id `settings-dialog`) and `dialogView`,
+  The six dialogs are one `DialogBlock` the Block binds (`DialogBinding`, id `settings-dialog`) and `dialogView`,
   which the workspace page lends the shell, renders for what the person is doing in it (`Entering`): Invite member,
   the address ("Sign-in email") and the role an invitation gives, with "No email is sent." and a Create invitation
   that sends it, ending seven days from when it is made; Invitations, every invitation newest first with where it
   stands (Pending, Accepted, Expired, or Revoked, which the state and the clock tell) and Revoke for each that
   waits, and Invite people; Revoke invitation?, naming the address; Transfer ownership, choosing the new owner
-  among the people who can become it and saying who becomes the only owner; and Remove {name}?, saying what they
-  lose and that they need a fresh invitation to rejoin. Each says "Creating…", "Revoking…", "Transferring…", or
+  among the people who can become it and saying who becomes the only owner; Remove {name}?, saying what they
+  lose and that they need a fresh invitation to rejoin; and Change your name (`ChangingName`), which the account menu on
+  the rail asks for, a compact dialog of one field, "Your name", that starts from the name the person has, takes the focus
+  with its text selected (the `SelectOnFocus` mount, `selectOnFocus.ts`), and a Save name that waits for a name that is not
+  blank and not the one they have. The page asks for it by raising `nameChangeRequests` in the Block's model, a count of the
+  times the person chose the entry, which the Block's one subscription turns into `RequestedChangeName`, since a message
+  to the Block would add a shape the workspace page's `makeUpdate` cannot carry (see `page/workspace`). Each says "Creating…", "Revoking…", "Transferring…", or
   "Removing…" while its request is on its way, and closing the dialog then is ignored: it opens again to show how
   the request ends. A request that ends well closes the dialog; one that does not stays open under the failure.
   Revoking from the invitations replaces them in the same dialog, so Cancel and the end of the request close it
@@ -464,7 +482,7 @@ the pages that compose them; the root composes the pages.
   "None yet" only once the connections are read and the integrations are listed. `view` is the list, the
   main content: All, Models, Tools, Sandboxes, Harnesses, and Channels on a tab each, with how many connections
   each holds once the connections and integrations are read (`connectionsOnTab`, a connection being on the tab of
-  each thing its integration gives, and on All alone once its integration is not installed), a search that
+  each thing its integration gives, and on All alone once its integration is not installed), a toolbar with a search that
   narrows the tab by the name of a connection or of its integration in any case and whatever the accents
   (`shownConnections`), the labels of its columns, Connection and Authentication, which a phone leaves out, and a
   row for each: the connections drawing on a mark with the status's patch, the name over the integration and
@@ -524,7 +542,7 @@ the pages that compose them; the root composes the pages.
   setup" on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
   ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
   Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
-  many agents it holds, an "Add agent" button that opens the dialog, a search that narrows the tab by name, in any case
+  many agents it holds, an "Add agent" button that opens the dialog, a toolbar with a search that narrows the tab by name, in any case
   and whatever the accents, and a row for each agent in the design's columns Agent, Harness,
   Model, and Activity: the lilac 32px mark and name, the harness (a connection's name, or "Auto")
   over its sandbox (a connection's name, or "No sandbox"), the model's id over its connection's
@@ -687,15 +705,15 @@ the pages that compose them; the root composes the pages.
     workspace is not created, nor an invitation accepted, unseen. Closing it while the listing is read again
     leaves the listing to show the result alone, without a toast.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
-  rail has the logo, a button named "Amends home" that goes Home, over "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings". Each
+  rail has the logo, a button named "Amends home" that goes Home, over "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings" and the person's account. Each
   destination is marked while it is open; Home is open while nothing, the inbox, the tasks in triage,
   every open task, the groups to browse, or a group is, and Connections while the connections, one
   connection, or the channels are. Search is no destination: it is never marked, and it sends `ClickedSearch`, as the
   sidebar's Find anything… does. The rail picks a destination and the sidebar lists its items, so the
   sidebar changes with the rail. The
-  sidebar, named by the workspace, has the workspace's name over a button to all workspaces and,
-  in its footer, who is signed in with a Sign out button, whichever destination is open. Between them
-  are the destination's sections. Home's are an
+  sidebar, named by the workspace, has the workspace's name over a button to all workspaces and, under them,
+  the destination's sections; it has no footer, since who is signed in and the way out are in the account menu on the rail.
+  Home's are an
   "Inbox" item with how many notifications wait, a "Triage" item with how many tasks wait in
   triage (`triageCount`), a "Tasks" item, and the groups' sections. The Agents destination's is the agents Block's
   `sidebarView`, in the slot `agents-sidebar`, and the Connections destination's, and the Channels',
@@ -741,7 +759,7 @@ the pages that compose them; the root composes the pages.
   navigation does. The
   workspace's name in the sidebar and
   the home pane is the settings' once they hold the workspace, so it follows a rename, and the one
-  the workspace was opened with until then. The page's view takes the account's email, the time now, and whether the page runs on an Apple
+  the workspace was opened with until then. The page's view takes the account's email, the Appearance the person chose, the time now, and whether the page runs on an Apple
   platform as view inputs, and gives the inbox, the tasks, and the open group, in the main pane and the side pane, the time now. Picking a group opens it; Home or any other destination leaves no group
   marked in the list; opening a task's thread opens its group with the thread already open,
   and marks the group, while opening a notification's leaves the inbox where it is. The shell lays itself out by the window's width: below 64rem the sidebar is
@@ -789,12 +807,29 @@ the pages that compose them; the root composes the pages.
   sidebar is in place, from `Desktop`, it closes the drawer, so a window that grows past 64rem while
   the drawer is open gets its sidebar back. It reports when the person leaves it and when they ask
   to sign out.
+
+  The account menu is a Foldkit `Menu` Block the page binds as `account` (`AccountBinding`, a menu of `AccountEntry`,
+  last among its bindings). The rail's account is a button named "Account: {name}", their initials on a mark, with their name
+  once the settings hold it, and the address they signed in with until then. It opens to the right of the rail with that
+  name over the address, an Appearance group of System, Light, and Dark with the current one checked, then Switch workspace,
+  Workspace settings, "Change your name…", and Sign out. The entries the app acts on (`AppEntry`: the Appearances, Switch
+  workspace, Workspace settings, and Sign out) are reported as `ChoseAccountEntry`, and the root acts on them: it shows and
+  keeps an Appearance, leaves the workspace for the list of the person's workspaces, signs out, and asks the workspace for
+  its settings (`RequestedWorkspaceSettings`, which shows the Workspace page as the rail's Settings does). Changing the
+  name is the page's alone and is reported to no one: it raises `nameChangeRequests` in the settings, and the settings open
+  their dialog. That goes through a count in the settings' model, not a message to the Block, and the workspace's settings
+  go to the root and back for the page, because TypeScript instantiates only so much for one `makeUpdate` call
+  (TS2589) and this page's, with thirteen bindings, is at that limit: a further binding, or a handler or fold of a shape
+  the call has not seen, tips it over, and silencing it with `@ts-expect-error` would leave `any` in the types downstream.
+  Menu items are `menuitem`s whose names say `(selected)` for the Appearance chosen, since the Block cannot draw a
+  `menuitemradio`.
+
 - The root, `composition.ts` with `model.ts`, `message.ts`, `init.ts`, `update.ts`, `subscription.ts`,
   and `view.ts`: the page the person is on, signed out at the form or signed in with their account,
   workspaces, and the one open, the width of the window, the time now, and whether the page runs on an Apple
   platform. Signing in lists the workspaces, which the page asks for with the account's email, so that it can
   suggest a name for joining one; signing
-  out, from the workspace list or from the open workspace's sidebar, which asks the root, is one step
+  out, from the workspace list or from the open workspace's account menu, which asks the root, is one step
   in `composition.ts`, and its command, `command.ts`, forgets the session, the person's stores, and
   their sync identity first, so it works offline, then removes the browser's sync key and ends the
   session as far as the host can be reached. A session the host no longer knows, which the workspace
@@ -809,7 +844,12 @@ the pages that compose them; the root composes the pages.
   the user agent's platform, `navigator.userAgentData.platform`, in the browsers that have one, and from
   `navigator.platform` in the others, which `namesApplePlatform` takes for macOS, iOS, or iPadOS. The
   root keeps it in its model, since nothing changes it, and gives it to the open workspace's view, which
-  writes the search's shortcut by it. The
+  writes the search's shortcut by it. The flags also carry the Appearance the browser kept (`readKeptAppearance`: System
+  when none was kept or what was kept is not one), which the root keeps in its model and the open workspace's account menu
+  checks. `init` shows it on the page (`ShowAppearance`), and choosing another in the menu shows and keeps it again
+  (`ShowAppearance`, `KeepAppearance`; a browser that refuses to keep it loses it only for the next visit). The runtime
+  paints once before it runs a command, so a page kept in Light or Dark may show the browser's preference for a moment
+  first. The
   subscription `WatchViewport`, in `subscription.ts`, keeps it current: it follows the three queries,
   drops a width that did not change, and sends `ChangedViewport`, whose update sets the width and
   informs the open workspace of it, and a workspace opened later starts from the width the root has
@@ -1050,14 +1090,17 @@ browser's storage. Each Block's tests sit beside it:
   task's thread in its group, and a notification's beside the inbox, which stays, naming the thread
   open in the group open or beside the inbox, opening the navigation drawer, closing it as its dialog asks and by every
   navigation to an item of a sidebar, and not by a destination picked on the rail, which shows it, showing the
-  connections, the agents, and the settings for what their sidebars ask, and asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
+  connections, the agents, and the settings for what their sidebars ask, reporting to the root each entry of the account
+  menu it acts on, asking the settings for their name dialog, and no one, when the person chooses to change their name, showing the
+  settings' Workspace page when the root asks, and taking the window's width, closing the drawer once the sidebar is in
   place; the thread opening the side pane's dialog where the pane is one, from a notification, from a
   task, from a thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing
   with the thread, with every navigation, and as the window widens to `Split`, which leaves the thread
   open; the thread closing as its dialog closes by itself, below `Split`; the thread beside the inbox
   closing with every navigation that leaves the inbox, so that coming back shows none; and
   the root signing in a step at a time, listing the workspaces, opening and closing one, signing out,
-  from the list or from the open workspace, signing out to the sign-in form with the address and a notice when the
+  from the list or from the open workspace's account menu, showing and keeping the Appearance chosen there, and the one
+  the flags name, leaving the workspace for the list, and showing the workspace's settings, signing out to the sign-in form with the address and a notice when the
   host no longer knows the session, and following the window's width, for the workspace it
   opens too, and keeping the time now from the flags and from each minute's report, which informs no
   one, and the platform from the flags. The commands that write a message's text run their handlers over `test/recordingStores.ts`, a
@@ -1191,10 +1234,11 @@ browser's storage. Each Block's tests sit beside it:
   a removal, naming the agent and saying it leaves and its messages stay, removing it once confirmed, saying
   under the question that it could not be, and left alone on Cancel; the settings' Workspace page, with the name renamed when it is new
   and the reason it could not be kept, the ID copied and shown Copied until its time is up, who made the
-  workspace and who owns it, the person's own name renamed, a member offered only their own name to change, what
+  workspace and who owns it, the person's own name changed in a compact dialog the page asks for, which starts from the name they have with it
+  selected, saves only a name that is new, says why it could not, and closes once it is kept, with no form for it on the page, what
   is on its way marked, loading, not loading, and a way to read again, and the store's changes shown; the Members
   page, with the members listed under their headings with their role and status, an agent said to be one,
-  narrowed by search and by whether they left, a row marking the member open and reporting it; and a member in the
+  narrowed by search and by a menu of whether they left, its labels kept under the toolbar only while it has someone to show, a row marking the member open and reporting it; and a member in the
   side pane, with their role changed or refused and the reason said, with Refresh where what the person sees is
   out of date, their access, a member who left, one the person may only read, and one the records no longer hold,
   and Remove member offered only to those who may use it; the Workspace page's Transfer ownership, offered to the
@@ -1245,7 +1289,8 @@ browser's storage. Each Block's tests sit beside it:
   the sidebar and from the list, a connection added, shown by its page after it is checked, and the
   connections listing the integrations
   again after the host could not be reached. The root's own scenes show
-  the open workspace with no header of its own, signing out from its sidebar, its Menu button
+  the open workspace with no header of its own, and no footer in its sidebar, signing out from the account menu on its rail,
+  an Appearance chosen there shown and kept and the one in use checked, switching workspace and opening the workspace's settings, its Menu button
   appearing and the sidebar leaving as the subscription reports a narrower window, and the reverse,
   and the thread open moving from its place beside the main pane into its dialog as the window narrows
   to `Desktop`, staying there at `Phone`, and back as it widens to `Split`, and the open inbox's

@@ -1,6 +1,6 @@
 /**
- * What happens at the root: the person signs out, what signing out reports back, the window changes width,
- * a minute passes, and the person presses the key that opens the search.
+ * What happens at the root: the person signs out, what signing out reports back, the page shows and keeps their
+ * Appearance, the window changes width, a minute passes, and the person presses the key that opens the search.
  */
 
 import { Viewport } from "@amends-dev/design/viewport"
@@ -10,6 +10,8 @@ import { defineMessageUnion } from "foldkit/message"
 export const Message = defineMessageUnion({
   ClickedSignOut: {},
   CompletedSignOut: {},
+  CompletedShowAppearance: {},
+  CompletedKeepAppearance: {},
   ChangedViewport: { viewport: Viewport },
   Ticked: { now: Schema.DateTimeUtc },
   PressedSearchKey: {}

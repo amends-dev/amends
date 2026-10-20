@@ -1,12 +1,13 @@
 /**
  * The workspace's settings, as the sidebar's Workspace and Members: on Workspace, its name, which the person renames
- * when they may, its ID, who made it, who owns it, whom the owner hands it to, and the person's own name; on Members,
- * the members in a roster the person searches and narrows to those who are still in the workspace or are not, and
- * the invitations waiting, with all of them in a history. A member opens in the side pane, where the person changes
- * their role, reads their access, and removes them; the invitations are issued, revoked, and read in dialogs, as is
- * the handing over of the workspace and the removal of a member. A control shows only when the person's grants and the
- * delegation rule allow it. The Block reports the member opened and closed, and what the person did, which the
- * workspace page shows the side pane for and confirms.
+ * when they may, its ID, who made it, who owns it, and whom the owner hands it to; on Members, the members in a
+ * roster the person searches and narrows to those who are still in the workspace or are not, and the invitations
+ * waiting, with all of them in a history. A member opens in the side pane, where the person changes their role, reads
+ * their access, and removes them; the invitations are issued, revoked, and read in dialogs, as is the handing over of
+ * the workspace, the removal of a member, and the changing of the person's own name, which the workspace page asks for
+ * from the account menu. A control shows only when the person's grants and the delegation rule allow it. The Block
+ * reports the member opened and closed, and what the person did, which the workspace page shows the side pane for and
+ * confirms.
  */
 
 import {
@@ -30,6 +31,7 @@ import {
   WorkspaceSettingsPermissions
 } from "@amends-dev/core/workspace"
 import { DialogBlock } from "@foldkit/ui/dialog"
+import * as Menu from "@foldkit/ui/menu"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
@@ -96,7 +98,10 @@ export type Reason = typeof Reason.Type
 export const Failure = Schema.Struct({ action: SettingsAction, reason: Reason })
 export type Failure = typeof Failure.Type
 
-/** A name the person is changing: what they typed, whether the write is on its way, and why the last one failed. */
+/**
+ * The name of the workspace the person is changing: what they typed, whether the write is on its way, and why the last
+ * one failed.
+ */
 export const NameEdit = Schema.Struct({
   name: Schema.String,
   isSaving: Schema.Boolean,
@@ -107,6 +112,9 @@ export type NameEdit = typeof NameEdit.Type
 /** What narrows the roster: the letters of a name, and whether it lists those who are in the workspace or who left. */
 export const MembersFilter = Schema.Struct({ query: Schema.String, status: Member.Status })
 export type MembersFilter = typeof MembersFilter.Type
+
+/** The menu in the roster's toolbar that chooses whether it lists those who are in the workspace or who left. */
+export const MemberStatusMenu = Menu.create<Member.Status>()
 
 /**
  * The member open in the side pane: which, the role the person chose and has not saved, whether the save is on its
@@ -126,8 +134,9 @@ export type Inviting = typeof Inviting.Type
 
 /**
  * What the person is doing in the dialog, each with whether its request is on its way and why the last one failed:
- * inviting someone, reading every invitation, confirming the revoking of one, choosing the workspace's new owner, or
- * confirming the removal of a member, who is called what they were when the person asked.
+ * inviting someone, reading every invitation, confirming the revoking of one, choosing the workspace's new owner,
+ * confirming the removal of a member, who is called what they were when the person asked, or changing the person's own
+ * name.
  */
 export const Entering = defineTaggedUnion({
   Inviting: {
@@ -153,15 +162,18 @@ export const Entering = defineTaggedUnion({
     name: Schema.String,
     isSending: Schema.Boolean,
     failure: Schema.Option(Failure)
-  }
+  },
+  ChangingName: { name: Schema.String, isSending: Schema.Boolean, failure: Schema.Option(Failure) }
 })
 export type Entering = typeof Entering.Type
 
 /**
  * The workspace, its members and their role assignments, the roles, the invitations, what the person may do, the
- * names they are changing, the roster's filter, the member open in the side pane, the dialog and what is done in it,
- * how many times they asked to copy the workspace's ID and which of them shows as done, and whether the settings could
- * not be read. `reads` counts how many times the person asked to read them again, which starts the read anew.
+ * name of the workspace they are changing, the roster's filter and its menu, the member open in the side pane, the
+ * dialog and what is done in it, how many times they asked to copy the workspace's ID and which of them shows as done,
+ * how many times the page asked for the dialog that changes their own name, and whether the settings could not be
+ * read. `reads` counts how many times the person asked to read them again, which starts the read anew, and
+ * `nameChangeRequests` how many times the page asked for that dialog, each of which opens it.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
@@ -175,13 +187,14 @@ export const Model = Schema.Struct({
   isUnreadable: Schema.Boolean,
   reads: Schema.Int,
   workspaceName: Schema.Option(NameEdit),
-  ownName: Schema.Option(NameEdit),
   filter: MembersFilter,
+  statusMenu: MemberStatusMenu.Model,
   selected: Schema.Option(Selected),
   dialog: DialogBlock.Model,
   entering: Schema.Option(Entering),
   copyAttempts: Schema.Int,
-  copiedAttempt: Schema.Option(Schema.Int)
+  copiedAttempt: Schema.Option(Schema.Int),
+  nameChangeRequests: Schema.Int
 })
 export type Model = typeof Model.Type
 
@@ -200,12 +213,13 @@ export const Message = defineMessageUnion({
   SubmittedWorkspaceName: {},
   TypedOwnName: { name: Schema.String },
   SubmittedOwnName: {},
+  CompletedSelectOnFocus: {},
+  RequestedChangeName: {},
   ClickedCopyId: {},
   CopiedWorkspaceId: { attempt: Schema.Int },
   FailedCopyWorkspaceId: {},
   ExpiredCopied: { attempt: Schema.Int },
   TypedMemberQuery: { query: Schema.String },
-  ChoseMemberStatus: { status: Member.Status },
   ClickedMember: { memberId: MemberId.MemberId },
   ClickedCloseMember: {},
   ChoseRole: { roleId: Role.RoleId },
@@ -431,10 +445,6 @@ export const transferCandidates = (model: Model): ReadonlyArray<Member.Member> =
 /** The name in the field of the workspace's name: what the person typed, or the name it has. */
 export const workspaceNameDraft = (model: Model): string =>
   Option.match(model.workspaceName, { onNone: () => workspaceName(model), onSome: ({ name }) => name })
-
-/** The name in the field of the person's own name: what they typed, or the name they have. */
-export const ownNameDraft = (model: Model): string =>
-  Option.match(model.ownName, { onNone: () => ownName(model), onSome: ({ name }) => name })
 
 /** Whether what the person typed is a name to save: not blank, and not the name already held. */
 export const isNameChanged = (typed: string, saved: string): boolean => typed.trim() !== "" && typed.trim() !== saved

@@ -3,9 +3,8 @@ import { composer, type MentionSuggestions } from "@amends-dev/design/composer"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import { initials } from "../../seen.ts"
-import * as Drafts from "../../store/Drafts.ts"
 import { ComposerComposition } from "./composition.ts"
-import { Message, type Model, suggestMembers } from "./definition.ts"
+import { boxId, Message, type Model, suggestMembers } from "./definition.ts"
 
 /**
  * How the box is labelled, what it shows while it is empty, and what its button says, and the members the
@@ -17,13 +16,6 @@ export type ViewInputs = Readonly<{
   submitLabel: string
   members: ReadonlyArray<Member.Member>
 }>
-
-/** The id of the box at a place, so a label finds it. */
-const idOf = (place: Drafts.Place) =>
-  Drafts.Place.match(place, {
-    Reply: ({ threadId }) => `reply-${threadId}`,
-    Thread: ({ groupId }) => `thread-${groupId}`
-  })
 
 const pickMention = ({ id, name }: Member.Member) => Message.PickedMention({ memberId: id, name })
 
@@ -55,7 +47,7 @@ const suggestionsOf = (
 
       const active = Math.min(activeIndex, suggested.length - 1)
       return Option.some({
-        id: `${idOf(model.place)}-members`,
+        id: `${boxId(model.place)}-members`,
         items: suggested.map((member, index) => ({
           id: member.id,
           mark: initials(member.name),
@@ -71,7 +63,7 @@ const suggestionsOf = (
 export const view = ComposerComposition.makeView.withInputs<ViewInputs>(
   (model, { label, placeholder, submitLabel, members }, h) =>
     composer(h, {
-      id: idOf(model.place),
+      id: boxId(model.place),
       label,
       placeholder,
       value: Option.getOrElse(model.text, () => ""),

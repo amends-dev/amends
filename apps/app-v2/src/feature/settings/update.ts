@@ -68,21 +68,30 @@ const refusedName =
 const atWorkspaceName = (model: Model, change: (edit: NameEdit) => NameEdit): Model =>
   modifyFields(model, { workspaceName: Option.map(change) })
 
-/** The model with the person's own name being changed as `change` makes it, while it is. */
-const atOwnName = (model: Model, change: (edit: NameEdit) => NameEdit): Model =>
-  modifyFields(model, { ownName: Option.map(change) })
-
 /** The model with the member open as `change` makes them, while one is. */
 const atSelected = (model: Model, change: (selected: Selected) => Selected): Model =>
   modifyFields(model, { selected: Option.map(change) })
 
 type Inviting = Extract<Entering, { readonly _tag: "Inviting" }>
 
+type ChangingName = Extract<Entering, { readonly _tag: "ChangingName" }>
+
 /** The model with the invitation being drafted as `change` makes it, while one is and it is not on its way. */
 const atInviting = (model: Model, change: (inviting: Inviting) => Inviting): Model =>
   modifyFields(model, {
     entering: Option.map((entering) =>
       Entering.isAnyOf(["Inviting"])(entering) && !entering.isSending ? change(entering) : entering
+    )
+  })
+
+/**
+ * The model with the person's own name being typed as `change` makes it, while the dialog changes it and its request
+ * is not on its way.
+ */
+const atChangingName = (model: Model, change: (changing: ChangingName) => ChangingName): Model =>
+  modifyFields(model, {
+    entering: Option.map((entering) =>
+      Entering.isAnyOf(["ChangingName"])(entering) && !entering.isSending ? change(entering) : entering
     )
   })
 
@@ -181,27 +190,34 @@ const submitWorkspaceName = (model: Model) =>
 
 /** Send the name the person typed for themselves, when it is one to save and the replica holds their membership. */
 const submitOwnName = (model: Model) =>
-  Option.match(model.ownName, {
+  Option.match(model.entering, {
     onNone: () => ({ model }),
-    onSome: (edit) => {
-      if (edit.isSaving) {
-        return { model }
-      }
+    onSome: (entering) =>
+      Entering.matchOrElse(
+        entering,
+        {
+          ChangingName: ({ name, isSending }) => {
+            if (isSending) {
+              return { model }
+            }
 
-      if (Option.isNone(findMember(model, model.memberId))) {
-        return { model: atOwnName(model, refusedName(failureOf("RenameSelf", "Gone"))) }
-      }
+            if (Option.isNone(findMember(model, model.memberId))) {
+              return { model: atEntering(model, refusedEntering(failureOf("RenameSelf", "Gone"))) }
+            }
 
-      if (!isNameChanged(edit.name, ownName(model))) {
-        return { model }
-      }
+            if (!isNameChanged(name, ownName(model))) {
+              return { model }
+            }
 
-      const { workspaceId, memberId } = model
-      return {
-        model: atOwnName(model, sentName),
-        commands: [RenameSelf({ workspaceId, memberId, name: edit.name.trim() })]
-      }
-    }
+            const { workspaceId, memberId } = model
+            return {
+              model: atEntering(model, sentEntering),
+              commands: [RenameSelf({ workspaceId, memberId, name: name.trim() })]
+            }
+          }
+        },
+        () => ({ model })
+      )
   })
 
 /** Send the role the person chose for the member open as a replacement of the roles they saw the member hold. */
@@ -249,6 +265,14 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
           openDialog(
             Entering.Inviting({ email: "", roleId: BuiltinRoles.MemberId, isSending: false, failure: Option.none() })
           )
+        ])
+      : { model }
+
+  /** Ask for the dialog that changes the person's own name, from the one they have, once the replica holds them. */
+  const askToChangeName = () =>
+    Option.isSome(findMember(model, model.memberId))
+      ? Update.combine(model, [
+          openDialog(Entering.ChangingName({ name: ownName(model), isSending: false, failure: Option.none() }))
         ])
       : { model }
 
@@ -457,10 +481,11 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
         model: modifyFields(model, { workspaceName: () => Option.none() }),
         outMessage: OutMessage.RenamedWorkspace()
       }),
-      RenameSelf: () => ({
-        model: modifyFields(model, { ownName: () => Option.none() }),
-        outMessage: OutMessage.RenamedSelf()
-      }),
+      RenameSelf: () =>
+        pipe(
+          Update.combine(model, closeDialogWhen(Option.exists(model.entering, Entering.isAnyOf(["ChangingName"])))),
+          Update.withOutMessage(OutMessage.RenamedSelf())
+        ),
       ChangeRole: ({ memberId }) => ({
         model: atSelected(model, (selected) =>
           selected.memberId === memberId
@@ -501,7 +526,7 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
   const refuse = (model: Model, written: Written, reason: Reason): Model =>
     Written.match(written, {
       Rename: () => atWorkspaceName(model, refusedName(failureOf("Rename", reason))),
-      RenameSelf: () => atOwnName(model, refusedName(failureOf("RenameSelf", reason))),
+      RenameSelf: () => refuseEntering(model, "RenameSelf", reason, Entering.isAnyOf(["ChangingName"])),
       ChangeRole: ({ memberId }) =>
         atSelected(model, (selected) =>
           selected.memberId === memberId
@@ -534,7 +559,6 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
         isUnreadable: () => false,
         reads: (reads) => reads + 1,
         workspaceName: Option.map((edit) => ({ ...edit, failure: Option.none() })),
-        ownName: Option.map((edit) => ({ ...edit, failure: Option.none() })),
         selected: Option.map((selected) => ({ ...selected, failure: Option.none() })),
         entering: Option.map(unfailedEntering)
       })
@@ -543,8 +567,12 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
       model: modifyFields(model, { workspaceName: (edit) => typedName(edit, name) })
     }),
     SubmittedWorkspaceName: () => submitWorkspaceName(model),
-    TypedOwnName: ({ name }) => ({ model: modifyFields(model, { ownName: (edit) => typedName(edit, name) }) }),
+    TypedOwnName: ({ name }) => ({
+      model: atChangingName(model, (changing) => ({ ...changing, name, failure: Option.none() }))
+    }),
     SubmittedOwnName: () => submitOwnName(model),
+    CompletedSelectOnFocus: () => ({ model }),
+    RequestedChangeName: () => askToChangeName(),
     ClickedCopyId: () => ({
       model: modifyFields(model, { copyAttempts: (attempts) => attempts + 1 }),
       commands: [CopyWorkspaceId({ workspaceId: model.workspaceId, attempt: model.copyAttempts + 1 })]
@@ -559,9 +587,6 @@ export const update = SettingsComposition.makeUpdate((model, message) => {
     }),
     TypedMemberQuery: ({ query }) => ({
       model: modifyFields(model, { filter: (filter) => ({ ...filter, query }) })
-    }),
-    ChoseMemberStatus: ({ status }) => ({
-      model: modifyFields(model, { filter: (filter) => ({ ...filter, status }) })
     }),
     ClickedMember: ({ memberId }) =>
       Option.isSome(findMember(model, memberId))

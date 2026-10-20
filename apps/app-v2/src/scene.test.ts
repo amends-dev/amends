@@ -29,14 +29,15 @@ import {
   session,
   thread
 } from "../test/fixtures.ts"
-import { SignOut } from "./command.ts"
+import { chooseMenuItem, openMenu } from "../test/menu.ts"
+import { KeepAppearance, ShowAppearance, SignOut } from "./command.ts"
 import { GroupBlock } from "./feature/group/block.ts"
 import { Message } from "./message.ts"
 import { type Model, Page } from "./model.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { SendCode } from "./page/signIn/command.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
-import { Open } from "./page/workspace/definition.ts"
+import { AccountMenu, Open } from "./page/workspace/definition.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
 import { Workspaces } from "./page/workspaces/definition.ts"
 import { subscriptions } from "./subscription.ts"
@@ -45,10 +46,14 @@ import { view } from "./view.ts"
 
 const signedOut: Model = {
   page: Page.SignedOut({ signIn: SignInBlock.init("").model }),
+  appearance: "System",
   viewport: "Split",
   now,
   isApplePlatform: true
 }
+
+/** The button that opens the account menu on the rail, for a person who has no name yet. */
+const accountButton = "Account: alice@example.com"
 
 /** Signed in as alice, who belongs to one workspace, with none of them opened. */
 const choosing: Model = {
@@ -59,6 +64,7 @@ const choosing: Model = {
     }),
     workspace: Option.none()
   }),
+  appearance: "System",
   viewport: "Split",
   now,
   isApplePlatform: true
@@ -87,6 +93,7 @@ const inWorkspace: Model = {
         .model
     })
   }),
+  appearance: "System",
   viewport: "Split",
   now,
   isApplePlatform: true
@@ -223,13 +230,14 @@ describe("the app", () => {
     )
   })
 
-  it("has no header over an opened workspace, which shows who is signed in and the way out in its sidebar", () => {
+  it("has no header over an opened workspace, which shows who is signed in and the way out in its rail's account menu", () => {
     scene(
       { update, view },
       given(inWorkspace),
       expect(role("banner")).toBeAbsent(),
-      expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toExist(),
-      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))).toExist(),
+      expect(within(role("navigation", { name: "Studio" }), text("alice@example.com"))).toBeAbsent(),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))).toBeAbsent(),
+      expect(within(role("navigation", { name: "Destinations" }), role("button", { name: accountButton }))).toExist(),
       expect(role("main", { name: "Studio" })).toExist(),
       expect(role("heading", { name: "Choose a workspace" })).toBeAbsent(),
       expect(role("heading", { name: "Sign in to amends" })).toBeAbsent()
@@ -302,15 +310,70 @@ describe("the app", () => {
     )
   })
 
-  it("signs out from the sidebar of an opened workspace, back to the sign-in form with the address kept", () => {
+  it("signs out from the account menu on the rail of an opened workspace, back to the sign-in form with the address kept", () => {
     scene(
       { update, view },
       given(inWorkspace),
-      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Sign out" }))),
+      ...openMenu(AccountMenu, accountButton),
+      ...chooseMenuItem(AccountMenu, "Sign out"),
       Command.expectExact(SignOut()),
       Command.resolve(SignOut, Message.CompletedSignOut()),
       expect(role("heading", { name: "Sign in to amends" })).toExist(),
       expect(label("Email")).toHaveValue("alice@example.com")
+    )
+  })
+
+  it("lays the page out in the Appearance the person chose, and checks it in the account menu", () => {
+    scene(
+      { update, view },
+      given(modifyFields(inWorkspace, { appearance: () => "Dark" })),
+      ...openMenu(AccountMenu, accountButton),
+      expect(role("menuitem", { name: "Dark (selected)" })).toExist(),
+      expect(role("menuitem", { name: "System" })).toExist(),
+      expect(role("menuitem", { name: "Light" })).toExist()
+    )
+  })
+
+  it("shows and keeps the Appearance the person chooses in the account menu, which is then checked", () => {
+    scene(
+      { update, view },
+      given(inWorkspace),
+      ...openMenu(AccountMenu, accountButton),
+      expect(role("menuitem", { name: "System (selected)" })).toExist(),
+      ...chooseMenuItem(AccountMenu, "Dark"),
+      Command.expectExact(ShowAppearance({ appearance: "Dark" }), KeepAppearance({ appearance: "Dark" })),
+      Command.resolve(ShowAppearance, Message.CompletedShowAppearance()),
+      Command.resolve(KeepAppearance, Message.CompletedKeepAppearance()),
+      ...openMenu(AccountMenu, accountButton),
+      expect(role("menuitem", { name: "Dark (selected)" })).toExist(),
+      expect(role("menuitem", { name: "System" })).toExist()
+    )
+  })
+
+  it("goes back to the workspaces to choose from when the person switches workspace, and keeps them signed in", () => {
+    scene(
+      { update, view },
+      given(inWorkspace),
+      ...openMenu(AccountMenu, accountButton),
+      ...chooseMenuItem(AccountMenu, "Switch workspace"),
+      expect(within(role("main"), role("heading", { name: "Choose a workspace", level: 1 }))).toExist(),
+      expect(role("navigation", { name: "Destinations" })).toBeAbsent(),
+      expect(within(role("banner"), role("button", { name: "Sign out" }))).toExist()
+    )
+  })
+
+  it("opens the Workspace page of the settings when the person chooses the workspace's settings in the account menu", () => {
+    scene(
+      { update, view },
+      given(inWorkspace),
+      expect(role("main", { name: "Workspace" })).toBeAbsent(),
+      ...openMenu(AccountMenu, accountButton),
+      ...chooseMenuItem(AccountMenu, "Workspace settings"),
+      expect(role("main", { name: "Workspace" })).toExist(),
+      expect(within(role("navigation", { name: "Studio" }), role("button", { name: "Workspace" }))).toHaveAttr(
+        "aria-current",
+        "page"
+      )
     )
   })
 

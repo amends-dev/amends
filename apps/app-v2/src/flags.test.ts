@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { KeyValueStore } from "effect/persistence"
+import { keepAppearance } from "./appearance.ts"
 import { flags, namesApplePlatform } from "./flags.ts"
 import * as Session from "./session.ts"
 
-const session = Session.layer("http://127.0.0.1:8787").pipe(Layer.provide(KeyValueStore.layerMemory))
+/** The session over a browser's storage, and that storage, which the Appearance is kept in too. */
+const storage = Session.layer("http://127.0.0.1:8787").pipe(Layer.provideMerge(KeyValueStore.layerMemory))
 
 /** Whether the flags say the page runs on an Apple platform, in a browser whose `navigator` is `browser`. */
 const readIsApplePlatform = (browser: object) =>
@@ -15,7 +17,7 @@ const readIsApplePlatform = (browser: object) =>
     Effect.andThen(flags),
     Effect.map(({ isApplePlatform }) => isApplePlatform),
     Effect.scoped,
-    Effect.provide(session)
+    Effect.provide(storage)
   )
 
 describe("namesApplePlatform", () => {
@@ -46,6 +48,14 @@ describe("the flags", () => {
         expect(yield* readIsApplePlatform({ platform: "Win32" })).toBe(false)
         expect(yield* readIsApplePlatform({ platform: "Linux x86_64" })).toBe(false)
       })
+  )
+
+  it.effect("say the Appearance the browser kept from the last visit, and System before one was kept", () =>
+    Effect.gen(function* () {
+      expect((yield* flags).appearance).toBe("System")
+      yield* keepAppearance("Dark")
+      expect((yield* flags).appearance).toBe("Dark")
+    }).pipe(Effect.provide(storage))
   )
 
   it.effect("say it by the user agent data's platform where the browser has it, over navigator.platform", () =>

@@ -33,6 +33,7 @@ import {
   roles,
   scout
 } from "../../../test/fixtures.ts"
+import { chooseFromMenu, closeMenu, openMenu } from "../../../test/menu.ts"
 import { SettingsBlock } from "./block.ts"
 import {
   ChangeRole,
@@ -43,9 +44,10 @@ import {
   RenameSelf,
   RenameWorkspace,
   RevokeInvitation,
+  SelectOnFocus,
   TransferOwnership
 } from "./command.ts"
-import { Message, type Model, OutMessage, Written } from "./definition.ts"
+import { MemberStatusMenu, Message, type Model, OutMessage, Written } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -103,7 +105,7 @@ const withOpen = (model: Model, memberId: typeof bob.id): Model =>
   })
 
 describe("the Workspace page of the settings", () => {
-  it("shows the workspace's name, its ID and who made it, who owns it, and the person's own name", () => {
+  it("shows the workspace's name, its ID and who made it, and who owns it, and has no form for the person's name", () => {
     scene(
       { update, view },
       given(owner),
@@ -126,11 +128,8 @@ describe("the Workspace page of the settings", () => {
         expect(text("Workspace owner")).toExist(),
         expect(text("A workspace has one owner. Transferring ownership makes you an administrator.")).toExist()
       ),
-      inside(
-        role("region", { name: "Your name" }),
-        expect(role("textbox", { name: "Your name" })).toHaveValue("Alice"),
-        expect(role("button", { name: "Save name" })).toBeDisabled()
-      )
+      expect(role("region", { name: "Your name" })).toBeAbsent(),
+      expect(role("textbox", { name: "Your name" })).toBeAbsent()
     )
   })
 
@@ -163,15 +162,72 @@ describe("the Workspace page of the settings", () => {
     )
   })
 
-  it("changes the person's own name", () => {
+  it("changes the person's own name in a compact dialog the page asks for, which starts from the name they have", () => {
+    const nameDialog = role("dialog", { name: "Change your name" })
+
     scene(
-      { update, view },
+      { update, view: withDialog(view), subscriptions: SettingsBlock.subscriptions },
       given(owner),
-      type(role("textbox", { name: "Your name" }), "Alice M."),
-      click(role("button", { name: "Save name" })),
+      expect(nameDialog).toBeAbsent(),
+      Subscription.emit(subscriptions.settings, Message.RequestedChangeName()),
+      ...dialogOpened(),
+      Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
+      inside(
+        nameDialog,
+        expect(role("textbox", { name: "Your name" })).toHaveValue("Alice"),
+        expect(text("How others in this workspace see you.")).toExist(),
+        expect(role("button", { name: "Cancel" })).toExist(),
+        // The name they have is no name to save, and neither is a blank one.
+        expect(role("button", { name: "Save name" })).toBeDisabled(),
+        type(role("textbox", { name: "Your name" }), "   "),
+        expect(role("button", { name: "Save name" })).toBeDisabled(),
+        type(role("textbox", { name: "Your name" }), "Alice M."),
+        expect(role("button", { name: "Save name" })).toBeEnabled(),
+        click(role("button", { name: "Save name" }))
+      ),
       Command.expectExact(RenameSelf({ ...asMember, name: "Alice M." })),
+      inside(
+        nameDialog,
+        expect(role("textbox", { name: "Your name" })).toBeDisabled(),
+        expect(role("button", { name: "Saving…" })).toBeDisabled()
+      ),
       Command.resolve(RenameSelf, Message.WroteAction({ written: Written.RenameSelf() })),
-      expect(role("textbox", { name: "Your name" })).toHaveValue("Alice")
+      expectOutMessage(OutMessage.RenamedSelf()),
+      ...dialogClosed(),
+      Mount.expectEnded(SelectOnFocus),
+      expect(nameDialog).toBeAbsent()
+    )
+  })
+
+  it("says why the name could not be saved, and keeps the dialog open to try again", () => {
+    const nameDialog = role("dialog", { name: "Change your name" })
+
+    scene(
+      { update, view: withDialog(view), subscriptions: SettingsBlock.subscriptions },
+      given(owner),
+      Subscription.emit(subscriptions.settings, Message.RequestedChangeName()),
+      ...dialogOpened(),
+      Mount.resolve(SelectOnFocus, Message.CompletedSelectOnFocus()),
+      inside(
+        nameDialog,
+        type(role("textbox", { name: "Your name" }), "A"),
+        click(role("button", { name: "Save name" }))
+      ),
+      Command.resolve(RenameSelf, Message.FailedWriteAction({ written: Written.RenameSelf(), reason: "Invalid" })),
+      inside(
+        nameDialog,
+        expect(text("Use 1 to 80 characters, with no invisible ones.")).toExist(),
+        expect(role("textbox", { name: "Your name" })).toHaveValue("A"),
+        type(role("textbox", { name: "Your name" }), "Al"),
+        expect(text("Use 1 to 80 characters, with no invisible ones.")).toBeAbsent(),
+        click(role("button", { name: "Save name" }))
+      ),
+      Command.resolve(RenameSelf, Message.FailedWriteAction({ written: Written.RenameSelf(), reason: "Failed" })),
+      inside(
+        nameDialog,
+        expect(text("Your name could not be saved. Try again when the host is available.")).toExist(),
+        expect(role("button", { name: "Save name" })).toBeEnabled()
+      )
     )
   })
 
@@ -189,7 +245,7 @@ describe("the Workspace page of the settings", () => {
     )
   })
 
-  it("leaves the name to the owner, and offers a member only their own", () => {
+  it("leaves the name to the owner", () => {
     scene(
       { update, view },
       given(readBy(bob)),
@@ -200,9 +256,7 @@ describe("the Workspace page of the settings", () => {
         role("region", { name: "Ownership" }),
         expect(text("Alice")).toExist(),
         expect(text("Workspace owner")).toExist()
-      ),
-      expect(role("textbox", { name: "Your name" })).toHaveValue("Bob"),
-      expect(role("button", { name: "Save name" })).toExist()
+      )
     )
   })
 
@@ -311,8 +365,9 @@ describe("the Members page of the settings", () => {
             )
         })
       ),
-      expect(label("Show members")).toHaveValue("active"),
-      change(label("Show members"), "removed"),
+      expect(role("button", { name: "Active members" })).toExist(),
+      ...chooseFromMenu(MemberStatusMenu, "Active members", "Removed members"),
+      expect(role("button", { name: "Removed members" })).toExist(),
       inside(
         role("list", { name: "Removed members" }),
         expect(role("button", { name: "Bob" })).toHaveAttr("aria-description", "Member · Removed"),
@@ -327,9 +382,37 @@ describe("the Members page of the settings", () => {
     scene(
       { update, view: membersPage },
       given(owner),
-      change(label("Show members"), "removed"),
+      ...chooseFromMenu(MemberStatusMenu, "Active members", "Removed members"),
       expect(text("Nobody has been removed from this workspace.")).toExist(),
-      expect(art("rest")).toExist()
+      expect(art("rest")).toExist(),
+      ...chooseFromMenu(MemberStatusMenu, "Removed members", "Active members"),
+      expect(role("list", { name: "Members" })).toExist()
+    )
+  })
+
+  it("narrows the roster in a menu in its toolbar, by whether the member is still in the workspace", () => {
+    scene(
+      { update, view: membersPage },
+      given(owner),
+      expect(label("Search members")).toExist(),
+      expect(role("button", { name: "Active members" })).toHaveAttr("aria-haspopup", "menu"),
+      expect(role("menu")).toBeAbsent(),
+      ...openMenu(MemberStatusMenu, "Active members"),
+      expect(role("menuitem", { name: "Active members (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Removed members" })).toExist(),
+      ...closeMenu(MemberStatusMenu, "Active members"),
+      expect(role("menu")).toBeAbsent(),
+      expect(role("list", { name: "Members" })).toExist()
+    )
+  })
+
+  it("keeps the labels of the columns under the toolbar while the roster has someone to show, and not when it has none", () => {
+    scene(
+      { update, view: membersPage },
+      given(owner),
+      expect(text("Workspace role")).toExist(),
+      ...chooseFromMenu(MemberStatusMenu, "Active members", "Removed members"),
+      expect(text("Workspace role")).toBeAbsent()
     )
   })
 

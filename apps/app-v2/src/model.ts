@@ -1,6 +1,6 @@
 /**
- * The app's state: the page the person is on, the width of the window, the time now, and whether the page runs
- * on an Apple platform. Signed out, the page is the sign-in form; signed in, their account, the workspaces they
+ * The app's state: the page the person is on, their Appearance, the width of the window, the time now, and whether
+ * the page runs on an Apple platform. Signed out, the page is the sign-in form; signed in, their account, the workspaces they
  * belong to, and the one they opened.
  */
 
@@ -10,6 +10,7 @@ import * as Accounts from "@amends-dev/gateway/Accounts"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { defineTaggedUnion } from "foldkit/schema"
+import { Appearance } from "./appearance.ts"
 import { SignInBlock } from "./page/signIn/block.ts"
 import { WorkspaceBlock } from "./page/workspace/block.ts"
 import { WorkspacesBlock } from "./page/workspaces/block.ts"
@@ -26,6 +27,7 @@ export type Page = typeof Page.Type
 
 export const Model = Schema.Struct({
   page: Page,
+  appearance: Appearance,
   viewport: Viewport,
   now: Schema.DateTimeUtc,
   isApplePlatform: Schema.Boolean
