@@ -20,18 +20,21 @@ export const subscriptions = ThreadDefinition.subscriptions((entry) => ({
           stores
             .read(workspaceId, memberId, (store) =>
               Stream.merge(
-                Stream.map(store.thread(threadId), ({ thread, messages, participation, latest, readThrough }) =>
-                  Message.ReceivedThread({
-                    title: Option.flatMap(thread, ({ record }) => Option.fromNullOr(record.value.title)),
-                    messages: messages.map(({ record, pending }) => ({ message: record.value, pending })),
-                    following: Option.map(participation, ({ record, pending }) => ({
-                      participationId: record.value.id,
-                      active: record.value.status === "active",
-                      pending
-                    })),
-                    latest,
-                    readThrough
-                  })
+                Stream.map(
+                  store.thread(threadId),
+                  ({ thread, messages, participation, participationChanges, latest, readThrough }) =>
+                    Message.ReceivedThread({
+                      title: Option.flatMap(thread, ({ record }) => Option.fromNullOr(record.value.title)),
+                      messages: messages.map(({ record, pending }) => ({ message: record.value, pending })),
+                      following: Option.map(participation, ({ record, pending }) => ({
+                        participationId: record.value.id,
+                        active: record.value.status === "active",
+                        pending
+                      })),
+                      changes: participationChanges,
+                      latest,
+                      readThrough
+                    })
                 ),
                 Stream.map(store.people, (people) => Message.ReceivedPeople(people))
               )

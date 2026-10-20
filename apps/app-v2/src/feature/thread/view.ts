@@ -15,13 +15,14 @@ import {
 } from "@amends-dev/design/control"
 import { property } from "@amends-dev/design/details"
 import { form } from "@amends-dev/design/form"
-import { description, divider, event, message, messageList } from "@amends-dev/design/message"
+import { description, divider, event, message, messageList, note } from "@amends-dev/design/message"
 import { pane, paneBack, paneClose, paneColumn, paneStack } from "@amends-dev/design/pane"
-import type * as DateTime from "effect/DateTime"
+import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import {
   authorName,
+  fullTimeOf,
   groupByDay,
   initials,
   messageText,
@@ -34,7 +35,7 @@ import {
 } from "../../seen.ts"
 import { replyActionView, replyLogView } from "../turns/view.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
-import { Message, type MessageItem, type Model, titleOf, typingIn } from "./definition.ts"
+import { Message, type MessageItem, type Model, noteOf, titleOf, typingIn } from "./definition.ts"
 import { Entry, timelineOf, turnPostingReply, whenOf } from "./timeline.ts"
 
 /**
@@ -212,8 +213,8 @@ const postedView = (
 ]
 
 /**
- * An entry of the timeline: a message, or the row of the agent's turn where it took on the work, which the turns
- * Block draws.
+ * An entry of the timeline: a message, the row of the agent's turn where it took on the work, which the turns Block
+ * draws, or the quiet line of who followed the thread or stopped taking part in it.
  */
 const entryView = (
   entry: Entry,
@@ -224,6 +225,15 @@ const entryView = (
 ): ReadonlyArray<Html> =>
   Entry.match(entry, {
     Posted: ({ item }) => postedView(item, model, inputs, timeLabel, h),
+    Noted: ({ change }) => [
+      note(h, {
+        key: change.id,
+        text: noteOf(model, change),
+        time: timeLabel(change.at),
+        dateTime: DateTime.formatIso(change.at),
+        title: fullTimeOf(change.at)
+      })
+    ],
     Took: ({ item: { turn } }) => [
       h.block(
         TurnsBinding.embedView({ slotId: `turn-${turn.id}`, model: model.turns, viewInputs: { turnId: turn.id } })

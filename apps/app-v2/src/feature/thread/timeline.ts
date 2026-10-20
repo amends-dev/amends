@@ -1,6 +1,6 @@
 /**
- * What a thread's timeline holds after its opening, by when each thing happened: its replies, and the turns where
- * agents took on the work that did not reply.
+ * What a thread's timeline holds after its opening, by when each thing happened: its replies, the turns where agents
+ * took on the work that did not reply, and the notes of who followed the thread or stopped taking part in it.
  */
 
 import type { ThreadMessageId } from "@amends-dev/core/thread"
@@ -9,23 +9,34 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import { defineTaggedUnion } from "foldkit/schema"
 import { TurnItem } from "../turns/definition.ts"
-import { MessageItem, type Model } from "./definition.ts"
+import { MessageItem, type Model, ParticipationChange } from "./definition.ts"
 
-/** A thing in the timeline: a message that was posted, or a turn where an agent took on the work. */
+/**
+ * A thing in the timeline: a message that was posted, a turn where an agent took on the work, or a change to who takes
+ * part in the thread.
+ */
 export const Entry = defineTaggedUnion({
   Posted: { item: MessageItem },
-  Took: { item: TurnItem }
+  Took: { item: TurnItem },
+  Noted: { change: ParticipationChange }
 })
 export type Entry = typeof Entry.Type
 
-/** When the entry happened: a message when it was published, a turn when the agent took on the work. */
+/**
+ * When the entry happened: a message when it was published, a turn when the agent took on the work, a note when the
+ * change was made.
+ */
 export const whenOf = Entry.match({
   Posted: ({ item }): DateTime.Utc => item.message.publishedAt,
-  Took: ({ item }): DateTime.Utc => item.turn.createdAt
+  Took: ({ item }): DateTime.Utc => item.turn.createdAt,
+  Noted: ({ change }): DateTime.Utc => change.at
 })
 
-/** What orders entries that happened at one moment: a turn follows the message that asked for it. */
-const kindRank = Entry.match({ Posted: () => 0, Took: () => 1 })
+/**
+ * What orders entries that happened at one moment: a turn follows the message that asked for it, and a note comes
+ * last.
+ */
+const kindRank = Entry.match({ Posted: () => 0, Took: () => 1, Noted: () => 2 })
 
 const byWhenThenKind: Order.Order<Entry> = Order.combine(
   Order.mapInput(DateTime.Order, whenOf),
@@ -37,8 +48,9 @@ const hasReplyAmong = ({ turn }: TurnItem, messages: ReadonlyArray<MessageItem>)
   turn.messageIds.some((id) => messages.some(({ message }) => message.id === id))
 
 /**
- * The thread's opening message, once it is read, and, after it, in the order they happened, its replies and its turns
- * that did not post a reply among them: a turn that replied is shown as its reply.
+ * The thread's opening message, once it is read, and, after it, in the order they happened, its replies, its turns
+ * that did not post a reply among them, and the notes of who followed it or stopped taking part: a turn that replied is
+ * shown as its reply.
  */
 export const timelineOf = (
   model: Model
@@ -46,7 +58,8 @@ export const timelineOf = (
   const [opening, ...replies] = model.messages
   const after = [
     ...replies.map((item) => Entry.Posted({ item })),
-    ...model.turns.turns.filter((item) => !hasReplyAmong(item, model.messages)).map((item) => Entry.Took({ item }))
+    ...model.turns.turns.filter((item) => !hasReplyAmong(item, model.messages)).map((item) => Entry.Took({ item })),
+    ...model.changes.map((change) => Entry.Noted({ change }))
   ]
 
   return { opening: Option.fromUndefinedOr(opening), after: after.toSorted(byWhenThenKind) }

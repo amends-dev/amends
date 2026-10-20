@@ -7,13 +7,19 @@
 
 import { Contact } from "@amends-dev/core/channel"
 import { Presence } from "@amends-dev/core/presence"
-import { ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
+import {
+  ThreadActivity,
+  ThreadId,
+  ThreadMessage,
+  ThreadMessageId,
+  ThreadParticipationId
+} from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { messageWords } from "../../seen.ts"
+import { memberName, messageWords } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
@@ -30,13 +36,32 @@ export const Following = Schema.Struct({
 })
 export type Following = typeof Following.Type
 
+/** How a member's part in the thread changed, as its timeline notes it. */
+export const ParticipationChangeKind = Schema.Literals([
+  "followed",
+  "unfollowed",
+  "left-group",
+  "removed-from-group",
+  "removed-from-workspace"
+])
+export type ParticipationChangeKind = typeof ParticipationChangeKind.Type
+
+/** A change to a member's part in the thread, when it was made, and whose part it was. */
+export const ParticipationChange = Schema.Struct({
+  id: ThreadActivity.ThreadActivityId,
+  at: Schema.DateTimeUtc,
+  change: ParticipationChangeKind,
+  memberId: MemberId.MemberId
+})
+export type ParticipationChange = typeof ParticipationChange.Type
+
 /** A message being edited, and its new text. */
 export const Editing = Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId, draft: Schema.String })
 export type Editing = typeof Editing.Type
 
 /**
- * The thread's title, when it has one, its messages, the person's part in it, the sequence of its
- * latest activity, how far they have read it and asked to, the title or message being changed,
+ * The thread's title, when it has one, its messages, the person's part in it, the changes to who takes part in it, the
+ * sequence of its latest activity, how far they have read it and asked to, the title or message being changed,
  * whether they said lately that they type there, who could have written its messages, who is
  * present, the reply being written, the task it tracks, its agents' turns, and why the last read or
  * write failed.
@@ -48,6 +73,7 @@ export const Model = Schema.Struct({
   title: Schema.Option(Schema.String),
   messages: Schema.Array(MessageItem),
   following: Schema.Option(Following),
+  changes: Schema.Array(ParticipationChange),
   latest: Schema.Int,
   readThrough: Schema.Int,
   readRequested: Schema.Int,
@@ -76,6 +102,7 @@ export const Message = defineMessageUnion({
     title: Schema.Option(Schema.String),
     messages: Schema.Array(MessageItem),
     following: Schema.Option(Following),
+    changes: Schema.Array(ParticipationChange),
     latest: Schema.Int,
     readThrough: Schema.Int
   },
@@ -112,6 +139,30 @@ export const titleOf = (model: Model): string =>
       onSome: ({ message }) => messageWords(message, model.members)
     })
   )
+
+/**
+ * What a change to a member's part in the thread says, as the person reads it: "Sara followed this thread", "You
+ * stopped following", "Sara left the group", "Sara was removed from the group", "You were removed from the
+ * workspace". The person is "You".
+ */
+export const noteOf = (model: Model, { change, memberId }: ParticipationChange): string => {
+  const isSelf = memberId === model.memberId
+  const who = isSelf ? "You" : memberName(model.members, memberId)
+  const were = isSelf ? "were" : "was"
+
+  switch (change) {
+    case "followed":
+      return `${who} followed this thread`
+    case "unfollowed":
+      return `${who} stopped following`
+    case "left-group":
+      return `${who} left the group`
+    case "removed-from-group":
+      return `${who} ${were} removed from the group`
+    case "removed-from-workspace":
+      return `${who} ${were} removed from the workspace`
+  }
+}
 
 /** The text and revision of `messageId`, while it has text. */
 export const textOf = (model: Model, messageId: ThreadMessageId.ThreadMessageId) =>

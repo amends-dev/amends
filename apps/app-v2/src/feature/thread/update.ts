@@ -9,7 +9,7 @@ const inThread = ({ workspaceId, memberId, threadId }: Model) => ({ workspaceId,
 
 export const update = ThreadComposition.makeUpdate((model, message) =>
   Message.match(message, {
-    ReceivedThread: ({ title, messages, following, latest, readThrough }) => {
+    ReceivedThread: ({ title, messages, following, changes, latest, readThrough }) => {
       // Reading it open marks it read through its latest activity, once for each.
       const marking = latest > Math.max(readThrough, model.readRequested)
       return {
@@ -17,6 +17,7 @@ export const update = ThreadComposition.makeUpdate((model, message) =>
           title: () => title,
           messages: () => messages,
           following: () => following,
+          changes: () => changes,
           latest: () => latest,
           readThrough: () => readThrough,
           readRequested: (requested) => (marking ? latest : requested)

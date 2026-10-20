@@ -14,6 +14,7 @@ export const init = ThreadComposition.makeInit(
       title: Option.none(),
       messages: [],
       following: Option.none(),
+      changes: [],
       latest: 0,
       readThrough: 0,
       readRequested: 0,

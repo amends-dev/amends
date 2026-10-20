@@ -36,6 +36,10 @@ export const initials = (name: string): string =>
 export const timeOf = (dateTime: DateTime.DateTime): string =>
   DateTime.formatLocal(dateTime, { hour: "numeric", minute: "2-digit" })
 
+/** The day and time `dateTime` was, with the weekday, as a tooltip names it: "Sunday, October 18, 2026 at 10:02 AM". */
+export const fullTimeOf = (dateTime: DateTime.DateTime): string =>
+  DateTime.formatLocal(dateTime, { dateStyle: "full", timeStyle: "short" })
+
 const millisPerMinute = 60_000
 const millisPerHour = 3_600_000
 const millisPerDay = 86_400_000

@@ -1,4 +1,10 @@
-import { ThreadId, ThreadMessage, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
+import {
+  ThreadActivity,
+  ThreadId,
+  ThreadMessage,
+  ThreadMessageId,
+  ThreadParticipationId
+} from "@amends-dev/core/thread"
 import { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, it } from "@effect/vitest"
 import { DateTime, Option, Schema } from "effect"
@@ -38,7 +44,7 @@ import {
   TellTyping,
   UnfollowThread
 } from "./command.ts"
-import { type Following, Message } from "./definition.ts"
+import { type Following, Message, type ParticipationChange, type ParticipationChangeKind } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
@@ -101,6 +107,39 @@ const readWith = (...messages: ReadonlyArray<Readonly<{ message: ThreadMessage.T
       title: Option.none(),
       messages,
       following: Option.none(),
+      changes: [],
+      latest: 0,
+      readThrough: 0
+    })
+  ),
+  Subscription.emit(subscriptions.thread, Message.ReceivedPeople({ members: [alice, bob], contacts: [] }))
+]
+
+/** The change `kind` to `member`'s part in the thread, made `at`. */
+const changing = (
+  kind: ParticipationChangeKind,
+  member: typeof alice,
+  at: string,
+  id = "activity-1"
+): ParticipationChange => ({
+  id: ThreadActivity.ThreadActivityId.make(id),
+  at: DateTime.makeUnsafe(at),
+  change: kind,
+  memberId: member.id
+})
+
+/** The thread read with `messages` and the `changes` to who takes part in it. */
+const readWithChanges = (
+  messages: ReadonlyArray<Readonly<{ message: ThreadMessage.ThreadMessage; pending: boolean }>>,
+  changes: ReadonlyArray<ParticipationChange>
+) => [
+  Subscription.emit(
+    subscriptions.thread,
+    Message.ReceivedThread({
+      title: Option.none(),
+      messages,
+      following: Option.none(),
+      changes,
       latest: 0,
       readThrough: 0
     })
@@ -309,7 +348,14 @@ describe("a thread", () => {
     const readFollowing = (following: Option.Option<Following>) =>
       Subscription.emit(
         subscriptions.thread,
-        Message.ReceivedThread({ title: Option.none(), messages: [], following, latest: 0, readThrough: 0 })
+        Message.ReceivedThread({
+          title: Option.none(),
+          messages: [],
+          following,
+          changes: [],
+          latest: 0,
+          readThrough: 0
+        })
       )
 
     scene(
@@ -399,6 +445,89 @@ describe("a thread", () => {
       expect(within(nth(all.role("listitem"), 4), role("group", { name: "Scout's turn log" }))).toExist(),
       click(role("button", { name: "View turn log" })),
       expect(role("group", { name: "Scout's turn log" })).toBeAbsent()
+    )
+  })
+
+  it("says who followed the thread or stopped taking part in it, as the person or as someone else", () => {
+    const noted = (kind: ParticipationChangeKind, member: typeof alice, line: string) =>
+      scene(
+        { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+        given(opened),
+        ...readWithChanges([{ message: opening, pending: false }], [changing(kind, member, "2026-10-18T12:02:00Z")]),
+        expect(within(role("list", { name: "Messages" }), text(line))).toExist()
+      )
+
+    noted("followed", bob, "Bob followed this thread")
+    noted("followed", alice, "You followed this thread")
+    noted("unfollowed", bob, "Bob stopped following")
+    noted("unfollowed", alice, "You stopped following")
+    noted("left-group", bob, "Bob left the group")
+    noted("left-group", alice, "You left the group")
+    noted("removed-from-group", bob, "Bob was removed from the group")
+    noted("removed-from-group", alice, "You were removed from the group")
+    noted("removed-from-workspace", bob, "Bob was removed from the workspace")
+    noted("removed-from-workspace", alice, "You were removed from the workspace")
+  })
+
+  it("places a note among the messages at the time of the change, quietly, with that time", () => {
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWithChanges(
+        [
+          { message: opening, pending: false },
+          { message: reply, pending: false }
+        ],
+        [changing("followed", bob, "2026-10-18T12:02:00Z")]
+      ),
+      expect(nth(all.role("listitem"), 0)).toHaveText("Today"),
+      expect(within(nth(all.role("listitem"), 1), text("Plans for the week"))).toExist(),
+      expect(nth(all.role("listitem"), 2)).toHaveText("1 reply"),
+      expect(within(nth(all.role("listitem"), 3), text("Bob followed this thread"))).toHaveClass("text-ink-secondary"),
+      expect(
+        within(nth(all.role("listitem"), 3), text(timeOf(DateTime.makeUnsafe("2026-10-18T12:02:00Z"))))
+      ).toHaveClass("text-ink-muted"),
+      expect(within(nth(all.role("listitem"), 4), text("Sounds good"))).toExist()
+    )
+  })
+
+  it("places a note under its day, and does not count it among the replies", () => {
+    const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      ...readWithChanges(
+        [{ message: yesterday, pending: false }],
+        [changing("left-group", bob, "2026-10-18T12:10:00Z")]
+      ),
+      expect(nth(all.role("listitem"), 0)).toHaveText("Yesterday"),
+      expect(within(nth(all.role("listitem"), 1), text("Plans for the week"))).toExist(),
+      expect(nth(all.role("listitem"), 2)).toHaveText("Today"),
+      expect(within(nth(all.role("listitem"), 3), text("Bob left the group"))).toExist(),
+      expect(text(/repl/)).toBeAbsent()
+    )
+  })
+
+  it("places the notes of a thread that tracks a task among its activity, by the day and the time of day", () => {
+    const yesterdayNoon = DateTime.formatIso(DateTime.subtract(now, { days: 1 }))
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(trackingTask),
+      ...readWithChanges(
+        [
+          { message: opening, pending: false },
+          { message: reply, pending: false }
+        ],
+        [changing("followed", bob, "2026-10-18T12:02:00Z"), changing("unfollowed", alice, yesterdayNoon, "activity-2")]
+      ),
+      expect(within(nth(all.role("listitem"), 1), text(/^Alice created this task · /))).toExist(),
+      expect(within(nth(all.role("listitem"), 3), text("Bob followed this thread"))).toExist(),
+      expect(within(nth(all.role("listitem"), 4), text("Sounds good"))).toExist(),
+      // No divider says its day here, so the one that was not today says it.
+      expect(within(nth(all.role("listitem"), 2), text("You stopped following"))).toExist(),
+      expect(within(nth(all.role("listitem"), 2), text("Yesterday"))).toExist()
     )
   })
 

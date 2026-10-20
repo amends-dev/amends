@@ -63,6 +63,7 @@ const received = (latest: number, readThrough: number, active = true) =>
       title: Option.none(),
       messages: [{ message: opening, pending: false }],
       following: Option.some({ participationId, active, pending: false }),
+      changes: [],
       latest,
       readThrough
     })

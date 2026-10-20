@@ -17,7 +17,15 @@ import type { Presence } from "@amends-dev/core/presence"
 import { ReplicaRecord } from "@amends-dev/core/replica"
 import { Request } from "@amends-dev/core/request"
 import type { Task } from "@amends-dev/core/task"
-import { type Thread, type ThreadId, ThreadMessage, ThreadParticipation } from "@amends-dev/core/thread"
+import {
+  type Thread,
+  type ThreadActivity,
+  ThreadActivityKind,
+  type ThreadId,
+  ThreadMessage,
+  ThreadParticipation,
+  ThreadParticipationActivity
+} from "@amends-dev/core/thread"
 import { Turn, TurnStore } from "@amends-dev/core/turn"
 import type { Member, MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import * as AgentSync from "@amends-dev/sync/AgentSync"
@@ -347,14 +355,90 @@ export interface TurnView {
 }
 
 /**
+ * What a member did to their part in a thread that its timeline notes: they followed it, stopped following it, left
+ * its group, were removed from its group, or were removed from the workspace.
+ */
+export type ParticipationChangeKind =
+  | "followed"
+  | "unfollowed"
+  | "left-group"
+  | "removed-from-group"
+  | "removed-from-workspace"
+
+/** A change to a member's part in a thread, when it was made, and whose part it was. */
+export interface ParticipationChange {
+  readonly id: ThreadActivity.ThreadActivityId
+  readonly at: DateTime.Utc
+  readonly change: ParticipationChangeKind
+  readonly memberId: MemberId.MemberId
+}
+
+/** How each way a participation ended is noted. */
+const endingChange: Readonly<Record<ThreadParticipation.EndReason, ParticipationChangeKind>> = {
+  unfollowed: "unfollowed",
+  "group-left": "left-group",
+  "group-removed": "removed-from-group",
+  "workspace-removed": "removed-from-workspace"
+}
+
+/** Which participation an activity is about and what it did to it, when it followed or ended one. */
+const changeOf = (
+  activity: ThreadActivity.ThreadActivity
+): Option.Option<
+  Readonly<{ participationId: ThreadParticipation.ThreadParticipation["id"]; change: ParticipationChangeKind }>
+> => {
+  if (ThreadActivityKind.is(ThreadParticipationActivity.Followed)(activity)) {
+    return Option.map(
+      Schema.decodeUnknownOption(ThreadParticipationActivity.Followed.details)(activity.details),
+      ({ participationId }) => ({ participationId, change: "followed" as const })
+    )
+  }
+
+  if (ThreadActivityKind.is(ThreadParticipationActivity.Ended)(activity)) {
+    return Option.map(
+      Schema.decodeUnknownOption(ThreadParticipationActivity.Ended.details)(activity.details),
+      ({ participationId, reason }) => ({ participationId, change: endingChange[reason] })
+    )
+  }
+
+  return Option.none()
+}
+
+/**
+ * The follows and endings among a thread's `activities` that its timeline notes, in the order of the thread, each with
+ * the member whose part it was among `participations`. Joining by writing or by being mentioned records no activity of
+ * its own, so it has no note, and a participation that is not a member's, a contact's or the triage's, has none either.
+ */
+export const deriveParticipationChanges = (
+  activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
+  participations: ReadonlyArray<ThreadParticipation.ThreadParticipation>
+): ReadonlyArray<ParticipationChange> =>
+  Array.sort(
+    activities,
+    Order.mapInput(Order.Number, ({ sequence }: ThreadActivity.ThreadActivity) => sequence)
+  ).flatMap((activity): ReadonlyArray<ParticipationChange> =>
+    Option.match(changeOf(activity), {
+      onNone: () => [],
+      onSome: ({ participationId, change }) => {
+        const participation = participations.find(({ id }) => id === participationId)
+        const memberId =
+          participation === undefined ? undefined : ThreadParticipation.memberOf(participation.participant)
+
+        return memberId === undefined ? [] : [{ id: activity.id, at: activity.occurredAt, change, memberId }]
+      }
+    })
+  )
+
+/**
  * A thread as the person sees it open: the thread, while the replica holds it, its messages, oldest
- * first, their own part in it, the sequence of its latest activity, how far they have read it, the
- * task it tracks, and its agents' turns, oldest first.
+ * first, their own part in it, the changes to who takes part in it, the sequence of its latest activity, how far they
+ * have read it, the task it tracks, and its agents' turns, oldest first.
  */
 export interface ThreadDetail {
   readonly thread: Option.Option<Pending.Held<Replica.RecordOf<"Thread">>>
   readonly messages: ReadonlyArray<Pending.Held<Replica.RecordOf<"ThreadMessage">>>
   readonly participation: Option.Option<Pending.Held<Replica.RecordOf<"ThreadParticipation">>>
+  readonly participationChanges: ReadonlyArray<ParticipationChange>
   readonly latest: number
   readonly readThrough: number
   readonly task: Option.Option<Pending.Held<Replica.RecordOf<"Task">>>
@@ -736,6 +820,10 @@ export const layer = (options: Options) =>
                       { Member: ({ memberId }) => memberId === options.memberId },
                       () => false
                     )
+                  ),
+                  participationChanges: deriveParticipationChanges(
+                    contents.activities.map(({ value }) => value),
+                    contents.participations.map(({ value }) => value)
                   ),
                   latest: contents.activities.reduce((latest, { value }) => Math.max(latest, value.sequence), 0),
                   readThrough: readThroughOf(Pending.overlay("ThreadPosition", place, contents.positions, pending)),

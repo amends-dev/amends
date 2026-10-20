@@ -23,6 +23,7 @@ import {
   expiryInDaysLabel,
   expiryLabel,
   foldAccents,
+  fullTimeOf,
   groupByDay,
   groupMark,
   initials,
@@ -129,6 +130,16 @@ describe("timeOf", () => {
 /** The time `hour`:`minute` on a day by the clock of the machine the tests run on, so no time zone changes the day. */
 const local = (year: number, month: number, day: number, hour = 12, minute = 0) =>
   DateTime.makeUnsafe(new Date(year, month - 1, day, hour, minute))
+
+describe("fullTimeOf", () => {
+  it("is the weekday, the date with its year, and the time of day, for a tooltip", () => {
+    const time = fullTimeOf(local(2026, 10, 18, 10, 2))
+
+    expect(time).toMatch(/Sunday/)
+    expect(time).toMatch(/October 18, 2026/)
+    expect(time).toContain(timeOf(local(2026, 10, 18, 10, 2)))
+  })
+})
 
 /** `at` spelled with `options` the way the person's own locale spells it. */
 const spelled = (at: DateTime.DateTime, options: Intl.DateTimeFormatOptions) =>

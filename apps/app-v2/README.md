@@ -229,8 +229,9 @@ below it counted at each level above.
   task it is a section named Thread: Rename, the form to rename it while the person does, the task
   (making it one, where they may), then its timeline as a list under a `divider` for each day it happened on by the
   person's own clock (`groupByDay`, named as `dayLabel` names it): the opening first, how many replies follow it,
-  and the replies and the agents' turns after it, in the order they happened (`timeline.ts`, `timelineOf`, which
-  orders what happened at one moment so that a turn follows the message that asked for it). Each message is by its
+  and the replies, the agents' turns, and the notes of who followed the thread or stopped taking part in it after it,
+  in the order they happened (`timeline.ts`, `timelineOf`, which orders what happened at one moment so that a turn
+  follows the message that asked for it and a note follows what it came after). Each message is by its
   author's initials, name, and when it was published (`timeOf`: its time of day, since a divider says its day), with
   "Sending…" after it, its text as markdown with each mention a chip (`messageText`, by the thread's members), or
   "Message deleted" in muted italics for a deleted one, " (edited)" quietly after the text of one that was edited, and
@@ -240,7 +241,12 @@ below it counted at each level above.
   view for each turn, whose input is the turn's id; a turn that replied is its reply instead, found by the
   messages its `messageIds` name, which have View turn log among their actions, and its log opens under the last of
   them, so a turn shows as a row only while none of its replies is among the thread's messages. Why the turns could
-  not be read shows above the timeline. Who else types shows in a live region under it: "Ada is typing…", "Ada and
+  not be read shows above the timeline. A note is a quiet line of the design's `note` with the time it happened,
+  its full date and time as its title (`fullTimeOf`), from the thread's activity in the replica (the store's
+  `deriveParticipationChanges`, by the member whose part it was; the person is "You"): "Sara followed this
+  thread", "You stopped following", "Sara left the group", "Sara was removed from the group", "You were removed
+  from the workspace" (`noteOf`). Joining a thread by writing in it or being mentioned in it records no activity of
+  its own, so it has no note, and a note is not a reply. Who else types shows in a live region under it: "Ada is typing…", "Ada and
   Bob are typing…", and "Several people are typing…" for three or more (`typingLine`). For a thread that tracks a
   task it is a
   section named Task, laid out as `apps/ui`'s task pane is: Rename, which `apps/ui` has no place for
@@ -1213,8 +1219,9 @@ choice is.
   reads follows the number of tasks and not of threads, and reads those of the tasks the person's
   unfinished actions create too, since their actions hold the tasks), `inbox` the person's
   notifications with the threads they come from, which the store
-  shows each by the message its activity is about, `thread` what a thread holds, with its task
-  and turns, `group` a group with its admissions and the person's follow of it, `groups` every group
+  shows each by the message its activity is about, `thread` what a thread holds, with its task,
+  its turns, and the changes to who takes part in it (`deriveParticipationChanges`: the follows and the endings
+  among its activities, each with the member whose part it was), `group` a group with its admissions and the person's follow of it, `groups` every group
   the replica holds with how many members it has, a team's admitted ones, which a removed
   admission leaves out, and a conversation's own, and `grants` what
   the person may do, resolved by core's `GrantResolver` from their active assignments and the
@@ -1449,7 +1456,8 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   disabled and named Stopping, every problem of a stop or retry in its words under the row, a turn's log followed as it
   is written, until the turn ends or it could not be followed, a turn that replied as its reply with View turn log
   and its log under it, and the thread placing its agents' turns among its messages at the moment they took on the
-  work, under the day; a group's main pane, titled by its name or by
+  work, under the day, and the notes of who followed it or stopped taking part in it, for the person as "You" and
+  for someone else, in each way, among them by their time; a group's main pane, titled by its name or by
   a conversation's other member, with the drawing of a channel or of a message before it, the workspace's name
   under it on a phone, its tabs named for it, its members as a stack of three marks named for how many there are, which
   opens them in the settings, the person's part in it as a bell named Following and pressed while they follow, and
@@ -1677,7 +1685,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and changed shows at once and becomes the server's, while a change from a stale value comes back
   refused, and a thread started as a task shows its task in its group's list at once in triage and then as the
   server made it, and a task in each of two groups lists with the name of its group and the replies its
-  thread has, as it is written and once the server has it; and a connection added over HTTP, to an integration the test host installs, reaches the
+  thread has, and a thread the person stops following and follows again notes both in the thread, none for starting it, as it is written and once the server has it; and a connection added over HTTP, to an integration the test host installs, reaches the
   store, and its rename and removal show at once, then as the server made them (the stub host the page's and the connections' command tests send their requests through is `test/host.ts`); and an agent added
   in the browser, with its membership, role, and admission, comes back as the server's under the
   IDs the browser gave them; and a channel added in the browser is the server's under the same ID,
@@ -1686,8 +1694,9 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   from reaches them, and a member renamed here shows at once, then as the host has it; and a search
   finds a team, a thread, and a conversation the person started, and the member they are with,
   before the server has them and after, whatever the case or accents of the query, and not the
-  person themselves. `Store.viewTurns` is
-  tested apart: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
+  person themselves. `Store.deriveParticipationChanges` is tested apart: a follow and each way a
+  participation ended in the order of the thread, when each was made, and nothing for other activity, details that do
+  not read, or a participation that is not a member's, and so is `Store.viewTurns`: which turns may run again, and so is `Store.summarizeReplies`: no replies, and each
   replier once in the order of their first reply, and so is `Store.deriveLastActiveAt`: the creation of a thread
   with no messages, and the later of two messages, and so is `Store.viewTasks`: each task with its
   thread, the place of its group, and the summary of its messages, a conversation's group placed by the other
@@ -1698,7 +1707,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   the member's current name and the syntax of its markdown not found, no thread by a deleted opening or without its group, the active members
   but the person by name, whatever the case or accents, and at most eight of each in the order given,
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
-  start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
+  full date and time of a moment, the start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
   and once it has, and of how many replies a thread has, and of who types, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
   a mention as "@" and the member's current name or the name it recorded, a title as written, and `settingsForm.ts`: the fields an
