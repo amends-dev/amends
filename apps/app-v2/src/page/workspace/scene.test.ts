@@ -15,6 +15,7 @@ import {
   expectAll,
   expectOutMessage,
   filter,
+  first,
   given,
   inside,
   label,
@@ -308,6 +309,7 @@ const asOwner = modifyFields(opened, {
 const withConnection = modifyFields(asOwner, {
   connections: (connections) =>
     modifyFields(connections, {
+      isLoaded: () => true,
       connections: () => [{ connection: connectionOf("connection-1", "Models"), pending: false }]
     })
 })
@@ -465,10 +467,8 @@ describe("a workspace", () => {
       click(role("button", { name: "Connections" })),
       inside(
         role("main", { name: "Connections" }),
-        expect(text("Models")).toExist(),
-        expect(text("Test API")).toExist(),
-        expect(text("Ready")).toExist(),
-        expect(role("button", { name: "Add a connection" })).toExist()
+        expect(role("tab", { name: "All" })).toHaveAttr("aria-description", "1"),
+        expect(role("button", { name: "Models" })).toHaveAttr("aria-description", "Test API · API key")
       )
     )
   })
@@ -483,7 +483,7 @@ describe("a workspace", () => {
       ),
       expect(role("main", { name: "Connections" })).toBeAbsent(),
       click(role("button", { name: "Connections" })),
-      inside(role("list", { name: "Connections" }), expect(text("Models")).toExist(), expect(text("Ready")).toExist())
+      inside(role("list", { name: "Connections" }), expect(role("button", { name: "Models" })).toExist())
     )
   })
 
@@ -501,13 +501,12 @@ describe("a workspace", () => {
       ),
       click(role("button", { name: "Connections" })),
       expect(text("The host could not be reached. Try again.")).toExist(),
-      expect(role("button", { name: "Add a connection" })).toBeAbsent(),
       click(role("button", { name: "Try again" })),
       Command.expectExact(LoadIntegrations({ workspaceId: workspace.id })),
       expect(text("Loading the integrations…")).toExist(),
       Command.resolve(LoadIntegrations, Message.ReceivedIntegrations({ integrations: [testApi] })),
       expect(text("Loading the integrations…")).toBeAbsent(),
-      expect(role("button", { name: "Add a connection" })).toExist()
+      expect(role("button", { name: "Try again" })).toBeAbsent()
     )
   })
 
@@ -928,13 +927,66 @@ describe("a workspace", () => {
       expect(sidebarButton("Channels")).toExist(),
       expect(sidebarButton("Hosted")).toExist(),
       expectAll(filter(all.role("listitem"), { hasText: "None yet" })).toHaveCount(2),
-      expect(sidebarButton("Add model connection")).toExist(),
-      expect(sidebarButton("Add tool connection")).toExist(),
+      expect(sidebarButton("Browse models")).toExist(),
+      expect(sidebarButton("Browse tools")).toExist(),
       expect(sidebarButton("Browse channels")).toExist(),
       expect(sidebarButton("Add channel connection")).toBeAbsent(),
       expect(sidebarButton("Models")).not.toHaveAttr("aria-current"),
       expect(sidebarButton("Channels")).not.toHaveAttr("aria-current"),
       expect(sidebarButton("Inbox")).toBeAbsent()
+    )
+  })
+
+  it("opens a connection's page from its row in the list and from the sidebar, and offers the list again when the connection is not there", () => {
+    const hosted = keylessConnection("models-1", "test-models", "Hosted")
+    const withHosted = modifyFields(opened, {
+      connections: (connections) =>
+        modifyFields(connections, {
+          isLoaded: () => true,
+          integrations: () =>
+            Integrations.Loaded({
+              integrations: [integrationGiving("test-models", "Test models", ["models", "tools"])]
+            }),
+          connections: () => [{ connection: hosted, pending: false }],
+          grants: () => grantsOf([aliceOwns])
+        })
+    })
+    scene(
+      { update, view: sceneView },
+      given(withHosted),
+      click(railButton("Connections")),
+      inside(role("main", { name: "Connections" }), click(role("button", { name: "Hosted" }))),
+      expect(role("main", { name: "Hosted" })).toExist(),
+      expect(role("main", { name: "Connections" })).toBeAbsent(),
+      expect(first(all.role("button", { name: "Hosted" }))).toHaveAttr("aria-current", "page"),
+      expect(railButton("Connections")).toHaveAttr("aria-current", "true"),
+      expect(sidebarButton("Models")).not.toHaveAttr("aria-current")
+    )
+    scene(
+      { update, view: sceneView },
+      given(withHosted),
+      click(railButton("Connections")),
+      click(sidebarButton("Hosted")),
+      expect(role("main", { name: "Hosted" })).toExist(),
+      click(sidebarButton("Tools")),
+      expect(role("main", { name: "Connections" })).toExist(),
+      expect(sidebarButton("Tools")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Models")).not.toHaveAttr("aria-current"),
+      expect(role("tab", { name: "Tools" })).toHaveAttr("aria-selected", "true"),
+      click(sidebarButton("Browse models")),
+      expect(role("tab", { name: "Models" })).toHaveAttr("aria-selected", "true")
+    )
+    scene(
+      { update, view: sceneView },
+      given(
+        modifyFields(withHosted, {
+          open: () => Open.Connection({ connectionId: keylessConnection("gone-1", "test-models", "Gone").id })
+        })
+      ),
+      expect(role("main", { name: "Connection" })).toExist(),
+      expect(role("heading", { name: "This connection isn't here", level: 2 })).toExist(),
+      click(role("button", { name: "Show all connections" })),
+      expect(role("main", { name: "Connections" })).toExist()
     )
   })
 

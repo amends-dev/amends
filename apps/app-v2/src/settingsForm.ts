@@ -5,7 +5,7 @@
  * choices at once, which a form may hold, is passed over.
  */
 
-import type { Connection as ConnectionContract, Integration } from "@amends-dev/connection"
+import type { Integration } from "@amends-dev/connection"
 import type { Connection } from "@amends-dev/core/connection"
 import * as McpSchema from "effect/ai/McpSchema"
 import * as Data from "effect/Data"
@@ -113,8 +113,8 @@ export const settingsOf = (
   return Result.succeed(settings)
 }
 
-/** How a connection authenticates, as the person reads it. */
-export const authLabels: Readonly<Record<ConnectionContract.AuthMethod, string>> = {
-  apiKey: "API key",
-  none: "No key"
+/** Whether two drafts of the same form hold the same value for every field. */
+export const isSameDraft = (left: Draft, right: Draft): boolean => {
+  const names = new Set([...Object.keys(left), ...Object.keys(right)])
+  return [...names].every((name) => left[name] === right[name])
 }

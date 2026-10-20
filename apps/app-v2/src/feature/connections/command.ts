@@ -1,31 +1,82 @@
 /**
- * What the person does with the workspace's connections: renaming one, changing its settings, and
- * removing it are actions written to their store; adding a connection, replacing a key, and
- * checking a connection go over HTTP, since a key never enters an action and no replica holds the
- * rest.
+ * What the person does with the workspace's connections: renaming one and changing its settings are actions written
+ * to their store; checking a connection goes over HTTP, since no replica holds what its system answers.
  */
 
 import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
 import { WorkspaceId } from "@amends-dev/core/workspace"
+import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as Redacted from "effect/Redacted"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Api from "../../api.ts"
 import * as Stores from "../../store/Stores.ts"
-import { ConnectionsDefinition, Message } from "./definition.ts"
+import {
+  type ConnectionsAction,
+  ConnectionsDefinition,
+  type Failure,
+  Message,
+  type Reason,
+  Written
+} from "./definition.ts"
 
-const written = [Message.WroteAction, Message.FailedWriteAction]
+const outcomes = [Message.WroteAction, Message.FailedWriteAction]
 
-/** Why `error` kept the action from being written, as the person reads it. */
-const failed = (error: string) => Message.FailedWriteAction({ error })
+/** What the action `done` reports when the store kept it. */
+const wrote = (done: Written) => Message.WroteAction({ written: done })
 
-const unreachable = "The host could not be reached. Try again."
+/** What the action `done` reports when it can't be made as entered. */
+const refused = (done: Written) => Message.FailedWriteAction({ written: done, reason: "Invalid" })
 
-/** Why the host refused a request, as core words it, or that it could not be reached. */
-const refusalOf = (error: unknown) => (Schema.is(CoreError.Rejection)(error) ? error.message : unreachable)
+/** What the action `done` reports when this browser could not keep it. */
+const unkept = (done: Written) => Message.FailedWriteAction({ written: done, reason: "Failed" })
+
+const failure = (action: ConnectionsAction, reason: Reason, description?: string): Failure => ({
+  action,
+  reason,
+  description: Option.fromUndefinedOr(description)
+})
+
+/**
+ * Why the host could not do `action`, as far as its answer `error` tells: that the person may not, that what they
+ * name is gone, that the host no longer installs the integration, that the integration refuses what it was given,
+ * that the connection takes no key, that the host keeps no keys, that what they entered does not hold, or, of
+ * anything else, including a host that could not be reached or did not confirm, only that it failed.
+ */
+export const failureOf = (action: ConnectionsAction, error: unknown): Failure => {
+  if (Schema.is(CoreError.Denied)(error)) {
+    return failure(action, "Denied")
+  }
+
+  if (Schema.is(CoreError.NotFound)(error)) {
+    return failure(action, "Gone")
+  }
+
+  if (Schema.is(CoreError.Invalid)(error)) {
+    return CoreError.InvalidReason.matchOrElse(
+      error.reason,
+      {
+        UnknownIntegration: () => failure(action, "Uninstalled"),
+        IntegrationRefused: ({ description }) => failure(action, "Refused", description),
+        Keyless: () => failure(action, "Changed")
+      },
+      () => failure(action, "Invalid")
+    )
+  }
+
+  if (Schema.is(CoreError.Unavailable)(error)) {
+    return CoreError.UnavailableReason.matchOrElse(
+      error.reason,
+      { CredentialsUnavailable: () => failure(action, "StorageUnavailable") },
+      () => failure(action, "Failed")
+    )
+  }
+
+  return failure(action, "Failed")
+}
 
 /** Rename `connectionId` to `name`, from the name the person saw. */
 export const RenameConnection = ConnectionsDefinition.command("RenameConnection", {
@@ -35,99 +86,40 @@ export const RenameConnection = ConnectionsDefinition.command("RenameConnection"
     name: Schema.String,
     expectedName: Schema.String
   },
-  messages: written,
+  messages: outcomes,
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ connectionId, name, expectedName, ...member }) =>
-      Stores.decoded(
-        Connection.RenameInput,
-        { connectionId, name, expectedName },
-        failed("A connection needs a name.")
-      ).pipe(
-        Effect.flatMap((input) => write(member, (store) => store.write("ConnectionRenamed", input))),
+    const stores = yield* Stores.Stores
+    return ({ connectionId, name, expectedName, ...member }) => {
+      const done = Written.Rename({ connectionId })
+      return Stores.decoded(Connection.RenameInput, { connectionId, name, expectedName }, refused(done)).pipe(
+        Effect.flatMap((input) =>
+          Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) =>
+            store.write("ConnectionRenamed", input)
+          )
+        ),
         Effect.catch(Effect.succeed)
       )
+    }
   }
 })
 
 /** Replace the settings of `connectionId` with `settings`. */
 export const ConfigureConnection = ConnectionsDefinition.command("ConfigureConnection", {
   args: { ...Stores.AsMember, connectionId: ConnectionContract.ConnectionId, settings: Connection.Settings },
-  messages: written,
+  messages: outcomes,
   handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ connectionId, settings, ...member }) =>
-      Stores.decoded(
-        Connection.ConfigureInput,
-        { connectionId, settings },
-        failed("A setting is too long, or holds what can't be stored.")
-      ).pipe(
-        Effect.flatMap((input) => write(member, (store) => store.write("ConnectionConfigured", input))),
-        Effect.catch(Effect.succeed)
-      )
-  }
-})
-
-/** Remove `connectionId` from the workspace. */
-export const RemoveConnection = ConnectionsDefinition.command("RemoveConnection", {
-  args: { ...Stores.AsMember, connectionId: ConnectionContract.ConnectionId },
-  messages: written,
-  handler: function* () {
-    const write = Stores.writer(yield* Stores.Stores, Message.WroteAction(), failed)
-    return ({ connectionId, ...member }) => write(member, (store) => store.write("ConnectionRemoved", { connectionId }))
-  }
-})
-
-/** Add a connection to `integration` called `name`, with its settings, and its key when it authenticates with one. */
-export const AddConnection = ConnectionsDefinition.command("AddConnection", {
-  args: {
-    workspaceId: WorkspaceId.WorkspaceId,
-    integration: Schema.String,
-    name: Schema.String,
-    auth: ConnectionContract.AuthMethod,
-    apiKey: Schema.String,
-    settings: Connection.Settings
-  },
-  messages: [Message.AddedConnection, Message.FailedAddConnection],
-  handler: function* () {
-    return ({ workspaceId, apiKey, ...connection }) =>
-      Stores.decoded(
-        Schema.toType(Connection.CreateInput),
-        { ...connection, ...(connection.auth === "apiKey" ? { apiKey: Redacted.make(apiKey.trim()) } : {}) },
-        Message.FailedAddConnection({ error: "A connection needs a name, and its key when it takes one." })
-      ).pipe(
-        Effect.flatMap((payload) =>
-          Effect.gen(function* () {
-            const client = yield* Api.asMember(workspaceId)
-            yield* client.connections.create({ headers: {}, payload })
-            return Message.AddedConnection()
-          }).pipe(Effect.catch((error) => Effect.succeed(Message.FailedAddConnection({ error: refusalOf(error) }))))
+    const stores = yield* Stores.Stores
+    return ({ connectionId, settings, ...member }) => {
+      const done = Written.Configure({ connectionId })
+      return Stores.decoded(Connection.ConfigureInput, { connectionId, settings }, refused(done)).pipe(
+        Effect.flatMap((input) =>
+          Stores.writer(stores, wrote(done), () => unkept(done))(member, (store) =>
+            store.write("ConnectionConfigured", input)
+          )
         ),
         Effect.catch(Effect.succeed)
       )
-  }
-})
-
-/** Replace the key of `connectionId` with `apiKey`. */
-export const ReplaceConnectionKey = ConnectionsDefinition.command("ReplaceConnectionKey", {
-  args: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId, apiKey: Schema.String },
-  messages: [Message.ReplacedKey, Message.FailedReplaceKey],
-  handler: function* () {
-    return ({ workspaceId, connectionId, apiKey }) =>
-      Stores.decoded(
-        Schema.toType(Connection.ApiKey),
-        Redacted.make(apiKey.trim()),
-        Message.FailedReplaceKey({ error: "Enter the new key." })
-      ).pipe(
-        Effect.flatMap((key) =>
-          Effect.gen(function* () {
-            const client = yield* Api.asMember(workspaceId)
-            yield* client.connections.replaceKey({ params: { connectionId }, payload: { apiKey: key } })
-            return Message.ReplacedKey()
-          }).pipe(Effect.catch((error) => Effect.succeed(Message.FailedReplaceKey({ error: refusalOf(error) }))))
-        ),
-        Effect.catch(Effect.succeed)
-      )
+    }
   }
 })
 
@@ -142,18 +134,13 @@ export const CheckConnection = ConnectionsDefinition.command("CheckConnection", 
         const health = yield* client.connections.check({ params: { connectionId } })
         return Message.CheckedConnection({ connectionId, health })
       }).pipe(
-        Effect.catch((error) =>
-          Effect.succeed(Message.FailedCheckConnection({ connectionId, error: refusalOf(error) }))
+        Effect.catchCause((cause) =>
+          Effect.succeed(
+            Message.FailedCheckConnection({ connectionId, failure: failureOf("Check", Cause.squash(cause)) })
+          )
         )
       )
   }
 })
 
-export const EffectsLayer = Layer.mergeAll(
-  RenameConnection.layer,
-  ConfigureConnection.layer,
-  RemoveConnection.layer,
-  AddConnection.layer,
-  ReplaceConnectionKey.layer,
-  CheckConnection.layer
-)
+export const EffectsLayer = Layer.mergeAll(RenameConnection.layer, ConfigureConnection.layer, CheckConnection.layer)

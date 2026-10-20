@@ -165,7 +165,11 @@ const fromSearch = (message: typeof SearchBlock.Message.Type) =>
 
 /** What the connections report, as the workspace receives it. */
 const fromConnections = (message: typeof ConnectionsBlock.Message.Type) =>
-  ConnectionsBinding.embedView({ slotId: "connections", model: opened.connections }).toParentMessage(message)
+  ConnectionsBinding.embedView({
+    slotId: "connections",
+    model: opened.connections,
+    viewInputs: { workspaceName: "Studio" }
+  }).toParentMessage(message)
 
 /** What the agents report, as the workspace receives it. */
 const fromAgents = (message: typeof AgentsBlock.Message.Type) =>
@@ -395,8 +399,8 @@ describe("a workspace", () => {
       Message.ClickedMembers(),
       fromAgents(AgentsBlock.Message.ClickedBrowse()),
       fromAgents(AgentsBlock.Message.ClickedAgent({ agentId: scoutAgent.id })),
-      fromConnections(ConnectionsBlock.Message.ClickedBrowse()),
-      fromConnections(ConnectionsBlock.Message.ClickedAdd()),
+      fromConnections(ConnectionsBlock.Message.ClickedBrowse({ tab: "models" })),
+      fromConnections(ConnectionsBlock.Message.ClickedConnection({ connectionId: models.id })),
       fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())
     ]) {
       story(
@@ -446,9 +450,16 @@ describe("a workspace", () => {
       model((model) => {
         expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
       }),
-      message(fromConnections(ConnectionsBlock.Message.ClickedBrowse())),
+      message(fromConnections(ConnectionsBlock.Message.ClickedBrowse({ tab: "tools" }))),
       model((model) => {
         expect(Open.isAnyOf(["Connections"])(model.open)).toBe(true)
+        expect(model.connections.browse.tab).toBe("tools")
+      }),
+      message(fromConnections(ConnectionsBlock.Message.ClickedConnection({ connectionId: models.id }))),
+      model((model) => {
+        expect(Open.matchOrElse(model.open, { Connection: ({ connectionId }) => connectionId }, () => undefined)).toBe(
+          models.id
+        )
       }),
       message(fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())),
       model((model) => {

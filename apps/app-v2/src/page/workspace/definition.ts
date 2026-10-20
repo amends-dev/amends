@@ -2,9 +2,9 @@
  * A workspace the person opened, as their member of it: its groups to pick from, their unfinished
  * actions, their inbox, the tasks they can see, their connections, their agents, their settings, and their
  * channels, and what the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the
- * groups to browse, the connections, the agents, one agent, the settings, the channels, or a group, with its
- * threads and the thread open among them. A thread opens in the side pane, beside the group's threads or beside the
- * inbox, which stays. The rail picks a destination, and the sidebar lists that destination's items: Home's
+ * groups to browse, the connections, one connection, the agents, one agent, the settings, the channels, or a group,
+ * with its threads and the thread open among them. A thread opens in the side pane, beside the group's threads or
+ * beside the inbox, which stays. The rail picks a destination, and the sidebar lists that destination's items: Home's
  * inbox, tasks, and groups, the agents, the connections by what they give and the channels, or the settings. It
  * lays itself out by the
  * window's width, which its parent informs it of: below 64rem the sidebar and the rail are in a navigation
@@ -17,6 +17,7 @@
  * ask to sign out.
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection } from "@amends-dev/core/connection"
 import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
@@ -43,8 +44,8 @@ import { titleOf } from "../../feature/thread/definition.ts"
 
 /**
  * What the main content shows: nothing yet, the inbox, the tasks in triage, every open task, the groups to
- * browse, the connections, the agents or one agent among them, the settings, the channels, or the group open in
- * the workspace.
+ * browse, the connections or one connection among them, the agents or one agent among them, the settings, the
+ * channels, or the group open in the workspace.
  */
 export const Open = defineTaggedUnion({
   Nothing: {},
@@ -53,6 +54,7 @@ export const Open = defineTaggedUnion({
   Tasks: {},
   Groups: {},
   Connections: {},
+  Connection: { connectionId: ConnectionContract.ConnectionId },
   Agents: {},
   Agent: { agentId: Identity.AgentId },
   Settings: {},

@@ -1,3 +1,4 @@
+import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { GroupId } from "@amends-dev/core/group"
 import type { Identity } from "@amends-dev/core/identity"
 import type { ThreadId } from "@amends-dev/core/thread"
@@ -64,6 +65,12 @@ export const showGroups = WorkspaceDefinition.step((model: Model) => ({
 export const showConnections = WorkspaceDefinition.step((model: Model) => ({
   model: modifyFields(model, { open: () => Open.Connections() })
 }))
+
+/** Show the page of the connection `connectionId` in the main content. */
+export const showConnection = (connectionId: ConnectionContract.ConnectionId) =>
+  WorkspaceDefinition.step((model: Model) => ({
+    model: modifyFields(model, { open: () => Open.Connection({ connectionId }) })
+  }))
 
 /** Show the agents in the main content. */
 export const showAgents = WorkspaceDefinition.step((model: Model) => ({
@@ -179,14 +186,13 @@ const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
 })
 
 /**
- * Asking to browse the connections, and picking one, show the connections as any destination is gone to, until a
- * connection has a page of its own to open, and asking to browse the channels shows them. Asking again for the
- * integrations lists them again.
+ * Asking to browse the connections shows the list as any destination is gone to, picking one opens its page, and
+ * asking to browse the channels shows them. Asking again for the integrations lists them again.
  */
 const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
   RequestedIntegrations: () => loadIntegrationsAgain,
   RequestedBrowse: () => goTo(showConnections),
-  OpenedConnection: () => goTo(showConnections),
+  OpenedConnection: ({ connectionId }) => goTo(showConnection(connectionId)),
   RequestedChannels: () => goTo(showChannels)
 })
 

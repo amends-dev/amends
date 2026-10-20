@@ -11,7 +11,11 @@ import {
   dialogView as agentsDialogView,
   sidebarView as agentsSidebarView
 } from "../../feature/agents/view.ts"
-import { sidebarView as connectionsSidebarView } from "../../feature/connections/view.ts"
+import {
+  connectionView,
+  sidebarView as connectionsSidebarView,
+  view as connectionsView
+} from "../../feature/connections/view.ts"
 import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
@@ -60,7 +64,7 @@ const railItems = (model: Model) => [
   {
     icon: "mark-connections" as const,
     label: "Connections",
-    isCurrent: Open.isAnyOf(["Connections", "Channels"])(model.open),
+    isCurrent: Open.isAnyOf(["Connections", "Connection", "Channels"])(model.open),
     onClick: Message.ClickedConnections()
   }
 ]
@@ -122,14 +126,25 @@ const agentsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Ht
   )
 ]
 
-/** The connections' sections of the sidebar, and the channels', whose title is current while the channels show. */
+/**
+ * The connections' sections of the sidebar, whose title is current while the list shows on its tab, and whose row is
+ * current while that connection's page is, and the channels', whose title is current while the channels show.
+ */
 const connectionsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => [
   h.block(
     ConnectionsBinding.embedView({
       slotId: "connections-sidebar",
       model: model.connections,
       view: connectionsSidebarView,
-      viewInputs: { isChannelsOpen: Open.isAnyOf(["Channels"])(model.open) }
+      viewInputs: {
+        isListOpen: Open.isAnyOf(["Connections"])(model.open),
+        openConnectionId: Open.matchOrElse(
+          model.open,
+          { Connection: ({ connectionId }) => Option.some(connectionId) },
+          () => Option.none()
+        ),
+        isChannelsOpen: Open.isAnyOf(["Channels"])(model.open)
+      }
     })
   )
 ]
@@ -158,6 +173,7 @@ const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArr
       Agents: () => agentsSections(model, h),
       Agent: () => agentsSections(model, h),
       Connections: () => connectionsSections(model, h),
+      Connection: () => connectionsSections(model, h),
       Channels: () => connectionsSections(model, h),
       Settings: () => settingsSections(h)
     },
@@ -213,7 +229,24 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
     Tasks: () =>
       h.block(TasksBinding.embedView({ slotId: "tasks", model: model.tasks, view: tasksView, viewInputs: { now } })),
     Groups: () => h.block(GroupsBinding.embedView({ slotId: "browse", model: model.groups, view: browseView })),
-    Connections: () => h.block(ConnectionsBinding.embedView({ slotId: "connections", model: model.connections })),
+    Connections: () =>
+      h.block(
+        ConnectionsBinding.embedView({
+          slotId: "connections",
+          model: model.connections,
+          view: connectionsView,
+          viewInputs: { workspaceName: nameOf(model) }
+        })
+      ),
+    Connection: ({ connectionId }) =>
+      h.block(
+        ConnectionsBinding.embedView({
+          slotId: "connection",
+          model: model.connections,
+          view: connectionView,
+          viewInputs: { connectionId, workspaceName: nameOf(model) }
+        })
+      ),
     Agents: () => h.block(AgentsBinding.embedView({ slotId: "agents", model: model.agents })),
     Agent: ({ agentId }) =>
       h.block(

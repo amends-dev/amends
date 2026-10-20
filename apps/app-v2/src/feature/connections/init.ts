@@ -11,9 +11,11 @@ export const init = ConnectionsComposition.makeInit(
       memberId,
       connections: [],
       isLoaded: false,
+      members: [],
       integrations: Integrations.Loading(),
       grants: [],
-      form: Option.none(),
+      browse: { tab: "all", query: "" },
+      edits: [],
       checks: [],
       notice: Option.none()
     })

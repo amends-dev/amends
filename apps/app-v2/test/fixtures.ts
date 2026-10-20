@@ -314,16 +314,75 @@ export const connectionOf = (id: string, name: string) =>
     readiness: { _tag: "Ready" }
   })
 
-/** An integration whose connections give `provides`, and take no settings or key, as its readers see it. */
-export const integrationGiving = (id: string, name: string, provides: Connection.IntegrationView["provides"]) =>
+/**
+ * An integration whose connections give `provides`, and take no settings, authenticating with `auth`, no key unless
+ * told, as its readers see it.
+ */
+export const integrationGiving = (
+  id: string,
+  name: string,
+  provides: Connection.IntegrationView["provides"],
+  auth: Connection.IntegrationView["auth"] = ["none"]
+) =>
   Schema.decodeSync(Connection.IntegrationView)({
     id,
     name,
-    auth: ["none"],
+    auth,
     provides,
     requiresSandbox: false,
     settings: { type: "object", properties: {} }
   })
+
+/**
+ * An integration that gives tools, takes a key or none, and asks for a server's address, a header its key goes in, a
+ * yes or no, and a region, of which only the address is required, as its readers see it.
+ */
+export const searchApi = Schema.decodeSync(Connection.IntegrationView)({
+  id: "search-api",
+  name: "MCP server",
+  docs: "https://modelcontextprotocol.io",
+  auth: ["apiKey", "none"],
+  provides: ["tools"],
+  requiresSandbox: false,
+  settings: {
+    type: "object",
+    properties: {
+      url: { type: "string", title: "Server URL", description: "Where the MCP server answers over Streamable HTTP." },
+      keyHeader: { type: "string", title: "Key header" },
+      verbose: { type: "boolean", title: "Verbose" },
+      region: { type: "string", title: "Region", enum: ["eu", "us"] }
+    },
+    required: ["url"]
+  }
+})
+
+/** A ready connection called `name` to the integration `integration`, which alice added, authenticating with `auth`. */
+export const connectionTo = (
+  id: string,
+  integration: string,
+  name: string,
+  auth: "apiKey" | "none" = "none",
+  settings: Connection.Settings = {}
+) =>
+  Schema.decodeSync(ReplicaRecord.Connection)({
+    id,
+    workspaceId: "workspace-1",
+    integration,
+    name,
+    settings,
+    auth,
+    status: "active",
+    createdBy: "member-1",
+    createdAt: "2026-10-18T12:00:00Z",
+    readiness: { _tag: "Ready" }
+  })
+
+/** `connection`, as the server reads it when it can't be used: not ready, because of `readiness`. */
+export const connectionReadAs = (
+  connection: ReplicaRecord.Connection,
+  readiness: (typeof ReplicaRecord.Connection.Encoded)["readiness"]
+) =>
+  Schema.decodeSync(ReplicaRecord.Connection)({ ...Schema.encodeSync(ReplicaRecord.Connection)(connection), readiness })
 
 /** A ready connection called `name` to the integration `integration`, which takes no key. */
 export const keylessConnection = (id: string, integration: string, name: string) =>

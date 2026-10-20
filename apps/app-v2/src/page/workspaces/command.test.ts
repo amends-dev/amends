@@ -1,69 +1,15 @@
 import { Request } from "@amends-dev/core/request"
 import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import { WorkspaceDirectory } from "@amends-dev/gateway"
-import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Schema } from "effect"
-import * as HttpClient from "effect/http/HttpClient"
-import * as HttpClientError from "effect/http/HttpClientError"
-import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import { TestClock } from "effect/testing"
-import { apiUrl, atlasInvitation, northstar, session } from "../../../test/fixtures.ts"
-import * as Session from "../../session.ts"
+import { atlasInvitation, northstar } from "../../../test/fixtures.ts"
+import { type Answer, hostAnswering } from "../../../test/host.ts"
 import { AcceptInvitation, CreateWorkspace, ExpireToast, FocusWorkspaceRow, LoadWorkspaces } from "./command.ts"
 import { FormErrors, JoinErrors, Message, noFormErrors, noJoinErrors, workspaceRowId } from "./definition.ts"
 
 const created = { id: "workspace-3", name: "Acme", createdBy: "alice", ownerMemberId: "member-20" }
-
-/** What the host answers: a status and a JSON body, or that it could not be reached. */
-type Answer = Readonly<{ status: number; body: unknown }> | "unreachable"
-
-/** What the app sent to the host: where, with which request key, and what. */
-interface Sent {
-  readonly path: string
-  readonly key: string | undefined
-  readonly payload: unknown
-}
-
-/** The app's services over a host that gives `answer` to each request it gets, and keeps what it was sent. */
-const hostAnswering = (answer: Answer) => {
-  const sent: Array<Sent> = []
-  const client = HttpClient.make((request) =>
-    Effect.gen(function* () {
-      const text = request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : ""
-      sent.push({
-        path: new URL(request.url).pathname,
-        key: request.headers["idempotency-key"],
-        payload: text === "" ? undefined : JSON.parse(text)
-      })
-      if (answer === "unreachable") {
-        return yield* new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request }) })
-      }
-      return HttpClientResponse.fromWeb(
-        request,
-        new Response(JSON.stringify(answer.body), {
-          status: answer.status,
-          headers: { "content-type": "application/json" }
-        })
-      )
-    })
-  )
-  const layer = Layer.mergeAll(
-    Layer.succeed(HttpClient.HttpClient, client),
-    Layer.succeed(
-      Session.Session,
-      Session.Session.of({
-        apiUrl,
-        current: Effect.succeedSome(session),
-        required: Effect.succeed(session),
-        keep: () => Effect.void,
-        forget: Effect.void
-      })
-    ),
-    BunCrypto.layer
-  )
-  return { sent, layer }
-}
 
 /** What the host answers to a request whose session it does not know. */
 const unauthorized: Answer = {
