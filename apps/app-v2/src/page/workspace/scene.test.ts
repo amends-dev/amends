@@ -313,6 +313,7 @@ const withChannel = modifyFields(opened, {
 const withAgent = modifyFields(opened, {
   agents: (agents) =>
     modifyFields(agents, {
+      isLoaded: () => true,
       agents: () => [{ agent: scoutAgent, pending: false }],
       members: () => [member, bob, scout],
       connections: () => [{ connection: keylessConnection("models-1", "test-models", "Models"), pending: false }],
@@ -493,9 +494,11 @@ describe("a workspace", () => {
       inside(
         role("main", { name: "Agents" }),
         expect(text("Scout")).toExist(),
-        expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist(),
-        expect(role("button", { name: "Add an agent" })).toExist(),
-        expect(role("button", { name: "Change setup" })).toExist()
+        expect(role("button", { name: "Scout" })).toHaveAttr(
+          "aria-description",
+          "Auto · No sandbox · test-model · Models"
+        ),
+        expect(role("button", { name: "Add agent" })).toExist()
       )
     )
   })
@@ -517,7 +520,10 @@ describe("a workspace", () => {
       ),
       expect(role("main", { name: "Agents" })).toBeAbsent(),
       click(role("button", { name: "Agents" })),
-      expect(text("Runs test-model on Models, any harness, no sandbox.")).toExist()
+      expect(role("button", { name: "Scout" })).toHaveAttr(
+        "aria-description",
+        "Auto · No sandbox · test-model · Models"
+      )
     )
   })
 

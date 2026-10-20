@@ -1,7 +1,8 @@
 import { Agent } from "@amends-dev/core/agent"
 import { type Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
-import type { MemberId } from "@amends-dev/core/workspace"
+import { ReplicaRecord } from "@amends-dev/core/replica"
+import { Member, type MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
@@ -22,7 +23,16 @@ import {
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
 import { givableRoles } from "../settings/definition.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
-import { findAgentName, listedAgents, Message, OfferedModels, OutMessage } from "./definition.ts"
+import {
+  findAgentName,
+  listedAgents,
+  Message,
+  nameOfAgent,
+  needsSetup,
+  OfferedModels,
+  OutMessage,
+  shownAgents
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -63,6 +73,26 @@ const listed = init(workspace.id, alice.id).model
 
 /** The agents read, and the integrations loaded. */
 const read = [message(received), message(integrations)] as const
+
+const agentMember = (id: string, agentId: string, name: string) =>
+  Schema.decodeSync(Member.Member)({
+    id,
+    workspaceId: "workspace-1",
+    identity: { _tag: "Agent", id: agentId },
+    name,
+    status: "active"
+  })
+
+const helper = agentMember("member-4", "agent-2", "Review helper")
+const nora = agentMember("member-5", "agent-3", "Nórá")
+
+/** An agent that can't run, since no connection gives a harness it can. */
+const helperAgent = Schema.decodeSync(ReplicaRecord.Agent)({
+  ...Schema.encodeSync(ReplicaRecord.Agent)(scoutAgent),
+  id: "agent-2",
+  memberId: helper.id,
+  readiness: { _tag: "Incomplete", issues: [{ _tag: "NoHarness" }] }
+})
 
 /** The configuration of an agent on any harness, the test model with a high effort, and no sandbox. */
 const reviewing = Schema.decodeSync(Agent.Configuration)({
@@ -130,12 +160,143 @@ describe("the agents", () => {
     )
   })
 
+  it("say they are read once the store has answered, so that none yet is not said before", () => {
+    story(
+      update,
+      given(listed),
+      model((model) => {
+        expect(model.isLoaded).toBe(false)
+      }),
+      message(Message.ReceivedAgents({ ...agentsOf(alice.id, [aliceOwns]), agents: [] })),
+      model((model) => {
+        expect(model.isLoaded).toBe(true)
+        expect(model.agents).toEqual([])
+      })
+    )
+  })
+
+  it("narrow the list by tab and by name, in any case and whatever the accents, and count those that need setup", () => {
+    story(
+      update,
+      given(listed),
+      message(
+        Message.ReceivedAgents({
+          ...agentsOf(alice.id, [aliceOwns]),
+          agents: [
+            scoutAgent,
+            helperAgent,
+            { ...helperAgent, id: Identity.AgentId.make("agent-3"), memberId: nora.id }
+          ].map((agent) => ({ agent, pending: false })),
+          members: [alice, bob, scout, helper, nora]
+        })
+      ),
+      model((model) => {
+        expect(model.browse).toEqual({ tab: "All", query: "" })
+        expect(shownAgents(model).map(({ agent }) => agent.id)).toEqual(["agent-1", "agent-2", "agent-3"])
+        expect(listedAgents(model).filter(needsSetup).length).toBe(2)
+      }),
+      message(Message.ChoseBrowseTab({ tab: "NeedsSetup" })),
+      model((model) => {
+        expect(shownAgents(model).map(({ agent }) => nameOfAgent(model, agent))).toEqual(["Review helper", "Nórá"])
+      }),
+      message(Message.TypedBrowseQuery({ query: " NORA " })),
+      model((model) => {
+        expect(model.browse).toEqual({ tab: "NeedsSetup", query: " NORA " })
+        expect(shownAgents(model).map(({ agent }) => nameOfAgent(model, agent))).toEqual(["Nórá"])
+      }),
+      message(Message.ChoseBrowseTab({ tab: "All" })),
+      message(Message.TypedBrowseQuery({ query: "scout" })),
+      model((model) => {
+        expect(shownAgents(model).map(({ agent }) => agent.id)).toEqual(["agent-1"])
+      }),
+      message(Message.TypedBrowseQuery({ query: "" })),
+      expectNoOutMessage(),
+      Command.expectNone()
+    )
+  })
+
+  it("count an agent on its way as needing nothing, since the server has not said how ready it is", () => {
+    expect(needsSetup({ agent: helperAgent, pending: true })).toBe(false)
+    expect(needsSetup({ agent: helperAgent, pending: false })).toBe(true)
+    expect(needsSetup({ agent: scoutAgent, pending: false })).toBe(false)
+  })
+
+  it("ask the page to show the agents when the person browses, and when they add one, since its form is in the list", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedBrowse()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      Command.expectNone(),
+      message(Message.ClickedAdd()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      model((model) => {
+        expect(model.form).toMatchObject(Option.some({ _tag: "Adding" }))
+      })
+    )
+  })
+
+  it("report the agent picked, and open its setup form where the person may change it", () => {
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedAgent({ agentId })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId })),
+      Command.expectExact(LoadModels({ workspaceId, connectionId: modelsId })),
+      Command.resolve(LoadModels, Message.ReceivedModels({ connectionId: modelsId, models: offered })),
+      model((model) => {
+        expect(model.form).toMatchObject(Option.some({ _tag: "Configuring", agentId }))
+      })
+    )
+  })
+
+  it("report the agent picked and open nothing for a person who may not change it, an agent on its way, or one that is gone", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ReceivedAgents(agentsOf(bob.id, [bobIsMember]))),
+      message(Message.ClickedAgent({ agentId })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.form).toEqual(Option.none())
+      })
+    )
+    story(
+      update,
+      given(listed),
+      message(
+        Message.ReceivedAgents({ ...agentsOf(alice.id, [aliceOwns]), agents: [{ agent: scoutAgent, pending: true }] })
+      ),
+      message(Message.ClickedAgent({ agentId })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.form).toEqual(Option.none())
+      })
+    )
+    story(
+      update,
+      given(listed),
+      ...read,
+      message(Message.ClickedAgent({ agentId: Identity.AgentId.make("agent-9") })),
+      expectOutMessage(OutMessage.OpenedAgent({ agentId: Identity.AgentId.make("agent-9") })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.form).toEqual(Option.none())
+      })
+    )
+  })
+
   it("add an agent as an action once its setup is complete, and say what a draft still wants", () => {
     story(
       update,
       given(listed),
       ...read,
       message(Message.ClickedAdd()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
       model((model) => {
         expect(model.form).toMatchObject(
           Option.some({ _tag: "Adding", name: "", roleId: BuiltinRoles.MemberId, error: Option.none() })

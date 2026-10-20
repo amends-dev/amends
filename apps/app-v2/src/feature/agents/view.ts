@@ -1,4 +1,4 @@
-import { Agent, AgentPermissions } from "@amends-dev/core/agent"
+import { Agent } from "@amends-dev/core/agent"
 import {
   button,
   buttonRow,
@@ -6,57 +6,71 @@ import {
   column,
   field,
   hint,
+  iconButton,
   notice,
-  sending,
   submit,
   textarea
 } from "@amends-dev/design/control"
-import { badge, entry, entryList } from "@amends-dev/design/details"
-import { pane, paneColumn, paneEmpty, paneForm } from "@amends-dev/design/pane"
+import { cellWithDetail, columns, row } from "@amends-dev/design/directory"
+import type { MarkStatus } from "@amends-dev/design/mark"
+import { pane, paneColumn, paneEmpty, paneForm, paneTabs } from "@amends-dev/design/pane"
+import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import type * as AgentSetup from "../../agentSetup.ts"
-import { may, memberTarget, workspaceTarget } from "../../permissions.ts"
-import { initials } from "../../seen.ts"
 import { connectionsGiving, Integrations } from "../connections/definition.ts"
 import { givableRoles } from "../settings/definition.ts"
 import { AgentsComposition, type AgentsViewBuilder } from "./composition.ts"
-import { type AgentItem, connectionName, Form, listedAgents, Message, type Model, OfferedModels } from "./definition.ts"
+import {
+  type AgentItem,
+  type BrowseTab,
+  connectionName,
+  findAgentName,
+  Form,
+  listedAgents,
+  mayAdd,
+  mayCreate,
+  Message,
+  type Model,
+  nameOfAgent,
+  needsSetup,
+  OfferedModels,
+  shownAgents
+} from "./definition.ts"
 
-/** Why an agent can't run, as the person reads it. */
-const issueText = (issue: Agent.Issue) =>
+/** Why an agent can't run, as a sentence. */
+const issueSentence = (issue: Agent.Issue): string =>
   Agent.Issue.match(issue, {
-    Removed: ({ part }) => `its ${part}'s connection was removed`,
-    Uninstalled: ({ part }) => `its ${part}'s integration is no longer installed`,
-    Invalid: ({ part, description }) => `its ${part}: ${description}`,
-    SandboxRequired: () => "its harness works only in a sandbox",
-    NoHarness: () => "no connection gives a harness it can run on"
+    Removed: ({ part }) => `Its ${part} connection was removed.`,
+    Uninstalled: ({ part }) => `Its ${part} connection's integration isn't installed on this host.`,
+    Invalid: ({ description }) => (description.endsWith(".") ? description : `${description}.`),
+    SandboxRequired: () => "Its harness works only in a sandbox, and it has none.",
+    NoHarness: () => "No connection gives a harness it can run on."
   })
 
-/** How ready an agent is, as the badge beside its name says it and is toned. */
-const readinessBadge = (readiness: Agent.Readiness, h: AgentsViewBuilder): Html =>
-  Agent.Readiness.match(readiness, {
-    Ready: () => badge(h, { label: "Ready", tone: "success" }),
-    Incomplete: () => badge(h, { label: "Can't run", tone: "danger" })
+/**
+ * How an agent stands, as the patch on its mark says it: Needs setup, with why on hover, when it can't run as it
+ * is set up. A ready agent shows nothing, and so does one still on its way, since the server tells how ready a new
+ * agent is once it has it.
+ */
+const statusOf = ({ agent, pending }: AgentItem): MarkStatus | undefined =>
+  pending
+    ? undefined
+    : Agent.Readiness.match(agent.readiness, {
+        Ready: () => undefined,
+        Incomplete: ({ issues }) => ({ kind: "attention", label: "Needs setup", detail: issueSentence(issues[0]) })
+      })
+
+/** The harness an agent runs on, as a line: `Auto`, or the connection's name. */
+const harnessLine = (agent: AgentItem["agent"], model: Model): string =>
+  Agent.Harness.match(agent.harness, {
+    Auto: () => "Auto",
+    Connection: ({ connectionId }) => connectionName(model, connectionId)
   })
 
-/** Why an agent can't run, when it can't. */
-const readinessNotes = (readiness: Agent.Readiness, h: AgentsViewBuilder): ReadonlyArray<Html> =>
-  Agent.Readiness.match(readiness, {
-    Ready: () => [],
-    Incomplete: ({ issues }) => [hint(h, issues.map(issueText).join("; "))]
-  })
-
-/** What an agent runs on, as the person reads it: its model, its harness, and its sandbox. */
-const setupText = (agent: AgentItem["agent"], model: Model) =>
-  [
-    `${agent.model.id} on ${connectionName(model, agent.model.connectionId)}`,
-    Agent.Harness.match(agent.harness, {
-      Auto: () => "any harness",
-      Connection: ({ connectionId }) => `the ${connectionName(model, connectionId)} harness`
-    }),
-    agent.sandbox === null ? "no sandbox" : `sandboxes on ${connectionName(model, agent.sandbox.connectionId)}`
-  ].join(", ")
+/** Where an agent works, as a line: the sandbox connection's name, or "No sandbox". */
+const sandboxLine = (agent: AgentItem["agent"], model: Model): string =>
+  agent.sandbox === null ? "No sandbox" : connectionName(model, agent.sandbox.connectionId)
 
 /** The model of the setup, from what its connection offers: those it lists, its id for others, and its effort. */
 const modelFields = (setup: AgentSetup.Draft, model: Model, h: AgentsViewBuilder): ReadonlyArray<Html> =>
@@ -168,42 +182,23 @@ const formView = (open: Form, model: Model, h: AgentsViewBuilder): Html => {
         notice(h, error),
         buttonRow(h, [submit(h, "Add"), cancel])
       ]),
-    Configuring: ({ setup, error }) =>
+    Configuring: ({ agentId, setup, error }) =>
       paneForm(h, { title: "Change the agent's setup", onSubmit: Message.SubmittedForm() }, [
         ...setupFields(setup, model, h),
         notice(h, error),
-        buttonRow(h, [submit(h, "Save"), cancel])
+        buttonRow(h, [
+          submit(h, "Save"),
+          ...(Option.isSome(findAgentName(model, agentId))
+            ? [button(h, "Rename", Message.ClickedRename({ agentId }), { variant: "quiet" })]
+            : []),
+          cancel
+        ])
       ]),
     Renaming: ({ name }) =>
       paneForm(h, { title: "Rename the agent", onSubmit: Message.SubmittedForm() }, [
         nameField(name),
         buttonRow(h, [submit(h, "Save"), cancel])
       ])
-  })
-}
-
-/** An agent, with how ready it is and what it runs on, and what the person may do with it. */
-const agentEntry = ({ agent, pending }: AgentItem, model: Model, h: AgentsViewBuilder): Html => {
-  const name = model.members.find(({ id }) => id === agent.memberId)?.name ?? "An agent"
-  const configurable = may(model.grants, AgentPermissions.Configure, memberTarget(model.workspaceId, agent.memberId))
-  return entry(h, {
-    key: agent.id,
-    mark: initials(name),
-    title: name,
-    // How ready a new agent is the server tells, once it has it.
-    trailing: [pending ? sending(h, pending) : readinessBadge(agent.readiness, h)],
-    children: [
-      ...(pending ? [] : readinessNotes(agent.readiness, h)),
-      hint(h, `Runs ${setupText(agent, model)}.`),
-      ...(configurable && !pending
-        ? [
-            buttonRow(h, [
-              button(h, "Rename", Message.ClickedRename({ agentId: agent.id }), { variant: "quiet" }),
-              button(h, "Change setup", Message.ClickedConfigure({ agentId: agent.id }), { variant: "quiet" })
-            ])
-          ]
-        : [])
-    ]
   })
 }
 
@@ -222,35 +217,196 @@ const integrationsView = (model: Model, h: AgentsViewBuilder): Html =>
         : h.empty
   })
 
-/** The workspace's agents, the form open among them, and adding one, for a person who may. */
-export const view = AgentsComposition.makeView((model, h) => {
+/** Whether the list page, which the sidebar's title opens, is what the main content shows. */
+export type SidebarInputs = Readonly<{ isListOpen: boolean }>
+
+/**
+ * The sidebar's section of the agents: each by its name on a lilac mark with how it stands as a patch on it, Browse
+ * to the list and, for a person who may add one, Add agent. The title opens the list and is current while it shows,
+ * and picking an agent reports it. An empty section says so once the agents are read.
+ */
+export const sidebarView = AgentsComposition.makeView.withInputs<SidebarInputs>((model, { isListOpen }, h) => {
   const listed = listedAgents(model)
-  const mayAdd =
-    Option.isNone(model.form) && may(model.grants, AgentPermissions.Create, workspaceTarget(model.workspaceId))
-  return pane(h, {
+
+  return sidebarSections(h, [
+    sidebarSection(h, {
+      label: "Agents",
+      onTitleClick: Message.ClickedBrowse(),
+      isTitleCurrent: isListOpen,
+      actions: [
+        iconButton(h, { icon: "list", label: "Browse agents", onClick: Message.ClickedBrowse() }, { size: "compact" }),
+        ...(mayAdd(model)
+          ? [
+              iconButton(
+                h,
+                { icon: "mark-new", label: "Add agent", onClick: Message.ClickedAdd() },
+                { size: "compact" }
+              )
+            ]
+          : [])
+      ],
+      children:
+        listed.length === 0 && model.isLoaded
+          ? [sidebarEmpty(h, "No agents yet")]
+          : listed.map((item) =>
+              sidebarItem(h, {
+                mark: { text: nameOfAgent(model, item.agent).slice(0, 1), tone: "lilac" },
+                status: statusOf(item),
+                label: nameOfAgent(model, item.agent),
+                isPending: item.pending,
+                isCurrent: false,
+                onClick: Message.ClickedAgent({ agentId: item.agent.id })
+              })
+            )
+    })
+  ])
+})
+
+/**
+ * An agent as a row of the list: its lilac mark with how it stands as a patch on it, its name, its harness over its
+ * sandbox, its model over its connection, and, blank while it is idle, what it is at work on, which no turn tells yet.
+ */
+const agentRow = (item: AgentItem, model: Model, h: AgentsViewBuilder): Html => {
+  const { agent, pending } = item
+  const name = nameOfAgent(model, agent)
+  const harness = harnessLine(agent, model)
+  const sandbox = sandboxLine(agent, model)
+  const connection = connectionName(model, agent.model.connectionId)
+
+  return h.keyed("li")(
+    agent.id,
+    [],
+    [
+      row(h, {
+        mark: { text: name.slice(0, 1), tone: "lilac" },
+        markSize: "md",
+        status: statusOf(item),
+        title: name,
+        ...(pending ? { meta: "Sending…" } : {}),
+        cells: [
+          cellWithDetail(h, { value: harness, detail: sandbox }),
+          cellWithDetail(h, { value: agent.model.id, detail: connection }),
+          h.empty
+        ],
+        cellsText: [harness, sandbox, agent.model.id, connection].join(" · "),
+        onClick: Message.ClickedAgent({ agentId: agent.id })
+      })
+    ]
+  )
+}
+
+/** What the list says when it has no row to show: nothing is there to browse, nothing needs setup, or nothing matches. */
+const emptyList = (model: Model, h: AgentsViewBuilder): Html => {
+  const { tab, query } = model.browse
+
+  if (query.trim() !== "") {
+    return paneEmpty(h, {
+      icon: "mark-search",
+      title: `No agents match “${query.trim()}”.`,
+      action: button(h, "Clear search", Message.TypedBrowseQuery({ query: "" }), { variant: "quiet" })
+    })
+  }
+
+  return tab === "NeedsSetup"
+    ? paneEmpty(h, { icon: "mark-done", title: "Every agent can run as it is set up." })
+    : paneEmpty(h, { icon: "mark-agents", title: "No agents yet" })
+}
+
+/** The search over the agents, the labels of the columns, and a row for each agent shown. */
+const agentList = (model: Model, h: AgentsViewBuilder): Html => {
+  const shown = shownAgents(model)
+
+  return column(h, [
+    field(
+      h,
+      {
+        id: "search-agents",
+        label: "Search agents",
+        type: "search",
+        value: model.browse.query,
+        onInput: (query) => Message.TypedBrowseQuery({ query }),
+        placeholder: "Search agents…",
+        isAutofocus: false,
+        isLabelHidden: true
+      },
+      Option.none()
+    ),
+    ...(shown.length === 0
+      ? [emptyList(model, h)]
+      : [
+          columns(h, { label: "Agent", cells: ["Harness", "Model", "Activity"] }),
+          h.ul(
+            [h.AriaLabel("Agents")],
+            shown.map((item) => agentRow(item, model, h))
+          )
+        ])
+  ])
+}
+
+/** What the list says when the workspace has no agent at all, and what a person who may add one can do about it. */
+const noAgents = (model: Model, h: AgentsViewBuilder): Html =>
+  paneEmpty(h, {
+    icon: "mark-agents",
+    title: "No agents yet",
+    copy: mayCreate(model)
+      ? "Add an agent: a member that works on a harness and a model your connections give."
+      : "An administrator can add agents to your workspace.",
+    ...(mayAdd(model) && Option.isNone(model.form)
+      ? { action: button(h, "Add agent", Message.ClickedAdd(), { variant: "primary" }) }
+      : {})
+  })
+
+/** The tabs over the list, All and Needs setup, each with how many agents are on it once they are read. */
+const browseTabs = (model: Model, h: AgentsViewBuilder): Html => {
+  const listed = listedAgents(model)
+  const tab = (tab: BrowseTab, label: string, count: number) => ({
+    label,
+    ...(model.isLoaded ? { count } : {}),
+    isCurrent: model.browse.tab === tab,
+    onClick: Message.ChoseBrowseTab({ tab })
+  })
+
+  return paneTabs(h, {
+    label: "Agents",
+    tabs: [tab("All", "All", listed.length), tab("NeedsSetup", "Needs setup", listed.filter(needsSetup).length)]
+  })
+}
+
+/** The list, or what it says when the workspace has no agent; nothing before the agents are read. */
+const listBody = (model: Model, h: AgentsViewBuilder): Html => {
+  if (!model.isLoaded) {
+    return h.empty
+  }
+
+  return listedAgents(model).length === 0 ? noAgents(model, h) : agentList(model, h)
+}
+
+/**
+ * The agents as the list page, the main content: All and those that need setup on a tab each, with the button to add
+ * one for a person who may, a search that narrows the tab by name, and a row for each agent, which picking opens
+ * below the list as its setup form until the agent has a page. The form open among the agents is under the list.
+ */
+export const view = AgentsComposition.makeView((model, h) =>
+  pane(h, {
     variant: "main",
     label: "Agents",
     header: {
       title: "Agents",
       icon: "mark-agents",
-      actions:
-        mayAdd && connectionsGiving(model, "models").length > 0
-          ? [button(h, "Add an agent", Message.ClickedAdd(), { variant: "secondary" })]
-          : []
+      actions: mayAdd(model) && Option.isNone(model.form) ? [button(h, "Add agent", Message.ClickedAdd())] : [],
+      tabs: browseTabs(model, h)
     },
     body: [
-      paneColumn(h, [
-        notice(h, model.notice),
-        mayAdd ? integrationsView(model, h) : h.empty,
-        listed.length === 0
-          ? paneEmpty(h, {
-              icon: "mark-agents",
-              title: "No agents yet",
-              copy: "Agents are members that take part in threads, running on what the connections give."
-            })
-          : entryList(h, { label: "Agents", children: listed.map((item) => agentEntry(item, model, h)) }),
-        Option.match(model.form, { onNone: () => h.empty, onSome: (open) => formView(open, model, h) })
-      ])
+      paneColumn(
+        h,
+        [
+          notice(h, model.notice),
+          mayCreate(model) && Option.isNone(model.form) ? integrationsView(model, h) : h.empty,
+          listBody(model, h),
+          Option.match(model.form, { onNone: () => h.empty, onSome: (open) => formView(open, model, h) })
+        ],
+        { isWide: true }
+      )
     ]
   })
-})
+)

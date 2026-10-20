@@ -152,6 +152,16 @@ const foldSearchOutMessage = SearchBlock.OutMessage.match({
   OpenedPerson: ({ memberId }) => GroupsBinding.requestConversationWith({ memberId })
 })
 
+/**
+ * Asking to browse the agents, and picking one, show the agents as any destination is gone to, until an agent has a
+ * page of its own to open. Asking again for the integrations lists them again.
+ */
+const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
+  RequestedIntegrations: () => loadIntegrationsAgain,
+  RequestedBrowse: () => goTo(showAgents),
+  OpenedAgent: () => goTo(showAgents)
+})
+
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
 const foldMenuOutMessage = DialogBlock.OutMessage.match({
   Opened: () => WorkspaceDefinition.stepNoop(),
@@ -243,7 +253,7 @@ export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock
 export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {
   field: "agents",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: AgentsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
+  outMessage: { fold: foldAgentsOutMessage }
 })
 
 export const SettingsBinding = WorkspaceDefinition.bindChild(SettingsBlock, {

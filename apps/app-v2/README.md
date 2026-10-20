@@ -395,10 +395,30 @@ the pages that compose them; the root composes the pages.
   about a connection that is gone closes. `connectionsGiving` names the connections whose
   integration gives a capability, from the connections and integrations a Model keeps, for the
   agents and channels features to choose among.
-- `feature/agents`: the workspace's agents, each by its membership's name with how ready it is and
-  what it runs on, its model on which connection, its harness, and its sandbox, as the store holds
-  them, marked as sending while a change to it is on its way; an agent still on its way shows no
-  readiness, since the server tells it once it has the agent. Where they may configure an agent,
+- `feature/agents`: the workspace's agents, as the store holds them, once the store has answered
+  (`isLoaded`, which keeps "No agents yet" from showing before). The Block has two views. Its
+  `sidebarView`, which the page puts in the sidebar for the Agents destination, is a section named
+  Agents: each agent by its membership's first letter on a lilac mark and its name, with Browse
+  (`list`, "Browse agents") and, where the person may create agents and a connection gives models,
+  "Add agent", and the title a button that opens the list and is current while it shows (the view
+  input `isListOpen`); an agent that needs setup has a caution triangle on its mark, with "Needs
+  setup" on hover and after its name for assistive technology, "Atlas, Needs setup"; one that is
+  ready shows nothing, and so does one still on its way, which says "Sending…" at its end. The
+  Block's list page, `view`, is a pane titled Agents with All and Needs setup tabs, each with how
+  many agents it holds, an "Add agent" button, a search that narrows the tab by name, in any case
+  and whatever the accents, and a row for each agent in the design's columns Agent, Harness,
+  Model, and Activity: the lilac 32px mark and name, the harness (a connection's name, or "Auto")
+  over its sandbox (a connection's name, or "No sandbox"), the model's id over its connection's
+  name ("Removed connection" once it is gone), and the activity, which stays blank until turns
+  say what an agent is at work on. An agent that needs setup shows what keeps it from running,
+  the first reason, in a sentence on its mark. With no agents the list offers adding the first
+  ("An administrator can add agents to your workspace." for a person who may not), the Needs setup
+  tab says every agent can run, and a search with no match says so and clears from "Clear search".
+  The Block reports `RequestedBrowse` when the person browses from the sidebar or adds from it, since
+  the form Add opens is in the list, and `OpenedAgent` with the agent picked, from the sidebar or
+  the list; the page shows the agents for both. Until an agent has a page of its own, picking one
+  opens its setup form below the list, where the person may configure it, and that form has a Rename
+  button for the other form. Where they may configure an agent,
   they rename it, from the name they saw, and change how it is set up; where they may create agents,
   they add one with a name, a role they may give, instructions, a harness, `Auto` or a connection
   that gives harnesses, a model connection, a model from what that connection offers, an effort, and
@@ -742,7 +762,10 @@ browser's storage. Each Block's tests sit beside it:
   models of the model connection the form chooses over HTTP and passing over a late answer for
   another connection, choosing the model again when the connection changes, renaming and setting up
   an agent again from what was seen, closing a form about an agent that is gone, offering the roles
-  the person may give, and why a read or a write could not be kept; the channels keeping the
+  the person may give, being read once the store has answered, narrowing the list by tab and by name
+  without regard to case or accents, counting those that need setup and not those on their way, asking the
+  page to show the agents when the person browses or adds, and reporting the agent picked, opening its setup
+  form only where the person may change it, and why a read or a write could not be kept; the channels keeping the
   integrations the page informs them of or why they could not be listed, asking the page to list
   them again, adding a channel as an action once its connection, group, and
   name are chosen and refusing one that lacks any, with why, offering only the connections that give
@@ -851,10 +874,15 @@ browser's storage. Each Block's tests sit beside it:
   owner with a harness, a model connection whose models load, a model, an effort, and a sandbox, or
   a model the connection does not list by its id, refused with why until the connection and the
   model are chosen, with the reason a connection's models could not be listed, renamed and set up
-  again with a failure shown, read by how ready each is and what it runs on, by an ordinary member
-  without the controls until the person is given the role that manages them, marked as sending with
-  none while a change is on its way, offering to add only once the host listed its integrations and
-  a connection gives models, and why they could not be read; the settings' two names renamed, the
+  again with a failure shown from the form that picking an agent opens, read as rows by what each runs
+  on, with the patch and the sentence for one that needs setup and none for one that is ready, by an
+  ordinary member without the controls until the person is given the role that manages them, marked as
+  sending with none while a change is on its way, offering to add only once the host listed its
+  integrations and a connection gives models, and why they could not be read; the list's tabs with their
+  counts, its search and the quiet line and Clear search for no match, its empty states, its columns,
+  and nothing shown before the agents are read; the sidebar's section with its title, Browse, and Add
+  agent, the agents by name with a patch on those that need setup, the one picked reported, and "No
+  agents yet" once the agents are read; the settings' two names renamed, the
   members listed with their roles as badges, or as a select to change for the members the person may
   act on, changed, removed, and handed the workspace by the owner, the invitations listed by their
   address, role, and end, revoked, and sent, what is on its way marked in each section, a name

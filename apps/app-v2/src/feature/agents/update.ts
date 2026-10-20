@@ -7,10 +7,12 @@ import { Integrations } from "../connections/definition.ts"
 import { ConfigureAgent, CreateAgent, LoadModels, RenameAgent } from "./command.ts"
 import { AgentsComposition } from "./composition.ts"
 import {
+  type AgentItem,
   findAgent,
   findAgentName,
   Form,
   listedAgents,
+  mayConfigure,
   Message,
   type Model,
   OfferedModels,
@@ -48,6 +50,16 @@ const askForModels = (model: Model, connectionId: string) =>
       commands: [LoadModels({ workspaceId: model.workspaceId, connectionId: connection.id })]
     })
   })
+
+/** Open the form that changes how `agent` is set up, with the models its connection offers asked for. */
+const openConfiguring = (model: Model, agent: AgentItem["agent"]) =>
+  askForModels(
+    modifyFields(model, {
+      form: () =>
+        Option.some(Form.Configuring({ agentId: agent.id, setup: AgentSetup.draftOf(agent), error: Option.none() }))
+    }),
+    agent.model.connectionId
+  )
 
 /** Whether `form` is about no agent, or about one the workspace still lists. */
 const isAboutListedAgent = (model: Model, form: Form): boolean => {
@@ -96,6 +108,7 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ReceivedAgents: ({ agents, members, connections, roles, workspace, grants }) => {
       const received = modifyFields(model, {
+        isLoaded: () => true,
         agents: () => agents,
         members: () => members,
         connections: () => connections,
@@ -120,6 +133,13 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
             outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },
+    ClickedBrowse: () => ({ model, outMessage: OutMessage.RequestedBrowse() }),
+    ChoseBrowseTab: ({ tab }) => ({
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { tab: () => tab }) })
+    }),
+    TypedBrowseQuery: ({ query }) => ({
+      model: modifyFields(model, { browse: (browse) => modifyFields(browse, { query: () => query }) })
+    }),
     ClickedAdd: () => ({
       model: modifyFields(model, {
         form: () =>
@@ -127,7 +147,8 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
             Form.Adding({ name: "", roleId: BuiltinRoles.MemberId, setup: AgentSetup.empty, error: Option.none() })
           ),
         offered: () => Option.none()
-      })
+      }),
+      outMessage: OutMessage.RequestedBrowse()
     }),
     TypedName: ({ name }) => ({
       model: atForm(model, (form) =>
@@ -168,15 +189,19 @@ export const update = AgentsComposition.makeUpdate((model, message) =>
     ClickedConfigure: ({ agentId }) =>
       Option.match(findAgent(model, agentId), {
         onNone: () => ({ model }),
-        onSome: ({ agent }) =>
-          askForModels(
-            modifyFields(model, {
-              form: () =>
-                Option.some(Form.Configuring({ agentId, setup: AgentSetup.draftOf(agent), error: Option.none() }))
-            }),
-            agent.model.connectionId
-          )
+        onSome: ({ agent }) => openConfiguring(model, agent)
       }),
+    // Until an agent has a page of its own, picking one opens its setup form below the list, for a person who may change it.
+    ClickedAgent: ({ agentId }) => {
+      const outMessage = OutMessage.OpenedAgent({ agentId })
+      return Option.match(findAgent(model, agentId), {
+        onNone: () => ({ model, outMessage }),
+        onSome: ({ agent, pending }) =>
+          mayConfigure(model, agent) && !pending
+            ? { ...openConfiguring(model, agent), outMessage }
+            : { model, outMessage }
+      })
+    },
     ReceivedModels: ({ connectionId, models }) => ({
       model: modifyFields(model, {
         offered: Option.map((offered) =>

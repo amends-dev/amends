@@ -9,6 +9,7 @@ export const init = AgentsComposition.makeInit((workspaceId: WorkspaceId.Workspa
   model: Model.make({
     workspaceId,
     memberId,
+    isLoaded: false,
     agents: [],
     members: [],
     connections: [],
@@ -16,6 +17,7 @@ export const init = AgentsComposition.makeInit((workspaceId: WorkspaceId.Workspa
     roles: [],
     workspace: Option.none(),
     grants: [],
+    browse: { tab: "All", query: "" },
     form: Option.none(),
     offered: Option.none(),
     notice: Option.none()
