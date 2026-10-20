@@ -19,7 +19,7 @@ import {
   toggle
 } from "../src/control.ts"
 import { badge, detailList, entry, entryList, log } from "../src/details.ts"
-import { columns, row, section, summary } from "../src/directory.ts"
+import { columns, row, rowWithButton, section, summary } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { mark, markCluster } from "../src/mark.ts"
@@ -161,6 +161,11 @@ const taskAssigneeChoices: ReadonlyArray<readonly [TaskAssignee, string]> = [
 const workspaces: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
   { name: "Mercier & Co", meta: "12 members · as Alex" },
   { name: "Fieldwork", meta: "4 members · Owner · as Alex" }
+]
+
+const invitations: ReadonlyArray<Readonly<{ name: string; meta: string }>> = [
+  { name: "Northstar Studio", meta: "Pending invitation · Expires in 7 days" },
+  { name: "Atlas Labs", meta: "Pending invitation · Expires in 3 days" }
 ]
 
 const groupRows: ReadonlyArray<Readonly<{ name: string; visibility: string; members: number }>> = [
@@ -579,6 +584,27 @@ const workspaceList = (h: ApplicationViewBuilder): Html =>
     )
   )
 
+const invitationList = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [h.AriaLabel("Invitations")],
+    invitations.map(({ name, meta }) =>
+      h.keyed("li")(
+        name,
+        [],
+        [
+          rowWithButton(h, {
+            mark: name.slice(0, 1),
+            title: name,
+            meta,
+            action: "Accept invite",
+            actionName: `Accept invite to ${name}`,
+            onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
+
 const groupList = (h: ApplicationViewBuilder): Html =>
   h.ul(
     [h.AriaLabel("Groups")],
@@ -616,9 +642,11 @@ const directoryScreen = (h: ApplicationViewBuilder): Html =>
         heading(h, "Choose a workspace", {
           action: button(h, "Create workspace", Message.ClickedButton(), { icon: "mark-new" })
         }),
-        copy(h, `${workspaces.length} workspaces`),
+        copy(h, `${workspaces.length} workspaces · ${invitations.length} pending invitations`),
         section(h, { label: "Your workspaces", count: workspaces.length }),
-        workspaceList(h)
+        workspaceList(h),
+        section(h, { label: "Invitations", count: invitations.length }),
+        invitationList(h)
       ])
     ]
   })
@@ -638,6 +666,12 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
       "flex max-w-2xl flex-col"
     ),
     sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col"),
+    sample(
+      h,
+      "Rows with a button: a section and two rows, the buttons named for their workspaces",
+      [section(h, { label: "Invitations", count: invitations.length }), invitationList(h)],
+      "flex max-w-2xl flex-col"
+    ),
     sample(
       h,
       "Row with cells and no action",

@@ -25,10 +25,11 @@ by side and wrapping in a narrow column; a select with its label hidden, in a ro
 field with its label hidden, in a section that names it; the toggle on and off; a select; the notice
 tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
-directory's section and rows, and a row with cells and no action, and a table of three groups' rows
+directory's section and rows, a row with cells and no action, and a section of two rows with a button
+named for their workspaces, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
-sign-in's two steps and as the workspace picker, whose heading has a Create workspace action on its line, each with its pieces in `screenContent` as the app's
+sign-in's two steps and as the workspace picker, whose heading has a Create workspace action on its line and which lists its workspaces and its invitations, each with its pieces in `screenContent` as the app's
 pages return them; the toast alone, with a detail, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, and as a wide
@@ -303,6 +304,15 @@ What a directory screen lists.
     column of the row there, and below it takes the whole width of its line (`basis-full`), which is
     what breaks the row after the title. A row without cells does not fold and keeps its action.
     `cellsText` is unchanged, so the folded row is described as it is wide.
+- `rowWithButton(h, { mark, title, meta?, action, actionName, onClick })` is a row for a thing the
+  person answers and does not open, such as an invitation, so it is not a button itself: the same
+  height, mark, and title over meta as `row`, and at the end a `secondary` `button` labelled `action`
+  that sends `onClick`. The row has no `hover` and no pointer, since it is not what is pressed. The
+  button is named by `actionName`, which begins with the `action`, such as "Accept invite to
+  Northstar Studio", so that the buttons of several rows are told apart; the mark is hidden from
+  assistive technology, and the title and meta are read as text. It is a renderer beside `row`, and
+  not an option of it, because the two are not the same element: a `row` is one button whose parts
+  describe it, and this is a line of text with one control. A page lists these as `li` items of a `ul`.
 
 ### `@amends-dev/design/shell`
 

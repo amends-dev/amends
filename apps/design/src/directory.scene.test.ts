@@ -2,10 +2,10 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { badge } from "./details.ts"
-import { columns, row, section, summary } from "./directory.ts"
+import { columns, row, rowWithButton, section, summary } from "./directory.ts"
 
 const Message = defineMessageUnion({ ClickedMercier: {}, ClickedFieldwork: {} })
 type Message = typeof Message.Type
@@ -81,6 +81,84 @@ describe("row", () => {
       { update, view: viewOf(rows) },
       given(initial),
       expect(within(role("button", { name: "Fieldwork" }), selector("span[aria-hidden]"))).toHaveText("F")
+    )
+  })
+})
+
+describe("rowWithButton", () => {
+  const northstar = (h: HtmlBuilder<Message>) =>
+    rowWithButton(h, {
+      mark: "N",
+      title: "Northstar Studio",
+      meta: "Pending invitation · Expires in 7 days",
+      action: "Accept invite",
+      actionName: "Accept invite to Northstar Studio",
+      onClick: Message.ClickedMercier()
+    })
+
+  const atlas = (h: HtmlBuilder<Message>) =>
+    rowWithButton(h, {
+      mark: "A",
+      title: "Atlas Labs",
+      action: "Accept invite",
+      actionName: "Accept invite to Atlas Labs",
+      onClick: Message.ClickedFieldwork()
+    })
+
+  const rows = (h: HtmlBuilder<Message>) => [northstar(h), atlas(h)]
+
+  it("is not a button itself: its one button is at its end", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expectAll(all.role("button")).toHaveCount(2),
+      expect(within(role("button", { name: "Accept invite to Northstar Studio" }), text("Accept invite"))).toExist(),
+      expect(
+        within(role("button", { name: "Accept invite to Northstar Studio" }), text("Northstar Studio"))
+      ).toBeAbsent()
+    )
+  })
+
+  it("names each button by its action and its title, so that the buttons of several rows are told apart", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "Accept invite to Northstar Studio" })).toExist(),
+      expect(role("button", { name: "Accept invite to Atlas Labs" })).toExist()
+    )
+  })
+
+  it("shows its title and its meta as text beside the button, and its mark hidden from assistive technology", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(text("Northstar Studio")).toExist(),
+      expect(text("Pending invitation · Expires in 7 days")).toExist(),
+      expect(text("N")).toHaveAttr("aria-hidden", "true"),
+      expect(text("Atlas Labs")).toExist()
+    )
+  })
+
+  it("sends the message of the row whose button is clicked", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      click(role("button", { name: "Accept invite to Atlas Labs" })),
+      click(role("button", { name: "Accept invite to Northstar Studio" })),
+      expect(role("status")).toHaveText("Opened Fieldwork, Mercier & Co")
+    )
+  })
+
+  it("has a secondary button, and no hover or pointer of its own, since the row is not what is pressed", () => {
+    const only = (h: HtmlBuilder<Message>) => [northstar(h)]
+
+    scene(
+      { update, view: viewOf(only) },
+      given(initial),
+      expect(role("button", { name: "Accept invite to Northstar Studio" })).toHaveClass("border-outline"),
+      expect(role("button", { name: "Accept invite to Northstar Studio" })).toHaveClass("bg-action-secondary"),
+      expect(selector("div.min-h-19")).not.toHaveClass("hover:bg-hover"),
+      expect(selector("div.min-h-19")).not.toHaveClass("cursor-pointer")
     )
   })
 })

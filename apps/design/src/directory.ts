@@ -1,10 +1,12 @@
 /**
  * What a directory screen lists: a label over each group, with how many it holds, a line that says what a
- * list holds, the labels of a table's columns, and a row for each thing in it, to open.
+ * list holds, the labels of a table's columns, and a row for each thing in it, to open it or to answer it with a
+ * button.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
+import { buttonWith } from "./control.ts"
 
 const sectionLine = "mt-9 mb-2 flex items-center gap-3 text-item font-medium text-ink"
 
@@ -31,8 +33,9 @@ const columnsActionSpace = "w-24 flex-none max-desktop:w-20"
 
 const columnsStitch = "h-0 border-t border-dashed border-stitch"
 
-const rowButton =
-  "group flex min-h-19 w-full cursor-pointer items-center gap-4 bg-transparent ps-3 pe-4 text-start focus-ring-inset hover:bg-hover"
+const rowShape = "flex min-h-19 w-full items-center gap-4 ps-3 pe-4"
+
+const rowButton = `${rowShape} group cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover`
 
 const rowFoldsCells = "max-tablet:flex-wrap max-tablet:gap-y-2 max-tablet:py-3"
 
@@ -57,6 +60,16 @@ const rowActionAmongCells = `w-24 text-end max-desktop:w-20 max-tablet:hidden ${
 
 const renderMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, letter: string): Html =>
   h.span([h.AriaHidden(true), h.Class(rowMark)], [letter])
+
+const renderText = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  title: string,
+  meta: string | undefined
+): Html =>
+  h.span(
+    [h.Class(rowText)],
+    [h.span([h.Class(rowTitle)], [title]), meta === undefined ? h.empty : h.span([h.Class(rowMeta)], [meta])]
+  )
 
 const renderAction = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -161,13 +174,7 @@ export const row = <Message, Requirements>(
           ],
           [
             renderMark(h, config.mark),
-            h.span(
-              [h.Class(rowText)],
-              [
-                h.span([h.Class(rowTitle)], [config.title]),
-                config.meta === undefined ? h.empty : h.span([h.Class(rowMeta)], [config.meta])
-              ]
-            ),
+            renderText(h, config.title, config.meta),
             config.cells === undefined
               ? h.empty
               : h.span(
@@ -181,3 +188,37 @@ export const row = <Message, Requirements>(
     h
   )
 }
+
+/**
+ * A row for a thing the person answers and does not open, so the row is not a button: the square mark with the
+ * `mark` letter and the `title` over its `meta`, drawn as `row` draws them, and at the end a `secondary` button
+ * labelled `action` that sends `onClick`. The row is not `hover`, since it is not what is pressed. The button is
+ * named by `actionName`, which begins with the label, such as "Accept invite to Northstar Studio", so that the
+ * buttons of several rows are told apart; the mark is hidden from assistive technology, and the title and meta
+ * are read as text.
+ */
+export const rowWithButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    mark: string
+    title: string
+    meta?: string
+    action: string
+    actionName: string
+    onClick: Message
+  }>
+): Html =>
+  h.div(
+    [h.Class(rowShape)],
+    [
+      renderMark(h, config.mark),
+      renderText(h, config.title, config.meta),
+      Button.view(
+        {
+          onClick: config.onClick,
+          toView: (attributes) => buttonWith(h, [...attributes.button, h.AriaLabel(config.actionName)], config.action)
+        },
+        h
+      )
+    ]
+  )
