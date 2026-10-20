@@ -7,12 +7,16 @@ import {
   Command,
   Mount,
   Subscription,
+  all,
   click,
   expect,
+  expectAll,
   expectOutMessage,
+  filter,
   given,
   inside,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -50,6 +54,7 @@ import {
 import { ActionsBlock } from "../../feature/actions/block.ts"
 import { Dismiss } from "../../feature/actions/command.ts"
 import { AgentsBlock } from "../../feature/agents/block.ts"
+import { LoadModels } from "../../feature/agents/command.ts"
 import { ChannelsBlock } from "../../feature/channels/block.ts"
 import { ComposerBlock } from "../../feature/composer/block.ts"
 import { ReadDraft } from "../../feature/composer/command.ts"
@@ -80,6 +85,13 @@ const opened = init(workspace.id, member.id, workspace.name, "Split").model
 const onPhone = modifyFields(opened, { viewport: () => "Phone" })
 
 const workspaceSubscriptions = WorkspaceBlock.subscriptions
+
+/** A button of the rail, which a section title of the sidebar with the same name is not. */
+const railButton = (name: string) => within(role("navigation", { name: "Destinations" }), role("button", { name }))
+
+/** A button of the sidebar, which a button of the rail with the same name is not. */
+const sidebarButton = (name: string | RegExp) =>
+  within(role("navigation", { name: "Studio" }), role("button", { name }))
 
 const sceneView = withViewInputs(view, { email: "alice@example.com", now, isApplePlatform: true })()
 
@@ -490,7 +502,7 @@ describe("a workspace", () => {
       given(withAgent),
       expect(role("button", { name: "Agents" })).toExist(),
       expect(role("main", { name: "Agents" })).toBeAbsent(),
-      click(role("button", { name: "Agents" })),
+      click(railButton("Agents")),
       inside(
         role("main", { name: "Agents" }),
         expect(text("Scout")).toExist(),
@@ -519,8 +531,8 @@ describe("a workspace", () => {
         })
       ),
       expect(role("main", { name: "Agents" })).toBeAbsent(),
-      click(role("button", { name: "Agents" })),
-      expect(role("button", { name: "Scout" })).toHaveAttr(
+      click(railButton("Agents")),
+      expect(within(role("main", { name: "Agents" }), role("button", { name: "Scout" }))).toHaveAttr(
         "aria-description",
         "Auto · No sandbox · test-model · Models"
       )
@@ -562,13 +574,14 @@ describe("a workspace", () => {
     )
   })
 
-  it("shows the channels on request, with what the person may do with them", () => {
+  it("shows the channels on request from the connections' sidebar, with what the person may do with them", () => {
     scene(
       { update, view: sceneView },
       given(withChannel),
-      expect(role("button", { name: "Channels" })).toExist(),
+      expect(role("button", { name: "Channels" })).toBeAbsent(),
+      click(railButton("Connections")),
       expect(role("main", { name: "Channels" })).toBeAbsent(),
-      click(role("button", { name: "Channels" })),
+      click(sidebarButton("Channels")),
       inside(
         role("main", { name: "Channels" }),
         expect(text("From Chat into General")).toExist(),
@@ -587,7 +600,8 @@ describe("a workspace", () => {
         ChannelsBlock.Message.ReceivedChannels({ channels: [] })
       ),
       expect(role("main", { name: "Channels" })).toBeAbsent(),
-      click(role("button", { name: "Channels" })),
+      click(railButton("Connections")),
+      click(sidebarButton("Browse channels")),
       expect(role("heading", { name: "No channels yet", level: 2 })).toExist()
     )
   })
@@ -631,17 +645,159 @@ describe("a workspace", () => {
       click(role("button", { name: "Connections" })),
       expect(role("button", { name: "Connections" })).toHaveAttr("aria-current", "true"),
       expect(role("button", { name: "Home" })).not.toHaveAttr("aria-current"),
-      click(role("button", { name: "Agents" })),
-      expect(role("button", { name: "Agents" })).toHaveAttr("aria-current", "true"),
-      expect(role("button", { name: "Connections" })).not.toHaveAttr("aria-current"),
-      click(role("button", { name: "Channels" })),
-      expect(role("button", { name: "Channels" })).toHaveAttr("aria-current", "true"),
+      click(railButton("Agents")),
+      expect(railButton("Agents")).toHaveAttr("aria-current", "true"),
+      expect(railButton("Connections")).not.toHaveAttr("aria-current"),
+      click(railButton("Connections")),
+      click(sidebarButton("Channels")),
+      expect(railButton("Connections")).toHaveAttr("aria-current", "true"),
+      expect(railButton("Agents")).not.toHaveAttr("aria-current"),
       click(role("button", { name: "Settings" })),
       expect(role("button", { name: "Settings" })).toHaveAttr("aria-current", "true"),
+      click(railButton("Home")),
       click(role("button", { name: "Inbox" })),
       expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
       expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page"),
       expect(role("button", { name: "Settings" })).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("lists Home, Agents, and Connections on the rail, then Search, and Settings at the bottom, with no Channels", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(nth(all.role("button"), 0)).toHaveAccessibleName("Home"),
+      expect(nth(all.role("button"), 1)).toHaveAccessibleName("Agents"),
+      expect(nth(all.role("button"), 2)).toHaveAccessibleName("Connections"),
+      expect(nth(all.role("button"), 3)).toHaveAccessibleName("Search"),
+      expect(nth(all.role("button"), 4)).toHaveAccessibleName("Settings"),
+      expect(railButton("Channels")).toBeAbsent()
+    )
+  })
+
+  it("opens the search from the rail, which never marks it current", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      expect(railButton("Search")).not.toHaveAttr("aria-current"),
+      expect(role("dialog", { name: "Find anything" })).toBeAbsent(),
+      click(railButton("Search")),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(role("dialog", { name: "Find anything" })).toExist(),
+      expect(railButton("Search")).not.toHaveAttr("aria-current"),
+      expect(railButton("Home")).toHaveAttr("aria-current", "true")
+    )
+  })
+
+  it("shows Home's sidebar for Home, with the Groups title opening the groups to browse", () => {
+    scene(
+      { update, view: sceneView },
+      given(withBrowsableGroup),
+      expect(sidebarButton("Inbox")).toExist(),
+      expect(sidebarButton("Triage")).toExist(),
+      expect(sidebarButton("Tasks")).toExist(),
+      expect(sidebarButton("General")).toExist(),
+      expect(sidebarButton("Groups")).not.toHaveAttr("aria-current"),
+      click(sidebarButton("Groups")),
+      expect(role("main", { name: "Groups" })).toExist(),
+      expect(sidebarButton("Groups")).toHaveAttr("aria-current", "page"),
+      click(sidebarButton("Inbox")),
+      expect(sidebarButton("Groups")).not.toHaveAttr("aria-current")
+    )
+  })
+
+  it("shows the agents' section for Agents, with its rows, its title current, and not Home's items", () => {
+    scene(
+      { update, view: sceneView },
+      given(withAgent),
+      expect(sidebarButton("Scout")).toBeAbsent(),
+      click(railButton("Agents")),
+      expect(sidebarButton("Agents")).toHaveAttr("aria-current", "page"),
+      expect(sidebarButton("Browse agents")).toExist(),
+      expect(sidebarButton("Add agent")).toExist(),
+      expect(sidebarButton("Scout")).toExist(),
+      expect(sidebarButton("Inbox")).toBeAbsent(),
+      expect(sidebarButton("Find anything…")).toExist()
+    )
+  })
+
+  it("opens the form to add an agent from the agents' sidebar, and an agent's setup from its row", () => {
+    scene(
+      { update, view: sceneView },
+      given(withAgent),
+      click(railButton("Agents")),
+      click(sidebarButton("Add agent")),
+      expect(role("form", { name: "Add an agent" })).toExist(),
+      click(sidebarButton("Scout")),
+      Command.resolve(
+        LoadModels,
+        AgentsBlock.Message.FailedLoadModels({
+          connectionId: keylessConnection("models-1", "test-models", "Models").id,
+          error: "No."
+        })
+      ),
+      expect(role("form", { name: "Change the agent's setup" })).toExist()
+    )
+  })
+
+  it("shows the connections' sections for Connections, by what they give, and the Channels section", () => {
+    const withModelsAndTools = modifyFields(opened, {
+      connections: (connections) =>
+        modifyFields(connections, {
+          isLoaded: () => true,
+          integrations: () =>
+            Integrations.Loaded({
+              integrations: [integrationGiving("test-models", "Test models", ["models", "tools"])]
+            }),
+          connections: () => [{ connection: keylessConnection("models-1", "test-models", "Hosted"), pending: false }],
+          grants: () => grantsOf([aliceOwns])
+        })
+    })
+    scene(
+      { update, view: sceneView },
+      given(withModelsAndTools),
+      click(railButton("Connections")),
+      expect(sidebarButton("Models")).toExist(),
+      expect(sidebarButton("Tools")).toExist(),
+      expect(sidebarButton("Sandboxes")).toExist(),
+      expect(sidebarButton("Harnesses")).toExist(),
+      expect(sidebarButton("Channels")).toExist(),
+      expect(sidebarButton("Hosted")).toExist(),
+      expectAll(filter(all.role("listitem"), { hasText: "None yet" })).toHaveCount(2),
+      expect(sidebarButton("Add model connection")).toExist(),
+      expect(sidebarButton("Add tool connection")).toExist(),
+      expect(sidebarButton("Browse channels")).toExist(),
+      expect(sidebarButton("Add channel connection")).toBeAbsent(),
+      expect(sidebarButton("Models")).not.toHaveAttr("aria-current"),
+      expect(sidebarButton("Channels")).not.toHaveAttr("aria-current"),
+      expect(sidebarButton("Inbox")).toBeAbsent()
+    )
+  })
+
+  it("marks the Channels title current while the channels show, with Connections current on the rail", () => {
+    scene(
+      { update, view: sceneView },
+      given(opened),
+      click(railButton("Connections")),
+      click(sidebarButton("Channels")),
+      expect(role("main", { name: "Channels" })).toExist(),
+      expect(sidebarButton("Channels")).toHaveAttr("aria-current", "page"),
+      expect(railButton("Connections")).toHaveAttr("aria-current", "true")
+    )
+  })
+
+  it("shows the settings' section for Settings, with Workspace and Members, each opening the settings", () => {
+    scene(
+      { update, view: sceneView },
+      given(withSettings),
+      click(railButton("Settings")),
+      expect(within(role("navigation", { name: "Studio" }), text("Settings"))).toExist(),
+      expect(sidebarButton("Workspace")).toExist(),
+      expect(sidebarButton("Members")).toExist(),
+      expect(sidebarButton("Inbox")).toBeAbsent(),
+      click(sidebarButton("Members")),
+      expect(role("main", { name: "Settings" })).toExist()
     )
   })
 
@@ -661,8 +817,10 @@ describe("a workspace", () => {
       expect(role("button", { name: "Triage" })).not.toHaveAttr("aria-current"),
       expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true"),
       click(role("button", { name: "Connections" })),
-      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current"),
-      expect(role("button", { name: "Home" })).not.toHaveAttr("aria-current")
+      expect(role("button", { name: "Tasks" })).toBeAbsent(),
+      expect(role("button", { name: "Home" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "Home" })),
+      expect(role("button", { name: "Tasks" })).not.toHaveAttr("aria-current")
     )
   })
 
@@ -714,29 +872,42 @@ describe("a workspace", () => {
     )
   })
 
-  it("closes the navigation drawer when a link of the sidebar or the rail is followed", () => {
+  it("closes the navigation drawer when an item of the sidebar is followed", () => {
     scene(
       { update, view: sceneView },
       given(onPhone),
       click(role("button", { name: "Menu" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
-      click(within(role("navigation", { name: "Studio" }), role("button", { name: "Inbox" }))),
+      click(sidebarButton("Inbox")),
       Command.expectExact(Dialog.test.CloseDialog),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),
       expect(role("main", { name: "Inbox" })).toExist(),
-      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent()
+    )
+  })
+
+  it("keeps the navigation drawer open when a destination is picked on the rail, which shows its sidebar", () => {
+    scene(
+      { update, view: sceneView },
+      given(onPhone),
       click(role("button", { name: "Menu" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      expect(within(role("dialog", { name: "Navigation" }), text("Inbox"))).toExist(),
+      click(railButton("Connections")),
+      Command.expectNone(),
       expect(role("dialog", { name: "Navigation" })).toExist(),
-      click(role("button", { name: "Connections" })),
+      expect(within(role("dialog", { name: "Navigation" }), text("Inbox"))).toBeAbsent(),
+      expect(within(role("dialog", { name: "Navigation" }), text("Models"))).toExist(),
+      expect(role("main", { name: "Connections" })).toExist(),
+      click(sidebarButton("Browse models")),
       Command.expectExact(Dialog.test.CloseDialog),
       Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
       Mount.expectEnded(Dialog.test.AcquireResources),
-      expect(role("main", { name: "Connections" })).toExist(),
-      expect(role("dialog", { name: "Navigation" })).toBeAbsent()
+      expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
+      expect(role("main", { name: "Connections" })).toExist()
     )
   })
 

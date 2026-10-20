@@ -73,13 +73,14 @@ export const CheckItem = Schema.Struct({ connectionId: ConnectionContract.Connec
 export type CheckItem = typeof CheckItem.Type
 
 /**
- * The workspace's connections, the integrations the host installs, what the person may do, the form
- * open among the connections, the last check of each, and why the last read or write failed.
+ * The workspace's connections, whether they are read yet, the integrations the host installs, what the person may
+ * do, the form open among the connections, the last check of each, and why the last read or write failed.
  */
 export const Model = Schema.Struct({
   workspaceId: WorkspaceId.WorkspaceId,
   memberId: MemberId.MemberId,
   connections: Schema.Array(ConnectionItem),
+  isLoaded: Schema.Boolean,
   integrations: Integrations,
   grants: Schema.Array(Grant.Grant),
   form: Schema.Option(Form),
@@ -95,6 +96,9 @@ export const Message = defineMessageUnion({
   FailedLoadIntegrations: { error: Schema.String },
   FailedRead: { error: Schema.String },
   ClickedReloadIntegrations: {},
+  ClickedBrowse: {},
+  ClickedConnection: { connectionId: ConnectionContract.ConnectionId },
+  ClickedBrowseChannels: {},
   ClickedAdd: {},
   ChoseIntegration: { integrationId: Schema.String },
   TypedName: { name: Schema.String },
@@ -119,8 +123,17 @@ export const Message = defineMessageUnion({
 })
 export type Message = typeof Message.Type
 
-/** What the Block asks of the workspace page: to list the integrations again, once the host could not be reached. */
-export const OutMessage = defineMessageUnion({ RequestedIntegrations: {} })
+/**
+ * What the Block asks of the workspace page: to list the integrations again, once the host could not be reached; to
+ * show the connections, which browsing them, adding one, and picking one from the sidebar ask; and to show the
+ * channels.
+ */
+export const OutMessage = defineMessageUnion({
+  RequestedIntegrations: {},
+  RequestedBrowse: {},
+  OpenedConnection: { connectionId: ConnectionContract.ConnectionId },
+  RequestedChannels: {}
+})
 export type OutMessage = typeof OutMessage.Type
 
 export const ConnectionsDefinition = Block.makeDefinition("Connections", { Model, Message, OutMessage })
@@ -146,6 +159,20 @@ export const findConnection = (
   Option.fromUndefinedOr(model.connections.find(({ connection }) => connection.id === connectionId))
 
 /**
+ * The connections whose integration gives `capability`, a connection that gives several in each of them. A
+ * connection whose integration the host does not install, or does not list yet, gives nothing.
+ */
+export const connectionItemsGiving = (
+  model: Pick<Model, "connections" | "integrations">,
+  capability: Integration.Capability
+): ReadonlyArray<ConnectionItem> => {
+  const integrations = integrationsOf(model)
+  return model.connections.filter(({ connection }) =>
+    integrations.some(({ id, provides }) => id === connection.integration && provides.includes(capability))
+  )
+}
+
+/**
  * The connections whose integration gives `capability`, each as its ID and what it is called, for
  * a choice among them. It reads the connections and integrations a Model keeps, so a Block that
  * keeps the same two fields, by `ConnectionItem` and `Integrations`, asks it of its own.
@@ -153,14 +180,8 @@ export const findConnection = (
 export const connectionsGiving = (
   model: Pick<Model, "connections" | "integrations">,
   capability: Integration.Capability
-): ReadonlyArray<readonly [ConnectionContract.ConnectionId, string]> => {
-  const integrations = integrationsOf(model)
-  return model.connections.flatMap(({ connection }) =>
-    integrations.some(({ id, provides }) => id === connection.integration && provides.includes(capability))
-      ? [[connection.id, connection.name] as const]
-      : []
-  )
-}
+): ReadonlyArray<readonly [ConnectionContract.ConnectionId, string]> =>
+  connectionItemsGiving(model, capability).map(({ connection }) => [connection.id, connection.name] as const)
 
 /** The last check of `connectionId`, if the person asked for one. */
 export const checkOf = (model: Model, connectionId: ConnectionContract.ConnectionId): Option.Option<Check> =>

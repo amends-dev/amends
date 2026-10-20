@@ -54,11 +54,11 @@ outside a workspace are composed from it: the root view frames the sign-in page 
 picker in `@amends-dev/design/centered`, and `page/signIn` and `page/workspaces` build their headings,
 forms, fields, rows, and the modal that creates a workspace or joins one from the design's `centered`, `control`, `form`, `directory`, and `modal` modules.
 The open workspace is on the design's shell: `page/workspace` renders `shell`, `rail`, `sidebar`,
-and the pane of each destination, `feature/groups` renders the sidebar's sections, the pane where the
+and the pane of each destination, `feature/groups`, `feature/agents`, and `feature/connections` render the sidebar's sections of their destinations, `feature/groups` the pane where the
 groups are browsed, as a table of the design's `directory` rows under its `columns`, and the modal where
 a team or a conversation is started, `feature/search` the modal where anything is found, `feature/group` the main pane, the modal of its settings, and the side pane, `feature/actions` the toasts, and every destination's view wraps
-its content in its own `pane`. The panes that read or are filled in, the settings, the connections, the agents,
-the channels, and the side panes, keep the `paneColumn`'s measure; the panes that list, the group's
+its content in its own `pane`. The panes that read or are filled in, the settings, the connections,
+the channels, and the side panes, keep the `paneColumn`'s measure; the panes that list, the agents, the group's
 threads and tasks, the groups to browse, the inbox, and the tasks' Triage and Tasks, pass it `isWide`,
 so that a list spans the pane. Inside the group's panes, the threads, the thread's messages, and the
 composers are the design's `message`, `divider`, and `composer`, in a `messageList`, with a person's
@@ -263,7 +263,8 @@ the pages that compose them; the root composes the pages.
   of its row. It reports the group picked, and its parent tells it which group is open, so the one
   marked is the one shown. Its view takes the title of the thread open in that group, from its
   parent, which it shows under the group. The Groups section's header has a button, Browse groups,
-  which reports `RequestedBrowse`, shown to everyone. `browseView` is the page it asks for, a main
+  which reports `RequestedBrowse`, shown to everyone, and so does the title, Groups, which is a
+  button too and is current while the page it opens shows (the view input `isBrowsing`). `browseView` is the page it asks for, a main
   pane titled Groups with two tabs, Your groups, the teams the person belongs to and their
   conversations, as the sidebar lists them, and Discover, the public teams they may join and do not
   belong to, each counted, Your groups at first, and Create group, the same as the sidebar's "+" for
@@ -392,9 +393,26 @@ the pages that compose them; the root composes the pages.
   one to an integration, choosing a name, how it authenticates, a key when it takes one, and its
   settings. Renaming, changing the settings, and removing are actions written to the store; adding a
   connection, replacing a key, and checking go over HTTP, since a key never enters an action. A form
-  about a connection that is gone closes. `connectionsGiving` names the connections whose
-  integration gives a capability, from the connections and integrations a Model keeps, for the
-  agents and channels features to choose among.
+  about a connection that is gone closes. `connectionItemsGiving` lists the connections whose
+  integration gives a capability, from the connections and integrations a Model keeps, and
+  `connectionsGiving` names them, for the agents and channels features to choose among. The Block's
+  `sidebarView`, which the page puts in the sidebar for the Connections and Channels destinations,
+  has a section for each thing a connection gives, Models, Tools, Sandboxes, and Harnesses, listing
+  the connections whose integration gives it, so one that gives two is in both, then a last
+  section, Channels. A connection is a row on the connections icon, with its status as a shape at the
+  end of the row, named after the status and with it on hover: Needs setup, a caution triangle, with
+  why, when it can't be used, and Unavailable, a danger square with a bar, when its integration
+  isn't installed on this host (such a connection gives nothing the sidebar can tell, so it is in no
+  section while the Connections pane lists it); a connection that is ready shows nothing, and so
+  does one still on its way, which says "Sending…". Each section has a title that opens the
+  connections, Browse ("Browse models"), and, where the person may add a connection and the host
+  listed its integrations, Add ("Add model connection"), which opens the form in the connections
+  pane, the same one for every section. Channels has the title and Browse, which open the channels
+  and mark the title current while they show (the view input `isChannelsOpen`), and no Add. A
+  section with no connections says "None yet" only once the connections are read (`isLoaded`) and
+  the integrations are listed. The Block reports `RequestedBrowse` for the titles, Browse, and Add,
+  `OpenedConnection` for a connection picked, and `RequestedChannels` for the channels; the page
+  shows the connections or the channels for them.
 - `feature/agents`: the workspace's agents, as the store holds them, once the store has answered
   (`isLoaded`, which keeps "No agents yet" from showing before). The Block has two views. Its
   `sidebarView`, which the page puts in the sidebar for the Agents destination, is a section named
@@ -487,13 +505,22 @@ the pages that compose them; the root composes the pages.
     person is in the workspace and the list could not be reloaded, with Try again, and Close leaves the listing
     to say the same.
 - `page/workspace`: a workspace the person opened, as their member of it, on the design's shell. The
-  rail has "Home", "Connections", "Agents", and "Channels" buttons and, below them, "Settings", each
-  marked while its destination is open; Home is open while nothing, the inbox, the tasks in triage,
-  every open task, the groups to browse, or a group is. The
-  sidebar, named by the workspace, has the workspace's name over a button to all workspaces, an
+  rail has "Home", "Agents", and "Connections" buttons, then "Search", and, below, "Settings". Each
+  destination is marked while it is open; Home is open while nothing, the inbox, the tasks in triage,
+  every open task, the groups to browse, or a group is, and Connections while the connections or the
+  channels are. Search is no destination: it is never marked, and it sends `ClickedSearch`, as the
+  sidebar's Find anything… does. The rail picks a destination and the sidebar lists its items, so the
+  sidebar changes with the rail. The
+  sidebar, named by the workspace, has the workspace's name over a button to all workspaces and,
+  in its footer, who is signed in with a Sign out button, whichever destination is open. Between them
+  are the destination's sections. Home's are an
   "Inbox" item with how many notifications wait, a "Triage" item with how many tasks wait in
-  triage (`triageCount`), a "Tasks" item, the groups' sections, and, in its footer, who is
-  signed in with a Sign out button. Over them, the sidebar's header has a button, Find anything…, with
+  triage (`triageCount`), a "Tasks" item, and the groups' sections. The Agents destination's is the agents Block's
+  `sidebarView`, in the slot `agents-sidebar`, and the Connections destination's, and the Channels',
+  the connections Block's, in `connections-sidebar`, which is how the channels are reached, since the
+  rail has no button for them. The Settings destination's is one section, Settings, with the items
+  Workspace and Members, which both open the settings, the one pane, and neither of which is marked
+  while it shows. Over them, the sidebar's header has a button, Find anything…, with
   the shortcut beside it, hidden from assistive technology, which sends `ClickedSearch`; the shortcut
   reads ⌘K on an Apple platform and Ctrl K on any other, the key it names being Command+K or Control+K, by
   the view input `isApplePlatform`. The main pane shows one destination: nothing yet, titled by the
@@ -527,10 +554,15 @@ the pages that compose them; the root composes the pages.
   button opens. The drawer is a `DialogBlock` the page binds as `menu` (`MenuBinding`, id
   `workspace-menu`) and lends the shell, so the framework traps focus in it, makes the rest of the
   window inert, closes it on Escape and on a click on its scrim, and returns focus when it closes. The
-  Menu button asks it to open (`ClickedMenu`), and every navigation, the rail's, the sidebar's Inbox,
-  Triage, Tasks, and Browse groups, a group picked, and a task's thread opened,
-  asks it to close (a close of a closed dialog does
-  nothing). The thread's side pane is in the shell's card beside the main pane only from 80rem
+  Menu button asks it to open (`ClickedMenu`), and every navigation to an item of a sidebar, the
+  sidebar's Inbox, Triage, Tasks, Workspace, Members, and Browse groups, what the agents and the
+  connections Blocks ask to be shown by their titles, Browse, Add, and rows, a group picked, and a
+  task's thread opened, asks it to close (a close of a closed dialog does nothing), which is
+  `goTo`. A destination picked on the rail does not: it switches to the destination
+  (`switchTo`), showing it in the main pane and closing the side pane's dialog and the thread
+  beside the inbox, and leaves the drawer open at a phone's width, where the rail is in it, so the
+  person sees the sidebar of the destination they picked and picks from it, which closes the drawer.
+  The thread's side pane is in the shell's card beside the main pane only from 80rem
   (`Split`); at every other width it is in a dialog of its own, so it gets what the drawer gets, and
   the toasts come inside whichever dialog is open, where they can be read and dismissed. The page
   binds another `DialogBlock` for it as `aside` (`AsideBinding`, id `workspace-aside`) and lends the
@@ -755,7 +787,9 @@ browser's storage. Each Block's tests sit beside it:
   HTTP once its integration, name, required settings, and key are in, once while it sends, and
   refused with why, renaming, changing the settings of, and removing one as actions from what was
   seen, replacing a key and checking over HTTP, closing a form about a connection that is gone,
-  naming the connections whose integration gives a capability, and why a read or a write could not
+  listing and naming the connections whose integration gives a capability, being read once the store
+  has answered, asking the page to show the connections when the person browses, picks one, or adds,
+  and the channels when they browse them, and why a read or a write could not
   be kept; the agents keeping the integrations the page informs them of or why they could not be
   listed, asking the page to list them again, adding an agent as an action
   with the configuration its draft makes and refusing a draft with what it still wants, loading the
@@ -782,8 +816,9 @@ browser's storage. Each Block's tests sit beside it:
   place with no group marked, and opening a group from the groups to browse, going home from a group or a destination, handing the settings and the channels what the
   person does in them, keeping what the tasks were narrowed to between Triage and Tasks, opening a
   task's thread in its group, and a notification's beside the inbox, which stays, naming the thread
-  open in the group open or beside the inbox, opening the navigation drawer, closing it as its dialog asks and by every navigation, and
-  asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
+  open in the group open or beside the inbox, opening the navigation drawer, closing it as its dialog asks and by every
+  navigation to an item of a sidebar, and not by a destination picked on the rail, which shows it, showing the
+  connections, the agents, and the settings for what their sidebars ask, and asking the root to sign out, and taking the window's width, closing the drawer once the sidebar is in
   place; the thread opening the side pane's dialog where the pane is one, from a notification, from a
   task, from a thread picked in the group, and as the window narrows, and not beside the main pane; its dialog closing
   with the thread, with every navigation, and as the window widens to `Split`, which leaves the thread
@@ -870,7 +905,12 @@ browser's storage. Each Block's tests sit beside it:
   settings shown, their key replaced, renamed with a failure shown, and removed; read by an ordinary
   member without the controls until the person is given the role that manages them, marked as
   sending with none while a change is on its way, by how ready each is, with why the integrations
-  could not be listed and a way to ask again, and why they could not be read; the agents added by an
+  could not be listed and a way to ask again, and why they could not be read; the connections'
+  sections of the sidebar, Models, Tools, Sandboxes, and Harnesses, then Channels, each connection
+  under every thing it gives with the shape of its status at the end of its row and none while it is
+  ready or on its way, "None yet" only once the connections and the integrations are read, the
+  titles, Browse, and Add opening the connections for a person who may add one and the channels
+  opening their own, and the connection picked reported; the agents added by an
   owner with a harness, a model connection whose models load, a model, an effort, and a sandbox, or
   a model the connection does not list by its id, refused with why until the connection and the
   model are chosen, with the reason a connection's models could not be listed, renamed and set up
@@ -896,9 +936,14 @@ browser's storage. Each Block's tests sit beside it:
   be read; and a workspace on the shell: counting what waits beside "Inbox", and the tasks that wait
   beside "Triage", whichever destination shows, then showing the inbox, the tasks in triage, every open
   task, the connections, the agents, the settings, or the channels, which
-  it reads whichever destination shows, each in a main pane named for it, with the rail marking the
-  destination open, Home from the inbox, the tasks, and the groups too, and the sidebar marking Triage
-  or Tasks while it shows, the groups to browse opened from the
+  it reads whichever destination shows, each in a main pane named for it, with the rail listing Home,
+  Agents, and Connections, then Search, which opens the search and is never marked, and Settings below, and
+  marking the destination open, Home from the inbox, the tasks, and the groups too, Connections from the
+  channels, and the sidebar marking Triage or Tasks while it shows, changing with the rail: Home's
+  items and the groups, with the Groups title opening the groups to browse and marked while they show;
+  the agents' section with its rows and its title marked; the connections' sections, by what they give,
+  and Channels, marked while the channels show; and the settings' Workspace and Members, which open the
+  settings; the groups to browse opened from the
   sidebar's button, from an open group and its thread, and from the drawer, which it closes, with
   a group opened from its row and a team started from Create group, also at `Phone` where the sidebar is
   in the shut drawer, the sidebar naming the workspace with
@@ -907,8 +952,8 @@ browser's storage. Each Block's tests sit beside it:
   composer to reply, marked in the list and under the group in the sidebar, the group's settings
   opened in a dialog from its main pane, the sidebar in place with no Menu button from `Desktop`, the
   Menu button at `Phone` opening the drawer as a dialog named Navigation that holds the rail and the
-  sidebar, its scrim closing it, or a link of the sidebar or the rail, a group picked among them,
-  closing it, the thread picked opened beside the main pane at `Split` with no dialog, and below it in
+  sidebar, its scrim closing it, or an item of the sidebar, a group picked among them, closing it, and
+  a destination picked on the rail leaving it open with that destination's sidebar in it, the thread picked opened beside the main pane at `Split` with no dialog, and below it in
   a dialog named Thread that holds the pane, closed by the pane's Close, by its Back on a phone, or by
   the scrim, which also closes the thread, a notification's thread opened the same way beside the inbox,
   which stays with its row current and loses both as the thread closes or the person leaves the inbox,

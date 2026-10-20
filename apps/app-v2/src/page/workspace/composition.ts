@@ -80,17 +80,20 @@ export const showChannels = WorkspaceDefinition.step((model: Model) => ({
 }))
 
 /**
- * Go to a destination: close the navigation drawer, the side pane's dialog, and the thread beside the inbox, leave
- * no group marked in the sidebar, and `show` it.
+ * Switch to a destination, as the rail does: close the side pane's dialog and the thread beside the inbox, leave
+ * no group marked in the sidebar, and `show` it, leaving the navigation drawer as it is, so the person sees the
+ * sidebar of the destination they picked.
  */
-export const goTo = (show: typeof showNothing) =>
+export const switchTo = (show: typeof showNothing) =>
   Update.combine([
-    MenuBinding.requestClose(),
     hideAside,
     InboxBinding.requestCloseThread(),
     GroupsBinding.informOpenGroup({ groupId: Option.none() }),
     show
   ])
+
+/** Go to a destination, as picking an item of the sidebar does: close the navigation drawer, and switch to it. */
+export const goTo = (show: typeof showNothing) => Update.combine([MenuBinding.requestClose(), switchTo(show)])
 
 /**
  * Open the group `groupId` without a thread, and close the navigation drawer, the side pane's dialog, and the
@@ -160,6 +163,18 @@ const foldAgentsOutMessage = AgentsBlock.OutMessage.match({
   RequestedIntegrations: () => loadIntegrationsAgain,
   RequestedBrowse: () => goTo(showAgents),
   OpenedAgent: () => goTo(showAgents)
+})
+
+/**
+ * Asking to browse the connections, and picking one, show the connections as any destination is gone to, until a
+ * connection has a page of its own to open, and asking to browse the channels shows them. Asking again for the
+ * integrations lists them again.
+ */
+const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
+  RequestedIntegrations: () => loadIntegrationsAgain,
+  RequestedBrowse: () => goTo(showConnections),
+  OpenedConnection: () => goTo(showConnections),
+  RequestedChannels: () => goTo(showChannels)
 })
 
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */
@@ -247,7 +262,7 @@ export const SearchBinding = WorkspaceDefinition.bindChild(SearchBlock, {
 export const ConnectionsBinding = WorkspaceDefinition.bindChild(ConnectionsBlock, {
   field: "connections",
   init: { contextToArgs: ({ workspaceId, memberId }) => [workspaceId, memberId] },
-  outMessage: { fold: ConnectionsBlock.OutMessage.match({ RequestedIntegrations: () => loadIntegrationsAgain }) }
+  outMessage: { fold: foldConnectionsOutMessage }
 })
 
 export const AgentsBinding = WorkspaceDefinition.bindChild(AgentsBlock, {

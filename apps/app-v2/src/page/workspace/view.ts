@@ -6,6 +6,8 @@ import { sidebar, sidebarFooter, sidebarHeader, sidebarItem, sidebarSection } fr
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
+import { sidebarView as agentsSidebarView } from "../../feature/agents/view.ts"
+import { sidebarView as connectionsSidebarView } from "../../feature/connections/view.ts"
 import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
@@ -46,29 +48,115 @@ const railItems = (model: Model) => [
     onClick: Message.ClickedHome()
   },
   {
-    icon: "mark-connections" as const,
-    label: "Connections",
-    isCurrent: Open.isAnyOf(["Connections"])(model.open),
-    onClick: Message.ClickedConnections()
-  },
-  {
     icon: "mark-agents" as const,
     label: "Agents",
     isCurrent: Open.isAnyOf(["Agents"])(model.open),
     onClick: Message.ClickedAgents()
   },
   {
-    icon: "mark-channel" as const,
-    label: "Channels",
-    isCurrent: Open.isAnyOf(["Channels"])(model.open),
-    onClick: Message.ClickedChannels()
+    icon: "mark-connections" as const,
+    label: "Connections",
+    isCurrent: Open.isAnyOf(["Connections", "Channels"])(model.open),
+    onClick: Message.ClickedConnections()
   }
 ]
 
-/** The sidebar: the workspace's name, the inbox, the tasks, the groups, and who is signed in. */
-const sidebarView = (model: Model, { email, isApplePlatform }: ViewInputs, h: WorkspaceViewBuilder): Html => {
+/** Home's sections of the sidebar: the inbox, the triage, the tasks, and the groups. */
+const homeSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => {
   const waiting = waitingCount(model.inbox)
   const inTriage = triageCount(model.tasks.items)
+  return [
+    sidebarSection(h, {
+      children: [
+        sidebarItem(h, {
+          icon: "mark-mail",
+          label: "Inbox",
+          ...(waiting > 0 ? { count: waiting } : {}),
+          isCurrent: Open.isAnyOf(["Inbox"])(model.open),
+          onClick: Message.ClickedInbox()
+        }),
+        sidebarItem(h, {
+          icon: "mark-triage",
+          label: "Triage",
+          ...(inTriage > 0 ? { count: inTriage } : {}),
+          isCurrent: Open.isAnyOf(["Triage"])(model.open),
+          onClick: Message.ClickedTriage()
+        }),
+        sidebarItem(h, {
+          icon: "mark-tasks",
+          label: "Tasks",
+          isCurrent: Open.isAnyOf(["Tasks"])(model.open),
+          onClick: Message.ClickedTasks()
+        })
+      ]
+    }),
+    h.block(
+      GroupsBinding.embedView({
+        slotId: "groups",
+        model: model.groups,
+        viewInputs: { openThread: openThreadTitle(model), isBrowsing: Open.isAnyOf(["Groups"])(model.open) }
+      })
+    )
+  ]
+}
+
+/** The agents' section of the sidebar, whose title is current while the list of agents is what the main pane shows. */
+const agentsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => [
+  h.block(
+    AgentsBinding.embedView({
+      slotId: "agents-sidebar",
+      model: model.agents,
+      view: agentsSidebarView,
+      viewInputs: { isListOpen: Open.isAnyOf(["Agents"])(model.open) }
+    })
+  )
+]
+
+/** The connections' sections of the sidebar, and the channels', whose title is current while the channels show. */
+const connectionsSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> => [
+  h.block(
+    ConnectionsBinding.embedView({
+      slotId: "connections-sidebar",
+      model: model.connections,
+      view: connectionsSidebarView,
+      viewInputs: { isChannelsOpen: Open.isAnyOf(["Channels"])(model.open) }
+    })
+  )
+]
+
+/** The settings' section of the sidebar: the workspace's and its members', which both open the settings. */
+const settingsSections = (h: WorkspaceViewBuilder): ReadonlyArray<Html> => [
+  sidebarSection(h, {
+    label: "Settings",
+    children: [
+      sidebarItem(h, {
+        icon: "mark-settings",
+        label: "Workspace",
+        isCurrent: false,
+        onClick: Message.ClickedWorkspace()
+      }),
+      sidebarItem(h, { icon: "users", label: "Members", isCurrent: false, onClick: Message.ClickedMembers() })
+    ]
+  })
+]
+
+/** The sections of the sidebar that belong to the destination open, Home's for every one that is Home's. */
+const destinationSections = (model: Model, h: WorkspaceViewBuilder): ReadonlyArray<Html> =>
+  Open.matchOrElse(
+    model.open,
+    {
+      Agents: () => agentsSections(model, h),
+      Connections: () => connectionsSections(model, h),
+      Channels: () => connectionsSections(model, h),
+      Settings: () => settingsSections(h)
+    },
+    () => homeSections(model, h)
+  )
+
+/**
+ * The sidebar: the workspace's name and the search, the sections of the destination open, and who is signed in.
+ */
+const sidebarView = (model: Model, { email, isApplePlatform }: ViewInputs, h: WorkspaceViewBuilder): Html => {
   const name = nameOf(model)
   return sidebar(h, {
     label: name,
@@ -88,39 +176,7 @@ const sidebarView = (model: Model, { email, isApplePlatform }: ViewInputs, h: Wo
         onClick: Message.ClickedSearch()
       }
     }),
-    children: [
-      sidebarSection(h, {
-        children: [
-          sidebarItem(h, {
-            icon: "mark-mail",
-            label: "Inbox",
-            ...(waiting > 0 ? { count: waiting } : {}),
-            isCurrent: Open.isAnyOf(["Inbox"])(model.open),
-            onClick: Message.ClickedInbox()
-          }),
-          sidebarItem(h, {
-            icon: "mark-triage",
-            label: "Triage",
-            ...(inTriage > 0 ? { count: inTriage } : {}),
-            isCurrent: Open.isAnyOf(["Triage"])(model.open),
-            onClick: Message.ClickedTriage()
-          }),
-          sidebarItem(h, {
-            icon: "mark-tasks",
-            label: "Tasks",
-            isCurrent: Open.isAnyOf(["Tasks"])(model.open),
-            onClick: Message.ClickedTasks()
-          })
-        ]
-      }),
-      h.block(
-        GroupsBinding.embedView({
-          slotId: "groups",
-          model: model.groups,
-          viewInputs: { openThread: openThreadTitle(model) }
-        })
-      )
-    ],
+    children: destinationSections(model, h),
     footer: sidebarFooter(h, [hint(h, email), button(h, "Sign out", Message.ClickedSignOut(), { variant: "link" })])
   })
 }
@@ -205,6 +261,7 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     rail: rail(h, {
       brand: { letter: "a", label: "amends" },
       items: railItems(model),
+      search: { label: "Search", onClick: Message.ClickedSearch() },
       footer: [
         {
           icon: "mark-settings",

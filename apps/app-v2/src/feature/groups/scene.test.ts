@@ -32,7 +32,7 @@ import { browseView, dialogView, view } from "./view.ts"
 
 const { workspace, member } = membership
 
-const sceneView = withViewInputs(view, { openThread: Option.none() })
+const sceneView = withViewInputs(view, { openThread: Option.none(), isBrowsing: false })
 
 /** The sidebar's groups and the dialog for starting a team or a conversation, which the shell keeps beside them. */
 const withDialog: ReturnType<typeof sceneView> = (model, h) => h.div([], [sceneView()(model, h), dialogView(model, h)])
@@ -287,7 +287,7 @@ describe("the groups", () => {
 
   it("mark the group picked, with the thread open in it under it, and no button for that thread", () => {
     scene(
-      { update, view: sceneView({ openThread: Option.some("Composer paste crash") }) },
+      { update, view: sceneView({ openThread: Option.some("Composer paste crash"), isBrowsing: false }) },
       given(modifyFields(listed, { selected: () => Option.some(design.id) })),
       expect(role("button", { name: "Design" })).toHaveAttr("aria-current", "page"),
       expect(within(selector('[aria-current="page"]:not(button)'), text("Composer paste crash"))).toExist(),
@@ -326,6 +326,24 @@ describe("the sidebar's way to browse", () => {
       expect(role("button", { name: "Browse groups" })).toExist(),
       click(role("button", { name: "Browse groups" })),
       expectOutMessage(OutMessage.RequestedBrowse())
+    )
+  })
+
+  it("is also the Groups title, a button that asks to browse", () => {
+    scene(
+      { update, view: sceneView() },
+      given(listed),
+      expect(role("button", { name: "Groups" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "Groups" })),
+      expectOutMessage(OutMessage.RequestedBrowse())
+    )
+  })
+
+  it("marks the Groups title current while the browse page shows", () => {
+    scene(
+      { update, view: sceneView({ openThread: Option.none(), isBrowsing: true }) },
+      given(listed),
+      expect(role("button", { name: "Groups" })).toHaveAttr("aria-current", "page")
     )
   })
 })

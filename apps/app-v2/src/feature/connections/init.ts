@@ -10,6 +10,7 @@ export const init = ConnectionsComposition.makeInit(
       workspaceId,
       memberId,
       connections: [],
+      isLoaded: false,
       integrations: Integrations.Loading(),
       grants: [],
       form: Option.none(),

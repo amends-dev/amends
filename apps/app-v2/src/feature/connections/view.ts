@@ -7,13 +7,16 @@ import {
   column,
   field,
   hint,
+  iconButton,
   notice,
   sending,
   submit,
   toggle
 } from "@amends-dev/design/control"
 import { badge, entry, entryList } from "@amends-dev/design/details"
+import type { MarkStatus } from "@amends-dev/design/mark"
 import { pane, paneColumn, paneEmpty, paneForm } from "@amends-dev/design/pane"
+import { sidebarEmpty, sidebarItem, sidebarSection, sidebarSections } from "@amends-dev/design/sidebar"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { connectionTarget, may, workspaceTarget } from "../../permissions.ts"
@@ -23,6 +26,7 @@ import {
   Check,
   checkOf,
   type ConnectionItem,
+  connectionItemsGiving,
   findConnection,
   findIntegration,
   Form,
@@ -258,13 +262,111 @@ const integrationsView = (model: Model, h: ConnectionsViewBuilder): Html =>
       ])
   })
 
-/** Adding a connection, for a person who may, once the host listed its integrations, until a form opens. */
-const addActions = (model: Model, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
-  Option.isNone(model.form) &&
+/** Whether the person may add a connection, once the host listed its integrations to add one to. */
+const mayAdd = (model: Model): boolean =>
   may(model.grants, ConnectionPermissions.Create, workspaceTarget(model.workspaceId)) &&
   integrationsOf(model).length > 0
+
+/** Adding a connection, for a person who may, until a form opens. */
+const addActions = (model: Model, h: ConnectionsViewBuilder): ReadonlyArray<Html> =>
+  Option.isNone(model.form) && mayAdd(model)
     ? [button(h, "Add a connection", Message.ClickedAdd(), { variant: "secondary" })]
     : []
+
+/**
+ * How a connection stands, as the shape at the end of its row says it: Needs setup, with why, when it can't be used,
+ * and Unavailable when its integration isn't installed on this host. A connection that is ready shows nothing, and
+ * so does one still on its way.
+ */
+const statusOf = ({ connection, pending }: ConnectionItem): MarkStatus | undefined =>
+  pending
+    ? undefined
+    : Connection.Readiness.match(connection.readiness, {
+        Ready: () => undefined,
+        Invalid: ({ description }): MarkStatus => ({ kind: "attention", label: "Needs setup", detail: description }),
+        Uninstalled: (): MarkStatus => ({
+          kind: "blocked",
+          label: "Unavailable",
+          detail: "Its integration isn't installed on this host."
+        })
+      })
+
+/** Whether the sidebar may say a section has no connections: they and the integrations that say what they give are read. */
+const isReadForSections = (model: Model): boolean =>
+  model.isLoaded && Integrations.isAnyOf(["Loaded"])(model.integrations)
+
+/** The sections of the sidebar that list connections, one for each thing a connection can give the workspace. */
+const capabilitySections = [
+  { capability: "models", title: "Models", noun: "model" },
+  { capability: "tools", title: "Tools", noun: "tool" },
+  { capability: "sandboxes", title: "Sandboxes", noun: "sandbox" },
+  { capability: "harnesses", title: "Harnesses", noun: "harness" }
+] as const
+
+/** Whether the channels are the destination open, which marks the Channels title current. */
+export type SidebarInputs = Readonly<{ isChannelsOpen: boolean }>
+
+/**
+ * The sidebar of the connections: a section for each thing a connection gives, Models, Tools, Sandboxes, and
+ * Harnesses, listing the connections whose integration gives it, so one that gives two is in both, each with its
+ * status at the end of its row, and then Channels, with a way to browse them. A title opens the connections, a
+ * Browse button does, and so does an Add button, for a person who may add one, since the form it opens is in the
+ * connections; picking a connection opens them too. An empty section says so once the connections and the
+ * integrations are read.
+ */
+export const sidebarView = ConnectionsComposition.makeView.withInputs<SidebarInputs>((model, { isChannelsOpen }, h) =>
+  sidebarSections(h, [
+    ...capabilitySections.map(({ capability, title, noun }) => {
+      const listed = connectionItemsGiving(model, capability)
+      return sidebarSection(h, {
+        label: title,
+        onTitleClick: Message.ClickedBrowse(),
+        actions: [
+          iconButton(
+            h,
+            { icon: "list", label: `Browse ${title.toLowerCase()}`, onClick: Message.ClickedBrowse() },
+            { size: "compact" }
+          ),
+          ...(mayAdd(model)
+            ? [
+                iconButton(
+                  h,
+                  { icon: "mark-new", label: `Add ${noun} connection`, onClick: Message.ClickedAdd() },
+                  { size: "compact" }
+                )
+              ]
+            : [])
+        ],
+        children:
+          listed.length === 0 && isReadForSections(model)
+            ? [sidebarEmpty(h, "None yet")]
+            : listed.map((item) =>
+                sidebarItem(h, {
+                  icon: "mark-connections",
+                  status: statusOf(item),
+                  label: item.connection.name,
+                  isPending: item.pending,
+                  isCurrent: false,
+                  onClick: Message.ClickedConnection({ connectionId: item.connection.id })
+                })
+              )
+      })
+    }),
+    sidebarSection(h, {
+      label: "Channels",
+      onTitleClick: Message.ClickedBrowseChannels(),
+      isTitleCurrent: isChannelsOpen,
+      actions: [
+        iconButton(
+          h,
+          { icon: "list", label: "Browse channels", onClick: Message.ClickedBrowseChannels() },
+          { size: "compact" }
+        )
+      ],
+      children: []
+    })
+  ])
+)
 
 /** The workspace's connections, the form open among them, and adding one, for a person who may. */
 export const view = ConnectionsComposition.makeView((model, h) =>

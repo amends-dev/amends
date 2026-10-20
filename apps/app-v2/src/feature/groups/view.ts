@@ -24,8 +24,11 @@ import {
   yours
 } from "./definition.ts"
 
-/** The title of the thread open in the group open, which the page reads from the group, when one is. */
-export type ViewInputs = Readonly<{ openThread: Option.Option<string> }>
+/**
+ * The title of the thread open in the group open, which the page reads from the group, when one is, and whether the
+ * browse page is the destination open, which marks the Groups title current.
+ */
+export type ViewInputs = Readonly<{ openThread: Option.Option<string>; isBrowsing: boolean }>
 
 /**
  * A group as a row of the sidebar, a team by its mark and a conversation by the first letter of the other
@@ -122,9 +125,10 @@ const mayCreateTeam = (model: Model): boolean =>
 
 /**
  * The sidebar's sections of the groups: the teams the person belongs to, their conversations, and the public
- * teams they may join. The buttons that start a team or a conversation open the dialog `dialogView` renders.
+ * teams they may join. The Groups title opens the browse page and is current while it shows. The buttons that start
+ * a team or a conversation open the dialog `dialogView` renders.
  */
-export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread }, h) => {
+export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { openThread, isBrowsing }, h) => {
   const own = yours(model)
   const teams = own.filter(({ group }) => group.kind === "Team")
   const conversations = own.filter(({ group }) => group.kind !== "Team")
@@ -134,6 +138,8 @@ export const view = GroupsComposition.makeView.withInputs<ViewInputs>((model, { 
     notice(h, model.notice),
     sidebarSection(h, {
       label: "Groups",
+      onTitleClick: Message.ClickedBrowse(),
+      isTitleCurrent: isBrowsing,
       actions: [
         iconButton(
           h,

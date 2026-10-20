@@ -134,6 +134,7 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
       return {
         model: modifyFields(model, {
           connections: () => connections,
+          isLoaded: () => true,
           // A form about a connection no longer there, as one removed, closes, and its check goes.
           form: Option.filter((form) =>
             Form.matchOrElse(
@@ -165,7 +166,11 @@ export const update = ConnectionsComposition.makeUpdate((model, message) => {
             outMessage: OutMessage.RequestedIntegrations()
           }
         : { model },
+    ClickedBrowse: () => ({ model, outMessage: OutMessage.RequestedBrowse() }),
+    ClickedConnection: ({ connectionId }) => ({ model, outMessage: OutMessage.OpenedConnection({ connectionId }) }),
+    ClickedBrowseChannels: () => ({ model, outMessage: OutMessage.RequestedChannels() }),
     ClickedAdd: () => ({
+      outMessage: OutMessage.RequestedBrowse(),
       model: modifyFields(model, {
         form: () =>
           Option.some(

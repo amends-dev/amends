@@ -11,7 +11,15 @@ import {
   RenameConnection,
   ReplaceConnectionKey
 } from "./command.ts"
-import { checkOf, connectionsGiving, Form, Integrations, Message, OutMessage } from "./definition.ts"
+import {
+  checkOf,
+  connectionItemsGiving,
+  connectionsGiving,
+  Form,
+  Integrations,
+  Message,
+  OutMessage
+} from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
 
@@ -327,6 +335,54 @@ describe("the connections", () => {
         expect(connectionsGiving(model, "models")).toEqual([[providers.id, "Models"]])
         expect(connectionsGiving(model, "channels")).toEqual([[chat.id, "Chat"]])
         expect(connectionsGiving(model, "sandboxes")).toEqual([])
+      })
+    )
+  })
+
+  it("tell the connections that give a thing as they are read, with whether each is on its way", () => {
+    const modelsIntegration = integrationGiving("test-models", "Test models", ["models", "tools"])
+    const providers = keylessConnection("models-1", "test-models", "Models")
+    story(
+      update,
+      given(listed),
+      message(Message.ReceivedIntegrations({ integrations: [modelsIntegration] })),
+      message(Message.ReceivedConnections({ connections: [{ connection: providers, pending: true }] })),
+      model((model) => {
+        expect(connectionItemsGiving(model, "models")).toEqual([{ connection: providers, pending: true }])
+        expect(connectionItemsGiving(model, "tools")).toEqual([{ connection: providers, pending: true }])
+        expect(connectionItemsGiving(model, "harnesses")).toEqual([])
+      })
+    )
+  })
+
+  it("are not read until the page has them, which the sidebar waits for before it says a section has none", () => {
+    story(
+      update,
+      given(listed),
+      model((model) => {
+        expect(model.isLoaded).toBe(false)
+      }),
+      message(Message.ReceivedConnections({ connections: [] })),
+      model((model) => {
+        expect(model.isLoaded).toBe(true)
+      })
+    )
+  })
+
+  it("ask the page to show the connections when browsing, picking one, or adding, and the channels when browsing them", () => {
+    story(
+      update,
+      given(listed),
+      message(Message.ClickedBrowse()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      message(Message.ClickedConnection({ connectionId: models.id })),
+      expectOutMessage(OutMessage.OpenedConnection({ connectionId: models.id })),
+      message(Message.ClickedBrowseChannels()),
+      expectOutMessage(OutMessage.RequestedChannels()),
+      message(Message.ClickedAdd()),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      model((model) => {
+        expect(model.form).toMatchObject(Option.some({ _tag: "Adding" }))
       })
     )
   })

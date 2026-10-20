@@ -82,7 +82,7 @@ const fromGroups = (message: typeof GroupsBlock.Message.Type) =>
   GroupsBinding.embedView({
     slotId: "groups",
     model: opened.groups,
-    viewInputs: { openThread: Option.none() }
+    viewInputs: { openThread: Option.none(), isBrowsing: false }
   }).toParentMessage(message)
 
 /** What the inbox reports, as the workspace receives it. */
@@ -320,16 +320,18 @@ describe("a workspace", () => {
     )
   })
 
-  it("closes the navigation drawer when the person goes home or to a destination", () => {
+  it("closes the navigation drawer when the person opens an item of a sidebar", () => {
     for (const navigation of [
-      Message.ClickedHome(),
       Message.ClickedInbox(),
       Message.ClickedTriage(),
       Message.ClickedTasks(),
-      Message.ClickedConnections(),
-      Message.ClickedAgents(),
-      Message.ClickedSettings(),
-      Message.ClickedChannels()
+      Message.ClickedWorkspace(),
+      Message.ClickedMembers(),
+      fromAgents(AgentsBlock.Message.ClickedBrowse()),
+      fromAgents(AgentsBlock.Message.ClickedAdd()),
+      fromConnections(ConnectionsBlock.Message.ClickedBrowse()),
+      fromConnections(ConnectionsBlock.Message.ClickedAdd()),
+      fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())
     ]) {
       story(
         update,
@@ -346,6 +348,55 @@ describe("a workspace", () => {
         })
       )
     }
+  })
+
+  it("keeps the navigation drawer open when the person picks a destination on the rail, which shows it", () => {
+    for (const [navigation, destination] of [
+      [Message.ClickedHome(), "Nothing"],
+      [Message.ClickedAgents(), "Agents"],
+      [Message.ClickedConnections(), "Connections"],
+      [Message.ClickedSettings(), "Settings"]
+    ] as const) {
+      story(
+        update,
+        given(opened),
+        message(Message.ClickedMenu()),
+        dialogShown,
+        message(navigation),
+        Command.expectNone(),
+        model((model) => {
+          expect(model.menu.isOpen).toBe(true)
+          expect(Open.isAnyOf([destination])(model.open)).toBe(true)
+        })
+      )
+    }
+  })
+
+  it("shows the connections, the agents, and the settings that an item of their sidebar opens", () => {
+    story(
+      update,
+      given(opened),
+      message(fromAgents(AgentsBlock.Message.ClickedBrowse())),
+      model((model) => {
+        expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
+      }),
+      message(fromConnections(ConnectionsBlock.Message.ClickedBrowse())),
+      model((model) => {
+        expect(Open.isAnyOf(["Connections"])(model.open)).toBe(true)
+      }),
+      message(fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())),
+      model((model) => {
+        expect(Open.isAnyOf(["Channels"])(model.open)).toBe(true)
+      }),
+      message(Message.ClickedMembers()),
+      model((model) => {
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+      }),
+      message(fromAgents(AgentsBlock.Message.ClickedAdd())),
+      model((model) => {
+        expect(Open.isAnyOf(["Agents"])(model.open)).toBe(true)
+      })
+    )
   })
 
   it("closes the navigation drawer when the person picks a group", () => {
@@ -697,7 +748,7 @@ describe("a workspace", () => {
       ),
       message(fromGroups(GroupsBlock.Message.ClickedGroup({ groupId }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
-      message(Message.ClickedChannels()),
+      message(fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())),
       model((model) => {
         expect(Open.isAnyOf(["Channels"])(model.open)).toBe(true)
         expect(model.groups.selected).toEqual(Option.none())
@@ -716,7 +767,7 @@ describe("a workspace", () => {
     story(
       update,
       given(opened),
-      message(Message.ClickedChannels()),
+      message(fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels())),
       message(fromChannels(ChannelsBlock.Message.ClickedAdd())),
       model((model) => {
         expect(model.channels.form).toMatchObject(Option.some({ _tag: "Adding" }))
@@ -809,7 +860,9 @@ describe("a workspace", () => {
       Message.ClickedConnections(),
       Message.ClickedAgents(),
       Message.ClickedSettings(),
-      Message.ClickedChannels(),
+      Message.ClickedWorkspace(),
+      Message.ClickedMembers(),
+      fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels()),
       fromGroups(GroupsBlock.Message.ClickedBrowse())
     ]) {
       story(
@@ -976,7 +1029,9 @@ describe("a workspace", () => {
       Message.ClickedConnections(),
       Message.ClickedAgents(),
       Message.ClickedSettings(),
-      Message.ClickedChannels(),
+      Message.ClickedWorkspace(),
+      Message.ClickedMembers(),
+      fromConnections(ConnectionsBlock.Message.ClickedBrowseChannels()),
       fromGroups(GroupsBlock.Message.ClickedBrowse())
     ]) {
       story(

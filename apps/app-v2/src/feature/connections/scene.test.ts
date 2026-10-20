@@ -1,29 +1,47 @@
 import { BuiltinRoles, GrantResolver } from "@amends-dev/core/authorization"
+import { ReplicaRecord } from "@amends-dev/core/replica"
 import { describe, it } from "@effect/vitest"
+import { Schema } from "effect"
 import {
   Command,
   Subscription,
+  all,
   change,
   click,
   expect,
+  expectAll,
   expectOutMessage,
+  filter,
+  first,
   given,
   inside,
+  selector,
   label,
   role,
   scene,
   text,
-  type
+  type,
+  withViewInputs,
+  within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { aliceOwns, connectionOf, membership, roleOf, roles, testApi } from "../../../test/fixtures.ts"
+import {
+  aliceOwns,
+  connectionOf,
+  integrationGiving,
+  keylessConnection,
+  membership,
+  roleOf,
+  roles,
+  testApi
+} from "../../../test/fixtures.ts"
 import { ConnectionsBlock } from "./block.ts"
 import { AddConnection, CheckConnection, RemoveConnection, RenameConnection, ReplaceConnectionKey } from "./command.ts"
 import { Integrations, Message, type Model, OutMessage } from "./definition.ts"
 import { init } from "./init.ts"
 import { subscriptions } from "./subscription.ts"
 import { update } from "./update.ts"
-import { view } from "./view.ts"
+import { sidebarView, view } from "./view.ts"
 
 const { workspace, member } = membership
 const asMember = { workspaceId: workspace.id, memberId: member.id }
@@ -243,6 +261,184 @@ describe("the connections", () => {
       ),
       expect(text("This browser could not read the workspace's copy.")).toExist(),
       expect(role("alert")).toExist()
+    )
+  })
+})
+
+describe("the connections' sections of the sidebar", () => {
+  const sidebar = withViewInputs(sidebarView, { isChannelsOpen: false })
+
+  const hostedBy = integrationGiving("test-models", "Test models", ["models", "tools"])
+  const sandboxedBy = integrationGiving("test-sandboxes", "Test sandboxes", ["sandboxes"])
+  const hosted = keylessConnection("connection-10", "test-models", "Hosted")
+  const local = keylessConnection("connection-11", "test-sandboxes", "Local")
+
+  /** The connections and the integrations read: one connection that gives models and tools, and one a sandbox. */
+  const withSeveral: Model = modifyFields(opened, {
+    isLoaded: () => true,
+    integrations: () => Integrations.Loaded({ integrations: [hostedBy, sandboxedBy] }),
+    connections: () => [hosted, local].map((connection) => ({ connection, pending: false }))
+  })
+
+  /** The connection `hosted`, read as the server reads it: not ready, because of `readiness`. */
+  const hostedAs = (readiness: (typeof ReplicaRecord.Connection.Encoded)["readiness"]): Model =>
+    modifyFields(withSeveral, {
+      connections: () => [
+        {
+          connection: Schema.decodeSync(ReplicaRecord.Connection)({
+            ...Schema.encodeSync(ReplicaRecord.Connection)(hosted),
+            readiness
+          }),
+          pending: false
+        }
+      ]
+    })
+
+  it("are one for each thing a connection gives, Models, Tools, Sandboxes, and Harnesses, then Channels", () => {
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      expect(role("heading", { name: "Models", level: 2 })).toExist(),
+      expect(role("heading", { name: "Tools", level: 2 })).toExist(),
+      expect(role("heading", { name: "Sandboxes", level: 2 })).toExist(),
+      expect(role("heading", { name: "Harnesses", level: 2 })).toExist(),
+      expect(role("heading", { name: "Channels", level: 2 })).toExist(),
+      expect(role("heading", { name: "Connections", level: 2 })).toBeAbsent()
+    )
+  })
+
+  it("list each connection under every thing its integration gives, and nothing for what it does not", () => {
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      expectAll(all.role("button", { name: "Hosted" })).toHaveCount(2),
+      expectAll(all.role("button", { name: "Local" })).toHaveCount(1),
+      expect(within(role("button", { name: "Local" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("button", { name: "Local" })).not.toHaveAttr("aria-current")
+    )
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(withSeveral, { integrations: () => Integrations.Loaded({ integrations: [sandboxedBy] }) })),
+      expect(role("button", { name: "Hosted" })).toBeAbsent(),
+      expect(role("button", { name: "Local" })).toExist()
+    )
+  })
+
+  it("say a section has none only once the connections and the integrations are read", () => {
+    const emptied = filter(all.role("listitem"), { hasText: "None yet" })
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(withSeveral, { isLoaded: () => false })),
+      expectAll(emptied).toHaveCount(0)
+    )
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(withSeveral, { integrations: () => Integrations.Loading() })),
+      expectAll(emptied).toHaveCount(0)
+    )
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      expectAll(emptied).toHaveCount(1),
+      expect(role("button", { name: "Browse harnesses" })).toExist()
+    )
+    scene({ update, view: sidebar() }, given(opened), expectAll(emptied).toHaveCount(0))
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(opened, { isLoaded: () => true })),
+      expectAll(emptied).toHaveCount(4)
+    )
+  })
+
+  it("open the connections from a title, from Browse, and from Add, which only a person who may add one is offered", () => {
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      click(role("button", { name: "Models" })),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      click(role("button", { name: "Browse tools" })),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      click(role("button", { name: "Add sandbox connection" })),
+      expectOutMessage(OutMessage.RequestedBrowse()),
+      Command.expectNone()
+    )
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(withSeveral, { grants: () => memberGrants })),
+      expect(role("button", { name: "Browse models" })).toExist(),
+      expect(role("button", { name: "Add model connection" })).toBeAbsent()
+    )
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(withSeveral, { integrations: () => Integrations.Loading() })),
+      expect(role("button", { name: "Add model connection" })).toBeAbsent()
+    )
+  })
+
+  it("report the connection picked, and that a section's Add shows the connections where its form opens", () => {
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      click(role("button", { name: "Add harness connection" })),
+      expectOutMessage(OutMessage.RequestedBrowse())
+    )
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      click(role("button", { name: "Local" })),
+      expectOutMessage(OutMessage.OpenedConnection({ connectionId: local.id }))
+    )
+  })
+
+  it("end a row with the connection's status, a shape named after it, and none for one that is ready", () => {
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      expect(within(role("button", { name: "Local" }), selector("[title]"))).toBeAbsent()
+    )
+    scene(
+      { update, view: sidebar() },
+      given(hostedAs({ _tag: "Invalid", description: "The key was refused" })),
+      expectAll(all.role("button", { name: "Hosted, Needs setup" })).toHaveCount(2),
+      expect(within(first(all.role("button", { name: "Hosted, Needs setup" })), selector("[title]"))).toHaveAttr(
+        "title",
+        "Needs setup: The key was refused"
+      )
+    )
+    scene(
+      { update, view: sidebar() },
+      given(hostedAs({ _tag: "Uninstalled" })),
+      expect(within(first(all.role("button", { name: "Hosted, Unavailable" })), selector("[title]"))).toHaveAttr(
+        "title",
+        "Unavailable: Its integration isn't installed on this host."
+      )
+    )
+  })
+
+  it("mark a connection that is on its way with Sending…, and no status", () => {
+    scene(
+      { update, view: sidebar() },
+      given(modifyFields(withSeveral, { connections: () => [{ connection: local, pending: true }] })),
+      expect(role("button", { name: "Local" })).toHaveAttr("aria-description", "Sending…")
+    )
+  })
+
+  it("end with Channels, whose title and Browse open the channels, and which has no Add", () => {
+    scene(
+      { update, view: sidebar() },
+      given(withSeveral),
+      click(role("button", { name: "Channels" })),
+      expectOutMessage(OutMessage.RequestedChannels()),
+      click(role("button", { name: "Browse channels" })),
+      expectOutMessage(OutMessage.RequestedChannels()),
+      expect(role("button", { name: "Add channel connection" })).toBeAbsent(),
+      expect(role("button", { name: "Channels" })).not.toHaveAttr("aria-current")
+    )
+    scene(
+      { update, view: sidebar({ isChannelsOpen: true }) },
+      given(withSeveral),
+      expect(role("button", { name: "Channels" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Models" })).not.toHaveAttr("aria-current")
     )
   })
 })
