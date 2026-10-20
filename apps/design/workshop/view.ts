@@ -2613,7 +2613,9 @@ const turnLogUnstartedLines = (words: string): ReadonlyArray<SummaryLine> => [
   { text: words }
 ]
 
-/** An agent's turn log as the side pane has it: Back to the thread, Stop while it can be stopped, Close, and its state. */
+/**
+ * An agent's turn log as the side pane has it: Back to the thread, Stop while it can be stopped, Close, and its state.
+ */
 const turnLogPane = (
   h: ApplicationViewBuilder,
   config: Readonly<{

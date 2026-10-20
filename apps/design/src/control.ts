@@ -362,8 +362,8 @@ export const linkButton = <Message, Requirements>(
 
 /**
  * A button that reads as part of a line of text, as `apps/ui` draws the link beside a turn's failure: its `label` at
- * `control` size in medium weight and `ink-secondary`, with no box around it, that darkens and is underlined while it is
- * hovered, and sends `onClick`. It is a button, since it does something on the page and goes nowhere.
+ * `control` size in medium weight and `ink-secondary`, with no box around it, that darkens and is underlined while it
+ * is hovered, and sends `onClick`. It is a button, since it does something on the page and goes nowhere.
  */
 export const lineButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
