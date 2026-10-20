@@ -64,7 +64,9 @@ const visibilityFocused = Command.resolve(
   VisibilityRadioGroupBlock.Message.CompletedFocusOption()
 )
 
-/** The dialog that creates a group, and its button that sends the form, which the sidebar's own button does not share. */
+/**
+ * The dialog that creates a group, and its button that sends the form, which the sidebar's own button does not share.
+ */
 const createDialog = role("dialog", { name: "Create group" })
 const createButton = within(createDialog, role("button", { name: "Create group" }))
 
@@ -574,7 +576,10 @@ describe("the groups", () => {
   })
 })
 
-/** The browse page and the dialog for starting a team, which the shell keeps beside the page whether or not the sidebar is. */
+/**
+ * The browse page and the dialog for starting a team, which the shell keeps beside the page whether or not the sidebar
+ * is.
+ */
 const browsingWithDialog: ReturnType<typeof sceneView> = (model, h) =>
   h.div([], [browseView(model, h), dialogView(model, h)])
 

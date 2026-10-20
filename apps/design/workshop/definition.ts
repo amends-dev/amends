@@ -68,7 +68,9 @@ export type Visibility = typeof Visibility.Type
 export const MembersPicker = Multi.create()
 export const VisibilityRadioGroup = RadioGroup.create<Visibility>()
 
-/** Which of the workshop's pickers a message is about: the empty one, the one with chips, and the ones in the modals. */
+/**
+ * Which of the workshop's pickers a message is about: the empty one, the one with chips, and the ones in the modals.
+ */
 export const MemberPlace = Schema.Literals(["empty", "chosen", "create", "add", "list"])
 export type MemberPlace = typeof MemberPlace.Type
 

@@ -226,7 +226,10 @@ const generalPanel = (group: Group.Team, model: Model, render: RenderInfo, h: Gr
   } satisfies SettingsPanel
 }
 
-/** What a row of the list says after the member's name, if anything: that they are the person, an agent, sending, or online. */
+/**
+ * What a row of the list says after the member's name, if anything: that they are the person, an agent, sending, or
+ * online.
+ */
 const noteOf = (model: Model, memberId: MemberId.MemberId, isPending: boolean): Pick<GroupMember<Message>, "note"> => {
   const member = model.members.find(({ id }) => id === memberId)
   const isSelf = memberId === model.memberId

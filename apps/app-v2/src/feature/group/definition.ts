@@ -49,7 +49,9 @@ export type OpenThread = typeof OpenThread.Type
 export const SettingsTab = Schema.Literals(["General", "Members"])
 export type SettingsTab = typeof SettingsTab.Type
 
-/** The `id` of the members picker of the Members section, which names its elements, such as the input that takes focus. */
+/**
+ * The `id` of the members picker of the Members section, which names its elements, such as the input that takes focus.
+ */
 export const admitMembersId = "group-admit-members"
 
 /**
@@ -209,7 +211,9 @@ export const admissibleMembers = (model: Model): ReadonlyArray<Member.Member> =>
   return model.members.filter((member) => member.status === "active" && !memberIds.includes(member.id))
 }
 
-/** The model with `memberId` among the members chosen to admit, unless they cannot be admitted or are chosen already. */
+/**
+ * The model with `memberId` among the members chosen to admit, unless they cannot be admitted or are chosen already.
+ */
 export const chooseToAdmit = (model: Model, memberId: string): Model => {
   const member = admissibleMembers(model).find(({ id }) => id === memberId)
 
