@@ -512,6 +512,47 @@ describe("answerKeys", () => {
     )
     scene({ update: findUpdate, view: findView }, given([]), expect(label("Find")).toHaveHandler("keydown"))
   })
+
+  it("asks the shortcut for the keys pressed with a modifier, which it keeps from the field when it answers them", () => {
+    const shortcutView = (pressed: ReadonlyArray<string>, h: HtmlBuilder<Finding>) =>
+      h.div(
+        [],
+        [
+          h.p([h.Role("status")], [`Pressed ${pressed.join(" ")}`]),
+          field(
+            h,
+            {
+              id: "find",
+              label: "Find",
+              type: "search",
+              value: "",
+              onInput: (value) => Finding.TypedFind({ value }),
+              isAutofocus: false,
+              attributes: [
+                answerKeys(h, answered, (key, { metaKey }) =>
+                  metaKey && key === "k" ? Option.some(Finding.PressedKey({ key: "Meta+K" })) : Option.none()
+                )
+              ]
+            },
+            Option.none()
+          )
+        ]
+      )
+
+    scene(
+      { update: findUpdate, view: shortcutView },
+      given([]),
+      keydown(label("Find"), "k", { metaKey: true }),
+      expectHandled(),
+      keydown(label("Find"), "j", { metaKey: true }),
+      expectIgnored(),
+      keydown(label("Find"), "k"),
+      expectIgnored(),
+      keydown(label("Find"), "Enter"),
+      expectHandled(),
+      expect(role("status")).toHaveText("Pressed Meta+K Enter")
+    )
+  })
 })
 
 describe("textarea", () => {
@@ -1210,6 +1251,27 @@ describe("iconButton", () => {
       given(initial),
       expect(role("button", { name: "Notifications" })).toExist(),
       expect(selector("[aria-pressed]")).toBeAbsent()
+    )
+  })
+
+  it("says what it controls and the keys that do the same, when it is given them, and nothing when it is not", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          iconButton(
+            h,
+            { icon: "type", label: "Formatting", onClick: Message.ClickedSave() },
+            { controls: "formatting", shortcuts: "Control+B Meta+B" }
+          ),
+          iconButton(h, { icon: "bell", label: "Notifications", onClick: Message.ClickedSave() })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-controls", "formatting"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-keyshortcuts", "Control+B Meta+B"),
+      expect(role("button", { name: "Notifications" })).not.toHaveAttr("aria-controls"),
+      expect(role("button", { name: "Notifications" })).not.toHaveAttr("aria-keyshortcuts")
     )
   })
 

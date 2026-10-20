@@ -4,8 +4,10 @@ import type { Update } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
+  all,
   click,
   expect,
+  expectAll,
   expectHandled,
   expectIgnored,
   given,
@@ -184,6 +186,7 @@ const mentionView = (model: MentionModel, h: HtmlBuilder<Mention>) =>
           ? {
               suggestions: {
                 id: "reply-members",
+                label: "People to mention",
                 items: members.map((member, index) => ({
                   ...member,
                   isActive: index === model.active,
@@ -306,6 +309,284 @@ describe("composer mentioning", () => {
       expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-controls"),
       expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-expanded"),
       expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-activedescendant")
+    )
+  })
+
+  it("keeps a person's list 16rem wide, and a command's as wide as the box", () => {
+    scene(
+      { update: mentionUpdate, view: mentionView },
+      given(typingMention),
+      expect(role("listbox", { name: "People to mention" })).toHaveClass("w-64"),
+      expect(role("listbox", { name: "People to mention" })).not.toHaveClass("inset-x-0")
+    )
+  })
+})
+
+const Format = defineMessageUnion({
+  TypedReply: { value: Schema.String },
+  SubmittedReply: {},
+  PressedFormat: { name: Schema.String },
+  ToggledFormatting: {},
+  PressedMention: {}
+})
+type Format = typeof Format.Type
+
+type FormatModel = Readonly<{ reply: string; isShown: boolean; last: string }>
+
+const formatting: FormatModel = { reply: "", isShown: true, last: "nothing" }
+
+const formatUpdate = (model: FormatModel, message: Format) =>
+  Format.match<Update.Return<FormatModel, Format>>(message, {
+    TypedReply: ({ value }) => ({ model: modifyFields(model, { reply: () => value }) }),
+    SubmittedReply: () => ({ model }),
+    PressedFormat: ({ name }) => ({ model: modifyFields(model, { last: () => name }) }),
+    ToggledFormatting: () => ({ model: modifyFields(model, { isShown: (isShown) => !isShown }) }),
+    PressedMention: () => ({ model: modifyFields(model, { last: () => "mention" }) })
+  })
+
+const formatView = (model: FormatModel, h: HtmlBuilder<Format>) =>
+  h.div(
+    [],
+    [
+      h.p([h.Role("status")], [`Last ${model.last}`]),
+      composer(h, {
+        id: "reply",
+        label: "Reply",
+        placeholder: "Reply in thread",
+        value: model.reply,
+        onInput: (value) => Format.TypedReply({ value }),
+        onSubmit: Format.SubmittedReply(),
+        submitLabel: "Send",
+        formatting: {
+          id: "reply-formatting",
+          label: "Formatting",
+          isShown: model.isShown,
+          groups: [
+            [
+              {
+                icon: "bold",
+                label: "Bold",
+                keys: "Control+B Meta+B",
+                onClick: Format.PressedFormat({ name: "bold" })
+              },
+              { icon: "italic", label: "Italic", onClick: Format.PressedFormat({ name: "italic" }) }
+            ],
+            [{ icon: "link", label: "Link", onClick: Format.PressedFormat({ name: "link" }) }],
+            [{ icon: "list", label: "Bulleted list", onClick: Format.PressedFormat({ name: "list" }) }]
+          ],
+          onToggle: Format.ToggledFormatting()
+        },
+        mention: { label: "Mention someone", onClick: Format.PressedMention() },
+        onShortcut: (key, modifiers) =>
+          key === "b" && (modifiers.ctrlKey || modifiers.metaKey)
+            ? Option.some(Format.PressedFormat({ name: "bold" }))
+            : Option.none()
+      })
+    ]
+  )
+
+describe("composer formatting", () => {
+  it("is a toolbar named for it over the box, a compact button for each of its buttons, named by their labels", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      expect(role("toolbar", { name: "Formatting" })).toHaveId("reply-formatting"),
+      expect(within(role("toolbar", { name: "Formatting" }), role("button", { name: "Bold" }))).toExist(),
+      expect(within(role("toolbar", { name: "Formatting" }), role("button", { name: "Italic" }))).toExist(),
+      expect(within(role("toolbar", { name: "Formatting" }), role("button", { name: "Link" }))).toExist(),
+      expect(within(role("toolbar", { name: "Formatting" }), role("button", { name: "Bulleted list" }))).toExist(),
+      expect(role("button", { name: "Bold" })).toHaveClass("size-6"),
+      expect(role("button", { name: "Bold" })).toHaveAttr("type", "button"),
+      expect(within(role("button", { name: "Bold" }), selector("svg"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+
+  it("says the keys that do what a button does, when it has some, and is not a switch", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      expect(role("button", { name: "Bold" })).toHaveAttr("aria-keyshortcuts", "Control+B Meta+B"),
+      expect(role("button", { name: "Italic" })).not.toHaveAttr("aria-keyshortcuts"),
+      expect(role("button", { name: "Bold" })).not.toHaveAttr("aria-pressed")
+    )
+  })
+
+  it("separates one group of buttons from the next by a rule that assistive technology skips", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      expectAll(all.selector('[aria-hidden="true"].w-px')).toHaveCount(2),
+      expect(within(role("toolbar", { name: "Formatting" }), selector('[aria-hidden="true"].w-px'))).toHaveClass("h-4")
+    )
+  })
+
+  it("sends what a button sends", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      click(role("button", { name: "Italic" })),
+      expect(role("status")).toHaveText("Last italic"),
+      click(role("button", { name: "Bold" })),
+      expect(role("status")).toHaveText("Last bold")
+    )
+  })
+
+  it("has a button before Send that is a switch for the toolbar, pressed while it is shown, controlling it", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-controls", "reply-formatting"),
+      expect(role("button", { name: "Formatting" })).toHaveClass("size-8"),
+      click(role("button", { name: "Formatting" })),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "false"),
+      click(role("button", { name: "Formatting" })),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "true")
+    )
+  })
+
+  it("hides the toolbar while it is not shown, keeping it in the page for the switch to control", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given({ ...formatting, isShown: false }),
+      expect(selector("#reply-formatting")).toHaveAttr("hidden"),
+      expect(selector("#reply-formatting")).toHaveClass("hidden"),
+      expect(selector("#reply-formatting")).not.toHaveClass("flex"),
+      expect(role("button", { name: "Formatting" })).toHaveAttr("aria-pressed", "false"),
+      click(role("button", { name: "Formatting" })),
+      expect(selector("#reply-formatting")).not.toHaveAttr("hidden"),
+      expect(selector("#reply-formatting")).toHaveClass("flex")
+    )
+  })
+
+  it("starts a mention with a button named for it, beside the switch and Send", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      click(role("button", { name: "Mention someone" })),
+      expect(role("status")).toHaveText("Last mention"),
+      expect(role("button", { name: "Mention someone" })).toHaveClass("size-8"),
+      expect(role("button", { name: "Send" })).toHaveAttr("type", "submit"),
+      expectAll(all.role("button")).toHaveCount(7)
+    )
+  })
+
+  it("draws none of this without the config for it", () => {
+    scene(
+      { update, view: replyView },
+      given(initial),
+      expect(role("toolbar")).toBeAbsent(),
+      expect(role("button", { name: "Formatting" })).toBeAbsent(),
+      expect(role("button", { name: "Mention someone" })).toBeAbsent()
+    )
+  })
+
+  it("asks for a key pressed with Control or Meta, and keeps the browser's action from a key it answers", () => {
+    scene(
+      { update: formatUpdate, view: formatView },
+      given(formatting),
+      keydown(role("textbox", { name: "Reply" }), "b", { ctrlKey: true }),
+      expectHandled(),
+      expect(role("status")).toHaveText("Last bold"),
+      click(role("button", { name: "Italic" })),
+      keydown(role("textbox", { name: "Reply" }), "b", { metaKey: true }),
+      expectHandled(),
+      expect(role("status")).toHaveText("Last bold"),
+      click(role("button", { name: "Italic" })),
+      keydown(role("textbox", { name: "Reply" }), "i", { ctrlKey: true }),
+      expectIgnored(),
+      keydown(role("textbox", { name: "Reply" }), "b"),
+      expectIgnored(),
+      expect(role("status")).toHaveText("Last italic")
+    )
+  })
+})
+
+const Commands = defineMessageUnion({
+  TypedReply: { value: Schema.String },
+  SubmittedReply: {},
+  RanCommand: { name: Schema.String }
+})
+type Commands = typeof Commands.Type
+
+type CommandsModel = Readonly<{ reply: string; ran: string }>
+
+const commandsUpdate = (model: CommandsModel, message: Commands) =>
+  Commands.match<Update.Return<CommandsModel, Commands>>(message, {
+    TypedReply: ({ value }) => ({ model: modifyFields(model, { reply: () => value }) }),
+    SubmittedReply: () => ({ model }),
+    RanCommand: ({ name }) => ({ model: modifyFields(model, { ran: () => name }) })
+  })
+
+const commandsView = (model: CommandsModel, h: HtmlBuilder<Commands>) =>
+  h.div(
+    [],
+    [
+      h.p([h.Role("status")], [`Ran ${model.ran}`]),
+      composer(h, {
+        id: "reply",
+        label: "Message #general",
+        placeholder: "Message #general",
+        value: model.reply,
+        onInput: (value) => Commands.TypedReply({ value }),
+        onSubmit: Commands.SubmittedReply(),
+        submitLabel: "Send",
+        suggestions: {
+          id: "reply-commands",
+          label: "Commands",
+          items: [
+            {
+              id: "follow",
+              name: "/follow",
+              description: "Follow #general to take part in its new threads",
+              isActive: true,
+              onPick: Commands.RanCommand({ name: "follow" })
+            },
+            {
+              id: "rename",
+              name: "/rename",
+              description: "Rename #general",
+              isActive: false,
+              onPick: Commands.RanCommand({ name: "rename" })
+            }
+          ],
+          onKeyDown: () => Option.none()
+        }
+      })
+    ]
+  )
+
+describe("composer commands", () => {
+  it("lists them in a list named for them, each row its name and, after it, what it does", () => {
+    scene(
+      { update: commandsUpdate, view: commandsView },
+      given({ reply: "/", ran: "none" }),
+      expect(role("listbox", { name: "Commands" })).toHaveId("reply-commands"),
+      expect(within(role("option", { name: /^\/follow/u }), text("/follow"))).toHaveClass("font-medium"),
+      expect(
+        within(role("option", { name: /^\/follow/u }), text("Follow #general to take part in its new threads"))
+      ).toHaveClass("text-ink-secondary"),
+      expect(role("option", { name: /^\/follow/u })).toHaveAttr("aria-selected", "true"),
+      expect(role("option", { name: /^\/rename/u })).toHaveAttr("aria-selected", "false")
+    )
+  })
+
+  it("draws no mark before a command, and is as wide as the box where a person's list is 16rem", () => {
+    scene(
+      { update: commandsUpdate, view: commandsView },
+      given({ reply: "/", ran: "none" }),
+      expect(within(role("option", { name: /^\/follow/u }), selector("[aria-hidden]"))).toBeAbsent(),
+      expect(role("listbox", { name: "Commands" })).toHaveClass("inset-x-0"),
+      expect(role("listbox", { name: "Commands" })).not.toHaveClass("w-64")
+    )
+  })
+
+  it("sends the pick of the row that is clicked, as it does for a person", () => {
+    scene(
+      { update: commandsUpdate, view: commandsView },
+      given({ reply: "/", ran: "none" }),
+      click(role("option", { name: /^\/rename/u })),
+      expect(role("status")).toHaveText("Ran rename")
     )
   })
 })

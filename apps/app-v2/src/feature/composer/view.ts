@@ -1,5 +1,5 @@
 import type { Member } from "@amends-dev/core/workspace"
-import { composer, type MentionSuggestions } from "@amends-dev/design/composer"
+import { composer, type Suggestions } from "@amends-dev/design/composer"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import { memberMark } from "../../seen.ts"
@@ -33,10 +33,7 @@ const answerKey = (key: string, suggested: ReadonlyArray<Member.Member>, activeI
  * The people the mention being typed may mean, listed while the person has not dismissed the list for its
  * letters and at least one member fits them.
  */
-const suggestionsOf = (
-  model: Model,
-  members: ReadonlyArray<Member.Member>
-): Option.Option<MentionSuggestions<Message>> =>
+const suggestionsOf = (model: Model, members: ReadonlyArray<Member.Member>): Option.Option<Suggestions<Message>> =>
   Option.flatMap(
     Option.filter(model.picking, ({ isDismissed }) => !isDismissed),
     ({ query, activeIndex }) => {
@@ -46,6 +43,7 @@ const suggestionsOf = (
       const active = Math.min(activeIndex, suggested.length - 1)
       return Option.some({
         id: `${boxId(model.place)}-members`,
+        label: "People to mention",
         items: suggested.map((member, index) => ({
           id: member.id,
           mark: memberMark(member),

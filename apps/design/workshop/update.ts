@@ -34,6 +34,7 @@ const withoutMember = (model: Model, place: MemberPlace, id: string) => {
 export const update = ApplicationComposition.makeUpdate((model, message) =>
   Message.match(message, {
     ClickedButton: () => ({ model: modifyFields(model, { pressCount: (pressCount) => pressCount + 1 }) }),
+    ToggledFormatting: () => ({ model: modifyFields(model, { isFormattingShown: (isShown) => !isShown }) }),
     TypedWorkspaceName: ({ value }) => ({ model: modifyFields(model, { workspaceName: () => value }) }),
     TypedFullName: ({ value }) => ({ model: modifyFields(model, { fullName: () => value }) }),
     TypedEmail: ({ value }) => ({ model: modifyFields(model, { email: () => value }) }),

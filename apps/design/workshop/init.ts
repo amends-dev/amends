@@ -52,6 +52,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     taskSort: "activity",
     appearance: "system",
     accountChoice: "nothing yet",
+    isFormattingShown: true,
     pressCount: 0
   }
 }))

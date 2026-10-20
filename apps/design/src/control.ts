@@ -204,6 +204,10 @@ export type IconButtonOptions = Readonly<{
   isPressed?: boolean
   /** Marks the button `aria-disabled`, drawn quiet, and sends nothing. It stays in the tab order. */
   isDisabled?: boolean
+  /** For a button that shows or hides something else on the page: the `id` of what it controls, as `aria-controls`. */
+  controls?: string
+  /** The keys that do what the button does, as `aria-keyshortcuts` names them, such as "Control+B Meta+B". */
+  shortcuts?: string
 }>
 
 /**
@@ -251,12 +255,17 @@ const hasModifier = ({ shiftKey, ctrlKey, altKey, metaKey }: KeyboardModifiers) 
 /**
  * A key handler for a text control above a list that its keys walk: `onKeyDown` says what a key sends, and a
  * key it answers does not do what the browser does for it, such as adding a line or moving the caret. A key it
- * does not answer is left to the browser, as is any key pressed with Shift, Control, Alt, or Meta.
+ * does not answer is left to the browser, as is any key pressed with Shift, Control, Alt, or Meta, unless
+ * `onShortcut` answers it: it is asked for those keys alone, and its answer is kept from the browser likewise.
  */
 export const answerKeys = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  onKeyDown: (key: string) => Option.Option<Message>
-) => h.OnKeyDownPreventDefault((key, modifiers) => (hasModifier(modifiers) ? Option.none() : onKeyDown(key)))
+  onKeyDown: (key: string) => Option.Option<Message>,
+  onShortcut?: (key: string, modifiers: KeyboardModifiers) => Option.Option<Message>
+) =>
+  h.OnKeyDownPreventDefault((key, modifiers) =>
+    hasModifier(modifiers) ? (onShortcut?.(key, modifiers) ?? Option.none()) : onKeyDown(key)
+  )
 
 /** What a button's look is made of, which `isDisabled`, `isExpanded`, and `name` are not: they are for its behavior. */
 export type ButtonLook = Omit<ButtonOptions, "isDisabled" | "isExpanded" | "name">
@@ -394,6 +403,8 @@ export const iconButtonWith = <Message, Requirements>(
     [
       ...attributes,
       ...(options.isPressed === undefined ? [] : [h.AriaPressed(options.isPressed ? "true" : "false")]),
+      ...(options.controls === undefined ? [] : [h.AriaControls(options.controls)]),
+      ...(options.shortcuts === undefined ? [] : [h.AriaKeyshortcuts(options.shortcuts)]),
       h.Class(joinClasses(iconButtonBase, iconButtonSizes[options.size ?? "regular"]))
     ],
     [icon(h, config.icon, { size: "sm" }), h.span([h.Class(hiddenLabel)], [config.label])]

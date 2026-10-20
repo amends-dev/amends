@@ -79,7 +79,7 @@ the current row, with markdown in the text as blocks in a message and as a previ
 start, with notes of who took part, an agent's turn in each of its states with the actions it offers and what it says under its line, a stop that did not go through, a turn that replied with View turn log among its message's actions, a failed turn's detail with Agent settings at its end, and a turn's row in a column 20rem wide, where the actions drop under the name and Agent settings under the failure, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a turn's log as the side pane, each in a frame of its own: a turn that works, with Stop in the header, what it runs on, its activity with a response it recorded and did not post, and the footer that follows it live; one that is stopping, with Stop dimmed and named Stopping; one that waits, with the Queued card and the footer that waits for activity; one that replied, with its reply recorded and posted and the footer that opens it in its thread; one that was interrupted and ran again and finished with no reply; one that failed before it started, with the caution card that points to the agent's setup, an alert, and Retry turn in the footer; activity that arrived while the reader was scrolled up, whose footer is one wide button; and the pane while its log is being read, not available, and could not be read; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
 and a line of copy under a header with an action, with two lines of copy, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
-groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
+groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, with its list of people to mention open on the second, an agent among them in its tone, with its toolbar of formatting over the box and the buttons beside Send that hide it and start a mention, the first of which hides it, again with the toolbar hidden as it starts on a phone, and with its list of commands open, as wide as the box; the sidebar's rows as three columns, each in a frame the sidebar's width: groups read, unread, with a count read as 2 for you, an agent at work with the logo working, queued, and stopping, and one still sending, the open thread under its group with the drawing of its task in each of its six statuses, the message icon, and a thread that is a button, and direct messages as people on the slate mark with a count and with the dot, several people by the people icon, an agent on the lilac mark at work and needing setup, and the teammates with no conversation yet; the shell twice, with and without its side pane, each in a
 frame of fixed height, its inbox, triage, and a group with their counts read aloud with what they count, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
@@ -240,11 +240,12 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   box, 36px tall and 44px on touch, with a magnifier at its start, 20rem wide at most, giving way before it wraps, and on
   a phone a line of its own. The `label` names it for assistive technology and is not shown, the `placeholder` says
   what it finds, and it never takes focus as it shows. The bordered `field` of type `search` is for a form.
-- `answerKeys(h, onKeyDown)` is the attribute for a text control above a list that its keys walk, such
+- `answerKeys(h, onKeyDown, onShortcut?)` is the attribute for a text control above a list that its keys walk, such
   as a search field above its results: `onKeyDown(key)` says what a key sends, or nothing to leave the
   key to the browser, and a key it answers does not do what the browser does for it, such as moving the
-  caret or adding a line. A key pressed with Shift, Control, Alt, or Meta is left to the browser. The
-  composer's list of members is answered the same way.
+  caret or adding a line. A key pressed with Shift, Control, Alt, or Meta is left to the browser, unless `onShortcut`
+  is given: it is asked, with the modifiers, for those keys alone, and a message it answers is sent in the browser's
+  place, as for any other key. The composer's list of members and commands is answered the same way.
 - `hint(h, text)` is a line of quiet text, at hint size in `ink-muted`, for what to know about the
   control next to it.
 - `textarea(h, { id, label, value, onInput, rows?, hint?, error?, isDisabled?, attributes? })` is the input's
@@ -273,7 +274,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   says `aria-pressed`, and shows it as `ink` while it is on. The caller draws the icon for the state, such
   as `bell` and `bell-filled`, and a button given no `isPressed` says nothing of the kind. `options.isDisabled`
   marks it `aria-disabled`, in the quiet color of a disabled control with no hover, and it sends nothing; it stays in
-  the tab order, and a switch that is disabled keeps saying whether it is pressed.
+  the tab order, and a switch that is disabled keeps saying whether it is pressed. `options.controls` is the `id` of
+  what the button shows or hides elsewhere on the page, as `aria-controls`, and `options.shortcuts` the keys that do
+  what it does, as `aria-keyshortcuts` names them, such as "Control+B Meta+B".
 - `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
   such as the composer's send button, with the same options.
 - `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
@@ -1081,7 +1084,8 @@ caller's builder, and no HTML string is ever set on the page.
 
 ### `@amends-dev/design/composer`
 
-- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, suggestions?, attributes? })` is where
+- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, formatting?, mention?, onShortcut?,
+suggestions?, attributes? })` is where
   the person writes a message: a form named by `label` (through `aria-labelledby`, so a lookup by `label` finds
   the textarea and not the form), a box with a border that darkens while the person writes in it,
   holding a textarea for `id` and, under it, the send button at the end. The textarea has the
@@ -1094,12 +1098,34 @@ caller's builder, and no HTML string is ever set on the page.
   registers. The design does not tell a key pressed while an input method composes text from any other, since
   Foldkit's key handler gives a key and its modifiers and not the event: a Block that wants those keys left to the
   input method registers a mount that stops them before the textarea's handler, and passes it here.
-- `suggestions`, `{ id, items, onKeyDown }`, opens a list of people to mention over the box while
-  the caller gives it. The list is a `listbox` named "People to mention" with the `id` given, above
-  the box (the form is `relative`; the list is `absolute`, 4px over it, 16rem wide at most, on
-  `raised` with `shadow-popover` and a border), and holds a row for each of `items`, in order, as many as the caller
-  gives: an `option` of the person's `mark` (a `MarkContent`, drawn at 22px in its tone, so an agent's is lilac) and
-  `name` at the control text size, `aria-selected` and on `selected` when its `isActive`, and sending its `onPick`
+- `formatting`, `{ id, label, isShown, groups, onToggle }`, draws the toolbar of formatting over the textarea and
+  the button that shows and hides it. The toolbar is a `toolbar` named `label` with the `id` given, holding a compact
+  `iconButton` (24px, and 44px on touch) for each button of each of `groups`, in order, each a `{ icon, label, keys?,
+onClick }` named by its `label`, saying its `keys` as `aria-keyshortcuts` (such as "Control+B Meta+B") when it has
+  some, and sending its `onClick`; between one group and the next is a rule 1px wide and 16px tall, hidden from
+  assistive technology. The buttons are not switches: nothing in the toolbar says what applies at the caret. Over the
+  textarea it takes 6px above its buttons and at their sides, and scrolls sideways, without a scrollbar, where the box
+  is too narrow for it. While it is not `isShown` it is `hidden` and takes no room, but stays in the page for the
+  button to control. That button is an `iconButton` named `label` too, with the `type` icon, at the start of the row
+  that ends in Send: a switch, `aria-pressed` while the toolbar is shown, with `aria-controls` the toolbar's `id`, and
+  sending `onToggle`.
+- `mention`, `{ label, onClick }`, adds an `iconButton` named `label` with the `mark-mention` icon after that switch
+  (or at the start of the row, without `formatting`). Both buttons are 32px, and 44px on touch, like Send, which is
+  at the far end of the row.
+- `onShortcut(key, modifiers)` is asked for a key pressed in the textarea with Shift, Control, Alt, or Meta, which the
+  builder otherwise leaves to the browser: a message it answers is sent, and the browser's action for the key does not
+  happen. It is asked for those keys alone; the keys without a modifier are the suggestions' and Enter's. The design
+  does not know which keys mean what: the caller does, and says their names to assistive technology in each button's
+  `keys`.
+- `suggestions`, `{ id, label, items, onKeyDown }`, opens a list of people to mention, or of commands to run, over the
+  box while the caller gives it. The list is a `listbox` named `label` ("People to mention", "Commands") with the `id`
+  given, above the box (the form is `relative`; the list is `absolute`, 4px over it, on `raised` with `shadow-popover`
+  and a border), 16rem wide at most, or as wide as the box when any of its rows has a `description`, and holds a row for
+  each of `items`, in order, as many as the caller gives: an `option` of the person's `mark` (a `MarkContent`, drawn at
+  22px in its tone, so an agent's is lilac) when the row has one and its `name` at the control text size, which is in
+  medium weight and does not shrink when the row has a `description`, a command such as "/follow", after which the
+  `description` is in `ink-secondary` and gives way, with an ellipsis, before the name does. A row is `aria-selected`
+  and on `selected` when its `isActive`, and sends its `onPick`
   when it is clicked, after which the textarea has the focus again. The textarea says that it completes from the
   list, with `aria-autocomplete="list"`, `aria-controls` the list's `id`, `aria-expanded="true"`, and
   `aria-activedescendant` the active option's id (the list's `id`, a hyphen, and the item's `id`). The
@@ -1431,7 +1457,12 @@ are left to the browser, and its list of people by the listbox named for it, its
 each mark at 22px in its tone, the
 textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
 row, the keys the caller answers, handled, and the others, and those with a modifier, left to the browser, and Enter
-that picks the active row with the list open and sends the form without it; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
+that picks the active row with the list open and sends the form without it, a command's row by its name in medium weight
+and its description after it, and the list of commands, as wide as the box where the people's is 16rem; its toolbar of
+formatting by its role and name, a compact button for each of its buttons, their `aria-keyshortcuts`, the rules between
+groups hidden from assistive technology, the toolbar `hidden` and without the flex that would show it while it is not
+shown, the switch beside Send as `aria-pressed` and `aria-controls` the toolbar, the mention button, and the keys with
+a modifier that `onShortcut` answers, handled, and the others, ignored; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere

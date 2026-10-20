@@ -3,7 +3,7 @@ import type { ViewInputs } from "@foldkit/ui/menu"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { centered, centeredAccount, copy, heading, screenContent } from "../src/centered.ts"
-import { composer } from "../src/composer.ts"
+import { composer, type FormatButton } from "../src/composer.ts"
 import {
   announcement,
   answerKeys,
@@ -3388,7 +3388,30 @@ const paneColumnGroup = (h: ApplicationViewBuilder, workspaceName: string): Html
     )
   ])
 
-const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: string): Html => {
+const formatGroups = (press: Message): ReadonlyArray<ReadonlyArray<FormatButton<Message>>> => [
+  [
+    { icon: "bold", label: "Bold", keys: "Control+B Meta+B", onClick: press },
+    { icon: "italic", label: "Italic", keys: "Control+I Meta+I", onClick: press },
+    { icon: "strikethrough", label: "Strikethrough", keys: "Control+Shift+X Meta+Shift+X", onClick: press }
+  ],
+  [{ icon: "link", label: "Link", keys: "Control+Shift+U Meta+Shift+U", onClick: press }],
+  [
+    { icon: "list-ordered", label: "Numbered list", keys: "Control+Shift+7 Meta+Shift+7", onClick: press },
+    { icon: "list", label: "Bulleted list", keys: "Control+Shift+8 Meta+Shift+8", onClick: press }
+  ],
+  [
+    { icon: "quote", label: "Quote", keys: "Control+Shift+9 Meta+Shift+9", onClick: press },
+    { icon: "code", label: "Code", keys: "Control+Shift+C Meta+Shift+C", onClick: press },
+    { icon: "code-block", label: "Code block", keys: "Control+Alt+Shift+C Meta+Alt+Shift+C", onClick: press }
+  ]
+]
+
+const composerGroup = (
+  h: ApplicationViewBuilder,
+  draft: string,
+  filledDraft: string,
+  isFormattingShown: boolean
+): Html => {
   const press = Message.ClickedButton()
 
   return group(h, "Composer", [
@@ -3454,10 +3477,90 @@ const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: st
           submitLabel: "Send",
           suggestions: {
             id: "mentioning-members",
+            label: "People to mention",
             items: [
               { id: "alex", mark: { text: "AM" }, name: "Alex Morgan", isActive: false, onPick: press },
               { id: "alma", mark: { text: "AI", tone: "lilac" }, name: "Alma Ito", isActive: true, onPick: press },
               { id: "alan", mark: { text: "AT" }, name: "Alan Turing", isActive: false, onPick: press }
+            ],
+            onKeyDown: () => Option.none()
+          }
+        })
+      ],
+      mentioningColumn
+    ),
+    sample(
+      h,
+      "Formatting, its toolbar over the box, the button that shows or hides it and the one that starts a mention beside Send",
+      [
+        composer(h, {
+          id: "formatting-draft",
+          label: "Reply in thread",
+          placeholder: "Reply in thread",
+          value: "Ship it **today**, and tell the team",
+          onInput: () => press,
+          onSubmit: press,
+          submitLabel: "Send",
+          formatting: {
+            id: "formatting-toolbar",
+            label: "Formatting",
+            isShown: isFormattingShown,
+            groups: formatGroups(press),
+            onToggle: Message.ToggledFormatting()
+          },
+          mention: { label: "Mention someone", onClick: press }
+        })
+      ],
+      composerColumn
+    ),
+    sample(
+      h,
+      "Formatting hidden, as it starts on a phone: the switch is not pressed",
+      [
+        composer(h, {
+          id: "hidden-formatting-draft",
+          label: "Reply in thread",
+          placeholder: "Reply in thread",
+          value: "",
+          onInput: () => press,
+          onSubmit: press,
+          submitLabel: "Send",
+          formatting: {
+            id: "hidden-formatting-toolbar",
+            label: "Formatting",
+            isShown: false,
+            groups: formatGroups(press),
+            onToggle: press
+          },
+          mention: { label: "Mention someone", onClick: press }
+        })
+      ],
+      composerColumn
+    ),
+    sample(
+      h,
+      "Commands, listed for a slash that is the whole draft: the box wide, each with what it does, the first active",
+      [
+        composer(h, {
+          id: "commands-draft",
+          label: "Message #general",
+          placeholder: "Message #general",
+          value: "/",
+          onInput: () => press,
+          onSubmit: press,
+          submitLabel: "Send",
+          suggestions: {
+            id: "commands-list",
+            label: "Commands",
+            items: [
+              {
+                id: "unfollow",
+                name: "/unfollow",
+                description: "Stop following #general",
+                isActive: true,
+                onPick: press
+              },
+              { id: "rename", name: "/rename", description: "Rename #general", isActive: false, onPick: press }
             ],
             onKeyDown: () => Option.none()
           }
@@ -6085,7 +6188,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           stateArtGroup(h),
           loadingGroup(h),
           codeInputGroup(h, model.code),
-          composerGroup(h, model.draft, model.filledDraft),
+          composerGroup(h, model.draft, model.filledDraft, model.isFormattingShown),
           formGroup(h, model.taskStatus),
           directoryGroup(h),
           centeredGroup(h, model.signInEmail, model.code)

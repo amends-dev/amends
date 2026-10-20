@@ -165,12 +165,14 @@ export const Model = Schema.Struct({
   statusPropertyMenu: TaskStatusMenu.Model,
   priorityPropertyMenu: TaskPriorityMenu.Model,
   assigneePropertyMenu: TaskAssigneeMenu.Model,
+  isFormattingShown: Schema.Boolean,
   pressCount: Schema.Finite
 })
 export type Model = typeof Model.Type
 
 export const Message = defineMessageUnion({
   ClickedButton: {},
+  ToggledFormatting: {},
   TypedWorkspaceName: { value: Schema.String },
   TypedFullName: { value: Schema.String },
   TypedEmail: { value: Schema.String },
