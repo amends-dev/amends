@@ -19,7 +19,7 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed, and disabled, also as a switch; a field empty, with a
 placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
 disabled; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
@@ -36,7 +36,7 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, as a compact one with a context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+Members tab has an action at the start of its footer and Done at its end, as a compact one with a context and a description whose Cancel and primary button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and the labels of the task list, and the same wrapped in a frame 360px wide; the task list, the labels over rows of every status, with an assignee and with none, a finished task's quiet title, the task open beside the list, a long title cut short, and a task still sending, alone and with the group after each title, and over the quiet line that says no task matches, and in frames 66rem, 52rem, and 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, each with its tooltip, the lilac tone, a drawing in place of letters, a status mark alone in its tooltip and the working logo, the logo's mark in each of its three motions for a turn, a task's status in each of its six drawings at 0.875rem and at 1rem, and the stack of two, three, and four with an agent among them in its tone, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, properties that are read under their captions, where an agent is at work as a line for each place and as a button for each, that opens the turn's thread, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -47,7 +47,7 @@ the current row, with a form in place of the text, and set apart by dividers, ce
 start, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a pane's empty state with a title
 and a line of copy under a header with an action, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
-groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
+groups, each in a frame wider than the measure; the composer empty, whose Send waits for words, filled, with only spaces, and with its list of people to mention open on the second, an agent among them in its tone; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
@@ -237,9 +237,11 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   textarea labelled Reply. It is 32px, and 44px on touch; `options.size` is `"compact"` for the 24px
   button along a list's heading, which is 44px on touch too. `options.isPressed` makes it a switch: it
   says `aria-pressed`, and shows it as `ink` while it is on. The caller draws the icon for the state, such
-  as `bell` and `bell-filled`, and a button given no `isPressed` says nothing of the kind.
+  as `bell` and `bell-filled`, and a button given no `isPressed` says nothing of the kind. `options.isDisabled`
+  marks it `aria-disabled`, in the quiet color of a disabled control with no hover, and it sends nothing; it stays in
+  the tab order, and a switch that is disabled keeps saying whether it is pressed.
 - `iconSubmit(h, { icon, label }, options?)` is that button as a `type="submit"` that sends its form,
-  such as the composer's send button.
+  such as the composer's send button, with the same options.
 - `iconButtonWith(h, attributes, { icon, label }, options?)` is that button over `attributes` that
   already give it its behavior, as `buttonWith` is for `button`.
 - `link(h, { label, href })` is a link to a page elsewhere, such as an integration's documentation: underlined text in
@@ -365,6 +367,12 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   2px apart, and, beyond three, "+4" for four more in `ink-secondary` at `meta` size. It is `hover` on
   hover and 44px tall on touch. The marks and the count are hidden from assistive technology, as a mark is,
   so the `label` says how many people it stands for, such as "7 members".
+- `markStack(h, { marks, label, onClick })` is a button of a few `marks`, each a `MarkContent` (`{ text, tone? }`, or a
+  drawing), at 22px (`choice`) in its tone, each overlapping the one before it by 5px with the later on top, as
+  `@amends-dev/ui`'s `AvatarStack` lies in a group's header. It shows every mark it is given, so the caller keeps to a
+  few, and no count: the `label`, such as "7 members", names the button and says how many people it stands for, since
+  the marks are hidden from assistive technology. It has no border, is 32px tall and 44px on touch, with `subtle` on
+  hover, and is not shown below 48rem, where the header is narrow.
 
 ### `@amends-dev/design/centered`
 
@@ -867,29 +875,35 @@ What a conversation is made of.
 
 ### `@amends-dev/design/composer`
 
-- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, suggestions? })` is where the person
-  writes a message: a form named by `label` (through `aria-labelledby`, so a lookup by `label` finds
+- `composer(h, { id, label, placeholder, value, onInput, onSubmit, submitLabel, suggestions?, attributes? })` is where
+  the person writes a message: a form named by `label` (through `aria-labelledby`, so a lookup by `label` finds
   the textarea and not the form), a box with a border that darkens while the person writes in it,
   holding a textarea for `id` and, under it, the send button at the end. The textarea has the
   `label` for assistive technology and does not show it, shows the `placeholder` while it is empty, has
   no border of its own, and grows with what is typed between 2.5rem and 15rem. The button is an
   `iconSubmit` named `submitLabel` showing the `mark-send` icon; it submits the form, which sends
-  `onSubmit`. Enter adds a line.
-- `suggestions`, `{ id, items, onKeyDown }`, opens a list of members to mention over the box while
-  the caller gives it. The list is a `listbox` named "Members to mention" with the `id` given, above
+  `onSubmit`, and it is `aria-disabled` while the `value` holds nothing but spaces. Enter in the textarea sends
+  `onSubmit` too, and the browser does not add a line for it; Shift+Enter adds one, as every key pressed with Shift,
+  Control, Alt, or Meta is left to the browser. The `attributes` go onto the textarea, such as a mount its Block
+  registers. The design does not tell a key pressed while an input method composes text from any other, since
+  Foldkit's key handler gives a key and its modifiers and not the event: a Block that wants those keys left to the
+  input method registers a mount that stops them before the textarea's handler, and passes it here.
+- `suggestions`, `{ id, items, onKeyDown }`, opens a list of people to mention over the box while
+  the caller gives it. The list is a `listbox` named "People to mention" with the `id` given, above
   the box (the form is `relative`; the list is `absolute`, 4px over it, 16rem wide at most, on
-  `raised` with `shadow-popover` and a border), and holds a row for each of `items`, in order, which
-  the caller keeps to six: an `option` of the member's `mark` (`xs`) and `name` at the control text
-  size, `aria-selected` and on `selected` when its `isActive`, and sending its `onPick` when it is
-  clicked, after which the textarea has the focus again. The textarea says that it completes from the
+  `raised` with `shadow-popover` and a border), and holds a row for each of `items`, in order, as many as the caller
+  gives: an `option` of the person's `mark` (a `MarkContent`, drawn at 22px in its tone, so an agent's is lilac) and
+  `name` at the control text size, `aria-selected` and on `selected` when its `isActive`, and sending its `onPick`
+  when it is clicked, after which the textarea has the focus again. The textarea says that it completes from the
   list, with `aria-autocomplete="list"`, `aria-controls` the list's `id`, `aria-expanded="true"`, and
   `aria-activedescendant` the active option's id (the list's `id`, a hyphen, and the item's `id`). The
   box keeps the focus while the list is open, and a key pressed in it asks `onKeyDown(key)`: a
   message it answers is sent, and the browser's action for that key, adding a line or moving the
-  focus on, does not happen; no answer leaves the key to the browser, as does any key pressed with
-  Shift, Control, Alt, or Meta. The caller decides what the keys do, such as moving the active row,
-  picking it, or dismissing the list. Without `suggestions` none of this is drawn, and the textarea
-  carries none of those attributes or a key handler. The builder has no handler that prevents the
+  focus on, does not happen. The caller is asked first, so a list that picks on Enter does not send the form; a key it
+  answers nothing for is left to the browser, or sends the form if it is Enter, as is any key pressed with Shift,
+  Control, Alt, or Meta left to the browser. The caller decides what the keys do, such as moving the active row,
+  picking it, or dismissing the list. Without `suggestions` none of this is drawn, and the textarea carries none of
+  those attributes. The builder has no handler that prevents the
   default action of a mouse press, so a click keeps the focus by returning it to the textarea after
   the row took it, not by never taking it.
 
@@ -1046,7 +1060,7 @@ headless menu's item is a `menuitem`, which has no checked state. The Block's tr
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
 renderer family as a person does, through what the app's own tests query: a button by
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
-`aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
+`aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, and its `aria-disabled` while it is disabled, which takes no click, the submit one's too, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
 landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, a compact row's 24px mark, its height, also with a 32px mark, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, a history row by its title, detail, and status as text, its quiet button named for what it acts on, disabled or absent, and its action moved under the status below 48rem, and a footnote by its text; the task list's labels, hidden from assistive technology, in the columns of the rows, with the Status label gone below 64rem and all of them below 48rem, a task by `role("button", { name })` of its title, described by all it says, in a `listitem` of the list named Tasks, its status drawn at 1rem and said in a word, its title quiet once finished, its assignee's mark in its tone or the people icon and Unassigned, its place after the title and under it below 48rem, its activity, its height, `aria-current` on the row open beside the list, and the quiet line that says no task matches; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; the logo the same, with a
@@ -1088,10 +1102,13 @@ text button named by its author and activity and described by its text, its mark
 takes the place of letters, its place and age,
 and an unread one by its dot, hidden from assistive technology, and its "Unread", a reply line by its
 label, its marks, and the count of the rest, the line and the marks hidden from assistive technology,
-and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, and the
-send button, and its list of members by the listbox named for it, its options with the active one selected, the
+and a divider by its label in the list; an event by its words as an item of the list, with its drawing hidden from assistive technology, and a description by its text, its mention as a chip, its actions, its body in place of the text, and `aria-current` while it is current; a property group by its label, its captions in capitals, hidden from assistive technology when the control under one names itself by it, a value that is read, and a property menu by the name its caption and its choice give, its icon, mark, or status drawing in the button and in the list, and the choice it reports; a list of where an agent is at work by its label, a line for each place, and the logo in the motion of each state, and a line with an action as a button named by it, that sends its message, 6px wider than its words, with a line with none beside it as text; a task's status in each of its shapes, its size and color, and a pane's header with it before the title, and Close task; a composer by its form, the textarea found by the same label, the placeholder, the attributes it is given, and the
+send button, which is unavailable while the box holds nothing or only spaces, Enter that sends the form and Shift+Enter, Control+Enter, Alt+Enter, and Meta+Enter that
+are left to the browser, and its list of people by the listbox named for it, its options with the active one selected and
+each mark at 22px in its tone, the
 textarea's `aria-autocomplete`, `aria-controls`, `aria-expanded`, and `aria-activedescendant`, a click that picks a
-row, and the keys the caller answers, handled, and the others, and those with a modifier, left to the browser; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; and the shell's landmarks by role and name: `navigation` for
+row, the keys the caller answers, handled, and the others, and those with a modifier, left to the browser, and Enter
+that picks the active row with the list open and sends the form without it; a mark as `aria-hidden`, with the patch of every status at every size, its sizes, shape, and color, and its hover text, and with a drawing in place of letters, fitted to its square; a row's status in its name and on its mark, and its two-line cells; a mark cluster by its label as a button that sends its message, with its first three marks and the count of the rest hidden from assistive technology; a mark stack by its label as a button that sends its message, with every mark it is given at 22px in its tone, hidden from assistive technology, its overlap, its height, and the width below which it is not shown; and the shell's landmarks by role and name: `navigation` for
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere

@@ -2,7 +2,7 @@ import type { Member } from "@amends-dev/core/workspace"
 import { composer, type MentionSuggestions } from "@amends-dev/design/composer"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
-import { initials } from "../../seen.ts"
+import { memberMark } from "../../seen.ts"
 import { ComposerComposition } from "./composition.ts"
 import { boxId, Message, type Model, suggestMembers } from "./definition.ts"
 
@@ -50,7 +50,7 @@ const suggestionsOf = (
         id: `${boxId(model.place)}-members`,
         items: suggested.map((member, index) => ({
           id: member.id,
-          mark: initials(member.name),
+          mark: memberMark(member),
           name: member.name,
           isActive: index === active,
           onPick: pickMention(member)

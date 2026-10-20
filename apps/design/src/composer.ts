@@ -1,13 +1,13 @@
 /**
  * Where the person writes a message: a box that grows with what they type, with the button that sends it, and
- * the list of members that opens over it while they mention one.
+ * the list of people that opens over it while they mention one.
  */
 
 import * as Textarea from "@foldkit/ui/textarea"
-import type * as Option from "effect/Option"
-import type { HtmlBuilder } from "foldkit/html"
+import * as Option from "effect/Option"
+import type { ChildAttribute, HtmlBuilder, TextareaAttribute } from "foldkit/html"
 import { answerKeys, iconSubmit } from "./control.ts"
-import { mark } from "./mark.ts"
+import { type MarkContent, mark } from "./mark.ts"
 
 const composerBox = "relative flex flex-col border border-outline bg-field focus-within:border-outline-strong"
 
@@ -26,18 +26,18 @@ const suggestionRow =
 
 const suggestionName = "min-w-0 truncate"
 
-/** One member the list offers: its `id`, the letters of its `mark`, its `name`, and what picking it sends. */
+/** One person the list offers: its `id`, their `mark` in their tone, their `name`, and what picking them sends. */
 export type MentionSuggestion<Message> = Readonly<{
   id: string
-  mark: string
+  mark: MarkContent
   name: string
   isActive: boolean
   onPick: Message
 }>
 
 /**
- * The list of members to mention, found by `id`, in the order given, at most six; `onKeyDown` says what a key
- * pressed in the box sends, or nothing to leave the key to the box.
+ * The list of people to mention, found by `id`, in the order given; `onKeyDown` says what a key pressed in the
+ * box sends, or nothing to leave the key to the box.
  */
 export type MentionSuggestions<Message> = Readonly<{
   id: string
@@ -48,7 +48,7 @@ export type MentionSuggestions<Message> = Readonly<{
 const optionId = (suggestions: MentionSuggestions<unknown>, item: MentionSuggestion<unknown>) =>
   `${suggestions.id}-${item.id}`
 
-/** What the textarea says of the list open over it, and the keys it hands the list. */
+/** What the textarea says of the list open over it. */
 const suggestionAttributes = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   suggestions: MentionSuggestions<Message>
@@ -59,12 +59,11 @@ const suggestionAttributes = <Message, Requirements>(
     h.AriaAutocomplete("list"),
     h.AriaControls(suggestions.id),
     h.AriaExpanded(true),
-    ...(active === undefined ? [] : [h.AriaActiveDescendant(optionId(suggestions, active))]),
-    answerKeys(h, suggestions.onKeyDown)
+    ...(active === undefined ? [] : [h.AriaActiveDescendant(optionId(suggestions, active))])
   ]
 }
 
-/** The list of members, each row sending its pick on a click and returning the focus to the textarea `textareaId`. */
+/** The list of people, each row sending its pick on a click and returning the focus to the textarea `textareaId`. */
 const suggestionListView = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   textareaId: string,
@@ -73,7 +72,7 @@ const suggestionListView = <Message, Requirements>(
   const focusSelector = `#${CSS.escape(textareaId)}`
 
   return h.div(
-    [h.Id(suggestions.id), h.Role("listbox"), h.AriaLabel("Members to mention"), h.Class(suggestionList)],
+    [h.Id(suggestions.id), h.Role("listbox"), h.AriaLabel("People to mention"), h.Class(suggestionList)],
     suggestions.items.map((item) =>
       h.div(
         [
@@ -84,7 +83,7 @@ const suggestionListView = <Message, Requirements>(
           h.OnClick(item.onPick, { defaultAction: "Prevent", focusSelector }),
           h.Class(suggestionRow)
         ],
-        [mark(h, { text: item.mark, size: "xs" }), h.span([h.Class(suggestionName)], [item.name])]
+        [mark(h, { ...item.mark, size: "choice" }), h.span([h.Class(suggestionName)], [item.name])]
       )
     )
   )
@@ -93,16 +92,18 @@ const suggestionListView = <Message, Requirements>(
 /**
  * A form named by `label`: a bordered box holding the textarea for `id`, whose label is read by assistive
  * technology and not shown, and whose `placeholder` shows while it is empty, then the button named
- * `submitLabel` that sends `onSubmit`. The box is between 2.5rem and 15rem tall, and the border darkens
- * while the person writes in it. The button submits the form; Enter adds a line.
+ * `submitLabel` that sends `onSubmit`, unavailable while the box holds nothing but spaces. The box is between
+ * 2.5rem and 15rem tall, and the border darkens while the person writes in it. Enter sends `onSubmit` too, and
+ * Shift+Enter adds a line, as every key pressed with Shift, Control, Alt, or Meta is left to the browser. The
+ * `attributes` go onto the textarea, such as a mount its Block registers.
  *
- * Given `suggestions`, a list named "Members to mention" opens over the box, 4px above it and 16rem wide at
- * most, a row for each: the member's mark and name, the active one selected. The textarea says that it
- * completes from the list (`aria-autocomplete`, `aria-controls`, `aria-expanded`) and which row is active
- * (`aria-activedescendant`). A key `onKeyDown` answers sends that answer and keeps the browser's own action
- * for it, a line added or the focus moved on, from happening; a key pressed with Shift, Control, Alt, or Meta
- * is left to the browser. A click on a row sends its `onPick` and returns the focus to the textarea. Without
- * `suggestions`, no list is drawn and the textarea is as it was.
+ * Given `suggestions`, a list named "People to mention" opens over the box, 4px above it and 16rem wide at
+ * most, a row for each: the person's mark at 22px in their tone, and their name, the active one selected. The
+ * textarea says that it completes from the list (`aria-autocomplete`, `aria-controls`, `aria-expanded`) and
+ * which row is active (`aria-activedescendant`). A key `onKeyDown` answers sends that answer in place of what the
+ * key does otherwise, Enter included, and keeps the browser's own action for it, a line added or the focus moved
+ * on, from happening. A click on a row sends its `onPick` and returns the focus to the textarea. Without
+ * `suggestions`, no list is drawn and the textarea has no more attributes.
  */
 export const composer = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -115,10 +116,16 @@ export const composer = <Message, Requirements>(
     onSubmit: Message
     submitLabel: string
     suggestions?: MentionSuggestions<Message> | undefined
+    attributes?: ReadonlyArray<TextareaAttribute<Message, Requirements> | ChildAttribute> | undefined
   }>
 ) => {
   const labelId = `${config.id}-label`
   const { suggestions } = config
+  const sendOnEnter = (key: string) => (key === "Enter" ? Option.some(config.onSubmit) : Option.none())
+  const answerKey =
+    suggestions === undefined
+      ? sendOnEnter
+      : (key: string) => Option.orElse(suggestions.onKeyDown(key), () => sendOnEnter(key))
 
   return h.form(
     [h.AriaLabelledBy(labelId), h.OnSubmit(config.onSubmit), h.Class(composerBox)],
@@ -138,6 +145,8 @@ export const composer = <Message, Requirements>(
                 h.textarea([
                   ...attributes.textarea,
                   ...(suggestions === undefined ? [] : suggestionAttributes(h, suggestions)),
+                  answerKeys(h, answerKey),
+                  ...(config.attributes ?? []),
                   h.Class(composerText)
                 ])
               ]
@@ -146,7 +155,10 @@ export const composer = <Message, Requirements>(
         h
       ),
       suggestions === undefined ? h.empty : suggestionListView(h, config.id, suggestions),
-      h.div([h.Class(composerActions)], [iconSubmit(h, { icon: "mark-send", label: config.submitLabel })])
+      h.div(
+        [h.Class(composerActions)],
+        [iconSubmit(h, { icon: "mark-send", label: config.submitLabel }, { isDisabled: config.value.trim() === "" })]
+      )
     ]
   )
 }

@@ -984,6 +984,22 @@ describe("iconSubmit", () => {
       expect(role("status")).toHaveText("Saved 0, removed 0, submitted 1")
     )
   })
+
+  it("is aria-disabled when disabled, and not otherwise", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          h.form(
+            [h.AriaLabel("Reply"), h.OnSubmit(Message.SubmittedForm())],
+            [iconSubmit(h, { icon: "mark-send", label: "Send" }, { isDisabled: true })]
+          )
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Send" })).toHaveAttr("aria-disabled", "true")
+    )
+  })
 })
 
 describe("buttonRow", () => {
@@ -1119,6 +1135,30 @@ describe("iconButton", () => {
       given(initial),
       expect(role("button", { name: "Notifications" })).toExist(),
       expect(selector("[aria-pressed]")).toBeAbsent()
+    )
+  })
+
+  it("says it is disabled and cannot be clicked, staying a switch when it is pressed", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          iconButton(
+            h,
+            { icon: "bell-filled", label: "Following", onClick: Message.ClickedSave() },
+            { isPressed: true, isDisabled: true }
+          ),
+          iconButton(h, { icon: "bell", label: "Follow", onClick: Message.ClickedSave() }, { isDisabled: false })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Following" })).toHaveAttr("aria-disabled", "true"),
+      expect(role("button", { name: "Following" })).toBeDisabled(),
+      expect(role("button", { name: "Following" })).toHaveAttr("aria-pressed", "true"),
+      expect(role("button", { name: "Follow" })).not.toHaveAttr("aria-disabled"),
+      expect(role("button", { name: "Follow" })).toBeEnabled(),
+      click(role("button", { name: "Follow" })),
+      expect(role("status")).toHaveText("Saved 1, removed 0, submitted 0")
     )
   })
 })

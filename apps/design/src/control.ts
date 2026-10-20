@@ -49,7 +49,7 @@ const buttonChevron = "flex flex-none text-ink-secondary"
 const buttonWide = "w-full"
 
 const iconButtonBase =
-  "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring hover:bg-subtle hover:text-ink aria-pressed:text-ink"
+  "inline-flex flex-none cursor-pointer items-center justify-center bg-transparent p-0 text-ink-secondary focus-ring not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-pressed:text-ink aria-disabled:cursor-default aria-disabled:text-ink-disabled"
 
 const hiddenLabel = "sr-only"
 
@@ -184,6 +184,8 @@ export type IconButtonOptions = Readonly<{
    * shows in `ink`. A button without it is not a switch.
    */
   isPressed?: boolean
+  /** Marks the button `aria-disabled`, drawn quiet, and sends nothing. It stays in the tab order. */
+  isDisabled?: boolean
 }>
 
 /**
@@ -364,6 +366,7 @@ const renderIconButton = <Message, Requirements>(
   Button.view(
     {
       ...behavior,
+      isDisabled: options.isDisabled ?? false,
       toView: (attributes) => iconButtonWith(h, attributes.button, config, options)
     },
     h
@@ -371,7 +374,8 @@ const renderIconButton = <Message, Requirements>(
 
 /**
  * A quiet square button of one icon, named by `label`, that sends `onClick`. Given `isPressed` it is a switch,
- * and the caller draws the icon for the state it is in.
+ * and the caller draws the icon for the state it is in. Given `isDisabled` it is `aria-disabled`, in the quiet
+ * color of a disabled control, and sends nothing.
  */
 export const iconButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

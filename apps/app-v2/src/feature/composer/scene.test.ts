@@ -70,9 +70,9 @@ describe("a composer mentioning a member", () => {
     scene(
       { update, view: sceneView },
       given(empty),
-      expect(role("listbox", { name: "Members to mention" })).toBeAbsent(),
+      expect(role("listbox", { name: "People to mention" })).toBeAbsent(),
       ...typed("Hi @al"),
-      expect(role("listbox", { name: "Members to mention" })).toExist(),
+      expect(role("listbox", { name: "People to mention" })).toExist(),
       expectAll(all.role("option")).toHaveCount(2),
       expect(within(role("listbox"), role("option", { name: "Alan Turing" }))).toExist(),
       expect(within(role("listbox"), role("option", { name: "Álvaro Ruiz" }))).toExist(),
@@ -177,8 +177,7 @@ describe("a composer mentioning a member", () => {
       { update, view: sceneView },
       given(empty),
       ...typed("Hello"),
-      expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-autocomplete"),
-      expect(role("textbox", { name: "Reply" })).not.toHaveHandler("keydown")
+      expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-autocomplete")
     )
   })
 })

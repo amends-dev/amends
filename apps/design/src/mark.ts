@@ -1,7 +1,7 @@
 /**
  * The square that stands for a person, a workspace, an agent, or a connection: one or two letters, or a drawing,
  * on a ground of its tone, the patch over its corner that says how it stands, the logo's mark that says it is at
- * work, the circle that says where a task stands, and the button that gathers a few marks to open the people they
+ * work, the circle that says where a task stands, and the button that overlaps a few marks to open the people they
  * stand for.
  */
 
@@ -76,6 +76,11 @@ const clusterLook =
   "inline-flex flex-none cursor-pointer items-center gap-0.5 border border-outline bg-transparent p-0.5 focus-ring hover:bg-hover max-desktop:min-h-11"
 
 const clusterRest = "px-1 text-meta text-ink-secondary tabular-nums"
+
+const stackLook =
+  "inline-grid h-8 flex-none cursor-pointer place-items-center border-0 bg-transparent px-1 focus-ring hover:bg-subtle max-desktop:me-2 max-desktop:h-11 max-tablet:hidden"
+
+const stackMarks = "inline-flex items-center [&>*+*]:-ms-1.25"
 
 const hiddenLabel = "sr-only"
 
@@ -288,6 +293,34 @@ export const markCluster = <Message, Requirements>(
             config.marks.length > clusterShown
               ? h.span([h.AriaHidden(true), h.Class(clusterRest)], [`+${config.marks.length - clusterShown}`])
               : h.empty,
+            h.span([h.Class(hiddenLabel)], [config.label])
+          ]
+        )
+    },
+    h
+  )
+
+/**
+ * A button of a few `marks` at 22px in their tones, each overlapping the one before it by 5px, as `@amends-dev/ui`'s
+ * `AvatarStack` lies in a group's header, that sends `onClick`. It is 32px tall and 44px on touch, `subtle` on hover,
+ * and gone below 48rem, where the header is narrow. It is named by `label`, which says how many people the marks stand
+ * for, since the marks are hidden from assistive technology; the caller gives it as many marks as it wants shown.
+ */
+export const markStack = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ marks: ReadonlyArray<MarkContent>; label: string; onClick: Message }>
+): Html =>
+  Button.view(
+    {
+      onClick: config.onClick,
+      toView: (attributes) =>
+        h.button(
+          [...attributes.button, h.Class(stackLook)],
+          [
+            h.span(
+              [h.Class(stackMarks)],
+              config.marks.map((content) => mark(h, { ...content, size: "choice" }))
+            ),
             h.span([h.Class(hiddenLabel)], [config.label])
           ]
         )

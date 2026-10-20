@@ -14,6 +14,7 @@ import {
   role,
   scene,
   selector,
+  text,
   type,
   within
 } from "foldkit/scene"
@@ -45,7 +46,8 @@ const replyView = (model: Model, h: HtmlBuilder<Message>) =>
         value: model.reply,
         onInput: (value) => Message.TypedReply({ value }),
         onSubmit: Message.SubmittedReply(),
-        submitLabel: "Reply"
+        submitLabel: "Reply",
+        attributes: [h.Spellcheck(false)]
       })
     ]
   )
@@ -82,11 +84,64 @@ describe("composer", () => {
       expect(role("button", { name: "Reply" })).toHaveAttr("type", "submit")
     )
   })
+
+  it("makes the button unavailable while the box holds nothing, or only spaces, and available once it holds words", () => {
+    scene(
+      { update, view: replyView },
+      given(initial),
+      expect(role("button", { name: "Reply" })).toHaveAttr("aria-disabled", "true"),
+      type(label("Reply"), "   "),
+      expect(role("button", { name: "Reply" })).toHaveAttr("aria-disabled", "true"),
+      type(label("Reply"), "Will do"),
+      expect(role("button", { name: "Reply" })).not.toHaveAttr("aria-disabled"),
+      type(label("Reply"), ""),
+      expect(role("button", { name: "Reply" })).toHaveAttr("aria-disabled", "true")
+    )
+  })
+
+  it("sends the form on Enter, keeping the browser from adding a line", () => {
+    scene(
+      { update, view: replyView },
+      given(initial),
+      type(label("Reply"), "Will do"),
+      keydown(role("textbox", { name: "Reply" }), "Enter"),
+      expectHandled(),
+      expect(role("status")).toHaveText('Reply "Will do", submitted 1')
+    )
+  })
+
+  it("leaves Enter with Shift to the browser, which adds a line, and with Control, Alt, or Meta, and other keys", () => {
+    scene(
+      { update, view: replyView },
+      given(initial),
+      type(label("Reply"), "Will do"),
+      keydown(role("textbox", { name: "Reply" }), "Enter", { shiftKey: true }),
+      expectIgnored(),
+      keydown(role("textbox", { name: "Reply" }), "Enter", { ctrlKey: true }),
+      expectIgnored(),
+      keydown(role("textbox", { name: "Reply" }), "Enter", { altKey: true }),
+      expectIgnored(),
+      keydown(role("textbox", { name: "Reply" }), "Enter", { metaKey: true }),
+      expectIgnored(),
+      keydown(role("textbox", { name: "Reply" }), "a"),
+      expectIgnored(),
+      expect(role("status")).toHaveText('Reply "Will do", submitted 0')
+    )
+  })
+
+  it("puts the attributes it is given onto the textarea", () => {
+    scene(
+      { update, view: replyView },
+      given(initial),
+      expect(role("textbox", { name: "Reply" })).toHaveAttr("spellcheck", "false"),
+      expect(role("form", { name: "Reply" })).not.toHaveAttr("spellcheck")
+    )
+  })
 })
 
 const members = [
-  { id: "member-1", mark: "AC", name: "Alice Chen" },
-  { id: "member-2", mark: "AM", name: "Alex Morgan" }
+  { id: "member-1", mark: { text: "AC" }, name: "Alice Chen" },
+  { id: "member-2", mark: { text: "AM", tone: "lilac" as const }, name: "Alex Morgan" }
 ]
 
 const Mention = defineMessageUnion({
@@ -98,14 +153,14 @@ const Mention = defineMessageUnion({
 })
 type Mention = typeof Mention.Type
 
-type MentionModel = Readonly<{ reply: string; active: number; isOpen: boolean; picked: string }>
+type MentionModel = Readonly<{ reply: string; active: number; isOpen: boolean; picked: string; sent: number }>
 
-const typingMention: MentionModel = { reply: "Hi @al", active: 0, isOpen: true, picked: "no one" }
+const typingMention: MentionModel = { reply: "Hi @al", active: 0, isOpen: true, picked: "no one", sent: 0 }
 
 const mentionUpdate = (model: MentionModel, message: Mention) =>
   Mention.match<Update.Return<MentionModel, Mention>>(message, {
     TypedReply: ({ value }) => ({ model: modifyFields(model, { reply: () => value }) }),
-    SubmittedReply: () => ({ model }),
+    SubmittedReply: () => ({ model: modifyFields(model, { sent: (sent) => sent + 1 }) }),
     PickedMember: ({ memberId }) => ({ model: modifyFields(model, { picked: () => memberId, isOpen: () => false }) }),
     MovedActive: ({ to }) => ({ model: modifyFields(model, { active: () => to }) }),
     DismissedList: () => ({ model: modifyFields(model, { isOpen: () => false }) })
@@ -116,6 +171,7 @@ const mentionView = (model: MentionModel, h: HtmlBuilder<Mention>) =>
     [],
     [
       h.p([h.Role("status")], [`Picked ${model.picked}, active ${model.active}`]),
+      h.p([h.Role("note"), h.AriaLabel("Sent")], [String(model.sent)]),
       composer(h, {
         id: "reply",
         label: "Reply",
@@ -153,11 +209,9 @@ describe("composer mentioning", () => {
     scene(
       { update: mentionUpdate, view: mentionView },
       given(typingMention),
-      expect(role("listbox", { name: "Members to mention" })).toHaveId("reply-members"),
-      expect(within(role("listbox", { name: "Members to mention" }), role("option", { name: "Alice Chen" }))).toExist(),
-      expect(
-        within(role("listbox", { name: "Members to mention" }), role("option", { name: "Alex Morgan" }))
-      ).toExist(),
+      expect(role("listbox", { name: "People to mention" })).toHaveId("reply-members"),
+      expect(within(role("listbox", { name: "People to mention" }), role("option", { name: "Alice Chen" }))).toExist(),
+      expect(within(role("listbox", { name: "People to mention" }), role("option", { name: "Alex Morgan" }))).toExist(),
       expect(role("option", { name: "Alice Chen" })).toHaveAttr("aria-selected", "true"),
       expect(role("option", { name: "Alex Morgan" })).toHaveAttr("aria-selected", "false"),
       expect(within(role("option", { name: "Alice Chen" }), selector("span"))).toHaveAttr("aria-hidden", "true")
@@ -177,6 +231,18 @@ describe("composer mentioning", () => {
       expect(role("textbox", { name: "Reply" })).toHaveAttr("aria-activedescendant", "reply-members-member-2"),
       expect(role("option", { name: "Alex Morgan" })).toHaveAttr("aria-selected", "true"),
       expect(role("option", { name: "Alice Chen" })).toHaveAttr("aria-selected", "false")
+    )
+  })
+
+  it("draws each person's mark at 22px in their tone, hidden from assistive technology", () => {
+    scene(
+      { update: mentionUpdate, view: mentionView },
+      given(typingMention),
+      expect(within(role("option", { name: "Alice Chen" }), text("AC"))).toHaveClass("size-5.5"),
+      expect(within(role("option", { name: "Alice Chen" }), text("AC"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("option", { name: "Alex Morgan" }), text("AM"))).toHaveClass("size-5.5"),
+      expect(within(role("option", { name: "Alex Morgan" }), text("AM"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(within(role("option", { name: "Alex Morgan" }), text("AM"))).toHaveAttr("aria-hidden", "true")
     )
   })
 
@@ -207,6 +273,27 @@ describe("composer mentioning", () => {
     )
   })
 
+  it("picks the active row on Enter, and does not send the form", () => {
+    scene(
+      { update: mentionUpdate, view: mentionView },
+      given(typingMention),
+      keydown(role("textbox", { name: "Reply" }), "Enter"),
+      expectHandled(),
+      expect(role("status")).toHaveText("Picked member-1, active 0"),
+      expect(role("note", { name: "Sent" })).toHaveText("0")
+    )
+  })
+
+  it("sends the form on Enter once the list is closed", () => {
+    scene(
+      { update: mentionUpdate, view: mentionView },
+      given({ ...typingMention, isOpen: false }),
+      keydown(role("textbox", { name: "Reply" }), "Enter"),
+      expectHandled(),
+      expect(role("note", { name: "Sent" })).toHaveText("1")
+    )
+  })
+
   it("closes the list on a key that dismisses it, and puts none of its attributes on the textarea", () => {
     scene(
       { update: mentionUpdate, view: mentionView },
@@ -218,8 +305,7 @@ describe("composer mentioning", () => {
       expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-autocomplete"),
       expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-controls"),
       expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-expanded"),
-      expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-activedescendant"),
-      expect(role("textbox", { name: "Reply" })).not.toHaveHandler("keydown")
+      expect(role("textbox", { name: "Reply" })).not.toHaveAttr("aria-activedescendant")
     )
   })
 })

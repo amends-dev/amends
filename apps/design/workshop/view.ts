@@ -62,6 +62,7 @@ import {
   type MarkStatus,
   mark,
   markCluster,
+  markStack,
   statusMark,
   statusTooltip,
   type TaskStatusShape,
@@ -374,7 +375,12 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
     ]),
     sample(h, "Icon buttons as a switch, off and pressed", [
       iconButton(h, { icon: "bell", label: "Follow", onClick: press }, { isPressed: false }),
-      iconButton(h, { icon: "bell-filled", label: "Unfollow", onClick: press }, { isPressed: true })
+      iconButton(h, { icon: "bell-filled", label: "Following", onClick: press }, { isPressed: true })
+    ]),
+    sample(h, "Icon buttons, disabled, as a switch off and pressed too", [
+      iconButton(h, { icon: "mark-settings", label: "Settings", onClick: press }, { isDisabled: true }),
+      iconButton(h, { icon: "bell", label: "Follow", onClick: press }, { isPressed: false, isDisabled: true }),
+      iconButton(h, { icon: "bell-filled", label: "Following", onClick: press }, { isPressed: true, isDisabled: true })
     ])
   ])
 }
@@ -1604,6 +1610,23 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
       [mark(h, { text: "Y", size: "xs" }), mark(h, { text: "Y", size: "sm" }), mark(h, { text: "Y", size: "md" })],
       iconSizeRow
     ),
+    sample(
+      h,
+      "Stack of two, three, and four, with an agent in its tone, each mark 22px and overlapping the last by 5px",
+      [
+        markStack(h, { marks: [{ text: "AM" }, { text: "Y" }], label: "2 members", onClick: Message.ClickedButton() }),
+        markStack(h, {
+          marks: [{ text: "AM" }, { text: "Y" }, { text: "S" }],
+          label: "3 members",
+          onClick: Message.ClickedButton()
+        }),
+        markStack(h, {
+          marks: [{ text: "AM" }, { text: "Y" }, { text: "S" }, { text: "AI", tone: "lilac" }],
+          label: "4 members",
+          onClick: Message.ClickedButton()
+        })
+      ]
+    ),
     sample(h, "Cluster of two, three, and seven", [
       markCluster(h, { marks: ["AM", "Y"], label: "2 members", onClick: Message.ClickedButton() }),
       markCluster(h, { marks: ["AM", "Y", "S"], label: "3 members", onClick: Message.ClickedButton() }),
@@ -2450,12 +2473,12 @@ const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: st
       [
         composer(h, {
           id: "draft",
-          label: "Start a thread",
+          label: "Message #general",
           placeholder: "Message #general",
           value: draft,
           onInput: (value) => Message.TypedDraft({ value }),
           onSubmit: press,
-          submitLabel: "Start"
+          submitLabel: "Send"
         })
       ],
       composerColumn
@@ -2466,34 +2489,50 @@ const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: st
       [
         composer(h, {
           id: "filled-draft",
-          label: "Reply",
+          label: "Reply in thread",
           placeholder: "Reply in thread",
           value: filledDraft,
           onInput: (value) => Message.TypedFilledDraft({ value }),
           onSubmit: press,
-          submitLabel: "Reply"
+          submitLabel: "Send"
         })
       ],
       composerColumn
     ),
     sample(
       h,
-      "Mentioning a member, the second one active",
+      "Only spaces, which count as empty: Send is unavailable",
+      [
+        composer(h, {
+          id: "spaces-draft",
+          label: "Reply in thread",
+          placeholder: "Reply in thread",
+          value: "   ",
+          onInput: () => press,
+          onSubmit: press,
+          submitLabel: "Send"
+        })
+      ],
+      composerColumn
+    ),
+    sample(
+      h,
+      "Mentioning, the second person active and an agent among them in its tone",
       [
         composer(h, {
           id: "mentioning-draft",
-          label: "Reply",
+          label: "Reply in thread",
           placeholder: "Reply in thread",
           value: "Can you look, @al",
           onInput: () => press,
           onSubmit: press,
-          submitLabel: "Reply",
+          submitLabel: "Send",
           suggestions: {
             id: "mentioning-members",
             items: [
-              { id: "alex", mark: "AM", name: "Alex Morgan", isActive: false, onPick: press },
-              { id: "alma", mark: "AI", name: "Alma Ito", isActive: true, onPick: press },
-              { id: "alan", mark: "AT", name: "Alan Turing", isActive: false, onPick: press }
+              { id: "alex", mark: { text: "AM" }, name: "Alex Morgan", isActive: false, onPick: press },
+              { id: "alma", mark: { text: "AI", tone: "lilac" }, name: "Alma Ito", isActive: true, onPick: press },
+              { id: "alan", mark: { text: "AT" }, name: "Alan Turing", isActive: false, onPick: press }
             ],
             onKeyDown: () => Option.none()
           }
@@ -3269,12 +3308,12 @@ const groupPane = (h: ApplicationViewBuilder, paneTab: PaneTab, composerText: st
     footer: [
       composer(h, {
         id: "composer",
-        label: "Start a thread",
+        label: "Message #general",
         placeholder: "Message #general",
         value: composerText,
         onInput: (value) => Message.TypedComposer({ value }),
         onSubmit: press,
-        submitLabel: "Start"
+        submitLabel: "Send"
       })
     ]
   })
@@ -3342,12 +3381,12 @@ const threadPane = (h: ApplicationViewBuilder, reply: string): Html => {
     footer: [
       composer(h, {
         id: "reply",
-        label: "Reply",
+        label: "Reply in thread",
         placeholder: "Reply in thread",
         value: reply,
         onInput: (value) => Message.TypedReply({ value }),
         onSubmit: press,
-        submitLabel: "Reply"
+        submitLabel: "Send"
       })
     ]
   })
@@ -3480,12 +3519,12 @@ const taskPane = (h: ApplicationViewBuilder, model: Model): Html => {
     footer: [
       composer(h, {
         id: "task-reply",
-        label: "Reply",
+        label: "Reply in thread",
         placeholder: "Reply in thread",
         value: model.reply,
         onInput: (value) => Message.TypedReply({ value }),
         onSubmit: press,
-        submitLabel: "Reply"
+        submitLabel: "Send"
       })
     ]
   })

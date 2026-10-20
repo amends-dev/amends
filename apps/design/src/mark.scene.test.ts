@@ -6,10 +6,12 @@ import { all, click, expect, expectAll, given, nth, role, scene, selector, text,
 import { modifyFields } from "foldkit/struct"
 import {
   activityMark,
+  type MarkContent,
   type MarkSize,
   type MarkStatus,
   mark,
   markCluster,
+  markStack,
   statusMark,
   statusTooltip,
   type TaskStatusShape,
@@ -545,6 +547,55 @@ describe("markCluster", () => {
       expect(text("OK")).toBeAbsent(),
       expect(text("RT")).toBeAbsent(),
       expect(within(role("button"), text("+4"))).toHaveAttr("aria-hidden", "true")
+    )
+  })
+})
+
+const stackOf = (people: ReadonlyArray<MarkContent>, label: string) => (model: Model, h: HtmlBuilder<Message>) =>
+  h.div(
+    [],
+    [
+      h.p([h.Role("status")], [`Opened ${model.openings} times`]),
+      markStack(h, { marks: people, label, onClick: Message.ClickedMembers() })
+    ]
+  )
+
+describe("markStack", () => {
+  it("is a button named by its label, and clicking it sends its message", () => {
+    scene(
+      { update, view: stackOf([{ text: "AM" }, { text: "Y" }], "2 members") },
+      given({ openings: 0 }),
+      expect(role("button", { name: "2 members" })).toExist(),
+      click(role("button", { name: "2 members" })),
+      click(role("button", { name: "2 members" })),
+      expect(role("status")).toHaveText("Opened 2 times")
+    )
+  })
+
+  it("draws each mark it is given at 22px in its tone, hidden from assistive technology, and no count", () => {
+    scene(
+      {
+        update,
+        view: stackOf([{ text: "AM" }, { text: "Y", tone: "lilac" }, { text: "S" }, { text: "OK" }], "9 members")
+      },
+      given({ openings: 0 }),
+      expect(within(role("button"), text("AM"))).toHaveClass("size-5.5"),
+      expect(within(role("button"), text("AM"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("button"), text("Y"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(within(role("button"), text("OK"))).toHaveClass("size-5.5"),
+      expect(within(role("button"), text("S"))).toHaveAttr("aria-hidden", "true"),
+      expect(text(/\+\d/)).toBeAbsent()
+    )
+  })
+
+  it("overlaps the marks by 5px, is 32px tall and 44px on touch, and is not shown below 48rem", () => {
+    scene(
+      { update, view: stackOf([{ text: "AM" }, { text: "Y" }], "2 members") },
+      given({ openings: 0 }),
+      expect(within(role("button"), selector("span.inline-flex"))).toHaveClass("[&>*+*]:-ms-1.25"),
+      expect(role("button", { name: "2 members" })).toHaveClass("h-8"),
+      expect(role("button", { name: "2 members" })).toHaveClass("max-desktop:h-11"),
+      expect(role("button", { name: "2 members" })).toHaveClass("max-tablet:hidden")
     )
   })
 })
