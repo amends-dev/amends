@@ -7,13 +7,11 @@ import { ComposerComposition } from "./composition.ts"
 import { boxId, Message, type Model, suggestMembers } from "./definition.ts"
 
 /**
- * How the box is labelled, what it shows while it is empty, and what its button says, and the members the
- * person may mention in it.
+ * What the box shows while it is empty, which also names it, and the members the person may mention in it. Its
+ * button is named Send.
  */
 export type ViewInputs = Readonly<{
-  label: string
   placeholder: string
-  submitLabel: string
   members: ReadonlyArray<Member.Member>
 }>
 
@@ -32,7 +30,7 @@ const answerKey = (key: string, suggested: ReadonlyArray<Member.Member>, activeI
   )
 
 /**
- * The members the mention being typed may mean, listed while the person has not dismissed the list for its
+ * The people the mention being typed may mean, listed while the person has not dismissed the list for its
  * letters and at least one member fits them.
  */
 const suggestionsOf = (
@@ -60,16 +58,15 @@ const suggestionsOf = (
     }
   )
 
-export const view = ComposerComposition.makeView.withInputs<ViewInputs>(
-  (model, { label, placeholder, submitLabel, members }, h) =>
-    composer(h, {
-      id: boxId(model.place),
-      label,
-      placeholder,
-      value: Option.getOrElse(model.text, () => ""),
-      onInput: (text) => Message.TypedText({ text }),
-      onSubmit: Message.SubmittedText(),
-      submitLabel,
-      suggestions: Option.getOrUndefined(suggestionsOf(model, members))
-    })
+export const view = ComposerComposition.makeView.withInputs<ViewInputs>((model, { placeholder, members }, h) =>
+  composer(h, {
+    id: boxId(model.place),
+    label: placeholder,
+    placeholder,
+    value: Option.getOrElse(model.text, () => ""),
+    onInput: (text) => Message.TypedText({ text }),
+    onSubmit: Message.SubmittedText(),
+    submitLabel: "Send",
+    suggestions: Option.getOrUndefined(suggestionsOf(model, members))
+  })
 )

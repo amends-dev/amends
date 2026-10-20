@@ -56,7 +56,7 @@ export const update = ComposerComposition.makeUpdate((model, message) =>
     }),
     SubmittedText: () => {
       const text = Option.getOrElse(model.text, () => "")
-      if (text === "") return { model }
+      if (text.trim() === "") return { model }
       return {
         model: modifyFields(model, { text: () => Option.some(""), picking: () => Option.none() }),
         commands: [saveDraft(model, "")],

@@ -357,16 +357,16 @@ describe("a group's threads", () => {
     )
   })
 
-  it("starts a thread from the composer, whose box is named for the group", () => {
+  it("starts a thread from the composer, whose box is named for the team and whose button is named Send", () => {
     scene(
       { update, view: withViewInputs(composerView, inputs)() },
       given(empty),
-      expect(role("form", { name: "Start a thread" })).toExist(),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message General"),
-      type(label("Start a thread"), "Plans for the week"),
+      expect(role("form", { name: "Message #General" })).toExist(),
+      expect(label("Message #General")).toHaveAttr("placeholder", "Message #General"),
+      type(label("Message #General"), "Plans for the week"),
       Command.expectExact(SaveDraft({ workspaceId, memberId, place, text: "Plans for the week" })),
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
-      click(role("button", { name: "Start" })),
+      click(role("button", { name: "Send" })),
       Command.expectExact(
         SaveDraft({ workspaceId, memberId, place, text: "" }),
         StartThread({ workspaceId, memberId, groupId, text: "Plans for the week", task: Option.none() })
@@ -376,21 +376,21 @@ describe("a group's threads", () => {
     )
   })
 
-  it("starts a task from the composer on the Tasks tab, whose box and button are named for the task", () => {
+  it("starts a task from the composer on the Tasks tab, whose box is named for the task and whose button is Send too", () => {
     scene(
       { update, view: withTabsAndComposer },
       given(empty),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message General"),
-      expect(role("button", { name: "Start" })).toExist(),
+      expect(label("Message #General")).toHaveAttr("placeholder", "Message #General"),
+      expect(role("button", { name: "Send" })).toExist(),
       click(role("tab", { name: "Tasks" })),
-      expect(role("form", { name: "New task" })).toExist(),
-      expect(role("form", { name: "Start a thread" })).toBeAbsent(),
-      expect(label("New task")).toHaveAttr("placeholder", "New task in #General"),
-      expect(role("button", { name: "Create task" })).toExist(),
-      type(label("New task"), "Ship the release"),
+      expect(role("form", { name: "New task in #General" })).toExist(),
+      expect(role("form", { name: "Message #General" })).toBeAbsent(),
+      expect(label("New task in #General")).toHaveAttr("placeholder", "New task in #General"),
+      expect(role("button", { name: "Send" })).toExist(),
+      type(label("New task in #General"), "Ship the release"),
       Command.expectExact(SaveDraft({ workspaceId, memberId, place, text: "Ship the release" })),
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
-      click(role("button", { name: "Create task" })),
+      click(role("button", { name: "Send" })),
       Command.expectExact(
         SaveDraft({ workspaceId, memberId, place, text: "" }),
         StartThread({ workspaceId, memberId, groupId, text: "Ship the release", task: Option.some({}) })
@@ -398,15 +398,22 @@ describe("a group's threads", () => {
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       Command.resolve(StartThread, Message.WroteAction()),
       click(role("tab", { name: "Threads" })),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message General")
+      expect(label("Message #General")).toHaveAttr("placeholder", "Message #General")
     )
   })
 
-  it("names a task started in a conversation by the other member, without the # of a team", () => {
+  it("names a message and a task started in a conversation by the other member, without the # of a team", () => {
+    const inConversation = withViewInputs(composerView, { ...inputs, groupName: "Bob", isTeam: false })()
+
     scene(
-      { update, view: withViewInputs(composerView, { ...inputs, groupName: "Bob", isTeam: false })() },
+      { update, view: inConversation },
+      given(empty),
+      expect(label("Message Bob")).toHaveAttr("placeholder", "Message Bob")
+    )
+    scene(
+      { update, view: inConversation },
       given(modifyFields(empty, { tab: () => "Tasks" as const })),
-      expect(label("New task")).toHaveAttr("placeholder", "New task in Bob")
+      expect(label("New task in Bob")).toHaveAttr("placeholder", "New task in Bob")
     )
   })
 })

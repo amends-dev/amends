@@ -40,6 +40,21 @@ describe("a composer", () => {
     )
   })
 
+  it("sends nothing for a draft of only spaces, which stays as it was typed", () => {
+    story(
+      update,
+      given(composer),
+      message(Message.TypedText({ text: "  \n " })),
+      Command.resolve(SaveDraft, Message.CompletedSaveDraft()),
+      message(Message.SubmittedText()),
+      Command.expectNone(),
+      expectNoOutMessage(),
+      model((model) => {
+        expect(model.text).toEqual(Option.some("  \n "))
+      })
+    )
+  })
+
   it("fills in the draft read when nothing was written yet", () => {
     story(
       update,
@@ -152,7 +167,7 @@ describe("a composer mentioning a member", () => {
     expect(completeTail("Hi @al", "[@Jo$&](member:member-4)")).toBe("Hi [@Jo$&](member:member-4) ")
   })
 
-  it("suggests the active members whose names contain the letters, case and accents aside, up to six, in order", () => {
+  it("suggests the active members with a word of their name starting with the letters, case and accents aside, up to eight, in order", () => {
     const named = (id: string, name: string, status: "active" | "removed" = "active") =>
       Schema.decodeSync(Member.Member)({
         id,
@@ -167,15 +182,20 @@ describe("a composer mentioning a member", () => {
       named("member-3", "Bob"),
       named("member-4", "Alan Turing"),
       named("member-5", "Alma Gone", "removed"),
-      ...["Ale", "Ali", "Alo", "Alu", "Aly"].map((name, index) => named(`member-${index + 6}`, name))
+      named("member-6", "Natalie Reed"),
+      named("member-7", "Mary Alvarez"),
+      ...["Ale", "Ali", "Alo", "Alu", "Aly", "Alb"].map((name, index) => named(`member-${index + 8}`, name))
     ]
     const names = (query: string) => suggestMembers(members, memberId, query).map(({ name }) => name)
 
-    // The person, Alice Chen, is not suggested to themselves, and Alma Gone has been removed.
-    expect(names("al")).toEqual(["Álvaro Ruiz", "Alan Turing", "Ale", "Ali", "Alo", "Alu"])
-    expect(names("ALV")).toEqual(["Álvaro Ruiz"])
-    expect(names("alv")).toEqual(["Álvaro Ruiz"])
-    expect(names("")).toHaveLength(6)
+    // The person, Alice Chen, is not suggested to themselves, Alma Gone has been removed, and "Natalie" only contains
+    // "al", so it is left out. Alb, the ninth to fit, is cut off.
+    expect(names("al")).toEqual(["Álvaro Ruiz", "Alan Turing", "Mary Alvarez", "Ale", "Ali", "Alo", "Alu", "Aly"])
+    expect(names("ALV")).toEqual(["Álvaro Ruiz", "Mary Alvarez"])
+    expect(names("alv")).toEqual(["Álvaro Ruiz", "Mary Alvarez"])
+    expect(names("ruiz")).toEqual(["Álvaro Ruiz"])
+    expect(names("uiz")).toEqual([])
+    expect(names("")).toHaveLength(8)
     expect(names("zz")).toEqual([])
     expect(suggestMembers(members, MemberId.MemberId.make("member-2"), "al")[0]?.name).toBe("Alice Chen")
   })

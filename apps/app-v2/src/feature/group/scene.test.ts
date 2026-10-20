@@ -220,17 +220,17 @@ describe("a group's main pane", () => {
       { update, view },
       given(withTaskThread),
       expect(role("list", { name: "Threads" })).toExist(),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Design"),
+      expect(label("Message #Design")).toHaveAttr("placeholder", "Message #Design"),
       click(role("tab", { name: "Tasks" })),
       expect(role("tab", { name: "Tasks" })).toHaveAttr("aria-selected", "true"),
       expect(role("list", { name: "Threads" })).toBeAbsent(),
       expect(within(role("list", { name: "Tasks" }), role("button", { name: "Plans for the week" }))).toExist(),
-      expect(label("New task")).toHaveAttr("placeholder", "New task in #Design"),
-      expect(within(role("main", { name: "Design" }), role("button", { name: "Create task" }))).toExist(),
+      expect(label("New task in #Design")).toHaveAttr("placeholder", "New task in #Design"),
+      expect(within(role("main", { name: "Design" }), role("button", { name: "Send" }))).toExist(),
       click(role("tab", { name: "Threads" })),
       expect(role("list", { name: "Threads" })).toExist(),
       expect(role("list", { name: "Tasks" })).toBeAbsent(),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Design")
+      expect(label("Message #Design")).toHaveAttr("placeholder", "Message #Design")
     )
   })
 
@@ -239,7 +239,7 @@ describe("a group's main pane", () => {
       { update, view },
       given(openedConversation),
       click(role("tab", { name: "Tasks" })),
-      expect(label("New task")).toHaveAttr("placeholder", "New task in Bob")
+      expect(label("New task in Bob")).toHaveAttr("placeholder", "New task in Bob")
     )
   })
 
@@ -317,9 +317,9 @@ describe("a group's main pane", () => {
     scene(
       { update, view },
       given(opened),
-      expect(within(role("main", { name: "Design" }), role("form", { name: "Start a thread" }))).toExist(),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Design"),
-      expect(within(role("main", { name: "Design" }), role("button", { name: "Start" }))).toExist()
+      expect(within(role("main", { name: "Design" }), role("form", { name: "Message #Design" }))).toExist(),
+      expect(label("Message #Design")).toHaveAttr("placeholder", "Message #Design"),
+      expect(within(role("main", { name: "Design" }), role("button", { name: "Send" }))).toExist()
     )
   })
 
@@ -390,7 +390,7 @@ describe("a group's main pane", () => {
       expect(role("button", { name: "Join" })).toExist(),
       expect(role("button", { name: "Follow" })).toBeAbsent(),
       expect(text("Join this team to read its threads.")).toExist(),
-      expect(role("form", { name: "Start a thread" })).toBeAbsent()
+      expect(role("form", { name: "Message #Announcements" })).toBeAbsent()
     )
   })
 
@@ -402,7 +402,7 @@ describe("a group's main pane", () => {
       expect(within(role("main", { name: "Bob" }), text("B"))).toExist(),
       expect(role("heading", { name: "Members" })).toBeAbsent(),
       expect(role("button", { name: "Leave" })).toBeAbsent(),
-      expect(label("Start a thread")).toHaveAttr("placeholder", "Message Bob")
+      expect(label("Message Bob")).toHaveAttr("placeholder", "Message Bob")
     )
   })
 
@@ -852,9 +852,9 @@ describe("a group's side pane", () => {
     scene(
       { update, view: threadView },
       given(withThread),
-      expect(within(role("complementary", { name: "Thread" }), role("form", { name: "Reply" }))).toExist(),
-      expect(label("Reply")).toHaveAttr("placeholder", "Reply in thread"),
-      expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Reply" }))).toExist(),
+      expect(within(role("complementary", { name: "Thread" }), role("form", { name: "Reply in thread" }))).toExist(),
+      expect(label("Reply in thread")).toHaveAttr("placeholder", "Reply in thread"),
+      expect(within(role("complementary", { name: "Thread" }), role("button", { name: "Send" }))).toExist(),
       expect(within(role("complementary", { name: "Thread" }), role("list", { name: "Messages" }))).toExist()
     )
   })

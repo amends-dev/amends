@@ -2,7 +2,7 @@
  * A composer: what the person writes at a place, a reply in a thread or a new thread in a group,
  * kept as a draft in their browser until they send it. It reports what it sends, and that its text
  * changed, to whatever holds it. While the person types a mention at the end of the text, `@` and
- * some letters of a name, it lists the members they may mean, and writes the one they pick into the
+ * some letters of a name, it lists the people they may mean, and writes the one they pick into the
  * text as a link.
  */
 
@@ -70,21 +70,29 @@ export const tailQuery = (text: string): Option.Option<string> =>
 export const completeTail = (text: string, mention: string): string =>
   text.replace(mentionAtEnd, (_, lead: string) => `${lead}${mention} `)
 
-/** The most members the list suggests. */
-export const maxSuggestions = 6
+/** The most people the list suggests. */
+export const maxSuggestions = 8
 
 /**
- * The active members, other than `memberId`, whose names contain `query` whatever its case or accents, in
- * the order of `members`, up to `maxSuggestions`.
+ * The active members, other than `memberId`, with a word of their name that starts with `query`, whatever its case
+ * or accents, in the order of `members`, up to `maxSuggestions`: "al" finds "Alan Turing" and "Mary Alvarez", and not
+ * "Natalie".
  */
 export const suggestMembers = (
   members: ReadonlyArray<Member.Member>,
   memberId: MemberId.MemberId,
   query: string
-): ReadonlyArray<Member.Member> =>
-  members
+): ReadonlyArray<Member.Member> => {
+  const prefix = foldAccents(query)
+
+  return members
     .filter(
       (member) =>
-        member.id !== memberId && member.status === "active" && foldAccents(member.name).includes(foldAccents(query))
+        member.id !== memberId &&
+        member.status === "active" &&
+        foldAccents(member.name)
+          .split(/\s+/u)
+          .some((word) => word.startsWith(prefix))
     )
     .slice(0, maxSuggestions)
+}

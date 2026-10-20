@@ -138,11 +138,11 @@ describe("a thread", () => {
         Message.ReceivedPresence({ present: [{ memberId: bob.id, typingIn: threadId }] })
       ),
       expect(text("Bob is typing…")).toExist(),
-      type(label("Reply"), "Will do"),
+      type(label("Reply in thread"), "Will do"),
       Command.expectExact(savingDraft("Will do"), TellTyping({ workspaceId, threadId })),
       Command.resolve(SaveDraft, ComposerBlock.Message.CompletedSaveDraft()),
       Command.resolve(TellTyping, Message.ToldTyping()),
-      click(role("button", { name: "Reply" })),
+      click(role("button", { name: "Send" })),
       Command.expectExact(
         savingDraft(""),
         PostReply({ workspaceId, memberId, threadId, text: "Will do" }),

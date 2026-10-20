@@ -224,24 +224,23 @@ export const view = ThreadsComposition.makeView.withInputs<ViewInputs>((model, i
 )
 
 /**
- * The composer to start a thread in the group, for a pane's footer, or on the Tasks tab, a thread that tracks a
- * task, which a team is named by its `#`.
+ * The composer to start a thread in the group, for a pane's footer, named by what it shows while it is empty: "Message
+ * #general" for a team and "Message Bob" for a conversation; or on the Tasks tab, a thread that tracks a task, "New
+ * task in #general".
  */
 export const composerView = ThreadsComposition.makeView.withInputs<ViewInputs>(
-  (model, { groupName, isTeam, members }, h) =>
-    h.block(
+  (model, { groupName, isTeam, members }, h) => {
+    const place = `${isTeam ? "#" : ""}${groupName}`
+
+    return h.block(
       ComposerBinding.embedView({
         slotId: "composer",
         model: model.composer,
-        viewInputs:
-          model.tab === "Tasks"
-            ? {
-                label: "New task",
-                submitLabel: "Create task",
-                placeholder: `New task in ${isTeam ? "#" : ""}${groupName}`,
-                members
-              }
-            : { label: "Start a thread", submitLabel: "Start", placeholder: `Message ${groupName}`, members }
+        viewInputs: {
+          placeholder: model.tab === "Tasks" ? `New task in ${place}` : `Message ${place}`,
+          members
+        }
       })
     )
+  }
 )

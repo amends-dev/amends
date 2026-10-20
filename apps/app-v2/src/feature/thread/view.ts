@@ -290,7 +290,7 @@ export const replyView = ThreadComposition.makeView((model, h) =>
     ReplyBinding.embedView({
       slotId: "reply",
       model: model.reply,
-      viewInputs: { label: "Reply", submitLabel: "Reply", placeholder: "Reply in thread", members: model.members }
+      viewInputs: { placeholder: "Reply in thread", members: model.members }
     })
   )
 )

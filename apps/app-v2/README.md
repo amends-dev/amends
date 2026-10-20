@@ -123,7 +123,12 @@ first message, says whom the message addresses by the mentions in its text (core
 
 The person writes a mention in the composer by typing "@" and some letters of a member's name, and
 picking the member from a list that opens over the box, which writes the link in their place and a
-space after it. Foldkit's builder gives a handler the key pressed and the value of the box, and nothing
+space after it. Enter sends what the composer holds and Shift+Enter adds a line, as in `apps/ui`; with the
+list open, Enter picks the highlighted person, as Tab does. The keys of an input method that composes text, such as the
+Enter that confirms a conversion, neither send nor pick nor add a line: Foldkit's key handler is given a key and its
+modifiers and not whether the event is composing, so `inputMethod.ts` keeps those keys, for as long as the app runs,
+from every handler of the page. A send that is refused comes back later, from the server, and the text is not
+put back in the box, as `apps/ui` keeps the draft of a send that failed. Foldkit's builder gives a handler the key pressed and the value of the box, and nothing
 gives the caret, so the composer reads the mention being typed at the end of the text, an "@" at its
 start or after a space and the letters after it with no space among them, and suggests members for
 that alone; a mention typed in the middle of the text is left as typed. A link written there, or by
@@ -191,15 +196,20 @@ below it counted at each level above.
 
 - `feature/composer`: what the person writes at a place, a reply in a thread or a new thread in a
   group, kept as a draft in their browser until they send it. It reports what it sends, and that
-  its text changed. Its view takes how the box is labelled, what it shows while it is empty, what
-  its button says, and the workspace's members, and is the design's `composer`. While the text ends in
-  a mention being typed (`tailQuery`), the Block lists up to six of the members whose names contain its
-  letters, whatever their case or accents, other than the person and the removed, in the members' order
-  (`suggestMembers`), and the view hands the design's list the keys: the arrows move the active
+  its text changed. Its view takes what the box shows while it is empty, which also names it ("Message #general",
+  "Message Bob", "Reply in thread"), and the workspace's members, and is the design's `composer`: its button is named
+  Send and is unavailable while the draft is empty or only spaces, and Enter sends it. Sending clears the box at once and the
+  write is held as the store holds any action, so Send has no state of its own for a message on its way, which `apps/ui`'s
+  composer has because it keeps the draft until the send succeeds; a draft of only spaces sends nothing. While the text ends in
+  a mention being typed (`tailQuery`), the Block lists up to eight of the people with a word of their name starting
+  with its letters, whatever their case or accents, other than the person and the removed, in the members' order
+  (`suggestMembers`), as a list named "People to mention", each with their mark at 22px in their tone, an agent's
+  lilac (`memberMark`), and the view hands the design's list the keys: the arrows move the active
   suggestion around the list (`MovedSuggestion` carries the index the view counted), Enter or Tab picks
   it (`PickedMention` writes `ThreadMessage.mentionText` in place of the "@" and the letters, and a
   space, as typing does: kept as the draft and reported), and Escape dismisses the list
-  (`DismissedSuggestions`) until the letters change. A draft read as the place opens opens no list.
+  (`DismissedSuggestions`) until the letters change. A draft read as the place opens opens no list. The mention
+  is still written as a link in the text, not as a chip in the box: a box that shows it as one is a later step.
 - `feature/thread`: a thread as the person reads and takes part in it: its title and messages, their
   part in it, how far they have read, who types there, the task it tracks, its agents' turns, and a
   composer to reply. They rename it, edit and delete their own messages, and follow it or stop;
@@ -226,7 +236,7 @@ below it counted at each level above.
   another thread from inside a side pane. It shows no title, which the pane's header has. `followView` is the bell for that header, as
   `apps/ui` draws it: an outlined bell named "Follow thread", or, while the person follows, a filled
   one named "Following thread" and pressed, which stops following, and " · Sending…" in its place
-  while a change is on its way. `replyView` is the reply composer, for the pane's footer, which
+  while a change is on its way. `replyView` is the reply composer, named and shown as "Reply in thread", for the pane's footer, which
   suggests the workspace's members the thread has read. `sidePane` puts the three into the design's
   side `pane` for the group and the inbox alike: the pane is named Thread, or Task for a thread that
   tracks one; the header has the thread's title, or its first message's words, before a message icon
@@ -317,10 +327,10 @@ below it counted at each level above.
   no task the tab says "No tasks yet" and to start one from the composer, which `apps/ui` has no words for, and with a
   search or a status that leaves none, "No tasks match these filters." in a quiet line under the labels of the columns, as
   `apps/ui` says it (`noTasksMatch`, the design's `taskListEmpty`). `composerView` is the composer to start one, for the
-  pane's footer, whose box shows "Message" and the group's name until the person writes. On the Tasks
-  tab it starts a thread that tracks a task, in triage: its box is named New task, shows "New task in"
-  and the group's name, with a `#` before a team's, and its button says Create task. The draft is the
-  same on both tabs.
+  pane's footer, whose box is named and shows "Message #general" for a team and "Message Bob" for a conversation
+  until the person writes. On the Tasks tab it starts a thread that tracks a task, in triage: its box is named and
+  shows "New task in #general", or "New task in Bob" for a conversation, which `apps/ui`'s Tasks tab has no composer
+  to word. The button says Send on both. The draft is the same on both tabs.
 - `feature/group`: a group as the person has it open: its name, their part in it, its threads, and
   the thread open among them, a keyed occurrence, so opening another makes a fresh one and a late
   result cannot land in the wrong one, and its settings in a modal. It opens with a thread already
@@ -1021,7 +1031,7 @@ below it counted at each level above.
   workspace's view the time now beside the email, as a view input and not a message, and the page
   gives it on to the inbox and the open group, the destinations that show ages and days; the workspace
   list's view takes it too, for when each invitation closes. `entry.ts` assembles the application over `services.ts`, which supplies the stores, the
-  session, and the browser's services beneath them, and gives it `crash.ts`'s view for when it stops on an unexpected
+  session, and the browser's services beneath them, and keeps the keys of an input method from the page's handlers (`inputMethod.ts`), and gives it `crash.ts`'s view for when it stops on an unexpected
   error: apps/ui's crash screen, outside the session, so with the brand alone in its header, the state art of something
   that came apart, "Something went wrong", what happened, and a primary Reload. Foldkit draws it after it has stopped
   dispatching, so its builder has no message to send, and Reload is a link to the page's own address, which loads the page

@@ -782,8 +782,8 @@ describe("the inbox's side pane", () => {
     scene(
       { update, view: sceneThreadView },
       given(openedThread),
-      expect(within(pane, role("form", { name: "Reply" }))).toExist(),
-      expect(label("Reply")).toHaveAttr("placeholder", "Reply in thread")
+      expect(within(pane, role("form", { name: "Reply in thread" }))).toExist(),
+      expect(label("Reply in thread")).toHaveAttr("placeholder", "Reply in thread")
     )
   })
 

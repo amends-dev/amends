@@ -461,9 +461,9 @@ describe("home", () => {
         expect(within(role("list", { name: "Threads" }), text("1 reply"))).toExist(),
         expect(within(role("list", { name: "Threads" }), text(timeOf(opening.publishedAt)))).toExist(),
         expect(role("button", { name: "Plans for the week" })).toExist(),
-        expect(role("form", { name: "Start a thread" })).toExist(),
-        expect(label("Start a thread")).toHaveAttr("placeholder", "Message General"),
-        expect(role("button", { name: "Start" })).toExist()
+        expect(role("form", { name: "Message #General" })).toExist(),
+        expect(label("Message #General")).toHaveAttr("placeholder", "Message #General"),
+        expect(role("button", { name: "Send" })).toExist()
       ),
       expect(
         within(role("list", { name: "Threads" }), within(selector('[aria-current="true"]'), text("Plans for the week")))
@@ -482,9 +482,9 @@ describe("home", () => {
         expect(within(role("list", { name: "Messages" }), text("1 reply"))).toExist(),
         expect(within(role("list", { name: "Messages" }), text("Sounds good"))).toExist(),
         expect(within(role("list", { name: "Messages" }), text(timeOf(reply.publishedAt)))).toExist(),
-        expect(role("form", { name: "Reply" })).toExist(),
-        expect(label("Reply")).toHaveAttr("placeholder", "Reply in thread"),
-        expect(role("button", { name: "Reply" })).toExist()
+        expect(role("form", { name: "Reply in thread" })).toExist(),
+        expect(label("Reply in thread")).toHaveAttr("placeholder", "Reply in thread"),
+        expect(role("button", { name: "Send" })).toExist()
       )
     )
   })
