@@ -61,6 +61,7 @@ import * as RpcClient from "effect/rpc/RpcClient"
 import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
+import { type AgentAtWork, agentsAtWork } from "../agentActivity.ts"
 import * as Api from "../api.ts"
 import { groupName, isAgent, messageWords, placeName } from "../seen.ts"
 import * as Drafts from "./Drafts.ts"
@@ -95,7 +96,8 @@ const sameAuthor = Schema.toEquivalence(ThreadMessage.Author)
 
 /**
  * A thread as its group lists it for the person: its opening message, its task, how many messages follow the
- * opening and who wrote them, when it was last active, and how much they have not read.
+ * opening and who wrote them, which agents are at work in it, when it was last active, and how much they have not
+ * read.
  */
 export interface ThreadView {
   readonly thread: Pending.Held<Replica.RecordOf<"Thread">>
@@ -105,6 +107,8 @@ export interface ThreadView {
   readonly replies: number
   /** The authors of those replies, each once, in the order of their first reply. */
   readonly repliers: ReadonlyArray<ThreadMessage.Author>
+  /** The agents with a turn under way in it. */
+  readonly working: ReadonlyArray<AgentAtWork>
   /** When its latest message was published, or when it was created while it has none. */
   readonly lastActiveAt: DateTime.Utc
   /** Its activities that count as new, past the member's position. */
@@ -770,6 +774,9 @@ export const layer = (options: Options) =>
                       ({ record }) => record.value
                     ),
                     ...summarizeReplies(messages),
+                    working: agentsAtWork(
+                      Pending.overlay("Turn", place, held?.turns ?? [], pending).map(({ record }) => record.value)
+                    ),
                     lastActiveAt: deriveLastActiveAt(thread.record.value, messages),
                     unread: (held?.activities ?? []).filter(
                       ({ value }) => value.newActivity && value.sequence > readThrough

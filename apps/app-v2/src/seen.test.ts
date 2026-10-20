@@ -1,4 +1,4 @@
-import { ThreadMessage } from "@amends-dev/core/thread"
+import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
@@ -28,7 +28,9 @@ import {
   groupMark,
   initials,
   isAgent,
+  isAuthorAgent,
   isOpen,
+  isStackedUnder,
   memberMark,
   messageText,
   messageWords,
@@ -36,6 +38,7 @@ import {
   pluralize,
   reasonSubtitle,
   repliesLabel,
+  shortTimeOf,
   sideSubtitle,
   statusShape,
   threadContains,
@@ -43,6 +46,7 @@ import {
   threadWords,
   timeOf,
   typingLine,
+  typingNames,
   whenLabel
 } from "./seen.ts"
 
@@ -377,6 +381,95 @@ describe("threadContains", () => {
     expect(threadContains(thread, Option.none(), members, "check")).toBe(false)
     expect(threadContains(thread, Option.none(), members, "")).toBe(true)
     expect(threadContains({ ...thread, title: "Retro" }, Option.none(), members, "retro")).toBe(true)
+  })
+})
+
+describe("shortTimeOf", () => {
+  it("is the time of day without AM or PM, as timeOf says it otherwise", () => {
+    const at = DateTime.makeUnsafe("2026-10-18T12:05:00Z")
+
+    expect(shortTimeOf(at)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(timeOf(at).startsWith(shortTimeOf(at))).toBe(true)
+  })
+
+  it("tells times five minutes apart apart", () => {
+    expect(shortTimeOf(DateTime.makeUnsafe("2026-10-18T12:05:00Z"))).not.toBe(
+      shortTimeOf(DateTime.makeUnsafe("2026-10-18T12:10:00Z"))
+    )
+  })
+})
+
+describe("isStackedUnder", () => {
+  const alice = ThreadMessage.Author.cases.Member.make({ memberId: membership.member.id })
+  const robert = ThreadMessage.Author.cases.Member.make({ memberId: bob.id })
+  const at = (minutes: number) =>
+    DateTime.add(DateTime.makeUnsafe("2026-10-18T12:00:00Z"), { milliseconds: minutes * 60_000 })
+  const written = (minutes: number, author = alice, hasReplies = false) => ({ author, at: at(minutes), hasReplies })
+
+  it("is true for the same author within five minutes after the message before", () => {
+    expect(isStackedUnder(written(1), written(0))).toBe(true)
+    expect(isStackedUnder(written(4.99), written(0))).toBe(true)
+    expect(isStackedUnder(written(0), written(0))).toBe(true)
+  })
+
+  it("is false five minutes or more after it, or before it", () => {
+    expect(isStackedUnder(written(5), written(0))).toBe(false)
+    expect(isStackedUnder(written(60), written(0))).toBe(false)
+    expect(isStackedUnder(written(0), written(1))).toBe(false)
+  })
+
+  it("is false for another author, and for the first message, which has none before it", () => {
+    expect(isStackedUnder(written(1, robert), written(0))).toBe(false)
+    expect(isStackedUnder(written(1), undefined)).toBe(false)
+  })
+
+  it("is false when either has replies, since a thread's replies end a stack and start their own", () => {
+    expect(isStackedUnder(written(1, alice, true), written(0))).toBe(false)
+    expect(isStackedUnder(written(1), written(0, alice, true))).toBe(false)
+  })
+})
+
+describe("isAuthorAgent", () => {
+  it("is true for a member that is an agent, and false for a person, an unknown member, and a contact", () => {
+    const members = [membership.member, bob, scout]
+
+    expect(isAuthorAgent(ThreadMessage.Author.cases.Member.make({ memberId: scout.id }), members)).toBe(true)
+    expect(isAuthorAgent(ThreadMessage.Author.cases.Member.make({ memberId: bob.id }), members)).toBe(false)
+    expect(isAuthorAgent(ThreadMessage.Author.cases.Member.make({ memberId: scout.id }), [bob])).toBe(false)
+    expect(isAuthorAgent(ThreadMessage.Author.cases.Contact.make({ contactId: "contact-1" as never }), members)).toBe(
+      false
+    )
+  })
+})
+
+describe("typingNames", () => {
+  const members = [membership.member, bob, scout]
+  const present = [
+    { memberId: bob.id, typingIn: thread.id },
+    { memberId: scout.id, typingIn: thread.id },
+    { memberId: membership.member.id, typingIn: thread.id }
+  ]
+
+  it("are those present who type in the thread, other than the person, by their names, in the order given", () => {
+    expect(typingNames(present, thread.id, membership.member.id, members)).toEqual(["Bob", "Scout"])
+  })
+
+  it("leave out those typing in another thread, or in none", () => {
+    expect(
+      typingNames(
+        [
+          { memberId: bob.id, typingIn: ThreadId.ThreadId.make("thread-9") },
+          { memberId: scout.id, typingIn: null }
+        ],
+        thread.id,
+        membership.member.id,
+        members
+      )
+    ).toEqual([])
+  })
+
+  it("call a member whose name is not read Someone", () => {
+    expect(typingNames(present, thread.id, membership.member.id, [membership.member])).toEqual(["Someone", "Someone"])
   })
 })
 

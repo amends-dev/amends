@@ -19,7 +19,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { memberName, messageWords } from "../../seen.ts"
+import { memberName, messageWords, typingNames } from "../../seen.ts"
 import { ComposerBlock } from "../composer/block.ts"
 import { TaskBlock } from "../task/block.ts"
 import { TurnsBlock } from "../turns/block.ts"
@@ -200,7 +200,4 @@ export const textOf = (model: Model, messageId: ThreadMessageId.ThreadMessageId)
   )
 
 /** Who other than the person types in the thread now, by their names here. */
-export const typingIn = (model: Model) =>
-  model.present
-    .filter((present) => present.typingIn === model.threadId && present.memberId !== model.memberId)
-    .map(({ memberId }) => model.members.find((member) => member.id === memberId)?.name ?? "Someone")
+export const typingIn = (model: Model) => typingNames(model.present, model.threadId, model.memberId, model.members)

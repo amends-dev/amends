@@ -1,16 +1,42 @@
+import type { Presence } from "@amends-dev/core/presence"
 import { Task } from "@amends-dev/core/task"
 import type { ThreadId } from "@amends-dev/core/thread"
-import type { Member } from "@amends-dev/core/workspace"
+import type { Member, MemberId } from "@amends-dev/core/workspace"
 import { button, column, loadingLine, notice, searchField } from "@amends-dev/design/control"
 import { summary } from "@amends-dev/design/directory"
+import type { MarkContent } from "@amends-dev/design/mark"
 import { choiceMenu } from "@amends-dev/design/menu"
-import { divider, message, messageList, replyLine } from "@amends-dev/design/message"
+import {
+  divider,
+  message,
+  messageList,
+  repliesButton,
+  replyInThreadButton,
+  type ThreadWork,
+  taskChip
+} from "@amends-dev/design/message"
 import { paneEmpty, paneTabs, paneToolbar, paneToolbarStack } from "@amends-dev/design/pane"
 import { taskHeadings, taskListEmpty } from "@amends-dev/design/taskList"
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { authorName, initials, pluralize, repliesLabel, statusLabel, threadText, whenLabel } from "../../seen.ts"
+import { workingLabel } from "../../agentActivity.ts"
+import {
+  authorName,
+  initials,
+  isAuthorAgent,
+  memberName,
+  pluralize,
+  repliesLabel,
+  shortTimeOf,
+  statusLabel,
+  statusShape,
+  threadText,
+  threadWords,
+  timeOf,
+  typingLine,
+  typingNames
+} from "../../seen.ts"
 import { assigneeFilterMenu, statusChoices, statusFilterMenu } from "../../taskFilter.ts"
 import { noTasksMatch, taskRows } from "../../taskList.ts"
 import {
@@ -25,6 +51,7 @@ import {
   byDay,
   isFiltered,
   isReadFailed,
+  isStackedUnderPrevious,
   Message,
   type Model,
   membersLine,
@@ -36,8 +63,8 @@ import {
 
 /**
  * Who could have written the openings, what the group is called and whether it is a team, who belongs to a team as its
- * welcome names them, which of its threads is open, and the time now, which the days the threads were created on and
- * when each was are read from.
+ * welcome names them, which of its threads is open, who is present and which thread each types in, and the time now,
+ * which the days the threads were created on are read from.
  */
 export type ViewInputs = Readonly<{
   members: ReadonlyArray<Member.Member>
@@ -45,6 +72,7 @@ export type ViewInputs = Readonly<{
   isTeam: boolean
   memberNames: ReadonlyArray<string>
   openThreadId: Option.Option<ThreadId.ThreadId>
+  present: ReadonlyArray<Presence.Present>
   now: DateTime.Utc
 }>
 
@@ -75,49 +103,90 @@ export const tabsView = ThreadsComposition.makeView.withInputs<TabsInputs>((mode
   })
 })
 
-/** The line under a thread's row that says who replied and how many replies there are, or nothing while it has none. */
-const replyMeta = (
+/** The marks of those who replied to a thread: a person's on the slate ground, an agent's on the lilac. */
+const replierMarks = (item: ThreadItem, members: ReadonlyArray<Member.Member>): ReadonlyArray<MarkContent> =>
+  item.repliers.map((author): MarkContent => ({
+    text: initials(authorName(author, members, [])),
+    tone: isAuthorAgent(author, members) ? "lilac" : "slate"
+  }))
+
+/** The agents at work in a thread, such as "Yumi working", and who types in it, which the buttons that open it say. */
+const threadNotes = (
   item: ThreadItem,
-  members: ReadonlyArray<Member.Member>,
-  h: ThreadsViewBuilder
-): ReadonlyArray<Html> =>
-  item.replies === 0
-    ? []
-    : [
-        replyLine(h, {
-          marks: item.repliers.map((author) => initials(authorName(author, members, []))),
-          label: repliesLabel(item.replies)
-        })
-      ]
+  self: MemberId.MemberId,
+  { members, present }: ViewInputs
+): Readonly<{ working: ReadonlyArray<ThreadWork>; typing: string | undefined }> => ({
+  working: item.working.map(({ memberId, state }) => ({
+    state,
+    label: workingLabel(memberName(members, memberId), state)
+  })),
+  typing: Option.getOrUndefined(typingLine(typingNames(present, item.thread.id, self, members)))
+})
 
 /**
- * A thread as a message: its opening's author, "A thread" until the opening is read, and when the thread was
- * created, its title or opening, who replied and how many times, and what is new in it.
+ * A thread as a message, as `apps/ui`'s timeline draws one: its opening's author, "A thread" until the opening is
+ * read, in their tone, with the time of day the thread was created, the title or the opening, stacked under the thread
+ * before it without a mark and a name when `isStackedUnderPrevious` says so, the task it tracks as a chip, and under
+ * them the button that opens it: how many replies it has and who wrote them, with a dot while any is unread, or "Reply
+ * in thread" where it has none, and at its end the agents at work in it and who types in it. A hovered thread also
+ * offers the reply as an action. Each of them opens the thread.
  */
-const threadRow = (item: ThreadItem, { members, openThreadId, now }: ViewInputs, h: ThreadsViewBuilder): Html => {
+const threadRow = (
+  item: ThreadItem,
+  previous: ThreadItem | undefined,
+  { memberId }: Model,
+  inputs: ViewInputs,
+  h: ThreadsViewBuilder
+): Html => {
+  const { members, openThreadId } = inputs
   const author = Option.match(item.opening, {
-    onNone: () => ({ name: "A thread", mark: "?" }),
+    onNone: () => ({ name: "A thread", mark: "?", isAgent: false }),
     onSome: (opening) => {
       const name = authorName(opening.author, members, [])
-      return { name, mark: initials(name) }
+      return { name, mark: initials(name), isAgent: isAuthorAgent(opening.author, members) }
     }
   })
-
-  return message(h, {
+  const words = threadWords(item.thread, item.opening, members)
+  const open = Message.ClickedThread({ threadId: item.thread.id })
+  const isCurrent = Option.exists(openThreadId, (threadId) => threadId === item.thread.id)
+  const opens = { onClick: open, description: words, isExpanded: isCurrent, ...threadNotes(item, memberId, inputs) }
+  const common = {
     key: item.thread.id,
     mark: author.mark,
     author: author.name,
-    time: whenLabel(item.thread.createdAt, now),
+    isAgent: author.isAgent,
+    time: timeOf(item.thread.createdAt),
     note: item.pending ? "Sending…" : undefined,
     text: threadText(item.thread, item.opening, members),
-    onOpen: Message.ClickedThread({ threadId: item.thread.id }),
-    isCurrent: Option.exists(openThreadId, (threadId) => threadId === item.thread.id),
+    isCurrent,
+    hoverActions: [
+      { icon: "mark-reply", label: "Reply in thread", onClick: open, description: words, isExpanded: isCurrent }
+    ],
     meta: [
-      ...replyMeta(item, members, h),
-      ...(item.unread > 0 ? [h.span([], [`${item.unread} new`])] : []),
-      ...Option.toArray(Option.map(item.task, (task) => h.span([], [statusLabel[task.status]])))
+      ...Option.toArray(
+        Option.map(item.task, (task) =>
+          taskChip(h, {
+            shape: statusShape[task.status],
+            status: statusLabel[task.status],
+            title: words,
+            onClick: open
+          })
+        )
+      ),
+      item.replies === 0
+        ? replyInThreadButton(h, opens)
+        : repliesButton(h, {
+            ...opens,
+            marks: replierMarks(item, members),
+            label: repliesLabel(item.replies),
+            isUnread: item.unread > 0
+          })
     ]
-  })
+  } as const
+
+  return isStackedUnderPrevious(item, previous)
+    ? message(h, { ...common, isStacked: true, shortTime: shortTimeOf(item.thread.createdAt) })
+    : message(h, common)
 }
 
 /**
@@ -147,8 +216,8 @@ export const cantLoadConversation = <Message, Requirements>(
   })
 
 /**
- * The group's threads, oldest first under the days they were created on, each as a message of whoever opened it, or
- * a line that says they are being read, or what the group says when nothing was said in it.
+ * The group's threads, oldest first under the days they were created on, each as a message of whoever opened it, as
+ * `threadRow` says, or a line that says they are being read, or what the group says when nothing was said in it.
  */
 const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): Html =>
   column(h, [
@@ -161,7 +230,7 @@ const threadsView = (model: Model, inputs: ViewInputs, h: ThreadsViewBuilder): H
             label: "Threads",
             children: byDay(model.threads, inputs.now).flatMap((day) => [
               divider(h, day.label),
-              ...day.items.map((item) => threadRow(item, inputs, h))
+              ...day.items.map((item, index) => threadRow(item, day.items[index - 1], model, inputs, h))
             ])
           })
   ])

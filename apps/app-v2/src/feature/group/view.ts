@@ -467,6 +467,7 @@ export const view = GroupComposition.makeView.withInputs<ViewInputs>((model, { n
     isTeam: Option.isSome(teamName(model)),
     memberNames: welcomeNames(model),
     openThreadId: Option.map(model.thread, ({ threadId }) => threadId),
+    present: model.present,
     now
   }
 

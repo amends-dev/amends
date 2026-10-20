@@ -234,7 +234,8 @@ below it counted at each level above.
   and the replies, the agents' turns, and the notes of who followed the thread or stopped taking part in it after it,
   in the order they happened (`timeline.ts`, `timelineOf`, which orders what happened at one moment so that a turn
   follows the message that asked for it and a note follows what it came after). Each message is by its
-  author's initials, name, and when it was published (`timeOf`: its time of day, since a divider says its day), with
+  author's initials, name, in their tone (the slate ground for a person, the lilac for an agent, whose name is in the
+  agent's color), and when it was published (`timeOf`: its time of day, since a divider says its day), with
   "Sending…" after it, its text as markdown with each mention a chip (`messageText`, by the thread's members), or
   "Message deleted" in muted italics for a deleted one, " (edited)" quietly after the text of one that was edited, and
   Edit and Delete on the person's own, which the form to edit it replaces while they
@@ -332,25 +333,43 @@ below it counted at each level above.
   `replyLogView` the log, as the design's `turnLog`, under that message. Why the turns could not be read is the Block's
   `notice`, which the thread shows above its timeline.
 - `feature/threads`: a group's threads, each with its opening message, how many messages follow it and
-  who wrote them, when it was last active, its task, whether it is still being started, and how much is new, and a composer to
+  who wrote them, which agents are at work in it, when it was last active, its task, whether it is still being started,
+  and how much is new, and a composer to
   start one, which suggests the group's members as it is typed in. It reports the thread picked. It has
   three views, and its tab, Threads or Tasks, Threads at first, says what `view` and `composerView` show.
   `tabsView` is the tabs, a `paneTabs` named for the group, as `apps/ui` names them: Threads, and Tasks, counted by the
   tasks that are neither done nor dismissed while there are any, for the group's header, which takes the group's
   name from its parent. The other two take the group's members, its name and whether it is a team, who belongs to
-  a team as its welcome names them, the thread open in it, and the time now from their parent. `view`, its canonical one, shows the tab chosen. On the Threads
+  a team as its welcome names them, the thread open in it, who is present and in which thread each types, and the time
+  now from their parent. `view`, its canonical one, shows the tab chosen. On the Threads
   tab it lists the
   threads as messages, oldest first by when each thread was created (core's `Thread.createdAt`, the
   moment its opening was published), whatever order the store gives them, under a `divider` for each
   day they were created on by the person's own clock, named as it is from the time now (`dayLabel`):
-  each the opening's author, by initials and name ("Someone" until the members are read, and "A thread"
-  when the opening is not read yet), when the thread was created (`whenLabel`: its time of day today,
-  "Yesterday" or the day's name before), which it says before the opening is read too, and the thread's
-  title as written or its opening's markdown as a preview, one run of its words with each mention a chip
-  (`threadText`, by the group's members), as the text that opens it, with "Sending…" while it is being started, under it,
-  while the thread has replies, a reply line: the initials of those who replied, in the order of their
-  first reply, and "1 reply" or "4 replies" (`repliesLabel`), and then how much is new and where its
-  task stands; the thread open is the current row. Until the store has answered (`isLoaded`) the tab says "Loading the
+  each a message as `apps/ui`'s timeline draws one (`threadRow`): the opening's author, by initials and name
+  ("Someone" until the members are read, and "A thread" when the opening is not read yet), in their tone, the mark on
+  the slate ground for a person and the lilac for an agent, with an agent's name in the agent's color
+  (`isAuthorAgent`); the time of day the thread was created (`timeOf`, "10:02 AM" under the day's divider, never
+  "Yesterday" or a weekday, which the divider says), which it says before the opening is read too; and the thread's
+  title as written or its opening's markdown as the message shows it, with each mention a chip (`threadText`, by the
+  group's members), with "Sending…" while it is being started. An opening by the same author as the thread before it
+  within the day, less than five minutes after it, stacks under it without its mark and name, with the short time of
+  day ("10:02", `shortTimeOf`) in the mark's place while the pointer or the keyboard is on it (`isStackedUnderPrevious`,
+  from `seen.ts`'s `isStackedUnder`: as `apps/ui`'s `stacked` has it, neither has replies, since a thread's replies
+  end a stack and start their own, and an opening not read yet stacks under none and has none stack under it). Under
+  the text, the task the thread tracks as a chip, the status drawn and the thread's words beside it, named "Plans for
+  the week, Triage" (`taskChip`, in place of the status word the row used to say), then the button that opens the
+  thread: while it has replies, "4 replies" (`repliesLabel`) with the marks of those who replied in the order of their
+  first reply, a person's on the slate ground and an agent's on the lilac, and a dot, named ", unread" in the button's
+  name, while any activity is past the person's position; and while it has none, "Reply in thread", which shows where
+  there is no pointer to hover and, where there is, stays only beside what is going on in the thread. A hovered or
+  focused thread also offers the reply as an action, "Reply in thread" in a group named "Message actions". The three
+  buttons open the thread, say whether it is open (`aria-expanded`), and are described by its words (`threadWords`).
+  After the count, or after "Reply in thread", come what is going on in the thread: the agents at work in it, "Yumi
+  working", "Atlas queued", or "Scout stopping" (`ThreadItem.working`, read from the thread's turns that are queued,
+  running, or being stopped: `agentsAtWork` and `workingLabel` in `agentActivity.ts`), and who types in it besides the
+  person, "Ada is typing…" (`typingNames` and `typingLine`, from the `present` the group's Block reads and gives
+  `view`); the thread open is the current row. Until the store has answered (`isLoaded`) the tab says "Loading the
   conversation…", and once it has, a group with no thread welcomes the person, "Welcome to #General" for a team and
   "Your conversation with Bob" for a conversation, with "Send the first message to start the conversation." and the
   caret blinking. A team's welcome says who belongs to it first, "You, Alex Morgan, and Sara are members." as
@@ -1230,6 +1249,9 @@ person reads it (`placeName`), or none while the store lacks the group; `activit
 with no turn, which is idle. `placesLine`, `activityLabel`, and `turnLabel` say them in words, "#general + 1 more" and
 "Working in #general", and `motionOfState` says how the logo moves for each: threaded, lit, or tugged. The Block
 reads the turns under way and the groups through its `ReadActivity` subscription, apart from the agents.
+`agentsAtWork` lists, from one thread's turns, the agents with a turn under way there, each by its membership and the
+state of its turn, the oldest turn first, which the store gives a group's thread list as `working`, and `workingLabel`
+says one in a line with its agent's name, "Yumi working".
 `taskList.ts`, tasks as the design's `taskList`, with the status of each drawn and the assignee named, is the threads
 feature's Tasks tab's and the tasks feature's, which adds the place of the group after each title, and holds the words
 the two say where the filters leave none (`noTasksMatch`).
@@ -1825,12 +1847,13 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   full date and time of a moment, the start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
-  and once it has, and of how many replies a thread has, and of who types, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
+  and once it has, and of how many replies a thread has, and of who types in a thread, by name and not the person, and of which messages stack under the one before, within five minutes by the same author and not beside a thread with replies, and of whether an author is an agent, and the short time of day, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
   a mention as "@" and the member's current name or the name it recorded, a title as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:
   the state of a turn in each status, the turns under way of an agent, ordered, named by place, and carrying the group and the thread each works in, its activity
-  from them, idle or by the most pressing state and each place once, and the words for them. `Drafts`'
+  from them, idle or by the most pressing state and each place once, and the words for them, and the agents at work
+  in one thread from its turns, by state and oldest first, and their line. `Drafts`'
   tests keep a draft for each place, the last one written, through being closed and opened again.
 
 `bun run --filter @amends-dev/app-v2 build` bundles the app, which CI builds too.

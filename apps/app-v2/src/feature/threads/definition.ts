@@ -18,13 +18,15 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { Block } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
-import { type Day, groupByDay, isOpen, threadContains } from "../../seen.ts"
+import { AgentAtWork } from "../../agentActivity.ts"
+import { type Day, groupByDay, isOpen, isStackedUnder, type Stackable, threadContains } from "../../seen.ts"
 import { AssigneeFilter, AssigneeMenu, isAssignedTo, StatusFilterMenu, TaskStatusFilter } from "../../taskFilter.ts"
 import { ComposerBlock } from "../composer/block.ts"
 
 /**
  * A thread of the group, with its opening message, its task, how many messages follow the opening and who wrote
- * them, when it was last active, whether it is still being started, and how much is unread.
+ * them, which agents are at work in it, when it was last active, whether it is still being started, and how much is
+ * unread.
  */
 export const ThreadItem = Schema.Struct({
   thread: Thread.Thread,
@@ -32,6 +34,7 @@ export const ThreadItem = Schema.Struct({
   task: Schema.Option(Task.Task),
   replies: Schema.Int,
   repliers: Schema.Array(ThreadMessage.Author),
+  working: Schema.Array(AgentAtWork),
   lastActiveAt: Schema.DateTimeUtc,
   pending: Schema.Boolean,
   unread: Schema.Int
@@ -118,6 +121,23 @@ const byCreated = Order.mapInput(DateTime.Order, ({ thread }: ThreadItem) => thr
  */
 export const byDay = (items: ReadonlyArray<ThreadItem>, now: DateTime.Utc): ReadonlyArray<Day<ThreadItem>> =>
   groupByDay(Array.sort(items, byCreated), ({ thread }) => thread.createdAt, now)
+
+/** What a thread's opening is to the thread before it when they stack: who wrote it, when the thread began, and replies. */
+const stackableOf = (item: ThreadItem): Option.Option<Stackable> =>
+  Option.map(item.opening, ({ author }) => ({
+    author,
+    at: item.thread.createdAt,
+    hasReplies: item.replies > 0
+  }))
+
+/**
+ * Whether the opening of `item` stacks under the opening of `previous`, the thread just before it within a day, as the
+ * timeline stacks messages: see `isStackedUnder`. An opening not yet read stacks under none and none stacks under it.
+ */
+export const isStackedUnderPrevious = (item: ThreadItem, previous: ThreadItem | undefined): boolean =>
+  Option.exists(stackableOf(item), (stackable) =>
+    isStackedUnder(stackable, Option.getOrUndefined(Option.flatMap(Option.fromUndefinedOr(previous), stackableOf)))
+  )
 
 const memberNamesList = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 

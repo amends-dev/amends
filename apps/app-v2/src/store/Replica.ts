@@ -121,7 +121,7 @@ export type KeyOf<Kind extends ReplicaRecord.Kind> = Extract<ReplicaRecord.Key, 
 
 /**
  * A group's thread, with what the replica holds in it that its group's list shows: its messages, its
- * activities, the member's position in it, and the task it tracks.
+ * activities, the member's position in it, the task it tracks, and its agents' turns.
  */
 export interface ThreadRecords {
   readonly thread: RecordOf<"Thread">
@@ -129,6 +129,7 @@ export interface ThreadRecords {
   readonly activities: ReadonlyArray<RecordOf<"ThreadActivity">>
   readonly positions: ReadonlyArray<RecordOf<"ThreadPosition">>
   readonly tasks: ReadonlyArray<RecordOf<"Task">>
+  readonly turns: ReadonlyArray<RecordOf<"Turn">>
 }
 
 /**
@@ -275,7 +276,7 @@ const make = Effect.gen(function* () {
     )
   }
 
-  /** `thread`, with its messages, its activities, the member's position in it, and its task. */
+  /** `thread`, with its messages, its activities, the member's position in it, its task, and its turns. */
   const selectContents = (thread: RecordOf<"Thread">) => {
     const place = ReplicaRecord.Place.cases.Thread.make({ threadId: thread.value.id })
     return Effect.map(
@@ -283,7 +284,8 @@ const make = Effect.gen(function* () {
         messages: select("ThreadMessage", place),
         activities: select("ThreadActivity", place),
         positions: select("ThreadPosition", place),
-        tasks: select("Task", place)
+        tasks: select("Task", place),
+        turns: select("Turn", place)
       }),
       (held): ThreadRecords => ({ thread, ...held })
     )

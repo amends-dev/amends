@@ -2,8 +2,9 @@
  * What the person sees of the workspace's records: what a member and a group are called, what letters mark them, and
  * where a group is as a line says it, who wrote a message and what it says, as the markdown a view shows and as the
  * words it comes to without its syntax, with a mention in it as its member's current name, when a time was, by its time
- * of day, its day, either as a message shows it, and how long ago it was, the date something was made, which day each
- * of a list's items falls on, how a thread is titled, where it is, how many replies it has, and who types in it,
+ * of day, short or whole, its day, either as a message shows it, and how long ago it was, the date something was made,
+ * which day each of a list's items falls on, which of a list's messages stack under the one before, how a thread is
+ * titled, where it is, how many replies it has, and who types in it,
  * whether anyone may join a group, how two texts are compared when the person searches and whether a thread's title or
  * opening has what they search for, how a task's status and priority and a turn's status read and how a status is
  * drawn, which statuses leave a task open, and when an invitation closes.
@@ -12,8 +13,9 @@
 import type { Contact } from "@amends-dev/core/channel"
 import type { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
+import type { Presence } from "@amends-dev/core/presence"
 import type { Task } from "@amends-dev/core/task"
-import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
+import { type Thread, type ThreadId, ThreadMessage } from "@amends-dev/core/thread"
 import type { Turn } from "@amends-dev/core/turn"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
 import type { MarkContent, TaskStatusShape } from "@amends-dev/design/mark"
@@ -21,6 +23,7 @@ import { type MessageText, messageTextWords } from "@amends-dev/design/message"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
 
 /** The uppercase first letters of the first two words of `name`, or of its first word alone. */
 export const initials = (name: string): string =>
@@ -35,6 +38,19 @@ export const initials = (name: string): string =>
 /** The time of day `dateTime` was, in the person's own time zone, as they read it: "10:02 AM". */
 export const timeOf = (dateTime: DateTime.DateTime): string =>
   DateTime.formatLocal(dateTime, { hour: "numeric", minute: "2-digit" })
+
+const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" })
+
+/**
+ * The time of day `dateTime` was, in the person's own time zone, without AM or PM, where there is little room: "10:02".
+ */
+export const shortTimeOf = (dateTime: DateTime.DateTime): string =>
+  clock
+    .formatToParts(DateTime.toDateUtc(dateTime))
+    .filter(({ type }) => type !== "dayPeriod")
+    .map(({ value }) => value)
+    .join("")
+    .trim()
 
 /** The day and time `dateTime` was, with the weekday, as a tooltip names it: "Sunday, October 18, 2026 at 10:02 AM". */
 export const fullTimeOf = (dateTime: DateTime.DateTime): string =>
@@ -88,6 +104,29 @@ export const groupByDay = <Item>(
         items: run.map(({ item }) => item)
       }))
     : []
+}
+
+/** How soon after its author's message another stacks under it. */
+const stackWithin = 5 * millisPerMinute
+
+/** What decides whether a message stacks: who wrote it, when, and whether it opens a thread that has replies. */
+export type Stackable = Readonly<{ author: ThreadMessage.Author; at: DateTime.DateTime; hasReplies: boolean }>
+
+const sameAuthor = Schema.toEquivalence(ThreadMessage.Author)
+
+/**
+ * Whether `message` stacks under `previous`, the message just before it with nothing between, as `apps/ui`'s timeline
+ * stacks them: by the same author, within five minutes after it, and neither has replies, since a thread's replies end
+ * a stack and start their own. The first message has none before it.
+ */
+export const isStackedUnder = (message: Stackable, previous: Stackable | undefined): boolean => {
+  if (previous === undefined || message.hasReplies || previous.hasReplies) {
+    return false
+  }
+
+  const gap = DateTime.toEpochMillis(message.at) - DateTime.toEpochMillis(previous.at)
+
+  return sameAuthor(message.author, previous.author) && gap >= 0 && gap < stackWithin
 }
 
 /**
@@ -256,6 +295,13 @@ export const authorName = (
     Contact: ({ contactId }) => contacts.find(({ id }) => id === contactId)?.name ?? "A contact"
   })
 
+/** Whether `author` is a member that is an agent, which a message marks in the agent's tone and color. */
+export const isAuthorAgent = (author: ThreadMessage.Author, members: ReadonlyArray<Member.Member>): boolean =>
+  ThreadMessage.Author.match(author, {
+    Member: ({ memberId }) => members.some((member) => member.id === memberId && isAgent(member)),
+    Contact: () => false
+  })
+
 /**
  * `author`'s mark: a member's own, on the agent's tone for an agent, or the letters of the name a channel's contact
  * gave, or of the name a member without a record here is called.
@@ -321,6 +367,20 @@ export const typingLine = (names: ReadonlyArray<string>): Option.Option<string> 
 
   return Option.some(names.length === 2 ? `${first} and ${second} are typing…` : severalTyping)
 }
+
+/**
+ * Who among `present` other than `self` types in the thread `threadId`, by their names among `members`, or "Someone"
+ * for a member whose name is not read.
+ */
+export const typingNames = (
+  present: ReadonlyArray<Presence.Present>,
+  threadId: ThreadId.ThreadId,
+  self: MemberId.MemberId,
+  members: ReadonlyArray<Member.Member>
+): ReadonlyArray<string> =>
+  present
+    .filter((who) => who.typingIn === threadId && who.memberId !== self)
+    .map(({ memberId }) => members.find((member) => member.id === memberId)?.name ?? "Someone")
 
 /**
  * A thread as the person reads it in a list: its title, as written, or its opening message as the text a view shows, or

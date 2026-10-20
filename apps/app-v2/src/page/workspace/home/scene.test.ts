@@ -167,6 +167,7 @@ const withConversation = modifyFields(withThread, {
                       task: Option.none(),
                       replies: 1,
                       repliers: [ThreadMessage.Author.cases.Member.make({ memberId: bob.id })],
+                      working: [],
                       lastActiveAt: reply.publishedAt,
                       pending: false,
                       unread: 0
@@ -501,7 +502,9 @@ describe("home", () => {
         expect(within(role("list", { name: "Threads" }), text("Alice"))).toExist(),
         expect(within(role("list", { name: "Threads" }), text("1 reply"))).toExist(),
         expect(within(role("list", { name: "Threads" }), text(timeOf(opening.publishedAt)))).toExist(),
-        expect(role("button", { name: "Plans for the week" })).toExist(),
+        expect(
+          within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))
+        ).toHaveAttr("aria-description", "Plans for the week"),
         expect(role("form", { name: "Message #General" })).toExist(),
         expect(label("Message #General")).toHaveAttr("placeholder", "Message #General"),
         expect(role("button", { name: "Send" })).toExist()
@@ -536,7 +539,7 @@ describe("home", () => {
       given(withoutThread),
       expect(role("complementary")).toBeAbsent(),
       expect(within(role("list", { name: "Threads" }), selector('[aria-current="true"]'))).toBeAbsent(),
-      click(role("button", { name: "Plans for the week" })),
+      click(within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       Command.expectNone(),
       expect(role("complementary", { name: "Thread" })).toExist(),

@@ -177,6 +177,28 @@ describe("Replica", () => {
     )
   )
 
+  it.effect("a group's threads come with the turns of their agents, and no other thread's", () =>
+    withReplica(
+      Effect.gen(function* () {
+        const replica = yield* Replica.Replica
+        const thread = yield* sample("Thread", { id: "thread-1", groupId: "group-1" })
+        const other = yield* sample("Thread", { id: "thread-2", groupId: "group-1" })
+        const turn = yield* sample("Turn", { id: "turn-1", threadId: "thread-1" })
+        const otherTurn = yield* sample("Turn", { id: "turn-2", threadId: "thread-2" })
+        yield* replica.apply(
+          batch(1, [
+            cases.Reset.make({}),
+            ...[thread, other, turn, otherTurn].map((record) => cases.Changed.make({ record }))
+          ])
+        )
+        const listed = yield* now(replica.threads("group-1" as never))
+        const turnsOf = (id: string) => listed.find((records) => records.thread.value.id === id)?.turns.map(keyOf) ?? []
+        expect(turnsOf("thread-1")).toEqual([keyOf(turn)])
+        expect(turnsOf("thread-2")).toEqual([keyOf(otherTurn)])
+      })
+    )
+  )
+
   it.effect("a reset leaves the person's actions as they are", () =>
     withReplica(
       Effect.gen(function* () {

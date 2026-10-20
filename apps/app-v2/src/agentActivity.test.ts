@@ -8,11 +8,13 @@ import {
   activityLabel,
   activityOf,
   activityStateOf,
+  agentsAtWork,
   motionOfState,
   placesLine,
   stateWord,
   turnLabel,
-  turnsUnderWay
+  turnsUnderWay,
+  workingLabel
 } from "./agentActivity.ts"
 
 const { member } = membership
@@ -44,6 +46,46 @@ describe("the state of a turn", () => {
   it("is told in a word, and moves the logo as it does: threaded while queued, lit while working, tugged while stopping", () => {
     expect(stateWord).toEqual({ queued: "Queued", working: "Working", stopping: "Stopping" })
     expect(motionOfState).toEqual({ queued: "thread", working: "working", stopping: "tug" })
+  })
+})
+
+describe("what a line says of an agent at work", () => {
+  it("is the agent's name and its state in a word of its own, as a line says it", () => {
+    expect(workingLabel("Yumi", "working")).toBe("Yumi working")
+    expect(workingLabel("Atlas", "queued")).toBe("Atlas queued")
+    expect(workingLabel("Scout", "stopping")).toBe("Scout stopping")
+  })
+})
+
+describe("the agents at work in a thread", () => {
+  const reviewersTurn = (id: string, status: Parameters<typeof turnOf>[1], minutes: number) => ({
+    ...scoutsTurn(id, status, general.id, minutes),
+    memberId: MemberId.MemberId.make("member-6")
+  })
+
+  it("are none for a thread with no turn, or whose turns all finished", () => {
+    expect(agentsAtWork([])).toEqual([])
+    expect(agentsAtWork([scoutsTurn("turn-1", "completed"), scoutsTurn("turn-2", "failed")])).toEqual([])
+    expect(agentsAtWork([scoutsTurn("turn-3", "cancelled")])).toEqual([])
+  })
+
+  it("are the members of the turns that are queued, running, or stopping, each in the state its turn is in", () => {
+    expect(agentsAtWork([scoutsTurn("turn-1", "queued")])).toEqual([{ memberId: scout.id, state: "queued" }])
+    expect(agentsAtWork([scoutsTurn("turn-1", "running")])).toEqual([{ memberId: scout.id, state: "working" }])
+    expect(agentsAtWork([scoutsTurn("turn-1", "cancelling")])).toEqual([{ memberId: scout.id, state: "stopping" }])
+  })
+
+  it("leave out an agent's turns that finished, and list the agents oldest turn first, whatever order they come in", () => {
+    expect(
+      agentsAtWork([
+        reviewersTurn("turn-3", "running", 5),
+        scoutsTurn("turn-2", "running", general.id, 3),
+        scoutsTurn("turn-1", "completed", general.id, 1)
+      ])
+    ).toEqual([
+      { memberId: scout.id, state: "working" },
+      { memberId: MemberId.MemberId.make("member-6"), state: "working" }
+    ])
   })
 })
 

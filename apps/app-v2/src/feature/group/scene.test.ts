@@ -199,6 +199,7 @@ const withTaskThread = modifyFields(opened, {
           task: Option.some({ ...task, groupId: design.id }),
           replies: 2,
           repliers: [],
+          working: [],
           lastActiveAt: opening.publishedAt,
           pending: false,
           unread: 0
@@ -474,6 +475,7 @@ describe("a group's main pane", () => {
                   task: Option.none(),
                   replies: 0,
                   repliers: [],
+                  working: [],
                   lastActiveAt: opening.publishedAt,
                   pending: false,
                   unread: 0
@@ -482,7 +484,10 @@ describe("a group's main pane", () => {
             })
         })
       ),
-      expect(within(role("list", { name: "Threads" }), role("button", { name: "Plans for the week" }))).toExist(),
+      expect(within(role("list", { name: "Threads" }), role("button", { name: "Reply in thread" }))).toHaveAttr(
+        "aria-expanded",
+        "true"
+      ),
       expect(within(selector('[aria-current="true"]'), text("Plans for the week"))).toExist()
     )
   })
@@ -495,6 +500,7 @@ describe("a group's main pane", () => {
       task: Option.none(),
       replies: 0,
       repliers: [],
+      working: [],
       lastActiveAt: openingMessage.publishedAt,
       pending: false,
       unread: 0

@@ -281,6 +281,7 @@ describe("Store", () => {
       )
       expect(started!.replies).toBe(0)
       expect(started!.repliers).toEqual([])
+      expect(started!.working).toEqual([])
       expect(started!.lastActiveAt).toEqual(Option.getOrThrow(started!.opening).publishedAt)
       const threadId = started!.thread.record.value.id
       yield* firstWhere(store.threads(Group.GeneralId), ([thread]) => thread?.thread.pending === false)

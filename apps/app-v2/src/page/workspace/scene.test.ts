@@ -263,6 +263,7 @@ const withConversation = atHome(withThread, (home) =>
                         task: Option.none(),
                         replies: 1,
                         repliers: [ThreadMessage.Author.cases.Member.make({ memberId: bob.id })],
+                        working: [],
                         lastActiveAt: reply.publishedAt,
                         pending: false,
                         unread: 0
@@ -1719,7 +1720,7 @@ describe("a workspace", () => {
       given(inWindow(withoutThread, "Desktop")),
       expect(role("complementary")).toBeAbsent(),
       expect(role("dialog", { name: "Thread" })).toBeAbsent(),
-      click(role("button", { name: "Plans for the week" })),
+      click(within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
@@ -1746,7 +1747,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(inWindow(withoutThread, "Phone")),
-      click(role("button", { name: "Plans for the week" })),
+      click(within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
@@ -1763,7 +1764,7 @@ describe("a workspace", () => {
     scene(
       { update, view: sceneView },
       given(inWindow(withoutThread, "Desktop")),
-      click(role("button", { name: "Plans for the week" })),
+      click(within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
@@ -1783,7 +1784,7 @@ describe("a workspace", () => {
       given(modifyFields(inWindow(withoutThread, "Desktop"), { actions: () => withRefusal.actions })),
       expect(within(role("alert"), text("Couldn't post the reply: You may not reply here."))).toExist(),
       expect(within(role("dialog", { name: "Thread" }), role("alert"))).toBeAbsent(),
-      click(role("button", { name: "Plans for the week" })),
+      click(within(role("group", { name: "Message actions" }), role("button", { name: "Reply in thread" }))),
       Command.resolve(ReadDraft, ComposerBlock.Message.ReceivedDraft({ text: "" })),
       Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
       Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),

@@ -25,6 +25,7 @@ import { AssigneeBinding, ComposerBinding, SortBinding, StatusBinding } from "./
 import {
   isFiltered,
   isReadFailed,
+  isStackedUnderPrevious,
   Message,
   membersLine,
   openTaskCount,
@@ -265,6 +266,7 @@ describe("a group's threads", () => {
               task: Option.none(),
               replies: 0,
               repliers: [],
+              working: [],
               lastActiveAt: thread.createdAt,
               pending: false,
               unread: 2
@@ -316,6 +318,7 @@ describe("the tasks of a group's threads", () => {
             ),
       replies: 0,
       repliers: [],
+      working: [],
       lastActiveAt: DateTime.subtract(now, { minutes: minutesAgo }),
       pending: false,
       unread: 0
@@ -420,6 +423,51 @@ describe("the tasks of a group's threads", () => {
     expect(openTaskCount(states("triage", "todo", "doing", "held"))).toBe(4)
     expect(openTaskCount(states("done", "dismissed", null))).toBe(0)
     expect(openTaskCount(states("done", "doing", null, "dismissed", "triage"))).toBe(2)
+  })
+})
+
+describe("the threads that stack under the one before", () => {
+  const aliceAuthor = ThreadMessage.Author.cases.Member.make({ memberId })
+  const bobAuthor = ThreadMessage.Author.cases.Member.make({ memberId: bob.id })
+
+  /** The thread `id` created `minutes` after the time now, opened by `author`, with `replies` replies. */
+  const opened = (id: string, minutes: number, author = aliceAuthor, replies = 0) => ({
+    thread: Schema.decodeSync(Thread.Thread)({
+      id,
+      workspaceId: "workspace-1",
+      groupId: "general",
+      title: null,
+      origin: null,
+      createdBy: { _tag: "Member", memberId: "member-1" },
+      createdAt: DateTime.formatIso(DateTime.add(now, { minutes }))
+    }),
+    opening: Option.some({ ...opening, author }),
+    task: Option.none(),
+    replies,
+    repliers: [],
+    working: [],
+    lastActiveAt: now,
+    pending: false,
+    unread: 0
+  })
+
+  it("is true for an opening by the same author within five minutes after the one before it", () => {
+    expect(isStackedUnderPrevious(opened("thread-2", 4), opened("thread-1", 0))).toBe(true)
+  })
+
+  it("is false five minutes after it, for another author, for the first of a day, and when either has replies", () => {
+    expect(isStackedUnderPrevious(opened("thread-2", 5), opened("thread-1", 0))).toBe(false)
+    expect(isStackedUnderPrevious(opened("thread-2", 1, bobAuthor), opened("thread-1", 0))).toBe(false)
+    expect(isStackedUnderPrevious(opened("thread-2", 1), undefined)).toBe(false)
+    expect(isStackedUnderPrevious(opened("thread-2", 1, aliceAuthor, 2), opened("thread-1", 0))).toBe(false)
+    expect(isStackedUnderPrevious(opened("thread-2", 1), opened("thread-1", 0, aliceAuthor, 2))).toBe(false)
+  })
+
+  it("is false while either opening is not read, which leaves its author unknown", () => {
+    const unknown = { ...opened("thread-2", 1), opening: Option.none() }
+
+    expect(isStackedUnderPrevious(unknown, opened("thread-1", 0))).toBe(false)
+    expect(isStackedUnderPrevious(opened("thread-1", 2), unknown)).toBe(false)
   })
 })
 

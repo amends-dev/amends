@@ -1,7 +1,8 @@
 /**
  * What an agent is doing, read from its turns: each turn it has under way, in what state and in which group, and, of
  * those, the agent's own activity: its most pressing state and each place it is at work. An agent with no turn under
- * way is idle. The agents list, the sidebar, and an agent's page show it.
+ * way is idle. The agents list, the sidebar, and an agent's page show it, and a group's threads show which agents are
+ * at work in each.
  */
 
 import type { Group, GroupId } from "@amends-dev/core/group"
@@ -9,15 +10,17 @@ import type { Identity } from "@amends-dev/core/identity"
 import type { ReplicaRecord } from "@amends-dev/core/replica"
 import type { ThreadId } from "@amends-dev/core/thread"
 import type { Turn, TurnId } from "@amends-dev/core/turn"
-import type { Member, MemberId } from "@amends-dev/core/workspace"
+import { type Member, MemberId } from "@amends-dev/core/workspace"
 import type { LogoMotion } from "@amends-dev/design/logo"
 import * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as Schema from "effect/Schema"
 import { placeName } from "./seen.ts"
 
 /** Where a turn under way stands: waiting to start, working, or stopping as asked. */
-export type ActivityState = "queued" | "working" | "stopping"
+export const ActivityState = Schema.Literals(["queued", "working", "stopping"])
+export type ActivityState = typeof ActivityState.Type
 
 /** The states from the most pressing: a turn at work, one being stopped, one waiting. */
 const mostPressingFirst: ReadonlyArray<ActivityState> = ["working", "stopping", "queued"]
@@ -40,6 +43,9 @@ export const stateWord: Readonly<Record<ActivityState, string>> = {
   stopping: "Stopping"
 }
 
+/** A state in a word within a line, such as "working": "Yumi working". */
+export const workingLabel = (name: string, state: ActivityState): string => `${name} ${stateWord[state].toLowerCase()}`
+
 /**
  * How the logo moves for a state: the thread drawn through while it waits, the stitches lit at work, the patch tugged.
  */
@@ -60,6 +66,24 @@ export type TurnUnderWay = Readonly<{
   state: ActivityState
   place: Option.Option<string>
 }>
+
+/** An agent with a turn under way in one thread: whose membership it is, and what state its turn is in. */
+export const AgentAtWork = Schema.Struct({ memberId: MemberId.MemberId, state: ActivityState })
+export type AgentAtWork = typeof AgentAtWork.Type
+
+/**
+ * The agents with a turn under way in a thread, from the thread's `turns`: each by its membership and the state of
+ * its turn, the oldest turn first. A thread has at most one under way for each agent.
+ */
+export const agentsAtWork = (turns: ReadonlyArray<ReplicaRecord.Turn>): ReadonlyArray<AgentAtWork> =>
+  turns
+    .toSorted(Order.mapInput(DateTime.Order, ({ createdAt }: ReplicaRecord.Turn) => createdAt))
+    .flatMap(({ memberId, status }) =>
+      Option.match(activityStateOf(status), {
+        onNone: () => [],
+        onSome: (state): ReadonlyArray<AgentAtWork> => [{ memberId, state }]
+      })
+    )
 
 /** What an agent is doing: its most pressing state, and each place it is at work, once. */
 export type AgentActivity = Readonly<{ state: ActivityState; places: ReadonlyArray<string> }>

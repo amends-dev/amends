@@ -94,7 +94,15 @@ const fromThreads = (message: typeof ThreadsBlock.Message.Type) =>
   ThreadsBinding.embedView({
     slotId: "threads",
     model: opened.threads,
-    viewInputs: { members: [], groupName: "Design", isTeam: true, memberNames: [], openThreadId: Option.none(), now }
+    viewInputs: {
+      members: [],
+      groupName: "Design",
+      isTeam: true,
+      memberNames: [],
+      openThreadId: Option.none(),
+      present: [],
+      now
+    }
   }).toParentMessage(message)
 
 describe("a group", () => {
