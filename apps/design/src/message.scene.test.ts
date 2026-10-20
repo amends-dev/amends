@@ -298,7 +298,7 @@ describe("message", () => {
                 mark: "Y",
                 author: "Yumi",
                 time: "10:03 AM",
-                note: "edited",
+                note: "Sending…",
                 text: "Reproduced on both.",
                 actions: [
                   button(h, "Edit", Message.ClickedEdit({ key: "message-1" }), { variant: "quiet" }),
@@ -312,11 +312,97 @@ describe("message", () => {
       given(initial),
       expect(role("button", { name: "Reproduced on both." })).toBeAbsent(),
       expect(text("Reproduced on both.")).toExist(),
-      expect(text(" · edited")).toExist(),
+      expect(text(" · Sending…")).toExist(),
       click(role("button", { name: "Edit" })),
       click(role("button", { name: "Delete" })),
       click(role("button", { name: "Delete" })),
       expect(role("status")).toHaveText("Current thread-2, edits 1, deletions 2")
+    )
+  })
+
+  it("shows (edited) quietly after its text while it says it is edited, and nothing after an unedited one", () => {
+    const edited = (isEdited: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Messages",
+        children: [
+          message(h, {
+            key: "message-1",
+            mark: "Y",
+            author: "Yumi",
+            time: "10:03 AM",
+            text: "Reproduced on both.",
+            ...(isEdited ? { isEdited } : {})
+          })
+        ]
+      })
+
+    scene(
+      { update, view: viewOf(edited(true)) },
+      given(initial),
+      expect(text(" (edited)")).toHaveClass("text-meta"),
+      expect(text(" (edited)")).toHaveClass("text-ink-muted"),
+      expect(selector("li div.text-body")).toHaveText("Reproduced on both. (edited)"),
+      expect(text(/·/)).toBeAbsent()
+    )
+    scene(
+      { update, view: viewOf(edited(false)) },
+      given(initial),
+      expect(text(" (edited)")).toBeAbsent(),
+      expect(selector("li div.text-body")).toHaveText("Reproduced on both.")
+    )
+  })
+
+  it("shows (edited) after the words of a text that is a button too, inside it", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) =>
+          messageList(h, {
+            label: "Threads",
+            children: [
+              message(h, {
+                key: "thread-1",
+                mark: "S",
+                author: "Sara",
+                text: "Reproduced on both.",
+                isEdited: true,
+                onOpen: Message.OpenedThread({ key: "thread-1" })
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Reproduced on both. (edited)" })).toExist()
+    )
+  })
+
+  it("shows the words that say it was deleted quiet and slanted, in place of text, as a button's too", () => {
+    const deleted = (onOpen: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+      messageList(h, {
+        label: "Messages",
+        children: [
+          message(h, {
+            key: "message-1",
+            mark: "Y",
+            author: "Yumi",
+            text: { deleted: "Message deleted" },
+            ...(onOpen ? { onOpen: Message.OpenedThread({ key: "message-1" }) } : {})
+          })
+        ]
+      })
+
+    scene(
+      { update, view: viewOf(deleted(false)) },
+      given(initial),
+      expect(text("Message deleted")).toHaveClass("italic"),
+      expect(text("Message deleted")).toHaveClass("text-ink-muted"),
+      expect(role("button", { name: "Message deleted" })).toBeAbsent()
+    )
+    scene(
+      { update, view: viewOf(deleted(true)) },
+      given(initial),
+      expect(within(role("button", { name: "Message deleted" }), text("Message deleted"))).toHaveClass("italic")
     )
   })
 
@@ -492,6 +578,16 @@ describe("notification", () => {
       expect(text(mention)).toExist(),
       click(role("button", { name: "Sara mentioned you" })),
       expect(role("status")).toHaveText("Current notification-1, edits 0, deletions 0")
+    )
+  })
+
+  it("describes the button that opens a deleted message's notification by the words that say so", () => {
+    scene(
+      { update, view: viewOf(notifications({ text: { deleted: "Message deleted" } })) },
+      given(initial),
+      expect(role("button", { name: "Sara mentioned you" })).toHaveAttr("aria-description", "Message deleted"),
+      expect(text("Message deleted")).toHaveClass("italic"),
+      expect(text("Message deleted")).toHaveClass("text-ink-muted")
     )
   })
 
@@ -737,6 +833,18 @@ describe("description", () => {
       expect(selector("[aria-current] div")).toHaveClass("mt-2.75"),
       expect(selector("p br")).toExist(),
       expect(text("@Jamie")).toHaveClass("bg-mention")
+    )
+  })
+
+  it("shows the words that say it was deleted quiet and slanted", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => description(h, { text: { deleted: "Message deleted" } }))
+      },
+      given(initial),
+      expect(text("Message deleted")).toHaveClass("italic"),
+      expect(text("Message deleted")).toHaveClass("text-ink-muted")
     )
   })
 

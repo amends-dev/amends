@@ -41,7 +41,7 @@ list, properties that are read under their captions, where an agent is at work a
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
-actions, and meta, with the replies under a row as one reply, three people, and more people than the
+an edited mark after the text, a deleted message, actions, and meta, with the replies under a row as one reply, three people, and more people than the
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with markdown in the text as blocks in a plain row and as a preview in a row that opens a thread and in a notification, with a form in place of the text, and set apart by dividers, centered and at the
 start, and notifications under the days Today and Yesterday, unread with a dot and read, an agent's on the lilac tone and one whose thread is unavailable with the message icon in place of letters, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; rich text as a message's text with every form markdown has and a mention of a member the workshop knows and one it does not, as the inline form of the same text for a preview, and in a narrow column, where a long word wraps and a wide table scrolls; a pane's empty state with a title
@@ -824,10 +824,12 @@ What a conversation is made of.
 - `message(h, config)` is one row of it, keyed by `config.key`: the author's `mark` letters at 32px,
   then a column of the author line, the text, and the meta row. The author line is the
   `author` at item size in medium weight, the `time` after it at `meta` size in `ink-muted`, already
-  formatted, and a `note` after that as ` · ${note}`, such as "edited" or "Sending…"; `actions` are
+  formatted, and a `note` after that as ` · ${note}`, such as "Sending…"; `actions` are
   quiet buttons at its end, such as Edit and Delete. The `text` is at body size, a `MessageText` (below); with `onOpen`
   it is a button named by the text that sends `onOpen`, aligned to the start, underlined on hover, for a message that
-  is the start of a thread, and `body` takes its place, such as the form that edits it. `meta` is a row of quiet
+  is the start of a thread, and `body` takes its place, such as the form that edits it. While `isEdited`, " (edited)"
+  follows the text at `meta` size in `ink-muted`, as `apps/ui`'s timeline has it: after the last block of markdown, on
+  a line of its own, and inside the button when the text is one. `meta` is a row of quiet
   facts under the text at hint size, such as a `replyLine`, "2 new", and a task's status. `isCurrent` fills the row
   with `selected`, draws the `indicator-bar` at its start as the sidebar's current row has, and makes it
   `aria-current="true"`. A row has 10px of space above and below and reaches 12px into the pane's
@@ -850,15 +852,17 @@ What a conversation is made of.
   what it is, and the text is what it says. The row has `message`'s spacing and reach into the pane's
   gutter. `isCurrent`, for the notification whose thread is open, fills it with `selected`, draws the
   `indicator-bar` at its start, and makes it `aria-current="true"`, as `message`'s current row is.
-- `MessageText` is what the `text` of a `message`, a `notification`, and a `description` takes: a string, or
-  markdown. A string is words as written, whatever characters it holds, such as a thread's title, which its author
+- `MessageText` is what the `text` of a `message`, a `notification`, and a `description` takes: a string,
+  markdown, or `{ deleted }`. A string is words as written, whatever characters it holds, such as a thread's title, which its author
   wrote as plain text. Markdown, `{ text, mentions? }` as `richText` takes it (below), is a message's text with the
   members its mentions may name: it shows as `richText`'s blocks, with a mention a chip with the member's current name,
   in a `message` that is not a button and in a `description`. A button may hold no block, link, or other button, so a
   `message` with `onOpen` shows its markdown as `richText`'s preview, one run of words and mentions, and a
   `notification`, a row of previews, always does. What a text says as words, "@Jamie can you check the composer fix"
   or "Release notes Shipped it, see the docs", is `messageTextWords`: a button's name when it has no other, and a
-  notification's `aria-description`; it is also what a caller searches or titles by.
+  notification's `aria-description`; it is also what a caller searches or titles by. `{ deleted }` is the words that say
+  a message was deleted, such as "Message deleted", which show in `ink-muted` and in italics wherever the text is, a
+  button's too.
 - `replyLine(h, { marks, label })` is what the first message of a thread shows in its `meta`, under its
   text: a short tree line that hangs from the row's mark, 12px by 12px with a border at its start and
   its bottom in `outline`, then the `marks`, the letters of those who replied, as `xs` marks overlapping
@@ -1153,7 +1157,7 @@ Cancel told to lead at the start and the rest at the end, the control given `ini
 Cancel by closing the dialog without sending the form, a Cancel that is disabled by `aria-disabled` and by closing
 nothing when pressed, the panel's width by its class for each of the three widths, and a list of rows by its label, a row each
 with its meta as its description, the side and bottom padding it cancels, and the message a row sends; a message by
-its text button, `aria-current`, its note, actions, meta, and body, its markdown as the blocks of `richText` and as the
+its text button, `aria-current`, its note, its edited mark, actions, meta, and body, the words of a deleted one, its markdown as the blocks of `richText` and as the
 preview a button holds, a string as the words it is, a mention in its text by the chip that holds it and a button by the
 words joined, a notification by its
 text button named by its author and activity and described by its text, its mark by its tone and by the icon that

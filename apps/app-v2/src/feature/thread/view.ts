@@ -20,7 +20,16 @@ import { pane, paneBack, paneClose, paneColumn, paneStack } from "@amends-dev/de
 import type * as DateTime from "effect/DateTime"
 import * as Option from "effect/Option"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { authorName, initials, messageText, repliesLabel, sideSubtitle, statusShape, whenLabel } from "../../seen.ts"
+import {
+  authorName,
+  initials,
+  messageText,
+  repliesLabel,
+  sideSubtitle,
+  statusShape,
+  typingLine,
+  whenLabel
+} from "../../seen.ts"
 import { ReplyBinding, TaskBinding, ThreadComposition, type ThreadViewBuilder, TurnsBinding } from "./composition.ts"
 import { Message, type MessageItem, type Model, titleOf, typingIn } from "./definition.ts"
 
@@ -82,15 +91,6 @@ const renameAction = (model: Model, h: ThreadViewBuilder): Html =>
     ? buttonRow(h, [button(h, "Rename", Message.ClickedRename(), { variant: "quiet" })])
     : h.empty
 
-/** What to say after a message's time: that it is on its way, or that it was changed. */
-const noteOf = (pending: boolean, edited: boolean): string | undefined => {
-  if (pending) {
-    return "Sending…"
-  }
-
-  return edited ? "edited" : undefined
-}
-
 /**
  * What the person may do to a message of theirs: the form that changes its text while they edit it, in the place of the
  * text, and, while they do not, Edit and Delete. Nothing for a message that is not theirs, is not text, or is still
@@ -151,8 +151,9 @@ const messageView = (
     mark: initials(author),
     author,
     time: whenLabel(item.message.publishedAt, now),
-    note: noteOf(item.pending, edited),
+    note: item.pending ? "Sending…" : undefined,
     text: messageText(item.message, model.members),
+    isEdited: edited,
     isCurrent: Option.contains(highlightedMessageId, item.message.id),
     body,
     actions
@@ -175,10 +176,7 @@ const messagesView = (model: Model, inputs: ViewInputs, h: ThreadViewBuilder): H
 
 /** Who types in the thread now, besides the person, in a live region so that it is announced as it appears. */
 const typingView = (names: ReadonlyArray<string>, h: ThreadViewBuilder): Html =>
-  h.div(
-    [h.AriaLive("polite")],
-    [names.length === 0 ? h.empty : hint(h, `${names.join(" and ")} ${names.length === 1 ? "is" : "are"} typing…`)]
-  )
+  h.div([h.AriaLive("polite")], Option.toArray(Option.map(typingLine(names), (line) => hint(h, line))))
 
 /**
  * What the task is described by: the thread's opening, as `apps/ui`'s task pane describes a task, under a caption, with

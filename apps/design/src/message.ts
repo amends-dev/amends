@@ -32,6 +32,10 @@ type Ink = "text-ink" | "text-ink-secondary"
 
 const textLook = (ink: Ink) => `m-0 text-body wrap-break-word ${ink}`
 
+const deletedLook = "text-ink-muted italic"
+
+const editedLook = "text-meta text-ink-muted"
+
 const textButton = (ink: Ink) =>
   `cursor-pointer self-start bg-transparent p-0 text-start text-body wrap-break-word ${ink} focus-ring hover:underline`
 
@@ -107,34 +111,62 @@ const renderTime = <Message, Requirements>(
         ]
       )
 
-/** What a row says: words as written, or the markdown of a message's text, which `richText` shows. */
-export type MessageText = string | Markdown
+/**
+ * What a row says: words as written, the markdown of a message's text, which `richText` shows, or `{ deleted }`, the
+ * words that say the message was deleted, which show quiet and slanted.
+ */
+export type MessageText = string | Markdown | Readonly<{ deleted: string }>
 
 /** The words of `text` as a reader hears them, a mention as "@" and the member's name, which describe a button. */
-export const messageTextWords = (text: MessageText): string => (typeof text === "string" ? text : richTextWords(text))
+export const messageTextWords = (text: MessageText): string => {
+  if (typeof text === "string") {
+    return text
+  }
+
+  return "deleted" in text ? text.deleted : richTextWords(text)
+}
 
 /**
  * The elements that show `text`: words as written, or its markdown, as the blocks of `richText`, or, when `isInline`,
- * as its preview, which a button may hold.
+ * as its preview, which a button may hold, or the words that say it was deleted.
  */
 const renderWords = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   text: MessageText,
   isInline: boolean
-): Html | string => (typeof text === "string" ? text : richText(h, { ...text, isInline }))
+): Html | string => {
+  if (typeof text === "string") {
+    return text
+  }
+
+  return "deleted" in text ? h.span([h.Class(deletedLook)], [text.deleted]) : richText(h, { ...text, isInline })
+}
+
+/** What follows the text of a message that was changed after it was sent, in its own words. */
+const renderEdited = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, isEdited: boolean): Html =>
+  isEdited ? h.span([h.Class(editedLook)], [" (edited)"]) : h.empty
 
 /**
- * The text, a button when `onOpen` is given, which is named `name` and described by the text when it has one. A button
- * holds the preview of markdown, since it may hold no block, link, or other button.
+ * The text, with " (edited)" after it when `isEdited`, a button when `onOpen` is given, which is named `name` and
+ * described by the text when it has one. A button holds the preview of markdown, since it may hold no block, link, or
+ * other button.
  */
 const renderText = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ text: MessageText; ink: Ink; isInline: boolean; onOpen?: Message; name?: string }>
+  config: Readonly<{
+    text: MessageText
+    ink: Ink
+    isInline: boolean
+    isEdited?: boolean
+    onOpen?: Message
+    name?: string
+  }>
 ): Html => {
   const { onOpen, name } = config
+  const isEdited = config.isEdited === true
 
   return onOpen === undefined
-    ? h.div([h.Class(textLook(config.ink))], [renderWords(h, config.text, config.isInline)])
+    ? h.div([h.Class(textLook(config.ink))], [renderWords(h, config.text, config.isInline), renderEdited(h, isEdited)])
     : Button.view(
         {
           onClick: onOpen,
@@ -145,7 +177,7 @@ const renderText = <Message, Requirements>(
                 ...(name === undefined ? [] : [h.AriaLabel(name), h.AriaDescription(messageTextWords(config.text))]),
                 h.Class(textButton(config.ink))
               ],
-              [renderWords(h, config.text, true)]
+              [renderWords(h, config.text, true), renderEdited(h, isEdited)]
             )
         },
         h
@@ -154,8 +186,9 @@ const renderText = <Message, Requirements>(
 
 /**
  * One message, a row of a `messageList` keyed by `key`: the author's `mark` letters, then the `author`
- * with the `time` after it and a `note` after that, such as "Sending…", and the `text`, words as written or markdown
- * as `richText` shows it, with its mentions as chips. Under the text, `meta` is a row of quiet facts, such as how
+ * with the `time` after it and a `note` after that, such as "Sending…", and the `text`, words as written, markdown
+ * as `richText` shows it, with its mentions as chips, or the words that say it was deleted, with " (edited)" quiet
+ * after it while `isEdited`. Under the text, `meta` is a row of quiet facts, such as how
  * much is new, and at the end of the author line, `actions` are quiet buttons, such as Edit and Delete.
  * `onOpen` makes the text a button named by it that sends `onOpen`, for a message that is the start of a
  * thread, and a button holds markdown as its preview, one run of words and mentions; `body` takes the text's place,
@@ -171,6 +204,7 @@ export const message = <Message, Requirements>(
     time?: string | undefined
     note?: string | undefined
     text: MessageText
+    isEdited?: boolean
     onOpen?: Message
     body?: Html | undefined
     actions?: ReadonlyArray<Html>

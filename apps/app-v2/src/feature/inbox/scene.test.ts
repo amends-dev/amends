@@ -408,7 +408,7 @@ describe("the inbox", () => {
     scene(
       { update, view: sceneView },
       given(modifyFields(opened, { items: () => [{ ...bobsReply, message: Option.some(deleted(reply)) }] })),
-      expect(role("button", { name: "Bob replied" })).toHaveAttr("aria-description", "This message was deleted.")
+      expect(role("button", { name: "Bob replied" })).toHaveAttr("aria-description", "Message deleted")
     )
   })
 

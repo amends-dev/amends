@@ -41,6 +41,7 @@ import {
   threadText,
   threadWords,
   timeOf,
+  typingLine,
   whenLabel
 } from "./seen.ts"
 
@@ -258,8 +259,8 @@ describe("messageText", () => {
     expect(messageText(reply, members)).toEqual({ text: "Sounds good", mentions: members })
   })
 
-  it("says a deleted message was deleted", () => {
-    expect(messageText(deleted(reply), members)).toBe("This message was deleted.")
+  it("says a deleted message was deleted, in the words that show quiet and slanted", () => {
+    expect(messageText(deleted(reply), members)).toEqual({ deleted: "Message deleted" })
   })
 })
 
@@ -287,7 +288,7 @@ describe("messageWords", () => {
   })
 
   it("says a deleted message was deleted", () => {
-    expect(messageWords(deleted(reply), members)).toBe("This message was deleted.")
+    expect(messageWords(deleted(reply), members)).toBe("Message deleted")
   })
 })
 
@@ -365,6 +366,19 @@ describe("threadContains", () => {
     expect(threadContains(thread, Option.none(), members, "check")).toBe(false)
     expect(threadContains(thread, Option.none(), members, "")).toBe(true)
     expect(threadContains({ ...thread, title: "Retro" }, Option.none(), members, "retro")).toBe(true)
+  })
+})
+
+describe("typingLine", () => {
+  it("is nothing while no one types", () => {
+    expect(typingLine([])).toEqual(Option.none())
+  })
+
+  it("names one person and two, and says several people for three or more", () => {
+    expect(typingLine(["Ada"])).toEqual(Option.some("Ada is typing…"))
+    expect(typingLine(["Ada", "Bob"])).toEqual(Option.some("Ada and Bob are typing…"))
+    expect(typingLine(["Ada", "Bob", "Cy"])).toEqual(Option.some("Several people are typing…"))
+    expect(typingLine(["Ada", "Bob", "Cy", "Di", "Ed"])).toEqual(Option.some("Several people are typing…"))
   })
 })
 

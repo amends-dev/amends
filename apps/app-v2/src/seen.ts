@@ -3,10 +3,10 @@
  * where a group is as a line says it, who wrote a message and what it says, as the markdown a view shows and as the
  * words it comes to without its syntax, with a mention in it as its member's current name, when a time was, by its time
  * of day, its day, either as a message shows it, and how long ago it was, the date something was made, which day each
- * of a list's items falls on, how a thread is titled, where it is, and how many replies it has, whether anyone may
- * join a group, how two texts are compared when the person searches and whether a thread's title or opening has what
- * they search for, how a task's status and priority and a turn's status read and how a status is drawn, which statuses
- * leave a task open, and when an invitation closes.
+ * of a list's items falls on, how a thread is titled, where it is, how many replies it has, and who types in it,
+ * whether anyone may join a group, how two texts are compared when the person searches and whether a thread's title or
+ * opening has what they search for, how a task's status and priority and a turn's status read and how a status is
+ * drawn, which statuses leave a task open, and when an invitation closes.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
@@ -266,16 +266,16 @@ export const authorMark = (
   })
 }
 
-const deletedText = "This message was deleted."
+const deletedText = "Message deleted"
 
 /**
  * What `message` says as the text a view shows: its markdown, with the members its mentions name, who are called what
- * they are now among `members`, or that it was deleted.
+ * they are now among `members`, or "Message deleted", which shows quiet and slanted.
  */
 export const messageText = (message: ThreadMessage.ThreadMessage, members: ReadonlyArray<Member.Member>): MessageText =>
   ThreadMessage.Content.match(message.content, {
     Text: ({ text }): MessageText => ({ text, mentions: members }),
-    Deleted: (): MessageText => deletedText
+    Deleted: (): MessageText => ({ deleted: deletedText })
   })
 
 /**
@@ -291,6 +291,26 @@ export const pluralize = (count: number, singular: string, plural: string): stri
 
 /** How many replies a thread has, as the person reads it: "1 reply", "4 replies". */
 export const repliesLabel = (replies: number): string => pluralize(replies, "reply", "replies")
+
+const severalTyping = "Several people are typing…"
+
+/**
+ * Who types, as a line says it, as `apps/ui` does: "Ada is typing…" for one, "Ada and Bob are typing…" for two, and
+ * "Several people are typing…" for three or more, and nothing while no one types.
+ */
+export const typingLine = (names: ReadonlyArray<string>): Option.Option<string> => {
+  const [first, second] = names
+
+  if (first === undefined) {
+    return Option.none()
+  }
+
+  if (second === undefined) {
+    return Option.some(`${first} is typing…`)
+  }
+
+  return Option.some(names.length === 2 ? `${first} and ${second} are typing…` : severalTyping)
+}
 
 /**
  * A thread as the person reads it in a list: its title, as written, or its opening message as the text a view shows, or

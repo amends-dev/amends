@@ -228,9 +228,11 @@ below it counted at each level above.
   (making it one, where they may) and the turns, then its messages as a list, the opening first, how
   many replies follow it, and the replies, each by its author's initials, name, and when it was
   published (`whenLabel`: its time of day today, "Yesterday" or the day's name before), with
-  "Sending…" or "edited" after it, its text as markdown with each mention a chip (`messageText`, by the
-  thread's members), and Edit and Delete on the person's own, which the form to edit it replaces while they
-  do; and who else types, in a live region under them. For a thread that tracks a task it is a
+  "Sending…" after it, its text as markdown with each mention a chip (`messageText`, by the thread's members), or
+  "Message deleted" in muted italics for a deleted one, " (edited)" quietly after the text of one that was edited, and
+  Edit and Delete on the person's own, which the form to edit it replaces while they
+  do; and who else types, in a live region under them: "Ada is typing…", "Ada and Bob are typing…", and "Several people
+  are typing…" for three or more (`typingLine`). For a thread that tracks a task it is a
   section named Task, laid out as `apps/ui`'s task pane is: Rename, which `apps/ui` has no place for
   and so stays at the top of the body, the task's properties, a "Description" caption over the
   thread's opening, which is the task's description, with Edit and Delete on the person's own, the
@@ -1396,7 +1398,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   in the document.
 - Scene tests drive a Block's view as a person does: a thread's messages by their authors' initials
   and names and their times, the opening first, how many replies follow it, a reply on its way, an
-  edited one, a message's markdown as blocks, a task's description as markdown, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, a reply written and sent, the title renamed from its form, and a message
+  edited one, a message's markdown as blocks, a task's description as markdown, a mention as a chip with its member's current name, a deleted one, the message highlighted drawn current and none otherwise, who types, as one person, two, or several, a reply written and sent, the title renamed from its form, and a message
   edited from its form and deleted by the person who wrote it; a group's threads as messages by the
   author of their opening, their time, a mention in the opening as a chip, its markdown as the words that open the thread and a title as written, who replied and how many
   times, how much is new and where their task stands, the one open marked as current, the thread picked reported, why they could not be read, and a thread started
@@ -1664,7 +1666,7 @@ state art, the brand alone in the header, and Reload as a link to the page's own
   and `seen.ts`: the text folded to lower case without accents, the initials of a name, the time of day, the
   start of a day in the person's own time zone, and the labels of a day, of when a message was, and of how long ago it was, from
   times fixed on the clock of the machine the tests run on, and of when an invitation expires, in days rounded up
-  and once it has, and of how many replies a thread has, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
+  and once it has, and of how many replies a thread has, and of who types, and a count with the word for one or many, whether a thread's title or opening has the letters searched for, and which statuses leave a task open, and the text of a message and of a thread's row as markdown with the members its mentions may name, and the words of a message and of a thread's row without that markdown's syntax,
   a mention as "@" and the member's current name or the name it recorded, a title as written, and `settingsForm.ts`: the fields an
   integration's form gives, a draft from its defaults or a connection's settings, and the settings a
   draft makes, and `agentSetup.ts`: an agent's draft, and the configuration a draft makes, and `agentActivity.ts`:

@@ -187,6 +187,45 @@ describe("a thread", () => {
     )
   })
 
+  it("says who types as one person, two, or several", () => {
+    const carol = Schema.decodeSync(Member.Member)({
+      id: "member-3",
+      workspaceId: "workspace-1",
+      identity: { _tag: "Human", id: "carol" },
+      name: "Carol",
+      status: "active"
+    })
+    const dana = Schema.decodeSync(Member.Member)({
+      id: "member-4",
+      workspaceId: "workspace-1",
+      identity: { _tag: "Human", id: "dana" },
+      name: "Dana",
+      status: "active"
+    })
+    const typing = (...members: ReadonlyArray<typeof carol>) =>
+      Subscription.emit(
+        subscriptions.presence,
+        Message.ReceivedPresence({ present: members.map(({ id }) => ({ memberId: id, typingIn: threadId })) })
+      )
+
+    scene(
+      { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
+      given(opened),
+      Subscription.emit(
+        subscriptions.thread,
+        Message.ReceivedPeople({ members: [alice, bob, carol, dana], contacts: [] })
+      ),
+      typing(bob),
+      expect(text("Bob is typing…")).toExist(),
+      typing(bob, carol),
+      expect(text("Bob and Carol are typing…")).toExist(),
+      typing(bob, carol, dana),
+      expect(text("Several people are typing…")).toExist(),
+      typing(),
+      expect(selector("[aria-live]")).toHaveText("")
+    )
+  })
+
   it("says when each message was by its time of day today, and by its day before today", () => {
     const yesterday = { ...opening, publishedAt: DateTime.subtract(now, { days: 1 }) }
 
@@ -394,16 +433,18 @@ describe("a thread", () => {
     )
   })
 
-  it("says a message was deleted in its place", () => {
+  it("says a message was deleted in its place, quiet and slanted", () => {
     scene(
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
       ...readWith({ message: opening, pending: false }, { message: deleted(reply), pending: false }),
-      expect(within(role("list", { name: "Messages" }), text("This message was deleted."))).toExist()
+      expect(within(role("list", { name: "Messages" }), text("Message deleted"))).toExist(),
+      expect(text("Message deleted")).toHaveClass("italic"),
+      expect(text("Message deleted")).toHaveClass("text-ink-muted")
     )
   })
 
-  it("says a message was edited after its time", () => {
+  it("says a message was edited after its text, quietly", () => {
     const edited = Schema.decodeSync(ThreadMessage.ThreadMessage)({
       ...Schema.encodeSync(ThreadMessage.ThreadMessage)(opening),
       content: {
@@ -419,8 +460,9 @@ describe("a thread", () => {
       { update, view: sidePane, subscriptions: ThreadBlock.subscriptions },
       given(opened),
       ...readWith({ message: edited, pending: false }),
-      expect(text(" · edited")).toExist(),
-      expect(within(selector("li"), text("Plans for next week"))).toExist()
+      expect(text(" (edited)")).toHaveClass("text-meta"),
+      expect(text(" (edited)")).toHaveClass("text-ink-muted"),
+      expect(selector("li div.text-body")).toHaveText("Plans for next week (edited)")
     )
   })
 

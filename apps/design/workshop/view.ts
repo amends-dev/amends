@@ -1878,7 +1878,7 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
     ),
     sample(
       h,
-      "A note, actions at the end of the author line, and meta under the text",
+      "A note, an edited mark after the text, actions at the end of the author line, and meta under the text",
       [
         messageList(h, {
           label: "Replies",
@@ -1888,8 +1888,8 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               mark: "Y",
               author: "Yumi",
               time: "10:05 AM",
-              note: "edited",
               text: "Reproduced on both. Images over 5 MB hit the crash.",
+              isEdited: true,
               actions: [
                 button(h, "Edit", press, { variant: "quiet" }),
                 button(h, "Delete", press, { variant: "quiet" })
@@ -1902,6 +1902,21 @@ const messageGroup = (h: ApplicationViewBuilder, openThread: string, editText: s
               author: "AJ",
               note: "Sending…",
               text: "Thanks! I'll attach the image to the task."
+            }),
+            message(h, {
+              key: "deleted",
+              mark: "S",
+              author: "Sara",
+              time: "10:07 AM",
+              text: { deleted: "Message deleted" }
+            }),
+            message(h, {
+              key: "edited-markdown",
+              mark: "Y",
+              author: "Yumi",
+              time: "10:09 AM",
+              text: written("A **bold** claim, [@Sara](member:sara)."),
+              isEdited: true
             })
           ]
         })
