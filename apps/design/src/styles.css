@@ -12,9 +12,10 @@
 
 /*
  * The theme of amends, from the Lunacy mocks. Every role is a custom property named `--amends-<role>`
- * with its light value here and its dark value under `prefers-color-scheme`; the `@theme` block below
- * gives each a Tailwind name, so `bg-panel`, `text-ink-secondary`, and `border-outline` exist for every
- * role and nothing else does: the default palette, type scale, shadows, and radii are cleared.
+ * with its light value here and its dark value under `prefers-color-scheme`, and under `data-theme="dark"`
+ * for a page whose person chose it; the `@theme` block below gives each a Tailwind name, so `bg-panel`,
+ * `text-ink-secondary`, and `border-outline` exist for every role and nothing else does: the default
+ * palette, type scale, shadows, and radii are cleared.
  */
 :root {
   color-scheme: light;
@@ -91,7 +92,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
 
     --amends-canvas: #111215;
@@ -162,6 +163,82 @@
     --amends-shadow-popover: 0 6px 12px rgb(0 0 0 / 0.4);
     --amends-shadow-toast: 0 4px 12px rgb(0 0 0 / 0.35);
   }
+}
+
+/*
+ * A person's choice of Appearance, `data-theme` on the root element, over the browser's preference: dark here, and
+ * light by leaving the media query above.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --amends-canvas: #111215;
+  --amends-panel: #1b1d21;
+  --amends-raised: #24272d;
+  --amends-popover: #2b2f36;
+  --amends-field: #181a1e;
+  --amends-search: #181a1e;
+  --amends-hover: #22252b;
+  --amends-active: #24272d;
+  --amends-selected: #30343b;
+  --amends-rail-selected: #30353d;
+  --amends-subtle: #262a30;
+  --amends-mention: #353a44;
+
+  --amends-ink: #eceef2;
+  --amends-ink-secondary: #b3b8c2;
+  --amends-ink-muted: #959ca8;
+  --amends-ink-disabled: #777e8a;
+  --amends-agent: #c2a1fa;
+  --amends-on-action: #191b20;
+
+  --amends-divider: #343942;
+  --amends-outline: #4b515c;
+  --amends-outline-strong: #9ca5b5;
+  --amends-outline-selected: #727d8f;
+  --amends-outline-danger: #e58a80;
+  --amends-stitch: #626b79;
+
+  --amends-action: #eceef2;
+  --amends-action-secondary: #25292f;
+  --amends-indicator: #eceef2;
+
+  --amends-success-mark: #4cc38a;
+  --amends-success-text: #8fd6ae;
+  --amends-success-surface: #1d2a23;
+  --amends-success-border: #2d4638;
+  --amends-caution-mark: #e2b25e;
+  --amends-caution-text: #d5b68c;
+  --amends-caution-surface: #2b2720;
+  --amends-caution-border: #4d4336;
+  --amends-danger-mark: #f07065;
+  --amends-danger-text: #f0a8a0;
+  --amends-danger-surface: #2e1e1d;
+  --amends-danger-border: #553330;
+
+  --amends-scrim: #00000080;
+  --amends-scrim-strong: #000000a6;
+
+  --amends-avatar-neutral-bg: #353a44;
+  --amends-avatar-neutral-fg: #bec5d0;
+  --amends-avatar-sand-bg: #3b3329;
+  --amends-avatar-sand-fg: #d5b68c;
+  --amends-avatar-lilac-bg: #382d49;
+  --amends-avatar-lilac-fg: #c7aceb;
+  --amends-avatar-clay-bg: #3c3030;
+  --amends-avatar-clay-fg: #d4ada0;
+  --amends-avatar-olive-bg: #303a2c;
+  --amends-avatar-olive-fg: #b3c59d;
+  --amends-avatar-slate-bg: #2c3741;
+  --amends-avatar-slate-fg: #afc5d8;
+  --amends-avatar-sage-bg: #2e392f;
+  --amends-avatar-sage-fg: #aec0a5;
+  --amends-avatar-ink-bg: #383c45;
+  --amends-avatar-ink-fg: #eceef2;
+
+  --amends-shadow-modal: 0 12px 28px rgb(0 0 0 / 0.4);
+  --amends-shadow-popover: 0 6px 12px rgb(0 0 0 / 0.4);
+  --amends-shadow-toast: 0 4px 12px rgb(0 0 0 / 0.35);
 }
 
 @theme inline {

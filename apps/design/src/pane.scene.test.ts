@@ -19,8 +19,20 @@ import {
   within
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { button, field, iconButton, sending, submit as submitButton } from "./control.ts"
-import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "./pane.ts"
+import { button, field, iconButton, searchField, sending, submit as submitButton } from "./control.ts"
+import { columns } from "./directory.ts"
+import {
+  pane,
+  paneBack,
+  paneClose,
+  paneColumn,
+  paneEmpty,
+  paneForm,
+  paneSection,
+  paneTabs,
+  paneToolbar,
+  paneToolbarStack
+} from "./pane.ts"
 
 const Tab = Schema.Literals(["threads", "tasks"])
 type Tab = typeof Tab.Type
@@ -677,6 +689,109 @@ describe("paneForm", () => {
       expect(within(role("region", { name: "Setup" }), selector(".border-dashed"))).toExist(),
       expect(within(role("region", { name: "Setup" }), role("form", { name: "Setup" }))).toExist(),
       expect(within(role("region", { name: "Rename" }), selector(".border-dashed"))).toBeAbsent()
+    )
+  })
+})
+
+describe("pane with a toolbar", () => {
+  const listPane = (model: Model, h: HtmlBuilder<Message>) =>
+    pane(h, {
+      variant: "main",
+      header: { title: "Members", icon: "users" },
+      toolbar: [
+        paneToolbar(h, {
+          start: [
+            searchField(h, {
+              id: "member-search",
+              label: "Search members",
+              placeholder: "Search members…",
+              value: model.name,
+              onInput: (name) => Message.TypedName({ name })
+            }),
+            button(h, "Active members", Message.OpenedSettings())
+          ],
+          end: [button(h, "Invite people", Message.OpenedSettings())]
+        }),
+        columns(h, { label: "Member", cells: ["Role"] })
+      ],
+      body: [h.ul([h.AriaLabel("Members")], [h.li([], ["Ada Lovelace"])])]
+    })
+
+  const scrollingBody = selector("div.overflow-y-auto")
+
+  it("holds the search, the filters, and the actions in a row under the header", () => {
+    scene(
+      { update, view: paneView(listPane) },
+      given(initial),
+      expect(label("Search members")).toHaveAttr("placeholder", "Search members…"),
+      expect(role("button", { name: "Active members" })).toExist(),
+      expect(role("button", { name: "Invite people" })).toExist(),
+      type(label("Search members"), "ada"),
+      expect(label("Search members")).toHaveValue("ada"),
+      click(role("button", { name: "Invite people" })),
+      expect(role("status")).toHaveText("Tab threads, closed 0, settings 1")
+    )
+  })
+
+  it("keeps the toolbar and the column labels out of the body that scrolls, which starts flush under them", () => {
+    scene(
+      { update, view: paneView(listPane) },
+      given(initial),
+      expect(within(scrollingBody, text("Ada Lovelace"))).toExist(),
+      expect(within(scrollingBody, label("Search members"))).toBeAbsent(),
+      expect(within(scrollingBody, text("Member"))).toBeAbsent(),
+      expect(scrollingBody).toHaveClass("pt-0"),
+      expect(scrollingBody).not.toHaveClass("py-5")
+    )
+  })
+
+  it("puts the actions at the end of the row, and at the start of the next line on a phone", () => {
+    scene(
+      { update, view: paneView(listPane) },
+      given(initial),
+      expect(selector("div.ms-auto")).toExist(),
+      expect(within(selector("div.ms-auto"), role("button", { name: "Invite people" }))).toExist(),
+      expect(within(selector("div.ms-auto"), role("button", { name: "Active members" }))).toBeAbsent(),
+      expect(selector("div.ms-auto")).toHaveClass("max-tablet:ms-0")
+    )
+  })
+
+  it("has no group of actions when it has none", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          paneToolbar(h, { start: [button(h, "Filter", Message.OpenedSettings())] })
+      },
+      given(initial),
+      expect(role("button", { name: "Filter" })).toExist(),
+      expect(selector("div.ms-auto")).toBeAbsent()
+    )
+  })
+
+  it("keeps the pieces of a toolbar drawn by another view as one element, 12px apart", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          paneToolbarStack(h, [
+            paneToolbar(h, { start: [button(h, "Filter", Message.OpenedSettings())] }),
+            columns(h, { label: "Member", cells: ["Role"] })
+          ])
+      },
+      given(initial),
+      expect(selector("div.gap-3")).toHaveClass("flex-col"),
+      expect(within(selector("div.gap-3"), role("button", { name: "Filter" }))).toExist(),
+      expect(within(selector("div.gap-3"), text("Member"))).toExist()
+    )
+  })
+
+  it("leaves a body without a toolbar its usual padding", () => {
+    scene(
+      { update, view: paneView(mainPane) },
+      given(initial),
+      expect(scrollingBody).toHaveClass("py-5"),
+      expect(scrollingBody).not.toHaveClass("pt-0")
     )
   })
 })

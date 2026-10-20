@@ -23,22 +23,28 @@ const buttonLooks = {
   primary:
     "border border-transparent bg-action font-medium text-on-action not-aria-disabled:hover:opacity-88 aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
   secondary:
-    "border border-outline bg-action-secondary font-medium text-ink not-aria-disabled:hover:border-outline-strong aria-disabled:border-transparent aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
+    "border border-outline bg-action-secondary font-medium text-ink not-aria-disabled:hover:border-outline-strong aria-expanded:border-outline-strong aria-disabled:border-transparent aria-disabled:bg-subtle aria-disabled:text-ink-disabled",
   quiet:
-    "border border-transparent bg-transparent font-normal text-ink-secondary not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-disabled:text-ink-disabled",
+    "border border-transparent bg-transparent font-normal text-ink-secondary not-aria-disabled:hover:bg-subtle not-aria-disabled:hover:text-ink aria-expanded:bg-subtle aria-disabled:text-ink-disabled",
   link: "bg-transparent text-ink underline underline-offset-2 not-aria-disabled:hover:text-ink-secondary aria-disabled:text-ink-disabled"
 }
 
 const linkLook = "text-ink underline underline-offset-2 focus-ring hover:text-ink-secondary"
 
 const buttonRegularSizes = {
-  primary: "min-h-9 px-4 text-control max-desktop:min-h-11",
-  secondary: "min-h-9 px-4 text-control max-desktop:min-h-11",
-  quiet: "min-h-8 px-2.5 text-hint max-desktop:min-h-11",
+  primary: "min-h-9 text-control max-desktop:min-h-11",
+  secondary: "min-h-9 text-control max-desktop:min-h-11",
+  quiet: "min-h-8 text-hint max-desktop:min-h-11",
   link: ""
 }
 
+const buttonPaddings = { primary: "px-4", secondary: "px-4", quiet: "px-2.5", link: "" }
+
+const buttonChevronPadding = "px-3"
+
 const buttonLargeSize = "min-h-11 px-5 text-item"
+
+const buttonChevron = "flex flex-none text-ink-secondary"
 
 const buttonWide = "w-full"
 
@@ -72,6 +78,14 @@ const controlBox =
 const inputBox = `${controlBox} px-3 placeholder:text-ink-muted`
 
 const textareaBox = `${inputBox} resize-none py-2.5`
+
+const searchBox =
+  "relative flex h-9 min-w-32 flex-[0_1_20rem] items-center bg-search text-ink-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink max-desktop:h-11 max-tablet:basis-full"
+
+const searchMagnifier = "pointer-events-none absolute start-3 flex"
+
+const searchInput =
+  "m-0 h-full min-w-0 flex-1 border-0 bg-transparent ps-8.75 pe-3 text-control text-ink outline-none placeholder:text-ink-muted [&::-webkit-search-cancel-button]:hidden max-tablet:text-body-touch"
 
 const selectBox = `${controlBox} cursor-pointer appearance-none ps-3 pe-10`
 
@@ -150,6 +164,8 @@ export type ButtonOptions = Readonly<{
   wide?: boolean
   /** Drawn at `sm` before the label, 8px from it, and hidden from assistive technology, which reads the label. */
   icon?: IconName
+  /** Draws a chevron after the label and tightens the padding, for a button that opens a menu. */
+  hasChevron?: boolean
   isDisabled?: boolean
   /**
    * What assistive technology calls the button when its label alone does not tell it from the buttons around it, such as
@@ -220,6 +236,35 @@ export const answerKeys = <Message, Requirements>(
   onKeyDown: (key: string) => Option.Option<Message>
 ) => h.OnKeyDownPreventDefault((key, modifiers) => (hasModifier(modifiers) ? Option.none() : onKeyDown(key)))
 
+/** What a button's look is made of, which `isDisabled` and `name` are not: they are for its behavior. */
+export type ButtonLook = Omit<ButtonOptions, "isDisabled" | "name">
+
+/**
+ * The classes of a button in the `look` given, for a control that is a button element of its own, such as a
+ * menu's trigger, whose label is `buttonContent`.
+ */
+export const buttonClass = (look: ButtonLook = {}): string => {
+  const variant = look.variant ?? "secondary"
+  const isLarge = look.size === "large" && variant !== "link"
+  const hasChevronPadding = look.hasChevron === true && variant !== "link"
+  const spacing = isLarge
+    ? buttonLargeSize
+    : joinClasses(buttonRegularSizes[variant], hasChevronPadding ? buttonChevronPadding : buttonPaddings[variant])
+
+  return joinClasses(buttonBase, buttonLooks[variant], spacing, look.wide === true && buttonWide)
+}
+
+/** What a button holds: the `label`, with its icon before it and its chevron after it, as the `look` says. */
+export const buttonContent = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  label: string,
+  look: ButtonLook = {}
+): ReadonlyArray<Html | string> => [
+  ...(look.icon === undefined ? [] : [icon(h, look.icon, { size: "sm" })]),
+  label,
+  ...(look.hasChevron === true ? [h.span([h.Class(buttonChevron)], [icon(h, "chevron-down", { size: "xs" })])] : [])
+]
+
 /**
  * A button in the look of `button` over `attributes` that already give it its behavior, such as the group a
  * headless dialog publishes for the control that closes it. Whether it is disabled is for those attributes to say.
@@ -228,21 +273,8 @@ export const buttonWith = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   attributes: ControlAttributes<Message>,
   label: string,
-  options: Omit<ButtonOptions, "isDisabled" | "name"> = {}
-) => {
-  const variant = options.variant ?? "secondary"
-  const className = joinClasses(
-    buttonBase,
-    buttonLooks[variant],
-    options.size === "large" && variant !== "link" ? buttonLargeSize : buttonRegularSizes[variant],
-    options.wide === true && buttonWide
-  )
-
-  return h.button(
-    [...attributes, h.Class(className)],
-    options.icon === undefined ? [label] : [icon(h, options.icon, { size: "sm" }), label]
-  )
-}
+  look: ButtonLook = {}
+) => h.button([...attributes, h.Class(buttonClass(look))], buttonContent(h, label, look))
 
 const renderButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -488,6 +520,45 @@ export const field = <Message, Requirements>(
               h.Class(inputBox)
             ]),
             ...describeField(h, attributes.description, config.hint, error)
+          ]
+        )
+    },
+    h
+  )
+
+/**
+ * A quiet search over a list: a filled box with a magnifier, in the toolbar above the list it narrows, 36px tall and
+ * 20rem wide at most, giving way to the filters beside it before it wraps, and on a phone a line of its own. The
+ * `label` names it for assistive technology and is not shown; the `placeholder` says what it finds. It is never
+ * focused as it shows.
+ */
+export const searchField = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    id: string
+    label: string
+    placeholder: string
+    value: string
+    onInput: (value: string) => Message
+  }>
+) =>
+  Input.view(
+    {
+      id: config.id,
+      type: "search",
+      value: config.value,
+      onInput: config.onInput,
+      isDisabled: false,
+      isInvalid: false,
+      hasDescription: false,
+      isAutofocus: false,
+      toView: (attributes) =>
+        h.div(
+          [h.Class(searchBox)],
+          [
+            h.label([...attributes.label, h.Class(hiddenLabel)], [config.label]),
+            h.span([h.Class(searchMagnifier)], [icon(h, "mark-search", { size: "sm" })]),
+            h.input([...attributes.input, h.Placeholder(config.placeholder), h.Class(searchInput)])
           ]
         )
     },

@@ -27,6 +27,8 @@ import { modifyFields } from "foldkit/struct"
 import {
   answerKeys,
   button,
+  buttonClass,
+  buttonContent,
   buttonRow,
   type Choice,
   choiceSelect,
@@ -41,6 +43,7 @@ import {
   loadingLine,
   notice,
   noticeBox,
+  searchField,
   sending,
   submit as submitButton,
   textarea,
@@ -1248,6 +1251,88 @@ describe("loadingLine", () => {
       given(initial),
       expect(role("status")).toHaveText("Loading your inbox…"),
       expect(selector('p[role="status"]')).toExist()
+    )
+  })
+})
+
+describe("searchField", () => {
+  const searchView = viewOf((model, h) => [
+    searchField(h, {
+      id: "search",
+      label: "Search tasks",
+      placeholder: "Search tasks…",
+      value: model.notes,
+      onInput: (value) => Message.TypedNotes({ value })
+    })
+  ])
+
+  it("is found by its hidden label, shows its placeholder, and takes what is typed", () => {
+    scene(
+      { update, view: searchView },
+      given(initial),
+      expect(label("Search tasks")).toHaveAttr("type", "search"),
+      expect(label("Search tasks")).toHaveAttr("placeholder", "Search tasks…"),
+      expect(text("Search tasks")).toHaveClass("sr-only"),
+      type(label("Search tasks"), "ship"),
+      expect(label("Search tasks")).toHaveValue("ship")
+    )
+  })
+
+  it("draws a magnifier that assistive technology does not read, and takes no focus as it shows", () => {
+    scene(
+      { update, view: searchView },
+      given(initial),
+      expect(selector("svg")).toHaveAttr("aria-hidden", "true"),
+      expect(label("Search tasks")).not.toHaveAttr("autofocus")
+    )
+  })
+
+  it("is a filled box 36px tall that gives way before it wraps, and a line of its own on a phone", () => {
+    scene(
+      { update, view: searchView },
+      given(initial),
+      expect(selector("div.bg-search")).toHaveClass("h-9"),
+      expect(selector("div.bg-search")).toHaveClass("flex-[0_1_20rem]"),
+      expect(selector("div.bg-search")).toHaveClass("max-tablet:basis-full")
+    )
+  })
+})
+
+describe("a button that opens a menu", () => {
+  it("has a chevron after its label, hidden from assistive technology, and tighter padding", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          h.div(
+            [],
+            [
+              h.button(
+                [h.Class(buttonClass({ hasChevron: true }))],
+                buttonContent(h, "Active members", { hasChevron: true })
+              ),
+              h.button([h.Class(buttonClass())], buttonContent(h, "Invite people"))
+            ]
+          )
+      },
+      given(initial),
+      expect(role("button", { name: "Active members" })).toHaveClass("px-3"),
+      expect(role("button", { name: "Active members" })).not.toHaveClass("px-4"),
+      expect(within(role("button", { name: "Active members" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("button", { name: "Invite people" })).toHaveClass("px-4"),
+      expect(within(role("button", { name: "Invite people" }), selector("svg"))).toBeAbsent()
+    )
+  })
+
+  it("takes a stronger border while its menu is open", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          h.button([h.Class(buttonClass({ hasChevron: true }))], buttonContent(h, "Status"))
+      },
+      given(initial),
+      expect(role("button", { name: "Status" })).toHaveClass("aria-expanded:border-outline-strong")
     )
   })
 })

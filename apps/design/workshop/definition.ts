@@ -2,10 +2,11 @@
  * What the workshop remembers: the text of its fields, boxes, and composers, among them the search over its agents, which switches are on, the plan
  * chosen, a task's status, priority, and assignee, which rail destination, pane tab, and thread are current,
  * the group settings typed in the modals, which section of the wide one shows, whether each modal is open,
- * and how often a button was pressed.
+ * what each menu chose and whether it is open, and how often a button was pressed.
  */
 
 import { DialogBlock } from "@foldkit/ui/dialog"
+import * as Menu from "@foldkit/ui/menu"
 import * as Schema from "effect/Schema"
 import { makeApplicationDefinition } from "foldkit"
 import { defineMessageUnion } from "foldkit/message"
@@ -21,6 +22,35 @@ export type TaskPriority = typeof TaskPriority.Type
 
 export const TaskAssignee = Schema.Literals(["", "alex", "yumi"])
 export type TaskAssignee = typeof TaskAssignee.Type
+
+export const MemberFilter = Schema.Literals(["active", "removed"])
+export type MemberFilter = typeof MemberFilter.Type
+
+export const TaskFilter = Schema.Literals(["all", "triage", "todo", "doing"])
+export type TaskFilter = typeof TaskFilter.Type
+
+export const TaskSort = Schema.Literals(["activity", "newest", "oldest"])
+export type TaskSort = typeof TaskSort.Type
+
+export const Appearance = Schema.Literals(["system", "light", "dark"])
+export type Appearance = typeof Appearance.Type
+
+/** What the account menu can be chosen for: an appearance, or one of the entries below it. */
+export const AccountEntry = Schema.Literals([
+  "system",
+  "light",
+  "dark",
+  "switch-workspace",
+  "settings",
+  "name",
+  "sign-out"
+])
+export type AccountEntry = typeof AccountEntry.Type
+
+export const MemberFilterMenu = Menu.create<MemberFilter>()
+export const TaskFilterMenu = Menu.create<TaskFilter>()
+export const TaskSortMenu = Menu.create<TaskSort>()
+export const AccountMenu = Menu.create<AccountEntry>()
 
 export const Destination = Schema.Literals(["home", "agents", "connections", "settings"])
 export type Destination = typeof Destination.Type
@@ -39,6 +69,7 @@ export const Model = Schema.Struct({
   code: Schema.String,
   notes: Schema.String,
   agentQuery: Schema.String,
+  taskQuery: Schema.String,
   composer: Schema.String,
   reply: Schema.String,
   draft: Schema.String,
@@ -55,6 +86,19 @@ export const Model = Schema.Struct({
   modal: DialogBlock.Model,
   wideModal: DialogBlock.Model,
   chooserModal: DialogBlock.Model,
+  memberFilter: MemberFilter,
+  memberFilterMenu: MemberFilterMenu.Model,
+  taskFilter: TaskFilter,
+  taskFilterMenu: TaskFilterMenu.Model,
+  taskSort: TaskSort,
+  taskSortMenu: TaskSortMenu.Model,
+  toolbarFilterMenu: TaskFilterMenu.Model,
+  toolbarSortMenu: TaskSortMenu.Model,
+  membersPaneFilterMenu: MemberFilterMenu.Model,
+  appearance: Appearance,
+  accountMenu: AccountMenu.Model,
+  railAccountMenu: AccountMenu.Model,
+  accountChoice: Schema.String,
   integrationQuery: Schema.String,
   plan: Plan,
   taskStatus: TaskStatus,
@@ -73,6 +117,7 @@ export const Message = defineMessageUnion({
   TypedCode: { value: Schema.String },
   TypedNotes: { value: Schema.String },
   TypedAgentQuery: { value: Schema.String },
+  TypedTaskQuery: { value: Schema.String },
   TypedComposer: { value: Schema.String },
   TypedReply: { value: Schema.String },
   TypedDraft: { value: Schema.String },

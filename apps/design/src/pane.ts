@@ -52,6 +52,16 @@ const subtitleLine = "m-0 truncate pt-1.5 pb-3 text-control leading-4.5 text-ink
 
 const bodyScroll = "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5"
 
+const bodyScrollUnderToolbar = "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-0 pb-5"
+
+const toolbarStack = "flex flex-col gap-3"
+
+const toolbarBand = `${toolbarStack} flex-none px-6 pt-5 max-desktop:pt-4 max-tablet:pb-3`
+
+const toolbarRow = "flex items-center gap-2 max-tablet:flex-wrap"
+
+const toolbarEnd = "ms-auto flex items-center gap-2 max-tablet:ms-0"
+
 const footerBar = "flex-none px-6 py-5"
 
 const tabList = "flex gap-6"
@@ -181,9 +191,13 @@ const renderHeader = <Message, Requirements>(
 /**
  * The main content, the page's `main` landmark, or the side panel, an `aside` named by `label`: the
  * `header` (96px, 104px below 64rem, so the two line up and the sidebar's header beside them; the main
- * pane's title starts after the shell's menu button there), the `body` that scrolls,
- * and the `footer`, such as the composer, that stays in place under it. The main title is an `h1` at
+ * pane's title starts after the shell's menu button there), the `toolbar` over a list, if it has one, the `body`
+ * that scrolls, and the `footer`, such as the composer, that stays in place under it. The main title is an `h1` at
  * title size, the side title an `h2` at body size; a `label` also names the main landmark.
+ *
+ * The `toolbar` is what stays under the header while the list scrolls: a `paneToolbar` of the search, the filters,
+ * and the actions, then, if the list has them, the line that says what it holds and its `columns`. The body then
+ * starts flush under it, so the first row is the one under the columns.
  */
 export const pane = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -191,6 +205,7 @@ export const pane = <Message, Requirements>(
     variant: PaneVariant
     label?: string
     header: PaneHeader
+    toolbar?: ReadonlyArray<Html>
     body: ReadonlyArray<Html>
     footer?: ReadonlyArray<Html>
   }>
@@ -198,12 +213,39 @@ export const pane = <Message, Requirements>(
   const attributes = [...(config.label === undefined ? [] : [h.AriaLabel(config.label)]), h.Class(paneRoot)]
   const children = [
     renderHeader(h, config.variant, config.header),
-    h.div([h.Class(bodyScroll)], config.body),
+    config.toolbar === undefined ? h.empty : h.div([h.Class(toolbarBand)], config.toolbar),
+    h.div([h.Class(config.toolbar === undefined ? bodyScroll : bodyScrollUnderToolbar)], config.body),
     config.footer === undefined ? h.empty : h.div([h.Class(footerBar)], config.footer)
   ]
 
   return config.variant === "main" ? h.main(attributes, children) : h.aside(attributes, children)
 }
+
+/**
+ * The row at the top of a list's `toolbar`: the `start` controls, a `searchField` and the menus that narrow the
+ * list, then, at the end, the actions on it, such as a sort and a `button` that adds to it. It is one row where the
+ * search gives way first; on a phone it wraps, the search taking a line of its own and the actions the line under it.
+ */
+export const paneToolbar = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ start: ReadonlyArray<Html>; end?: ReadonlyArray<Html> }>
+): Html =>
+  h.div(
+    [h.Class(toolbarRow)],
+    [
+      ...config.start,
+      config.end === undefined || config.end.length === 0 ? h.empty : h.div([h.Class(toolbarEnd)], config.end)
+    ]
+  )
+
+/**
+ * The pieces of a `toolbar` as one element, 12px apart as the toolbar keeps them, for a view that is given only one
+ * element to return, such as a Block's, when the Block draws the toolbar of a pane that another draws.
+ */
+export const paneToolbarStack = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  children: ReadonlyArray<Html>
+): Html => h.div([h.Class(toolbarStack)], children)
 
 /**
  * The tabs under a title, a `tablist` named by `label`, each a button that sends its `onClick`. The

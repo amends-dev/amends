@@ -12,6 +12,7 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     TypedCode: ({ value }) => ({ model: modifyFields(model, { code: () => value }) }),
     TypedNotes: ({ value }) => ({ model: modifyFields(model, { notes: () => value }) }),
     TypedAgentQuery: ({ value }) => ({ model: modifyFields(model, { agentQuery: () => value }) }),
+    TypedTaskQuery: ({ value }) => ({ model: modifyFields(model, { taskQuery: () => value }) }),
     TypedComposer: ({ value }) => ({ model: modifyFields(model, { composer: () => value }) }),
     TypedReply: ({ value }) => ({ model: modifyFields(model, { reply: () => value }) }),
     TypedDraft: ({ value }) => ({ model: modifyFields(model, { draft: () => value }) }),

@@ -35,7 +35,7 @@ sign-in's two steps and as the workspace picker five times, each with its pieces
 pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a wide
-one with tabs and a description, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; a badge with a motion for each way something is under way; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
+one with tabs and a description, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
 list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -50,9 +50,9 @@ groups, each in a frame wider than the measure; the composer empty, filled, and 
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
-as a plain row under its group and the second with its notices; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a filter over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
+as a plain row under its group and the second with its notices; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a menu of Active or Removed members in a toolbar over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
-open and close. So do the shell's rail and tabs, whose current item follows a click, and the list of
+open and close, as do the menus, whose choices are kept. The first shell's rail has the account menu that opens, and the other shells draw its button closed, since a menu's Block owns the ids of its button and its list. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
 the window's width, so the rail, the sidebar, and the side pane are always in place, and no menu and a
 side pane whose dialog shows nothing, since the navigation drawer and the side pane's dialog are over
@@ -62,7 +62,7 @@ before a page composes it. It follows the browser's light or dark preference. A 
 hidden never renders a frame, and Foldkit renders on frames, so look at it in a visible tab. The
 folded table's frame is an `iframe` of the workshop itself, opened with `?frame=directory-table` to
 show the table alone, since a table folds by the width of the window, which a `div` 360px wide does
-not change. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
+not change. The toolbar's wrapped frame is an `iframe` the same way, opened with `?frame=pane-toolbar`, since a toolbar wraps by the width of the window. `bun run --filter @amends-dev/design build` bundles it, which CI builds too.
 
 ## Using it in an app
 
@@ -82,7 +82,12 @@ passes it the builder it was given.
 
 `src/styles.css` holds the whole theme. Each role is a custom property `--amends-<role>` with its
 light value on `:root` and its dark value under `prefers-color-scheme: dark`, and an `@theme inline`
-block gives each a Tailwind name, so a utility exists for every role. The block clears Tailwind's
+block gives each a Tailwind name, so a utility exists for every role.
+
+The person's own choice of Appearance wins over the browser's: an app sets `data-theme` on the root element to
+`light` or `dark`, and removes it for System. The dark values are under `:root[data-theme="dark"]` as well, and the
+media query keeps them from `:root:not([data-theme="light"])`, so light needs no block of its own. `theme.test.ts`
+checks that the two dark blocks give the same values. The block clears Tailwind's
 defaults for colors, fonts, type sizes, shadows, radii, and breakpoints, so a class outside the
 design, such as `bg-red-500` or `rounded-md`, does not exist. Spacing is Tailwind's 4px grid.
 
@@ -165,8 +170,13 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   technology. `options.name` is what assistive technology calls the button when its label alone does not tell
   it from the buttons around it, such as "Revoke invitation for casey@mercier.example" for "Revoke"; it begins
   with the label. The actions that create something use `mark-new`, which the reference's buttons use,
-  not `plus`, which is smaller and lighter and has no mark's weight. A button is 36px tall, a quiet
-  one 32px, and every one but a link 44px on touch.
+  not `plus`, which is smaller and lighter and has no mark's weight. `options.hasChevron` draws a chevron after the
+  label and tightens the padding, for a button that opens a menu. A button is 36px tall, a quiet
+  one 32px, and every one but a link 44px on touch. A secondary button with an open menu has a stronger border and a
+  quiet one the `subtle` fill, by `aria-expanded`.
+- `buttonClass(look?)` and `buttonContent(h, label, look?)` are what a button is made of, its classes and its
+  icon, label, and chevron, for a control that is a button element of its own, such as a menu's trigger, which
+  `buttonWith` draws from them too.
 - `submit(h, label, options?)` is a button of `type="submit"`, primary unless `options.variant`
   says otherwise.
 - `buttonWith(h, attributes, label, options?)` is the look of `button` over `attributes` that already
@@ -186,6 +196,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   which a field in a dialog takes with `isAutofocus` off, and the caller's own, such as `answerKeys`
   and an `aria-activedescendant`, for a field above a list its keys walk, or a mount its Block registers,
   such as one that selects the field's text when it takes focus (`ControlAttributes`).
+- `searchField(h, { id, label, placeholder, value, onInput })` is the quiet search over a list, for a toolbar: a filled
+  box, 36px tall and 44px on touch, with a magnifier at its start, 20rem wide at most, giving way before it wraps, and on
+  a phone a line of its own. The `label` names it for assistive technology and is not shown, the `placeholder` says
+  what it finds, and it never takes focus as it shows. The bordered `field` of type `search` is for a form.
 - `answerKeys(h, onKeyDown)` is the attribute for a text control above a list that its keys walk, such
   as a search field above its results: `onKeyDown(key)` says what a key sends, or nothing to leave the
   key to the browser, and a key it answers does not do what the browser does for it, such as moving the
@@ -529,8 +543,11 @@ The frame of the first four layout patterns, which the modules below fill.
   40px button of the icon alone, named by `label`. The current one is `aria-current="true"`, filled
   `rail-selected`, with the `indicator-bar` at its left edge. The optional `search`, `{ label, onClick }`, is
   the way to search, which is not a destination: a `mark-search` button last among the `items`, at the same
-  spacing as they are, as the mock draws it, and never current. The optional `account` is
-  `{ letter, label, onClick }`, a 24px `avatar-neutral` square in a button, last of all.
+  spacing as they are, as the mock draws it, and never current. The optional `account`, last of all
+  under the `footer`, is a `railAccount`.
+- `railAccount(h, { name, initials, header?, groups, embed })` is the person at the foot of the rail: their `initials` in a
+  `mark`, in a 40px target like the destinations, on a button named "Account: {name}", which opens a `menu` of the
+  `header` and `groups` to the right of the rail, with its end at the button's (`right-end`).
 
 ### `@amends-dev/design/sidebar`
 
@@ -578,8 +595,10 @@ The frame of the first four layout patterns, which the modules below fill.
 
 The third and fourth layout patterns share one structure.
 
-- `pane(h, { variant, label?, header, body, footer? })` is a column of a header, a `body` that
-  scrolls, and a `footer` that stays in place. The `"main"` variant is the page's `main` landmark,
+- `pane(h, { variant, label?, header, toolbar?, body, footer? })` is a column of a header, a `body` that
+  scrolls, and a `footer` that stays in place. The `toolbar`, for a list, is what stays under the header while the body
+  scrolls: a `paneToolbar`, then, over a list, the `summary` line and the `columns`. The body then starts flush under it,
+  with no padding above, so the first row is the one under the column labels. The `"main"` variant is the page's `main` landmark,
   its title an `h1` at title size; the `"side"` variant is an `aside` named by `label`, its title an
   `h2` at body size, in medium weight. A `label` names the main landmark too.
 - The `header` is `{ title, icon?, mark?, status?, context?, phoneContext?, leading?, actions?, tabs?, subtitle? }`,
@@ -595,6 +614,12 @@ The third and fourth layout patterns share one structure.
   further in below 64rem, for the shell's menu button over it; its tabs and subtitle keep the pane's
   gutter, and the side pane's row is not moved. The line under the header is drawn inside it, so the
   current tab's bar sits over the line. A `subtitle` shows only when there are no `tabs`.
+- `paneToolbar(h, { start, end? })` is the row at the top of a `toolbar`: the `start` controls, a `searchField` and the
+  menus that narrow the list, then, at the end, the actions on it, such as a sort and a `button` that adds to it. It is one
+  row where the search gives way first; below 48rem it wraps, the search a line of its own and the actions at the start
+  of the line under the filters.
+- `paneToolbarStack(h, children)` holds the pieces of a `toolbar` as one element, 12px apart as the toolbar keeps them,
+  for a Block whose view is given one element to return and draws the toolbar of a pane that another draws.
 - `paneTabs(h, { label, tabs })` is a `tablist` named by `label` of `{ label, count?, isCurrent,
 onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
   a 2px `indicator` bar under it. The tab is named by its label and described by its `count`, which
@@ -818,6 +843,44 @@ A Block uses it in four steps:
 
 The groups Block's form for a new team does all four.
 
+### `@amends-dev/design/menu`
+
+What opens from a button to choose among things: a filter above a list, a sort, the account at the foot of the rail. It
+is the look of `@foldkit/ui`'s headless menu, so the framework keeps the button's keys, the list's arrow keys, Home and
+End, typeahead by label, Enter, Escape, a click outside, and the focus that returns to the button.
+
+- `menu(h, { trigger, placement?, header?, groups, embed })` builds the headless menu's view inputs and hands them to
+  `embed`, which embeds the Block the page bound. The `trigger` is the button: by default a `choice`, `{ text, name? }`,
+  a secondary button of the current choice's `text` with a chevron, or `{ variant: "plain", name, content }`, a button
+  with no look of its own around its `content`, such as a mark. The `name` is what assistive technology calls the button
+  when its text says too little, such as "Sort: Latest activity", and a plain button must have one. The `placement` is
+  where the list opens from its button, `bottom-start` unless given, as `@foldkit/ui` names it: the rail's account is
+  `right-end`, and a filter at the end of a toolbar `bottom-end`. The `groups` are `{ label?, choices }`, each choice
+  `{ value, label, isChecked? }`, separated by a line: a group's `label` is a heading above it, a choice with an
+  `isChecked` is one of a group of which one is current, with a check mark while it is `true`, and a choice without one
+  is an action. The `header`, `{ title, detail? }`, is a title over a detail above the first group, with a line under it,
+  as the account's name is over its sign-in address. A choice's `value` is what the Block reports, and each choice of a
+  menu has one of its own.
+- `choiceMenu(h, { choices, value, text?, name?, placement?, embed })` is the toolbar's replacement for a select: a menu of
+  one group of `choices`, each `[value, label]`, with `value` checked and its label on the button, or `text` when given,
+  such as "Status" while every status is chosen.
+
+A Block uses it in three steps:
+
+- It creates the menu's Block once at module scope, `Menu.create<Value>()` from `@foldkit/ui/menu`, with the choices'
+  values for `Value`, and binds it as a child, with an `id` for the menu through `init`. A Block's ids are for one place,
+  so a menu is rendered once, and a place that shows two has two bindings.
+- Its binding's out message fold answers `Selected({ value })` with what the choice was for, and `Closed` with nothing.
+- Its view calls `menu` or `choiceMenu` with `embed: (viewInputs) => h.block(Binding.embedView({ slotId, model:
+model.menu, viewInputs }))`.
+
+The list is drawn in the document's portal root, outside the Block that renders it, 6px from its button and 8px from the
+window's edges, flipping to the other side when it does not fit, over a transparent backdrop that closes it. It is 12rem
+wide at least and `popover` on a border, with `shadow-popover`; an item is 32px tall, 44px on touch, filled `subtle` while
+it is active, and a checked choice has its check at the end and says "(selected)" to assistive technology, since a
+headless menu's item is a `menuitem`, which has no checked state. The Block's trigger is `aria-haspopup="menu"` and
+`aria-expanded`, and its list is a `menu` labelled by the trigger.
+
 ## Tests
 
 `bun run test --project @amends-dev/design` runs the scene tests in happy-dom. They drive each
@@ -832,7 +895,16 @@ the part its kind moves; the code input's six cells, the digits it keeps, its co
 outlined cell and its refusal, and its loading line as a `status`; a list that is loading by its `status` line and
 its rows hidden from assistive technology; a rail
 destination by `role("button", { name })` with `aria-current`, and the search beside them, which is never current and
-sends what it is given; a sidebar item by its name, which has the status's word after the label, with
+sends what it is given, and the account at its foot, a button named for the person that opens a menu to the right with their
+name over their address, Appearance, and the rest, whose choice it reports, and that closes on Escape with the focus on its
+button; a menu by its trigger's `aria-haspopup` and `aria-expanded`, its list as a `menu` of `menuitem`s, the current one
+checked and named "(selected)", a choice that closes it and is reported, the arrow keys and Home and End and Enter and typeahead,
+Escape, a click on the backdrop, and the button pressed again, which each close it with the focus back on the button, its
+placement as the anchor its Mount is given, a header with a line under it, a heading over a group, the line between groups,
+and a plain button holding its content; a pane's toolbar by its search found by its label, its menus and its actions at the
+end, kept out of the body that scrolls, which starts flush under it, and a pane without one with its usual padding; the quiet
+search by its hidden label, its placeholder and its magnifier, hidden from assistive technology; the theme's two dark
+blocks, which give the same values, by `theme.test.ts`; a sidebar item by its name, which has the status's word after the label, with
 `aria-current` and its count, the row under it as a button or as a plain row, the working logo at the end of a row at
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's

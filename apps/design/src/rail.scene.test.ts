@@ -1,35 +1,79 @@
 import { describe, it } from "@effect/vitest"
+import * as Menu from "@foldkit/ui/menu"
 import { Schema } from "effect"
-import type { Update } from "foldkit"
+import { makeApplicationDefinition } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
+import {
+  Command,
+  Mount,
+  all,
+  click,
+  expect,
+  expectAll,
+  given,
+  keydown,
+  last,
+  role,
+  scene,
+  selector,
+  text,
+  within
+} from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import type { IconName } from "./icon.ts"
-import { rail } from "./rail.ts"
+import { rail, railAccount } from "./rail.ts"
 
 const Destination = Schema.Literals(["home", "connections", "agents", "settings"])
 type Destination = typeof Destination.Type
 
+const AccountEntry = Schema.Literals(["System", "Light", "Dark", "SwitchWorkspace", "SignOut"])
+type AccountEntry = typeof AccountEntry.Type
+
+const AccountMenu = Menu.create<AccountEntry>()
+
+const Model = Schema.Struct({
+  current: Destination,
+  chose: Schema.String,
+  brandClicks: Schema.Finite,
+  searches: Schema.Finite,
+  accountMenu: AccountMenu.Model
+})
+type Model = typeof Model.Type
+
 const Message = defineMessageUnion({
   ChangedDestination: { destination: Destination },
-  ClickedAccount: {},
   ClickedBrand: {},
   ClickedSearch: {}
 })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ current: Destination; accountClicks: number; brandClicks: number; searches: number }>
+const Definition = makeApplicationDefinition({ Model, Message })
 
-const initial: Model = { current: "home", accountClicks: 0, brandClicks: 0, searches: 0 }
+const AccountBinding = Definition.bindChild(AccountMenu, {
+  field: "accountMenu",
+  init: { contextToArgs: () => [{ id: "rail-account" }] },
+  outMessage: {
+    fold: AccountMenu.OutMessage.match({
+      Selected: ({ value }) => Definition.stepFields(() => ({ chose: () => value })),
+      Closed: () => Definition.stepNoop()
+    })
+  }
+})
 
-const update = (model: Model, message: Message) =>
-  Message.match<Update.Return<Model, Message>>(message, {
+const Composition = Definition.makeComposition({ bindings: [AccountBinding] })
+
+const update = Composition.makeUpdate((model, message) =>
+  Message.match(message, {
     ChangedDestination: ({ destination }) => ({ model: modifyFields(model, { current: () => destination }) }),
-    ClickedAccount: () => ({ model: modifyFields(model, { accountClicks: (accountClicks) => accountClicks + 1 }) }),
     ClickedBrand: () => ({ model: modifyFields(model, { brandClicks: (brandClicks) => brandClicks + 1 }) }),
     ClickedSearch: () => ({ model: modifyFields(model, { searches: (searches) => searches + 1 }) })
   })
+)
+
+const initial = Composition.makeInit(() => ({
+  model: { current: "home" as const, chose: "nothing", brandClicks: 0, searches: 0 }
+}))().model
 
 const destinations: ReadonlyArray<readonly [Destination, IconName, string]> = [
   ["home", "mark-home", "Home"],
@@ -37,32 +81,79 @@ const destinations: ReadonlyArray<readonly [Destination, IconName, string]> = [
   ["connections", "mark-connections", "Connections"]
 ]
 
-const railView = (options: Readonly<{ isBrandButton: boolean }>) => (model: Model, h: HtmlBuilder<Message>) => {
-  const toItem = ([destination, icon, label]: readonly [Destination, IconName, string]) => ({
-    icon,
-    label,
-    isCurrent: model.current === destination,
-    onClick: Message.ChangedDestination({ destination })
+const railView = (options: Readonly<{ isBrandButton: boolean; hasAccount?: boolean }>) =>
+  Composition.makeView((model, h) => {
+    const toItem = ([destination, icon, label]: readonly [Destination, IconName, string]) => ({
+      icon,
+      label,
+      isCurrent: model.current === destination,
+      onClick: Message.ChangedDestination({ destination })
+    })
+
+    return h.div(
+      [],
+      [
+        h.p([h.Role("status")], [`Current ${model.current}, chose ${model.chose}, brand ${model.brandClicks}`]),
+        h.p([h.Role("note")], [`Searches ${model.searches}`]),
+        rail(h, {
+          brand: {
+            label: "Amends home",
+            ...(options.isBrandButton ? { onClick: Message.ClickedBrand() } : {})
+          },
+          items: destinations.map(toItem),
+          search: { label: "Search", onClick: Message.ClickedSearch() },
+          footer: [toItem(["settings", "mark-settings", "Settings"])],
+          ...(options.hasAccount === false
+            ? {}
+            : {
+                account: railAccount(h, {
+                  name: "Joan Mercier",
+                  initials: "JM",
+                  header: { title: "Joan Mercier", detail: "joan@mercier.example" },
+                  groups: [
+                    {
+                      label: "Appearance",
+                      choices: (["System", "Light", "Dark"] as const).map((value) => ({
+                        value,
+                        label: value,
+                        isChecked: value === "System"
+                      }))
+                    },
+                    {
+                      choices: [
+                        { value: "SwitchWorkspace", label: "Switch workspace" },
+                        { value: "SignOut", label: "Sign out" }
+                      ]
+                    }
+                  ],
+                  embed: (viewInputs) =>
+                    h.block(AccountBinding.embedView({ slotId: "account", model: model.accountMenu, viewInputs }))
+                })
+              })
+        })
+      ]
+    )
   })
 
-  return h.div(
-    [],
-    [
-      h.p([h.Role("status")], [`Current ${model.current}, account ${model.accountClicks}, brand ${model.brandClicks}`]),
-      h.p([h.Role("note")], [`Searches ${model.searches}`]),
-      rail(h, {
-        brand: {
-          label: "Amends home",
-          ...(options.isBrandButton ? { onClick: Message.ClickedBrand() } : {})
-        },
-        items: destinations.map(toItem),
-        search: { label: "Search", onClick: Message.ClickedSearch() },
-        footer: [toItem(["settings", "mark-settings", "Settings"])],
-        account: { letter: "JM", label: "Account", onClick: Message.ClickedAccount() }
+const accountOpened = () =>
+  [
+    Command.resolve(Menu.test.FocusMenuItems, AccountMenu.Message.CompletedFocusMenuItems()),
+    Mount.expectHas(
+      Menu.test.AnchorMenu({
+        buttonId: "rail-account-button",
+        anchor: { placement: "right-end", gap: 6, padding: 8 }
       })
-    ]
-  )
-}
+    ),
+    Mount.resolve(Menu.test.AnchorMenu, AccountMenu.Message.CompletedAnchorMenu()),
+    Mount.resolve(Menu.test.PortalMenuBackdrop, AccountMenu.Message.CompletedPortalMenuBackdrop())
+  ] as const
+
+const accountClosed = () =>
+  [
+    Command.resolve(Menu.test.FocusMenuButton, AccountMenu.Message.CompletedFocusMenuButton()),
+    Mount.expectEnded(Menu.test.AnchorMenu),
+    Mount.expectEnded(Menu.test.PortalMenuBackdrop)
+  ] as const
 
 describe("rail", () => {
   it("is a navigation landmark named Destinations", () => {
@@ -82,7 +173,7 @@ describe("rail", () => {
       click(role("button", { name: "Agents" })),
       expect(role("button", { name: "Agents" })).toHaveAttr("aria-current", "true"),
       expect(role("button", { name: "Home" })).not.toHaveAttr("aria-current"),
-      expect(role("status")).toHaveText("Current agents, account 0, brand 0")
+      expect(role("status")).toHaveText("Current agents, chose nothing, brand 0")
     )
   })
 
@@ -129,15 +220,15 @@ describe("rail", () => {
     )
   })
 
-  it("lists the footer's destinations the same way, and the account last", () => {
+  it("lists the footer's destinations the same way, with Settings over the account", () => {
     scene(
       { update, view: railView({ isBrandButton: true }) },
       given(initial),
       expect(role("button", { name: "Settings" })).not.toHaveAttr("aria-current"),
       click(role("button", { name: "Settings" })),
       expect(role("button", { name: "Settings" })).toHaveAttr("aria-current", "true"),
-      click(role("button", { name: "Account" })),
-      expect(role("status")).toHaveText("Current settings, account 1, brand 0")
+      expect(last(all.role("button"))).toHaveAttr("aria-haspopup", "menu"),
+      expect(role("status")).toHaveText("Current settings, chose nothing, brand 0")
     )
   })
 
@@ -146,7 +237,7 @@ describe("rail", () => {
       { update, view: railView({ isBrandButton: true }) },
       given(initial),
       click(role("button", { name: "Amends home" })),
-      expect(role("status")).toHaveText("Current home, account 0, brand 1")
+      expect(role("status")).toHaveText("Current home, chose nothing, brand 1")
     )
     scene(
       { update, view: railView({ isBrandButton: false }) },
@@ -180,6 +271,71 @@ describe("rail", () => {
       expect(role("navigation", { name: "Destinations" })).toHaveClass(
         "[--amends-status-knockout:var(--amends-canvas)]"
       )
+    )
+  })
+})
+
+describe("the rail's account", () => {
+  it("is the person's initials in a mark, on a button named for them that opens a menu", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      expect(role("button", { name: "Account: Joan Mercier" })).toHaveAttr("aria-haspopup", "menu"),
+      expect(role("button", { name: "Account: Joan Mercier" })).toHaveAttr("aria-expanded", "false"),
+      expect(within(role("button", { name: "Account: Joan Mercier" }), text("JM"))).toHaveAttr("aria-hidden", "true"),
+      expect(role("menu")).toBeAbsent()
+    )
+  })
+
+  it("opens to the right of the rail with the person's name over their address, then Appearance and the rest", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      click(role("button", { name: "Account: Joan Mercier" })),
+      ...accountOpened(),
+      expect(within(role("menu"), text("Joan Mercier"))).toExist(),
+      expect(within(role("menu"), text("joan@mercier.example"))).toExist(),
+      expect(within(role("menu"), text("Appearance"))).toExist(),
+      expect(role("menuitem", { name: "System (selected)" })).toExist(),
+      expect(role("menuitem", { name: "Light" })).toExist(),
+      expect(role("menuitem", { name: "Dark" })).toExist(),
+      expect(role("menuitem", { name: "Switch workspace" })).toExist(),
+      expect(role("menuitem", { name: "Sign out" })).toExist()
+    )
+  })
+
+  it("reports the entry chosen, and closes", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      click(role("button", { name: "Account: Joan Mercier" })),
+      ...accountOpened(),
+      click(role("menuitem", { name: "Sign out" })),
+      ...accountClosed(),
+      expect(role("menu")).toBeAbsent(),
+      expect(role("status")).toHaveText("Current home, chose SignOut, brand 0")
+    )
+  })
+
+  it("closes on Escape, with the focus back on the account's button", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      click(role("button", { name: "Account: Joan Mercier" })),
+      ...accountOpened(),
+      keydown(role("menu"), "Escape"),
+      Command.expectHas(Menu.test.FocusMenuButton),
+      ...accountClosed(),
+      expect(role("menu")).toBeAbsent()
+    )
+  })
+
+  it("is not drawn when the rail is given none", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true, hasAccount: false }) },
+      given(initial),
+      expectAll(all.role("button")).toHaveCount(6),
+      expect(role("button", { name: "Account: Joan Mercier" })).toBeAbsent()
     )
   })
 })

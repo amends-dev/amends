@@ -9,6 +9,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     code: "",
     notes: "",
     agentQuery: "",
+    taskQuery: "",
     composer: "",
     reply: "",
     draft: "",
@@ -27,6 +28,11 @@ export const init = ApplicationComposition.makeInit(() => ({
     taskStatus: "triage",
     taskPriority: "none",
     taskAssignee: "",
+    memberFilter: "active",
+    taskFilter: "all",
+    taskSort: "activity",
+    appearance: "system",
+    accountChoice: "nothing yet",
     pressCount: 0
   }
 }))

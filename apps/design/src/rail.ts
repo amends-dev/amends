@@ -7,6 +7,8 @@ import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
 import { logo } from "./logo.ts"
+import { mark } from "./mark.ts"
+import { type MenuConfig, menu } from "./menu.ts"
 
 const railColumn =
   "flex w-13 flex-none flex-col items-center pt-2.5 pb-3.25 [--amends-status-knockout:var(--amends-canvas)]"
@@ -25,10 +27,7 @@ const railFooter = "m-0 mt-auto flex list-none flex-col items-center gap-4 p-0 p
 
 const railDestination = `${railTarget} cursor-pointer bg-transparent text-ink-secondary focus-ring hover:bg-subtle hover:text-ink aria-[current=true]:bg-rail-selected aria-[current=true]:text-ink aria-[current=true]:indicator-bar`
 
-const railAccountButton = `${railTarget} cursor-pointer bg-transparent focus-ring`
-
-const railAccountMark =
-  "grid size-6 place-items-center bg-avatar-neutral-bg text-meta font-medium text-avatar-neutral-fg uppercase"
+const railAccountAvatar = `${railTarget} text-ink`
 
 export type RailItem<Message> = Readonly<{
   icon: IconName
@@ -44,8 +43,6 @@ export type RailBrand<Message> = Readonly<{
   /** The mark is a button when it has one. */
   onClick?: Message
 }>
-
-export type RailAccount<Message> = Readonly<{ letter: string; label: string; onClick: Message }>
 
 /** The way to search, which is not a destination: it is never current. */
 export type RailSearch<Message> = Readonly<{ label: string; onClick: Message }>
@@ -85,28 +82,31 @@ const renderBrand = <Message, Requirements>(h: HtmlBuilder<Message, Requirements
         h
       )
 
-const renderAccount = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, account: RailAccount<Message>) =>
-  h.li(
-    [],
-    [
-      Button.view(
-        {
-          onClick: account.onClick,
-          toView: (attributes) =>
-            h.button(
-              [...attributes.button, h.AriaLabel(account.label), h.Class(railAccountButton)],
-              [h.span([h.AriaHidden(true), h.Class(railAccountMark)], [account.letter])]
-            )
-        },
-        h
-      )
-    ]
-  )
+/**
+ * The person's account at the foot of the rail: their mark, `initials` in a 40px target like the destinations, a
+ * button named "Account: {name}" that opens the account's menu to the right of the rail, with its end at the
+ * button's. The menu is the `header` over its `groups`, as `menu` has them.
+ */
+export const railAccount = <Value extends string, Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ name: string; initials: string }> & Pick<MenuConfig<Value>, "header" | "groups" | "embed">
+): Html =>
+  menu(h, {
+    trigger: {
+      variant: "plain",
+      name: `Account: ${config.name}`,
+      content: h.span([h.Class(railAccountAvatar)], [mark(h, { text: config.initials })])
+    },
+    placement: "right-end",
+    ...(config.header === undefined ? {} : { header: config.header }),
+    groups: config.groups,
+    embed: config.embed
+  })
 
 /**
  * The column of destinations, a `nav` named Destinations: the `brand`, the logo with a short line under it,
- * the `items`, then the `search` when there is one, and at the bottom the `footer` items and the optional
- * `account` mark. The current item is `aria-current="true"`, filled, with a 2px bar at the rail's left edge.
+ * the `items`, then the `search` when there is one, and at the bottom the `footer` items, such as Settings, and the
+ * optional `account`, a `railAccount`, under them. The current item is `aria-current="true"`, filled, with a 2px bar at the rail's left edge.
  * The search is an item like the others in look and spacing, a magnifier named by its `label`, and is never
  * current. A brand with an `onClick` is a button named by its `label`, whose logo lifts its patch when hovered;
  * with none it is the logo as an image of that name. The logo is cut out of the canvas the rail lies on.
@@ -118,7 +118,7 @@ export const rail = <Message, Requirements>(
     items: ReadonlyArray<RailItem<Message>>
     search?: RailSearch<Message>
     footer: ReadonlyArray<RailItem<Message>>
-    account?: RailAccount<Message>
+    account?: Html
   }>
 ): Html =>
   h.nav(
@@ -139,7 +139,7 @@ export const rail = <Message, Requirements>(
         [h.Class(railFooter)],
         [
           ...config.footer.map((item) => renderDestination(h, item)),
-          config.account === undefined ? h.empty : renderAccount(h, config.account)
+          config.account === undefined ? h.empty : h.li([], [config.account])
         ]
       )
     ]

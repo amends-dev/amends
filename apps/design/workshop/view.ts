@@ -1,4 +1,5 @@
 import type { RenderInfo } from "@foldkit/ui/dialog"
+import type { ViewInputs } from "@foldkit/ui/menu"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
 import { centered, centeredAccount, copy, heading, screenContent } from "../src/centered.ts"
@@ -18,6 +19,7 @@ import {
   loadingLine,
   notice,
   noticeBox,
+  searchField,
   sending,
   submit,
   textarea,
@@ -39,10 +41,21 @@ import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { logo, logoMotions } from "../src/logo.ts"
 import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
+import { choiceMenu, type MenuGroup, menu } from "../src/menu.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
-import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
-import { rail } from "../src/rail.ts"
+import {
+  pane,
+  paneBack,
+  paneClose,
+  paneColumn,
+  paneEmpty,
+  paneForm,
+  paneSection,
+  paneTabs,
+  paneToolbar
+} from "../src/pane.ts"
+import { rail, railAccount } from "../src/rail.ts"
 import { shell } from "../src/shell.ts"
 import {
   sidebar,
@@ -56,20 +69,33 @@ import {
 import { type StateArtKind, stateArt, stateArtKinds } from "../src/stateArt.ts"
 import { toast, toastStack } from "../src/toast.ts"
 import {
+  AccountBinding,
   type ApplicationViewBuilder,
   ApplicationComposition,
   ChooserModalBinding,
+  MemberFilterBinding,
+  MembersPaneFilterBinding,
   ModalBinding,
+  RailAccountBinding,
+  TaskFilterBinding,
+  TaskSortBinding,
+  ToolbarFilterBinding,
+  ToolbarSortBinding,
   WideModalBinding
 } from "./composition.ts"
 import {
+  type AccountEntry,
+  type Appearance,
   type Destination,
   Message,
+  type MemberFilter,
   type Model,
   type PaneTab,
   type Plan,
   type TaskAssignee,
+  type TaskFilter,
   type TaskPriority,
+  type TaskSort,
   type TaskStatus
 } from "./definition.ts"
 
@@ -104,6 +130,10 @@ const conversationColumn = "flex max-w-xl flex-col px-3"
 const composerColumn = "flex max-w-md flex-col"
 
 const mentioningColumn = "flex max-w-md flex-col pt-24"
+
+const toolbarPaneFrame = "flex h-120 flex-col outline outline-outline"
+
+const toolbarWindowFrame = "h-160 w-90 flex-none outline outline-outline"
 
 const emptyPaneFrame = "flex h-96 flex-col outline outline-outline"
 
@@ -820,8 +850,10 @@ const memberSamples: ReadonlyArray<MemberSample> = [
   { name: "Yumi", role: "Member", status: "Active", isAgent: true, isOpen: false }
 ]
 
-const memberTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
-  columns(h, { label: "Member", cells: ["Workspace role", "Status"] }),
+const memberColumns = (h: ApplicationViewBuilder): Html =>
+  columns(h, { label: "Member", cells: ["Workspace role", "Status"] })
+
+const memberList = (h: ApplicationViewBuilder): Html =>
   h.ul(
     [h.AriaLabel("Members")],
     memberSamples.map(({ name, role, status, isAgent, isOpen }) =>
@@ -843,7 +875,8 @@ const memberTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
       )
     )
   )
-]
+
+const memberTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [memberColumns(h), memberList(h)]
 
 type InvitationSample = Readonly<{ recipient: string; detail: string; isSending?: boolean }>
 
@@ -989,13 +1022,16 @@ const agentRow = (h: ApplicationViewBuilder, agent: AgentSample): Html =>
     ]
   )
 
-const agentTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
-  columns(h, { label: "Agent", cells: ["Harness", "Model", "Activity"] }),
+const agentColumns = (h: ApplicationViewBuilder): Html =>
+  columns(h, { label: "Agent", cells: ["Harness", "Model", "Activity"] })
+
+const agentList = (h: ApplicationViewBuilder): Html =>
   h.ul(
     [h.AriaLabel("Agents")],
     agentSamples.map((agent) => agentRow(h, agent))
   )
-]
+
+const agentTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [agentColumns(h), agentList(h)]
 
 const directoryScreen = (h: ApplicationViewBuilder, children: ReadonlyArray<Html>): Html =>
   centered(h, {
@@ -2228,6 +2264,228 @@ const composerGroup = (h: ApplicationViewBuilder, draft: string, filledDraft: st
   ])
 }
 
+const memberFilterChoices: ReadonlyArray<readonly [MemberFilter, string]> = [
+  ["active", "Active members"],
+  ["removed", "Removed members"]
+]
+
+const taskFilterChoices: ReadonlyArray<readonly [TaskFilter, string]> = [
+  ["all", "Any status"],
+  ["triage", "Triage"],
+  ["todo", "To do"],
+  ["doing", "In progress"]
+]
+
+const taskSortChoices: ReadonlyArray<readonly [TaskSort, string]> = [
+  ["activity", "Latest activity"],
+  ["newest", "Newest"],
+  ["oldest", "Oldest"]
+]
+
+/** Where a menu is shown: among the menu samples, or in the pane whose toolbar holds it. Each place has its own Block. */
+type Place = "sample" | "pane"
+
+const memberFilterMenu = (h: ApplicationViewBuilder, model: Model, place: Place): Html =>
+  choiceMenu(h, {
+    choices: memberFilterChoices,
+    value: model.memberFilter,
+    placement: "bottom-end",
+    embed: (viewInputs) =>
+      place === "sample"
+        ? h.block(MemberFilterBinding.embedView({ slotId: "member-filter", model: model.memberFilterMenu, viewInputs }))
+        : h.block(
+            MembersPaneFilterBinding.embedView({
+              slotId: "members-pane-filter",
+              model: model.membersPaneFilterMenu,
+              viewInputs
+            })
+          )
+  })
+
+/** The status filter says "Status" while every status is chosen, and the status once one is. */
+const taskFilterMenu = (h: ApplicationViewBuilder, model: Model, place: Place): Html =>
+  choiceMenu(h, {
+    choices: taskFilterChoices,
+    value: model.taskFilter,
+    ...(model.taskFilter === "all" ? { text: "Status" } : {}),
+    embed: (viewInputs) =>
+      place === "sample"
+        ? h.block(TaskFilterBinding.embedView({ slotId: "task-filter", model: model.taskFilterMenu, viewInputs }))
+        : h.block(
+            ToolbarFilterBinding.embedView({ slotId: "toolbar-filter", model: model.toolbarFilterMenu, viewInputs })
+          )
+  })
+
+const taskSortMenu = (h: ApplicationViewBuilder, model: Model, place: Place): Html => {
+  const current = taskSortChoices.find(([value]) => value === model.taskSort)?.[1] ?? ""
+
+  return choiceMenu(h, {
+    choices: taskSortChoices,
+    value: model.taskSort,
+    name: `Sort: ${current}`,
+    embed: (viewInputs) =>
+      place === "sample"
+        ? h.block(TaskSortBinding.embedView({ slotId: "task-sort", model: model.taskSortMenu, viewInputs }))
+        : h.block(ToolbarSortBinding.embedView({ slotId: "toolbar-sort", model: model.toolbarSortMenu, viewInputs }))
+  })
+}
+
+/** The account's menu: the three appearances, the entries that go somewhere, and the one that ends the session. */
+const accountGroups = (appearance: Appearance): ReadonlyArray<MenuGroup<AccountEntry>> => [
+  {
+    label: "Appearance",
+    choices: (
+      [
+        ["system", "System"],
+        ["light", "Light"],
+        ["dark", "Dark"]
+      ] as const
+    ).map(([value, label]) => ({ value, label, isChecked: appearance === value }))
+  },
+  {
+    choices: [
+      { value: "switch-workspace", label: "Switch workspace" },
+      { value: "settings", label: "Workspace settings" },
+      { value: "name", label: "Change your name…" }
+    ]
+  },
+  { choices: [{ value: "sign-out", label: "Sign out" }] }
+]
+
+/**
+ * The closed button of a menu, drawn without its Block, for the frames that show the rail more than once: the Block
+ * owns the ids of its button and its list, so one frame has the menu that opens and the rest show it closed.
+ */
+const closedMenuButton =
+  (h: ApplicationViewBuilder) =>
+  (viewInputs: ViewInputs<AccountEntry>): Html =>
+    h.div(
+      [h.Class(viewInputs.className ?? "")],
+      [
+        h.button(
+          [h.Type("button"), h.AriaLabel(viewInputs.ariaLabel ?? ""), h.Class(viewInputs.buttonClassName ?? "")],
+          [viewInputs.buttonContent]
+        )
+      ]
+    )
+
+const menuFrame = "flex h-72 items-start gap-6"
+
+const menuGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  group(h, "Menu", [
+    sample(
+      h,
+      "A choice: the current one on the button with a chevron, the list opening below from its start, the current choice checked; the button says Status while every status is chosen",
+      [taskFilterMenu(h, model, "sample"), taskSortMenu(h, model, "sample"), memberFilterMenu(h, model, "sample")],
+      menuFrame
+    ),
+    sample(
+      h,
+      "Groups behind a plain button: a header of a title over a detail, a labelled group of checked choices, actions, and a line between the groups, opening to the right and below, with the account's mark as its button",
+      [
+        menu(h, {
+          trigger: { variant: "plain", name: "Account: Jamie Morgan", content: mark(h, { text: "JM" }) },
+          header: { title: "Jamie Morgan", detail: "jamie@mercier.example" },
+          groups: accountGroups(model.appearance),
+          embed: (viewInputs) =>
+            h.block(AccountBinding.embedView({ slotId: "account", model: model.accountMenu, viewInputs }))
+        }),
+        h.p([h.Role("status"), h.Class(lineText)], [`Last chosen: ${model.accountChoice}`])
+      ],
+      menuFrame
+    )
+  ])
+
+const taskSamples: ReadonlyArray<Readonly<{ title: string; meta: string; status: string; age: string }>> = [
+  { title: "Composer crashes on paste", meta: "Started by AJ · 4 replies", status: "To do", age: "2m ago" },
+  { title: "Plan the launch week", meta: "Started by Sara · 2 replies", status: "In progress", age: "14m ago" },
+  { title: "Review the logo", meta: "Started by Alex · 7 replies", status: "Triage", age: "1h ago" },
+  { title: "Ship the release", meta: "Started by Oliver · 3 replies", status: "To do", age: "3h ago" },
+  { title: "Fix the sidebar count", meta: "Started by Yumi · 1 reply", status: "In progress", age: "Yesterday" },
+  { title: "Write the changelog", meta: "Started by Graeme · 5 replies", status: "To do", age: "Sep 20" }
+]
+
+const taskRows = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [h.AriaLabel("Tasks")],
+    taskSamples.map(({ title, meta, status, age }) =>
+      h.keyed("li")(
+        title,
+        [],
+        [
+          row(h, {
+            mark: { text: title.slice(0, 1) },
+            markSize: "sm",
+            title,
+            meta,
+            cells: [badge(h, { label: status }), h.span([], [age])],
+            cellsText: `${status} · ${age}`,
+            action: "Open →",
+            onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
+
+/**
+ * A list's pane with its toolbar: the search and the status filter at the start, the sort and the action that adds at
+ * the end, then the line that says what the list holds and the labels of its columns, all of which stay while the rows
+ * scroll under them.
+ */
+const taskListPane = (h: ApplicationViewBuilder, model: Model): Html =>
+  pane(h, {
+    variant: "main",
+    label: "Tasks",
+    header: { title: "Tasks", icon: "mark-tasks", subtitle: "Every open task you can see." },
+    toolbar: [
+      paneToolbar(h, {
+        start: [
+          searchField(h, {
+            id: "workshop-task-search",
+            label: "Search tasks",
+            placeholder: "Search tasks…",
+            value: model.taskQuery,
+            onInput: (value) => Message.TypedTaskQuery({ value })
+          }),
+          taskFilterMenu(h, model, "pane")
+        ],
+        end: [taskSortMenu(h, model, "pane"), button(h, "New task", Message.ClickedButton(), { icon: "mark-new" })]
+      }),
+      summary(h, { copy: "Open tasks across your groups.", count: `${taskSamples.length} tasks` }),
+      columns(h, { label: "Task", cells: ["Status", "Activity"] })
+    ],
+    body: [paneColumn(h, [taskRows(h)], { isWide: true })]
+  })
+
+/**
+ * The `frame` that the workshop is opened with to show the pane's toolbar alone, since it wraps by the width of the
+ * window, not of what holds it, so the wrapped toolbar is shown in a frame that is a window of its own, 360px wide.
+ */
+export const paneToolbarFrame = "pane-toolbar"
+
+const paneToolbarGroup = (h: ApplicationViewBuilder, model: Model): Html =>
+  group(h, "Pane toolbar", [
+    sample(
+      h,
+      "Over a list that scrolls: the search and the filter at the start, a sort and New task at the end, and the line and the column labels flush under them",
+      [h.div([h.Class(toolbarPaneFrame)], [taskListPane(h, model)])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Wrapped below 48rem in a frame 360px wide: the search a line of its own, the filter and the actions under it",
+      [
+        h.iframe([
+          h.Class(toolbarWindowFrame),
+          h.Title("Pane toolbar in a window 360px wide"),
+          h.Src(`?frame=${paneToolbarFrame}`)
+        ])
+      ],
+      "flex flex-col"
+    )
+  ])
+
 const labelledLines = (h: ApplicationViewBuilder, lines: ReadonlyArray<readonly [string, string]>): Html =>
   h.div(
     [h.Class(lineColumn)],
@@ -2236,7 +2494,7 @@ const labelledLines = (h: ApplicationViewBuilder, lines: ReadonlyArray<readonly 
     )
   )
 
-const shellRail = (h: ApplicationViewBuilder, current: Destination): Html => {
+const shellRail = (h: ApplicationViewBuilder, current: Destination, model?: Model): Html => {
   const toItem = (item: Readonly<{ destination: Destination; icon: IconName; label: string }>) => ({
     icon: item.icon,
     label: item.label,
@@ -2249,7 +2507,19 @@ const shellRail = (h: ApplicationViewBuilder, current: Destination): Html => {
     items: railDestinations.map(toItem),
     search: { label: "Search", onClick: Message.ClickedButton() },
     footer: [toItem(railSettings)],
-    account: { letter: "JM", label: "Account", onClick: Message.ClickedButton() }
+    account: railAccount(h, {
+      name: "Jamie Morgan",
+      initials: "JM",
+      header: { title: "Jamie Morgan", detail: "jamie@mercier.example" },
+      groups: accountGroups(model?.appearance ?? "system"),
+      embed:
+        model === undefined
+          ? closedMenuButton(h)
+          : (viewInputs) =>
+              h.block(
+                RailAccountBinding.embedView({ slotId: "rail-account", model: model.railAccountMenu, viewInputs })
+              )
+    })
   })
 }
 
@@ -2367,7 +2637,7 @@ const settingsSidebar = (h: ApplicationViewBuilder): Html => {
   ])
 }
 
-const membersPane = (h: ApplicationViewBuilder): Html => {
+const membersPane = (h: ApplicationViewBuilder, model: Model): Html => {
   const press = Message.ClickedButton()
 
   return pane(h, {
@@ -2379,41 +2649,26 @@ const membersPane = (h: ApplicationViewBuilder): Html => {
       phoneContext: "Mercier & Co",
       actions: [button(h, "Invite people", press)]
     },
+    toolbar: [
+      paneToolbar(h, {
+        start: [
+          searchField(h, {
+            id: "member-search",
+            label: "Search members",
+            placeholder: "Search members…",
+            value: "",
+            onInput: () => press
+          })
+        ],
+        end: [memberFilterMenu(h, model, "pane")]
+      }),
+      memberColumns(h)
+    ],
     body: [
       paneColumn(
         h,
         [
-          fieldGrid(h, [
-            field(
-              h,
-              {
-                id: "member-search",
-                label: "Search members",
-                type: "search",
-                value: "",
-                placeholder: "Search members…",
-                isAutofocus: false,
-                isLabelHidden: true,
-                onInput: () => press
-              },
-              Option.none()
-            ),
-            choiceSelect(
-              h,
-              {
-                id: "member-filter",
-                label: "Show members",
-                choices: [
-                  ["active", "Active members"],
-                  ["removed", "Removed members"]
-                ],
-                value: "active",
-                onChange: () => press
-              },
-              { isLabelHidden: true }
-            )
-          ]),
-          ...memberTable(h),
+          memberList(h),
           section(h, {
             label: "Pending invitations",
             count: pendingInvitations.length,
@@ -2551,31 +2806,21 @@ const agentsPane = (h: ApplicationViewBuilder, query: string): Html =>
         ]
       })
     },
-    body: [
-      paneColumn(
-        h,
-        [
-          column(h, [
-            field(
-              h,
-              {
-                id: "workshop-agents-search",
-                label: "Search agents",
-                type: "search",
-                value: query,
-                onInput: (value) => Message.TypedAgentQuery({ value }),
-                placeholder: "Search agents…",
-                isAutofocus: false,
-                isLabelHidden: true
-              },
-              Option.none()
-            ),
-            ...agentTable(h)
-          ])
-        ],
-        { isWide: true }
-      )
-    ]
+    toolbar: [
+      paneToolbar(h, {
+        start: [
+          searchField(h, {
+            id: "workshop-agents-search",
+            label: "Search agents",
+            placeholder: "Search agents…",
+            value: query,
+            onInput: (value) => Message.TypedAgentQuery({ value })
+          })
+        ]
+      }),
+      agentColumns(h)
+    ],
+    body: [paneColumn(h, [agentList(h)], { isWide: true })]
   })
 
 const groupThreads = (h: ApplicationViewBuilder): Html => {
@@ -3244,7 +3489,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           [
             shell(h, {
               viewport: "Split",
-              rail: shellRail(h, model.destination),
+              rail: shellRail(h, model.destination, model),
               sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
               aside: { label: "Thread", view: threadPane(h, model.reply), isOpen: false, dialog: () => h.empty }
@@ -3320,7 +3565,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               viewport: "Split",
               rail: shellRail(h, "settings"),
               sidebar: settingsSidebar(h),
-              main: membersPane(h),
+              main: membersPane(h, model),
               aside: { label: "Member details", view: memberPane(h), isOpen: false, dialog: () => h.empty }
             })
           ]
@@ -3366,6 +3611,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           fieldGroup(h, model),
           toggleGroup(h, model.isNotificationsOn, model.isDigestOn),
           selectGroup(h, model.plan),
+          menuGroup(h, model),
           noticeGroup(h),
           toastGroup(h),
           modalGroup(h, model),
@@ -3386,10 +3632,20 @@ export const view = ApplicationComposition.makeView((model, h) => ({
       ),
       h.div(
         [h.Class(wideColumn)],
-        [directoryTableGroup(h), paneColumnGroup(h, model.workspaceName), shellGroup(h, model)]
+        [
+          directoryTableGroup(h),
+          paneToolbarGroup(h, model),
+          paneColumnGroup(h, model.workspaceName),
+          shellGroup(h, model)
+        ]
       )
     ]
   )
+}))
+
+export const paneToolbarView = ApplicationComposition.makeView((model, h) => ({
+  title: "amends design workshop: pane toolbar",
+  body: h.div([h.Class("flex h-dvh flex-col")], [taskListPane(h, model)])
 }))
 
 export const directoryTableView = ApplicationComposition.makeView((_model, h) => ({
