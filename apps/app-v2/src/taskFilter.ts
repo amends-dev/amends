@@ -17,7 +17,9 @@ import { memberMark, memberName, statusLabel } from "./seen.ts"
 export const TaskStatusFilter = Schema.Literals(["All", ...Task.Status.literals])
 export type TaskStatusFilter = typeof TaskStatusFilter.Type
 
-/** Which tasks a list keeps by who they are assigned to: any, those assigned to no one, or those assigned to one member. */
+/**
+ * Which tasks a list keeps by who they are assigned to: any, those assigned to no one, or those assigned to one member.
+ */
 export const AssigneeFilter = defineTaggedUnion({
   Anyone: {},
   Unassigned: {},

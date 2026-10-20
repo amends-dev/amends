@@ -21,7 +21,10 @@ import { Message, Open, openThreadTitle } from "./definition.ts"
 /** The time now, which the inbox, the tasks, and the group open are given. */
 export type ViewInputs = Readonly<{ now: DateTime.Utc }>
 
-/** The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the time now. */
+/**
+ * The main pane: what the person opened, the inbox at first. The inbox, the tasks, and the open group are given the
+ * time now.
+ */
 export const view = HomeComposition.makeView.withInputs<ViewInputs>((model, { now }, h) =>
   Open.match(model.open, {
     Inbox: () => h.block(InboxBinding.embedView({ slotId: "inbox", model: model.inbox, viewInputs: { now } })),

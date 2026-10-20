@@ -1043,8 +1043,7 @@ browser's storage. Each Block's tests sit beside it. The commands that call the 
 what a test names, which can be that its call dies, and the message they end in is given to the form's update, to show
 it leaves its sending state with the general failure. `appearance.test.ts` runs the script of `index.html` against the
 key `keepAppearance` keeps, to show the two agree. `crash.test.ts` renders the crash view: the heading and its words, the
-state art, the brand alone in the header, and Reload as a link to the page's own address. `entry.test.ts` imports the
-entry with the runtime stubbed, so that nothing boots, and shows that it assembles the application with that view:
+state art, the brand alone in the header, and Reload as a link to the page's own address:
 
 - Story tests drive a Block's update: the thread read through its latest activity, once, its title
   and messages changed from what was seen, following and unfollowing, typing said once while a reply

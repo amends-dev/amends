@@ -1,12 +1,11 @@
 /**
- * What the person sees of the workspace's records: what a member and a group are called, what letters
- * mark them, and where a group is as a line says it, who wrote a message and what it says, with a
- * mention in it as its member's current name, when a time was, by its time of day, its day, either as a
- * message shows it, and how long ago it was, the date something was made, which day each of a list's items falls on, how a thread is
- * titled, where it is, and how many replies it has, whether anyone may join a group, how two texts are
- * compared when the person searches and whether a thread's title or opening has what they search for,
- * how a task's status and priority and a turn's status read, which statuses leave a task open, and when an
- * invitation closes.
+ * What the person sees of the workspace's records: what a member and a group are called, what letters mark them, and
+ * where a group is as a line says it, who wrote a message and what it says, with a mention in it as its member's
+ * current name, when a time was, by its time of day, its day, either as a message shows it, and how long ago it was,
+ * the date something was made, which day each of a list's items falls on, how a thread is titled, where it is, and how
+ * many replies it has, whether anyone may join a group, how two texts are compared when the person searches and whether
+ * a thread's title or opening has what they search for, how a task's status and priority and a turn's status read,
+ * which statuses leave a task open, and when an invitation closes.
  */
 
 import type { Contact } from "@amends-dev/core/channel"
