@@ -21,7 +21,11 @@ import { threadView as groupThreadView } from "../../feature/group/view.ts"
 import { browseView, dialogView } from "../../feature/groups/view.ts"
 import { waitingCount } from "../../feature/inbox/definition.ts"
 import { threadView as inboxThreadView } from "../../feature/inbox/view.ts"
-import { memberView as settingsMemberView, membersView as settingsMembersView } from "../../feature/settings/view.ts"
+import {
+  dialogView as settingsDialogView,
+  memberView as settingsMemberView,
+  membersView as settingsMembersView
+} from "../../feature/settings/view.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { tasksView, triageView } from "../../feature/tasks/view.ts"
 import {
@@ -273,7 +277,12 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       page === "Workspace"
         ? h.block(SettingsBinding.embedView({ slotId: "settings-workspace", model: model.settings }))
         : h.block(
-            SettingsBinding.embedView({ slotId: "settings-members", model: model.settings, view: settingsMembersView })
+            SettingsBinding.embedView({
+              slotId: "settings-members",
+              model: model.settings,
+              view: settingsMembersView,
+              viewInputs: { now, viewport: model.viewport }
+            })
           ),
     Channels: () => h.block(ChannelsBinding.embedView({ slotId: "channels", model: model.channels })),
     Group: ({ groupId, model: open }) =>
@@ -342,7 +351,8 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
  * and the notices, laid out for the window's width, with the dialogs of the navigation drawer and of the side
  * pane lent to the shell, and the dialogs of the groups, for starting a team or a conversation, of the connections,
  * for adding one, replacing its key, or confirming its removal, of the agents, for
- * adding one or confirming its removal, and of the search, which the shell keeps in the frame whether or not the
+ * adding one or confirming its removal, of the settings, for inviting someone, reading the invitations, revoking one,
+ * handing the workspace over, or removing a member, and of the search, which the shell keeps in the frame whether or not the
  * sidebar or the page that opens them is on the page.
  */
 export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model, inputs, h) => {
@@ -399,6 +409,14 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
           model: model.agents,
           view: agentsDialogView,
           viewInputs: { workspaceName: nameOf(model) }
+        })
+      ),
+      h.block(
+        SettingsBinding.embedView({
+          slotId: "settings-dialog",
+          model: model.settings,
+          view: settingsDialogView,
+          viewInputs: { now }
         })
       ),
       h.block(SearchBinding.embedView({ slotId: "search", model: model.search }))

@@ -1,12 +1,19 @@
 /**
- * What the settings say, in the words of `@amends-dev/ui`: who a member is called, what the roster and a member's
- * access say of each, and what went wrong with an action for the place it was made.
+ * What the settings say, in the words of `@amends-dev/ui`: who a member is called, what the roster, the invitations,
+ * and a member's access say of each, what went wrong with an action for the place it was made, and what confirms an
+ * action that was kept.
  */
 
 import { Assignment, Scope } from "@amends-dev/core/authorization"
 import type { Member, MemberId } from "@amends-dev/core/workspace"
+import type { BadgeTone } from "@amends-dev/design/details"
+import type * as DateTime from "effect/DateTime"
+import { dayLabel, dayOf, expiryLabel } from "../../seen.ts"
 import {
   type Failure,
+  type InvitationItem,
+  type InvitationStatus,
+  invitationStatus,
   type MembersFilter,
   type Model,
   type Reason,
@@ -38,6 +45,39 @@ export const emptyRoster = (filter: MembersFilter): string => {
   return filter.status === "removed" ? "Nobody has been removed from this workspace." : "No members yet."
 }
 
+/** How an invitation's standing reads in the history. */
+export const invitationStatusLabels: Readonly<Record<InvitationStatus, string>> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  expired: "Expired",
+  revoked: "Revoked"
+}
+
+/** How an invitation's standing shows as a badge in the history. */
+export const invitationStatusTones: Readonly<Record<InvitationStatus, BadgeTone>> = {
+  pending: "neutral",
+  accepted: "success",
+  expired: "caution",
+  revoked: "neutral"
+}
+
+/** "Member · Expires in 5 days", "Member · Expired Tuesday", or, for one that was accepted or revoked, when it was created. */
+export const invitationDetail = (item: InvitationItem, model: Pick<Model, "roles">, now: DateTime.Utc): string => {
+  const { details } = item.invitation
+  const role = roleName(model, details.roleId)
+  const status = invitationStatus(item, now)
+
+  if (status === "pending") {
+    return `${role} · ${expiryLabel(details.expiresAt, now)}`
+  }
+
+  if (status === "expired") {
+    return `${role} · Expired ${dayLabel(dayOf(details.expiresAt), now)}`
+  }
+
+  return `${role} · Created ${dayLabel(dayOf(details.issuedAt), now)}`
+}
+
 /** What one of a member's assignments is of: the role's name, or the permission a direct grant gives. */
 export const accessName = (model: Pick<Model, "roles">, assignment: Assignment.Assignment): string =>
   Assignment.Source.match(assignment.source, {
@@ -58,35 +98,45 @@ export const accessDetail = (assignment: Assignment.Assignment): string => {
 const invalidMessages: Readonly<Record<Exclude<SettingsAction, "Read">, string>> = {
   Rename: "Use 1 to 80 characters, with no invisible ones.",
   RenameSelf: "Use 1 to 80 characters, with no invisible ones.",
-  ChangeRole: "Choose a role."
+  Transfer: "Choose a new owner.",
+  ChangeRole: "Choose a role.",
+  Remove: "That change isn't possible.",
+  Invite: "Enter the email they sign in with.",
+  Revoke: "That change isn't possible."
 }
 
 const failedMessages: Readonly<Record<Exclude<SettingsAction, "Read">, string>> = {
   Rename: "The name could not be saved. Try again when the host is available.",
   RenameSelf: "Your name could not be saved. Try again when the host is available.",
-  ChangeRole: "The role could not be saved. Try again when the host is available."
+  Transfer: "Ownership could not be transferred. Try again when the host is available.",
+  ChangeRole: "The role could not be saved. Try again when the host is available.",
+  Remove: "The member could not be removed. Try again when the host is available.",
+  Invite: "The invitation could not be created. Try again when the host is available; it won't be created twice.",
+  Revoke: "The invitation could not be revoked. Try again when the host is available."
 }
 
 const goneMessages: Readonly<Record<Exclude<SettingsAction, "Read">, string>> = {
   Rename: "This workspace is no longer available to you.",
   RenameSelf: "This workspace is no longer available to you.",
-  ChangeRole: "This member is no longer in the workspace. Refresh to see the latest."
+  Transfer: "That member can no longer become the owner. Refresh to choose again.",
+  ChangeRole: "This member is no longer in the workspace. Refresh to see the latest.",
+  Remove: "This member is no longer in the workspace. Refresh to see the latest.",
+  Invite: "This workspace is no longer available to you.",
+  Revoke: "This invitation is no longer available. Refresh to see where it stands."
 }
 
-const deniedMessage = "You no longer have permission to do this. Refresh to review your access."
-
-const unreadableMessage = "The latest settings could not be loaded. Refresh to try again."
+const unreadable = "The latest settings could not be loaded. Refresh to try again."
 
 /** What went wrong, for the place the action was made. */
 export const settingsMessage = ({ action, reason }: Failure): string => {
   if (action === "Read" || reason === "Outdated") {
-    return unreadableMessage
+    return unreadable
   }
 
   const messageOfReason: Readonly<Record<Exclude<Reason, "Outdated">, string>> = {
     Invalid: invalidMessages[action],
     Failed: failedMessages[action],
-    Denied: deniedMessage,
+    Denied: "You no longer have permission to do this. Refresh to review your access.",
     Gone: goneMessages[action]
   }
 
@@ -96,3 +146,14 @@ export const settingsMessage = ({ action, reason }: Failure): string => {
 /** Whether the person must refresh before changing anything more: what they see is out of date. */
 export const needsRefresh = (reason: Reason): boolean =>
   reason === "Denied" || reason === "Gone" || reason === "Outdated"
+
+/** What confirms an action that was kept, for a toast: `ownerChanged`, `roleSaved`, and `memberRemoved` say whom by name. */
+export const settingsToast = {
+  workspaceRenamed: "Workspace renamed",
+  ownNameSaved: "Name saved",
+  ownerChanged: (name: string) => `${name} is now the owner`,
+  roleSaved: (name: string) => `Role saved for ${name}`,
+  memberRemoved: (name: string) => `${name} was removed`,
+  invitationCreated: "Invitation created",
+  invitationRevoked: "Invitation revoked"
+}

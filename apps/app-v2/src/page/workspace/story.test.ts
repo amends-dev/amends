@@ -16,6 +16,7 @@ import {
   design,
   general,
   grantsOf,
+  invitation,
   keylessConnection,
   membership,
   notificationOf,
@@ -60,6 +61,7 @@ import { waitingCount } from "../../feature/inbox/definition.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { Result } from "../../feature/search/definition.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { Written as SettingsWritten } from "../../feature/settings/definition.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { triageCount } from "../../feature/tasks/definition.ts"
 import { ThreadsBlock } from "../../feature/threads/block.ts"
@@ -1186,6 +1188,84 @@ describe("a workspace", () => {
         expect(model.aside.isOpen).toBe(false)
         expect(openMemberId(model)).toEqual(Option.some(bob.id))
       })
+    )
+  })
+
+  it("confirms to the person in a toast what they did in the settings, by name, and stays where they are", () => {
+    story(
+      update,
+      given(settingsRead),
+      message(Message.ClickedMembers()),
+      message(fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.Rename() }))),
+      Command.expectExact(ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Workspace renamed" }])
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 })),
+      message(fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.RenameSelf() }))),
+      Command.expectExact(ExpireConfirmation({ id: 2 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 2, text: "Name saved" }])
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 2 })),
+      message(
+        fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.ChangeRole({ memberId: bob.id }) }))
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 3 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 3, text: "Role saved for Bob" }])
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 3 })),
+      message(
+        fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.Transfer({ memberId: bob.id }) }))
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 4 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 4, text: "Bob is now the owner" }])
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 4 })),
+      message(fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.Invite() }))),
+      Command.expectExact(ExpireConfirmation({ id: 5 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 5, text: "Invitation created" }])
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 5 })),
+      message(
+        fromSettings(
+          SettingsBlock.Message.WroteAction({
+            written: SettingsWritten.Revoke({ invitationId: invitation.details.id })
+          })
+        )
+      ),
+      Command.expectExact(ExpireConfirmation({ id: 6 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 6, text: "Invitation revoked" }])
+        expect(Open.matchOrElse(model.open, { Settings: ({ page }) => page }, () => undefined)).toBe("Members")
+      }),
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 6 }))
+    )
+  })
+
+  it("confirms a member removed in a toast, and closes the member and the dialog it was in", () => {
+    story(
+      update,
+      given(modifyFields(settingsRead, { viewport: () => "Desktop" })),
+      message(Message.ClickedMembers()),
+      message(fromSettings(SettingsBlock.Message.ClickedMember({ memberId: bob.id }))),
+      dialogShown,
+      message(
+        fromSettings(SettingsBlock.Message.WroteAction({ written: SettingsWritten.Remove({ memberId: bob.id }) }))
+      ),
+      Command.expectHas(Dialog.test.CloseDialog, ExpireConfirmation({ id: 1 })),
+      model((model) => {
+        expect(model.actions.confirmations).toEqual([{ id: 1, text: "Bob was removed" }])
+        expect(openMemberId(model)).toEqual(Option.none())
+        expect(model.aside.isOpen).toBe(false)
+        expect(Open.isAnyOf(["Settings"])(model.open)).toBe(true)
+      }),
+      dialogClosed,
+      Command.resolve(ExpireConfirmation, ActionsBlock.Message.ExpiredConfirmation({ id: 1 }))
     )
   })
 

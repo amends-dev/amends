@@ -1,23 +1,56 @@
 import { type Assignment, BuiltinRoles } from "@amends-dev/core/authorization"
-import type { MemberId } from "@amends-dev/core/workspace"
+import { Invitation, type MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
+import { Dialog, DialogBlock } from "@foldkit/ui"
 import { Option } from "effect"
 import { Command, expectNoOutMessage, expectOutMessage, given, message, model, story } from "foldkit/story"
-import { aliceOwns, bob, bobIsMember, grantsOf, membership, roleOf, roles, scout } from "../../../test/fixtures.ts"
-import { ChangeRole, CopyWorkspaceId, ExpireCopied, RenameSelf, RenameWorkspace } from "./command.ts"
 import {
+  aliceOwns,
+  bob,
+  bobIsMember,
+  grantsOf,
+  invitation,
+  membership,
+  now,
+  roleOf,
+  roles,
+  scout
+} from "../../../test/fixtures.ts"
+import {
+  ChangeRole,
+  CopyWorkspaceId,
+  ExpireCopied,
+  Invite,
+  RemoveMember,
+  RenameSelf,
+  RenameWorkspace,
+  RevokeInvitation,
+  TransferOwnership
+} from "./command.ts"
+import { DialogBinding } from "./composition.ts"
+import {
+  Entering,
   givableRoles,
+  invitationHistory,
+  invitationStatus,
+  isDialogBusy,
   mayChangeRole,
+  mayInvite,
   mayReadAccess,
+  mayRemove,
   mayRename,
+  mayTransferOwnership,
+  mayTransferTo,
   Message,
   OutMessage,
+  pendingInvitations,
   shownMembers,
+  transferCandidates,
   Written
 } from "./definition.ts"
 import { init } from "./init.ts"
 import { update } from "./update.ts"
-import { emptyRoster, settingsMessage } from "./wording.ts"
+import { emptyRoster, invitationDetail, settingsMessage, settingsToast } from "./wording.ts"
 
 const { workspace, member: alice } = membership
 const asMember = { workspaceId: workspace.id, memberId: alice.id }
@@ -37,6 +70,7 @@ const settingsOf = (
   members: [alice, bob, scout].map((member) => ({ member, pending: false })),
   roles,
   assignments: assignments.map((assignment) => ({ assignment, pending: false })),
+  invitations: [{ invitation, pending: false }],
   grants: grantsOf(assignments.filter((assignment) => assignment.memberId === memberId))
 })
 
@@ -464,5 +498,588 @@ describe("what the settings say of a failure", () => {
     expect(settingsMessage({ action: "Read", reason: "Outdated" })).toBe(
       "The latest settings could not be loaded. Refresh to try again."
     )
+  })
+})
+
+/** What the dialog reports, as the settings receive it. */
+const fromDialog = (message: typeof DialogBlock.Message.Type) =>
+  DialogBinding.embedView({
+    slotId: "dialog",
+    model: opened.dialog,
+    viewInputs: { toView: () => null }
+  }).toParentMessage(message)
+
+const dialogShown = Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog())
+const dialogClosed = Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog())
+
+/** An invitation of the workspace to `email` that is in `state`, made a day before the one carol has. */
+const invitationTo = (id: string, email: string, state: Invitation.Invitation["state"]): Invitation.Invitation => ({
+  details: {
+    ...invitation.details,
+    id: Invitation.InvitationId.make(id),
+    recipientEmail: email,
+    issuedAt: invitation.details.issuedAt
+  },
+  state
+})
+
+/** Alice's invitation to dana, which dana accepted. */
+const accepted = invitationTo(
+  "invitation-2",
+  "dana@example.com",
+  Invitation.State.cases.Accepted.make({ memberId: bob.id, acceptedAt: invitation.details.issuedAt })
+)
+
+/** Alice's invitation to erin, which alice revoked. */
+const revoked = invitationTo(
+  "invitation-3",
+  "erin@example.com",
+  Invitation.State.cases.Revoked.make({ revokedBy: alice.id, revokedAt: invitation.details.issuedAt })
+)
+
+describe("inviting from the settings", () => {
+  it("drafts an invitation in the dialog and sends it with the role chosen, and tells the page when it is made", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedInvite()),
+      dialogShown,
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(model.entering).toEqual(
+          Option.some(
+            Entering.Inviting({ email: "", roleId: BuiltinRoles.MemberId, isSending: false, failure: Option.none() })
+          )
+        )
+      }),
+      // Nothing to send until the address names someone.
+      message(Message.SubmittedInvite()),
+      Command.expectNone(),
+      message(Message.TypedInviteEmail({ email: "  " })),
+      message(Message.SubmittedInvite()),
+      Command.expectNone(),
+      message(Message.TypedInviteEmail({ email: " dana@example.com " })),
+      message(Message.ChoseInviteRole({ roleId: BuiltinRoles.AdministratorId })),
+      message(Message.SubmittedInvite()),
+      Command.expectExact(Invite({ ...asMember, email: "dana@example.com", roleId: BuiltinRoles.AdministratorId })),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(Invite, Message.WroteAction({ written: Written.Invite() })),
+      expectOutMessage(OutMessage.InvitedMember()),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("is for those who manage invitations alone", () => {
+    story(
+      update,
+      given(opened),
+      message(received(bob.id)),
+      message(Message.ClickedInvite()),
+      message(Message.ClickedViewHistory()),
+      message(Message.ClickedRevoke({ invitationId: invitation.details.id })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+  })
+
+  it("says why the invitation could not be made, keeps the draft, and clears the failure as the person types", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedInvite()),
+      dialogShown,
+      message(Message.TypedInviteEmail({ email: "dana" })),
+      message(Message.SubmittedInvite()),
+      Command.resolve(Invite, Message.FailedWriteAction({ written: Written.Invite(), reason: "Invalid" })),
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(
+            Entering.Inviting({
+              email: "dana",
+              roleId: BuiltinRoles.MemberId,
+              isSending: false,
+              failure: Option.some({ action: "Invite", reason: "Invalid" })
+            })
+          )
+        )
+      }),
+      message(Message.TypedInviteEmail({ email: "dana@example.com" })),
+      model((model) => {
+        expect(Option.exists(model.entering, Entering.isAnyOf(["Inviting"]))).toBe(true)
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Inviting"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.none())
+      }),
+      message(Message.SubmittedInvite()),
+      Command.resolve(Invite, Message.FailedWriteAction({ written: Written.Invite(), reason: "Failed" })),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(false)
+        expect(model.dialog.isOpen).toBe(true)
+      })
+    )
+  })
+
+  it("refuses to send an invitation the person may no longer make", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedInvite()),
+      dialogShown,
+      message(Message.TypedInviteEmail({ email: "dana@example.com" })),
+      message(received(bob.id)),
+      message(Message.SubmittedInvite()),
+      Command.expectNone(),
+      model((model) => {
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Inviting"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Invite", reason: "Denied" }))
+      })
+    )
+  })
+
+  it("lists every invitation in the dialog, and lets the person make another from it", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedViewHistory()),
+      dialogShown,
+      model((model) => {
+        expect(model.entering).toEqual(Option.some(Entering.ViewingHistory()))
+        expect(isDialogBusy(model)).toBe(false)
+      }),
+      message(Message.ClickedInvite()),
+      model((model) => {
+        expect(Option.exists(model.entering, Entering.isAnyOf(["Inviting"]))).toBe(true)
+      })
+    )
+  })
+})
+
+describe("revoking an invitation from the settings", () => {
+  it("asks first, names the address, and tells the page when it is revoked", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedRevoke({ invitationId: invitation.details.id })),
+      dialogShown,
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(
+            Entering.Revoking({
+              invitationId: invitation.details.id,
+              recipient: "carol@example.com",
+              isSending: false,
+              failure: Option.none()
+            })
+          )
+        )
+      }),
+      message(Message.ConfirmedRevocation()),
+      Command.expectExact(RevokeInvitation({ ...asMember, invitationId: invitation.details.id })),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(
+        RevokeInvitation,
+        Message.WroteAction({ written: Written.Revoke({ invitationId: invitation.details.id }) })
+      ),
+      expectOutMessage(OutMessage.RevokedInvitation()),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("asks to revoke only an invitation that is waiting and not itself on its way", () => {
+    story(
+      update,
+      given(opened),
+      message(
+        Message.ReceivedSettings({
+          ...settingsOf(alice.id),
+          invitations: [
+            { invitation: accepted, pending: false },
+            { invitation: revoked, pending: false },
+            { invitation, pending: true }
+          ]
+        })
+      ),
+      message(Message.ClickedRevoke({ invitationId: accepted.details.id })),
+      message(Message.ClickedRevoke({ invitationId: revoked.details.id })),
+      message(Message.ClickedRevoke({ invitationId: invitation.details.id })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("says the invitation is gone when the replica no longer lists it as waiting, and why a revoke was not kept", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedRevoke({ invitationId: invitation.details.id })),
+      dialogShown,
+      message(
+        Message.ReceivedSettings({
+          ...settingsOf(alice.id),
+          invitations: [{ invitation: accepted, pending: false }]
+        })
+      ),
+      message(Message.ConfirmedRevocation()),
+      Command.expectNone(),
+      model((model) => {
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Revoking"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Revoke", reason: "Gone" }))
+      })
+    )
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedRevoke({ invitationId: invitation.details.id })),
+      dialogShown,
+      message(Message.ConfirmedRevocation()),
+      Command.resolve(
+        RevokeInvitation,
+        Message.FailedWriteAction({
+          written: Written.Revoke({ invitationId: invitation.details.id }),
+          reason: "Failed"
+        })
+      ),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(false)
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Revoking"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Revoke", reason: "Failed" }))
+      })
+    )
+  })
+
+  it("tells where each invitation stands by its state and the clock", () => {
+    const items = [accepted, revoked, invitation].map((value) => ({ invitation: value, pending: false }))
+    const later = invitation.details.expiresAt
+    const read = { ...readAs(alice.id), invitations: items }
+
+    expect(items.map((item) => invitationStatus(item, now))).toEqual(["accepted", "revoked", "pending"])
+    expect(invitationStatus({ invitation, pending: false }, later)).toBe("expired")
+    expect(pendingInvitations(read, now).map(({ invitation: waiting }) => waiting.details.id)).toEqual([
+      invitation.details.id
+    ])
+    expect(pendingInvitations(read, later)).toEqual([])
+    expect(invitationHistory(read)).toHaveLength(3)
+    expect(invitationDetail({ invitation, pending: false }, read, now)).toBe("Member · Expires in 6 days")
+  })
+})
+
+describe("handing the workspace over from the settings", () => {
+  it("chooses the new owner among the people who can become it, and sends it from the owner's assignment seen", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedTransferOwnership()),
+      dialogShown,
+      // Nothing to send until someone is chosen.
+      message(Message.ConfirmedTransfer()),
+      Command.expectNone(),
+      message(Message.ChoseNewOwner({ memberId: Option.some(bob.id) })),
+      message(Message.ConfirmedTransfer()),
+      Command.expectExact(
+        TransferOwnership({ ...asMember, newOwnerMemberId: bob.id, expectedOwnerAssignmentId: aliceOwns.id })
+      ),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(TransferOwnership, Message.WroteAction({ written: Written.Transfer({ memberId: bob.id }) })),
+      expectOutMessage(OutMessage.TransferredOwnership({ name: "Bob" })),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("is not offered to those who do not own the workspace, or when nobody can become its owner", () => {
+    story(
+      update,
+      given(opened),
+      message(received(bob.id)),
+      message(Message.ClickedTransferOwnership()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+    story(
+      update,
+      given(opened),
+      message(Message.ReceivedSettings({ ...settingsOf(alice.id), members: [{ member: alice, pending: false }] })),
+      message(Message.ClickedTransferOwnership()),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("says the choice is gone when the member can no longer become the owner, and why a transfer was not kept", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedTransferOwnership()),
+      dialogShown,
+      message(Message.ChoseNewOwner({ memberId: Option.some(bob.id) })),
+      message(Message.ReceivedSettings({ ...settingsOf(alice.id), members: [{ member: alice, pending: false }] })),
+      message(Message.ConfirmedTransfer()),
+      Command.expectNone(),
+      model((model) => {
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Transferring"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Transfer", reason: "Gone" }))
+      }),
+      message(received(alice.id)),
+      message(Message.ChoseNewOwner({ memberId: Option.some(bob.id) })),
+      message(Message.ConfirmedTransfer()),
+      Command.resolve(
+        TransferOwnership,
+        Message.FailedWriteAction({ written: Written.Transfer({ memberId: bob.id }), reason: "Failed" })
+      ),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(false)
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Transferring"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Transfer", reason: "Failed" }))
+      })
+    )
+  })
+})
+
+describe("removing a member from the settings", () => {
+  it("asks first, names the member, and tells the page when they are removed, who is no longer open", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedMember({ memberId: bob.id })),
+      message(Message.ClickedRemoveMember({ memberId: bob.id })),
+      dialogShown,
+      model((model) => {
+        expect(model.entering).toEqual(
+          Option.some(Entering.Removing({ memberId: bob.id, name: "Bob", isSending: false, failure: Option.none() }))
+        )
+      }),
+      message(Message.ConfirmedRemoval()),
+      Command.expectExact(RemoveMember({ ...asMember, removeMemberId: bob.id })),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      Command.resolve(RemoveMember, Message.WroteAction({ written: Written.Remove({ memberId: bob.id }) })),
+      expectOutMessage(OutMessage.RemovedMember({ name: "Bob" })),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.selected).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("is not asked for the person themselves, for a member who left, or by one who may not remove them", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedRemoveMember({ memberId: alice.id })),
+      message(
+        Message.ReceivedSettings({
+          ...settingsOf(alice.id),
+          members: [alice, { ...bob, status: "removed" as const }].map((member) => ({ member, pending: false }))
+        })
+      ),
+      message(Message.ClickedRemoveMember({ memberId: bob.id })),
+      message(received(bob.id)),
+      message(Message.ClickedRemoveMember({ memberId: scout.id })),
+      Command.expectNone(),
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+  })
+
+  it("says why the removal was not kept, and that the member is gone when they have already left", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedRemoveMember({ memberId: bob.id })),
+      dialogShown,
+      message(Message.ConfirmedRemoval()),
+      Command.resolve(
+        RemoveMember,
+        Message.FailedWriteAction({ written: Written.Remove({ memberId: bob.id }), reason: "Failed" })
+      ),
+      model((model) => {
+        expect(isDialogBusy(model)).toBe(false)
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Removing"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Remove", reason: "Failed" }))
+      }),
+      message(
+        Message.ReceivedSettings({
+          ...settingsOf(alice.id),
+          members: [alice, { ...bob, status: "removed" as const }].map((member) => ({ member, pending: false }))
+        })
+      ),
+      message(Message.ConfirmedRemoval()),
+      Command.expectNone(),
+      model((model) => {
+        expect(
+          Option.flatMap(model.entering, (entering) =>
+            Entering.isAnyOf(["Removing"])(entering) ? entering.failure : Option.none()
+          )
+        ).toEqual(Option.some({ action: "Remove", reason: "Gone" }))
+      })
+    )
+  })
+})
+
+describe("what the settings tell the page the person did", () => {
+  it("is each rename and role change that the store kept, by name", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.TypedWorkspaceName({ name: "Atelier" })),
+      message(Message.SubmittedWorkspaceName()),
+      Command.resolve(RenameWorkspace, Message.WroteAction({ written: Written.Rename() })),
+      expectOutMessage(OutMessage.RenamedWorkspace()),
+      message(Message.TypedOwnName({ name: "Alice M." })),
+      message(Message.SubmittedOwnName()),
+      Command.resolve(RenameSelf, Message.WroteAction({ written: Written.RenameSelf() })),
+      expectOutMessage(OutMessage.RenamedSelf()),
+      message(Message.ClickedMember({ memberId: bob.id })),
+      message(Message.ChoseRole({ roleId: BuiltinRoles.AdministratorId })),
+      message(Message.SubmittedRole()),
+      Command.resolve(ChangeRole, Message.WroteAction({ written: Written.ChangeRole({ memberId: bob.id }) })),
+      expectOutMessage(OutMessage.ChangedRole({ name: "Bob" }))
+    )
+  })
+
+  it("is said in a toast in the words of apps/ui", () => {
+    expect(settingsToast.workspaceRenamed).toBe("Workspace renamed")
+    expect(settingsToast.ownNameSaved).toBe("Name saved")
+    expect(settingsToast.roleSaved("Bob")).toBe("Role saved for Bob")
+    expect(settingsToast.ownerChanged("Bob")).toBe("Bob is now the owner")
+    expect(settingsToast.memberRemoved("Bob")).toBe("Bob was removed")
+    expect(settingsToast.invitationCreated).toBe("Invitation created")
+    expect(settingsToast.invitationRevoked).toBe("Invitation revoked")
+  })
+})
+
+describe("closing the settings' dialog", () => {
+  it("ends what was being done, except while a request is on its way, when it opens again to show how it ends", () => {
+    story(
+      update,
+      given(opened),
+      message(received(alice.id)),
+      message(Message.ClickedInvite()),
+      dialogShown,
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+        expect(model.dialog.isOpen).toBe(false)
+      })
+    )
+    const sending = {
+      ...readAs(alice.id),
+      dialog: { ...opened.dialog, isOpen: true },
+      entering: Option.some(
+        Entering.Inviting({
+          email: "dana@example.com",
+          roleId: BuiltinRoles.MemberId,
+          isSending: true,
+          failure: Option.none()
+        })
+      )
+    }
+    story(
+      update,
+      given(sending),
+      message(fromDialog(DialogBlock.Message.RequestedClose())),
+      Command.expectHas(Dialog.test.CloseDialog, Dialog.test.ShowDialog),
+      model((model) => {
+        expect(model.dialog.isOpen).toBe(true)
+        expect(isDialogBusy(model)).toBe(true)
+      }),
+      dialogClosed,
+      dialogShown,
+      message(Message.WroteAction({ written: Written.Invite() })),
+      expectOutMessage(OutMessage.InvitedMember()),
+      dialogClosed,
+      model((model) => {
+        expect(model.entering).toEqual(Option.none())
+      })
+    )
+  })
+})
+
+describe("what the person may do with invitations, handing the workspace over, and removals", () => {
+  it("is everything to the owner, and the invitations alone to an administrator", () => {
+    const owner = readAs(alice.id, [aliceOwns, bobIsAdministrator, scoutIsMember])
+    expect(mayInvite(owner)).toBe(true)
+    expect(mayRemove(owner, bob.id)).toBe(true)
+    expect(mayRemove(owner, alice.id)).toBe(false)
+    expect(mayTransferOwnership(owner)).toBe(true)
+    expect(mayTransferTo(owner, bob)).toBe(true)
+    expect(mayTransferTo(owner, scout)).toBe(false)
+    expect(mayTransferTo(owner, alice)).toBe(false)
+    expect(transferCandidates(owner).map(({ id }) => id)).toEqual([bob.id])
+
+    const administrator = readAs(bob.id, [aliceOwns, bobIsAdministrator, scoutIsMember])
+    expect(mayInvite(administrator)).toBe(true)
+    expect(mayRemove(administrator, scout.id)).toBe(true)
+    expect(mayRemove(administrator, alice.id)).toBe(false)
+    expect(mayTransferOwnership(administrator)).toBe(false)
+  })
+
+  it("is nothing to a member", () => {
+    const plain = readAs(bob.id)
+    expect(mayInvite(plain)).toBe(false)
+    expect(mayRemove(plain, scout.id)).toBe(false)
+    expect(mayTransferOwnership(plain)).toBe(false)
+    expect(transferCandidates(plain)).toEqual([])
   })
 })

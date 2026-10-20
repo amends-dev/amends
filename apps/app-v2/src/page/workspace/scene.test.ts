@@ -39,6 +39,7 @@ import {
   design,
   general,
   grantsOf,
+  invitation,
   integrationGiving,
   keylessConnection,
   membership,
@@ -401,6 +402,7 @@ const withSettings = modifyFields(opened, {
       members: () => [member, bob].map((item) => ({ member: item, pending: false })),
       roles: () => roles,
       assignments: () => [aliceOwns, bobIsMember].map((assignment) => ({ assignment, pending: false })),
+      invitations: () => [{ invitation, pending: false }],
       grants: () => grantsOf([aliceOwns])
     })
 })
@@ -617,6 +619,7 @@ describe("a workspace", () => {
           members: withSettings.settings.members,
           roles: withSettings.settings.roles,
           assignments: withSettings.settings.assignments,
+          invitations: withSettings.settings.invitations,
           grants: withSettings.settings.grants
         })
       ),
@@ -1254,6 +1257,30 @@ describe("a workspace", () => {
       click(within(role("complementary", { name: "Member details" }), role("button", { name: "Close" }))),
       expect(role("complementary")).toBeAbsent(),
       expect(role("main", { name: "Members" })).toExist()
+    )
+  })
+
+  it("lists the invitations waiting on the Members page, and lends the settings' dialog to the shell to invite from", () => {
+    scene(
+      { update, view: sceneView },
+      given(withSettings),
+      click(railButton("Settings")),
+      click(sidebarButton("Members")),
+      inside(
+        role("main", { name: "Members" }),
+        expect(within(role("region", { name: "Pending invitations" }), text("carol@example.com"))).toExist(),
+        click(role("button", { name: "Invite people" }))
+      ),
+      Command.resolve(Dialog.test.ShowDialog, DialogBlock.Message.SucceededShowDialog()),
+      Mount.resolve(Dialog.test.AcquireResources, DialogBlock.Message.SucceededAcquireResources()),
+      inside(
+        role("dialog", { name: "Invite member" }),
+        expect(role("textbox", { name: "Sign-in email" })).toExist(),
+        click(role("button", { name: "Cancel" }))
+      ),
+      Command.resolve(Dialog.test.CloseDialog, DialogBlock.Message.CompletedCloseDialog()),
+      Mount.expectEnded(Dialog.test.AcquireResources),
+      expect(role("dialog", { name: "Invite member" })).toBeAbsent()
     )
   })
 

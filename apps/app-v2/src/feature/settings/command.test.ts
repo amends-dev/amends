@@ -1,11 +1,21 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import * as Clipboard from "@effect/platform-browser/Clipboard"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Fiber, Layer } from "effect"
+import { DateTime, Effect, Fiber, Layer } from "effect"
 import { TestClock } from "effect/testing"
-import { bob, bobIsMember, membership } from "../../../test/fixtures.ts"
+import { aliceOwns, bob, bobIsMember, invitation, membership } from "../../../test/fixtures.ts"
 import { recordingStores } from "../../../test/recordingStores.ts"
-import { ChangeRole, CopyWorkspaceId, ExpireCopied, RenameSelf, RenameWorkspace } from "./command.ts"
+import {
+  ChangeRole,
+  CopyWorkspaceId,
+  ExpireCopied,
+  Invite,
+  RemoveMember,
+  RenameSelf,
+  RenameWorkspace,
+  RevokeInvitation,
+  TransferOwnership
+} from "./command.ts"
 import { Message, Written } from "./definition.ts"
 
 const { workspace, member } = membership
@@ -99,6 +109,87 @@ describe("ChangeRole", () => {
         }
       ])
       expect(message).toEqual(Message.WroteAction({ written: Written.ChangeRole({ memberId: bob.id }) }))
+    })
+  )
+})
+describe("RemoveMember", () => {
+  it.effect("writes the removal, and says which member it was for", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const message = yield* RemoveMember({ ...asMember, removeMemberId: bob.id }).effect.pipe(
+        Effect.provide(Layer.provide(RemoveMember.layer, layer))
+      )
+
+      expect(written).toEqual([{ action: "MemberRemoved", payload: { memberId: bob.id } }])
+      expect(message).toEqual(Message.WroteAction({ written: Written.Remove({ memberId: bob.id }) }))
+    })
+  )
+})
+
+describe("TransferOwnership", () => {
+  it.effect("writes the handing over from the owner's assignment the person saw, and says to whom", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const message = yield* TransferOwnership({
+        ...asMember,
+        newOwnerMemberId: bob.id,
+        expectedOwnerAssignmentId: aliceOwns.id
+      }).effect.pipe(Effect.provide(Layer.provide(TransferOwnership.layer, layer)))
+
+      expect(written).toEqual([
+        { action: "OwnershipTransferred", payload: { memberId: bob.id, expectedOwnerAssignmentId: aliceOwns.id } }
+      ])
+      expect(message).toEqual(Message.WroteAction({ written: Written.Transfer({ memberId: bob.id }) }))
+    })
+  )
+})
+
+describe("Invite", () => {
+  it.effect("writes the invitation to the address, with the role, ending seven days from now", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const message = yield* Invite({
+        ...asMember,
+        email: "dana@example.com",
+        roleId: BuiltinRoles.AdministratorId
+      }).effect.pipe(Effect.provide(Layer.provide(Invite.layer, layer)))
+
+      expect(written).toHaveLength(1)
+      expect(written).toMatchObject([
+        {
+          action: "InvitationIssued",
+          payload: { email: "dana@example.com", roleId: BuiltinRoles.AdministratorId }
+        }
+      ])
+      const endings = written.map(({ payload }) => (payload as { readonly expiresAt: DateTime.Utc }).expiresAt)
+      expect(endings.map((expiresAt) => DateTime.toEpochMillis(expiresAt))).toEqual([7 * 24 * 60 * 60 * 1000])
+      expect(message).toEqual(Message.WroteAction({ written: Written.Invite() }))
+    })
+  )
+
+  it.effect("writes nothing for an address that can't be one, and says so", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const message = yield* Invite({ ...asMember, email: "dana", roleId: BuiltinRoles.MemberId }).effect.pipe(
+        Effect.provide(Layer.provide(Invite.layer, layer))
+      )
+
+      expect(written).toEqual([])
+      expect(message).toEqual(Message.FailedWriteAction({ written: Written.Invite(), reason: "Invalid" }))
+    })
+  )
+})
+
+describe("RevokeInvitation", () => {
+  it.effect("writes the revoking, and says which invitation it was for", () =>
+    Effect.gen(function* () {
+      const { written, layer } = recordingStores()
+      const message = yield* RevokeInvitation({ ...asMember, invitationId: invitation.details.id }).effect.pipe(
+        Effect.provide(Layer.provide(RevokeInvitation.layer, layer))
+      )
+
+      expect(written).toEqual([{ action: "InvitationRevoked", payload: { invitationId: invitation.details.id } }])
+      expect(message).toEqual(Message.WroteAction({ written: Written.Revoke({ invitationId: invitation.details.id }) }))
     })
   )
 })

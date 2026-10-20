@@ -18,6 +18,7 @@ import { GroupsBlock } from "../../feature/groups/block.ts"
 import { InboxBlock } from "../../feature/inbox/block.ts"
 import { SearchBlock } from "../../feature/search/block.ts"
 import { SettingsBlock } from "../../feature/settings/block.ts"
+import { settingsToast } from "../../feature/settings/wording.ts"
 import { TasksBlock } from "../../feature/tasks/block.ts"
 import { LoadIntegrations } from "./command.ts"
 import { isAsideFloating, type Model, Open, type SettingsPage, WorkspaceDefinition } from "./definition.ts"
@@ -230,11 +231,21 @@ const foldConnectionsOutMessage = ConnectionsBlock.OutMessage.match({
 
 /**
  * A member opening in the settings opens beside the page, and opens the side pane's dialog where the pane is one;
- * closing it closes both.
+ * closing it closes both. What the person did is confirmed to them in a toast: renaming the workspace or themselves,
+ * changing a member's role, handing the workspace over, inviting someone, and revoking an invitation. Removing a
+ * member confirms it too, and closes the member, who is no longer there to show.
  */
 const foldSettingsOutMessage = SettingsBlock.OutMessage.match({
   OpenedMember: ({ memberId }) => Update.combine([openMember(memberId), showAside]),
-  ClosedMember: () => Update.combine([closeMember, hideAside])
+  ClosedMember: () => Update.combine([closeMember, hideAside]),
+  RenamedWorkspace: () => ActionsBinding.confirm({ text: settingsToast.workspaceRenamed }),
+  RenamedSelf: () => ActionsBinding.confirm({ text: settingsToast.ownNameSaved }),
+  ChangedRole: ({ name }) => ActionsBinding.confirm({ text: settingsToast.roleSaved(name) }),
+  RemovedMember: ({ name }) =>
+    Update.combine([closeMember, hideAside, ActionsBinding.confirm({ text: settingsToast.memberRemoved(name) })]),
+  TransferredOwnership: ({ name }) => ActionsBinding.confirm({ text: settingsToast.ownerChanged(name) }),
+  InvitedMember: () => ActionsBinding.confirm({ text: settingsToast.invitationCreated }),
+  RevokedInvitation: () => ActionsBinding.confirm({ text: settingsToast.invitationRevoked })
 })
 
 /** The navigation drawer's dialog opening, closing, and finishing its close changes nothing else. */

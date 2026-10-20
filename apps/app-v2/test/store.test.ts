@@ -710,6 +710,7 @@ describe("Store", () => {
           members.length === 2 && roles.length === 3 && assignments.length === 2 && grants.length > 0
       )
       expect(Option.map(settings.workspace, ({ workspace }) => workspace.name)).toEqual(Option.some("Studio"))
+      expect(settings.invitations.map(({ invitation }) => invitation.state._tag)).toEqual(["Accepted"])
       expect(may(settings.grants, WorkspaceSettingsPermissions.Rename, workspaceTarget(workspace.id))).toBe(true)
     }).pipe(Effect.scoped, Effect.provide(browser))
   )
