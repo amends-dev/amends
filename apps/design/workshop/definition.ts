@@ -1,5 +1,5 @@
 /**
- * What the workshop remembers: the text of its fields, boxes, and composers, which switches are on, the plan
+ * What the workshop remembers: the text of its fields, boxes, and composers, among them the search over its agents, which switches are on, the plan
  * chosen, a task's status, priority, and assignee, which rail destination, pane tab, and thread are current,
  * the group settings typed in the modals, which section of the wide one shows, whether each modal is open,
  * and how often a button was pressed.
@@ -22,7 +22,7 @@ export type TaskPriority = typeof TaskPriority.Type
 export const TaskAssignee = Schema.Literals(["", "alex", "yumi"])
 export type TaskAssignee = typeof TaskAssignee.Type
 
-export const Destination = Schema.Literals(["home", "connections", "agents", "channels", "settings"])
+export const Destination = Schema.Literals(["home", "agents", "connections", "settings"])
 export type Destination = typeof Destination.Type
 
 export const PaneTab = Schema.Literals(["threads", "tasks"])
@@ -38,6 +38,7 @@ export const Model = Schema.Struct({
   signInEmail: Schema.String,
   code: Schema.String,
   notes: Schema.String,
+  agentQuery: Schema.String,
   composer: Schema.String,
   reply: Schema.String,
   draft: Schema.String,
@@ -69,6 +70,7 @@ export const Message = defineMessageUnion({
   TypedSignInEmail: { value: Schema.String },
   TypedCode: { value: Schema.String },
   TypedNotes: { value: Schema.String },
+  TypedAgentQuery: { value: Schema.String },
   TypedComposer: { value: Schema.String },
   TypedReply: { value: Schema.String },
   TypedDraft: { value: Schema.String },

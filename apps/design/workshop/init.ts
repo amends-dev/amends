@@ -8,6 +8,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     signInEmail: "",
     code: "",
     notes: "",
+    agentQuery: "",
     composer: "",
     reply: "",
     draft: "",

@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import type { Update } from "foldkit"
 import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, role, scene, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import type { IconName } from "./icon.ts"
 import { rail } from "./rail.ts"
@@ -14,25 +14,27 @@ type Destination = typeof Destination.Type
 const Message = defineMessageUnion({
   ChangedDestination: { destination: Destination },
   ClickedAccount: {},
-  ClickedBrand: {}
+  ClickedBrand: {},
+  ClickedSearch: {}
 })
 type Message = typeof Message.Type
 
-type Model = Readonly<{ current: Destination; accountClicks: number; brandClicks: number }>
+type Model = Readonly<{ current: Destination; accountClicks: number; brandClicks: number; searches: number }>
 
-const initial: Model = { current: "home", accountClicks: 0, brandClicks: 0 }
+const initial: Model = { current: "home", accountClicks: 0, brandClicks: 0, searches: 0 }
 
 const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     ChangedDestination: ({ destination }) => ({ model: modifyFields(model, { current: () => destination }) }),
     ClickedAccount: () => ({ model: modifyFields(model, { accountClicks: (accountClicks) => accountClicks + 1 }) }),
-    ClickedBrand: () => ({ model: modifyFields(model, { brandClicks: (brandClicks) => brandClicks + 1 }) })
+    ClickedBrand: () => ({ model: modifyFields(model, { brandClicks: (brandClicks) => brandClicks + 1 }) }),
+    ClickedSearch: () => ({ model: modifyFields(model, { searches: (searches) => searches + 1 }) })
   })
 
 const destinations: ReadonlyArray<readonly [Destination, IconName, string]> = [
   ["home", "mark-home", "Home"],
-  ["connections", "mark-connections", "Connections"],
-  ["agents", "mark-agents", "Agents"]
+  ["agents", "mark-agents", "Agents"],
+  ["connections", "mark-connections", "Connections"]
 ]
 
 const railView = (options: Readonly<{ isBrandButton: boolean }>) => (model: Model, h: HtmlBuilder<Message>) => {
@@ -47,6 +49,7 @@ const railView = (options: Readonly<{ isBrandButton: boolean }>) => (model: Mode
     [],
     [
       h.p([h.Role("status")], [`Current ${model.current}, account ${model.accountClicks}, brand ${model.brandClicks}`]),
+      h.p([h.Role("note")], [`Searches ${model.searches}`]),
       rail(h, {
         brand: {
           letter: "A",
@@ -54,6 +57,7 @@ const railView = (options: Readonly<{ isBrandButton: boolean }>) => (model: Mode
           ...(options.isBrandButton ? { onClick: Message.ClickedBrand() } : {})
         },
         items: destinations.map(toItem),
+        search: { label: "Search", onClick: Message.ClickedSearch() },
         footer: [toItem(["settings", "mark-settings", "Settings"])],
         account: { letter: "JM", label: "Account", onClick: Message.ClickedAccount() }
       })
@@ -88,6 +92,42 @@ describe("rail", () => {
       { update, view: railView({ isBrandButton: true }) },
       given(initial),
       expect(within(role("button", { name: "Connections" }), text("Connections"))).toBeAbsent()
+    )
+  })
+
+  it("lists its destinations in order, then the search, which is not a destination", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      expectAll(all.role("button")).toHaveCount(7),
+      expect(within(role("navigation", { name: "Destinations" }), role("button", { name: "Search" }))).toExist(),
+      expect(role("button", { name: "Search" })).not.toHaveAttr("aria-current"),
+      expect(within(role("button", { name: "Search" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Search" }), text("Search"))).toBeAbsent()
+    )
+  })
+
+  it("sends what the search is given, and never marks it current", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      click(role("button", { name: "Search" })),
+      click(role("button", { name: "Search" })),
+      expect(role("note")).toHaveText("Searches 2"),
+      expect(role("button", { name: "Search" })).not.toHaveAttr("aria-current"),
+      expect(role("button", { name: "Home" })).toHaveAttr("aria-current", "true")
+    )
+  })
+
+  it("takes no search, and then has none", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          rail(h, { brand: { letter: "A", label: "amends" }, items: [], footer: [] })
+      },
+      given(initial),
+      expect(role("button", { name: "Search" })).toBeAbsent()
     )
   })
 

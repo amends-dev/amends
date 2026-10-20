@@ -69,7 +69,7 @@ const workspacesSection = (
               [],
               [
                 row(h, {
-                  mark: firstLetterOf(membership.workspace.name),
+                  mark: { text: firstLetterOf(membership.workspace.name) },
                   title: membership.workspace.name,
                   meta: workspaceMeta(membership),
                   action: "Open →",

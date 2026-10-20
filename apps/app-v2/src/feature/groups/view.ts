@@ -40,7 +40,7 @@ const groupRow = (
   const name = groupName(group, model.members, model.memberId)
   const isCurrent = Option.contains(model.selected, group.id)
   return sidebarItem(h, {
-    ...(group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: name.slice(0, 1) }),
+    ...(group.kind === "Team" ? { icon: "mark-channel" as const } : { mark: { text: name.slice(0, 1) } }),
     label: name,
     isPending: pending,
     isCurrent,
@@ -228,7 +228,7 @@ const browseRow = ({ group, pending, members }: GroupItem, model: Model, h: Grou
     [],
     [
       row(h, {
-        mark: groupMark(group, name),
+        mark: { text: groupMark(group, name) },
         title: name,
         ...(pending ? { meta: "Sending…" } : {}),
         cells: [badge(h, { label: visibility }), h.span([], [memberCount])],

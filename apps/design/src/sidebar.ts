@@ -6,7 +6,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
-import { mark } from "./mark.ts"
+import { activityMark, type MarkContent, type MarkStatus, mark, statusMark } from "./mark.ts"
 
 const sidebarColumn = "flex w-66 flex-none flex-col overflow-hidden bg-panel"
 
@@ -32,16 +32,20 @@ const searchShortcut = "flex-none text-meta"
 
 const sectionColumn = "flex flex-none flex-col gap-1.5"
 
-const sectionHeading = "flex h-7 items-center gap-1 ps-2 max-desktop:h-11"
+const sectionHeading =
+  "relative flex h-7 items-center gap-1 ps-2 has-[[aria-current=page]]:bg-selected has-[[aria-current=page]]:indicator-bar max-desktop:h-11"
 
 const sectionLabel = "min-w-0 flex-1 truncate text-meta font-medium text-ink-muted uppercase"
 
-const sectionActions = "flex flex-none items-center gap-1"
+const sectionTitleButton =
+  "block w-full cursor-pointer truncate bg-transparent p-0 text-start text-meta font-medium text-ink-muted uppercase focus-ring-inset after:absolute after:inset-0 aria-[current=page]:text-ink"
+
+const sectionActions = "relative flex flex-none items-center gap-1"
 
 const itemList = "m-0 flex list-none flex-col gap-1 p-0"
 
 const itemRow =
-  "relative flex h-9.5 w-full cursor-pointer items-center gap-2.5 bg-transparent px-3 text-start text-item text-ink-secondary focus-ring-inset hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:font-medium aria-[current=page]:text-ink aria-[current=page]:indicator-bar max-desktop:h-11"
+  "relative flex h-9.5 w-full cursor-pointer items-center gap-2.5 bg-transparent px-3 text-start text-item text-ink-secondary focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)] aria-[current=page]:bg-selected aria-[current=page]:[--amends-status-knockout:var(--amends-selected)] aria-[current=page]:font-medium aria-[current=page]:text-ink aria-[current=page]:indicator-bar max-desktop:h-11"
 
 const itemIcon = "flex flex-none text-ink-secondary"
 
@@ -51,6 +55,8 @@ const itemCount =
   "inline-grid h-5 min-w-5 flex-none place-items-center bg-subtle px-1.25 text-meta font-medium text-ink-secondary tabular-nums"
 
 const itemPending = "flex-none text-meta text-ink-muted"
+
+const itemActivity = "flex flex-none text-ink-secondary"
 
 const subItemList = "m-0 mt-1 flex list-none flex-col gap-1 p-0"
 
@@ -130,13 +136,55 @@ const renderSubItem = <Message, Requirements>(
 
 const renderItemLeading = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  leading: Readonly<{ icon?: IconName; mark?: string }>
+  leading: Readonly<{ icon?: IconName; mark?: MarkContent; status?: MarkStatus | undefined }>
 ): Html => {
   if (leading.icon !== undefined) {
     return h.span([h.Class(itemIcon)], [icon(h, leading.icon, { size: "sm" })])
   }
 
-  return leading.mark === undefined ? h.empty : mark(h, { text: leading.mark, size: "xs" })
+  return leading.mark === undefined ? h.empty : mark(h, { ...leading.mark, status: leading.status })
+}
+
+type ItemEnd = Readonly<{
+  mark?: MarkContent
+  status?: MarkStatus | undefined
+  count?: number
+  activity?: string
+  isPending?: boolean
+}>
+
+/**
+ * What a row shows at its end, after its label: "Sending…" while it is pending, and otherwise the logo's mark while
+ * it is at work, the shape of its status when it has no mark of its own to carry it, and the count.
+ */
+const renderItemEnd = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: ItemEnd
+): ReadonlyArray<Html> => {
+  if (config.isPending === true) {
+    return [h.span([h.AriaHidden(true), h.Class(itemPending)], ["Sending…"])]
+  }
+
+  return [
+    config.activity === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(itemActivity)], [activityMark(h)]),
+    config.status === undefined || config.mark !== undefined ? h.empty : statusMark(h, config.status),
+    config.count === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(itemCount)], [`${config.count}`])
+  ]
+}
+
+/** What names the row besides its label: its status's word, or its activity's words while it has no status. */
+const itemName = (config: Readonly<{ label: string; status?: MarkStatus | undefined; activity?: string }>): string => {
+  const state = config.status?.label ?? config.activity
+  return state === undefined ? config.label : `${config.label}, ${state}`
+}
+
+/** What describes the row: "Sending…" while it is pending, and its count otherwise. */
+const itemDescription = (config: Readonly<{ count?: number; isPending?: boolean }>): string | undefined => {
+  if (config.isPending === true) {
+    return "Sending…"
+  }
+
+  return config.count === undefined ? undefined : `${config.count}`
 }
 
 /**
@@ -204,14 +252,56 @@ export const sidebarHeader = <Message, Requirements>(
   )
 }
 
+const renderSectionLabel = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; onTitleClick?: Message; isTitleCurrent?: boolean }>
+): Html => {
+  const { onTitleClick } = config
+
+  return h.h2(
+    [h.Class(sectionLabel)],
+    [
+      onTitleClick === undefined
+        ? config.label
+        : Button.view(
+            {
+              onClick: onTitleClick,
+              toView: (attributes) =>
+                h.button(
+                  [
+                    ...attributes.button,
+                    ...(config.isTitleCurrent === true ? [h.AriaCurrent("page")] : []),
+                    h.Class(sectionTitleButton)
+                  ],
+                  [config.label]
+                )
+            },
+            h
+          )
+    ]
+  )
+}
+
 /**
  * A group of items under an uppercase `label` that is a heading, with icon-only `actions` at its right,
  * such as search and create. Without a `label` it is the list alone, as the first group of a sidebar is.
- * `children` are `sidebarItem`s, or a `sidebarEmpty` when there are none.
+ *
+ * The title is a button that sends `onTitleClick` when the section has the full list of what it holds to open,
+ * and covers the whole heading but its actions. While that list shows, `isTitleCurrent`, the heading is filled
+ * like a current row, with the 2px bar, and the button is `aria-current="page"`.
+ *
+ * `children` are `sidebarItem`s, or a `sidebarEmpty` when there are none; with an empty list of them the
+ * section is its heading and actions alone, which open what the section would list.
  */
 export const sidebarSection = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label?: string; actions?: ReadonlyArray<Html>; children: ReadonlyArray<Html> }>
+  config: Readonly<{
+    label?: string
+    onTitleClick?: Message
+    isTitleCurrent?: boolean
+    actions?: ReadonlyArray<Html>
+    children: ReadonlyArray<Html>
+  }>
 ): Html =>
   h.div(
     [h.Class(sectionColumn)],
@@ -220,9 +310,12 @@ export const sidebarSection = <Message, Requirements>(
         ? h.empty
         : h.div(
             [h.Class(sectionHeading)],
-            [h.h2([h.Class(sectionLabel)], [config.label]), h.div([h.Class(sectionActions)], config.actions ?? [])]
+            [
+              renderSectionLabel(h, { ...config, label: config.label }),
+              h.div([h.Class(sectionActions)], config.actions ?? [])
+            ]
           ),
-      h.ul([h.Class(itemList)], config.children)
+      config.children.length === 0 ? h.empty : h.ul([h.Class(itemList)], config.children)
     ]
   )
 
@@ -237,33 +330,35 @@ export const sidebarSections = <Message, Requirements>(
 ): Html => h.div([h.Class(sectionsColumn)], children)
 
 /**
- * A row of the sidebar as one button that sends `onClick`: an `icon`, or a `mark` letter on a small square
- * for a person or a workspace, then the `label` and a `count` at the end. A row is `isPending` while what it
- * stands for is on its way, such as a group still being created, and says "Sending…" at its end in the
- * count's place; a pending row has no count. The button is named by the label and described by what is at its
- * end. The current row is filled with the 2px bar and `aria-current="page"`. `children` are the items under
- * it, such as a group's open thread, joined to it by a dashed line; one with no `onClick` is a plain row that
- * says where the person is.
+ * A row of the sidebar as one button that sends `onClick`: an `icon`, or a `mark` on a 24px square for a person,
+ * a workspace, or an agent, then the `label` and a `count` at the end. A `status` is how the item stands: a patch
+ * on its mark, or, for an item with an `icon` or no mark, its shape alone, 9px, at the row's end. A row has an
+ * `activity`, such as "Working in #design", while what it stands for is at work, and shows the logo's mark at its
+ * end, since its words say what it is doing. A row is `isPending` while what it stands for is on its way, such as
+ * a group still being created, and says "Sending…" at its end in place of those and the count.
+ *
+ * The button is named by the label and then by the status's word, "Atlas, Needs setup", or by the activity's words
+ * when there is no status, and described by "Sending…" or the count. The patch is cut out of the row's own
+ * surface: while the row is hovered or current, `status-knockout` is that row's color. The current row is filled
+ * with the 2px bar and `aria-current="page"`. `children` are the items under it, such as a group's open thread,
+ * joined to it by a dashed line; one with no `onClick` is a plain row that says where the person is.
  */
 export const sidebarItem = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
     icon?: IconName
-    mark?: string
+    mark?: MarkContent
+    status?: MarkStatus | undefined
     label: string
     count?: number
+    activity?: string
     isPending?: boolean
     isCurrent: boolean
     onClick: Message
     children?: ReadonlyArray<SidebarSubItem<Message>>
   }>
 ): Html => {
-  const end =
-    config.isPending === true
-      ? { text: "Sending…", look: itemPending }
-      : config.count === undefined
-        ? undefined
-        : { text: `${config.count}`, look: itemCount }
+  const description = itemDescription(config)
 
   return h.li(
     [],
@@ -275,16 +370,12 @@ export const sidebarItem = <Message, Requirements>(
             h.button(
               [
                 ...attributes.button,
-                h.AriaLabel(config.label),
-                ...(end === undefined ? [] : [h.AriaDescription(end.text)]),
+                h.AriaLabel(itemName(config)),
+                ...(description === undefined ? [] : [h.AriaDescription(description)]),
                 ...(config.isCurrent ? [h.AriaCurrent("page")] : []),
                 h.Class(itemRow)
               ],
-              [
-                renderItemLeading(h, config),
-                h.span([h.Class(itemLabel)], [config.label]),
-                end === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(end.look)], [end.text])
-              ]
+              [renderItemLeading(h, config), h.span([h.Class(itemLabel)], [config.label]), ...renderItemEnd(h, config)]
             )
         },
         h

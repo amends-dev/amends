@@ -77,7 +77,7 @@ const renderRow = <Message, Requirements>(
     [],
     [
       row(h, {
-        mark: task.assignee === null ? "–" : initials(memberName(members, task.assignee)),
+        mark: { text: task.assignee === null ? "–" : initials(memberName(members, task.assignee)) },
         title: threadWords(thread, opening, members),
         meta: [
           `Started by ${authorName(thread.createdBy, members, contacts)}`,

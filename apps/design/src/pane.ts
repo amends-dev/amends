@@ -60,6 +60,8 @@ const emptyIcon = "mb-2 grid size-10 flex-none place-items-center bg-subtle text
 
 const emptyTitle = "m-0 text-item font-medium text-ink"
 
+const emptyAction = "mt-3 flex"
+
 const measuredColumnBody = "flex max-w-170 flex-col gap-10 pt-1"
 
 const wideColumnBody = "flex flex-col gap-10 pt-1"
@@ -219,18 +221,20 @@ export const paneTabs = <Message, Requirements>(
 /**
  * What a pane's body says when it has nothing to list: 64px under the header, centered, a 40px square on
  * `subtle` holding the `icon`, then the `title` as an `h2`, under the pane's `h1`, and the `copy` under it,
- * a line of what to do or why, in quiet text. The text is centered and 20rem wide at most.
+ * a line of what to do or why, in quiet text, and the `action` under that, such as a `button` that does it,
+ * 12px below. The text is centered and 20rem wide at most.
  */
 export const paneEmpty = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ icon: IconName; title: string; copy?: string }>
+  config: Readonly<{ icon: IconName; title: string; copy?: string; action?: Html }>
 ): Html =>
   h.div(
     [h.Class(emptyColumn)],
     [
       h.span([h.Class(emptyIcon)], [icon(h, config.icon)]),
       h.h2([h.Class(emptyTitle)], [config.title]),
-      config.copy === undefined ? h.empty : hint(h, config.copy)
+      config.copy === undefined ? h.empty : hint(h, config.copy),
+      config.action === undefined ? h.empty : h.div([h.Class(emptyAction)], [config.action])
     ]
   )
 

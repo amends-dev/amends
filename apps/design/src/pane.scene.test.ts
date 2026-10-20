@@ -5,7 +5,7 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, label, role, scene, selector, submit, text, type, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { field, iconButton, sending, submit as submitButton } from "./control.ts"
+import { button, field, iconButton, sending, submit as submitButton } from "./control.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "./pane.ts"
 
 const Tab = Schema.Literals(["threads", "tasks"])
@@ -282,6 +282,33 @@ describe("paneEmpty", () => {
       expect(selector("svg")).toHaveAttr("aria-hidden", "true"),
       expect(role("img")).toBeAbsent()
     )
+  })
+
+  it("shows its action under the copy, and none without one", () => {
+    scene(
+      {
+        update,
+        view: paneView((_: Model, h: HtmlBuilder<Message>) =>
+          pane(h, {
+            variant: "main",
+            header: { title: "Agents" },
+            body: [
+              paneEmpty(h, {
+                icon: "mark-agents",
+                title: "No agents yet",
+                copy: "Add an agent.",
+                action: button(h, "Add agent", Message.OpenedSettings(), { variant: "primary" })
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(within(role("main"), role("button", { name: "Add agent" }))).toExist(),
+      click(role("button", { name: "Add agent" })),
+      expect(role("status")).toHaveText("Tab threads, closed 0, settings 1")
+    )
+    scene({ update, view: paneView(emptyPane("Nothing new.")) }, given(initial), expect(role("button")).toBeAbsent())
   })
 })
 

@@ -5,7 +5,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { badge } from "./details.ts"
-import { columns, row, rowWithButton, section, summary } from "./directory.ts"
+import { activityCell, cellWithDetail, columns, row, rowWithButton, section, summary } from "./directory.ts"
 
 const Message = defineMessageUnion({ ClickedMercier: {}, ClickedFieldwork: {} })
 type Message = typeof Message.Type
@@ -45,13 +45,13 @@ describe("section", () => {
 describe("row", () => {
   const rows = (h: HtmlBuilder<Message>) => [
     row(h, {
-      mark: "M",
+      mark: { text: "M" },
       title: "Mercier & Co",
       meta: "12 members · as Alex",
       action: "Open →",
       onClick: Message.ClickedMercier()
     }),
-    row(h, { mark: "F", title: "Fieldwork", onClick: Message.ClickedFieldwork() })
+    row(h, { mark: { text: "F" }, title: "Fieldwork", onClick: Message.ClickedFieldwork() })
   ]
 
   it("is one button named by its title and described by its meta, and clicking it sends its message", () => {
@@ -207,7 +207,7 @@ describe("columns", () => {
 describe("row with cells", () => {
   const rows = (h: HtmlBuilder<Message>) => [
     row(h, {
-      mark: "#",
+      mark: { text: "#" },
       title: "design",
       cells: [badge(h, { label: "Public" }), h.span([], ["12 members"])],
       cellsText: "Public · 12 members",
@@ -215,14 +215,14 @@ describe("row with cells", () => {
       onClick: Message.ClickedMercier()
     }),
     row(h, {
-      mark: "#",
+      mark: { text: "#" },
       title: "product",
       meta: "Design reviews",
       cells: [badge(h, { label: "Private" })],
       cellsText: "Private",
       onClick: Message.ClickedFieldwork()
     }),
-    row(h, { mark: "N", title: "Northstar", action: "Open →", onClick: Message.ClickedFieldwork() })
+    row(h, { mark: { text: "N" }, title: "Northstar", action: "Open →", onClick: Message.ClickedFieldwork() })
   ]
 
   it("shows its cells and its action inside the button, which its cells' words describe", () => {
@@ -314,6 +314,112 @@ describe("row with cells", () => {
       given(initial),
       click(role("button", { name: "design" })),
       expect(role("status")).toHaveText("Opened Mercier & Co")
+    )
+  })
+})
+
+describe("row with a status", () => {
+  const needsSetup = { kind: "attention", label: "Needs setup", detail: "Its model connection was removed." } as const
+
+  const rows = (h: HtmlBuilder<Message>) => [
+    row(h, {
+      mark: { text: "R", tone: "lilac" },
+      markSize: "md",
+      status: needsSetup,
+      title: "Review helper",
+      cells: [cellWithDetail(h, { value: "Auto", detail: "No sandbox" })],
+      cellsText: "Auto · No sandbox",
+      onClick: Message.ClickedMercier()
+    }),
+    row(h, { mark: { text: "N", tone: "lilac" }, markSize: "md", title: "Nora", onClick: Message.ClickedFieldwork() })
+  ]
+
+  const reviewHelper = role("button", { name: "Review helper, Needs setup" })
+
+  it("is named by its title and then its status's word, and described by its cells' words", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(reviewHelper).toHaveAttr("aria-description", "Auto · No sandbox"),
+      expect(role("button", { name: "Nora" })).toExist(),
+      click(reviewHelper),
+      expect(role("status")).toHaveText("Opened Mercier & Co")
+    )
+  })
+
+  it("puts the patch on its mark, which shows the word and the reason on hover and is hidden from assistive technology", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(within(reviewHelper, text("R"))).toHaveAttr("title", "Needs setup: Its model connection was removed."),
+      expect(within(reviewHelper, text("R"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Nora" }), text("N"))).not.toHaveAttr("title")
+    )
+  })
+
+  it("draws its mark at 32px in the tone it is given, or 40px and neutral unless told", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(within(reviewHelper, text("R"))).toHaveClass("size-8"),
+      expect(within(reviewHelper, text("R"))).toHaveClass("bg-avatar-lilac-bg")
+    )
+    scene(
+      {
+        update,
+        view: viewOf((h) => [row(h, { mark: { text: "G" }, title: "Group", onClick: Message.ClickedMercier() })])
+      },
+      given(initial),
+      expect(within(role("button", { name: "Group" }), text("G"))).toHaveClass("size-10"),
+      expect(within(role("button", { name: "Group" }), text("G"))).toHaveClass("bg-avatar-neutral-bg")
+    )
+  })
+
+  it("is cut out of its own surface while it is hovered, and starts the folded cells under its 32px mark", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(reviewHelper).toHaveClass("hover:[--amends-status-knockout:var(--amends-hover)]"),
+      expect(within(reviewHelper, selector(".contents"))).toHaveClass("max-tablet:ps-12")
+    )
+  })
+})
+
+describe("cells of two lines", () => {
+  const rows = (h: HtmlBuilder<Message>) => [
+    row(h, {
+      mark: { text: "A", tone: "lilac" },
+      title: "Atlas",
+      cells: [
+        cellWithDetail(h, { value: "Claude Code", detail: "Remote development" }),
+        cellWithDetail(h, { value: "Claude Sonnet 5" }),
+        activityCell(h, { state: "Working", place: "#design" })
+      ],
+      cellsText: "Claude Code · Remote development · Claude Sonnet 5 · Working · #design",
+      onClick: Message.ClickedMercier()
+    })
+  ]
+
+  it("show a value over a quieter detail, and the logo's mark before the state of what is at work", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(text("Claude Code")).toExist(),
+      expect(text("Remote development")).toHaveClass("text-ink-secondary"),
+      expect(text("Claude Sonnet 5")).toExist(),
+      expect(text("Working")).toExist(),
+      expect(text("#design")).toHaveClass("text-ink-secondary"),
+      expect(within(role("button", { name: "Atlas" }), selector("svg[aria-hidden]"))).toExist()
+    )
+  })
+
+  it("keep only the value below 48rem, where the cells fold under the title", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(text("Remote development")).toHaveClass("max-tablet:hidden"),
+      expect(text("#design")).toHaveClass("max-tablet:hidden"),
+      expect(text("Claude Code")).not.toHaveClass("max-tablet:hidden")
     )
   })
 })

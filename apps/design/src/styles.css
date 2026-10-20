@@ -30,6 +30,8 @@
   --amends-rail-selected: #e9e9ec;
   --amends-subtle: #f3f3f5;
   --amends-mention: #eceef1;
+  /* What a status mark is cut out of, the surface behind it. A row that is hovered or current sets its own. */
+  --amends-status-knockout: var(--amends-panel);
 
   --amends-ink: #242528;
   --amends-ink-secondary: #73757b;
@@ -181,6 +183,7 @@
   --color-rail-selected: var(--amends-rail-selected);
   --color-subtle: var(--amends-subtle);
   --color-mention: var(--amends-mention);
+  --color-status-knockout: var(--amends-status-knockout);
 
   --color-ink: var(--amends-ink);
   --color-ink-secondary: var(--amends-ink-secondary);

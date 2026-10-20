@@ -19,10 +19,10 @@ import {
   toggle
 } from "../src/control.ts"
 import { badge, detailList, entry, entryList, log } from "../src/details.ts"
-import { columns, row, rowWithButton, section, summary } from "../src/directory.ts"
+import { activityCell, cellWithDetail, columns, row, rowWithButton, section, summary } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
-import { mark, markCluster } from "../src/mark.ts"
+import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal } from "../src/modal.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "../src/pane.ts"
@@ -108,12 +108,25 @@ const lineText = "text-body text-ink"
 
 const railDestinations: ReadonlyArray<Readonly<{ destination: Destination; icon: IconName; label: string }>> = [
   { destination: "home", icon: "mark-home", label: "Home" },
-  { destination: "connections", icon: "mark-connections", label: "Connections" },
   { destination: "agents", icon: "mark-agents", label: "Agents" },
-  { destination: "channels", icon: "mark-channel", label: "Channels" }
+  { destination: "connections", icon: "mark-connections", label: "Connections" }
 ]
 
 const railSettings = { destination: "settings", icon: "mark-settings", label: "Settings" } as const
+
+const online: MarkStatus = { kind: "available", label: "Online" }
+
+const needsSetup: MarkStatus = {
+  kind: "attention",
+  label: "Needs setup",
+  detail: "Its model connection was removed."
+}
+
+const unavailable: MarkStatus = {
+  kind: "blocked",
+  label: "Unavailable",
+  detail: "Its integration isn't installed on this host."
+}
 
 const iconNames: ReadonlyArray<IconName> = [
   "mark-home",
@@ -579,7 +592,15 @@ const workspaceList = (h: ApplicationViewBuilder): Html =>
       h.keyed("li")(
         name,
         [],
-        [row(h, { mark: name.slice(0, 1), title: name, meta, action: "Open →", onClick: Message.ClickedButton() })]
+        [
+          row(h, {
+            mark: { text: name.slice(0, 1) },
+            title: name,
+            meta,
+            action: "Open →",
+            onClick: Message.ClickedButton()
+          })
+        ]
       )
     )
   )
@@ -614,7 +635,7 @@ const groupList = (h: ApplicationViewBuilder): Html =>
         [],
         [
           row(h, {
-            mark: "#",
+            mark: { text: "#" },
             title: name,
             cells: [badge(h, { label: visibility }), h.span([], [`${members} members`])],
             cellsText: `${visibility} · ${members} members`,
@@ -630,6 +651,81 @@ const groupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   summary(h, { copy: "Public and private groups you've joined.", count: `${groupRows.length} groups` }),
   columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
   groupList(h)
+]
+
+type AgentSample = Readonly<{
+  name: string
+  status?: MarkStatus
+  harness: string
+  sandbox: string
+  model: string
+  connection: string
+  activity?: Readonly<{ state: string; place: string }>
+}>
+
+const agentSamples: ReadonlyArray<AgentSample> = [
+  {
+    name: "Atlas",
+    status: { kind: "available", label: "Queued in #design" },
+    harness: "Claude Code",
+    sandbox: "Remote development",
+    model: "Claude Sonnet 5",
+    connection: "Anthropic · Team",
+    activity: { state: "Queued", place: "#design" }
+  },
+  { name: "Nora", harness: "Auto", sandbox: "No sandbox", model: "Claude Haiku 4.5", connection: "Anthropic · Team" },
+  {
+    name: "Review helper",
+    status: needsSetup,
+    harness: "Auto",
+    sandbox: "No sandbox",
+    model: "Claude Sonnet 5",
+    connection: "Anthropic · Backup"
+  },
+  {
+    name: "Yumi",
+    status: { kind: "available", label: "Working in #general" },
+    harness: "Claude Code",
+    sandbox: "Local development",
+    model: "Claude Opus 5",
+    connection: "Anthropic · Team",
+    activity: { state: "Working", place: "#general" }
+  }
+]
+
+const agentRow = (h: ApplicationViewBuilder, agent: AgentSample): Html =>
+  h.keyed("li")(
+    agent.name,
+    [],
+    [
+      row(h, {
+        mark: { text: agent.name.slice(0, 1), tone: "lilac" },
+        markSize: "md",
+        ...(agent.status === undefined ? {} : { status: agent.status }),
+        title: agent.name,
+        cells: [
+          cellWithDetail(h, { value: agent.harness, detail: agent.sandbox }),
+          cellWithDetail(h, { value: agent.model, detail: agent.connection }),
+          agent.activity === undefined ? h.empty : activityCell(h, agent.activity)
+        ],
+        cellsText: [
+          agent.harness,
+          agent.sandbox,
+          agent.model,
+          agent.connection,
+          ...(agent.activity === undefined ? [] : [agent.activity.state, agent.activity.place])
+        ].join(" · "),
+        onClick: Message.ClickedButton()
+      })
+    ]
+  )
+
+const agentTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  columns(h, { label: "Agent", cells: ["Harness", "Model", "Activity"] }),
+  h.ul(
+    [h.AriaLabel("Agents")],
+    agentSamples.map((agent) => agentRow(h, agent))
+  )
 ]
 
 const directoryScreen = (h: ApplicationViewBuilder): Html =>
@@ -662,7 +758,7 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
     sample(
       h,
       "Row without meta or action",
-      [row(h, { mark: "N", title: "Northstar Studio", onClick: Message.ClickedButton() })],
+      [row(h, { mark: { text: "N" }, title: "Northstar Studio", onClick: Message.ClickedButton() })],
       "flex max-w-2xl flex-col"
     ),
     sample(h, "Section without count", [section(h, { label: "Invitations" })], "flex max-w-2xl flex-col"),
@@ -677,7 +773,7 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
       "Row with cells and no action",
       [
         row(h, {
-          mark: "#",
+          mark: { text: "#" },
           title: "design",
           cells: [badge(h, { label: "Public" }), h.span([], ["12 members"])],
           cellsText: "Public · 12 members",
@@ -685,6 +781,12 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
         })
       ],
       "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Table of agents: 32px lilac marks with a status patch (none while ready and idle), the status read after the name, cells of two lines, and the activity blank while idle",
+      agentTable(h),
+      "flex max-w-3xl flex-col"
     )
   ])
 
@@ -805,8 +907,36 @@ const iconGroup = (h: ApplicationViewBuilder): Html =>
     sample(h, "Named, which makes it an image", [icon(h, "alert-triangle", { label: "Needs attention" })])
   ])
 
+const markStatuses: ReadonlyArray<MarkStatus> = [online, { kind: "offline", label: "Offline" }, needsSetup, unavailable]
+
+const markSizes: ReadonlyArray<MarkSize> = ["xs", "sm", "md", "lg"]
+
 const markGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Marks", [
+    ...markStatuses.map((status) =>
+      sample(
+        h,
+        `Status ${status.label.toLowerCase()}, at every size: 20px, 24, 32, and 40, with its patch 7, 8, 9, and 10px`,
+        markSizes.map((size) => mark(h, { text: "AM", size, status })),
+        iconSizeRow
+      )
+    ),
+    sample(
+      h,
+      "Lilac, the tone of an agent, with a status and without",
+      [
+        mark(h, { text: "A", tone: "lilac", size: "md" }),
+        mark(h, { text: "A", tone: "lilac", size: "md", status: online }),
+        mark(h, { text: "R", tone: "lilac", size: "md", status: needsSetup })
+      ],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "A status mark alone, 9px, for an item with no mark of its own, and the logo's mark of what is at work",
+      [...markStatuses.map((status) => statusMark(h, status)), activityMark(h)],
+      iconSizeRow
+    ),
     sample(
       h,
       "Sizes",
@@ -1208,6 +1338,31 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
     ),
     sample(
       h,
+      "A title, a line of copy, and an action under it",
+      [
+        h.div(
+          [h.Class(emptyPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Agents",
+              header: { title: "Agents", icon: "mark-agents" },
+              body: [
+                paneEmpty(h, {
+                  icon: "mark-agents",
+                  title: "No agents yet",
+                  copy: "Add an agent: a member that works on a harness and a model your connections give.",
+                  action: button(h, "Add agent", press, { variant: "primary" })
+                })
+              ]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
       "A title alone",
       [
         h.div(
@@ -1378,8 +1533,20 @@ const shellRail = (h: ApplicationViewBuilder, current: Destination): Html => {
   return rail(h, {
     brand: { letter: "A", label: "amends" },
     items: railDestinations.map(toItem),
+    search: { label: "Search", onClick: Message.ClickedButton() },
     footer: [toItem(railSettings)],
     account: { letter: "JM", label: "Account", onClick: Message.ClickedButton() }
+  })
+}
+
+const workspaceHeader = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return sidebarHeader(h, {
+    mark: "M",
+    name: "Mercier & Co",
+    actions: [iconButton(h, { icon: "mark-menu", label: "Switch workspace", onClick: press })],
+    search: { label: "Find anything…", shortcut: "⌘ K", onClick: press }
   })
 }
 
@@ -1388,12 +1555,7 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
 
   return sidebar(h, {
     label: "Workspace",
-    header: sidebarHeader(h, {
-      mark: "M",
-      name: "Mercier & Co",
-      actions: [iconButton(h, { icon: "mark-menu", label: "Switch workspace", onClick: press })],
-      search: { label: "Find anything…", shortcut: "⌘ K", onClick: press }
-    }),
+    header: workspaceHeader(h),
     children: [
       sidebarSection(h, {
         children: [
@@ -1405,6 +1567,7 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
       sidebarSections(h, [
         sidebarSection(h, {
           label: "Groups",
+          onTitleClick: press,
           actions: [
             iconButton(h, { icon: "mark-search", label: "Search groups", onClick: press }, { size: "compact" }),
             iconButton(h, { icon: "mark-new", label: "Create group", onClick: press }, { size: "compact" })
@@ -1432,8 +1595,8 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
           children: isDirectMessagesEmpty
             ? [sidebarEmpty(h, "No conversations yet")]
             : [
-                sidebarItem(h, { mark: "AM", label: "Alex Morgan", isCurrent: false, onClick: press }),
-                sidebarItem(h, { mark: "Y", label: "Yumi", isCurrent: false, onClick: press })
+                sidebarItem(h, { mark: { text: "AM" }, label: "Alex Morgan", isCurrent: false, onClick: press }),
+                sidebarItem(h, { mark: { text: "Y" }, label: "Yumi", isCurrent: false, onClick: press })
               ]
         })
       ])
@@ -1441,6 +1604,135 @@ const shellSidebar = (h: ApplicationViewBuilder, isThreadOpen: boolean, isDirect
     footer: sidebarFooter(h, [hint(h, "12 members · as Alex")])
   })
 }
+
+const destinationSidebar = (h: ApplicationViewBuilder, sections: ReadonlyArray<Html>): Html =>
+  sidebar(h, {
+    label: "Workspace",
+    header: workspaceHeader(h),
+    children: [sidebarSections(h, sections)],
+    footer: sidebarFooter(h, [hint(h, "12 members · as Alex")])
+  })
+
+const agentsSidebar = (h: ApplicationViewBuilder, current: string | undefined): Html => {
+  const press = Message.ClickedButton()
+
+  return destinationSidebar(h, [
+    sidebarSection(h, {
+      label: "Agents",
+      onTitleClick: press,
+      isTitleCurrent: current === undefined,
+      actions: [
+        iconButton(h, { icon: "list", label: "Browse agents", onClick: press }, { size: "compact" }),
+        iconButton(h, { icon: "mark-new", label: "Add agent", onClick: press }, { size: "compact" })
+      ],
+      children: agentSamples.map((agent) =>
+        sidebarItem(h, {
+          mark: { text: agent.name.slice(0, 1), tone: "lilac" },
+          ...(agent.status === undefined ? {} : { status: agent.status }),
+          ...(agent.activity === undefined ? {} : { activity: `${agent.activity.state} in ${agent.activity.place}` }),
+          label: agent.name,
+          isCurrent: agent.name === current,
+          onClick: press
+        })
+      )
+    })
+  ])
+}
+
+const connectionSections: ReadonlyArray<
+  Readonly<{ title: string; noun: string; entries: ReadonlyArray<Readonly<{ name: string; status?: MarkStatus }>> }>
+> = [
+  {
+    title: "Models",
+    noun: "model",
+    entries: [
+      { name: "Anthropic · Team" },
+      { name: "Anthropic · Backup", status: needsSetup },
+      { name: "OpenAI-compatible", status: unavailable }
+    ]
+  },
+  { title: "Tools", noun: "tool", entries: [{ name: "GitHub" }] },
+  { title: "Sandboxes", noun: "sandbox", entries: [{ name: "Remote development" }] },
+  { title: "Harnesses", noun: "harness", entries: [] }
+]
+
+const connectionsSidebar = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return destinationSidebar(h, [
+    ...connectionSections.map(({ title, noun, entries }) =>
+      sidebarSection(h, {
+        label: title,
+        onTitleClick: press,
+        actions: [
+          iconButton(h, { icon: "list", label: `Browse ${title.toLowerCase()}`, onClick: press }, { size: "compact" }),
+          iconButton(h, { icon: "mark-new", label: `Add ${noun} connection`, onClick: press }, { size: "compact" })
+        ],
+        children:
+          entries.length === 0
+            ? [sidebarEmpty(h, "None yet")]
+            : entries.map(({ name, status }) =>
+                sidebarItem(h, {
+                  icon: "mark-connections",
+                  ...(status === undefined ? {} : { status }),
+                  label: name,
+                  isCurrent: false,
+                  onClick: press
+                })
+              )
+      })
+    ),
+    sidebarSection(h, {
+      label: "Channels",
+      onTitleClick: press,
+      actions: [iconButton(h, { icon: "list", label: "Browse channels", onClick: press }, { size: "compact" })],
+      children: []
+    })
+  ])
+}
+
+const agentsPane = (h: ApplicationViewBuilder, query: string): Html =>
+  pane(h, {
+    variant: "main",
+    label: "Agents",
+    header: {
+      title: "Agents",
+      icon: "mark-agents",
+      actions: [button(h, "Add agent", Message.ClickedButton())],
+      tabs: paneTabs(h, {
+        label: "Agents",
+        tabs: [
+          { label: "All", count: agentSamples.length, isCurrent: true, onClick: Message.ClickedButton() },
+          { label: "Needs setup", count: 1, isCurrent: false, onClick: Message.ClickedButton() }
+        ]
+      })
+    },
+    body: [
+      paneColumn(
+        h,
+        [
+          column(h, [
+            field(
+              h,
+              {
+                id: "workshop-agents-search",
+                label: "Search agents",
+                type: "search",
+                value: query,
+                onInput: (value) => Message.TypedAgentQuery({ value }),
+                placeholder: "Search agents…",
+                isAutofocus: false,
+                isLabelHidden: true
+              },
+              Option.none()
+            ),
+            ...agentTable(h)
+          ])
+        ],
+        { isWide: true }
+      )
+    ]
+  })
 
 const groupThreads = (h: ApplicationViewBuilder): Html => {
   const press = Message.ClickedButton()
@@ -1999,6 +2291,65 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               sidebar: shellSidebar(h, false, true),
               main: agentPane(h),
               notices: toastStack(h, [renameRefusal(h), postRefusal(h)])
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Agents: the rail on Agents and the Search item, the sidebar's title current with each agent's status and the logo at those at work, and the list",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              viewport: "Split",
+              rail: shellRail(h, "agents"),
+              sidebar: agentsSidebar(h, undefined),
+              main: agentsPane(h, model.agentQuery)
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Agents with one open: its row current, and its patch cut out of the row's own surface",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              viewport: "Split",
+              rail: shellRail(h, "agents"),
+              sidebar: agentsSidebar(h, "Review helper"),
+              main: agentPane(h)
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Connections: a section for each capability, with a status mark at the end of those that need one, a quiet line for none, and a last section that is its heading and Browse alone",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              viewport: "Split",
+              rail: shellRail(h, "connections"),
+              sidebar: connectionsSidebar(h),
+              main: pane(h, {
+                variant: "main",
+                label: "Connections",
+                header: { title: "Connections", icon: "mark-connections" },
+                body: []
+              })
             })
           ]
         )

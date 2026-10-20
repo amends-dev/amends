@@ -7,6 +7,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { buttonWith } from "./control.ts"
+import { activityMark, type MarkContent, type MarkStatus, mark } from "./mark.ts"
 
 const sectionLine = "mt-9 mb-2 flex items-center gap-3 text-item font-medium text-ink"
 
@@ -35,12 +36,9 @@ const columnsStitch = "h-0 border-t border-dashed border-stitch"
 
 const rowShape = "flex min-h-19 w-full items-center gap-4 ps-3 pe-4"
 
-const rowButton = `${rowShape} group cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover`
+const rowButton = `${rowShape} group cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)]`
 
 const rowFoldsCells = "max-tablet:flex-wrap max-tablet:gap-y-2 max-tablet:py-3"
-
-const rowMark =
-  "grid size-10 flex-none place-items-center bg-avatar-neutral-bg text-item font-medium text-avatar-neutral-fg uppercase"
 
 const rowText = "flex min-w-0 flex-1 flex-col gap-1"
 
@@ -48,8 +46,10 @@ const rowTitle = "block truncate text-body font-medium text-ink"
 
 const rowMeta = "block truncate text-hint text-ink-secondary"
 
-const rowCells =
-  "contents max-tablet:flex max-tablet:basis-full max-tablet:min-w-0 max-tablet:flex-wrap max-tablet:items-center max-tablet:gap-2 max-tablet:ps-14"
+const rowCellsFolded =
+  "contents max-tablet:flex max-tablet:basis-full max-tablet:min-w-0 max-tablet:flex-wrap max-tablet:items-center max-tablet:gap-2"
+
+const rowCellsStart = { md: "max-tablet:ps-12", lg: "max-tablet:ps-14" }
 
 const rowCell =
   "block w-32 flex-none text-hint text-ink-secondary max-desktop:w-24 max-tablet:w-auto max-tablet:max-w-full max-tablet:truncate"
@@ -58,8 +58,11 @@ const rowAction = "flex-none px-3 text-control font-medium whitespace-nowrap tex
 
 const rowActionAmongCells = `w-24 text-end max-desktop:w-20 max-tablet:hidden ${rowAction}`
 
-const renderMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, letter: string): Html =>
-  h.span([h.AriaHidden(true), h.Class(rowMark)], [letter])
+const cellColumn = "flex min-w-0 flex-col gap-1"
+
+const cellValue = "flex min-w-0 items-center gap-1.5 text-control text-ink"
+
+const cellDetail = "block truncate text-hint text-ink-secondary max-tablet:hidden"
 
 const renderText = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
@@ -131,14 +134,49 @@ export const columns = <Message, Requirements>(
   )
 
 /**
- * A whole row as one button that sends `onClick`: a square mark with the `mark` letter, the `title` over
- * its `meta`, and the `action` at the right. The button is named by the title and described by the meta.
+ * A cell of two lines for a `row`: a `value` over a quieter `detail`, such as an agent's harness over its sandbox.
+ * Below 48rem, where the cells fold under the title, only the value shows.
+ */
+export const cellWithDetail = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ value: string; detail?: string }>
+): Html =>
+  h.span(
+    [h.Class(cellColumn)],
+    [
+      h.span([h.Class(cellValue)], [h.span([h.Class("truncate")], [config.value])]),
+      config.detail === undefined ? h.empty : h.span([h.Class(cellDetail)], [config.detail])
+    ]
+  )
+
+/**
+ * A cell of what is at work for a `row`, in the shape of `cellWithDetail`: the logo's mark and the `state`, such
+ * as "Working", over the `place` it works, such as "#design".
+ */
+export const activityCell = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ state: string; place?: string }>
+): Html =>
+  h.span(
+    [h.Class(cellColumn)],
+    [
+      h.span([h.Class(cellValue)], [activityMark(h), h.span([h.Class("truncate")], [config.state])]),
+      config.place === undefined ? h.empty : h.span([h.Class(cellDetail)], [config.place])
+    ]
+  )
+
+/**
+ * A whole row as one button that sends `onClick`: a square mark of the `mark` letter, 40px, or 32px with
+ * `markSize` `md`, the `title` over its `meta`, and the `action` at the right. The `status` is a patch on the
+ * mark, cut out of the row's own surface, which is `hover`'s while it is hovered. The button is named by the title
+ * and then the status's word, "Atlas, Needs setup", and described by the meta.
  *
- * The `cells`, such as a `badge` and a count, each lie in a column 8rem wide between the title and the action,
- * under the labels `columns` gives them. Like the mark and the action they are hidden from assistive technology,
- * so `cellsText`, what they say in words, such as "Public · 12 members", describes the button after the meta. A
- * row with cells keeps 6rem at its end for its action, right-aligned, whether it has one or not. From 48rem to
- * 64rem the columns are 6rem wide and the action's room 5rem, so a title keeps its room beside three cells.
+ * The `cells`, such as a `badge` and a count, or a `cellWithDetail`, each lie in a column 8rem wide between the
+ * title and the action, under the labels `columns` gives them. Like the mark and the action they are hidden from
+ * assistive technology, so `cellsText`, what they say in words, such as "Public · 12 members", describes the
+ * button after the meta. A row with cells keeps 6rem at its end for its action, right-aligned, whether it has one
+ * or not. From 48rem to 64rem the columns are 6rem wide and the action's room 5rem, so a title keeps its room
+ * beside three cells.
  *
  * Below 48rem a row with cells folds: the mark, the title, and the meta stay the first line, and the cells wrap
  * under them as a line of their own, 8px apart, in their order, from the title's start, each as wide as it is, or
@@ -149,7 +187,9 @@ export const columns = <Message, Requirements>(
 export const row = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
-    mark: string
+    mark: MarkContent
+    markSize?: "md" | "lg"
+    status?: MarkStatus | undefined
     title: string
     meta?: string
     cells?: ReadonlyArray<Html>
@@ -160,6 +200,7 @@ export const row = <Message, Requirements>(
 ): Html => {
   const description = [config.meta, config.cellsText].filter((part) => part !== undefined).join(" · ")
   const hasCells = config.cells !== undefined
+  const markSize = config.markSize ?? "lg"
 
   return Button.view(
     {
@@ -168,17 +209,17 @@ export const row = <Message, Requirements>(
         h.button(
           [
             ...attributes.button,
-            h.AriaLabel(config.title),
+            h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
             ...(description === "" ? [] : [h.AriaDescription(description)]),
             h.Class(hasCells ? `${rowButton} ${rowFoldsCells}` : rowButton)
           ],
           [
-            renderMark(h, config.mark),
+            mark(h, { ...config.mark, size: markSize, status: config.status }),
             renderText(h, config.title, config.meta),
             config.cells === undefined
               ? h.empty
               : h.span(
-                  [h.AriaHidden(true), h.Class(rowCells)],
+                  [h.AriaHidden(true), h.Class(`${rowCellsFolded} ${rowCellsStart[markSize]}`)],
                   config.cells.map((cell) => h.span([h.Class(rowCell)], [cell]))
                 ),
             renderAction(h, config.action, hasCells)
@@ -211,7 +252,7 @@ export const rowWithButton = <Message, Requirements>(
   h.div(
     [h.Class(rowShape)],
     [
-      renderMark(h, config.mark),
+      mark(h, { text: config.mark, size: "lg" }),
       renderText(h, config.title, config.meta),
       Button.view(
         {

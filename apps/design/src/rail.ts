@@ -44,6 +44,9 @@ export type RailBrand<Message> = Readonly<{
 
 export type RailAccount<Message> = Readonly<{ letter: string; label: string; onClick: Message }>
 
+/** The way to search, which is not a destination: it is never current. */
+export type RailSearch<Message> = Readonly<{ label: string; onClick: Message }>
+
 const renderDestination = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, item: RailItem<Message>) =>
   h.li(
     [],
@@ -99,15 +102,17 @@ const renderAccount = <Message, Requirements>(h: HtmlBuilder<Message, Requiremen
 
 /**
  * The column of destinations, a `nav` named Destinations: the `brand` mark with a short line under it,
- * the `items`, and at the bottom the `footer` items and the optional `account` mark. The current item is
- * `aria-current="true"`, filled, with a 2px bar at the rail's left edge. A brand with no `onClick` is a
- * mark and no button.
+ * the `items`, then the `search` when there is one, and at the bottom the `footer` items and the optional
+ * `account` mark. The current item is `aria-current="true"`, filled, with a 2px bar at the rail's left edge.
+ * The search is an item like the others in look and spacing, a magnifier named by its `label`, and is never
+ * current. A brand with no `onClick` is a mark and no button.
  */
 export const rail = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
     brand: RailBrand<Message>
     items: ReadonlyArray<RailItem<Message>>
+    search?: RailSearch<Message>
     footer: ReadonlyArray<RailItem<Message>>
     account?: RailAccount<Message>
   }>
@@ -119,7 +124,12 @@ export const rail = <Message, Requirements>(
       h.div([h.AriaHidden(true), h.Class(railSeam)]),
       h.ul(
         [h.Class(railDestinations)],
-        config.items.map((item) => renderDestination(h, item))
+        [
+          ...config.items.map((item) => renderDestination(h, item)),
+          config.search === undefined
+            ? h.empty
+            : renderDestination(h, { icon: "mark-search", ...config.search, isCurrent: false })
+        ]
       ),
       h.ul(
         [h.Class(railFooter)],

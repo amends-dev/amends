@@ -97,7 +97,7 @@ const workspaceSidebar = (model: Model, h: HtmlBuilder<Message>) =>
         label: "Direct messages",
         children: [
           sidebarItem(h, {
-            mark: "AM",
+            mark: { text: "AM" },
             label: "Alex Morgan",
             isCurrent: model.current === "Alex Morgan",
             onClick: open("Alex Morgan")
@@ -341,6 +341,210 @@ describe("sidebarSections", () => {
       click(role("button", { name: "general" })),
       expect(role("button", { name: "general" })).toHaveAttr("aria-current", "page"),
       expect(role("button", { name: "Inbox" })).toHaveAttr("aria-current", "page")
+    )
+  })
+})
+
+describe("sidebarItem with a status", () => {
+  const needsSetup = { kind: "attention", label: "Needs setup", detail: "Its sandbox was removed." } as const
+
+  const agentsSidebar = (model: Model, h: HtmlBuilder<Message>) =>
+    sidebarSection(h, {
+      label: "Agents",
+      children: [
+        sidebarItem(h, {
+          mark: { text: "A", tone: "lilac" },
+          status: { kind: "available", label: "Working in #design" },
+          activity: "Working in #design",
+          label: "Atlas",
+          isCurrent: model.current === "Atlas",
+          onClick: open("Atlas")
+        }),
+        sidebarItem(h, {
+          mark: { text: "N", tone: "lilac" },
+          label: "Nora",
+          isCurrent: model.current === "Nora",
+          onClick: open("Nora")
+        }),
+        sidebarItem(h, {
+          mark: { text: "R", tone: "lilac" },
+          status: needsSetup,
+          label: "Review helper",
+          isCurrent: model.current === "Review helper",
+          onClick: open("Review helper")
+        }),
+        sidebarItem(h, {
+          mark: { text: "Y", tone: "lilac" },
+          activity: "Queued in #general",
+          label: "Yumi",
+          isCurrent: false,
+          onClick: open("Yumi")
+        })
+      ]
+    })
+
+  it("is named by its label and then its status's word, and by its activity's words when it has no status", () => {
+    scene(
+      { update, view: sidebarView(agentsSidebar) },
+      given(initial),
+      expect(role("button", { name: "Atlas, Working in #design" })).toExist(),
+      expect(role("button", { name: "Review helper, Needs setup" })).toExist(),
+      expect(role("button", { name: "Yumi, Queued in #general" })).toExist(),
+      expect(role("button", { name: "Nora" })).toExist()
+    )
+  })
+
+  it("puts the patch on the mark, with its word on hover, hidden from assistive technology like the mark", () => {
+    scene(
+      { update, view: sidebarView(agentsSidebar) },
+      given(initial),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveAttr(
+        "title",
+        "Needs setup: Its sandbox was removed."
+      ),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveAttr(
+        "aria-hidden",
+        "true"
+      ),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), text("R"))).toHaveClass("size-6"),
+      expect(within(role("button", { name: "Nora" }), text("N"))).not.toHaveAttr("title"),
+      expect(role("img")).toBeAbsent()
+    )
+  })
+
+  it("shows the logo's mark at the end of a row at work, where the count would be, and nothing for an idle one", () => {
+    scene(
+      { update, view: sidebarView(agentsSidebar) },
+      given(initial),
+      expect(within(role("button", { name: "Atlas, Working in #design" }), selector("svg"))).toHaveAttr(
+        "aria-hidden",
+        "true"
+      ),
+      expect(within(role("button", { name: "Yumi, Queued in #general" }), selector("svg"))).toExist(),
+      expect(within(role("button", { name: "Nora" }), selector("svg"))).toBeAbsent(),
+      expect(within(role("button", { name: "Review helper, Needs setup" }), selector("svg"))).toBeAbsent(),
+      expect(role("button", { name: "Atlas, Working in #design" })).not.toHaveAttr("aria-description")
+    )
+  })
+
+  it("is cut out of the surface of the row it is on while the row is hovered or current", () => {
+    scene(
+      { update, view: sidebarView(agentsSidebar) },
+      given(initial),
+      expect(role("button", { name: "Nora" })).toHaveClass("hover:[--amends-status-knockout:var(--amends-hover)]"),
+      expect(role("button", { name: "Nora" })).toHaveClass(
+        "aria-[current=page]:[--amends-status-knockout:var(--amends-selected)]"
+      ),
+      click(role("button", { name: "Review helper, Needs setup" })),
+      expect(role("button", { name: "Review helper, Needs setup" })).toHaveAttr("aria-current", "page")
+    )
+  })
+
+  it("shows the shape alone at the row's end for an item with no mark, and names the row by it", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((_, h) =>
+          sidebarSection(h, {
+            label: "Models",
+            children: [
+              sidebarItem(h, {
+                icon: "mark-connections",
+                status: {
+                  kind: "blocked",
+                  label: "Unavailable",
+                  detail: "Its integration isn't installed on this host."
+                },
+                label: "OpenAI-compatible",
+                isCurrent: false,
+                onClick: open("OpenAI-compatible")
+              }),
+              sidebarItem(h, { icon: "mark-connections", label: "Team", isCurrent: false, onClick: open("Team") })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "OpenAI-compatible, Unavailable" })).toExist(),
+      expect(within(role("button", { name: "OpenAI-compatible, Unavailable" }), selector("[title]"))).toHaveAttr(
+        "title",
+        "Unavailable: Its integration isn't installed on this host."
+      ),
+      expect(within(role("button", { name: "Team" }), selector("[title]"))).toBeAbsent()
+    )
+  })
+
+  it("says Sending… in place of the activity, the status mark's shape, and the count while it is pending", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((_, h) =>
+          sidebarSection(h, {
+            label: "Agents",
+            children: [
+              sidebarItem(h, {
+                mark: { text: "S" },
+                activity: "Working in #design",
+                count: 2,
+                isPending: true,
+                label: "Scout",
+                isCurrent: false,
+                onClick: open("Scout")
+              })
+            ]
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Scout, Working in #design" })).toHaveAttr("aria-description", "Sending…"),
+      expect(within(role("button", { name: "Scout, Working in #design" }), selector("svg"))).toBeAbsent(),
+      expect(within(role("button", { name: "Scout, Working in #design" }), text("2"))).toBeAbsent()
+    )
+  })
+})
+
+describe("sidebarSection's title", () => {
+  const sectionView = (isTitleCurrent: boolean) => (_: Model, h: HtmlBuilder<Message>) =>
+    sidebarSection(h, {
+      label: "Agents",
+      onTitleClick: open("Agents"),
+      isTitleCurrent,
+      actions: [iconButton(h, { icon: "list", label: "Browse agents", onClick: open("Browse") }, { size: "compact" })],
+      children: []
+    })
+
+  it("is a button inside the heading that sends its message, and the actions are buttons beside it", () => {
+    scene(
+      { update, view: sidebarView(sectionView(false)) },
+      given(initial),
+      expect(within(role("heading", { name: "Agents", level: 2 }), role("button", { name: "Agents" }))).toExist(),
+      expect(role("button", { name: "Agents" })).not.toHaveAttr("aria-current"),
+      click(role("button", { name: "Agents" })),
+      expect(role("status")).toHaveText("Current Agents, searches 0, creations 0"),
+      click(role("button", { name: "Browse agents" })),
+      expect(role("status")).toHaveText("Current Browse, searches 0, creations 0")
+    )
+  })
+
+  it("is current while its list shows, which fills the heading like a current row", () => {
+    scene(
+      { update, view: sidebarView(sectionView(true)) },
+      given(initial),
+      expect(role("button", { name: "Agents" })).toHaveAttr("aria-current", "page"),
+      expect(role("button", { name: "Agents" })).toHaveClass("aria-[current=page]:text-ink")
+    )
+  })
+
+  it("is plain text, not a button, without a message, and a section with no items has no list", () => {
+    scene(
+      {
+        update,
+        view: sidebarView((_, h) => sidebarSection(h, { label: "Channels", children: [] }))
+      },
+      given(initial),
+      expect(role("heading", { name: "Channels", level: 2 })).toExist(),
+      expect(role("button", { name: "Channels" })).toBeAbsent(),
+      expect(role("list")).toBeAbsent()
     )
   })
 })
