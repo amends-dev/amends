@@ -29,6 +29,7 @@ export const init = ApplicationComposition.makeInit(() => ({
     taskPriority: "none",
     taskAssignee: "",
     memberFilter: "active",
+    assigneeFilter: "anyone",
     taskFilter: "all",
     taskSort: "activity",
     appearance: "system",

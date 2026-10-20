@@ -391,6 +391,51 @@
   }
 }
 
+/* The anchor of a tooltip's popover, its trigger, named for itself alone so that tooltips do not share one. */
+@utility tooltip-anchor {
+  anchor-scope: --tooltip;
+  anchor-name: --tooltip;
+}
+
+/*
+ * The popover above its trigger, 6px from it, centered on it. Where the browser places by anchor it is fixed to the
+ * window, so nothing that scrolls or clips around the trigger cuts it off; elsewhere it sits in the flow.
+ */
+@utility tooltip-above {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 50%;
+  margin-block-end: 0.375rem;
+  translate: -50% 0;
+
+  @supports (position-area: top) {
+    position: fixed;
+    position-anchor: --tooltip;
+    position-area: top;
+    justify-self: anchor-center;
+    inset: auto;
+    translate: none;
+  }
+}
+
+/* The popover below its trigger, for one that has no room above it, such as the mark in a pane's header. */
+@utility tooltip-below {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-start: 50%;
+  margin-block-start: 0.375rem;
+  translate: -50% 0;
+
+  @supports (position-area: bottom) {
+    position: fixed;
+    position-anchor: --tooltip;
+    position-area: bottom;
+    justify-self: anchor-center;
+    inset: auto;
+    translate: none;
+  }
+}
+
 /* The body text size sits on `body`: on `html` it would make every rem 15px instead of the 16px the scale is written in. */
 @layer base {
   html {

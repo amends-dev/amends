@@ -26,6 +26,7 @@
     "./sidebar": "./src/sidebar.ts",
     "./stateArt": "./src/stateArt.ts",
     "./toast": "./src/toast.ts",
+    "./tooltip": "./src/tooltip.ts",
     "./viewport": "./src/viewport.ts"
   },
   "scripts": {

@@ -20,7 +20,7 @@ import {
 } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
-import { choiceMenu, menu } from "./menu.ts"
+import { type ChoiceMenuChoice, choiceMenu, menu } from "./menu.ts"
 
 const Sort = Schema.Literals(["Activity", "Newest", "Oldest"])
 type Sort = typeof Sort.Type
@@ -428,6 +428,55 @@ describe("a menu of one choice whose button says something else", () => {
       ...sortOpened(),
       expect(role("menuitem", { name: "Any sort (selected)" })).toExist(),
       expect(role("menuitem", { name: "Newest" })).toExist()
+    )
+  })
+})
+
+describe("a menu of choices with a mark", () => {
+  const people: ReadonlyArray<ChoiceMenuChoice<Sort>> = [
+    ["Activity", "Anyone"],
+    ["Newest", "Alex Morgan", { text: "AM" }],
+    ["Oldest", "Review helper", { text: "R", tone: "lilac" }]
+  ]
+
+  const peopleView = Composition.makeView((model, h) =>
+    h.div(
+      [],
+      [
+        h.p([h.Role("status")], [`Sort ${model.sort}`]),
+        choiceMenu(h, {
+          choices: people,
+          value: model.sort,
+          text: "Assignee",
+          embed: (viewInputs) => h.block(SortBinding.embedView({ slotId: "sort", model: model.sortMenu, viewInputs }))
+        })
+      ]
+    )
+  )
+
+  it("shows the mark of a person at 22px before their name, in their tone, hidden from assistive technology, and none before a choice without one", () => {
+    scene(
+      { update, view: peopleView },
+      given(initial),
+      click(role("button", { name: "Assignee" })),
+      ...sortOpened(),
+      expect(within(role("menuitem", { name: "Alex Morgan" }), text("AM"))).toHaveClass("size-5.5"),
+      expect(within(role("menuitem", { name: "Alex Morgan" }), text("AM"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("menuitem", { name: "Alex Morgan" }), text("AM"))).toHaveClass("bg-avatar-neutral-bg"),
+      expect(within(role("menuitem", { name: "Review helper" }), text("R"))).toHaveClass("bg-avatar-lilac-bg"),
+      expect(within(role("menuitem", { name: "Anyone (selected)" }), selector(".uppercase"))).toBeAbsent()
+    )
+  })
+
+  it("names a choice by its label alone, and reports the value of the one chosen", () => {
+    scene(
+      { update, view: peopleView },
+      given(initial),
+      click(role("button", { name: "Assignee" })),
+      ...sortOpened(),
+      click(role("menuitem", { name: "Review helper" })),
+      ...sortClosed(),
+      expect(role("status")).toHaveText("Sort Oldest")
     )
   })
 })

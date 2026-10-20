@@ -17,6 +17,7 @@ import type { AnchorConfig, ViewInputs } from "@foldkit/ui/menu"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { buttonClass, buttonContent } from "./control.ts"
 import { icon } from "./icon.ts"
+import { type MarkContent, mark } from "./mark.ts"
 
 const wrapperLook = "inline-flex flex-none"
 
@@ -58,12 +59,14 @@ export type MenuPlacement = NonNullable<AnchorConfig["placement"]>
 
 /**
  * One line of the menu, which `Selected` reports by its `value`. A choice with an `isChecked` is one of a group of
- * which one is current, and shows a check mark while it is `true`; a choice without it is an action.
+ * which one is current, and shows a check mark while it is `true`; a choice without it is an action. A choice with a
+ * `mark` shows it before its label, at 22px, for a person or anything else that has one.
  */
 export type MenuChoice<Value extends string> = Readonly<{
   /** What the Block reports when it is chosen. Each choice of a menu has a value of its own. */
   value: Value
   label: string
+  mark?: MarkContent
   isChecked?: boolean
 }>
 
@@ -102,6 +105,7 @@ const renderItem = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>
   h.span(
     [h.Class(itemContent)],
     [
+      choice.mark === undefined ? h.empty : mark(h, { ...choice.mark, size: "choice" }),
       h.span([h.Class(itemLabel)], [choice.label]),
       ...(choice.isChecked === true
         ? [
@@ -207,15 +211,18 @@ export const menu = <Value extends string, Message, Requirements>(
   config: MenuConfig<Value>
 ): Html => config.embed(viewInputsOf(h, config))
 
+/** A choice of `choiceMenu`: its value, how the person reads it, and the mark that goes before it, if it has one. */
+export type ChoiceMenuChoice<Value extends string> = readonly [Value, string] | readonly [Value, string, MarkContent]
+
 /**
- * A button that shows the current one of `choices`, each a value and how the person reads it, and opens a menu to
- * choose another, as a select does in a toolbar. The button says `text` instead of the current choice's label when
- * given, such as "Status" while every status is chosen.
+ * A button that shows the current one of `choices`, each a value and how the person reads it, and a mark before it
+ * if it has one, and opens a menu to choose another, as a select does in a toolbar. The button says `text` instead
+ * of the current choice's label when given, such as "Status" while every status is chosen.
  */
 export const choiceMenu = <Value extends string, Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
-    choices: ReadonlyArray<readonly [Value, string]>
+    choices: ReadonlyArray<ChoiceMenuChoice<Value>>
     value: Value
     text?: string
     name?: string
@@ -231,7 +238,12 @@ export const choiceMenu = <Value extends string, Message, Requirements>(
     ...(config.placement === undefined ? {} : { placement: config.placement }),
     groups: [
       {
-        choices: config.choices.map(([value, label]) => ({ value, label, isChecked: value === config.value }))
+        choices: config.choices.map(([value, label, choiceMark]) => ({
+          value,
+          label,
+          ...(choiceMark === undefined ? {} : { mark: choiceMark }),
+          isChecked: value === config.value
+        }))
       }
     ],
     embed: config.embed

@@ -16,6 +16,7 @@ import {
   hint,
   iconButton,
   link,
+  linkButton,
   loadingLine,
   notice,
   noticeBox,
@@ -42,7 +43,7 @@ import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
 import { logo, logoMotions } from "../src/logo.ts"
 import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
-import { choiceMenu, type MenuGroup, menu } from "../src/menu.ts"
+import { type ChoiceMenuChoice, choiceMenu, type MenuGroup, menu } from "../src/menu.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
 import {
@@ -69,10 +70,12 @@ import {
 } from "../src/sidebar.ts"
 import { type StateArtKind, stateArt, stateArtKinds } from "../src/stateArt.ts"
 import { toast, toastStack } from "../src/toast.ts"
+import { tooltip } from "../src/tooltip.ts"
 import {
   AccountBinding,
   type ApplicationViewBuilder,
   ApplicationComposition,
+  AssigneeFilterBinding,
   ChooserModalBinding,
   ConfirmModalBinding,
   MemberFilterBinding,
@@ -88,6 +91,7 @@ import {
 import {
   type AccountEntry,
   type Appearance,
+  type AssigneeFilter,
   type Destination,
   Message,
   type MemberFilter,
@@ -302,6 +306,11 @@ const buttonGroup = (h: ApplicationViewBuilder, pressCount: number): Html => {
     ]),
     sample(h, "Link to another page, which opens in a new tab", [
       h.p([], ["MCP server · ", link(h, { label: "Documentation", href: "https://modelcontextprotocol.io" })])
+    ]),
+    sample(h, "Link in the look of a button, to the address of the page itself, which loads it again", [
+      linkButton(h, { label: "Reload", href: "" }, { variant: "primary" }),
+      linkButton(h, { label: "Reload", href: "" }),
+      linkButton(h, { label: "Reload", href: "" }, { variant: "primary", size: "large" })
     ]),
     sample(h, "Icon buttons, regular and compact", [
       iconButton(h, { icon: "mark-settings", label: "Settings", onClick: press }),
@@ -1178,10 +1187,14 @@ const somethingWentWrong = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
     art: "came-apart",
     title: "Something went wrong",
     copy: "amends stopped on an unexpected error. Reloading usually fixes it.",
-    action: button(h, "Reload", Message.ClickedButton(), { variant: "primary" }),
+    action: linkButton(h, { label: "Reload", href: "" }, { variant: "primary" }),
     level: 1
   })
 ]
+
+/** The screen after a crash, outside the session, so the header holds the brand alone. */
+const crashScreen = (h: ApplicationViewBuilder): Html =>
+  centered(h, { width: "form", children: [screenContent(h, somethingWentWrong(h))] })
 
 const workspaceClosedToYou = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   paneEmpty(h, {
@@ -1413,8 +1426,8 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
     ),
     sample(
       h,
-      "Form width, after an unexpected error",
-      [h.div([h.Class(screenFrame)], [formScreen(h, somethingWentWrong(h))])],
+      "Form width, after an unexpected error, outside the session: the brand alone in the header, and Reload a link to the page itself",
+      [h.div([h.Class(screenFrame)], [crashScreen(h)])],
       "flex flex-col"
     ),
     sample(
@@ -1449,14 +1462,14 @@ const iconGroup = (h: ApplicationViewBuilder): Html =>
 
 const markStatuses: ReadonlyArray<MarkStatus> = [online, { kind: "offline", label: "Offline" }, needsSetup, unavailable]
 
-const markSizes: ReadonlyArray<MarkSize> = ["xs", "sm", "md", "lg"]
+const markSizes: ReadonlyArray<MarkSize> = ["xs", "choice", "sm", "md", "lg"]
 
 const markGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Marks", [
     ...markStatuses.map((status) =>
       sample(
         h,
-        `Status ${status.label.toLowerCase()}, at every size: 20px, 24, 32, and 40, with its patch 7, 8, 9, and 10px`,
+        `Status ${status.label.toLowerCase()}, at every size: 20px, 22, 24, 32, and 40, with its patch 7, 7, 8, 9, and 10px`,
         markSizes.map((size) => mark(h, { text: "AM", size, status })),
         iconSizeRow
       )
@@ -1508,6 +1521,82 @@ const markGroup = (h: ApplicationViewBuilder): Html =>
         onClick: Message.ClickedButton()
       })
     ])
+  ])
+
+const tooltipRow = "flex items-center gap-6 pt-4"
+
+const tooltipScrollFrame = "mt-16 flex h-40 w-72 flex-col gap-32 overflow-y-auto outline outline-outline"
+
+const tooltipTones = [
+  { title: "Offline", detail: "It has not answered in a day." },
+  { title: "Online", detail: "It is at work in #general.", tone: "success" },
+  { title: "Needs setup", detail: "Its model connection was removed.", tone: "caution" },
+  { title: "Unavailable", detail: "Its integration isn't installed on this host.", tone: "danger" }
+] as const
+
+const tooltipGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Tooltip", [
+    sample(
+      h,
+      "A title and why under it, in each tone, above a mark the pointer rests on for 300ms; it is gone as soon as the pointer leaves",
+      tooltipTones.map(({ title, detail, ...rest }) =>
+        tooltip(h, { title, detail, ...rest, children: [mark(h, { text: title.slice(0, 1), size: "md" })] })
+      ),
+      tooltipRow
+    ),
+    sample(
+      h,
+      "The title alone, in each tone",
+      tooltipTones.map(({ title, ...rest }) =>
+        tooltip(h, { title, ...rest, children: [mark(h, { text: title.slice(0, 1), size: "md" })] })
+      ),
+      tooltipRow
+    ),
+    sample(
+      h,
+      "Over a control, which Tab reaches: the popover shows while the control has keyboard focus, and its label is what assistive technology reads",
+      [
+        tooltip(h, {
+          title: "Follow",
+          detail: "Get a notification when someone replies.",
+          children: [iconButton(h, { icon: "bell", label: "Follow", onClick: Message.ClickedButton() })]
+        })
+      ],
+      tooltipRow
+    ),
+    sample(h, "In a frame that scrolls, with the mark at its top edge: the popover is not cut off by the frame", [
+      h.div(
+        [h.Class(tooltipScrollFrame)],
+        [
+          tooltip(h, {
+            title: "Needs setup",
+            detail: "Its model connection was removed.",
+            tone: "caution",
+            children: [mark(h, { text: "R", size: "md" })]
+          }),
+          tooltip(h, {
+            title: "Unavailable",
+            detail: "Its integration isn't installed on this host.",
+            tone: "danger",
+            children: [mark(h, { text: "V", size: "md" })]
+          })
+        ]
+      )
+    ]),
+    sample(
+      h,
+      "Below the mark, for one with no room above it, such as the mark in a pane's header",
+      [
+        tooltip(h, {
+          title: "Needs setup",
+          detail: "Its model connection was removed.",
+          tone: "caution",
+          placement: "below",
+          children: [mark(h, { text: "R", size: "md" })]
+        })
+      ],
+      "flex items-center gap-6 pb-16"
+    )
   ])
 
 const openableThreads: ReadonlyArray<
@@ -2363,6 +2452,30 @@ const memberFilterMenu = (h: ApplicationViewBuilder, model: Model, place: Place)
           )
   })
 
+const assigneeFilterChoices: ReadonlyArray<ChoiceMenuChoice<AssigneeFilter>> = [
+  ["anyone", "Anyone"],
+  ["unassigned", "Unassigned"],
+  ["alex", "Alex Morgan", { text: "AM" }],
+  ["yumi", "Yumi Tanaka", { text: "YT" }],
+  ["review-helper", "Review helper", { text: "R", tone: "lilac" }]
+]
+
+/** The assignee filter says "Assignee" while anyone is chosen, and who or what was chosen once one is. */
+const assigneeFilterMenu = (h: ApplicationViewBuilder, model: Model): Html => {
+  const current = assigneeFilterChoices.find(([value]) => value === model.assigneeFilter)?.[1] ?? ""
+
+  return choiceMenu(h, {
+    choices: assigneeFilterChoices,
+    value: model.assigneeFilter,
+    ...(model.assigneeFilter === "anyone" ? { text: "Assignee" } : {}),
+    name: `Assignee: ${current}`,
+    embed: (viewInputs) =>
+      h.block(
+        AssigneeFilterBinding.embedView({ slotId: "assignee-filter", model: model.assigneeFilterMenu, viewInputs })
+      )
+  })
+}
+
 /** The status filter says "Status" while every status is chosen, and the status once one is. */
 const taskFilterMenu = (h: ApplicationViewBuilder, model: Model, place: Place): Html =>
   choiceMenu(h, {
@@ -2438,6 +2551,12 @@ const menuGroup = (h: ApplicationViewBuilder, model: Model): Html =>
       h,
       "A choice: the current one on the button with a chevron, the list opening below from its start, the current choice checked; the button says Status while every status is chosen",
       [taskFilterMenu(h, model, "sample"), taskSortMenu(h, model, "sample"), memberFilterMenu(h, model, "sample")],
+      menuFrame
+    ),
+    sample(
+      h,
+      "A choice with a mark before each person: Anyone and Unassigned, then each person at 22px, the button saying Assignee while anyone is chosen and the person's name once one is",
+      [assigneeFilterMenu(h, model)],
       menuFrame
     ),
     sample(
@@ -3706,6 +3825,7 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           iconGroup(h),
           logoGroup(h),
           markGroup(h),
+          tooltipGroup(h),
           detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
           paneEmptyGroup(h),

@@ -29,6 +29,9 @@ export type MemberFilter = typeof MemberFilter.Type
 export const TaskFilter = Schema.Literals(["all", "triage", "todo", "doing"])
 export type TaskFilter = typeof TaskFilter.Type
 
+export const AssigneeFilter = Schema.Literals(["anyone", "unassigned", "alex", "yumi", "review-helper"])
+export type AssigneeFilter = typeof AssigneeFilter.Type
+
 export const TaskSort = Schema.Literals(["activity", "newest", "oldest"])
 export type TaskSort = typeof TaskSort.Type
 
@@ -48,6 +51,7 @@ export const AccountEntry = Schema.Literals([
 export type AccountEntry = typeof AccountEntry.Type
 
 export const MemberFilterMenu = Menu.create<MemberFilter>()
+export const AssigneeFilterMenu = Menu.create<AssigneeFilter>()
 export const TaskFilterMenu = Menu.create<TaskFilter>()
 export const TaskSortMenu = Menu.create<TaskSort>()
 export const AccountMenu = Menu.create<AccountEntry>()
@@ -89,6 +93,8 @@ export const Model = Schema.Struct({
   confirmModal: DialogBlock.Model,
   memberFilter: MemberFilter,
   memberFilterMenu: MemberFilterMenu.Model,
+  assigneeFilter: AssigneeFilter,
+  assigneeFilterMenu: AssigneeFilterMenu.Model,
   taskFilter: TaskFilter,
   taskFilterMenu: TaskFilterMenu.Model,
   taskSort: TaskSort,

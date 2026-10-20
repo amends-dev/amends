@@ -324,6 +324,17 @@ export const link = <Message, Requirements>(
 ): Html => h.a([h.Href(config.href), h.Target("_blank"), h.Rel("noreferrer"), h.Class(linkLook)], [config.label])
 
 /**
+ * A link to `href` in the look of a button, for a control that goes to a page and sends nothing, such as Reload on a
+ * screen that has no messages left: the address of the page itself, `""`, loads it again. It is a link to assistive
+ * technology, and Enter follows it, as it does any link.
+ */
+export const linkButton = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; href: string }>,
+  look: ButtonLook = {}
+): Html => h.a([h.Href(config.href), h.Class(buttonClass(look))], buttonContent(h, config.label, look))
+
+/**
  * A button of one icon in the look of `iconButton`, named by `label`, over `attributes` that already give it its
  * behavior, such as the group a headless dialog publishes for the control that closes it.
  */

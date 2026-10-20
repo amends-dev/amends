@@ -19,7 +19,7 @@ bun run --filter @amends-dev/design workshop   # http://127.0.0.1:4420/
 ```
 
 A small Foldkit app in `workshop/` that shows every renderer in every state under a heading each:
-buttons by variant, disabled, large, and wide, with the link in a sentence, and a link to another page, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
+buttons by variant, disabled, large, and wide, with the link in a sentence, and a link to another page, and a link in the look of a button to the page's own address, and with an icon before the label, and icon buttons, regular and compact, and as a switch, off and pressed; a field empty, with a
 placeholder, filled, invalid, disabled, and with a hint under it; a hint; a textarea, and with a hint, refused, and
 disabled; a grid of selects, side
 by side and wrapping in a narrow column; a select with its label hidden, in a row beside a name; a
@@ -32,11 +32,11 @@ named for their workspaces, with a footnote after them, and a table of three gro
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
 sign-in's two steps and as the workspace picker five times, each with its pieces in `screenContent` as the app's
-pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header; the toast alone, with a detail, as a confirmation, and as a stack of
+pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header but the one after something went wrong, which is outside the session, with the brand alone in the header and Reload a link to the page itself; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
+Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice among them, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -122,12 +122,17 @@ headers to 104px, written `max-desktop:`. Below the
 tablet breakpoint is a phone, where inputs use 16px text so the browser does not zoom the page,
 written `max-tablet:`.
 
-Four utilities are the theme's own. `focus-ring` draws a 2px outline in `ink`, offset 2px outside
+Seven utilities are the theme's own. `focus-ring` draws a 2px outline in `ink`, offset 2px outside
 a control that has keyboard focus, and `focus-ring-inset` draws it inside, for full-width rows that
 would clip an outer one. `indicator-bar` draws the 2px, 20px-tall bar that marks the current rail
 destination and sidebar row, at the inline start of an element that is `relative`; a variant such as
 `aria-[current=page]:indicator-bar` shows it on the current one only. `chevron-down` draws the arrow
-of a select on the element it is on, which must hold the select. The base styles set `html` to the sans font, `ink`, and `canvas`, and `body`
+of a select on the element it is on, which must hold the select. `tooltip-anchor`, `tooltip-above`, and
+`tooltip-below` are the tooltip's: the first names its trigger as the anchor of its own popover, so that
+tooltips do not borrow each other's, and the others put the popover 6px above or below it, centered on it. Where the
+browser places by anchor (`position-area`) the popover is `fixed` to the window, so a list that scrolls or clips around
+the trigger does not cut it off; elsewhere it is `absolute` against the trigger, and a clipping ancestor cuts it off.
+`theme.test.ts` checks that each is written. The base styles set `html` to the sans font, `ink`, and `canvas`, and `body`
 to the `body` size with no margin; the size is on `body` because on `html` it would make a rem 15px
 instead of the 16px the scale is written in.
 
@@ -237,6 +242,11 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   `ink` at the size of the line around it, the look of a `link` button, that opens in a new tab and sends the page it was
   opened from nothing (`rel="noreferrer"`). A button that does something in the app is a `button`; this goes to another
   address.
+- `linkButton(h, { label, href }, look?)` is a link in the look of a button, `look` being the `variant`, `size`, `wide`,
+  `icon`, and `hasChevron` of `buttonClass`, for a control that goes to a page and sends no message. The address of the
+  page itself, `href: ""`, loads it again, which is how a screen that has no messages left reloads: the crash screen's
+  Reload is `linkButton(h, { label: "Reload", href: "" }, { variant: "primary" })`. It opens in the same tab and is a
+  link to assistive technology, which Enter follows.
 - `buttonRow(h, children, options?)` is a row of controls with an 8px gap, wrapping onto a new line when
   they do not fit, such as a thread's Follow and Rename or a form's Save and Cancel. With `isCentered`
   the controls are in the middle of the row's width, for the quiet button that ends a list, such as
@@ -309,9 +319,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 
 - `mark(h, { text | icon, size?, tone?, status? })` is the square that stands for a person, a workspace, an agent, or
   a connection: the `text` letters in capitals, or, for a thing that has no name to abbreviate, an `icon` drawn at the
-  size that fits the square (`xs`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
+  size that fits the square (`xs`, `xs`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
   (the default, `avatar-neutral`) or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, as a reply line shows those who
-  replied), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
+  replied), `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
   `"md"` (32px, `hint` text, as a message shows its author and an agent's row in a list), or `"lg"` (40px, `item` text, as a
   directory row shows it). A mark is `aria-hidden`: the name it abbreviates is always beside it. `sidebarHeader`,
   `sidebarItem`, `row`, `pane`, `message`, and `replyLine` draw their marks with it.
@@ -322,7 +332,7 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
     setup) a triangle in `caution-mark`, as `@amends-dev/ui` draws it, a little wider than tall; `"blocked"` (can't run,
     unavailable) a square in `danger-mark` with a 1.5px bar of the knockout across its middle, inset 20% each side. The
     patch is 8px on a 24px mark, 9px on 32, and 10px on 40, as the mocks and `@amends-dev/ui` size it, and 7px on
-    20px, the least `@amends-dev/ui` draws. The mark's `title` is the status's `label`, with the `detail` after a colon
+    20px and 22px, the least `@amends-dev/ui` draws. The mark's `title` is the status's `label`, with the `detail` after a colon
     when there is one, which the browser shows on hover; a tooltip is for later. A mark stays hidden from assistive
     technology, since it knows only the letters: the row that holds it is named by the name and then the status's label,
     "Atlas, Needs setup".
@@ -363,7 +373,9 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
 - What a screen says when it has nothing to show is the pane module's `paneEmpty`: a state art, a title, a
   line, and an action under it, 64px under what is above it. Under the screen's `heading` it is an `h2`,
   as a list that is empty says; when the message is all the screen has, such as the host not being
-  reached, it takes `level: 1` and is the screen's `h1`, with no `heading` of its own.
+  reached, it takes `level: 1` and is the screen's `h1`, with no `heading` of its own. The screen after an unexpected
+  error is outside the session, so it has no `actions` in its header, and its Reload is a `linkButton` to the page's own
+  address, since the framework's crash view has no messages to send.
 
 ### `@amends-dev/design/form`
 
@@ -856,6 +868,28 @@ A Block uses it in four steps:
 
 The groups Block's form for a new team does all four.
 
+### `@amends-dev/design/tooltip`
+
+The words over a mark whose meaning has no room beside it, as `@amends-dev/ui`'s Tooltip is, made of CSS with no
+Foldkit Block: the popover's showing is the pointer's or the focus's, not the app's state, and a Block bound under a page
+costs the app's types.
+
+- `tooltip(h, { title, detail?, tone?, placement?, children })` wraps `children` in a trigger and gives them a popover:
+  the `title`, such as "Needs setup", in medium weight, with the `detail`, why, in a sentence under it in `ink-secondary`,
+  on a `popover` card with a border and `shadow-popover`, 280px wide at most. A `tone`, `"success"`, `"caution"`, or
+  `"danger"`, colors the title as a status; without one it is `ink`. The popover shows after the pointer has rested on
+  the trigger for 300ms, and also at once while a control inside the trigger has keyboard focus (`:focus-visible`, so
+  a click does not show it), and it is gone at once when the pointer or the focus leaves. It sits above the trigger,
+  6px from it and centered on it, or with `placement: "below"` under it, for a trigger with no room above, such as the
+  mark in a pane's header at the top of the window. The popover takes no pointer events, as in `@amends-dev/ui`, so it
+  cannot be hovered or dismissed without moving away, and it flips to neither side by itself: the caller chooses.
+- The trigger is a `span`, `inline-flex` and `flex-none`, so it can sit inside a link and holds the layout of what it
+  wraps, and it is the `tooltip-anchor` of its popover (see the theme's utilities).
+- The popover is `aria-hidden`: hover reaches no one who is not using a pointer, so the words must reach assistive
+  technology another way, as they do for a mark, whose row is named by its name and then the status's label, and for a
+  control inside the trigger, which has its own label. No `title` attribute is set, which a browser would show a second
+  time.
+
 ### `@amends-dev/design/menu`
 
 What opens from a button to choose among things: a filter above a list, a sort, the account at the foot of the rail. It
@@ -869,14 +903,16 @@ End, typeahead by label, Enter, Escape, a click outside, and the focus that retu
   when its text says too little, such as "Sort: Latest activity", and a plain button must have one. The `placement` is
   where the list opens from its button, `bottom-start` unless given, as `@foldkit/ui` names it: the rail's account is
   `right-end`, and a filter at the end of a toolbar `bottom-end`. The `groups` are `{ label?, choices }`, each choice
-  `{ value, label, isChecked? }`, separated by a line: a group's `label` is a heading above it, a choice with an
+  `{ value, label, mark?, isChecked? }`, separated by a line: a choice's `mark`, a `MarkContent`, is drawn at 22px before
+  its label, hidden from assistive technology, for a person; a group's `label` is a heading above it, a choice with an
   `isChecked` is one of a group of which one is current, with a check mark while it is `true`, and a choice without one
   is an action. The `header`, `{ title, detail? }`, is a title over a detail above the first group, with a line under it,
   as the account's name is over its sign-in address. A choice's `value` is what the Block reports, and each choice of a
   menu has one of its own.
 - `choiceMenu(h, { choices, value, text?, name?, placement?, embed })` is the toolbar's replacement for a select: a menu of
-  one group of `choices`, each `[value, label]`, with `value` checked and its label on the button, or `text` when given,
-  such as "Status" while every status is chosen.
+  one group of `choices`, each `[value, label]` or `[value, label, mark]`, with `value` checked and its label on the
+  button, or `text` when given, such as "Status" while every status is chosen. A choice with a `mark` is a person: the
+  assignee filter lists Anyone and Unassigned, which have none, and then each person with theirs.
 
 A Block uses it in three steps:
 

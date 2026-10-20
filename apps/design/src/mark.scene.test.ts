@@ -56,6 +56,37 @@ describe("mark", () => {
   })
 })
 
+describe("mark beside a choice", () => {
+  it("is 22px, between the reply line's 20 and the row's 24, with letters of 10px, hidden from assistive technology", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div([], [h.p([], ["Alex Morgan"]), mark(h, { text: "am", size: "choice" })])
+      },
+      given(null),
+      expect(text("am")).toHaveClass("size-5.5"),
+      expect(text("am")).toHaveClass("text-[0.625rem]"),
+      expect(text("am")).toHaveClass("uppercase"),
+      expect(text("am")).toHaveAttr("aria-hidden", "true"),
+      expect(role("img")).toBeAbsent()
+    )
+  })
+
+  it("fits its icon at the size of the 20px mark's, 12px", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div([h.Id("icon")], [mark(h, { icon: "mark-connections", size: "choice" })])
+      },
+      given(null),
+      expect(within(selector("#icon"), selector("svg"))).toHaveAttr("width", "0.75rem"),
+      expect(within(selector("#icon"), selector("span.relative"))).toHaveClass("size-5.5")
+    )
+  })
+})
+
 describe("mark with an icon", () => {
   const icons = (_: null, h: HtmlBuilder<never>) =>
     h.div(
@@ -126,9 +157,10 @@ describe("mark with an icon", () => {
   })
 })
 
-/** The cut-out and the patch a status has at each size: 8px on 24, 9 on 32, 10 on 40, and 7 on 20. */
+/** The cut-out and the patch a status has at each size: 8px on 24, 9 on 32, 10 on 40, and 7 on 20 and 22. */
 const patchSizes: ReadonlyArray<readonly [MarkSize, string, string]> = [
   ["xs", "size-2.75", "size-1.75"],
+  ["choice", "size-2.75", "size-1.75"],
   ["sm", "size-3", "size-2"],
   ["md", "size-3.25", "size-2.25"],
   ["lg", "size-3.5", "size-2.5"]

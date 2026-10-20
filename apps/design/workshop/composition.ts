@@ -5,6 +5,7 @@ import {
   AccountMenu,
   Appearance,
   ApplicationDefinition,
+  AssigneeFilterMenu,
   MemberFilterMenu,
   TaskFilterMenu,
   TaskSortMenu
@@ -46,6 +47,17 @@ export const MemberFilterBinding = ApplicationDefinition.bindChild(MemberFilterM
   outMessage: {
     fold: MemberFilterMenu.OutMessage.match({
       Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ memberFilter: () => value })),
+      Closed: () => ApplicationDefinition.stepNoop()
+    })
+  }
+})
+
+export const AssigneeFilterBinding = ApplicationDefinition.bindChild(AssigneeFilterMenu, {
+  field: "assigneeFilterMenu",
+  init: { contextToArgs: () => [{ id: "workshop-assignee-filter" }] },
+  outMessage: {
+    fold: AssigneeFilterMenu.OutMessage.match({
+      Selected: ({ value }) => ApplicationDefinition.stepFields(() => ({ assigneeFilter: () => value })),
       Closed: () => ApplicationDefinition.stepNoop()
     })
   }
@@ -135,6 +147,7 @@ export const ApplicationComposition = ApplicationDefinition.makeComposition({
     ChooserModalBinding,
     ConfirmModalBinding,
     MemberFilterBinding,
+    AssigneeFilterBinding,
     TaskFilterBinding,
     TaskSortBinding,
     ToolbarFilterBinding,

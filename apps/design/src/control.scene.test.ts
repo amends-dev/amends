@@ -40,6 +40,7 @@ import {
   iconButton,
   iconSubmit,
   link,
+  linkButton,
   loadingLine,
   notice,
   noticeBox,
@@ -890,6 +891,47 @@ describe("link", () => {
       expect(role("link", { name: "Documentation" })).toHaveAttr("target", "_blank"),
       expect(role("link", { name: "Documentation" })).toHaveAttr("rel", "noreferrer"),
       expect(role("link", { name: "Documentation" })).toHaveClass("underline")
+    )
+  })
+})
+
+describe("linkButton", () => {
+  it("is a link found by its name, to the address it is given, in the look of a button, and opens in the same tab", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          linkButton(h, { label: "Reload", href: "" }, { variant: "primary" }),
+          linkButton(h, { label: "Documentation", href: "/docs" })
+        ])
+      },
+      given(initial),
+      expect(role("link", { name: "Reload" })).toHaveAttr("href", ""),
+      expect(role("link", { name: "Reload" })).toHaveClass("bg-action"),
+      expect(role("link", { name: "Reload" })).toHaveClass("text-on-action"),
+      expect(role("link", { name: "Reload" })).toHaveClass("min-h-9"),
+      expect(role("link", { name: "Reload" })).toHaveClass("focus-ring"),
+      expect(role("link", { name: "Reload" })).not.toHaveAttr("target"),
+      expect(role("link", { name: "Documentation" })).toHaveAttr("href", "/docs"),
+      expect(role("link", { name: "Documentation" })).toHaveClass("border-outline"),
+      expect(role("button")).toBeAbsent()
+    )
+  })
+
+  it("takes the size and the icon of a button", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          linkButton(h, { label: "Reload", href: "" }, { variant: "primary", size: "large" }),
+          linkButton(h, { label: "New task", href: "/tasks/new" }, { icon: "mark-new" })
+        ])
+      },
+      given(initial),
+      expect(role("link", { name: "Reload" })).toHaveClass("min-h-11"),
+      expect(role("link", { name: "Reload" })).toHaveClass("text-item"),
+      expect(role("link", { name: "New task" })).toHaveClass("gap-2"),
+      expect(within(role("link", { name: "New task" }), selector("svg"))).toHaveAttr("aria-hidden", "true")
     )
   })
 })

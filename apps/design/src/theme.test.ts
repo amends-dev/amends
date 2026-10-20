@@ -59,3 +59,24 @@ describe("the theme's Appearance", () => {
     expect(lightOnly).toEqual(["--amends-status-knockout"])
   })
 })
+
+describe("the theme's tooltip utilities", () => {
+  it("give each trigger an anchor of its own, so that tooltips do not borrow each other's", () => {
+    const anchor = blockAfter("@utility tooltip-anchor {")
+
+    expect(anchor).toContain("anchor-scope: --tooltip")
+    expect(anchor).toContain("anchor-name: --tooltip")
+  })
+
+  it("place the popover above or below its trigger by anchor where the browser can, and in the flow where it cannot", () => {
+    const above = blockAfter("@utility tooltip-above {")
+    const below = blockAfter("@utility tooltip-below {")
+
+    expect(above).toContain("position: absolute")
+    expect(above).toContain("@supports (position-area: top)")
+    expect(above).toContain("position-area: top")
+    expect(below).toContain("position: absolute")
+    expect(below).toContain("@supports (position-area: bottom)")
+    expect(below).toContain("position-area: bottom")
+  })
+})
