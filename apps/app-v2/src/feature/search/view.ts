@@ -83,7 +83,7 @@ const searchModal = (render: RenderInfo, model: Model, h: SearchViewBuilder): Ht
 
   return modal(h, render, {
     title: "Find anything",
-    width: "wide",
+    size: "wide",
     body: [
       field(
         h,

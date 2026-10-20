@@ -730,7 +730,7 @@ const historyModal = (render: RenderInfo, model: Model, now: DateTime.Utc, h: Se
   return modal(h, render, {
     title: "Invitations",
     context: workspaceName(model),
-    width: "wide",
+    size: "wide",
     body: [
       summary(h, { copy: "Invitations", count: `${history.length} total` }),
       history.length === 0
@@ -833,7 +833,7 @@ const changingNameModal = (
     title: "Your name",
     context: workspaceName(model),
     description: "What people in this workspace call you. Others keep their own.",
-    width: "compact",
+    size: "compact",
     body: [
       field(
         h,

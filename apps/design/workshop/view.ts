@@ -1,11 +1,12 @@
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import type { ViewInputs } from "@foldkit/ui/menu"
 import * as Option from "effect/Option"
-import type { Html } from "foldkit/html"
+import type { Html, HtmlBuilder } from "foldkit/html"
 import { centered, centeredAccount, copy, heading, screenContent } from "../src/centered.ts"
 import { composer } from "../src/composer.ts"
 import {
   announcement,
+  answerKeys,
   button,
   buttonRow,
   type Choice,
@@ -102,7 +103,8 @@ import {
   turnLog,
   turnRow
 } from "../src/message.ts"
-import { modal, modalList } from "../src/modal.ts"
+import { type ModalRender, modal, modalList } from "../src/modal.ts"
+import { palette, type PaletteItem, type PaletteSection } from "../src/palette.ts"
 import {
   pane,
   paneBack,
@@ -140,6 +142,7 @@ import {
   AssigneeFilterBinding,
   ChooserModalBinding,
   ChosenPickerBinding,
+  FormModalBinding,
   CompactModalBinding,
   ConfirmModalBinding,
   CreateModalBinding,
@@ -159,6 +162,8 @@ import {
   ToolbarFilterBinding,
   ToolbarSortBinding,
   VisibilityBinding,
+  PaletteModalBinding,
+  SettingsModalBinding,
   WideModalBinding
 } from "./composition.ts"
 import {
@@ -178,6 +183,12 @@ import {
   type TaskStatus,
   type Visibility
 } from "./definition.ts"
+
+/** What a dialog publishes to a modal that the workshop's builder draws. */
+type ApplicationModalRender =
+  ApplicationViewBuilder extends HtmlBuilder<infer Universe, infer Requirements>
+    ? ModalRender<Universe, Requirements>
+    : never
 
 const pageColumn = "mx-auto flex max-w-3xl flex-col px-6 py-8"
 
@@ -4372,7 +4383,12 @@ const toastGroup = (h: ApplicationViewBuilder): Html =>
     )
   ])
 
-const groupNameField = (h: ApplicationViewBuilder, id: string, model: Model, render: RenderInfo): Html =>
+const groupNameField = (
+  h: ApplicationViewBuilder,
+  id: string,
+  model: Model,
+  render: Pick<RenderInfo, "initialFocus">
+): Html =>
   field(
     h,
     {
@@ -4430,15 +4446,14 @@ const settingsModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mod
     body:
       model.modalTab === "general"
         ? [
-            groupNameField(h, "wide-modal-group-name", model, render),
-            groupPrivateToggle(h, "wide-modal-group-private", model)
+            groupNameField(h, "settings-modal-group-name", model, render),
+            groupPrivateToggle(h, "settings-modal-group-private", model)
           ]
         : membersTab(h, model),
     ...(model.modalTab === "general"
       ? { cancelLabel: "Cancel", footer: [submit(h, "Save changes")] }
       : { leading: [button(h, "Invite people", Message.ClickedButton())], cancelLabel: "Done" }),
-    onSubmit: Message.SubmittedWideModal(),
-    width: "wide"
+    onSubmit: Message.SubmittedSettingsModal()
   })
 
 const confirmModal = (h: ApplicationViewBuilder, render: RenderInfo): Html =>
@@ -4450,7 +4465,8 @@ const confirmModal = (h: ApplicationViewBuilder, render: RenderInfo): Html =>
     cancelLabel: "Cancel",
     isCancelLeading: true,
     footer: [submit(h, "Remove connection")],
-    onSubmit: Message.SubmittedConfirmModal()
+    onSubmit: Message.SubmittedConfirmModal(),
+    size: "compact"
   })
 
 const compactModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
@@ -4484,8 +4500,193 @@ const compactModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Mode
     isCancelDisabled: model.isNameSending,
     footer: [submit(h, model.isNameSending ? "Saving…" : "Save name", { isDisabled: model.isNameSending })],
     onSubmit: Message.SubmittedCompactModal(),
-    width: "compact"
+    size: "compact"
   })
+
+const formModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Configure connection",
+    context: "Mercier & Co",
+    description: "Name the connection and give the key it signs in with.",
+    body: [
+      field(
+        h,
+        {
+          id: "form-modal-connection-name",
+          label: "Name",
+          type: "text",
+          value: model.connectionName,
+          isAutofocus: false,
+          attributes: render.initialFocus,
+          onInput: (value) => Message.TypedConnectionName({ value })
+        },
+        Option.none()
+      ),
+      field(
+        h,
+        {
+          id: "form-modal-connection-key",
+          label: "API key",
+          type: "password",
+          value: model.connectionKey,
+          hint: "Kept encrypted. Only the last four characters show again.",
+          isAutofocus: false,
+          onInput: (value) => Message.TypedConnectionKey({ value })
+        },
+        Option.none()
+      )
+    ],
+    leading: [button(h, "Back", Message.ClickedButton())],
+    cancelLabel: "Cancel",
+    footer: [submit(h, "Create connection")],
+    onSubmit: Message.SubmittedFormModal(),
+    size: "form"
+  })
+
+const wideModal = (h: ApplicationViewBuilder, render: RenderInfo, model: Model): Html =>
+  modal(h, render, {
+    title: "Add agent",
+    context: "Mercier & Co",
+    description: "Name the agent, say what it is for, and tell it how to work.",
+    body: [
+      fieldGrid(h, [
+        field(
+          h,
+          {
+            id: "wide-modal-agent-name",
+            label: "Name",
+            type: "text",
+            value: model.agentName,
+            isAutofocus: false,
+            attributes: render.initialFocus,
+            onInput: (value) => Message.TypedAgentName({ value })
+          },
+          Option.none()
+        ),
+        field(
+          h,
+          {
+            id: "wide-modal-agent-role",
+            label: "Role",
+            type: "text",
+            value: model.agentRole,
+            placeholder: "e.g. Reviewer",
+            isAutofocus: false,
+            onInput: (value) => Message.TypedAgentRole({ value })
+          },
+          Option.none()
+        )
+      ]),
+      textarea(h, {
+        id: "wide-modal-agent-instructions",
+        label: "Instructions",
+        value: model.agentInstructions,
+        rows: 8,
+        hint: "Sent to the model at the start of every turn.",
+        onInput: (value) => Message.TypedAgentInstructions({ value })
+      })
+    ],
+    cancelLabel: "Cancel",
+    footer: [submit(h, "Add agent", { isDisabled: model.agentName.trim() === "" })],
+    onSubmit: Message.SubmittedWideModal(),
+    size: "wide"
+  })
+
+type PalettePlace = Omit<PaletteItem<Message>, "isActive" | "onClick">
+
+type PalettePlaces = Readonly<{ title: string; items: ReadonlyArray<PalettePlace> }>
+
+const palettePlaces: ReadonlyArray<PalettePlaces> = [
+  {
+    title: "Go to",
+    items: [
+      { id: "workshop-palette-inbox", label: "Inbox", leading: { icon: "mark-mail" } },
+      { id: "workshop-palette-agents", label: "Agents", leading: { icon: "mark-agents" } },
+      { id: "workshop-palette-connections", label: "Connections", leading: { icon: "mark-connections" } },
+      { id: "workshop-palette-settings", label: "Settings", leading: { icon: "mark-settings" } }
+    ]
+  },
+  {
+    title: "Groups",
+    items: ["general", "design", "engineering", "product"].map((name) => ({
+      id: `workshop-palette-group-${name}`,
+      label: name,
+      leading: { icon: "mark-channel" }
+    }))
+  },
+  {
+    title: "People",
+    items: [
+      { id: "workshop-palette-person-alex", label: "Alex Morgan", detail: "Direct message", leading: { text: "AM" } },
+      { id: "workshop-palette-person-sara", label: "Sara Lind", detail: "Direct message", leading: { text: "SL" } },
+      { id: "workshop-palette-person-oliver", label: "Oliver Dean", detail: "Direct message", leading: { text: "OD" } }
+    ]
+  },
+  {
+    title: "Agents",
+    items: [{ id: "workshop-palette-agent-yumi", label: "Yumi", leading: { text: "Y", tone: "lilac" } }]
+  }
+]
+
+/** The places whose names contain what is typed, a section at a time, and none of a section that has none. */
+const placesNamed = (query: string): ReadonlyArray<PalettePlaces> => {
+  const wanted = query.trim().toLowerCase()
+
+  return palettePlaces
+    .map(({ title, items }) => ({ title, items: items.filter(({ label }) => label.toLowerCase().includes(wanted)) }))
+    .filter(({ items }) => items.length > 0)
+}
+
+/** The places as the palette lists them, the one at `activeIndex` among them all reached, and each picking itself. */
+const paletteSectionsOf = (
+  places: ReadonlyArray<PalettePlaces>,
+  activeIndex: number
+): ReadonlyArray<PaletteSection<Message>> => {
+  const activeId = places.flatMap(({ items }) => items).at(activeIndex)?.id
+
+  return places.map(({ title, items }) => ({
+    title,
+    items: items.map((place) => ({ ...place, isActive: place.id === activeId, onClick: Message.PickedPaletteItem() }))
+  }))
+}
+
+/** What the arrow keys and Enter do in the palette's field: move through the places, wrapping, or pick the one reached. */
+const answerPaletteKey = (key: string, count: number, activeIndex: number): Option.Option<Message> => {
+  if (count === 0) {
+    return Option.none()
+  }
+
+  if (key === "ArrowDown") {
+    return Option.some(Message.MovedPaletteActive({ to: (activeIndex + 1) % count }))
+  }
+
+  if (key === "ArrowUp") {
+    return Option.some(Message.MovedPaletteActive({ to: (activeIndex + count - 1) % count }))
+  }
+
+  return key === "Enter" ? Option.some(Message.PickedPaletteItem()) : Option.none()
+}
+
+const paletteOf = (h: ApplicationViewBuilder, render: ApplicationModalRender, model: Model): Html => {
+  const places = placesNamed(model.paletteQuery)
+  const count = places.flatMap(({ items }) => items).length
+  const activeId = places.flatMap(({ items }) => items).at(model.paletteActive)?.id
+
+  return palette(h, render, {
+    label: "Jump to",
+    id: "workshop-palette",
+    placeholder: "Jump to a group, person, or page…",
+    query: model.paletteQuery,
+    onInput: (value) => Message.TypedPaletteQuery({ value }),
+    attributes: [
+      ...render.initialFocus,
+      answerKeys(h, (key) => answerPaletteKey(key, count, model.paletteActive)),
+      ...(activeId === undefined ? [] : [h.AriaActiveDescendant(activeId)])
+    ],
+    sections: paletteSectionsOf(places, model.paletteActive),
+    emptyText: `Nothing matches "${model.paletteQuery.trim()}".`
+  })
+}
 
 type IntegrationSample = Readonly<{ name: string; detail: string }>
 
@@ -4804,21 +5005,54 @@ const membersGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     )
   ])
 
+/**
+ * The `frame` that the workshop is opened with to show a regular modal alone, as a phone shows it. A modal fills the
+ * window below 48rem, which only a window of that width shows, so it is shown in a frame that is a window of its own,
+ * 360px wide.
+ */
+export const phoneModalFrame = "phone-modal"
+
+/** The `frame` that the workshop is opened with to show the palette alone, as a phone shows it. */
+export const phonePaletteFrame = "phone-palette"
+
+const phoneModalSample = (h: ApplicationViewBuilder): Html =>
+  sample(
+    h,
+    "Below 48rem every modal fills the window, in a frame 360px wide: no shadow, below the safe area at the top, and the footer's buttons sharing its width. The palette fills it too, with no keys to show",
+    [
+      h.iframe([
+        h.Class(phoneWindowFrame),
+        h.Title("Regular modal in a window 360px wide"),
+        h.Src(`?frame=${phoneModalFrame}`)
+      ]),
+      h.iframe([
+        h.Class(phoneWindowFrame),
+        h.Title("Palette in a window 360px wide"),
+        h.Src(`?frame=${phonePaletteFrame}`)
+      ])
+    ],
+    "flex flex-wrap items-start gap-6"
+  )
+
 const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
   group(h, "Modal", [
-    sample(h, "A context, a field with the initial focus, a toggle, and a footer", [
-      button(h, "Open the modal", Message.ClickedOpenModal()),
-      h.block(
-        ModalBinding.embedView({
-          slotId: "modal",
-          model: model.modal,
-          viewInputs: { toView: (render) => renameModal(h, render, model) }
-        })
-      )
-    ]),
     sample(
       h,
-      "A form with a description, a field with a placeholder, a choice, and a members picker with the person locked; its action waits for a name",
+      "Regular, the default, 40rem by 37.5rem: a context, a field with the initial focus, a toggle, and a footer whose Cancel is a secondary button, bordered as the action beside it is",
+      [
+        button(h, "Open the modal", Message.ClickedOpenModal()),
+        h.block(
+          ModalBinding.embedView({
+            slotId: "modal",
+            model: model.modal,
+            viewInputs: { toView: (render) => renameModal(h, render, model) }
+          })
+        )
+      ]
+    ),
+    sample(
+      h,
+      "Regular, with a description, a field with a placeholder, a choice, and a members picker with the person locked; its action waits for a name",
       [
         button(h, "Open the create group modal", Message.ClickedOpenCreateModal()),
         h.block(
@@ -4832,7 +5066,7 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
     ),
     sample(
       h,
-      "A view the modal moved to, with Back before the title in place of Close, the list of people always shown, and a wide action",
+      "Regular, a view the modal moved to, with Back before the title in place of Close, the list of people always shown, and a wide action",
       [
         button(h, "Open the add members view", Message.ClickedOpenAddViewModal()),
         h.block(
@@ -4844,26 +5078,30 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
         )
       ]
     ),
-    sample(h, "A confirmation, with Cancel at the start of the footer and the primary action at its end", [
-      button(h, "Open the confirmation", Message.ClickedOpenConfirmModal()),
-      h.block(
-        ConfirmModalBinding.embedView({
-          slotId: "confirm-modal",
-          model: model.confirmModal,
-          viewInputs: { hasDescription: true, toView: (render) => confirmModal(h, render) }
-        })
-      )
-    ]),
     sample(
       h,
-      "Wide, with tabs and a description; on Members, an action at the start of the footer and Done at its end",
+      "Regular, with tabs and a description; on Members, an action at the start of the footer and Done at its end",
       [
-        button(h, "Open the wide modal", Message.ClickedOpenWideModal()),
+        button(h, "Open the settings modal", Message.ClickedOpenSettingsModal()),
         h.block(
-          WideModalBinding.embedView({
-            slotId: "wide-modal",
-            model: model.wideModal,
+          SettingsModalBinding.embedView({
+            slotId: "settings-modal",
+            model: model.settingsModal,
             viewInputs: { hasDescription: true, toView: (render) => settingsModal(h, render, model) }
+          })
+        )
+      ]
+    ),
+    sample(
+      h,
+      "Compact, 35rem wide and as tall as its content: a confirmation, with Cancel at the start of the footer and the primary action at its end",
+      [
+        button(h, "Open the confirmation", Message.ClickedOpenConfirmModal()),
+        h.block(
+          ConfirmModalBinding.embedView({
+            slotId: "confirm-modal",
+            model: model.confirmModal,
+            viewInputs: { hasDescription: true, toView: (render) => confirmModal(h, render) }
           })
         )
       ]
@@ -4878,7 +5116,31 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
         })
       )
     ]),
-    sample(h, "A search over rows that run to the panel's edges", [
+    sample(
+      h,
+      "Form, 40rem wide and as tall as its content: two fields, a hint, a control at the start of the footer, and Cancel and the action at its end",
+      [
+        button(h, "Open the form modal", Message.ClickedOpenFormModal()),
+        h.block(
+          FormModalBinding.embedView({
+            slotId: "form-modal",
+            model: model.formModal,
+            viewInputs: { hasDescription: true, toView: (render) => formModal(h, render, model) }
+          })
+        )
+      ]
+    ),
+    sample(h, "Wide, 45rem by 54rem: fields side by side over a taller box; its action waits for a name", [
+      button(h, "Open the wide modal", Message.ClickedOpenWideModal()),
+      h.block(
+        WideModalBinding.embedView({
+          slotId: "wide-modal",
+          model: model.wideModal,
+          viewInputs: { hasDescription: true, toView: (render) => wideModal(h, render, model) }
+        })
+      )
+    ]),
+    sample(h, "Regular, a search over rows that run to the panel's edges", [
       button(h, "Open the chooser", Message.ClickedOpenChooserModal()),
       h.block(
         ChooserModalBinding.embedView({
@@ -4887,7 +5149,22 @@ const modalGroup = (h: ApplicationViewBuilder, model: Model): Html =>
           viewInputs: { toView: (render) => chooserModal(h, render, model) }
         })
       )
-    ])
+    ]),
+    sample(
+      h,
+      "Palette, 40rem by 30rem near the top of the window, with no title: the field and Close, the places under the title of their section, the one reached filled, and the keys; the arrow keys move, Enter picks, and what matches nothing says so",
+      [
+        button(h, "Open the palette", Message.ClickedOpenPaletteModal()),
+        h.block(
+          PaletteModalBinding.embedView({
+            slotId: "palette-modal",
+            model: model.paletteModal,
+            viewInputs: { toView: (render) => paletteOf(h, render, model) }
+          })
+        )
+      ]
+    ),
+    phoneModalSample(h)
   ])
 
 const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
@@ -5086,4 +5363,39 @@ export const listPaneView = ApplicationComposition.makeView((model, h) => ({
 export const directoryTableView = ApplicationComposition.makeView((_model, h) => ({
   title: "amends design workshop: directory table",
   body: h.div([h.Class(tableFrameBody)], groupTable(h))
+}))
+
+/**
+ * What an open dialog publishes, for a modal shown in a frame without the dialog that opens it: the dialog open and
+ * filling the frame, as the headless dialog's element does, and no attribute in any other group.
+ */
+const openDialogRender = (h: ApplicationViewBuilder): ApplicationModalRender => ({
+  dialog: [h.Open(true), h.Style({ position: "fixed", inset: "0", width: "100%", height: "100%" })],
+  backdrop: [],
+  panel: [],
+  title: [],
+  description: [],
+  initialFocus: [],
+  closeButton: [],
+  isVisible: true
+})
+
+export const phoneModalView = ApplicationComposition.makeView((model, h) => ({
+  title: "amends design workshop: modal on a phone",
+  body: modal(h, openDialogRender(h), {
+    title: "Rename group",
+    context: "# general",
+    body: [
+      groupNameField(h, "phone-modal-group-name", model, { initialFocus: [] }),
+      groupPrivateToggle(h, "phone-modal-group-private", model)
+    ],
+    cancelLabel: "Cancel",
+    footer: [submit(h, "Save changes")],
+    onSubmit: Message.SubmittedModal()
+  })
+}))
+
+export const phonePaletteView = ApplicationComposition.makeView((model, h) => ({
+  title: "amends design workshop: palette on a phone",
+  body: paletteOf(h, openDialogRender(h), model)
 }))

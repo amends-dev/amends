@@ -622,7 +622,7 @@ const addingModal = (
   return modal(h, render, {
     title: "Add agent",
     context: workspaceName,
-    width: "wide",
+    size: "wide",
     body: [
       field(
         h,

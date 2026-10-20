@@ -1,9 +1,9 @@
 /**
  * What the workshop remembers: the text of its fields, boxes, and composers, among them the search over its agents,
  * which switches are on, the plan chosen, a task's status, priority, and assignee, which the selects and the menus of
- * the task's properties change, which rail destination, pane tab, and thread are current, the group settings typed in
- * the modals, which section of the wide one shows, whether each modal is open, what each menu chose and whether it is
- * open, and how often a button was pressed.
+ * the task's properties change, which rail destination, pane tab, and thread are current, what is typed in the modals
+ * and the palette and which place the palette has reached, which section of the group settings shows, whether each
+ * modal is open, what each menu chose and whether it is open, and how often a button was pressed.
  */
 
 import { Multi } from "@foldkit/ui/combobox"
@@ -99,6 +99,13 @@ export const Model = Schema.Struct({
   editText: Schema.String,
   groupName: Schema.String,
   newGroupName: Schema.String,
+  connectionName: Schema.String,
+  connectionKey: Schema.String,
+  agentName: Schema.String,
+  agentRole: Schema.String,
+  agentInstructions: Schema.String,
+  paletteQuery: Schema.String,
+  paletteActive: Schema.Int,
   openThread: Schema.String,
   destination: Destination,
   paneTab: PaneTab,
@@ -108,7 +115,10 @@ export const Model = Schema.Struct({
   isNameSending: Schema.Boolean,
   modalTab: ModalTab,
   modal: DialogBlock.Model,
+  settingsModal: DialogBlock.Model,
+  formModal: DialogBlock.Model,
   wideModal: DialogBlock.Model,
+  paletteModal: DialogBlock.Model,
   chooserModal: DialogBlock.Model,
   confirmModal: DialogBlock.Model,
   compactModal: DialogBlock.Model,
@@ -181,7 +191,10 @@ export const Message = defineMessageUnion({
   ToggledGroupPrivate: { isOn: Schema.Boolean },
   ToggledNameSending: { isOn: Schema.Boolean },
   ClickedOpenModal: {},
+  ClickedOpenSettingsModal: {},
+  ClickedOpenFormModal: {},
   ClickedOpenWideModal: {},
+  ClickedOpenPaletteModal: {},
   ClickedOpenChooserModal: {},
   ClickedOpenConfirmModal: {},
   ClickedOpenCompactModal: {},
@@ -197,7 +210,17 @@ export const Message = defineMessageUnion({
   PickedIntegration: {},
   ChangedModalTab: { tab: ModalTab },
   SubmittedModal: {},
+  SubmittedSettingsModal: {},
+  SubmittedFormModal: {},
   SubmittedWideModal: {},
+  TypedConnectionName: { value: Schema.String },
+  TypedConnectionKey: { value: Schema.String },
+  TypedAgentName: { value: Schema.String },
+  TypedAgentRole: { value: Schema.String },
+  TypedAgentInstructions: { value: Schema.String },
+  TypedPaletteQuery: { value: Schema.String },
+  MovedPaletteActive: { to: Schema.Int },
+  PickedPaletteItem: {},
   SubmittedConfirmModal: {},
   SubmittedCompactModal: {},
   SubmittedCreateModal: {},

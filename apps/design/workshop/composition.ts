@@ -29,9 +29,27 @@ export const ModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
   outMessage: { fold: foldDialogOutMessage }
 })
 
+export const SettingsModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "settingsModal",
+  init: { contextToArgs: () => [{ id: "workshop-settings-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
+export const FormModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "formModal",
+  init: { contextToArgs: () => [{ id: "workshop-form-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
 export const WideModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
   field: "wideModal",
   init: { contextToArgs: () => [{ id: "workshop-wide-modal" }] },
+  outMessage: { fold: foldDialogOutMessage }
+})
+
+export const PaletteModalBinding = ApplicationDefinition.bindChild(DialogBlock, {
+  field: "paletteModal",
+  init: { contextToArgs: () => [{ id: "workshop-palette-modal" }] },
   outMessage: { fold: foldDialogOutMessage }
 })
 
@@ -296,7 +314,10 @@ export const RailAccountBinding = ApplicationDefinition.bindChild(AccountMenu, {
 export const ApplicationComposition = ApplicationDefinition.makeComposition({
   bindings: [
     ModalBinding,
+    SettingsModalBinding,
+    FormModalBinding,
     WideModalBinding,
+    PaletteModalBinding,
     ChooserModalBinding,
     ConfirmModalBinding,
     CompactModalBinding,

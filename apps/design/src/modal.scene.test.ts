@@ -25,7 +25,7 @@ import { modifyFields } from "foldkit/struct"
 import * as Update from "foldkit/update"
 import { button, field, submit } from "./control.ts"
 import { row } from "./directory.ts"
-import { type ModalConfig, type ModalRender, modal, modalList } from "./modal.ts"
+import { type ModalConfig, type ModalRender, modal, modalFrame, modalList } from "./modal.ts"
 import { paneTabs } from "./pane.ts"
 
 const Message = defineMessageUnion({
@@ -196,30 +196,135 @@ describe("modal over a dialog's published groups", () => {
   })
 })
 
-describe("modal width", () => {
-  const widthView = (width?: ModalConfig<Message>["width"]) => (_: Model, h: HtmlBuilder<Message>) =>
+describe("modal size", () => {
+  const sizeView = (size?: ModalConfig<Message>["size"]) => (_: Model, h: HtmlBuilder<Message>) =>
     modal(h, visibleRender, {
       title: "Your name",
       body: [],
       onSubmit: Message.SubmittedSettings(),
-      ...(width === undefined ? {} : { width })
+      ...(size === undefined ? {} : { size })
     })
 
-  it("is 26rem wide unless it is told otherwise, 32rem for wide, and 35rem for compact, less than the window by a gutter", () => {
+  it("is 40rem wide and 37.5rem tall unless it is told otherwise, less than the window by 2rem and 4rem", () => {
     scene(
-      { update, view: widthView() },
+      { update, view: sizeView() },
       given(initial),
-      expect(selector("form")).toHaveClass("w-[min(26rem,calc(100%-2rem))]")
+      expect(selector("form")).toHaveClass("w-[min(40rem,calc(100%-2rem))]"),
+      expect(selector("form")).toHaveClass("h-[min(37.5rem,calc(100dvh-4rem))]"),
+      expect(selector("form")).toHaveClass("max-h-[calc(100dvh-4rem)]")
     )
     scene(
-      { update, view: widthView("wide") },
+      { update, view: sizeView("regular") },
       given(initial),
-      expect(selector("form")).toHaveClass("w-[min(32rem,calc(100%-2rem))]")
+      expect(selector("form")).toHaveClass("w-[min(40rem,calc(100%-2rem))]"),
+      expect(selector("form")).toHaveClass("h-[min(37.5rem,calc(100dvh-4rem))]")
     )
+  })
+
+  it("is 35rem wide and as tall as its content for compact", () => {
     scene(
-      { update, view: widthView("compact") },
+      { update, view: sizeView("compact") },
       given(initial),
-      expect(selector("form")).toHaveClass("w-[min(35rem,calc(100%-2rem))]")
+      expect(selector("form")).toHaveClass("w-[min(35rem,calc(100%-2rem))]"),
+      expect(selector("form")).toHaveClass("max-h-[calc(100dvh-4rem)]"),
+      expect(selector("form")).not.toHaveClass("h-[min(37.5rem,calc(100dvh-4rem))]")
+    )
+  })
+
+  it("is 40rem wide and as tall as its content for form", () => {
+    scene(
+      { update, view: sizeView("form") },
+      given(initial),
+      expect(selector("form")).toHaveClass("w-[min(40rem,calc(100%-2rem))]"),
+      expect(selector("form")).toHaveClass("max-h-[calc(100dvh-4rem)]"),
+      expect(selector("form")).not.toHaveClass("h-[min(37.5rem,calc(100dvh-4rem))]")
+    )
+  })
+
+  it("is 45rem wide and 54rem tall for wide, less than the window by 2rem and 4rem", () => {
+    scene(
+      { update, view: sizeView("wide") },
+      given(initial),
+      expect(selector("form")).toHaveClass("w-[min(45rem,calc(100%-2rem))]"),
+      expect(selector("form")).toHaveClass("h-[min(54rem,calc(100dvh-4rem))]")
+    )
+  })
+
+  it("is a plain panel in the size given when it has no form to send", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          modalFrame(h, visibleRender, { size: "palette", children: [h.p([], ["Nothing to send."])] })
+      },
+      given(initial),
+      expect(role("form")).toBeAbsent(),
+      expect(selector("div.self-start")).toHaveClass("mt-[12vh]"),
+      expect(selector("div.self-start")).toHaveClass("h-[min(30rem,calc(100dvh-4rem))]"),
+      expect(selector("div.self-start")).toHaveClass("self-start")
+    )
+  })
+})
+
+describe("modal on a phone", () => {
+  const phoneView = (size?: ModalConfig<Message>["size"]) => (_: Model, h: HtmlBuilder<Message>) =>
+    modal(h, visibleRender, {
+      title: "Your name",
+      body: [],
+      cancelLabel: "Cancel",
+      footer: [submit(h, "Save name")],
+      onSubmit: Message.SubmittedSettings(),
+      ...(size === undefined ? {} : { size })
+    })
+
+  it("fills the window below 48rem at every size, with no shadow, below the safe area at the top", () => {
+    for (const size of [undefined, "compact", "form", "wide"] as const) {
+      scene(
+        { update, view: phoneView(size) },
+        given(initial),
+        expect(selector("form")).toHaveClass("max-tablet:h-dvh"),
+        expect(selector("form")).toHaveClass("max-tablet:w-full"),
+        expect(selector("form")).toHaveClass("max-tablet:max-h-none"),
+        expect(selector("form")).toHaveClass("max-tablet:shadow-none"),
+        expect(selector("form")).toHaveClass("max-tablet:pt-[env(safe-area-inset-top)]")
+      )
+    }
+  })
+
+  it("keeps its shadow from 48rem", () => {
+    scene(
+      { update, view: phoneView() },
+      given(initial),
+      expect(selector("form")).toHaveClass("shadow-modal"),
+      expect(selector("form")).not.toHaveClass("shadow-none")
+    )
+  })
+
+  it("shares the footer's width among its buttons, leaving room below for the safe area", () => {
+    scene(
+      { update, view: phoneView() },
+      given(initial),
+      expect(selector("div.justify-end")).toHaveClass("max-tablet:*:flex-1"),
+      expect(selector("div.justify-end")).toHaveClass("max-tablet:px-4"),
+      expect(selector("div.justify-end")).toHaveClass("max-tablet:pb-[max(1rem,env(safe-area-inset-bottom))]")
+    )
+  })
+
+  it("shares the width among the buttons at the start of the footer too", () => {
+    scene(
+      {
+        update,
+        view: (_: Model, h: HtmlBuilder<Message>) =>
+          modal(h, visibleRender, {
+            title: "Configure connection",
+            body: [],
+            leading: [button(h, "Back", Message.ClickedOpen())],
+            cancelLabel: "Cancel",
+            footer: [submit(h, "Create connection")]
+          })
+      },
+      given(initial),
+      expect(selector("div.me-auto")).toHaveClass("max-tablet:*:flex-1")
     )
   })
 })
@@ -276,6 +381,35 @@ describe("modal footer", () => {
       { update, view: footerView(() => ({ cancelLabel: "Cancel" })) },
       given(initial),
       expect(role("button", { name: "Cancel" })).not.toHaveAttr("aria-disabled")
+    )
+  })
+
+  it("draws the Cancel as a secondary button, bordered as the action beside it is, and not as quiet text", () => {
+    scene(
+      {
+        update,
+        view: footerView((h) => ({
+          cancelLabel: "Cancel",
+          footer: [button(h, "Replace key", Message.ClickedOpen(), { variant: "primary" })]
+        }))
+      },
+      given(initial),
+      expect(role("button", { name: "Cancel" })).toHaveClass("border"),
+      expect(role("button", { name: "Cancel" })).toHaveClass("border-outline"),
+      expect(role("button", { name: "Cancel" })).toHaveClass("bg-action-secondary"),
+      expect(role("button", { name: "Cancel" })).not.toHaveClass("bg-transparent"),
+      expect(role("button", { name: "Cancel" })).not.toHaveClass("font-normal"),
+      expect(role("button", { name: "Replace key" })).toHaveClass("bg-action")
+    )
+  })
+
+  it("keeps the dimmed Cancel a secondary button", () => {
+    scene(
+      { update, view: footerView(() => ({ cancelLabel: "Cancel", isCancelDisabled: true })) },
+      given(initial),
+      expect(role("button", { name: "Cancel" })).toHaveClass("border-outline"),
+      expect(role("button", { name: "Cancel" })).toHaveClass("bg-action-secondary"),
+      expect(role("button", { name: "Cancel" })).toHaveClass("aria-disabled:bg-subtle")
     )
   })
 

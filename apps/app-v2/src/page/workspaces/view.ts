@@ -214,7 +214,7 @@ const createFormModal = (
   modal(h, render, {
     title: createTitle,
     description: createDescription,
-    width: "form",
+    size: "form",
     body: [
       field(
         h,
@@ -264,7 +264,7 @@ const openingModal = (
   modal(h, render, {
     title: "Workspace created",
     description: `${workspaceName} is ready.`,
-    width: "form",
+    size: "form",
     body: reloadFailed
       ? [notice(h, Option.some("Your workspace was created, but we couldn't refresh the list. Try again to open it."))]
       : [hint(h, "Opening your workspace…")],
@@ -290,7 +290,7 @@ const joinFormModal = (
   modal(h, render, {
     title: joinTitle(invitation),
     description: joinDescription,
-    width: "form",
+    size: "form",
     body: [
       field(
         h,
@@ -325,7 +325,7 @@ const joinedModal = (
 ): Html =>
   modal(h, render, {
     title: joinTitle(invitation),
-    width: "form",
+    size: "form",
     body: reloadFailed
       ? [notice(h, Option.some("Joined, but we couldn't load your workspaces. Try again."))]
       : [hint(h, "Joining…")],

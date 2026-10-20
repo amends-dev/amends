@@ -33,16 +33,20 @@ with cells, under the line that says what it holds and the labels of its columns
 folded, in a frame 360px wide; the centered screen as the
 sign-in's two steps, the second again with the announcement of a new code, and as the workspace picker five times, each with its pieces in `screenContent` as the app's
 pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header but the one after something went wrong, which is outside the session, with the brand alone in the header and Reload a link to the page itself; the toast alone, with a detail, and as a stack of two refusals, and the confirmation alone, with an action, long, as a stack of two,
-and beside a refusal, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
-that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
-Cancel at the start of the footer and the primary button at its end, as a form for a new group with a description, a
-name field with a placeholder, the visibility as a choice, and a members picker with the person locked, whose action
-waits for a name, as a wide one with tabs, a description, and a Close settings button whose Members tab has the picker
-beside its Add button, the count of the people held over a dashed rule, their list, an action at the start of its
-footer, and Done at its end, as a view the modal moved to, with Back before the title in place of Close, the list of
-people always shown, and a wide action, as a compact one with a context and a description whose Cancel and primary
-button are dimmed while a toggle says its request is on its way, and as a search over rows of integrations that run to
-the panel's edges; the members picker empty and with the person locked as You and two chosen under a hint that counts
+and beside a refusal, each in a frame of its own; the modal, opened by a button, at each of its sizes: regular, as a
+form with a context, a field that takes the initial focus, a toggle, and a footer of a bordered Cancel and a primary
+button, as a form for a new group with a description, a name field with a placeholder, the visibility as a choice, and
+a members picker with the person locked, whose action waits for a name, as a view the modal moved to, with Back before
+the title in place of Close, the list of people always shown, and a wide action, as one with tabs, a description, and a
+Close settings button whose Members tab has the picker beside its Add button, the count of the people held over a
+dashed rule, their list, an action at the start of its footer, and Done at its end, and as a search over rows of
+integrations that run to the panel's edges; compact, as a confirmation with Cancel at the start of the footer and the
+primary button at its end, and as one with a context and a description whose Cancel and primary button are dimmed
+while a toggle says its request is on its way; form, with two fields, a hint, and a control at the start of the
+footer; and wide, with fields side by side over a taller box; the palette, opened by a button, with the places under
+the title of their section, the one reached filled, the arrow keys moving through them, Enter picking one, and a
+message for what matches nothing; and a regular modal and the palette each in a frame 360px wide, as a phone shows
+them, filling the window with the footer's buttons sharing its width; the members picker empty and with the person locked as You and two chosen under a hint that counts
 them, the same field with its list always shown under it for a phone, the count and list of a group's people with You
 and Agent beside names and a group of one, and the visibility choice, open to change and dimmed; the logo at five sizes,
 decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on
@@ -1074,8 +1078,8 @@ the `dialog` element, the focus inside it, Escape, the click on the scrim, and t
     hint size in `ink-secondary`, and describes the dialog to assistive technology, so the Block
     passes `hasDescription: true` to the dialog's view when it gives one.
   - `footer`, `cancelLabel`, and `leading`, which are all optional, and make a footer under a line when any is
-    given. Its buttons sit at the end 8px apart: a quiet Cancel that closes the dialog when there is a
-    `cancelLabel`, then the `footer`'s controls, the one the modal exists for last, such as a `submit`. The `leading`
+    given. Its buttons sit at the end 8px apart: a Cancel that closes the dialog when there is a
+    `cancelLabel`, a secondary button, bordered as the other buttons are and as `@amends-dev/ui`'s is, then the `footer`'s controls, the one the modal exists for last, such as a `submit`. The `leading`
     controls, such as Back to the step before or an action that opens another dialog, sit at the start, apart from the
     rest, and `isCancelLeading` puts the Cancel there too, ahead of them, as a confirmation does with the primary
     action alone at the end. With `isCancelDisabled` the Cancel is dimmed and closes nothing, for a form whose request
@@ -1083,10 +1087,16 @@ the `dialog` element, the focus inside it, Escape, the click on the scrim, and t
   - `onSubmit`, which makes the panel a form that sends it, so a `submit` in the footer sends it.
     Close and Cancel are `type="button"`, so they close without sending it. Without `onSubmit` the
     panel is a `div`.
-  - `width`, `"form"` (the default) for a panel 26rem wide, `"wide"` for 32rem, or `"compact"` for 35rem, the width
-    of `@amends-dev/ui`'s compact modals, such as the one that changes a name. A panel is
-    never wider than the window less a 1rem gutter on each side, nor taller than the window less
-    4rem. It is `raised` with `shadow-modal` and no rounding, over a `scrim-strong` scrim.
+  - `size`, as `@amends-dev/ui`'s modals have: `"regular"` (the default), 40rem wide and 37.5rem tall, for a dialog of
+    sections, such as a group's settings or the form that creates a group; `"compact"`, 35rem wide and as tall as its
+    content, for a short form or a confirmation, such as the one that changes a name; `"form"`, 40rem wide and as tall
+    as its content, for a form of a few sections, such as the one that sets a connection up; and `"wide"`, 45rem by
+    54rem, for a long form with fields side by side. A panel is never wider than the window less 2rem, nor taller than
+    the window less 4rem. It is `raised` with `shadow-modal` and no rounding, over a `scrim-strong` scrim. Below 48rem
+    every modal fills the window instead, with no shadow, its padding at the top the safe-area inset, and its footer's
+    buttons, at the start and the end, sharing its width, over the safe-area inset at the bottom.
+- `modalFrame(h, render, { size, onSubmit, children })` is the dialog's element, the scrim, and the panel of a `size`
+  around `children`, which `modal` and `palette` both draw with. A `palette` is the one size `modal` does not take.
 - `modalList(h, label, rows)` is for a modal that is a choice among things, such as the integrations
   a connection can go through. It lists the `rows`, each a `row` of `directory` with no cells, as a
   list named `label`, and it runs to the edges of the panel: it cancels the body's `px-6` on both
@@ -1108,6 +1118,35 @@ A Block uses it in four steps:
   itself.
 
 The groups Block's form for a new team does all four.
+
+### `@amends-dev/design/palette`
+
+A search that jumps anywhere in a workspace, as `@amends-dev/ui`'s Jump to is: a modal near the top of the window that
+has no title to read, only a field, the places that match what is typed, and the keys to use it by. A Block binds the
+dialog and embeds it as it does for a `modal`.
+
+- `palette(h, render, config)` renders `render` in a `modalFrame` of the `palette` size: 40rem wide and 30rem tall, so
+  that it keeps its place as what matches narrows, 12vh from the top of the window, and the whole window below 48rem. The
+  `config` is:
+  - `label`, which names the dialog and the field, as an `sr-only` `h2` of the dialog and the field's label, and `id`,
+    the prefix of the ids of the field's list, which the field controls.
+  - `placeholder`, `query`, and `onInput`, for the field: a combobox of `type="text"` at title size on no box, with a
+    magnifier before it and a Close button, an icon button of `mark-close` named `closeLabel` ("Close" unless given),
+    after it, in a row with a line under it. The `attributes` go onto the field: the dialog's `initialFocus`, the keys
+    its Block answers, which are `answerKeys` of `control` (the palette answers none itself), and the item reached as
+    `aria-activedescendant`.
+  - `sections`, `{ title, items }` each, which the palette draws in the order given as a `group` named by its title,
+    in capitals at meta size in `ink-muted`, over its items. An item is `{ id, label, detail, leading, isActive,
+onClick }`: a line of `min-h-9` (`min-h-11` below 64rem), as an `option` whose `id` the field names, with its
+    `leading` before the `label`, a drawing for a page or a group (`{ icon }`, 16px in `ink-secondary`) or a person's or
+    an agent's mark (`{ text, tone }`, a `mark` of the `choice` size), and its `detail`, a quiet note, at the end, such
+    as "Direct message". The item reached, `isActive`, is `aria-selected` and filled with `selected`; one hovered is
+    filled with `hover`. A click sends `onClick`. The list is a `listbox` named Places.
+  - `emptyText`, which the list says in place of its sections when there are none, as a `status`, such as that nothing
+    matches what is typed.
+  - Under the list, a line of the keys it is used by, `↑ ↓ to move`, `↵ to open`, and `esc to close`, each key in a
+    bordered `kbd`, hidden from assistive technology and from windows below 64rem, where there is no keyboard to press
+    them.
 
 ### `@amends-dev/design/tooltip`
 

@@ -389,7 +389,7 @@ const settingsModal = (render: RenderInfo, model: Model, viewport: Viewport, h: 
           title: "Members",
           context: nameOf(model),
           closeLabel: "Close settings",
-          width: "wide",
+          size: "wide",
           cancelLabel: "Done",
           ...membersPanel(model, viewport, h)
         })
@@ -405,7 +405,7 @@ const settingsModal = (render: RenderInfo, model: Model, viewport: Viewport, h: 
         title: "Group settings",
         context: `# ${nameOf(model)}`,
         closeLabel: "Close settings",
-        width: "wide",
+        size: "wide",
         tabs: settingsTabs(model, h),
         cancelLabel: isMembers ? "Done" : "Cancel",
         ...(isMembers ? membersPanel(model, viewport, h) : generalPanel(group, model, render, h))

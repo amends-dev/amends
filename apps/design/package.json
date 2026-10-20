@@ -21,6 +21,7 @@
     "./menu": "./src/menu.ts",
     "./message": "./src/message.ts",
     "./modal": "./src/modal.ts",
+    "./palette": "./src/palette.ts",
     "./pane": "./src/pane.ts",
     "./rail": "./src/rail.ts",
     "./richText": "./src/richText.ts",

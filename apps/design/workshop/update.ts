@@ -8,6 +8,9 @@ import {
   ConfirmModalBinding,
   CreateModalBinding,
   ModalBinding,
+  FormModalBinding,
+  PaletteModalBinding,
+  SettingsModalBinding,
   WideModalBinding
 } from "./composition.ts"
 import { Message, type MemberPlace, type Model } from "./definition.ts"
@@ -52,7 +55,10 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     ToggledGroupPrivate: ({ isOn }) => ({ model: modifyFields(model, { isGroupPrivate: () => isOn }) }),
     ToggledNameSending: ({ isOn }) => ({ model: modifyFields(model, { isNameSending: () => isOn }) }),
     ClickedOpenModal: () => ModalBinding.requestOpen()(model),
+    ClickedOpenSettingsModal: () => SettingsModalBinding.requestOpen()(model),
+    ClickedOpenFormModal: () => FormModalBinding.requestOpen()(model),
     ClickedOpenWideModal: () => WideModalBinding.requestOpen()(model),
+    ClickedOpenPaletteModal: () => PaletteModalBinding.requestOpen()(model),
     ClickedOpenChooserModal: () => ChooserModalBinding.requestOpen()(model),
     ClickedOpenConfirmModal: () => ConfirmModalBinding.requestOpen()(model),
     ClickedOpenCompactModal: () => CompactModalBinding.requestOpen()(model),
@@ -77,7 +83,19 @@ export const update = ApplicationComposition.makeUpdate((model, message) =>
     PickedIntegration: () => ChooserModalBinding.requestClose()(model),
     ChangedModalTab: ({ tab }) => ({ model: modifyFields(model, { modalTab: () => tab }) }),
     SubmittedModal: () => ModalBinding.requestClose()(model),
+    SubmittedSettingsModal: () => SettingsModalBinding.requestClose()(model),
+    SubmittedFormModal: () => FormModalBinding.requestClose()(model),
     SubmittedWideModal: () => WideModalBinding.requestClose()(model),
+    TypedConnectionName: ({ value }) => ({ model: modifyFields(model, { connectionName: () => value }) }),
+    TypedConnectionKey: ({ value }) => ({ model: modifyFields(model, { connectionKey: () => value }) }),
+    TypedAgentName: ({ value }) => ({ model: modifyFields(model, { agentName: () => value }) }),
+    TypedAgentRole: ({ value }) => ({ model: modifyFields(model, { agentRole: () => value }) }),
+    TypedAgentInstructions: ({ value }) => ({ model: modifyFields(model, { agentInstructions: () => value }) }),
+    TypedPaletteQuery: ({ value }) => ({
+      model: modifyFields(model, { paletteQuery: () => value, paletteActive: () => 0 })
+    }),
+    MovedPaletteActive: ({ to }) => ({ model: modifyFields(model, { paletteActive: () => to }) }),
+    PickedPaletteItem: () => PaletteModalBinding.requestClose()(model),
     SubmittedConfirmModal: () => ConfirmModalBinding.requestClose()(model),
     SubmittedCompactModal: () => CompactModalBinding.requestClose()(model),
     SubmittedCreateModal: () => CreateModalBinding.requestClose()(model),

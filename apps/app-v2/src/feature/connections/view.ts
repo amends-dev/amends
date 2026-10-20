@@ -734,7 +734,7 @@ const choosingModal = (
   return modal(h, render, {
     title: addLabel(choosing.capability),
     context: workspaceName,
-    width: "wide",
+    size: "wide",
     body:
       integrationsToAdd(model, choosing.capability).length === 0
         ? [

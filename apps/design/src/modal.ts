@@ -14,6 +14,13 @@
  *
  * A modal that is a choice among things, such as the integrations a connection can go through, puts them in a
  * `modalList` after its search, so that the rows run to the panel's edges.
+ *
+ * A modal has a size, as `@amends-dev/ui`'s has: `regular` (the default), 40rem wide and 37.5rem tall, for a
+ * dialog of sections; `compact`, 35rem wide and as tall as its content, for a short form or a confirmation; `form`,
+ * 40rem wide and as tall as its content, for a form of a few sections; and `wide`, 45rem by 54rem, for a long form
+ * with fields side by side. Each is less than the window by 2rem across and 4rem down. Below 48rem every modal fills
+ * the window, without its shadow, below the safe area at the top, and its footer's buttons share its width. The search
+ * that jumps anywhere is a `palette`, in the module of that name, which draws its panel with `modalFrame`.
  */
 
 import type { RenderInfo } from "@foldkit/ui/dialog"
@@ -24,12 +31,15 @@ const dialogLook = "m-0 max-h-none max-w-none bg-transparent p-0 open:grid open:
 
 const backdropLook = "fixed inset-0 bg-scrim-strong"
 
-const panelBase = "relative flex max-h-[calc(100dvh-4rem)] flex-col bg-raised shadow-modal"
+const panelBase =
+  "relative flex max-h-[calc(100dvh-4rem)] flex-col bg-raised shadow-modal max-tablet:h-dvh max-tablet:max-h-none max-tablet:w-full max-tablet:pt-[env(safe-area-inset-top)] max-tablet:shadow-none"
 
-const panelWidths = {
-  form: "w-[min(26rem,calc(100%-2rem))]",
-  wide: "w-[min(32rem,calc(100%-2rem))]",
-  compact: "w-[min(35rem,calc(100%-2rem))]"
+const panelSizes = {
+  regular: "h-[min(37.5rem,calc(100dvh-4rem))] w-[min(40rem,calc(100%-2rem))]",
+  compact: "w-[min(35rem,calc(100%-2rem))]",
+  form: "w-[min(40rem,calc(100%-2rem))]",
+  wide: "h-[min(54rem,calc(100dvh-4rem))] w-[min(45rem,calc(100%-2rem))]",
+  palette: "mt-[12vh] h-[min(30rem,calc(100dvh-4rem))] w-[min(40rem,calc(100%-2rem))] self-start max-tablet:mt-0"
 }
 
 const headerBand = "flex flex-none flex-col px-6 shadow-[inset_0_-1px_0_var(--amends-divider)]"
@@ -54,9 +64,10 @@ const descriptionText = "m-0 text-hint text-ink-secondary"
 
 const listLook = "-mx-6 -mb-5 border-t border-divider"
 
-const footerRow = "flex flex-none items-center justify-end gap-2 border-t border-divider px-6 py-4"
+const footerRow =
+  "flex flex-none items-center justify-end gap-2 border-t border-divider px-6 py-4 max-tablet:px-4 max-tablet:pb-[max(1rem,env(safe-area-inset-bottom))] max-tablet:*:flex-1"
 
-const footerLeading = "me-auto flex items-center gap-2"
+const footerLeading = "me-auto flex items-center gap-2 max-tablet:*:flex-1"
 
 type DialogAttribute<Message, Requirements> = Parameters<HtmlBuilder<Message, Requirements>["dialog"]>[0][number]
 
@@ -67,7 +78,8 @@ type DialogAttribute<Message, Requirements> = Parameters<HtmlBuilder<Message, Re
 export type ModalRender<Message, Requirements> = Omit<RenderInfo, "dialog"> &
   Readonly<{ dialog: ReadonlyArray<DialogAttribute<Message, Requirements>> }>
 
-export type ModalWidth = keyof typeof panelWidths
+/** How big the panel is; the `palette` is the size of the module of that name. */
+export type ModalSize = keyof typeof panelSizes
 
 export type ModalConfig<Message> = Readonly<{
   /** Names the dialog for assistive technology, and heads the panel. */
@@ -90,7 +102,7 @@ export type ModalConfig<Message> = Readonly<{
   footer?: ReadonlyArray<Html>
   /** Controls at the start of the footer, such as Back to the step before, or an action that opens another dialog. */
   leading?: ReadonlyArray<Html>
-  /** Adds a quiet button that closes the modal, before the footer's actions, or at the start of the footer. */
+  /** Adds a secondary button that closes the modal, before the footer's actions, or at the start of the footer. */
   cancelLabel?: string
   /** Puts the `cancelLabel` button at the start of the footer, ahead of the `leading` controls, and not at its end. */
   isCancelLeading?: boolean
@@ -98,8 +110,8 @@ export type ModalConfig<Message> = Readonly<{
   isCancelDisabled?: boolean
   /** Makes the panel a form that sends this when submitted, so a `submit` in the footer sends it. */
   onSubmit?: Message
-  /** `form` (the default) is 26rem, `wide` 32rem, and `compact` 35rem, each less than the window by a 1rem gutter. */
-  width?: ModalWidth
+  /** `regular` (the default) is 40rem by 37.5rem, `compact` 35rem wide, `form` 40rem wide, and `wide` 45rem by 54rem. */
+  size?: Exclude<ModalSize, "palette">
 }>
 
 const renderHeader = <Message, Requirements>(
@@ -151,8 +163,7 @@ const renderFooter = <Message, Requirements>(
     config.isCancelDisabled === true
       ? [h.Type("button"), h.AriaDisabled(true), h.DataAttribute("disabled", "")]
       : render.closeButton
-  const cancel =
-    config.cancelLabel === undefined ? [] : [buttonWith(h, cancelAttributes, config.cancelLabel, { variant: "quiet" })]
+  const cancel = config.cancelLabel === undefined ? [] : [buttonWith(h, cancelAttributes, config.cancelLabel)]
   const leading = [...(config.isCancelLeading === true ? cancel : []), ...(config.leading ?? [])]
 
   return h.div(
@@ -181,42 +192,56 @@ export const modalList = <Message, Requirements>(
   )
 
 /**
- * The dialog `render` describes, as a panel over a scrim while it is visible, and nothing while it is not: a
- * header of the `title`, the `context` after it, and a Close button, with the `tabs` under it; the `body`,
- * which scrolls, led by the `description`; and a footer of the `leading` controls at the start, and at the end a
- * quiet Cancel and the `footer`'s actions, or, with `isCancelLeading`, the Cancel at the start. A Cancel that
- * `isCancelDisabled` is dimmed and closes nothing. The panel is 26rem wide, 32rem for `wide`, or 35rem for `compact`,
- * and less than the window by a gutter.
+ * The dialog `render` describes, as a panel of `size` over a scrim while it is visible, and nothing while it is not,
+ * around `children`: a form that sends `onSubmit` when one is given, and a plain panel when it is not.
  */
-export const modal = <Message, Requirements>(
+export const modalFrame = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   render: ModalRender<Message, Requirements>,
-  config: ModalConfig<Message>
+  frame: Readonly<{ size: ModalSize; onSubmit?: Message | undefined; children: ReadonlyArray<Html> }>
 ): Html => {
-  const panelAttributes = [...render.panel, h.Class(`${panelBase} ${panelWidths[config.width ?? "form"]}`)]
-  const panelChildren = [
-    renderHeader(h, render, config),
-    h.div(
-      [h.Class(bodyColumn)],
-      [
-        config.description === undefined
-          ? h.empty
-          : h.p([...render.description, h.Class(descriptionText)], [config.description]),
-        ...config.body
-      ]
-    ),
-    renderFooter(h, render, config)
-  ]
+  const panelAttributes = [...render.panel, h.Class(`${panelBase} ${panelSizes[frame.size]}`)]
 
   return h.dialog(
     [...render.dialog, h.Class(dialogLook)],
     render.isVisible
       ? [
           h.div([...render.backdrop, h.Class(backdropLook)]),
-          config.onSubmit === undefined
-            ? h.div(panelAttributes, panelChildren)
-            : h.form([...panelAttributes, h.OnSubmit(config.onSubmit)], panelChildren)
+          frame.onSubmit === undefined
+            ? h.div(panelAttributes, frame.children)
+            : h.form([...panelAttributes, h.OnSubmit(frame.onSubmit)], frame.children)
         ]
       : []
   )
 }
+
+/**
+ * The dialog `render` describes, as a panel over a scrim while it is visible, and nothing while it is not: a
+ * header of the `title`, the `context` after it, and a Close button, with the `tabs` under it; the `body`,
+ * which scrolls, led by the `description`; and a footer of the `leading` controls at the start, and at the end a
+ * Cancel and the `footer`'s actions, or, with `isCancelLeading`, the Cancel at the start. A Cancel is a secondary
+ * button, bordered as the buttons beside it are, and one that `isCancelDisabled` is dimmed and closes nothing. The
+ * panel is of the `size` given, `regular` unless told otherwise, and less than the window by a gutter.
+ */
+export const modal = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  render: ModalRender<Message, Requirements>,
+  config: ModalConfig<Message>
+): Html =>
+  modalFrame(h, render, {
+    size: config.size ?? "regular",
+    onSubmit: config.onSubmit,
+    children: [
+      renderHeader(h, render, config),
+      h.div(
+        [h.Class(bodyColumn)],
+        [
+          config.description === undefined
+            ? h.empty
+            : h.p([...render.description, h.Class(descriptionText)], [config.description]),
+          ...config.body
+        ]
+      ),
+      renderFooter(h, render, config)
+    ]
+  })
