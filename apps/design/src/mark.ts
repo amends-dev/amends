@@ -20,6 +20,7 @@ const markSizes = {
   xs: "size-5 text-[0.5625rem]",
   choice: "size-5.5 text-[0.625rem]",
   sm: "size-6 text-meta",
+  account: "size-7 text-[0.8125rem]",
   md: "size-8 text-hint",
   lg: "size-10 text-item"
 }
@@ -28,15 +29,30 @@ const iconSizes = {
   xs: "xs",
   choice: "xs",
   sm: "sm",
+  account: "sm",
   md: "sm",
   lg: "md"
 } as const satisfies Record<keyof typeof markSizes, IconSize>
 
 const patchCut = "absolute -end-1 -bottom-1 grid place-items-center bg-status-knockout"
 
-const patchCutSizes = { xs: "size-2.75", choice: "size-2.75", sm: "size-3", md: "size-3.25", lg: "size-3.5" }
+const patchCutSizes = {
+  xs: "size-2.75",
+  choice: "size-2.75",
+  sm: "size-3",
+  account: "size-3.25",
+  md: "size-3.25",
+  lg: "size-3.5"
+}
 
-const patchSizes = { xs: "size-1.75", choice: "size-1.75", sm: "size-2", md: "size-2.25", lg: "size-2.5" }
+const patchSizes = {
+  xs: "size-1.75",
+  choice: "size-1.75",
+  sm: "size-2",
+  account: "size-2.25",
+  md: "size-2.25",
+  lg: "size-2.5"
+}
 
 const statusShapes = {
   available: "bg-success-mark",
@@ -90,12 +106,12 @@ const renderStatusShape = <Message, Requirements>(
 
 /**
  * The `text` letters, upper-cased, or the `icon`, in a square on the ground of its `tone`, `neutral` unless given:
- * `xs` 20px, `choice` 22px, `sm` (the default) 24px, `md` 32px, or `lg` 40px. An icon is drawn at the size that fits
- * its square (`xs`, `xs`, `sm`, `sm`, and `md`) and takes the color of the ground's text. A mark with a `status` has
- * its patch over the bottom end corner, overhanging it by 2px, in a notch 2px wider all round that is cut from the
- * surface behind it, in the color of `status-knockout`, which a row that is hovered or current sets to its own. The
- * patch is 8px on `sm`, 9px on `md`, 10px on `lg`, and 7px on `xs` and `choice`, the least the design draws. The
- * status is the word on hover, in the `title`. A mark is hidden from assistive technology, since the name it
+ * `xs` 20px, `choice` 22px, `sm` (the default) 24px, `account` 28px, `md` 32px, or `lg` 40px. An icon is drawn at the
+ * size that fits its square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md`) and takes the color of the ground's text. A mark
+ * with a `status` has its patch over the bottom end corner, overhanging it by 2px, in a notch 2px wider all round that
+ * is cut from the surface behind it, in the color of `status-knockout`, which a row that is hovered or current sets to
+ * its own. The patch is 8px on `sm`, 9px on `account` and `md`, 10px on `lg`, and 7px on `xs` and `choice`, the least
+ * the design draws. The status is the word on hover, in the `title`. A mark is hidden from assistive technology, since the name it
  * abbreviates is always beside it, and the row that holds it adds the status to its own name, "Atlas, Needs setup".
  */
 export const mark = <Message, Requirements>(

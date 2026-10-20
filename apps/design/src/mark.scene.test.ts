@@ -87,6 +87,22 @@ describe("mark beside a choice", () => {
   })
 })
 
+describe("mark of an account", () => {
+  it("is 28px, with letters of 13px, hidden from assistive technology", () => {
+    scene(
+      {
+        ...still,
+        view: (_: null, h: HtmlBuilder<never>) =>
+          h.div([], [h.p([], ["ada@example.com"]), mark(h, { text: "a", size: "account" })])
+      },
+      given(null),
+      expect(text("a")).toHaveClass("size-7"),
+      expect(text("a")).toHaveClass("text-[0.8125rem]"),
+      expect(text("a")).toHaveAttr("aria-hidden", "true")
+    )
+  })
+})
+
 describe("mark with an icon", () => {
   const icons = (_: null, h: HtmlBuilder<never>) =>
     h.div(
@@ -157,11 +173,12 @@ describe("mark with an icon", () => {
   })
 })
 
-/** The cut-out and the patch a status has at each size: 8px on 24, 9 on 32, 10 on 40, and 7 on 20 and 22. */
+/** The cut-out and the patch a status has at each size: 8px on 24, 9 on 28 and 32, 10 on 40, and 7 on 20 and 22. */
 const patchSizes: ReadonlyArray<readonly [MarkSize, string, string]> = [
   ["xs", "size-2.75", "size-1.75"],
   ["choice", "size-2.75", "size-1.75"],
   ["sm", "size-3", "size-2"],
+  ["account", "size-3.25", "size-2.25"],
   ["md", "size-3.25", "size-2.25"],
   ["lg", "size-3.5", "size-2.5"]
 ]

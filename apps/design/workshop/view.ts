@@ -1462,14 +1462,14 @@ const iconGroup = (h: ApplicationViewBuilder): Html =>
 
 const markStatuses: ReadonlyArray<MarkStatus> = [online, { kind: "offline", label: "Offline" }, needsSetup, unavailable]
 
-const markSizes: ReadonlyArray<MarkSize> = ["xs", "choice", "sm", "md", "lg"]
+const markSizes: ReadonlyArray<MarkSize> = ["xs", "choice", "sm", "account", "md", "lg"]
 
 const markGroup = (h: ApplicationViewBuilder): Html =>
   group(h, "Marks", [
     ...markStatuses.map((status) =>
       sample(
         h,
-        `Status ${status.label.toLowerCase()}, at every size: 20px, 22, 24, 32, and 40, with its patch 7, 7, 8, 9, and 10px`,
+        `Status ${status.label.toLowerCase()}, at every size: 20px, 22, 24, 28, 32, and 40, with its patch 7, 7, 8, 9, 9, and 10px`,
         markSizes.map((size) => mark(h, { text: "AM", size, status })),
         iconSizeRow
       )

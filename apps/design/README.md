@@ -36,7 +36,7 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a confirmation with
 Cancel at the start of the footer and the primary button at its end, as a wide one with tabs and a description whose
-Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice among them, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
+Members tab has an action at the start of its footer and Done at its end, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; the menu as a choice, the status filter that says Status while every status is chosen, a sort, and the member filter, each opening a list with the current choice checked, the assignee filter whose choices are Anyone, Unassigned, and each person with a 22px mark before their name, and as groups behind the account's mark, with a header, a labelled group of checked choices, actions, and the line between them; a pane's toolbar over a list that scrolls, the search and the status filter at its start, a sort and New task at its end, then the line that says what the list holds and its column labels, and the same wrapped in a frame 360px wide; a badge with a motion for each way something is under way; the marks by size, 20px to 40px with the 22px mark of a choice and the 28px mark of an account among them, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; the tooltip in each tone, with a detail and with the title alone, over a control that Tab reaches, in a frame that scrolls with the mark at its top edge, and below its mark; what a pane says about one thing, as a detail
 list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -319,9 +319,10 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 
 - `mark(h, { text | icon, size?, tone?, status? })` is the square that stands for a person, a workspace, an agent, or
   a connection: the `text` letters in capitals, or, for a thing that has no name to abbreviate, an `icon` drawn at the
-  size that fits the square (`xs`, `xs`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
+  size that fits the square (`xs`, `xs`, `sm`, `sm`, `sm`, and `md` for the sizes below), on the ground of its `tone`, `"neutral"`
   (the default, `avatar-neutral`) or `"lilac"` (`avatar-lilac`, which is an agent's). `size` is `"xs"` (20px, 9px text, as a reply line shows those who
   replied), `"choice"` (22px, 10px text, as `@amends-dev/ui` draws a person beside a choice, in a menu of people), `"sm"` (the default, 24px, `meta` text, as the sidebar's header and a sidebar row show it, and a pane's title),
+  `"account"` (28px, 13px text, as `@amends-dev/ui` draws the signed-in address in a centered screen's header),
   `"md"` (32px, `hint` text, as a message shows its author and an agent's row in a list), or `"lg"` (40px, `item` text, as a
   directory row shows it). A mark is `aria-hidden`: the name it abbreviates is always beside it. `sidebarHeader`,
   `sidebarItem`, `row`, `pane`, `message`, and `replyLine` draw their marks with it.
@@ -331,7 +332,7 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
     `success-mark`; `"offline"` a square drawn as a 1.5px ring in `ink-muted` over the knockout; `"attention"` (needs
     setup) a triangle in `caution-mark`, as `@amends-dev/ui` draws it, a little wider than tall; `"blocked"` (can't run,
     unavailable) a square in `danger-mark` with a 1.5px bar of the knockout across its middle, inset 20% each side. The
-    patch is 8px on a 24px mark, 9px on 32, and 10px on 40, as the mocks and `@amends-dev/ui` size it, and 7px on
+    patch is 8px on a 24px mark, 9px on 28 and 32, and 10px on 40, as the mocks and `@amends-dev/ui` size it, and 7px on
     20px and 22px, the least `@amends-dev/ui` draws. The mark's `title` is the status's `label`, with the `detail` after a colon
     when there is one, which the browser shows on hover; a tooltip is for later. A mark stays hidden from assistive
     technology, since it knows only the letters: the row that holds it is named by the name and then the status's label,
@@ -357,7 +358,7 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
   `--amends-screen-height` shows the card at that height instead of the viewport's, as the
   workshop does to show both widths on one page.
 - `centeredAccount(h, identity)` is who is signed in, for the header's `actions` beside a Sign out button: the first
-  letter of the `identity`, such as the address they signed in with, in a 24px mark, then the identity in
+  letter of the `identity`, such as the address they signed in with, in a 28px mark, then the identity in
   quiet text, which gives way to the mark below 48rem. The mark is hidden from assistive technology, since the
   identity is beside it.
 - `heading(h, text, options?)` is the screen's `h1`, at display size, with 12px below it for what

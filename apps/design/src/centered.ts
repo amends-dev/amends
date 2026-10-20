@@ -81,14 +81,14 @@ export const centered = <Message, Requirements>(
 
 /**
  * Who is signed in, for the header's `actions`: the first letter of their `identity`, such as the address they
- * signed in with, in a 24px mark, then the identity in quiet text, which gives way to the mark below 48rem. The
+ * signed in with, in a 28px mark, then the identity in quiet text, which gives way to the mark below 48rem. The
  * mark is hidden from assistive technology, since the identity is beside it.
  */
 export const centeredAccount = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, identity: string): Html =>
   h.span(
     [h.Class(accountLine)],
     [
-      mark(h, { text: Array.from(identity.trim()).at(0) ?? "", size: "sm" }),
+      mark(h, { text: Array.from(identity.trim()).at(0) ?? "", size: "account" }),
       h.span([h.Class(accountIdentity)], [identity])
     ]
   )

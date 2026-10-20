@@ -77,6 +77,15 @@ describe("centeredAccount", () => {
     )
   })
 
+  it("draws the mark at 28px, as apps/ui does, with the identity in quiet text beside it", () => {
+    scene(
+      { update, view: signedIn },
+      given(initial),
+      expect(within(role("banner"), selector('span[aria-hidden="true"]'))).toHaveClass("size-7"),
+      expect(within(role("banner"), selector("span.text-ink-secondary"))).toHaveClass("text-hint")
+    )
+  })
+
   it("lets the identity give way to the mark on phones", () => {
     scene(
       { update, view: signedIn },
