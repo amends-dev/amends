@@ -328,8 +328,12 @@ export const paneClose = <Message, Requirements>(h: HtmlBuilder<Message, Require
   h.span([h.Class(closeSlot)], [iconButton(h, { icon: "mark-close", label: "Close", onClick })])
 
 /**
- * The side panel's Back button, named Back, for the header's `leading`. It shows below 48rem, where the side
- * panel is full screen over the main pane, and sends the same message as `paneClose` does.
+ * The side panel's Back button, named Back unless `label` names where it goes back to, such as "Back to Members",
+ * for the header's `leading`. It shows below 48rem, where the side panel is full screen over the main pane, and
+ * sends the same message as `paneClose` does.
  */
-export const paneBack = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, onClick: Message): Html =>
-  h.span([h.Class(backSlot)], [iconButton(h, { icon: "mark-back", label: "Back", onClick })])
+export const paneBack = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  onClick: Message,
+  label = "Back"
+): Html => h.span([h.Class(backSlot)], [iconButton(h, { icon: "mark-back", label, onClick })])

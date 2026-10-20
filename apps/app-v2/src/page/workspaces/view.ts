@@ -113,7 +113,7 @@ const invitationsSection = (
               [],
               [
                 rowWithButton(h, {
-                  mark: invitationMark(invitation),
+                  mark: { text: invitationMark(invitation) },
                   title: invitationTitle(invitation),
                   meta: invitationMeta(invitation, now),
                   action: "Accept invite",

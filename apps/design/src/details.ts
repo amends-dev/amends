@@ -1,11 +1,11 @@
 /**
- * What a pane says about one thing: its facts as labelled values, a mark of how it stands, the people
- * or agents' work it lists, and the log an agent wrote.
+ * What a pane says about one thing: its facts as labelled values, a mark of how it stands, a person it is
+ * about, the people or agents' work it lists, and the log an agent wrote.
  */
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
-import { mark } from "./mark.ts"
+import { type MarkContent, type MarkSize, mark } from "./mark.ts"
 
 const detailGrid = "m-0 grid grid-cols-[minmax(5rem,auto)_1fr] items-baseline gap-x-4 gap-y-2"
 
@@ -21,6 +21,14 @@ const badgeTones = {
   caution: "border-caution-border bg-caution-surface text-caution-text",
   danger: "border-danger-border bg-danger-surface text-danger-text"
 }
+
+const personRow = "flex min-w-0 items-center gap-3"
+
+const personText = "flex min-w-0 flex-col"
+
+const personName = "block truncate text-item font-medium text-ink"
+
+const personDetail = "block truncate text-hint text-ink-secondary"
 
 const entryColumn = "m-0 flex list-none flex-col p-0"
 
@@ -63,6 +71,29 @@ export const badge = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{ label: string; tone?: BadgeTone }>
 ): Html => h.span([h.Class(`${badgeBase} ${badgeTones[config.tone ?? "neutral"]}`)], [config.label])
+
+/**
+ * One person or agent, alone and not in a list: their `mark`, 40px unless `markSize` says otherwise, beside their
+ * `name` in medium weight, over a quieter line of what they are, the `detail`, such as who owns a workspace. The
+ * mark is hidden from assistive technology; the name and the detail are read as text.
+ */
+export const person = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ mark: MarkContent; markSize?: MarkSize; name: string; detail?: string }>
+): Html =>
+  h.div(
+    [h.Class(personRow)],
+    [
+      mark(h, { ...config.mark, size: config.markSize ?? "lg" }),
+      h.div(
+        [h.Class(personText)],
+        [
+          h.span([h.Class(personName)], [config.name]),
+          config.detail === undefined ? h.empty : h.span([h.Class(personDetail)], [config.detail])
+        ]
+      )
+    ]
+  )
 
 /**
  * A list of people or agents' work, such as a thread's turns, named by `label`, a column of `entry`s with no

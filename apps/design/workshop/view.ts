@@ -21,7 +21,7 @@ import {
   textarea,
   toggle
 } from "../src/control.ts"
-import { badge, detailList, entry, entryList, log } from "../src/details.ts"
+import { badge, detailList, entry, entryList, log, person } from "../src/details.ts"
 import {
   activityCell,
   cellWithDetail,
@@ -770,7 +770,7 @@ const invitationList = (h: ApplicationViewBuilder): Html =>
         [],
         [
           rowWithButton(h, {
-            mark: name.slice(0, 1),
+            mark: { text: name.slice(0, 1) },
             title: name,
             meta,
             action: "Accept invite",
@@ -808,6 +808,72 @@ const groupTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   columns(h, { label: "Group", cells: ["Visibility", "Members"] }),
   groupList(h)
 ]
+
+type MemberSample = Readonly<{ name: string; role: string; status: string; isAgent: boolean; isOpen: boolean }>
+
+const memberSamples: ReadonlyArray<MemberSample> = [
+  { name: "Jamie Morgan · You", role: "Owner", status: "Active", isAgent: false, isOpen: false },
+  { name: "Alex Morgan", role: "Member", status: "Active", isAgent: false, isOpen: true },
+  { name: "Sara", role: "Administrator", status: "Active", isAgent: false, isOpen: false },
+  { name: "Yumi", role: "Member", status: "Active", isAgent: true, isOpen: false }
+]
+
+const memberTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  columns(h, { label: "Member", cells: ["Workspace role", "Status"] }),
+  h.ul(
+    [h.AriaLabel("Members")],
+    memberSamples.map(({ name, role, status, isAgent, isOpen }) =>
+      h.keyed("li")(
+        name,
+        [],
+        [
+          row(h, {
+            mark: { text: name.slice(0, 1), tone: isAgent ? "lilac" : "neutral" },
+            markSize: "sm",
+            title: name,
+            ...(isAgent ? { meta: "Agent" } : {}),
+            cells: [h.span([], [role]), h.span([], [status])],
+            cellsText: `${role} · ${status}`,
+            isCurrent: isOpen,
+            onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
+]
+
+type InvitationSample = Readonly<{ recipient: string; detail: string; isSending?: boolean }>
+
+const pendingInvitations: ReadonlyArray<InvitationSample> = [
+  { recipient: "casey@mercier.example", detail: "Member · Expires in 5 days" },
+  { recipient: "taylor@mercier.example", detail: "Administrator · Expires in 6 days" },
+  { recipient: "dana@mercier.example", detail: "Member · Expires in 7 days · Sending…", isSending: true }
+]
+
+const pendingInvitationList = (h: ApplicationViewBuilder): Html =>
+  h.ul(
+    [h.AriaLabel("Pending invitations")],
+    pendingInvitations.map(({ recipient, detail, isSending }) =>
+      h.keyed("li")(
+        recipient,
+        [],
+        [
+          rowWithButton(h, {
+            mark: { icon: "mark-mail" },
+            markSize: "md",
+            title: recipient,
+            meta: detail,
+            action: "Revoke",
+            actionName: `Revoke invitation for ${recipient}`,
+            isDisabled: isSending === true,
+            variant: "quiet",
+            onClick: Message.ClickedButton()
+          })
+        ]
+      )
+    )
+  )
 
 type AgentSample = Readonly<{
   name: string
@@ -1033,6 +1099,25 @@ const directoryGroup = (h: ApplicationViewBuilder): Html =>
           cellsText: "Public · 12 members",
           onClick: Message.ClickedButton()
         })
+      ],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Table of members: 24px marks in rows 56px tall, the second the member open beside the list (filled, with the bar), an agent's lilac mark with Agent under its name, and the role and status as cells",
+      memberTable(h),
+      "flex max-w-3xl flex-col"
+    ),
+    sample(
+      h,
+      "Section with an action after its line, over rows with a quiet button, each on a drawing of a mail",
+      [
+        section(h, {
+          label: "Pending invitations",
+          count: pendingInvitations.length,
+          action: button(h, "View history", Message.ClickedButton(), { variant: "quiet" })
+        }),
+        pendingInvitationList(h)
       ],
       "flex max-w-2xl flex-col"
     ),
@@ -1938,6 +2023,136 @@ const agentsSidebar = (h: ApplicationViewBuilder, current: string | undefined): 
   ])
 }
 
+const settingsSidebar = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return destinationSidebar(h, [
+    sidebarSection(h, {
+      label: "Settings",
+      children: [
+        sidebarItem(h, { icon: "mark-settings", label: "Workspace", isCurrent: false, onClick: press }),
+        sidebarItem(h, { icon: "users", label: "Members", isCurrent: true, onClick: press })
+      ]
+    })
+  ])
+}
+
+const membersPane = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return pane(h, {
+    variant: "main",
+    label: "Members",
+    header: {
+      title: "Members",
+      icon: "users",
+      phoneContext: "Mercier & Co",
+      actions: [button(h, "Invite people", press)]
+    },
+    body: [
+      paneColumn(
+        h,
+        [
+          fieldGrid(h, [
+            field(
+              h,
+              {
+                id: "member-search",
+                label: "Search members",
+                type: "search",
+                value: "",
+                placeholder: "Search members…",
+                isAutofocus: false,
+                isLabelHidden: true,
+                onInput: () => press
+              },
+              Option.none()
+            ),
+            choiceSelect(
+              h,
+              {
+                id: "member-filter",
+                label: "Show members",
+                choices: [
+                  ["active", "Active members"],
+                  ["removed", "Removed members"]
+                ],
+                value: "active",
+                onChange: () => press
+              },
+              { isLabelHidden: true }
+            )
+          ]),
+          ...memberTable(h),
+          section(h, {
+            label: "Pending invitations",
+            count: pendingInvitations.length,
+            action: button(h, "View history", press, { variant: "quiet" })
+          }),
+          pendingInvitationList(h)
+        ],
+        { isWide: true }
+      )
+    ]
+  })
+}
+
+const memberPane = (h: ApplicationViewBuilder): Html => {
+  const press = Message.ClickedButton()
+
+  return pane(h, {
+    variant: "side",
+    label: "Member details",
+    header: {
+      title: "Member details",
+      leading: paneBack(h, press, "Back to Members"),
+      actions: [paneClose(h, press)],
+      subtitle: "Mercier & Co"
+    },
+    body: [
+      paneColumn(h, [
+        person(h, { mark: { text: "AM" }, name: "Alex Morgan", detail: "Person · Active" }),
+        paneForm(h, { title: "Workspace role", onSubmit: press }, [
+          choiceSelect(
+            h,
+            {
+              id: "member-role",
+              label: "Workspace role",
+              choices: [
+                ["member", "Member"],
+                ["administrator", "Administrator"]
+              ],
+              value: "member",
+              hint: "Changing the workspace role keeps any separate permissions in place.",
+              onChange: () => press
+            },
+            { isLabelHidden: true }
+          ),
+          buttonRow(h, [submit(h, "Save role", { isDisabled: true })])
+        ]),
+        paneSection(h, {
+          title: "Access",
+          hasStitch: true,
+          children: [
+            entryList(h, {
+              label: "Access",
+              children: [entry(h, { key: "member", title: "Member", children: [hint(h, "Workspace · Active")] })]
+            })
+          ]
+        }),
+        paneSection(h, {
+          title: "Membership",
+          hasStitch: true,
+          children: [
+            buttonRow(h, [button(h, "Remove member", press)]),
+            hint(h, "Rejoining after removal requires a new invitation.")
+          ]
+        })
+      ])
+    ]
+  })
+}
+
 const connectionSections: ReadonlyArray<
   Readonly<{ title: string; noun: string; entries: ReadonlyArray<Readonly<{ name: string; status?: MarkStatus }>> }>
 > = [
@@ -2372,6 +2587,16 @@ const detailsGroup = (
     ),
     sample(
       h,
+      "A person: a mark beside a name over what they are, at 40px, in the agent's tone, and at 24px with a name alone",
+      [
+        person(h, { mark: { text: "JM" }, name: "Jamie Morgan · You", detail: "Workspace owner" }),
+        person(h, { mark: { text: "Y", tone: "lilac" }, name: "Yumi", detail: "Agent · Active" }),
+        person(h, { mark: { text: "JM" }, markSize: "sm", name: "Jamie Morgan" })
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
       "Badge tones",
       [
         badge(h, { label: "Queued" }),
@@ -2682,7 +2907,7 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               rail: shellRail(h, model.destination),
               sidebar: shellSidebar(h, true, false),
               main: groupPane(h, model.paneTab, model.composer),
-              aside: { view: threadPane(h, model.reply), isOpen: false, dialog: () => h.empty }
+              aside: { label: "Thread", view: threadPane(h, model.reply), isOpen: false, dialog: () => h.empty }
             })
           ]
         )
@@ -2738,6 +2963,25 @@ const shellGroup = (h: ApplicationViewBuilder, model: Model): Html =>
               rail: shellRail(h, "agents"),
               sidebar: agentsSidebar(h, "Review helper"),
               main: agentPane(h)
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Settings, Members: a search and a filter over a table of members, the member open beside it as the side pane, and the pending invitations under the table",
+      [
+        h.div(
+          [h.Class(shellFrame)],
+          [
+            shell(h, {
+              viewport: "Split",
+              rail: shellRail(h, "settings"),
+              sidebar: settingsSidebar(h),
+              main: membersPane(h),
+              aside: { label: "Member details", view: memberPane(h), isOpen: false, dialog: () => h.empty }
             })
           ]
         )

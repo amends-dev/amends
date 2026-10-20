@@ -55,7 +55,8 @@ const update = (model: Model, message: Message) =>
   })
 
 const viewWith =
-  (lent: Readonly<{ hasMenu: boolean; hasSearch: boolean }>) => (model: Model, h: HtmlBuilder<Message>) =>
+  (lent: Readonly<{ hasMenu: boolean; hasSearch: boolean; asideLabel: string }>) =>
+  (model: Model, h: HtmlBuilder<Message>) =>
     shell(h, {
       viewport: model.viewport,
       rail: rail(h, {
@@ -86,6 +87,7 @@ const viewWith =
       ...(model.isThreadOpen
         ? {
             aside: {
+              label: lent.asideLabel,
               view: pane(h, {
                 variant: "side",
                 label: "Composer paste crash",
@@ -158,8 +160,9 @@ const viewWith =
         : {})
     })
 
-const view = viewWith({ hasMenu: true, hasSearch: false })
-const viewWithSearch = viewWith({ hasMenu: true, hasSearch: true })
+const view = viewWith({ hasMenu: true, hasSearch: false, asideLabel: "Thread" })
+const viewWithSearch = viewWith({ hasMenu: true, hasSearch: true, asideLabel: "Thread" })
+const viewOfMember = viewWith({ hasMenu: true, hasSearch: false, asideLabel: "Member details" })
 
 const inWindow = (viewport: Viewport, extra: Partial<Model> = {}): Model => ({ ...initial, viewport, ...extra })
 
@@ -311,7 +314,7 @@ describe("shell", () => {
   it("has no Menu button or dialog when it is given no menu, and no sidebar below Desktop", () => {
     for (const viewport of ["Phone", "Tablet"] as const) {
       scene(
-        { update, view: viewWith({ hasMenu: false, hasSearch: false }) },
+        { update, view: viewWith({ hasMenu: false, hasSearch: false, asideLabel: "Thread" }) },
         given(inWindow(viewport, { isMenuOpen: true })),
         expect(role("button", { name: "Menu" })).toBeAbsent(),
         expect(role("dialog", { name: "Navigation" })).toBeAbsent(),
@@ -358,6 +361,15 @@ describe("shell", () => {
         expect(role("main")).toExist()
       )
     }
+  })
+
+  it("names the side pane's dialog by the label it is given, whatever the pane holds", () => {
+    scene(
+      { update, view: viewOfMember },
+      given(inWindow("Desktop", { isAsideOpen: true })),
+      expect(within(role("dialog"), role("heading", { name: "Member details", level: 2 }))).toExist(),
+      expect(within(role("dialog"), role("heading", { name: "Thread" }))).toBeAbsent()
+    )
   })
 
   it("closes the side pane's dialog by the pane's Close and by its Back, which send the pane's message", () => {

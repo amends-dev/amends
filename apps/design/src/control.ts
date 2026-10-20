@@ -138,6 +138,11 @@ export type ButtonOptions = Readonly<{
   /** Drawn at `sm` before the label, 8px from it, and hidden from assistive technology, which reads the label. */
   icon?: IconName
   isDisabled?: boolean
+  /**
+   * What assistive technology calls the button when its label alone does not tell it from the buttons around it, such as
+   * "Revoke invitation for casey@mercier.example" for "Revoke". It begins with the label.
+   */
+  name?: string
 }>
 
 export type IconButtonOptions = Readonly<{
@@ -210,7 +215,7 @@ export const buttonWith = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   attributes: ControlAttributes<Message>,
   label: string,
-  options: Omit<ButtonOptions, "isDisabled"> = {}
+  options: Omit<ButtonOptions, "isDisabled" | "name"> = {}
 ) => {
   const variant = options.variant ?? "secondary"
   const className = joinClasses(
@@ -237,7 +242,13 @@ const renderButton = <Message, Requirements>(
     {
       ...behavior,
       isDisabled: options.isDisabled ?? false,
-      toView: (attributes) => buttonWith(h, attributes.button, label, { variant: defaultVariant, ...options })
+      toView: (attributes) =>
+        buttonWith(
+          h,
+          options.name === undefined ? attributes.button : [...attributes.button, h.AriaLabel(options.name)],
+          label,
+          { variant: defaultVariant, ...options }
+        )
     },
     h
   )

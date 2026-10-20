@@ -264,15 +264,19 @@ const mainView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Htm
       h.block(GroupBinding.embedView({ key: groupId, slotId: "group", model: open, viewInputs: { now } }))
   })
 
+/** What the side pane is called, which names the dialog that holds it, and what it shows. */
+type Aside = Readonly<{ label: string; view: Html }>
+
 /** The side pane: the thread open, in the group open or beside the inbox, while there is one, given the time now. */
-const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Option.Option<Html> =>
+const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Option.Option<Aside> =>
   Open.matchOrElse(
     model.open,
     {
       Inbox: () =>
         Option.isSome(model.inbox.selected)
-          ? Option.some(
-              h.block(
+          ? Option.some({
+              label: "Thread",
+              view: h.block(
                 InboxBinding.embedView({
                   slotId: "inbox-thread",
                   model: model.inbox,
@@ -280,12 +284,13 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
                   view: inboxThreadView
                 })
               )
-            )
+            })
           : Option.none(),
       Group: ({ groupId, model: open }) =>
         Option.isSome(open.thread)
-          ? Option.some(
-              h.block(
+          ? Option.some({
+              label: "Thread",
+              view: h.block(
                 GroupBinding.embedView({
                   key: groupId,
                   slotId: "group-thread",
@@ -294,7 +299,7 @@ const asideView = (model: Model, now: DateTime.Utc, h: WorkspaceViewBuilder): Op
                   viewInputs: { now }
                 })
               )
-            )
+            })
           : Option.none()
     },
     () => Option.none()
@@ -332,7 +337,8 @@ export const view = WorkspaceComposition.makeView.withInputs<ViewInputs>((model,
     ...(Option.isSome(aside)
       ? {
           aside: {
-            view: aside.value,
+            label: aside.value.label,
+            view: aside.value.view,
             isOpen: model.aside.isOpen,
             dialog: (toView) =>
               h.block(AsideBinding.embedView({ slotId: "aside", model: model.aside, viewInputs: { toView } }))

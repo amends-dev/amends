@@ -4,6 +4,7 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
+import { button } from "./control.ts"
 import { badge } from "./details.ts"
 import { activityCell, cellWithDetail, columns, footnote, row, rowWithButton, section, summary } from "./directory.ts"
 
@@ -38,6 +39,30 @@ describe("section", () => {
       { update, view: viewOf((h) => [section(h, { label: "Invitations" })]) },
       given(initial),
       expect(role("heading", { name: "Invitations" })).toExist()
+    )
+  })
+
+  it("ends with the action it is given, after the line that runs to the edge", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          section(h, {
+            label: "Pending invitations",
+            count: 2,
+            action: button(h, "View history", Message.ClickedMercier(), { variant: "quiet" })
+          })
+        ])
+      },
+      given(initial),
+      expect(role("heading", { name: "Pending invitations", level: 2 })).toExist(),
+      click(role("button", { name: "View history" })),
+      expect(role("status")).toHaveText("Opened Mercier & Co")
+    )
+    scene(
+      { update, view: viewOf((h) => [section(h, { label: "Invitations", count: 2 })]) },
+      given(initial),
+      expect(role("button")).toBeAbsent()
     )
   })
 })
@@ -103,7 +128,7 @@ describe("row", () => {
 describe("rowWithButton", () => {
   const northstar = (h: HtmlBuilder<Message>) =>
     rowWithButton(h, {
-      mark: "N",
+      mark: { text: "N" },
       title: "Northstar Studio",
       meta: "Pending invitation · Expires in 7 days",
       action: "Accept invite",
@@ -113,7 +138,7 @@ describe("rowWithButton", () => {
 
   const atlas = (h: HtmlBuilder<Message>) =>
     rowWithButton(h, {
-      mark: "A",
+      mark: { text: "A" },
       title: "Atlas Labs",
       action: "Accept invite",
       actionName: "Accept invite to Atlas Labs",
@@ -174,6 +199,94 @@ describe("rowWithButton", () => {
       expect(role("button", { name: "Accept invite to Northstar Studio" })).toHaveClass("bg-action-secondary"),
       expect(selector("div.min-h-19")).not.toHaveClass("hover:bg-hover"),
       expect(selector("div.min-h-19")).not.toHaveClass("cursor-pointer")
+    )
+  })
+})
+
+describe("rowWithButton as a pending invitation's", () => {
+  const casey = (h: HtmlBuilder<Message>) =>
+    rowWithButton(h, {
+      mark: { icon: "mark-mail" },
+      markSize: "md",
+      title: "casey@mercier.example",
+      meta: "Member · Expires in 5 days",
+      action: "Revoke",
+      actionName: "Revoke invitation for casey@mercier.example",
+      variant: "quiet",
+      onClick: Message.ClickedFieldwork()
+    })
+
+  it("draws an icon in a 32px mark, hidden from assistive technology, and keeps its title and meta as text", () => {
+    scene(
+      { update, view: viewOf((h) => [casey(h)]) },
+      given(initial),
+      expect(selector("span.relative.size-8 svg")).toExist(),
+      expect(selector("span.relative.size-8")).toHaveAttr("aria-hidden", "true"),
+      expect(text("casey@mercier.example")).toExist(),
+      expect(text("Member · Expires in 5 days")).toExist()
+    )
+  })
+
+  it("has a quiet button named for the invitation, in place of the secondary one", () => {
+    scene(
+      { update, view: viewOf((h) => [casey(h)]) },
+      given(initial),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toHaveText("Revoke"),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toHaveClass("bg-transparent"),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).not.toHaveClass(
+        "bg-action-secondary"
+      ),
+      click(role("button", { name: "Revoke invitation for casey@mercier.example" })),
+      expect(role("status")).toHaveText("Opened Fieldwork")
+    )
+  })
+
+  it("disables its button while the invitation is itself on its way, and not otherwise", () => {
+    scene(
+      { update, view: viewOf((h) => [casey(h)]) },
+      given(initial),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toBeEnabled()
+    )
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          rowWithButton(h, {
+            mark: { icon: "mark-mail" },
+            markSize: "md",
+            title: "casey@mercier.example",
+            action: "Revoke",
+            actionName: "Revoke invitation for casey@mercier.example",
+            variant: "quiet",
+            isDisabled: true,
+            onClick: Message.ClickedFieldwork()
+          })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Revoke invitation for casey@mercier.example" })).toBeDisabled()
+    )
+  })
+
+  it("is as tall as its mark makes it, 76px with a 32px mark and 56px with a 24px one", () => {
+    scene({ update, view: viewOf((h) => [casey(h)]) }, given(initial), expect(selector("div.min-h-19")).toExist())
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          rowWithButton(h, {
+            mark: { text: "N" },
+            markSize: "sm",
+            title: "Nora",
+            action: "Remove",
+            actionName: "Remove Nora",
+            onClick: Message.ClickedMercier()
+          })
+        ])
+      },
+      given(initial),
+      expect(selector("div.min-h-14")).toExist(),
+      expect(role("button", { name: "Remove Nora" })).toHaveClass("bg-action-secondary")
     )
   })
 })
@@ -410,6 +523,67 @@ describe("row with a status", () => {
       given(initial),
       expect(reviewHelper).toHaveClass("hover:[--amends-status-knockout:var(--amends-hover)]"),
       expect(within(reviewHelper, selector(".contents"))).toHaveClass("max-tablet:ps-12")
+    )
+  })
+})
+
+describe("compact row", () => {
+  const rows = (h: HtmlBuilder<Message>) => [
+    row(h, {
+      mark: { text: "JM" },
+      markSize: "sm",
+      title: "Jamie Morgan · You",
+      cells: [h.span([], ["Owner"]), h.span([], ["Active"])],
+      cellsText: "Owner · Active",
+      isCurrent: true,
+      onClick: Message.ClickedMercier()
+    }),
+    row(h, {
+      mark: { text: "Y", tone: "lilac" },
+      markSize: "sm",
+      title: "Yumi",
+      meta: "Agent",
+      cells: [h.span([], ["Member"]), h.span([], ["Active"])],
+      cellsText: "Member · Active",
+      onClick: Message.ClickedFieldwork()
+    })
+  ]
+
+  it("draws a 24px mark in a row 56px tall, and starts the folded cells 40px in", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(within(role("button", { name: "Yumi" }), text("Y"))).toHaveClass("size-6"),
+      expect(role("button", { name: "Yumi" })).toHaveClass("min-h-14"),
+      expect(role("button", { name: "Yumi" })).not.toHaveClass("min-h-19"),
+      expect(within(role("button", { name: "Yumi" }), selector(".contents"))).toHaveClass("max-tablet:ps-10")
+    )
+  })
+
+  it("keeps the 76px of a roomier row for its 32px and 40px marks", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => [
+          row(h, { mark: { text: "A" }, markSize: "md", title: "Atlas", onClick: Message.ClickedMercier() }),
+          row(h, { mark: { text: "M" }, title: "Mercier", onClick: Message.ClickedFieldwork() })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Atlas" })).toHaveClass("min-h-19"),
+      expect(role("button", { name: "Mercier" })).toHaveClass("min-h-19")
+    )
+  })
+
+  it("marks the row whose details are open as current, filled and with the bar, and no other", () => {
+    scene(
+      { update, view: viewOf(rows) },
+      given(initial),
+      expect(role("button", { name: "Jamie Morgan · You" })).toHaveAttr("aria-current", "true"),
+      expect(role("button", { name: "Jamie Morgan · You" })).toHaveClass("aria-[current=true]:bg-selected"),
+      expect(role("button", { name: "Jamie Morgan · You" })).toHaveClass("aria-[current=true]:indicator-bar"),
+      expect(role("button", { name: "Jamie Morgan · You" })).toHaveClass("relative"),
+      expect(role("button", { name: "Yumi" })).not.toHaveAttr("aria-current")
     )
   })
 })

@@ -5,7 +5,7 @@ import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button, buttonRow, hint, sending } from "./control.ts"
-import { badge, detailList, entry, entryList, log } from "./details.ts"
+import { badge, detailList, entry, entryList, log, person } from "./details.ts"
 
 const Message = defineMessageUnion({ ClickedStop: {}, ClickedOpen: {} })
 type Message = typeof Message.Type
@@ -47,6 +47,37 @@ describe("detailList", () => {
       expect(selector("dd")).toHaveText("Triage"),
       click(within(selector("dl"), role("button", { name: "Open thread" }))),
       expect(role("status")).toHaveText("Stopped 0, opened 1")
+    )
+  })
+})
+
+describe("person", () => {
+  it("is a mark beside a name over a line of what they are, the mark hidden from assistive technology", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => person(h, { mark: { text: "JM" }, name: "Jamie Morgan · You", detail: "Workspace owner" }))
+      },
+      given(initial),
+      expect(text("Jamie Morgan · You")).toExist(),
+      expect(text("Workspace owner")).toExist(),
+      expect(text("JM")).toHaveAttr("aria-hidden", "true"),
+      expect(text("JM")).toHaveClass("size-10"),
+      expect(text("Jamie Morgan · You")).toHaveClass("font-medium")
+    )
+  })
+
+  it("draws the mark at the size it is given, in the tone it is given, and has no line under a name without a detail", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) => person(h, { mark: { text: "Y", tone: "lilac" }, markSize: "sm", name: "Yumi" }))
+      },
+      given(initial),
+      expect(text("Y")).toHaveClass("size-6"),
+      expect(text("Y")).toHaveClass("bg-avatar-lilac-bg"),
+      expect(text("Yumi")).toExist(),
+      expect(selector("span.text-ink-secondary")).toBeAbsent()
     )
   })
 })

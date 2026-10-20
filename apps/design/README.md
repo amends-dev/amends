@@ -27,7 +27,7 @@ field with its label hidden, in a section that names it; the toggle on and off, 
 descriptions and a choice that can't be chosen and a hint, refused, and disabled; the notice
 tones, a boxed note in each of its three tones, and a notice over a button in a column; `sending`; a form with its inline text and a value with its link, and setting rows with an
 action, with a select, with a label alone, and wrapping in a narrow column; the
-directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, a table of connections with a drawing on each mark and the authentication as a cell, and a section of two rows with a button
+directory's section and rows, a row with cells and no action, a table of agents with their status patches and cells of two lines, a table of connections with a drawing on each mark and the authentication as a cell, a table of members with 24px marks in rows 56px tall, the second the member open beside the list, an agent's lilac mark, and the role and status as cells, a section with an action after its line over two rows with a quiet button, each on a drawing of a mail, and a section of two rows with a button
 named for their workspaces, with a footnote after them, and a table of three groups' rows
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
@@ -36,7 +36,7 @@ pages return them: with workspaces and invitations, whose heading has a Create w
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a wide
 one with tabs and a description, and as a search over rows of integrations that run to the panel's edges; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
-list, the four badge tones, entries with and without marks, with trailing badges, and with children,
+list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
 conversation's messages as a list with a current row whose text opens the thread, with a note,
@@ -50,7 +50,7 @@ groups, each in a frame wider than the measure; the composer empty, filled, and 
 frame of fixed height, its groups, one of them still on its way, and direct messages through
 `sidebarSections`, its threads,
 replies, and composers made of `message`, `divider`, and `composer`, the first with the open thread
-as a plain row under its group and the second with its notices; the shell three more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, and Connections, with a section for each capability; and the icons by size, as the shell
+as a plain row under its group and the second with its notices; the shell four more times with the rail on a destination of its own: Agents, with the sidebar's title current, each agent's status and the logo at those at work, and the list in the main pane, again with an agent open, whose page is the main pane: its mark and status in the header, a boxed note of why it can't run, a name form, and its setup, details, and removal set apart by a stitch, Connections, with a section for each capability, and Settings, on Members: a search and a filter over a table of members, with the pending invitations under it, and a member's details as the side pane, whose Back is named for where it goes back to; and the icons by size, as the shell
 draws them, and with a label. The toggles, fields, composers, and select take input, and the modals
 open and close. So do the shell's rail and tabs, whose current item follows a click, and the list of
 threads, whose current row follows a click. The frames pass the shell the viewport `Split`, whatever
@@ -155,7 +155,9 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   link ignores it. `options.wide` fills the container, and `options.isDisabled` marks it
   `aria-disabled` and sends nothing. `options.icon` draws an icon before the label, at `sm`, 8px from
   it, in the label's color; the label still names the button, and the icon is hidden from assistive
-  technology. The actions that create something use `mark-new`, which the reference's buttons use,
+  technology. `options.name` is what assistive technology calls the button when its label alone does not tell
+  it from the buttons around it, such as "Revoke invitation for casey@mercier.example" for "Revoke"; it begins
+  with the label. The actions that create something use `mark-new`, which the reference's buttons use,
   not `plus`, which is smaller and lighter and has no mark's weight. A button is 36px tall, a quiet
   one 32px, and every one but a link 44px on touch.
 - `submit(h, label, options?)` is a button of `type="submit"`, primary unless `options.variant`
@@ -319,8 +321,9 @@ What a form screen is made of beside its controls.
 
 What a directory screen lists.
 
-- `section(h, { label, count? })` is the label as an `h2`, the count in a 20px `subtle` badge, and a
-  dashed line in `stitch` running to the right edge, 36px below what is above it.
+- `section(h, { label, count?, action? })` is the label as an `h2`, the count in a 20px `subtle` badge, and a
+  dashed line in `stitch` running to the right edge, 36px below what is above it. An `action`, such as a quiet
+  View history, comes after the line, at the end.
 - `summary(h, { copy, count })` is a line at hint size in `ink-muted` that says what a list holds,
   the `copy`, with the `count`, such as "4 groups", at its end.
 - `columns(h, { label, cells })` is the labels of a table's columns over its rows, hidden from
@@ -334,8 +337,8 @@ What a directory screen lists.
   says what else the person can do, such as "Accept an invitation above, or create your own workspace."
 - `row(h, { id?, mark, markSize?, status?, title, meta?, cells?, cellsText?, action?, onClick })` is one button the width of
   its container, at least 76px tall: a square mark holding the `mark` letters, `{ text, tone? }`, or its drawing,
-  `{ icon, tone? }`, as a connection's is, 40px (`markSize` `"lg"`, the default) or 32px (`"md"`, as a list of agents
-  draws it), on `avatar-neutral` unless given the `lilac` tone, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
+  `{ icon, tone? }`, as a connection's is, 40px (`markSize` `"lg"`, the default), 32px (`"md"`, as a list of agents
+  draws it), or 24px (`"sm"`, which makes the row 56px tall, for a table of people), on `avatar-neutral` unless given the `lilac` tone, the `title` at body size over the `meta` at hint size in `ink-secondary`, and the
   `action` at the right in `ink-secondary`. The row is `hover` on hover. A `status` is the patch on the mark, cut
   out of the row's own fill, which a hovered row gives `status-knockout`. The button is named by the title and, with a
   status, its label after it, "Atlas, Needs setup", and described by the meta through `aria-description`, and the mark
@@ -344,7 +347,8 @@ What a directory screen lists.
   gives them, and are hidden like the mark; `cellsText`, what they say in words, such as "Public ·
   12 members", describes the button after the meta. A row with cells keeps 6rem at its end for its
   action, right-aligned, whether it has one or not. An `id` is the button's own, for the app to move focus to
-  a row, such as the one for a workspace the person has just joined. A page lists rows as `li` items of a `ul`.
+  a row, such as the one for a workspace the person has just joined. A row that `isCurrent` is the one whose details are open beside the list: it is filled `selected` with the
+  2px bar at its start, and the button is `aria-current="true"`. A page lists rows as `li` items of a `ul`.
   - From 48rem to 64rem (`max-desktop:`) the cell columns are 6rem wide and the room for the action
     5rem, so a title keeps its room beside three cells, and `columns` follows with the same widths.
   - Below 48rem (`max-tablet:`) a row with cells folds, in CSS alone and from the same markup: the
@@ -354,8 +358,8 @@ What a directory screen lists.
     of `columns`. The cells lie in one element that is `display: contents` from 48rem, so each is a
     column of the row there, and below it takes the whole width of its line (`basis-full`), which is
     what breaks the row after the title. A row without cells does not fold and keeps its action.
-    `cellsText` is unchanged, so the folded row is described as it is wide. The folded cells start under a 32px
-    mark's title, 48px in, as under a 40px one's, 56px in.
+    `cellsText` is unchanged, so the folded row is described as it is wide. The folded cells start under a 24px
+    mark's title, 40px in, as under a 32px mark's, 48px in, and a 40px one's, 56px in.
 - `cellWithDetail(h, { value, detail? })` is a cell of two lines for a row: the `value` at control size in `ink`
   over the `detail` at hint size in `ink-secondary`, such as an agent's harness over its sandbox. Both end in an
   ellipsis. Below 48rem, where the cells fold under the title, the detail is not shown, so the folded line reads
@@ -363,10 +367,12 @@ What a directory screen lists.
 - `activityCell(h, { state, place? })` is a cell of the same two lines for what is at work: the logo's mark and the
   `state`, "Working", over the `place`, "#design". A row that is idle leaves its cell empty and the column keeps
   its place.
-- `rowWithButton(h, { mark, title, meta?, action, actionName, onClick })` is a row for a thing the
+- `rowWithButton(h, { mark, markSize?, title, meta?, action, actionName, variant?, isDisabled?, onClick })` is a row for a thing the
   person answers and does not open, such as an invitation, so it is not a button itself: the same
-  height, mark, and title over meta as `row`, and at the end a `secondary` `button` labelled `action`
-  that sends `onClick`. The row has no `hover` and no pointer, since it is not what is pressed. The
+  height, mark (letters or an icon, at the sizes `row` has), and title over meta as `row`, and at the end a
+  `secondary` `button` labelled `action`, or a `quiet` one with `variant`, as a pending invitation's Revoke is,
+  that sends `onClick`, which is disabled with `isDisabled`, as a pending invitation's Revoke is while the
+  invitation is itself on its way. The row has no `hover` and no pointer, since it is not what is pressed. The
   button is named by `actionName`, which begins with the `action`, such as "Accept invite to
   Northstar Studio", so that the buttons of several rows are told apart; the mark is hidden from
   assistive technology, and the title and meta are read as text. It is a renderer beside `row`, and
@@ -423,11 +429,11 @@ The frame of the first four layout patterns, which the modules below fill.
   150ms transition of `translate` from `starting:` styles, mirrored in right-to-left and off for
   reduced motion; closing is instant, since the dialog is not animated.
 
-  The `aside` is `{ view, isOpen, dialog }`, lent the same way from the page's own bound dialog. At
+  The `aside` is `{ label, view, isOpen, dialog }`, lent the same way from the page's own bound dialog. At
   `Split` the shell puts `aside.view` in the card and never calls `aside.dialog`. At every other
   viewport it calls it, and while the dialog is visible it is a `dialog` element like the drawer's,
-  with a backdrop, and a panel holding an `sr-only` `h2` named Thread, which names the dialog, then
-  `aside.view`. The look is by viewport: floating at `Desktop` and `Tablet`, filling the window at
+  with a backdrop, and a panel holding an `sr-only` `h2` named by the `label`, "Thread" or "Member details",
+  which names the dialog, then `aside.view`. The look is by viewport: floating at `Desktop` and `Tablet`, filling the window at
   `Phone`.
 
   The dialogs are the framework's, so each gets what a dialog gets: focus is trapped in it and
@@ -562,8 +568,8 @@ onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and 
   is a region and the form a landmark, both found by the `title`. It takes the section's `hasStitch`.
 - `paneClose(h, onClick)` is the side pane's close button, an `iconButton` named Close, for the
   header's `actions`. It shows from 48rem; below that the side pane is full screen and has `paneBack`.
-- `paneBack(h, onClick)` is the side pane's Back button, an `iconButton` named Back, for the header's
-  `leading`, pulled to the pane's edge. It shows below 48rem only. Page code gives the two the same
+- `paneBack(h, onClick, label?)` is the side pane's Back button, an `iconButton` named Back, or by `label` for where
+  it goes back to, such as "Back to Members", for the header's `leading`, pulled to the pane's edge. It shows below 48rem only. Page code gives the two the same
   message, so each way out of the side pane does the same.
 
 ### `@amends-dev/design/details`
@@ -573,6 +579,10 @@ What a pane says about one thing.
 - `detailList(h, items)` is a definition list of `{ label, value }` items, the `value` text or any
   `Html`: two columns, each `label` at hint size in `ink-muted` at least 5rem wide before its value at
   item size in `ink`, rows 8px apart.
+- `person(h, { mark, markSize?, name, detail? })` is one person or agent alone, not in a list: their `mark`, 40px
+  unless `markSize` says otherwise, beside the `name` at item size in medium weight over the `detail` at hint
+  size in `ink-secondary`, such as "Workspace owner" or "Person · Active". The mark is hidden from assistive
+  technology; the name and the detail are read as text.
 - `badge(h, { label, tone? })` is a small inline mark of how something stands, 20px tall, at `meta`
   size in medium weight. `tone` is `"neutral"` (the default) on `subtle`, or `"success"`, `"caution"`,
   or `"danger"` on its own surface and text with a 1px border.
@@ -753,7 +763,7 @@ renderer family as a person does, through what the app's own tests query: a butt
 `role("button", { name })`, a field by its label, an invalid field's `role("alert")`,
 `aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
-landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, and a footnote by its text; an
+landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, a compact row's 24px mark, its height, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, and a footnote by its text; an
 icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
 destination by `role("button", { name })` with `aria-current`, and the search beside them, which is never current and
 sends what it is given; a sidebar item by its name, which has the status's word after the label, with
@@ -762,7 +772,7 @@ work, the shape of a status at the end of a row with no mark, and the sections o
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
 section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title; a pane's empty state by
 its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, its action, and its icon as `aria-hidden`; a detail list's labels
-and values, a value that is a button; a badge by its label; an entry list by `role("list")`, an
+and values, a value that is a button, a person's mark in its size and tone, hidden from assistive technology, and its name and detail; a badge by its label; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and
@@ -784,7 +794,7 @@ row, and the keys the caller answers, handled, and the others, and those with a 
 the rail and the sidebar, `main`, and `complementary`, with its notices, and by viewport: the sidebar
 in place at `Desktop` and `Split` with no Menu button, and at `Tablet` and `Phone` a Menu button, the
 sidebar, and at `Phone` the rail, inside the dialog named Navigation once it is visible and nowhere
-before; the side pane in place at `Split` and otherwise inside the dialog named Thread once it is
+before; the side pane in place at `Split` and otherwise inside the dialog named Thread, or by the label it is given, once it is
 visible and nowhere before; the notices' live region once, inside the dialog that is visible and
 in the frame otherwise; and the dialogs it is lent, in the frame at every viewport and last, after the
 drawer's and the side pane's, empty while closed, with the notices left in the frame while one is

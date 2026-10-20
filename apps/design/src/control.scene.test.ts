@@ -148,6 +148,30 @@ describe("button", () => {
     )
   })
 
+  it("is found by the name it is given when its label alone does not tell it from the buttons around it", () => {
+    scene(
+      {
+        update,
+        view: viewOf((_, h) => [
+          button(h, "Revoke", Message.ClickedSave(), {
+            variant: "quiet",
+            name: "Revoke invitation for casey@example.com"
+          }),
+          button(h, "Revoke", Message.ClickedRemove(), {
+            variant: "quiet",
+            name: "Revoke invitation for dana@example.com"
+          })
+        ])
+      },
+      given(initial),
+      expect(role("button", { name: "Revoke" })).toBeAbsent(),
+      click(role("button", { name: "Revoke invitation for dana@example.com" })),
+      expect(role("status")).toHaveText("Saved 0, removed 1, submitted 0"),
+      click(role("button", { name: "Revoke invitation for casey@example.com" })),
+      expect(role("status")).toHaveText("Saved 1, removed 1, submitted 0")
+    )
+  })
+
   it("is a link inside a sentence, found by its name, and clicking sends its message", () => {
     scene(
       {

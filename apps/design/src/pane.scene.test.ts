@@ -149,6 +149,30 @@ describe("pane", () => {
     )
   })
 
+  it("names where Back goes when it is told, as Back to Members, which does what Back does", () => {
+    scene(
+      {
+        update,
+        view: paneView((_, h) =>
+          pane(h, {
+            variant: "side",
+            label: "Member details",
+            header: {
+              title: "Member details",
+              leading: paneBack(h, Message.WentBack(), "Back to Members"),
+              actions: [paneClose(h, Message.ClosedThread())]
+            },
+            body: []
+          })
+        )
+      },
+      given(initial),
+      expect(role("button", { name: "Back" })).toBeAbsent(),
+      click(role("button", { name: "Back to Members" })),
+      expect(role("note")).toHaveText("Back 1")
+    )
+  })
+
   it("has no Back in a pane that is given none", () => {
     scene({ update, view: paneView(mainPane) }, given(initial), expect(role("button", { name: "Back" })).toBeAbsent())
   })

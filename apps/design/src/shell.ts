@@ -80,6 +80,8 @@ export type ShellMenu<Message, Requirements> = ShellDialog<Message, Requirements
 
 export type ShellAside<Message, Requirements> = ShellDialog<Message, Requirements> &
   Readonly<{
+    /** What the side pane is, such as "Thread" or "Member details", which names the dialog that holds it elsewhere. */
+    label: string
     /** The side pane, which the shell puts beside the main pane from `Split` and the dialog holds elsewhere. */
     view: Html
   }>
@@ -133,14 +135,14 @@ const drawer = <Message, Requirements>(
 
 /**
  * The dialog `render` describes, as the side pane over the rest of the window while it is visible, and nothing
- * while it is not: an `sr-only` heading named Thread, then the `view`, and the `notices` after the panel. A
+ * while it is not: an `sr-only` heading named for the pane, then the `view`, and the `notices` after the panel. A
  * `Floating` panel is at the end of the window, inset by the frame's gutter, with a shadow, over a scrim; a
  * `FullScreen` one fills the window inside the screen's safe areas, over a backdrop that shows nothing.
  */
 const sidePaneDialog = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   render: ModalRender<Message, Requirements>,
-  parts: Readonly<{ layout: Exclude<AsideLayout, "Beside">; view: Html; notices: Html }>
+  parts: Readonly<{ layout: Exclude<AsideLayout, "Beside">; label: string; view: Html; notices: Html }>
 ): Html =>
   h.dialog(
     [...render.dialog, h.Class(dialogLook)],
@@ -149,7 +151,7 @@ const sidePaneDialog = <Message, Requirements>(
           h.div([...render.backdrop, h.Class(sidePaneLooks[parts.layout].backdrop)]),
           h.div(
             [...render.panel, h.Class(sidePaneLooks[parts.layout].panel)],
-            [h.h2([...render.title, h.Class(dialogTitleLook)], ["Thread"]), parts.view]
+            [h.h2([...render.title, h.Class(dialogTitleLook)], [parts.label]), parts.view]
           ),
           parts.notices
         ]
@@ -244,6 +246,7 @@ export const shell = <Message, Requirements>(
         : asideDialog.dialog((render) =>
             sidePaneDialog(h, render, {
               layout: asideDialog.layout,
+              label: asideDialog.label,
               view: asideDialog.view,
               notices: noticesIn("Aside")
             })

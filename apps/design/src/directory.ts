@@ -36,9 +36,11 @@ const columnsStitch = "h-0 border-t border-dashed border-stitch"
 
 const footnoteLine = "mt-6 text-control text-ink-secondary"
 
-const rowShape = "flex min-h-19 w-full items-center gap-4 ps-3 pe-4"
+const rowShape = "flex w-full items-center gap-4 ps-3 pe-4"
 
-const rowButton = `${rowShape} group cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)]`
+const rowHeights = { sm: "min-h-14", md: "min-h-19", lg: "min-h-19" }
+
+const rowButton = `${rowShape} group relative cursor-pointer bg-transparent text-start focus-ring-inset hover:bg-hover hover:[--amends-status-knockout:var(--amends-hover)] aria-[current=true]:bg-selected aria-[current=true]:[--amends-status-knockout:var(--amends-selected)] aria-[current=true]:indicator-bar`
 
 const rowFoldsCells = "max-tablet:flex-wrap max-tablet:gap-y-2 max-tablet:py-3"
 
@@ -51,7 +53,7 @@ const rowMeta = "block truncate text-hint text-ink-secondary"
 const rowCellsFolded =
   "contents max-tablet:flex max-tablet:basis-full max-tablet:min-w-0 max-tablet:flex-wrap max-tablet:items-center max-tablet:gap-2"
 
-const rowCellsStart = { md: "max-tablet:ps-12", lg: "max-tablet:ps-14" }
+const rowCellsStart = { sm: "max-tablet:ps-10", md: "max-tablet:ps-12", lg: "max-tablet:ps-14" }
 
 const rowCell =
   "block w-32 flex-none text-hint text-ink-secondary max-desktop:w-24 max-tablet:w-auto max-tablet:max-w-full max-tablet:truncate"
@@ -88,17 +90,21 @@ const renderAction = <Message, Requirements>(
   return action === undefined ? h.empty : h.span([h.AriaHidden(true), h.Class(rowAction)], [action])
 }
 
-/** The label over a group of rows, with how many are in it and a dashed line running to the edge. */
+/**
+ * The label over a group of rows, with how many are in it and a dashed line running to the edge, and, when given,
+ * an `action` after the line, such as a quiet button that opens the group's history.
+ */
 export const section = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; count?: number }>
+  config: Readonly<{ label: string; count?: number; action?: Html }>
 ): Html =>
   h.div(
     [h.Class(sectionLine)],
     [
       h.h2([h.Class(sectionLabel)], [config.label]),
       config.count === undefined ? h.empty : h.span([h.Class(sectionCount)], [`${config.count}`]),
-      h.div([h.AriaHidden(true), h.Class(sectionStitch)])
+      h.div([h.AriaHidden(true), h.Class(sectionStitch)]),
+      config.action ?? h.empty
     ]
   )
 
@@ -171,11 +177,16 @@ export const activityCell = <Message, Requirements>(
     ]
   )
 
+/** How big a row's mark is, which sets how tall the row is: a 24px mark makes a compact row, 32px and 40px a roomy one. */
+export type RowMarkSize = keyof typeof rowHeights
+
 /**
  * A whole row as one button that sends `onClick`: a square mark of the `mark` letter, 40px, or 32px with
- * `markSize` `md`, the `title` over its `meta`, and the `action` at the right. The `status` is a patch on the
- * mark, cut out of the row's own surface, which is `hover`'s while it is hovered. The button is named by the title
- * and then the status's word, "Atlas, Needs setup", and described by the meta.
+ * `markSize` `md`, or 24px with `sm`, which makes the row 56px tall and not 76px, for a table of people, the `title`
+ * over its `meta`, and the `action` at the right. The `status` is a patch on the mark, cut out of the row's own
+ * surface, which is `hover`'s while it is hovered. The button is named by the title and then the status's word,
+ * "Atlas, Needs setup", and described by the meta. A row that `isCurrent` is the one whose details are open beside
+ * the list: it is filled `selected`, with the 2px bar at its start, and is `aria-current="true"`.
  *
  * The `cells`, such as a `badge` and a count, or a `cellWithDetail`, each lie in a column 8rem wide between the
  * title and the action, under the labels `columns` gives them. Like the mark and the action they are hidden from
@@ -197,13 +208,14 @@ export const row = <Message, Requirements>(
   config: Readonly<{
     id?: string
     mark: MarkContent
-    markSize?: "md" | "lg"
+    markSize?: RowMarkSize
     status?: MarkStatus | undefined
     title: string
     meta?: string
     cells?: ReadonlyArray<Html>
     cellsText?: string
     action?: string
+    isCurrent?: boolean
     onClick: Message
   }>
 ): Html => {
@@ -221,7 +233,12 @@ export const row = <Message, Requirements>(
             ...(config.id === undefined ? [] : [h.Id(config.id)]),
             h.AriaLabel(config.status === undefined ? config.title : `${config.title}, ${config.status.label}`),
             ...(description === "" ? [] : [h.AriaDescription(description)]),
-            h.Class(hasCells ? `${rowButton} ${rowFoldsCells}` : rowButton)
+            ...(config.isCurrent === true ? [h.AriaCurrent("true")] : []),
+            h.Class(
+              hasCells
+                ? `${rowButton} ${rowHeights[markSize]} ${rowFoldsCells}`
+                : `${rowButton} ${rowHeights[markSize]}`
+            )
           ],
           [
             mark(h, { ...config.mark, size: markSize, status: config.status }),
@@ -241,35 +258,47 @@ export const row = <Message, Requirements>(
 }
 
 /**
- * A row for a thing the person answers and does not open, so the row is not a button: the square mark with the
- * `mark` letter and the `title` over its `meta`, drawn as `row` draws them, and at the end a `secondary` button
- * labelled `action` that sends `onClick`. The row is not `hover`, since it is not what is pressed. The button is
- * named by `actionName`, which begins with the label, such as "Accept invite to Northstar Studio", so that the
+ * A row for a thing the person answers and does not open, so the row is not a button: the square mark, 40px unless
+ * `markSize` says otherwise, of the `mark` letters or an icon, and the `title` over its `meta`, drawn as `row` draws
+ * them, and at the end a button labelled `action` that sends `onClick`, `secondary` unless `variant` makes it
+ * `quiet`, as a pending invitation's Revoke is. The row is not `hover`, since it is not what is pressed. The button
+ * is named by `actionName`, which begins with the label, such as "Accept invite to Northstar Studio", so that the
  * buttons of several rows are told apart; the mark is hidden from assistive technology, and the title and meta
- * are read as text.
+ * are read as text. The button is disabled while `isDisabled`, as a pending invitation's Revoke is while the invitation
+ * is itself on its way.
  */
 export const rowWithButton = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
-    mark: string
+    mark: MarkContent
+    markSize?: RowMarkSize
     title: string
     meta?: string
     action: string
     actionName: string
+    variant?: "secondary" | "quiet"
+    isDisabled?: boolean
     onClick: Message
   }>
-): Html =>
-  h.div(
-    [h.Class(rowShape)],
+): Html => {
+  const markSize = config.markSize ?? "lg"
+
+  return h.div(
+    [h.Class(`${rowShape} ${rowHeights[markSize]}`)],
     [
-      mark(h, { text: config.mark, size: "lg" }),
+      mark(h, { ...config.mark, size: markSize }),
       renderText(h, config.title, config.meta),
       Button.view(
         {
           onClick: config.onClick,
-          toView: (attributes) => buttonWith(h, [...attributes.button, h.AriaLabel(config.actionName)], config.action)
+          isDisabled: config.isDisabled ?? false,
+          toView: (attributes) =>
+            buttonWith(h, [...attributes.button, h.AriaLabel(config.actionName)], config.action, {
+              variant: config.variant ?? "secondary"
+            })
         },
         h
       )
     ]
   )
+}
