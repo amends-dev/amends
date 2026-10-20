@@ -3,7 +3,21 @@ import { Option, Schema } from "effect"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { click, expect, given, label, role, scene, selector, submit, text, type, within } from "foldkit/scene"
+import {
+  all,
+  click,
+  expect,
+  expectAll,
+  given,
+  label,
+  role,
+  scene,
+  selector,
+  submit,
+  text,
+  type,
+  within
+} from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button, field, iconButton, sending, submit as submitButton } from "./control.ts"
 import { pane, paneBack, paneClose, paneColumn, paneEmpty, paneForm, paneSection, paneTabs } from "./pane.ts"
@@ -340,7 +354,7 @@ describe("paneEmpty", () => {
       header: { title: "Inbox" },
       body: [
         paneEmpty(h, {
-          icon: "mark-done",
+          art: "rest",
           title: "You're all caught up",
           ...(copy === undefined ? {} : { copy })
         })
@@ -363,7 +377,7 @@ describe("paneEmpty", () => {
         update,
         view: paneView((_: Model, h: HtmlBuilder<Message>) =>
           paneEmpty(h, {
-            icon: "mark-connections",
+            art: "lost-thread",
             title: "Can't reach your workspace host",
             copy: "You're still signed in. Try again once the host is running.",
             level: 1
@@ -386,12 +400,57 @@ describe("paneEmpty", () => {
     )
   })
 
-  it("hides its icon from assistive technology", () => {
+  it("draws its art above the title, hidden from assistive technology", () => {
     scene(
       { update, view: paneView(emptyPane("Nothing new.")) },
       given(initial),
+      expectAll(all.selector("svg")).toHaveCount(1),
       expect(selector("svg")).toHaveAttr("aria-hidden", "true"),
-      expect(role("img")).toBeAbsent()
+      expect(selector("svg")).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(selector("svg g.art-breathing")).toExist(),
+      expect(role("img")).toBeAbsent(),
+      expect(selector('div[role="status"]')).toBeAbsent()
+    )
+  })
+
+  it("draws the art it is given, a different drawing for each kind", () => {
+    scene(
+      {
+        update,
+        view: paneView((_: Model, h: HtmlBuilder<Message>) =>
+          paneEmpty(h, { art: "lost-thread", title: "Can't reach your workspace host", level: 1 })
+        )
+      },
+      given(initial),
+      expect(selector("svg")).toHaveAttr("viewBox", "0 0 120 64"),
+      expect(selector("svg .art-recoiling-start")).toExist(),
+      expect(selector("svg .art-recoiling-end")).toExist(),
+      expect(selector("svg .art-breathing")).toBeAbsent()
+    )
+  })
+
+  it("is a live region with the logo working when what it says is waited on", () => {
+    scene(
+      {
+        update,
+        view: paneView((_: Model, h: HtmlBuilder<Message>) =>
+          paneEmpty(h, {
+            art: "working",
+            title: "Checking your session",
+            copy: "Connecting to your workspace host…",
+            level: 1
+          })
+        )
+      },
+      given(initial),
+      expect(
+        within(selector('div[role="status"]'), role("heading", { name: "Checking your session", level: 1 }))
+      ).toExist(),
+      expect(within(selector('div[role="status"]'), text("Connecting to your workspace host…"))).toExist(),
+      expect(selector("svg")).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(selector("svg")).toHaveAttr("width", "3.5rem"),
+      expect(selector("svg")).toHaveAttr("aria-hidden", "true"),
+      expect(selector("svg.logo-working")).toExist()
     )
   })
 
@@ -405,7 +464,7 @@ describe("paneEmpty", () => {
             header: { title: "Agents" },
             body: [
               paneEmpty(h, {
-                icon: "mark-agents",
+                art: "sew-in",
                 title: "No agents yet",
                 copy: "Add an agent.",
                 action: button(h, "Add agent", Message.OpenedSettings(), { variant: "primary" })

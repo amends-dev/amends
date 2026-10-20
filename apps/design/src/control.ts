@@ -1,7 +1,7 @@
 /**
  * The controls the app's views share, over `@foldkit/ui`'s headless components: buttons and the row
  * they lie in, a link to another page, labelled fields and boxes and the grid they lie in, a labelled
- * switch, a choice from a list, a line of hint, why an entry was refused, a boxed note for a page as a
+ * switch, a choice from a list, a six-digit code, a line of hint, what is being waited for, why an entry was refused, a boxed note for a page as a
  * whole, that an action is on its way, and the column that holds a few of these together. Each renders
  * with the caller's builder and messages, and carries the look.
  */
@@ -122,6 +122,19 @@ const noticeBoxLines = "m-0 flex list-none flex-col gap-1 p-0 text-control text-
 const sendingMark = "text-meta text-ink-muted"
 
 const hintText = "text-hint text-ink-muted"
+
+const loadingText = "m-0 text-control text-ink-secondary"
+
+const codeCells = "group relative grid grid-cols-6 gap-3 max-tablet:gap-2"
+
+const codeCell =
+  "grid h-14 place-items-center border border-outline bg-field text-[1.375rem] leading-[1.875rem] font-medium text-ink tabular-nums group-focus-within:data-next:border-outline-strong group-data-invalid:border-outline-danger group-data-invalid:group-focus-within:data-next:border-outline-danger group-data-disabled:bg-subtle group-data-disabled:text-ink-disabled"
+
+const codeInputBox =
+  "absolute inset-0 m-0 size-full border-0 bg-transparent p-0 text-body tracking-[2rem] text-transparent caret-transparent outline-none selection:bg-transparent focus-ring"
+
+/** How many digits the sign-in code has. */
+const codeLength = 6
 
 export type ButtonVariant = keyof typeof buttonLooks
 
@@ -400,6 +413,13 @@ export const noticeBox = <Message, Requirements>(
 export const hint = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Class(hintText)], [text])
 
+/**
+ * A quiet line that says what a pane or a page is waiting for, such as "Loading your inbox…", in a live region, a
+ * `status`, so that it is announced.
+ */
+export const loadingLine = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
+  h.p([h.Role("status"), h.Class(loadingText)], [text])
+
 /** That what the person did is on its way to the server, while it is. */
 export const sending = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, pending: boolean): Html =>
   pending ? h.span([h.Class(sendingMark)], [" · Sending…"]) : h.empty
@@ -473,6 +493,89 @@ export const field = <Message, Requirements>(
     },
     h
   )
+
+const digitsOf = (text: string): string => text.replaceAll(/\D/g, "").slice(0, codeLength)
+
+/**
+ * A labelled six-digit code in one native input, drawn as six cells of 56px, 12px apart (8px on phones) across
+ * the column. Typing, pasting, deleting, and the platform's one-time-code autofill work as in a text field: what
+ * `onInput` is given is digits only, at most six, so the caller keeps what it is given and the field shows it. The
+ * cell the next digit goes into is outlined while the input has focus, and `error` outlines every cell in the
+ * danger color, as it describes the input under them, with the `hint`, as `field` does. When the sixth digit is in,
+ * `onComplete` is sent with the code in place of `onInput`, so that the caller can verify at once. The input is
+ * focused as it shows unless `isAutofocus` says otherwise. The cells are hidden from assistive technology, which
+ * reads the input and its label.
+ */
+export const codeInput = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{
+    id: string
+    label: string
+    value: string
+    hint?: string
+    onInput: (code: string) => Message
+    onComplete?: (code: string) => Message
+    isAutofocus?: boolean
+    isDisabled?: boolean
+  }>,
+  error: Option.Option<string>
+) => {
+  const digits = Array.from(digitsOf(config.value))
+  const nextCell = Math.min(digits.length, codeLength - 1)
+
+  return Input.view(
+    {
+      id: config.id,
+      type: "text",
+      value: config.value,
+      onInput: (typed) => {
+        const code = digitsOf(typed)
+        return code.length === codeLength && config.onComplete !== undefined
+          ? config.onComplete(code)
+          : config.onInput(code)
+      },
+      isDisabled: config.isDisabled ?? false,
+      isInvalid: Option.isSome(error),
+      hasDescription: Option.isSome(error) || config.hint !== undefined,
+      isAutofocus: config.isAutofocus ?? true,
+      toView: (attributes) =>
+        h.div(
+          [h.Class(fieldColumn)],
+          [
+            h.label([...attributes.label, h.Class(fieldLabel)], [config.label]),
+            h.div(
+              [
+                h.Class(codeCells),
+                ...(Option.isSome(error) ? [h.DataAttribute("invalid", "")] : []),
+                ...(config.isDisabled === true ? [h.DataAttribute("disabled", "")] : [])
+              ],
+              [
+                ...Array.from({ length: codeLength }, (_, index) =>
+                  h.span(
+                    [
+                      h.AriaHidden(true),
+                      ...(index === nextCell ? [h.DataAttribute("next", "")] : []),
+                      h.Class(codeCell)
+                    ],
+                    [digits[index] ?? ""]
+                  )
+                ),
+                h.input([
+                  ...attributes.input,
+                  h.InputMode("numeric"),
+                  h.Autocomplete("one-time-code"),
+                  h.Spellcheck(false),
+                  h.Class(codeInputBox)
+                ])
+              ]
+            ),
+            ...describeField(h, attributes.description, config.hint, error)
+          ]
+        )
+    },
+    h
+  )
+}
 
 /**
  * A labelled box for longer text, `rows` lines tall, three unless given, with the `hint` under it and why its

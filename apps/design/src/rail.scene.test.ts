@@ -52,8 +52,7 @@ const railView = (options: Readonly<{ isBrandButton: boolean }>) => (model: Mode
       h.p([h.Role("note")], [`Searches ${model.searches}`]),
       rail(h, {
         brand: {
-          letter: "A",
-          label: "amends",
+          label: "Amends home",
           ...(options.isBrandButton ? { onClick: Message.ClickedBrand() } : {})
         },
         items: destinations.map(toItem),
@@ -123,8 +122,7 @@ describe("rail", () => {
     scene(
       {
         update,
-        view: (_: Model, h: HtmlBuilder<Message>) =>
-          rail(h, { brand: { letter: "A", label: "amends" }, items: [], footer: [] })
+        view: (_: Model, h: HtmlBuilder<Message>) => rail(h, { brand: { label: "Amends home" }, items: [], footer: [] })
       },
       given(initial),
       expect(role("button", { name: "Search" })).toBeAbsent()
@@ -143,18 +141,45 @@ describe("rail", () => {
     )
   })
 
-  it("is a button when its brand has a click, and a mark when it has none", () => {
+  it("is a button when its brand has a click, and an image when it has none", () => {
     scene(
       { update, view: railView({ isBrandButton: true }) },
       given(initial),
-      click(role("button", { name: "amends" })),
+      click(role("button", { name: "Amends home" })),
       expect(role("status")).toHaveText("Current home, account 0, brand 1")
     )
     scene(
       { update, view: railView({ isBrandButton: false }) },
       given(initial),
-      expect(role("button", { name: "amends" })).toBeAbsent(),
-      expect(role("img", { name: "amends" })).toExist()
+      expect(role("button", { name: "Amends home" })).toBeAbsent(),
+      expect(role("img", { name: "Amends home" })).toExist()
+    )
+  })
+
+  it("draws the logo as its brand: decorative in the button that names it, and named when alone", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      expect(within(role("button", { name: "Amends home" }), selector("svg"))).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(within(role("button", { name: "Amends home" }), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("button", { name: "Amends home" }), selector("svg rect"))).toExist(),
+      expect(role("img")).toBeAbsent()
+    )
+    scene(
+      { update, view: railView({ isBrandButton: false }) },
+      given(initial),
+      expect(role("img", { name: "Amends home" })).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(role("img", { name: "Amends home" })).not.toHaveAttr("aria-hidden")
+    )
+  })
+
+  it("cuts the logo out of the canvas it lies on", () => {
+    scene(
+      { update, view: railView({ isBrandButton: true }) },
+      given(initial),
+      expect(role("navigation", { name: "Destinations" })).toHaveClass(
+        "[--amends-status-knockout:var(--amends-canvas)]"
+      )
     )
   })
 })

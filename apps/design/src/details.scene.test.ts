@@ -108,6 +108,50 @@ describe("badge", () => {
       expect(text("Failed")).toExist()
     )
   })
+
+  it("has no logo unless it is given a motion", () => {
+    scene(
+      { update, view: viewOf((h) => badge(h, { label: "Queued" })) },
+      given(initial),
+      expect(selector("svg")).toBeAbsent()
+    )
+  })
+
+  for (const motion of ["thread", "working", "tug"] as const) {
+    it(`moves the logo in its ${motion} motion before the label, hidden from assistive technology`, () => {
+      scene(
+        {
+          update,
+          view: viewOf((h) => h.span([h.Id("turn")], [badge(h, { label: "Running", tone: "caution", motion })]))
+        },
+        given(initial),
+        expect(selector("#turn svg")).toHaveClass(`logo-${motion}`),
+        expect(selector("#turn svg")).toHaveAttr("aria-hidden", "true"),
+        expect(selector("#turn svg")).toHaveAttr("width", "0.875rem"),
+        expect(text("Running")).toExist()
+      )
+    })
+  }
+
+  it("cuts the logo out of the badge's own surface", () => {
+    scene(
+      {
+        update,
+        view: viewOf((h) =>
+          h.div(
+            [],
+            [
+              badge(h, { label: "Running", tone: "caution", motion: "working" }),
+              badge(h, { label: "Queued", motion: "thread" })
+            ]
+          )
+        )
+      },
+      given(initial),
+      expect(text("Running")).toHaveClass("[--amends-status-knockout:var(--amends-caution-surface)]"),
+      expect(text("Queued")).toHaveClass("[--amends-status-knockout:var(--amends-subtle)]")
+    )
+  })
 })
 
 const turns = (h: HtmlBuilder<Message>) =>

@@ -4,6 +4,8 @@
  */
 
 import type { Html, HtmlBuilder } from "foldkit/html"
+import { logo } from "./logo.ts"
+import { mark } from "./mark.ts"
 
 const screenFrame =
   "flex h-[var(--amends-screen-height,100dvh)] bg-canvas p-2 max-tablet:bg-panel max-tablet:p-0 max-tablet:pt-[env(safe-area-inset-top)]"
@@ -14,7 +16,13 @@ const screenHeader = "flex min-h-20 flex-none items-center justify-between gap-4
 
 const screenBrand = "inline-flex items-center gap-1 text-title font-semibold text-ink"
 
+const screenBrandMark = "grid size-10 place-items-center"
+
 const screenActions = "flex items-center gap-3"
+
+const accountLine = "flex min-w-0 items-center gap-3 text-hint leading-5 text-ink-secondary"
+
+const accountIdentity = "min-w-0 truncate max-tablet:hidden"
 
 const screenBodyBase = "mx-auto flex w-full flex-1 flex-col px-6 max-tablet:px-4"
 
@@ -38,16 +46,15 @@ const contentLook = "contents"
 export type CenteredWidth = keyof typeof screenBodyWidths
 
 /**
- * A standalone screen: the `brand` on the left of the header and the `actions` on its right, over the
- * `children`. A `form` is a 420px column in the middle of the card; a `directory` is 800px, from near
- * the top. The card fills the viewport's height (`100dvh`, or `--amends-screen-height` where an
- * ancestor sets it, to show the screen at another height), with a gutter around it, and edge to edge
- * on phones.
+ * A standalone screen: the brand on the left of the header, the logo and the word amends, and the `actions` on
+ * its right, such as the signed-in `centeredAccount` and a Sign out button, over the `children`. A `form` is a
+ * 420px column in the middle of the card; a `directory` is 800px, from near the top. The card fills the
+ * viewport's height (`100dvh`, or `--amends-screen-height` where an ancestor sets it, to show the screen at
+ * another height), with a gutter around it, and edge to edge on phones.
  */
 export const centered = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
   config: Readonly<{
-    brand: string
     actions?: ReadonlyArray<Html>
     width: CenteredWidth
     children: ReadonlyArray<Html>
@@ -61,11 +68,28 @@ export const centered = <Message, Requirements>(
         [
           h.header(
             [h.Class(screenHeader)],
-            [h.span([h.Class(screenBrand)], [config.brand]), h.div([h.Class(screenActions)], config.actions ?? [])]
+            [
+              h.span([h.Class(screenBrand)], [h.span([h.Class(screenBrandMark)], [logo(h)]), "amends"]),
+              h.div([h.Class(screenActions)], config.actions ?? [])
+            ]
           ),
           h.main([h.Class(`${screenBodyBase} ${screenBodyWidths[config.width]}`)], config.children)
         ]
       )
+    ]
+  )
+
+/**
+ * Who is signed in, for the header's `actions`: the first letter of their `identity`, such as the address they
+ * signed in with, in a 24px mark, then the identity in quiet text, which gives way to the mark below 48rem. The
+ * mark is hidden from assistive technology, since the identity is beside it.
+ */
+export const centeredAccount = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, identity: string): Html =>
+  h.span(
+    [h.Class(accountLine)],
+    [
+      mark(h, { text: Array.from(identity.trim()).at(0) ?? "", size: "sm" }),
+      h.span([h.Class(accountIdentity)], [identity])
     ]
   )
 

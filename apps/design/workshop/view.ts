@@ -1,19 +1,21 @@
 import type { RenderInfo } from "@foldkit/ui/dialog"
 import * as Option from "effect/Option"
 import type { Html } from "foldkit/html"
-import { centered, copy, heading, screenContent } from "../src/centered.ts"
+import { centered, centeredAccount, copy, heading, screenContent } from "../src/centered.ts"
 import { composer } from "../src/composer.ts"
 import {
   button,
   buttonRow,
   type Choice,
   choiceSelect,
+  codeInput,
   column,
   field,
   fieldGrid,
   hint,
   iconButton,
   link,
+  loadingLine,
   notice,
   noticeBox,
   sending,
@@ -27,6 +29,7 @@ import {
   cellWithDetail,
   columns,
   footnote,
+  loadingRows,
   row,
   rowWithButton,
   section,
@@ -34,6 +37,7 @@ import {
 } from "../src/directory.ts"
 import { form, inline, settingRow, valueWithAction } from "../src/form.ts"
 import { type IconName, icon } from "../src/icon.ts"
+import { logo, logoMotions } from "../src/logo.ts"
 import { activityMark, type MarkSize, type MarkStatus, mark, markCluster, statusMark } from "../src/mark.ts"
 import { divider, message, messageList, notification, replyLine, type TextRun } from "../src/message.ts"
 import { modal, modalList } from "../src/modal.ts"
@@ -49,6 +53,7 @@ import {
   sidebarSection,
   sidebarSections
 } from "../src/sidebar.ts"
+import { type StateArtKind, stateArt, stateArtKinds } from "../src/stateArt.ts"
 import { toast, toastStack } from "../src/toast.ts"
 import {
   type ApplicationViewBuilder,
@@ -680,7 +685,6 @@ const noticeGroup = (h: ApplicationViewBuilder): Html =>
 
 const emailScreen = (h: ApplicationViewBuilder, signInEmail: string): Html =>
   centered(h, {
-    brand: "amends",
     width: "form",
     children: [
       screenContent(h, [
@@ -709,7 +713,6 @@ const emailScreen = (h: ApplicationViewBuilder, signInEmail: string): Html =>
 
 const codeScreen = (h: ApplicationViewBuilder, code: string): Html =>
   centered(h, {
-    brand: "amends",
     width: "form",
     children: [
       screenContent(h, [
@@ -721,12 +724,11 @@ const codeScreen = (h: ApplicationViewBuilder, code: string): Html =>
           button(h, "Change email", Message.ClickedButton(), { variant: "link" })
         ),
         form(h, { onSubmit: Message.ClickedButton(), label: "Verify" }, [
-          field(
+          codeInput(
             h,
             {
               id: "screen-code",
               label: "Verification code",
-              type: "text",
               value: code,
               onInput: (value) => Message.TypedCode({ value }),
               isAutofocus: false
@@ -997,9 +999,15 @@ const agentTable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
 
 const directoryScreen = (h: ApplicationViewBuilder, children: ReadonlyArray<Html>): Html =>
   centered(h, {
-    brand: "amends",
-    actions: [inline(h, ["alex@mercier.example"]), button(h, "Sign out", Message.ClickedButton())],
+    actions: [centeredAccount(h, "alex@mercier.example"), button(h, "Sign out", Message.ClickedButton())],
     width: "directory",
+    children: [screenContent(h, children)]
+  })
+
+const formScreen = (h: ApplicationViewBuilder, children: ReadonlyArray<Html>): Html =>
+  centered(h, {
+    actions: [centeredAccount(h, "alex@mercier.example"), button(h, "Sign out", Message.ClickedButton())],
+    width: "form",
     children: [screenContent(h, children)]
   })
 
@@ -1029,7 +1037,7 @@ const noWorkspacesYet = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   heading(h, "Choose a workspace"),
   copy(h, "Create a workspace to get started."),
   paneEmpty(h, {
-    icon: "mark-home",
+    art: "sew-in",
     title: "No workspaces yet",
     copy: "Create a workspace for your team. Invitations will appear here.",
     action: button(h, "Create workspace", Message.ClickedButton(), { variant: "primary", icon: "mark-new" })
@@ -1047,12 +1055,51 @@ const reloadFailed = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   workspaceList(h)
 ]
 
+const checkingSession = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  paneEmpty(h, {
+    art: "working",
+    title: "Checking your session",
+    copy: "Connecting to your workspace host…",
+    level: 1
+  })
+]
+
 const hostUnreachable = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
   paneEmpty(h, {
-    icon: "mark-connections",
+    art: "lost-thread",
     title: "Can't reach your workspace host",
     copy: "You're still signed in. Try again once the host is running.",
     action: button(h, "Try again", Message.ClickedButton(), { variant: "primary" }),
+    level: 1
+  })
+]
+
+const nothingAtThisAddress = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  paneEmpty(h, {
+    art: "nothing-here",
+    title: "Nothing at this address",
+    copy: "This page doesn't exist. Check the link, or start again from your workspaces.",
+    action: button(h, "Your workspaces", Message.ClickedButton(), { variant: "primary" }),
+    level: 1
+  })
+]
+
+const somethingWentWrong = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  paneEmpty(h, {
+    art: "came-apart",
+    title: "Something went wrong",
+    copy: "amends stopped on an unexpected error. Reloading usually fixes it.",
+    action: button(h, "Reload", Message.ClickedButton(), { variant: "primary" }),
+    level: 1
+  })
+]
+
+const workspaceClosedToYou = (h: ApplicationViewBuilder): ReadonlyArray<Html> => [
+  paneEmpty(h, {
+    art: "held-back",
+    title: "That workspace is closed to you",
+    copy: "This workspace doesn't exist, or it hasn't been shared with alex@mercier.example. Ask a member to invite this address.",
+    action: button(h, "Your workspaces", Message.ClickedButton()),
     level: 1
   })
 ]
@@ -1253,8 +1300,32 @@ const centeredGroup = (h: ApplicationViewBuilder, signInEmail: string, code: str
     ),
     sample(
       h,
-      "Directory width, with the host not reached: the message is the screen's h1",
-      [h.div([h.Class(screenFrame)], [directoryScreen(h, hostUnreachable(h))])],
+      "Form width, while the session is checked against the host: the logo working, in a live region, and the message is the screen's h1",
+      [h.div([h.Class(screenFrame)], [formScreen(h, checkingSession(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Form width, with the host not reached",
+      [h.div([h.Class(screenFrame)], [formScreen(h, hostUnreachable(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Form width, at an address that matches no page",
+      [h.div([h.Class(screenFrame)], [formScreen(h, nothingAtThisAddress(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Form width, after an unexpected error",
+      [h.div([h.Class(screenFrame)], [formScreen(h, somethingWentWrong(h))])],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "Form width, at a workspace that is closed to the person",
+      [h.div([h.Class(screenFrame)], [formScreen(h, workspaceClosedToYou(h))])],
       "flex flex-col"
     )
   ])
@@ -1713,7 +1784,7 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
               variant: "main",
               label: "Inbox",
               header: { title: "Inbox", icon: "mark-mail", actions: [button(h, "Mark all seen", press)] },
-              body: [paneEmpty(h, { icon: "mark-done", title: "You're all caught up", copy: "Nothing new." })]
+              body: [paneEmpty(h, { art: "rest", title: "You're all caught up", copy: "Nothing new." })]
             })
           ]
         )
@@ -1733,7 +1804,7 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
               header: { title: "Agents", icon: "mark-agents" },
               body: [
                 paneEmpty(h, {
-                  icon: "mark-agents",
+                  art: "sew-in",
                   title: "No agents yet",
                   copy: "Add an agent: a member that works on a harness and a model your connections give.",
                   action: button(h, "Add agent", press, { variant: "primary" })
@@ -1756,12 +1827,271 @@ const paneEmptyGroup = (h: ApplicationViewBuilder): Html => {
               variant: "main",
               label: "Tasks",
               header: { title: "Tasks", icon: "mark-tasks" },
-              body: [paneEmpty(h, { icon: "mark-tasks", title: "No tasks yet" })]
+              body: [paneEmpty(h, { art: "fill", title: "No tasks yet" })]
             })
           ]
         )
       ],
       "flex flex-col"
+    ),
+    sample(
+      h,
+      "Waiting on the host: the logo working, in a live region",
+      [
+        h.div(
+          [h.Class(emptyPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Settings",
+              header: { title: "Settings", icon: "mark-settings" },
+              body: [paneEmpty(h, { art: "working", title: "Opening your workspace", copy: "This takes a moment." })]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    ),
+    sample(
+      h,
+      "A failure, with a way to try again",
+      [
+        h.div(
+          [h.Class(emptyPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Settings",
+              header: { title: "Settings", icon: "mark-settings" },
+              body: [
+                paneEmpty(h, {
+                  art: "came-apart",
+                  title: "Can't load settings",
+                  copy: "Try again once the host is reachable.",
+                  action: button(h, "Try again", press)
+                })
+              ]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    )
+  ])
+}
+
+const stateArtMeanings: Readonly<Record<StateArtKind, string>> = {
+  "sew-in": "a new piece sewn in beside empty outlines, for a first thing to make",
+  reach: "a thread reaching for an empty outline, for nothing connected yet",
+  fill: "an outline filling in, for a place waiting for its first thing",
+  caret: "a stitch blinking on a seam, for nothing said yet",
+  rest: "the mark breathing, for nothing left to do",
+  "came-apart": "the patch swinging loose, for something that failed",
+  "lost-thread": "the thread between two pieces snapping back, for something out of reach",
+  "nothing-here": "a scan across an empty hole, for something that isn't there",
+  "held-back": "the patch straining at its stitches, for access the reader lacks"
+}
+
+const stateArtGroup = (h: ApplicationViewBuilder): Html =>
+  group(
+    h,
+    "State art",
+    stateArtKinds.map((kind) =>
+      sample(h, `${kind}: ${stateArtMeanings[kind]}`, [h.div([h.Class("text-ink")], [stateArt(h, kind)])])
+    )
+  )
+
+const logoSizes: ReadonlyArray<string> = ["0.875rem", "1rem", "1.25rem", "2rem", "3.5rem"]
+
+const logoGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Logo", [
+    sample(
+      h,
+      "Sizes: 0.875rem, 1rem, 1.25rem (the default), 2rem, and 3.5rem, in the color of the text around it",
+      logoSizes.map((size) => logo(h, { size })),
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "Decorative, hidden from assistive technology, and named, which makes it an image",
+      [logo(h, { size: "2rem" }), logo(h, { size: "2rem", label: "amends" })],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "Motions, looping: sew-on, thread, tug, and working",
+      logoMotions.map((motion) =>
+        h.div(
+          [h.Class("flex flex-col items-center gap-2 text-hint text-ink-secondary")],
+          [logo(h, { size: "3.5rem", motion }), motion]
+        )
+      ),
+      "flex items-end gap-8"
+    ),
+    sample(
+      h,
+      "Hover the link and the button: the patch lifts and the stitches swell",
+      [
+        h.a(
+          [h.Href("#logo"), h.AriaLabel("Amends home"), h.Class("inline-flex size-10 items-center justify-center")],
+          [logo(h, { size: "2rem" })]
+        ),
+        h.button(
+          [
+            h.Type("button"),
+            h.AriaLabel("Amends home"),
+            h.OnClick(Message.ClickedButton()),
+            h.Class("inline-flex size-10 cursor-pointer items-center justify-center bg-transparent p-0")
+          ],
+          [logo(h, { size: "2rem" })]
+        ),
+        h.button(
+          [
+            h.Type("button"),
+            h.AriaLabel("Working"),
+            h.OnClick(Message.ClickedButton()),
+            h.Class("inline-flex size-10 cursor-pointer items-center justify-center bg-transparent p-0")
+          ],
+          [logo(h, { size: "2rem", motion: "working" })]
+        )
+      ],
+      iconSizeRow
+    ),
+    sample(
+      h,
+      "On the canvas, which the rail draws it on, cut out of the canvas",
+      [
+        h.div(
+          [h.Class("bg-canvas p-4 [--amends-status-knockout:var(--amends-canvas)]")],
+          [logo(h, { size: "2rem", motion: "thread" })]
+        )
+      ],
+      iconSizeRow
+    )
+  ])
+
+const loadingGroup = (h: ApplicationViewBuilder): Html =>
+  group(h, "Loading", [
+    sample(
+      h,
+      "A line that says what is waited for, in a live region",
+      [loadingLine(h, "Loading your inbox…")],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Rows for a list of 32px marks, as agents and connections show: three unless given",
+      [loadingRows(h, { label: "Loading agents…", markSize: "md" })],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Rows for 40px marks, as groups and workspaces show, two of them",
+      [loadingRows(h, { label: "Loading workspaces…", count: 2 })],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "Rows for 24px marks, as a table of people shows",
+      [loadingRows(h, { label: "Loading members…", markSize: "sm", count: 4 })],
+      "flex max-w-2xl flex-col"
+    ),
+    sample(
+      h,
+      "In a pane, whose header and tabs stay while its list is read",
+      [
+        h.div(
+          [h.Class(columnPaneFrame)],
+          [
+            pane(h, {
+              variant: "main",
+              label: "Agents",
+              header: {
+                title: "Agents",
+                icon: "mark-agents",
+                tabs: paneTabs(h, {
+                  label: "Agents",
+                  tabs: [
+                    { label: "All", isCurrent: true, onClick: Message.ClickedButton() },
+                    { label: "Needs setup", isCurrent: false, onClick: Message.ClickedButton() }
+                  ]
+                })
+              },
+              body: [paneColumn(h, [loadingRows(h, { label: "Loading agents…", markSize: "md" })], { isWide: true })]
+            })
+          ]
+        )
+      ],
+      "flex flex-col"
+    )
+  ])
+
+const codeInputGroup = (h: ApplicationViewBuilder, code: string): Html => {
+  const press = () => Message.ClickedButton()
+
+  return group(h, "Code input", [
+    sample(
+      h,
+      "Type, paste, or delete: only digits are kept, the cell the next goes into is outlined while it has focus, and the sixth completes it",
+      [
+        codeInput(
+          h,
+          {
+            id: "code-typed",
+            label: "Verification code",
+            value: code,
+            hint: code.length === 6 ? "That is all six digits." : "Use your most recent code.",
+            onInput: (value) => Message.TypedCode({ value }),
+            onComplete: (value) => Message.TypedCode({ value }),
+            isAutofocus: false
+          },
+          Option.none()
+        )
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Empty, part filled, and complete",
+      ["", "482", "482916"].map((value) =>
+        codeInput(
+          h,
+          { id: `code-${value.length}`, label: "Verification code", value, onInput: press, isAutofocus: false },
+          Option.none()
+        )
+      ),
+      sampleStack
+    ),
+    sample(
+      h,
+      "Refused: every cell is outlined in danger, and the reason describes the input",
+      [
+        codeInput(
+          h,
+          { id: "code-refused", label: "Verification code", value: "482916", onInput: press, isAutofocus: false },
+          Option.some("That code doesn't match. Check it and try again.")
+        )
+      ],
+      sampleStack
+    ),
+    sample(
+      h,
+      "Disabled, while a code is checked",
+      [
+        codeInput(
+          h,
+          {
+            id: "code-disabled",
+            label: "Verification code",
+            value: "482916",
+            onInput: press,
+            isDisabled: true,
+            isAutofocus: false
+          },
+          Option.none()
+        )
+      ],
+      sampleStack
     )
   ])
 }
@@ -1915,7 +2245,7 @@ const shellRail = (h: ApplicationViewBuilder, current: Destination): Html => {
   })
 
   return rail(h, {
-    brand: { letter: "A", label: "amends" },
+    brand: { label: "Amends home", onClick: Message.ClickedButton() },
     items: railDestinations.map(toItem),
     search: { label: "Search", onClick: Message.ClickedButton() },
     footer: [toItem(railSettings)],
@@ -2608,6 +2938,16 @@ const detailsGroup = (
     ),
     sample(
       h,
+      "Badges with the logo moving: waiting (thread), running (working), and stopping (tug)",
+      [
+        badge(h, { label: "Queued", motion: "thread" }),
+        badge(h, { label: "Running", tone: "caution", motion: "working" }),
+        badge(h, { label: "Stopping", tone: "caution", motion: "tug" })
+      ],
+      sampleRow
+    ),
+    sample(
+      h,
       "Entries with marks, trailing badges, and children",
       [entryList(h, { label: "Turns", children: turnEntries(h) })],
       sidePaneColumn
@@ -3030,10 +3370,14 @@ export const view = ApplicationComposition.makeView((model, h) => ({
           toastGroup(h),
           modalGroup(h, model),
           iconGroup(h),
+          logoGroup(h),
           markGroup(h),
           detailsGroup(h, model),
           messageGroup(h, model.openThread, model.editText),
           paneEmptyGroup(h),
+          stateArtGroup(h),
+          loadingGroup(h),
+          codeInputGroup(h, model.code),
           composerGroup(h, model.draft, model.filledDraft),
           formGroup(h, model.taskStatus),
           directoryGroup(h),

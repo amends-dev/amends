@@ -32,10 +32,10 @@ named for their workspaces, with a footnote after them, and a table of three gro
 with cells, under the line that says what it holds and the labels of its columns, wide and beside it
 folded, in a frame 360px wide; the centered screen as the
 sign-in's two steps and as the workspace picker five times, each with its pieces in `screenContent` as the app's
-pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; and with the host not reached, whose message is the screen's `h1`; the toast alone, with a detail, as a confirmation, and as a stack of
+pages return them: with workspaces and invitations, whose heading has a Create workspace action on its line; with invitations only and the footnote after them; with nothing yet, whose empty state has the Create workspace button in place of the heading's; with a reload that failed, an alert and a quiet Try again over the list it kept; with the session being checked, whose working mark is the screen's `h1`; with the host not reached, whose message is the screen's `h1`; with nothing at the address, with something that went wrong, and with a workspace closed to the person, each a message that is the screen's `h1`, all with the person's address and a Sign out in the header; the toast alone, with a detail, as a confirmation, and as a stack of
 two, each in a frame of its own; the modal, opened by a button, as a form with a context, a field
 that takes the initial focus, a toggle, and a footer of Cancel and a primary button, as a wide
-one with tabs and a description, and as a search over rows of integrations that run to the panel's edges; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the logo's mark, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
+one with tabs and a description, and as a search over rows of integrations that run to the panel's edges; the logo at five sizes, decorative and labelled, in each of its four motions, in a link and a button that lift its patch when hovered, and on the canvas the rail draws it on; the nine state arts, each drawn and moving; the loading line and the rows that stand in for a list that is being read, at the three sizes of mark and in a pane under its header and tabs; the code input typed into, empty, part filled, complete, refused, and disabled; a badge with a motion for each way something is under way; the marks by size, each status at every size, the lilac tone, a drawing in place of letters, a status mark alone and the working logo, and the cluster of two, three, and seven; what a pane says about one thing, as a detail
 list, a person by their mark at two sizes and in the agent's tone, the four badge tones, entries with and without marks, with trailing badges, and with children,
 entries that are buttons, the second of them active, a log short and long, a pane's sections as a task to change, a task to read, and the turns, and a
 pane's section that is one form; a
@@ -44,7 +44,7 @@ actions, and meta, with the replies under a row as one reply, three people, and 
 line shows, with a mention in the text as a chip, in plain text, in a row that opens a thread, and in
 the current row, with a form in place of the text, and set apart by dividers, centered and at the
 start, and notifications under the days Today and Yesterday, unread with a dot and read, with the notification whose thread is open as the current row among them, and a list ended by a centered quiet Show older; a pane's empty state with a title
-and a line of copy under a header with an action, with an action of its own under the copy, and with a title alone, each in a frame of its
+and a line of copy under a header with an action, with an action of its own under the copy, with a title alone, with its mark working, and for a failure with Try again, each in a frame of its
 own; a pane's column keeping its measure around a form and, wide, spanning the pane around a table of
 groups, each in a frame wider than the measure; the composer empty, filled, and with its list of members to mention open on the second; the shell twice, with and without its side pane, each in a
 frame of fixed height, its groups, one of them still on its way, and direct messages through
@@ -103,6 +103,13 @@ The status tones hold the values of Lunacy's "Status colors", light and dark, as
 do, and a status mark is the only saturated color; the offline mark draws `ink-muted` as a ring. `status-knockout`
 is the surface a status mark is cut out of: it is the panel's by default, and a row that is hovered or current
 sets `--amends-status-knockout` to its own fill, so the notch matches the row.
+
+Motion is in `src/motion.css`, which `styles.css` imports. It holds the keyframes and the `@utility` blocks of the
+logo and the state art (`logo-*`, `art-*`) and of the loading rows (`loading-pulse`). Each utility that animates
+or transitions stills itself under `prefers-reduced-motion: reduce`, inside the utility, so that nothing can outrank
+it; a drawing that moves rests in a pose that still says what it is. `motion.test.ts` checks that every
+`logo-`, `art-`, and `loading-` class a renderer names has a utility, that every animation names a keyframes rule,
+and that every one of them is stilled under reduced motion.
 
 Below the desktop breakpoint is touch: controls and the rows of the sidebar grow to 44px, and
 headers to 104px, written `max-desktop:`. Below the
@@ -189,6 +196,17 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 - `textarea(h, { id, label, value, onInput, rows?, hint?, error?, isDisabled?, attributes? })` is the input's
   look over `rows` lines, three unless given, with the `hint` under it, `error` (an `Option<string>`) as the
   alert that describes it first, and the `attributes` on the box, as a field has them.
+- `codeInput(h, { id, label, value, hint?, onInput, onComplete?, isAutofocus?, isDisabled? }, error)` is a labelled
+  six-digit code in one native input, drawn as six cells of 56px, 12px apart (8px on phones) across the column. The
+  input lies over the cells, transparent, so typing, pasting, deleting, and the platform's one-time-code
+  autofill work as in a text field (`inputmode="numeric"`, `autocomplete="one-time-code"`). What `onInput` is given
+  is digits only, at most six; the caller keeps it and the field shows it. The cell the next digit goes into is
+  outlined while the input has focus, and an `error` (an `Option<string>`) outlines every cell in the danger
+  color and describes the input, as `field`'s does, with the `hint`. When the sixth digit is in, `onComplete`
+  is sent with the code in place of `onInput`, so the caller can verify at once. The cells are hidden from assistive
+  technology, which reads the input and its label.
+- `loadingLine(h, text)` is a quiet line of what a pane or a page is waiting for, such as "Loading your inbox…", in
+  a live region, a `status`, so that it is announced. A list that is being read shows `loadingRows` instead.
 - `iconButton(h, { icon, label, onClick }, options?)` is a quiet square button of one icon, named by
   `label`, which is all it says to assistive technology: the icon is hidden, and the label is text
   that is not shown, not an `aria-label`, so a button named Reply does not answer a lookup of the
@@ -234,6 +252,34 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
   of its own.
 - `sending(h, pending)` is " · Sending…" while an action is on its way, and nothing otherwise.
 
+### `@amends-dev/design/logo`
+
+- `logo(h, { size?, label?, motion? })` is the amends mark: a square, a patch over its corner, and four stitches
+  across the seam, drawn on a 64-unit grid in the color of the text around it, with the patch and the stitches
+  cut out of the surface behind it, `status-knockout`. `size` is a CSS length, `1.25rem` unless given, which
+  scales with the reader's text size. The mark is decorative and `aria-hidden`; a `label` makes it an image
+  named by that label, for one that stands alone, such as the rail's brand when it is not a button. Inside a link
+  or a button its patch lifts a little when hovered, and a stitch grows. A `motion` loops: `"sew-on"` drops the
+  patch on and pops the stitches in, for a launch; `"thread"` draws each stitch through in turn, quiet enough to
+  idle, for what waits; `"tug"` wobbles the patch from its corner, for what is stopping; and `"working"` lights
+  the stitches while the patch breathes, for what is waited on. A motion is still when the reader prefers less
+  motion, and the mark is then the mark.
+- `stitchPaths` are the four stitches, which the state art draws too, and `logoMotions` and `LogoMotion` the motions.
+
+### `@amends-dev/design/stateArt`
+
+- `stateArt(h, kind)` draws what a list, a page, or a screen says when it has nothing to show or something went
+  wrong, as an `svg` 4.5rem tall that is `aria-hidden`, since the words beside it say it. The drawings are made of the
+  logo's pieces, empty states as outlines waiting to be filled and errors as stitches that came undone, and each
+  moves in its own way, still under reduced motion. `kind` is a `StateArtKind`, listed in `stateArtKinds`:
+  `"sew-in"` a new piece sewn in beside empty outlines, for a first thing to make; `"reach"` a thread reaching for an empty
+  outline, for nothing connected yet; `"fill"` an outline filling in, for a place waiting for its first thing;
+  `"caret"` a stitch blinking on a seam, for nothing said yet; `"rest"` the mark breathing, for nothing left to do;
+  `"came-apart"` the patch swinging loose, for something that failed; `"lost-thread"` the thread between two
+  pieces snapping back, for something out of reach; `"nothing-here"` a scan across an empty hole, for something
+  that isn't there; and `"held-back"` the patch straining at its stitches, for access the reader lacks. It is
+  the `art` of `paneEmpty`, which a view uses rather than calling this itself.
+
 ### `@amends-dev/design/icon`
 
 - `icon(h, name, options?)` draws one of [`icons`](../icons/README.md)'s drawings by name, an
@@ -267,8 +313,8 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
     "Atlas, Needs setup".
 - `statusMark(h, status)` is a status's shape alone, 9px, with the same `title` and hidden from assistive technology, for the
   end of a row whose item has no mark of its own, such as a connection.
-- `activityMark(h)` is the logo's mark, the `mark-agents` icon at `sm`, which a row shows at its end while the thing it
-  stands for is at work, in the color of the text around it and hidden from assistive technology. It does not move yet.
+- `activityMark(h)` is the logo at 1rem in its `working` motion, which a row shows at its end while the thing it
+  stands for is at work, in the color of the text around it and hidden from assistive technology.
 - `markCluster(h, { marks, label, onClick })` is a button named `label` that gathers the people a group
   has: a bordered box, 1px in `outline` with 2px of padding, holding the first three `marks` as `xs` marks
   2px apart, and, beyond three, "+4" for four more in `ink-secondary` at `meta` size. It is `hover` on
@@ -279,12 +325,16 @@ control keeps its label association, role, `aria-invalid`, and keyboard behavior
 
 The sixth layout pattern, for screens outside a workspace such as sign-in and the workspace picker.
 
-- `centered(h, { brand, actions?, width, children })` frames one card on the canvas, `100dvh` tall
-  with an 8px gutter, and edge to edge on phones. Its header holds the `brand` on the left and
-  `actions` on the right. The body is a column: `width: "form"` centers a 420px column vertically,
+- `centered(h, { actions?, width, children })` frames one card on the canvas, `100dvh` tall
+  with an 8px gutter, and edge to edge on phones. Its header holds the brand on the left, the logo at 40px
+  beside "amends", and `actions` on the right. The body is a column: `width: "form"` centers a 420px column vertically,
   and `"directory"` starts an 800px column near the top. An ancestor that sets
   `--amends-screen-height` shows the card at that height instead of the viewport's, as the
   workshop does to show both widths on one page.
+- `centeredAccount(h, identity)` is who is signed in, for the header's `actions` beside a Sign out button: the first
+  letter of the `identity`, such as the address they signed in with, in a 24px mark, then the identity in
+  quiet text, which gives way to the mark below 48rem. The mark is hidden from assistive technology, since the
+  identity is beside it.
 - `heading(h, text, options?)` is the screen's `h1`, at display size, with 12px below it for what
   follows. An `options.action`, such as a `button` that creates what the screen lists, shares the
   title's line: the title takes the line's width and the action lies at its end, in line with the
@@ -295,7 +345,7 @@ The sixth layout pattern, for screens outside a workspace such as sign-in and th
   one, such as a page. It is `display: contents`, so they lie in the card's column as if it were not
   there, each spacing itself as `heading` and `copy` do. Use it, not `column`, whose gap would add to
   theirs.
-- What a screen says when it has nothing to show is the pane module's `paneEmpty`: an icon, a title, a
+- What a screen says when it has nothing to show is the pane module's `paneEmpty`: a state art, a title, a
   line, and an action under it, 64px under what is above it. Under the screen's `heading` it is an `h2`,
   as a list that is empty says; when the message is all the screen has, such as the host not being
   reached, it takes `level: 1` and is the screen's `h1`, with no `heading` of its own.
@@ -321,6 +371,12 @@ What a form screen is made of beside its controls.
 
 What a directory screen lists.
 
+- `loadingRows(h, { label, count?, markSize? })` is what a list shows while it is read for the first time: `count` rows,
+  three unless given, in the shape of a `row` of the same `markSize` (`"lg"` unless given, or `"md"` for a list of
+  agents), a square of `subtle` where the mark goes and two bars where the title and the meta go, slowly dimming and
+  brightening, and still under reduced motion. The rows are hidden from assistive technology; the `label`, such as
+  "Loading agents…", is a `status` that only it can read. The caller shows them in place of the list, and the heading and
+  the tabs stay where they are.
 - `section(h, { label, count?, action? })` is the label as an `h2`, the count in a 20px `subtle` badge, and a
   dashed line in `stitch` running to the right edge, 36px below what is above it. An `action`, such as a quiet
   View history, comes after the line, at the end.
@@ -466,8 +522,9 @@ The frame of the first four layout patterns, which the modules below fill.
 ### `@amends-dev/design/rail`
 
 - `rail(h, { brand, items, search?, footer, account? })` is the column of global destinations, a `nav` named
-  Destinations, 52px wide. The `brand` is `{ letter, label, onClick? }`, a mark with a short line
-  under it that is a button named by `label` when it has an `onClick` and an image otherwise. Each
+  Destinations, 52px wide. The `brand` is `{ label, onClick? }`, the logo over the seam, cut out of the canvas the
+  rail lies on, that is a button named by `label` when it has an `onClick`, whose patch lifts when hovered, and an
+  image of that name otherwise. Each
   of `items` and `footer`, the second at the bottom, is `{ icon, label, isCurrent, onClick }`: a
   40px button of the icon alone, named by `label`. The current one is `aria-current="true"`, filled
   `rail-selected`, with the `indicator-bar` at its left edge. The optional `search`, `{ label, onClick }`, is
@@ -542,11 +599,13 @@ The third and fourth layout patterns share one structure.
 onClick }` tabs: buttons that are `aria-selected`, the current one in `ink` and medium weight with
   a 2px `indicator` bar under it. The tab is named by its label and described by its `count`, which
   shows in a badge after it. Tabs are all in the tab order; arrow keys do not move between them.
-- `paneEmpty(h, { icon, title, copy?, action?, level? })` is what a pane's body says when it has nothing to
-  list, a centered column 64px under the header and 20rem wide at most: a 40px square on `subtle` holding the
-  `icon` at `md` in `ink-secondary`, the `title` as an `h2` at item size in medium weight, under the
+- `paneEmpty(h, { art, title, copy?, action?, level? })` is what a pane's body says when it has nothing to
+  list, a centered column 64px under the header and 20rem wide at most: the `art`, a `StateArtKind` drawn by
+  `stateArt` in `ink`, or `"working"`, the logo at 3.5rem in its working motion, for what is waited on, then the
+  `title` as an `h2` at item size in medium weight, under the
   pane's `h1`, and the `copy` under it at hint size in `ink-muted`, then the `action`, such as the `button` that
-  does what the copy says, 12px below. The icon is hidden from assistive technology. A centered screen uses it
+  does what the copy says, 12px below. The art is hidden from assistive technology; the column of a working one is
+  a live region, a `status`, so that its title is announced. A centered screen uses it
   too, for what it has nothing to show of (see `centered`); with `level: 1` the title is an `h1`, for a screen
   whose message is all it has.
 - `paneColumn(h, children, options?)` is the one column of a pane's body, its sections 40px apart, with
@@ -583,9 +642,12 @@ What a pane says about one thing.
   unless `markSize` says otherwise, beside the `name` at item size in medium weight over the `detail` at hint
   size in `ink-secondary`, such as "Workspace owner" or "Person · Active". The mark is hidden from assistive
   technology; the name and the detail are read as text.
-- `badge(h, { label, tone? })` is a small inline mark of how something stands, 20px tall, at `meta`
+- `badge(h, { label, tone?, motion? })` is a small inline mark of how something stands, 20px tall, at `meta`
   size in medium weight. `tone` is `"neutral"` (the default) on `subtle`, or `"success"`, `"caution"`,
-  or `"danger"` on its own surface and text with a 1px border.
+  or `"danger"` on its own surface and text with a 1px border. A `motion`, one of the logo's, puts the logo at
+  0.875rem before the label, moving and cut out of the badge's own surface, for what is under way: `"thread"` while
+  it waits, `"working"` while it runs, `"tug"` while it stops. The logo is hidden from assistive technology, since
+  the label says it.
 - `entryList(h, { label, children })` is a `ul` named by `label`, a column with no list style, of
   `entry`s. It is for lists of people or agents' work, such as a thread's turns, and of people, such as
   a workspace's members and the invitations waiting.
@@ -764,15 +826,19 @@ renderer family as a person does, through what the app's own tests query: a butt
 `aria-invalid`, and description, a switch by its label, a disabled one by its `aria-disabled`, an icon button's `aria-pressed` while it is given `isPressed` and none otherwise, a select's change, a choice's description after its label and a choice that can't be chosen as a disabled option, a link by `role("link", { name })` with its address, its new tab, and its `noreferrer`, a hint and a refusal that describe a select or a textarea as they do a field, a disabled field, textarea, and select, a boxed note by `role("note", { name })` with a line for each reason, in each of its three tones, also when its label is
 hidden, a setting row's label, copy, and action, a button's icon, hidden from assistive technology, the centered screen's
 landmarks, a heading's action on its line, a form by its label, with the pane variant of a form the same; a row by its title and the `id` on its button, a compact row's 24px mark, its height, its folded cells' indent, and `aria-current` while its details are open, a section's action, a row with a quiet button and an icon for its mark, and a footnote by its text; an
-icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; a rail
+icon by `role("img", { name })` when it has a label and as `aria-hidden` when it has none; the logo the same, with a
+class for each motion and none without one; each state art drawn, hidden from assistive technology, and moving in
+the part its kind moves; the code input's six cells, the digits it keeps, its completion at the sixth, its
+outlined cell and its refusal, and its loading line as a `status`; a list that is loading by its `status` line and
+its rows hidden from assistive technology; a rail
 destination by `role("button", { name })` with `aria-current`, and the search beside them, which is never current and
 sends what it is given; a sidebar item by its name, which has the status's word after the label, with
-`aria-current` and its count, the row under it as a button or as a plain row, the logo's mark at the end of a row at
+`aria-current` and its count, the row under it as a button or as a plain row, the working logo at the end of a row at
 work, the shape of a status at the end of a row with no mark, and the sections of
 `sidebarSections` among the sidebar's own, a section's title as a button inside its heading, current or not; a tab by `role("tab")` with `aria-selected`; a pane's
 section by `role("region")` and its `h3`, its trailing pieces and children, and its stitch, hidden from assistive technology, when it has one; a pane header's mark in its tone with its status as the patch, its hover text, and an `sr-only` word, and its phone-only line under the title; a pane's empty state by
-its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, its action, and its icon as `aria-hidden`; a detail list's labels
-and values, a value that is a button, a person's mark in its size and tone, hidden from assistive technology, and its name and detail; a badge by its label; an entry list by `role("list")`, an
+its `h2` under the pane's `h1`, or its `h1` with `level` 1, its copy, its action, and its art as `aria-hidden`, with a working one in a live region; a detail list's labels
+and values, a value that is a button, a person's mark in its size and tone, hidden from assistive technology, and its name and detail; a badge by its label, and the logo in its motion; an entry list by `role("list")`, an
 entry by its title, its mark hidden from assistive technology, its trailing pieces and its children,
 an entry given a message as the button that holds them, with its key as its id and `aria-current` while
 it is active and not otherwise, a field's keys that `answerKeys` answers, handled, and the others, and

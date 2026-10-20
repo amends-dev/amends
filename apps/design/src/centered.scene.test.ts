@@ -4,7 +4,7 @@ import type { HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import { click, expect, given, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
-import { centered, copy, heading, screenContent } from "./centered.ts"
+import { centered, centeredAccount, copy, heading, screenContent } from "./centered.ts"
 import { button } from "./control.ts"
 
 const Message = defineMessageUnion({ ClickedSignOut: {}, ClickedCreate: {} })
@@ -20,7 +20,6 @@ const update = (model: Model, message: Message) =>
 
 const screen = (width: "form" | "directory") => (model: Model, h: HtmlBuilder<Message>) =>
   centered(h, {
-    brand: "amends",
     actions: [button(h, "Sign out", Message.ClickedSignOut(), { variant: "quiet" })],
     width,
     children: [heading(h, "Sign in"), copy(h, "Enter the code sent to ada@example.com"), h.p([], [`${model.signOuts}`])]
@@ -45,10 +44,52 @@ describe("centered", () => {
   }
 })
 
+describe("centered brand", () => {
+  it("is the logo and the word amends in the header, the logo hidden from assistive technology", () => {
+    scene(
+      { update, view: screen("form") },
+      given(initial),
+      expect(within(role("banner"), text("amends"))).toExist(),
+      expect(within(role("banner"), selector("svg"))).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(within(role("banner"), selector("svg"))).toHaveAttr("aria-hidden", "true"),
+      expect(within(role("banner"), selector("svg"))).toHaveAttr("width", "1.25rem"),
+      expect(role("img")).toBeAbsent()
+    )
+  })
+})
+
+describe("centeredAccount", () => {
+  const signedIn = (_: Model, h: HtmlBuilder<Message>) =>
+    centered(h, {
+      actions: [centeredAccount(h, "ada@example.com"), button(h, "Sign out", Message.ClickedSignOut())],
+      width: "directory",
+      children: [heading(h, "Choose a workspace")]
+    })
+
+  it("is the first letter of the identity in a mark, then the identity, beside Sign out", () => {
+    scene(
+      { update, view: signedIn },
+      given(initial),
+      expect(within(role("banner"), text("ada@example.com"))).toExist(),
+      expect(within(role("banner"), text("a"))).toExist(),
+      expect(within(role("banner"), role("button", { name: "Sign out" }))).toExist(),
+      expect(within(role("banner"), selector('span[aria-hidden="true"]'))).toHaveText("a")
+    )
+  })
+
+  it("lets the identity give way to the mark on phones", () => {
+    scene(
+      { update, view: signedIn },
+      given(initial),
+      expect(within(role("banner"), selector("span.truncate"))).toHaveText("ada@example.com"),
+      expect(within(role("banner"), selector("span.truncate"))).toHaveClass("max-tablet:hidden")
+    )
+  })
+})
+
 describe("heading", () => {
   const titled = (action: "none" | "create") => (model: Model, h: HtmlBuilder<Message>) =>
     centered(h, {
-      brand: "amends",
       width: "directory",
       children: [
         screenContent(h, [
@@ -98,7 +139,6 @@ describe("screenContent", () => {
         update,
         view: (_: Model, h: HtmlBuilder<Message>) =>
           centered(h, {
-            brand: "amends",
             width: "form",
             children: [screenContent(h, [heading(h, "Sign in"), copy(h, "Enter the code sent to ada@example.com")])]
           })

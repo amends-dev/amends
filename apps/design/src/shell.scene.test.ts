@@ -60,7 +60,7 @@ const viewWith =
     shell(h, {
       viewport: model.viewport,
       rail: rail(h, {
-        brand: { letter: "A", label: "amends" },
+        brand: { label: "Amends home" },
         items: [{ icon: "mark-home", label: "Home", isCurrent: true, onClick: Message.ClickedHome() }],
         footer: []
       }),

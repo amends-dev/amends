@@ -2,11 +2,21 @@ import { describe, it } from "@effect/vitest"
 import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
-import { all, click, expect, expectAll, given, role, scene, selector, text, within } from "foldkit/scene"
+import { all, click, expect, expectAll, given, nth, role, scene, selector, text, within } from "foldkit/scene"
 import { modifyFields } from "foldkit/struct"
 import { button } from "./control.ts"
 import { badge } from "./details.ts"
-import { activityCell, cellWithDetail, columns, footnote, row, rowWithButton, section, summary } from "./directory.ts"
+import {
+  activityCell,
+  cellWithDetail,
+  columns,
+  footnote,
+  loadingRows,
+  row,
+  rowWithButton,
+  section,
+  summary
+} from "./directory.ts"
 
 const Message = defineMessageUnion({ ClickedMercier: {}, ClickedFieldwork: {} })
 type Message = typeof Message.Type
@@ -661,7 +671,8 @@ describe("cells of two lines", () => {
       expect(text("Claude Sonnet 5")).toExist(),
       expect(text("Working")).toExist(),
       expect(text("#design")).toHaveClass("text-ink-secondary"),
-      expect(within(role("button", { name: "Atlas" }), selector("svg[aria-hidden]"))).toExist()
+      expect(within(role("button", { name: "Atlas" }), selector("svg[aria-hidden]"))).toExist(),
+      expect(within(role("button", { name: "Atlas" }), selector("svg.logo-working"))).toExist()
     )
   })
 
@@ -672,6 +683,71 @@ describe("cells of two lines", () => {
       expect(text("Remote development")).toHaveClass("max-tablet:hidden"),
       expect(text("#design")).toHaveClass("max-tablet:hidden"),
       expect(text("Claude Code")).not.toHaveClass("max-tablet:hidden")
+    )
+  })
+})
+
+describe("loadingRows", () => {
+  it("says what is loading in a live region that only assistive technology reads", () => {
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading agents…" })]) },
+      given(initial),
+      expect(selector("p.sr-only")).toHaveText("Loading agents…"),
+      expect(selector("p.sr-only")).toHaveAttr("role", "status")
+    )
+  })
+
+  it("stands in with three rows unless given a count, hidden from assistive technology", () => {
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading agents…" })]) },
+      given(initial),
+      expect(selector("ul")).toHaveAttr("aria-hidden", "true"),
+      expectAll(all.selector("ul li")).toHaveCount(3)
+    )
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading workspaces…", count: 2 })]) },
+      given(initial),
+      expectAll(all.selector("ul li")).toHaveCount(2)
+    )
+  })
+
+  it("draws each row as a square where the mark goes and a long and a short bar where the text goes", () => {
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading agents…", count: 1 })]) },
+      given(initial),
+      expectAll(all.selector("li .bg-subtle")).toHaveCount(3),
+      expect(nth(all.selector("li .bg-subtle"), 0)).toHaveClass("flex-none"),
+      expect(nth(all.selector("li .bg-subtle"), 1)).toHaveClass("w-[min(16rem,60%)]"),
+      expect(nth(all.selector("li .bg-subtle"), 2)).toHaveClass("w-[min(9rem,35%)]")
+    )
+  })
+
+  it("takes the shape of a row of the same mark size: 40px marks unless given, and 32px and 24px", () => {
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading…", count: 1 })]) },
+      given(initial),
+      expect(nth(all.selector("li .bg-subtle"), 0)).toHaveClass("size-10"),
+      expect(selector("li")).toHaveClass("min-h-19")
+    )
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading…", count: 1, markSize: "md" })]) },
+      given(initial),
+      expect(nth(all.selector("li .bg-subtle"), 0)).toHaveClass("size-8"),
+      expect(selector("li")).toHaveClass("min-h-19")
+    )
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading…", count: 1, markSize: "sm" })]) },
+      given(initial),
+      expect(nth(all.selector("li .bg-subtle"), 0)).toHaveClass("size-6"),
+      expect(selector("li")).toHaveClass("min-h-14")
+    )
+  })
+
+  it("dims and brightens slowly, as the pulse the reader accepts motion for", () => {
+    scene(
+      { update, view: viewOf((h) => [loadingRows(h, { label: "Loading agents…", count: 1 })]) },
+      given(initial),
+      expect(selector("li")).toHaveClass("loading-pulse")
     )
   })
 })

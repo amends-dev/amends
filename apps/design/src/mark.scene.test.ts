@@ -247,11 +247,14 @@ describe("statusMark", () => {
 })
 
 describe("activityMark", () => {
-  it("is the logo's mark, hidden from assistive technology", () => {
+  it("is the logo in its working motion, hidden from assistive technology", () => {
     scene(
       { ...still, view: (_: null, h: HtmlBuilder<never>) => h.div([h.Id("work")], [activityMark(h)]) },
       given(null),
       expect(selector("#work svg")).toHaveAttr("aria-hidden", "true"),
+      expect(selector("#work svg")).toHaveAttr("viewBox", "0 0 64 64"),
+      expect(selector("#work svg")).toHaveAttr("width", "1rem"),
+      expect(selector("#work svg")).toHaveClass("logo-working"),
       expect(role("img")).toBeAbsent()
     )
   })

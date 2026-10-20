@@ -1,0 +1,574 @@
+/*
+ * The motion of the logo, of the state art drawn from its parts, and of a list that is loading. A motion is a
+ * utility on the drawing's root, such as `logo-working` or `art-came-apart`, that animates the parts inside it
+ * by the class each part carries; the parts themselves are drawn with Tailwind's own classes. Every animation
+ * is switched off when the reader prefers less motion, in the rule that sets it, so it can not be outranked.
+ */
+
+@keyframes amends-blink {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes amends-logo-drop {
+  0% {
+    transform: translate(18px, -18px) rotate(10deg);
+    opacity: 0;
+  }
+  18% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  22% {
+    transform: translate(0, 1.2px);
+  }
+  27% {
+    transform: translate(0, 0);
+  }
+  86% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  96%,
+  100% {
+    transform: translate(18px, -18px) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+@keyframes amends-logo-pop {
+  0%,
+  30% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  38% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+  44% {
+    transform: scale(1);
+  }
+  86% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  94%,
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes amends-logo-draw {
+  0% {
+    stroke-dashoffset: 7;
+  }
+  18%,
+  78% {
+    stroke-dashoffset: 0;
+  }
+  96%,
+  100% {
+    stroke-dashoffset: -7;
+  }
+}
+
+@keyframes amends-logo-pull {
+  0%,
+  40%,
+  100% {
+    transform: rotate(0deg);
+  }
+  8% {
+    transform: rotate(-6deg);
+  }
+  16% {
+    transform: rotate(4deg);
+  }
+  24% {
+    transform: rotate(-1.5deg);
+  }
+  32% {
+    transform: rotate(0.5deg);
+  }
+}
+
+@keyframes amends-logo-twang {
+  0%,
+  30%,
+  100% {
+    transform: scale(1);
+  }
+  8% {
+    transform: scale(1.35);
+  }
+  16% {
+    transform: scale(0.9);
+  }
+}
+
+@keyframes amends-logo-nudge {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(2.5px, 2.5px);
+  }
+}
+
+/* The patch lifts at its corner when the link or button that holds the logo is hovered. */
+@utility logo-patch {
+  transform-box: fill-box;
+  transform-origin: 0 0;
+  transition: transform 0.35s cubic-bezier(0.3, 1.7, 0.5, 1);
+
+  :is(a, button):hover & {
+    transform: rotate(7deg) translate(1.5px, 1.5px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility logo-stitch {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.35s cubic-bezier(0.3, 1.7, 0.5, 1);
+
+  :is(a, button):hover & {
+    transform: scale(1.35);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* The patch drops on and the stitches pop in, for a launch. */
+@utility logo-sew-on {
+  & .logo-patch {
+    transform-origin: center;
+    animation: amends-logo-drop 3.2s cubic-bezier(0.3, 1.4, 0.5, 1) 0s infinite both;
+  }
+
+  & .logo-stitch {
+    animation: amends-logo-pop 3.2s cubic-bezier(0.3, 1.4, 0.5, 1) 0s infinite both;
+  }
+
+  & .logo-stitch:nth-of-type(2) {
+    animation-delay: 0.12s;
+  }
+
+  & .logo-stitch:nth-of-type(3) {
+    animation-delay: 0.24s;
+  }
+
+  & .logo-stitch:nth-of-type(4) {
+    animation-delay: 0.36s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .logo-patch,
+    & .logo-stitch {
+      animation: none;
+    }
+  }
+}
+
+/* Each stitch is drawn through in turn, quiet enough to idle. */
+@utility logo-thread {
+  & .logo-stitch {
+    stroke-linecap: butt;
+    stroke-dasharray: 7 20;
+    animation: amends-logo-draw 3s ease-in-out 0s infinite both;
+  }
+
+  & .logo-stitch:nth-of-type(2) {
+    animation-delay: 0.3s;
+  }
+
+  & .logo-stitch:nth-of-type(3) {
+    animation-delay: 0.6s;
+  }
+
+  & .logo-stitch:nth-of-type(4) {
+    animation-delay: 0.9s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .logo-stitch {
+      animation: none;
+    }
+  }
+}
+
+/* The patch wobbles from its corner and the stitches twang, for something done. */
+@utility logo-tug {
+  & .logo-patch {
+    animation: amends-logo-pull 2.4s ease-in-out 0s infinite both;
+  }
+
+  & .logo-stitch {
+    animation: amends-logo-twang 2.4s ease-out 0s infinite both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .logo-patch,
+    & .logo-stitch {
+      animation: none;
+    }
+  }
+}
+
+/* The stitches light in turn while the patch breathes, a loader. */
+@utility logo-working {
+  & .logo-patch {
+    animation: amends-logo-nudge 1.2s ease-in-out 0s infinite both;
+  }
+
+  & .logo-stitch {
+    animation: amends-blink 1.2s linear 0s infinite both;
+  }
+
+  & .logo-stitch:nth-of-type(2) {
+    animation-delay: 0.3s;
+  }
+
+  & .logo-stitch:nth-of-type(3) {
+    animation-delay: 0.6s;
+  }
+
+  & .logo-stitch:nth-of-type(4) {
+    animation-delay: 0.9s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .logo-patch,
+    & .logo-stitch {
+      animation: none;
+    }
+  }
+}
+
+@keyframes amends-art-sew-in {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translateY(-12px) rotate(8deg);
+  }
+  22% {
+    opacity: 1;
+    transform: none;
+  }
+  27% {
+    transform: translateY(1.5px);
+  }
+  32%,
+  78% {
+    transform: none;
+    opacity: 1;
+  }
+  92%,
+  100% {
+    opacity: 0;
+    transform: translateY(-12px) rotate(8deg);
+  }
+}
+
+@keyframes amends-art-reach {
+  0%,
+  100% {
+    stroke-dashoffset: 46;
+  }
+  45%,
+  55% {
+    stroke-dashoffset: 22;
+  }
+}
+
+@keyframes amends-art-fill {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  45%,
+  55% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+}
+
+@keyframes amends-art-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes amends-art-swing {
+  0%,
+  100% {
+    transform: rotate(-15deg);
+  }
+  50% {
+    transform: rotate(-4deg);
+  }
+}
+
+@keyframes amends-art-fray {
+  0%,
+  100% {
+    transform: rotate(-9deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes amends-art-recoil-start {
+  0%,
+  60%,
+  100% {
+    transform: translateX(0);
+  }
+  12% {
+    transform: translateX(-3.5px);
+  }
+  30% {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes amends-art-recoil-end {
+  0%,
+  60%,
+  100% {
+    transform: translateX(0);
+  }
+  12% {
+    transform: translateX(3.5px);
+  }
+  30% {
+    transform: translateX(-1px);
+  }
+}
+
+@keyframes amends-art-scan {
+  0% {
+    transform: translateX(-10px);
+    opacity: 0;
+  }
+  18%,
+  82% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(10px);
+  }
+  100% {
+    transform: translateX(-10px);
+    opacity: 0;
+  }
+}
+
+@keyframes amends-art-pull {
+  0%,
+  55%,
+  100% {
+    transform: translate(0, 0);
+  }
+  22% {
+    transform: translate(4.5px, 4.5px);
+  }
+  34% {
+    transform: translate(3px, 3px);
+  }
+}
+
+@keyframes amends-art-taut {
+  0%,
+  55%,
+  100% {
+    transform: scaleX(1);
+  }
+  22% {
+    transform: scaleX(1.55);
+  }
+}
+
+/* A new piece sewn in beside empty outlines. */
+@utility art-sewing-in {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: amends-art-sew-in 3.2s cubic-bezier(0.3, 1.4, 0.5, 1) 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* A thread reaching for an empty outline. */
+@utility art-reaching {
+  stroke-linecap: square;
+  stroke-dasharray: 46;
+  animation: amends-art-reach 2.8s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* An outline filling in. */
+@utility art-filling {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: amends-art-fill 2.8s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* A stitch blinking on a seam. */
+@utility art-caret {
+  stroke-linecap: square;
+  animation: amends-blink 1.5s linear 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The mark breathing. */
+@utility art-breathing {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: amends-art-breathe 3.6s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The patch swinging loose from its corner. Still, it rests partway, so the break still reads. */
+@utility art-swinging {
+  transform-box: fill-box;
+  transform-origin: 0 0;
+  animation: amends-art-swing 2.6s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: rotate(-10deg);
+  }
+}
+
+/* A stitch fraying from its end. Still, it rests partway, as the patch does. */
+@utility art-fraying {
+  transform-box: fill-box;
+  transform-origin: 0 50%;
+  animation: amends-art-fray 2.6s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: rotate(-9deg);
+  }
+}
+
+@utility art-fraying-late {
+  transform-box: fill-box;
+  transform-origin: 0 50%;
+  animation: amends-art-fray 2.6s ease-in-out 0.15s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: rotate(7deg);
+  }
+}
+
+/* The two halves of a thread snapping back from the break. */
+@utility art-recoiling-start {
+  transform-box: fill-box;
+  transform-origin: center;
+  stroke-linecap: square;
+  animation: amends-art-recoil-start 2.2s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility art-recoiling-end {
+  transform-box: fill-box;
+  transform-origin: center;
+  stroke-linecap: square;
+  animation: amends-art-recoil-end 2.2s ease-in-out 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* A scan across an empty hole. */
+@utility art-scanning {
+  transform-box: fill-box;
+  transform-origin: center;
+  stroke-linecap: square;
+  animation: amends-art-scan 2.6s linear 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The patch straining at its stitches, which draw taut. */
+@utility art-pulling {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: amends-art-pull 2.4s cubic-bezier(0.3, 1.5, 0.5, 1) 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility art-tautening {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: amends-art-taut 2.4s cubic-bezier(0.3, 1.5, 0.5, 1) 0s infinite both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes amends-loading-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* A placeholder row that is waiting for what it stands for, quiet and still when the reader prefers less. */
+@utility loading-pulse {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: amends-loading-pulse 1.6s ease-in-out infinite;
+  }
+}

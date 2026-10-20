@@ -1,7 +1,7 @@
 /**
  * What a directory screen lists: a label over each group, with how many it holds, a line that says what a
  * list holds, the labels of a table's columns, a row for each thing in it, to open it or to answer it with a
- * button, and a quiet line after a list.
+ * button, a quiet line after a list, and the placeholder rows that stand in for a list while it loads.
  */
 
 import * as Button from "@foldkit/ui/button"
@@ -62,6 +62,18 @@ const rowAction = "flex-none px-3 text-control font-medium whitespace-nowrap tex
 
 const rowActionAmongCells = `w-24 text-end max-desktop:w-20 max-tablet:hidden ${rowAction}`
 
+const placeholderRow = "loading-pulse"
+
+const placeholderMarks = { sm: "size-6", md: "size-8", lg: "size-10" }
+
+const placeholderLines = "flex min-w-0 flex-1 flex-col gap-2.5"
+
+const placeholderLine = "h-3 w-[min(16rem,60%)] bg-subtle"
+
+const placeholderShortLine = "h-3 w-[min(9rem,35%)] bg-subtle"
+
+const hiddenStatus = "sr-only"
+
 const cellColumn = "flex min-w-0 flex-col gap-1"
 
 const cellValue = "flex min-w-0 items-center gap-1.5 text-control text-ink"
@@ -120,6 +132,43 @@ export const summary = <Message, Requirements>(
  */
 export const footnote = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, text: string): Html =>
   h.p([h.Class(footnoteLine)], [text])
+
+/**
+ * What a list shows while it is read for the first time: `count` rows (three unless given) in the shape of a
+ * `row` of the same `markSize`, a square of `subtle` where the mark goes and two bars where the title and the
+ * meta go, quiet and slowly dimming and brightening, and still when the reader prefers less motion. The rows are
+ * hidden from assistive technology; the `label`, such as "Loading agents…", is a live region, a `status`, that
+ * only it can read.
+ */
+export const loadingRows = <Message, Requirements>(
+  h: HtmlBuilder<Message, Requirements>,
+  config: Readonly<{ label: string; count?: number; markSize?: RowMarkSize }>
+): Html => {
+  const markSize = config.markSize ?? "lg"
+
+  return h.div(
+    [],
+    [
+      h.p([h.Role("status"), h.Class(hiddenStatus)], [config.label]),
+      h.ul(
+        [h.AriaHidden(true)],
+        Array.from({ length: config.count ?? 3 }, (_, index) =>
+          h.keyed("li")(
+            `${index}`,
+            [h.Class(`${rowShape} ${rowHeights[markSize]} ${placeholderRow}`)],
+            [
+              h.span([h.Class(`flex-none bg-subtle ${placeholderMarks[markSize]}`)]),
+              h.span(
+                [h.Class(placeholderLines)],
+                [h.span([h.Class(placeholderLine)]), h.span([h.Class(placeholderShortLine)])]
+              )
+            ]
+          )
+        )
+      )
+    ]
+  )
+}
 
 /**
  * The labels of a table's columns over its `row`s, at the size and in the case of a quiet caption, over a dashed

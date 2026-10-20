@@ -6,12 +6,16 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, icon } from "./icon.ts"
+import { logo } from "./logo.ts"
 
-const railColumn = "flex w-13 flex-none flex-col items-center pt-2.5 pb-3.25"
+const railColumn =
+  "flex w-13 flex-none flex-col items-center pt-2.5 pb-3.25 [--amends-status-knockout:var(--amends-canvas)]"
 
 const railTarget = "relative grid size-10 flex-none place-items-center p-0 max-desktop:size-11"
 
-const railBrand = `${railTarget} cursor-pointer bg-transparent text-title font-medium text-ink focus-ring`
+const railMark = `${railTarget} text-ink`
+
+const railBrand = `${railMark} cursor-pointer bg-transparent focus-ring`
 
 const railSeam = "mt-2.25 mb-3 h-px w-6 flex-none bg-divider"
 
@@ -35,8 +39,7 @@ export type RailItem<Message> = Readonly<{
 }>
 
 export type RailBrand<Message> = Readonly<{
-  /** The mark's letter. */
-  letter: string
+  /** What the mark is called, such as "Amends home" for the button that goes there. */
   label: string
   /** The mark is a button when it has one. */
   onClick?: Message
@@ -72,12 +75,12 @@ const renderDestination = <Message, Requirements>(h: HtmlBuilder<Message, Requir
 
 const renderBrand = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>, brand: RailBrand<Message>) =>
   brand.onClick === undefined
-    ? h.span([h.Role("img"), h.AriaLabel(brand.label), h.Class(railBrand)], [brand.letter])
+    ? h.span([h.Class(railMark)], [logo(h, { label: brand.label })])
     : Button.view(
         {
           onClick: brand.onClick,
           toView: (attributes) =>
-            h.button([...attributes.button, h.AriaLabel(brand.label), h.Class(railBrand)], [brand.letter])
+            h.button([...attributes.button, h.AriaLabel(brand.label), h.Class(railBrand)], [logo(h)])
         },
         h
       )
@@ -101,11 +104,12 @@ const renderAccount = <Message, Requirements>(h: HtmlBuilder<Message, Requiremen
   )
 
 /**
- * The column of destinations, a `nav` named Destinations: the `brand` mark with a short line under it,
+ * The column of destinations, a `nav` named Destinations: the `brand`, the logo with a short line under it,
  * the `items`, then the `search` when there is one, and at the bottom the `footer` items and the optional
  * `account` mark. The current item is `aria-current="true"`, filled, with a 2px bar at the rail's left edge.
  * The search is an item like the others in look and spacing, a magnifier named by its `label`, and is never
- * current. A brand with no `onClick` is a mark and no button.
+ * current. A brand with an `onClick` is a button named by its `label`, whose logo lifts its patch when hovered;
+ * with none it is the logo as an image of that name. The logo is cut out of the canvas the rail lies on.
  */
 export const rail = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,

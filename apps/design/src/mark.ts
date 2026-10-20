@@ -7,6 +7,7 @@
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { type IconName, type IconSize, icon } from "./icon.ts"
+import { logo } from "./logo.ts"
 
 const markBase = "relative grid flex-none place-items-center font-medium uppercase"
 
@@ -123,11 +124,12 @@ export const statusMark = <Message, Requirements>(h: HtmlBuilder<Message, Requir
   )
 
 /**
- * The logo's mark, which a row shows at its end while the thing it stands for is at work. It takes the color of
- * the text around it and is hidden from assistive technology, since the row says in words what it is doing.
+ * The logo in its working motion, 1rem, which a row shows at its end while the thing it stands for is at work. It
+ * takes the color of the text around it, is cut out of the row's own surface, and is hidden from assistive
+ * technology, since the row says in words what it is doing.
  */
 export const activityMark = <Message, Requirements>(h: HtmlBuilder<Message, Requirements>): Html =>
-  icon(h, "mark-agents", { size: "sm" })
+  logo(h, { size: "1rem", motion: "working" })
 
 /**
  * A button of the first three `marks`, as `xs` marks side by side in a bordered box, and "+4" after them for

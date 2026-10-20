@@ -5,6 +5,7 @@
 
 import * as Button from "@foldkit/ui/button"
 import type { Html, HtmlBuilder } from "foldkit/html"
+import { type LogoMotion, logo } from "./logo.ts"
 import { type MarkContent, type MarkSize, mark } from "./mark.ts"
 
 const detailGrid = "m-0 grid grid-cols-[minmax(5rem,auto)_1fr] items-baseline gap-x-4 gap-y-2"
@@ -16,11 +17,16 @@ const detailValue = "m-0 min-w-0 text-item wrap-break-word text-ink"
 const badgeBase = "inline-flex h-5 flex-none items-center border px-1.5 text-meta font-medium whitespace-nowrap"
 
 const badgeTones = {
-  neutral: "border-transparent bg-subtle text-ink-secondary",
-  success: "border-success-border bg-success-surface text-success-text",
-  caution: "border-caution-border bg-caution-surface text-caution-text",
-  danger: "border-danger-border bg-danger-surface text-danger-text"
+  neutral: "border-transparent bg-subtle text-ink-secondary [--amends-status-knockout:var(--amends-subtle)]",
+  success:
+    "border-success-border bg-success-surface text-success-text [--amends-status-knockout:var(--amends-success-surface)]",
+  caution:
+    "border-caution-border bg-caution-surface text-caution-text [--amends-status-knockout:var(--amends-caution-surface)]",
+  danger:
+    "border-danger-border bg-danger-surface text-danger-text [--amends-status-knockout:var(--amends-danger-surface)]"
 }
+
+const badgeWithLogo = "gap-1"
 
 const personRow = "flex min-w-0 items-center gap-3"
 
@@ -65,12 +71,22 @@ export const detailList = <Message, Requirements>(
 
 /**
  * A small mark of how something stands, 20px tall: `neutral` (the default) on `subtle`, and `success`,
- * `caution`, and `danger` on their own surfaces with a border.
+ * `caution`, and `danger` on their own surfaces with a border. With a `motion` the logo moves before the
+ * label, 0.875rem, cut out of the badge's own surface, for what is under way: `thread` while it waits, `working`
+ * while it runs, `tug` while it stops. The logo is hidden from assistive technology, since the label says it.
  */
 export const badge = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ label: string; tone?: BadgeTone }>
-): Html => h.span([h.Class(`${badgeBase} ${badgeTones[config.tone ?? "neutral"]}`)], [config.label])
+  config: Readonly<{ label: string; tone?: BadgeTone; motion?: LogoMotion }>
+): Html =>
+  h.span(
+    [
+      h.Class(
+        `${badgeBase} ${badgeTones[config.tone ?? "neutral"]}${config.motion === undefined ? "" : ` ${badgeWithLogo}`}`
+      )
+    ],
+    config.motion === undefined ? [config.label] : [logo(h, { size: "0.875rem", motion: config.motion }), config.label]
+  )
 
 /**
  * One person or agent, alone and not in a list: their `mark`, 40px unless `markSize` says otherwise, beside their

@@ -4,14 +4,17 @@ import type { Update } from "foldkit"
 import type { Html, HtmlBuilder } from "foldkit/html"
 import { defineMessageUnion } from "foldkit/message"
 import {
+  all,
   change,
   click,
   expect,
+  expectAll,
   expectHandled,
   expectIgnored,
   given,
   keydown,
   label,
+  nth,
   role,
   scene,
   selector,
@@ -27,6 +30,7 @@ import {
   buttonRow,
   type Choice,
   choiceSelect,
+  codeInput,
   column,
   field,
   fieldGrid,
@@ -34,6 +38,7 @@ import {
   iconButton,
   iconSubmit,
   link,
+  loadingLine,
   notice,
   noticeBox,
   sending,
@@ -48,6 +53,8 @@ const Message = defineMessageUnion({
   SubmittedForm: {},
   TypedEmail: { value: Schema.String },
   TypedNotes: { value: Schema.String },
+  TypedCode: { value: Schema.String },
+  CompletedCode: { value: Schema.String },
   ToggledNotifications: { isOn: Schema.Boolean },
   ChangedPlan: { plan: Schema.String }
 })
@@ -59,6 +66,8 @@ type Model = Readonly<{
   submissions: number
   email: string
   notes: string
+  code: string
+  completions: number
   isNotificationsOn: boolean
   plan: string
 }>
@@ -69,6 +78,8 @@ const initial: Model = {
   submissions: 0,
   email: "",
   notes: "",
+  code: "",
+  completions: 0,
   isNotificationsOn: false,
   plan: "free"
 }
@@ -80,6 +91,10 @@ const update = (model: Model, message: Message) =>
     SubmittedForm: () => ({ model: modifyFields(model, { submissions: (submissions) => submissions + 1 }) }),
     TypedEmail: ({ value }) => ({ model: modifyFields(model, { email: () => value }) }),
     TypedNotes: ({ value }) => ({ model: modifyFields(model, { notes: () => value }) }),
+    TypedCode: ({ value }) => ({ model: modifyFields(model, { code: () => value }) }),
+    CompletedCode: ({ value }) => ({
+      model: modifyFields(model, { code: () => value, completions: (completions) => completions + 1 })
+    }),
     ToggledNotifications: ({ isOn }) => ({ model: modifyFields(model, { isNotificationsOn: () => isOn }) }),
     ChangedPlan: ({ plan }) => ({ model: modifyFields(model, { plan: () => plan }) })
   })
@@ -1058,6 +1073,181 @@ describe("iconButton", () => {
       given(initial),
       expect(role("button", { name: "Notifications" })).toExist(),
       expect(selector("[aria-pressed]")).toBeAbsent()
+    )
+  })
+})
+
+describe("codeInput", () => {
+  type CodeFieldOptions = Readonly<{
+    isComplete?: boolean
+    error?: string
+    hint?: string
+    isDisabled?: boolean
+    isAutofocus?: boolean
+  }>
+
+  const codeField = (model: Model, h: HtmlBuilder<Message>, options: CodeFieldOptions = {}): Html =>
+    codeInput(
+      h,
+      {
+        id: "code",
+        label: "Verification code",
+        value: model.code,
+        onInput: (value) => Message.TypedCode({ value }),
+        ...(options.isComplete === true ? { onComplete: (value: string) => Message.CompletedCode({ value }) } : {}),
+        ...(options.hint === undefined ? {} : { hint: options.hint }),
+        ...(options.isDisabled === true ? { isDisabled: true } : {}),
+        isAutofocus: options.isAutofocus ?? false
+      },
+      options.error === undefined ? Option.none() : Option.some(options.error)
+    )
+
+  const codeView = (options: CodeFieldOptions = {}) =>
+    viewOf((model, h) => [codeField(model, h, options), h.p([h.Role("note")], [`${model.completions} completed`])])
+
+  const cells = all.selector('span[aria-hidden="true"]')
+
+  it("is one native input found by its label, for a numeric one-time code", () => {
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      expect(label("Verification code")).toHaveAttr("type", "text"),
+      expect(label("Verification code")).toHaveAttr("inputmode", "numeric"),
+      expect(label("Verification code")).toHaveAttr("autocomplete", "one-time-code"),
+      expect(label("Verification code")).toHaveAttr("id", "code"),
+      expect(label("Verification code")).not.toHaveAttr("aria-invalid"),
+      expectAll(all.selector("input")).toHaveCount(1)
+    )
+  })
+
+  it("is focused as it shows unless it says otherwise", () => {
+    scene({ update, view: codeView() }, given(initial), expect(label("Verification code")).not.toHaveAttr("autofocus"))
+    scene(
+      { update, view: codeView({ isAutofocus: true }) },
+      given(initial),
+      expect(label("Verification code")).toHaveAttr("autofocus")
+    )
+  })
+
+  it("draws six cells, hidden from assistive technology, that show the digits typed", () => {
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      expectAll(cells).toHaveCount(6),
+      type(label("Verification code"), "482"),
+      expect(label("Verification code")).toHaveValue("482"),
+      expect(nth(cells, 0)).toHaveText("4"),
+      expect(nth(cells, 1)).toHaveText("8"),
+      expect(nth(cells, 2)).toHaveText("2"),
+      expect(nth(cells, 3)).toHaveText(""),
+      expect(nth(cells, 5)).toHaveText("")
+    )
+  })
+
+  it("keeps digits only, whatever is typed or pasted", () => {
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      type(label("Verification code"), "4a8 2-"),
+      expect(label("Verification code")).toHaveValue("482"),
+      expect(nth(cells, 2)).toHaveText("2"),
+      expect(nth(cells, 3)).toHaveText("")
+    )
+  })
+
+  it("keeps at most six digits", () => {
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      type(label("Verification code"), "48 29 16 77"),
+      expect(label("Verification code")).toHaveValue("482916")
+    )
+  })
+
+  it("sends onComplete with the code in place of onInput when the sixth digit is in", () => {
+    scene(
+      { update, view: codeView({ isComplete: true }) },
+      given(initial),
+      type(label("Verification code"), "48291"),
+      expect(label("Verification code")).toHaveValue("48291"),
+      expect(role("note")).toHaveText("0 completed"),
+      type(label("Verification code"), "482 916"),
+      expect(label("Verification code")).toHaveValue("482916"),
+      expect(role("note")).toHaveText("1 completed")
+    )
+  })
+
+  it("sends onInput for the sixth digit when it has no onComplete", () => {
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      type(label("Verification code"), "482916"),
+      expect(label("Verification code")).toHaveValue("482916"),
+      expect(role("note")).toHaveText("0 completed")
+    )
+  })
+
+  it("outlines the cell the next digit goes into, the last one when all six are in", () => {
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      expectAll(all.selector("span[data-next]")).toHaveCount(1),
+      expect(nth(cells, 0)).toHaveAttr("data-next"),
+      type(label("Verification code"), "482"),
+      expect(nth(cells, 3)).toHaveAttr("data-next"),
+      expect(nth(cells, 0)).not.toHaveAttr("data-next"),
+      type(label("Verification code"), "482916"),
+      expectAll(all.selector("span[data-next]")).toHaveCount(1),
+      expect(nth(cells, 5)).toHaveAttr("data-next")
+    )
+  })
+
+  it("outlines every cell in danger and describes the input with the reason it was refused", () => {
+    scene(
+      { update, view: codeView({ error: "That code doesn't match. Check it and try again." }) },
+      given(initial),
+      expect(selector("[data-invalid]")).toExist(),
+      expect(label("Verification code")).toHaveAttr("aria-invalid", "true"),
+      expect(label("Verification code")).toHaveAttr("aria-describedby", "code-description"),
+      expect(role("alert")).toHaveText("That code doesn't match. Check it and try again.")
+    )
+    scene(
+      { update, view: codeView() },
+      given(initial),
+      expect(selector("[data-invalid]")).toBeAbsent(),
+      expect(role("alert")).toBeAbsent()
+    )
+  })
+
+  it("shows a hint under the cells, which describes the input", () => {
+    scene(
+      { update, view: codeView({ hint: "Use your most recent code." }) },
+      given(initial),
+      expect(text("Use your most recent code.")).toExist(),
+      expect(label("Verification code")).toHaveAttr("aria-describedby", "code-description"),
+      expect(within(selector("#code-description"), text("Use your most recent code."))).toExist()
+    )
+  })
+
+  it("shows its digits and takes none while it is disabled", () => {
+    scene(
+      { update, view: codeView({ isDisabled: true }) },
+      given({ ...initial, code: "482916" }),
+      expect(label("Verification code")).toBeDisabled(),
+      expect(selector("[data-disabled]")).toExist(),
+      expect(nth(cells, 0)).toHaveText("4"),
+      expect(nth(cells, 5)).toHaveText("6")
+    )
+  })
+})
+
+describe("loadingLine", () => {
+  it("says what is waited for, in a live region", () => {
+    scene(
+      { update, view: (_: Model, h: HtmlBuilder<Message>) => h.div([], [loadingLine(h, "Loading your inbox…")]) },
+      given(initial),
+      expect(role("status")).toHaveText("Loading your inbox…"),
+      expect(selector('p[role="status"]')).toExist()
     )
   })
 })

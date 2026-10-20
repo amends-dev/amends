@@ -8,7 +8,9 @@ import type { Html, HtmlBuilder } from "foldkit/html"
 import { hint, iconButton } from "./control.ts"
 import { form } from "./form.ts"
 import { type IconName, icon } from "./icon.ts"
+import { logo } from "./logo.ts"
 import { type MarkContent, type MarkStatus, mark } from "./mark.ts"
+import { type StateArtKind, stateArt } from "./stateArt.ts"
 
 const paneRoot = "flex min-h-0 min-w-0 flex-1 flex-col"
 
@@ -62,7 +64,7 @@ const tabCount =
 
 const emptyColumn = "mx-auto flex max-w-80 flex-col items-center gap-1 pt-16 text-center"
 
-const emptyIcon = "mb-2 grid size-10 flex-none place-items-center bg-subtle text-ink-secondary"
+const emptyArt = "mb-3 flex flex-none text-ink"
 
 const emptyTitle = "m-0 text-item font-medium text-ink"
 
@@ -241,20 +243,25 @@ export const paneTabs = <Message, Requirements>(
 
 /**
  * What a pane's body says when it has nothing to list, or a centered screen when it has nothing to show: 64px
- * under the header, centered, a 40px square on `subtle` holding the `icon`, then the `title` as an `h2`, under the
- * pane's `h1`, and the `copy` under it, a line of what to do or why, in quiet text, and the `action` under that,
- * such as a `button` that does it, 12px below. The text is centered and 20rem wide at most. A screen whose
- * message is all it has, such as one that says the host cannot be reached, makes the title its `h1` with `level`
- * 1; under a heading, as a list that is empty does, it stays an `h2`.
+ * under the header, centered, the `art` that draws the state, then the `title` as an `h2`, under the pane's `h1`,
+ * and the `copy` under it, a line of what to do or why, in quiet text, and the `action` under that, such as a
+ * `button` that does it, 12px below. The text is centered and 20rem wide at most. The `art` is one of the
+ * `stateArt` kinds, or `working`, the logo at 3.5rem in its working motion, for what is waited on: the column is
+ * then a live region, a `status`, so that what it says is announced. A screen whose message is all it has, such as
+ * one that says the host cannot be reached, makes the title its `h1` with `level` 1; under a heading, as a list
+ * that is empty does, it stays an `h2`.
  */
 export const paneEmpty = <Message, Requirements>(
   h: HtmlBuilder<Message, Requirements>,
-  config: Readonly<{ icon: IconName; title: string; copy?: string; action?: Html; level?: 1 | 2 }>
+  config: Readonly<{ art: StateArtKind | "working"; title: string; copy?: string; action?: Html; level?: 1 | 2 }>
 ): Html =>
   h.div(
-    [h.Class(emptyColumn)],
+    [...(config.art === "working" ? [h.Role("status")] : []), h.Class(emptyColumn)],
     [
-      h.span([h.Class(emptyIcon)], [icon(h, config.icon)]),
+      h.span(
+        [h.Class(emptyArt)],
+        [config.art === "working" ? logo(h, { size: "3.5rem", motion: "working" }) : stateArt(h, config.art)]
+      ),
       config.level === 1 ? h.h1([h.Class(emptyTitle)], [config.title]) : h.h2([h.Class(emptyTitle)], [config.title]),
       config.copy === undefined ? h.empty : hint(h, config.copy),
       config.action === undefined ? h.empty : h.div([h.Class(emptyAction)], [config.action])
